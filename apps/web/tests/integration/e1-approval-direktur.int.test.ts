@@ -252,6 +252,7 @@ describe('AC-8: requests submitted before E1 finish on their old snapshot', () =
 })
 
 describe('APK needs (E3 / AC-10 server side)', () => {
+  // ADR 0028: intercompanyPayment = Finance / PM / Direktur (stored roles)
   it('/me capabilities: approval inbox for Direktur, Finance and (ADR 0021) the PM', async () => {
     // FR1 field-report capabilities are false while DRMS has fieldReportsEnabled off (default)
     const noField = { serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false, dailyReportCreate: false }
@@ -261,9 +262,9 @@ describe('APK needs (E3 / AC-10 server side)', () => {
       const { serviceReportCreate: _s, unitTimesheetCreate: _u, aftersalesActivityCreate: _a, dailyReportCreate: _d, ...rest } = c
       return rest
     }
-    expect(await cap(w.users.owner)).toEqual({ approvalInbox: true, teamMonitor: false, progressReportCreate: true })
-    expect(await cap(w.users.finance)).toEqual({ approvalInbox: true, teamMonitor: false, progressReportCreate: false })
-    expect(await cap(w.users.pm)).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true })
-    expect(await cap(w.users.staffA)).toEqual({ approvalInbox: false, teamMonitor: false, progressReportCreate: false })
+    expect(await cap(w.users.owner)).toEqual({ approvalInbox: true, teamMonitor: false, progressReportCreate: true, intercompanyPayment: true })
+    expect(await cap(w.users.finance)).toEqual({ approvalInbox: true, teamMonitor: false, progressReportCreate: false, intercompanyPayment: true })
+    expect(await cap(w.users.pm)).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, intercompanyPayment: true })
+    expect(await cap(w.users.staffA)).toEqual({ approvalInbox: false, teamMonitor: false, progressReportCreate: false, intercompanyPayment: false })
   })
 })

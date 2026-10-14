@@ -38,6 +38,12 @@ abstract final class MasterTypes {
   static const vendors = 'vendors';
   static const vendorBankAccounts = 'vendor-bank-accounts';
 
+  /// ADR 0028 "Pembayaran antar-PT": the payee directory of the PT (other PTs of the group with a designated receiving
+  /// account; `id` = the receiving PT, masked account) — for offline drafts; online the editor reads
+  /// `GET /intercompany/payees`. Only Finance / PM / Direktur of the PT get rows. Needs a server with ADR 0028 (an
+  /// older one answers 400 for the type) — the APK with this change is released after that server.
+  static const intercompanyPayees = 'intercompany-payees';
+
   static const forExpense = [
     projects,
     costCenters,
@@ -50,6 +56,7 @@ abstract final class MasterTypes {
     urgencyLevels,
     vendors,
     vendorBankAccounts,
+    intercompanyPayees,
   ];
 
   /// Everything the APK caches (expense pickers + E4 stages + E6 team assignments for on-behalf offline + FR1
@@ -84,6 +91,7 @@ MasterItem masterFromJson(String type, Map<String, dynamic> j, {Map<int, String>
     MasterTypes.projectStages => s('name'),
     MasterTypes.urgencyLevels => s('name'),
     MasterTypes.clients => s('name'),
+    MasterTypes.intercompanyPayees => [s('shortCode'), s('name')].where((e) => e.isNotEmpty).join(' — '),
     MasterTypes.teamAssignments => '#$id',
     MasterTypes.employees => s('nickname').isNotEmpty ? '${s('name')} (${s('nickname')})' : s('name'),
     _ => s('code').isNotEmpty ? '${s('code')} — ${s('name')}' : s('name'),

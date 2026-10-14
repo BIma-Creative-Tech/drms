@@ -162,6 +162,10 @@ const doneStepTitle = 'Selesai';
 
 /// ADR 0027: note of the final step of a vendor payment (web `VENDOR_END_NOTE`).
 const vendorDoneNote = 'pembayaran vendor selesai saat ditransfer — invoice = bukti, tanpa LPJ';
+
+/// ADR 0028: note of the final step of a PT grup payment (web `INTERCOMPANY_END_NOTE`).
+const intercompanyDoneNote =
+    'pembayaran antar-PT selesai saat ditransfer — kas masuk di PT penerima tercatat otomatis, tanpa LPJ';
 const rejectedStepTitle = 'Ditolak';
 const cancelledStepTitle = 'Dibatalkan';
 
@@ -184,8 +188,8 @@ List<TimelineStep> buildRequestStepper(ExpenseDetail d) {
   if (d.type == RequestType.reimburse) {
     final check = _receiptCheckStep(d, ended: ended, turn: turn);
     steps.insert(steps.indexWhere((s) => s.title == transferStepTitle), check);
-  } else if (!d.isVendor) {
-    // ADR 0027: a vendor payment has no LPJ — the transfer completes it.
+  } else if (!d.isDirectPayment) {
+    // ADR 0027 / 0028: a vendor / PT grup payment has no LPJ — the transfer completes it.
     steps.add(_lpjStep(d, ended: ended, turn: turn));
   }
   steps.add(_finalStep(d, rejected: rejected, cancelled: cancelled, turn: turn));
@@ -250,7 +254,11 @@ TimelineStep _finalStep(ExpenseDetail d, {required bool rejected, required bool 
       title: doneStepTitle,
       state: TurnState.done,
       at: d.settlement?.settledAt,
-      note: d.isVendor ? vendorDoneNote : null,
+      note: d.isVendor
+          ? vendorDoneNote
+          : d.isPtGrup
+          ? intercompanyDoneNote
+          : null,
     );
   }
   // A transferred Reimburse waits for the requester / Finance to confirm completion.
@@ -267,11 +275,14 @@ TimelineStep transferStep(ExpenseDetail d, {required bool submitted, required bo
   final voided = d.transfers.where((t) => main(t) && t.isVoid).toList();
   final voidNote = voided.isEmpty ? null : 'void: ${voided.map((t) => t.docNo ?? '-').join(', ')}';
   if (posted.isNotEmpty) {
+    // ADR 0028: the transfer of a PT grup payment also posted the receiving PT's Kas Masuk
+    final km = d.intercompany;
+    final kmNote = km == null || km.voided ? null : intercompanyEntryNote(km);
     return TimelineStep(
       title: transferStepTitle,
       state: TurnState.done,
       at: posted.last.transferDate,
-      note: [posted.map((t) => t.docNo ?? '-').join(', '), ?voidNote].join(' · '),
+      note: [posted.map((t) => t.docNo ?? '-').join(', '), ?kmNote, ?voidNote].join(' · '),
     );
   }
   final queue =
@@ -293,6 +304,12 @@ TimelineStep transferStep(ExpenseDetail d, {required bool submitted, required bo
     note: note,
   );
 }
+
+/// ADR 0028: "Kas masuk di PT LAS: KM/LAS/2610/0003" (web summary row; "(dibatalkan — jurnal balik tercatat)" after a
+/// void of the transfer).
+String intercompanyEntryNote(RequestIntercompany km) =>
+    'Kas masuk di PT ${km.companyCode ?? 'penerima'}: ${km.targetEntryNo}'
+    '${km.voided ? ' (dibatalkan — jurnal balik tercatat)' : ''}';
 
 /// ADR 0013 G1-2 wording (web PDF/Riwayat use the same text).
 const skippedNote = '(tidak berlaku — pemohon)';
@@ -355,6 +372,8 @@ String currentTurn(ExpenseDetail d) => switch (d.status) {
   RequestStatus.approved =>
     d.isVendor
         ? 'Finance — transfer ke rekening vendor'
+        : d.isPtGrup
+        ? 'Finance — transfer ke rekening penerimaan antar-PT'
         : d.type == RequestType.reimburse
         ? 'Finance — verifikasi nota'
         : 'Finance — antri transfer',

@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../../../core/connectivity/connectivity_controller.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../masters/domain/master_item.dart';
 import '../domain/draft.dart';
 import '../domain/expense_request.dart';
+import '../domain/intercompany.dart';
 
 final openDraftsProvider = StreamProvider<List<DraftRequest>>((ref) {
   final sub = ref.watch(currentSubProvider);
@@ -29,6 +31,24 @@ final mastersForCompanyProvider = FutureProvider.family<Map<String, List<MasterI
   if (sub == null) return const {};
   ref.watch(mastersRevisionProvider);
   return ref.watch(mastersRepositoryProvider).cached(sub, companyId: companyId);
+});
+
+/// ADR 0028: payee directory of a PT grup payment of PT [companyId] — online `GET /intercompany/payees` (fresh), offline
+/// (or when the call fails) the cached masters `intercompany-payees` of that PT. Never the paying PT itself.
+final intercompanyPayeesProvider = FutureProvider.autoDispose.family<List<IntercompanyPayee>, int?>((
+  ref,
+  companyId,
+) async {
+  final masters = await ref.watch(mastersForCompanyProvider(companyId).future);
+  final cached = [
+    for (final m in masters[MasterTypes.intercompanyPayees] ?? const <MasterItem>[]) IntercompanyPayee.fromMaster(m),
+  ];
+  if (companyId == null || !ref.watch(connectivityProvider)) return payeesFor(cached, companyId);
+  try {
+    return payeesFor(await ref.watch(expenseApiProvider).intercompanyPayees(companyId), companyId);
+  } on Object {
+    return payeesFor(cached, companyId);
+  }
 });
 
 final requestDetailProvider = FutureProvider.autoDispose.family<ExpenseDetail, int>(

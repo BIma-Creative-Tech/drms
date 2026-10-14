@@ -3885,4 +3885,90 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get vendorCostCenterHint => 'Tanpa project: pilih pusat biaya (mis. tagihan kantor).';
+
+  @override
+  String get payeePtGrup => 'PT grup';
+
+  @override
+  String get fieldPayeeCompany => 'PT penerima';
+
+  @override
+  String get payeeCompanyPickHint => 'Pilih PT penerima';
+
+  @override
+  String get intercompanyPaymentHint =>
+      'Pembayaran antar-PT: Finance mentransfer ke rekening penerimaan antar-PT milik PT penerima; kas masuk di PT itu tercatat otomatis. Dokumen PT penerima (tagihan / memo) = bukti — tanpa nota per baris dan tanpa LPJ.';
+
+  @override
+  String get intercompanyPayeesNone =>
+      'Belum ada PT lain yang menetapkan rekening penerimaan antar-PT — minta Finance / Admin PT penerima menandainya.';
+
+  @override
+  String get intercompanyPayeeGone =>
+      'PT ini tidak ada lagi di daftar penerima antar-PT (mis. rekening penerimaannya dicabut). Pilih ulang PT penerima.';
+
+  @override
+  String get intercompanyReceivingAccount => 'Rekening penerimaan antar-PT';
+
+  @override
+  String get fieldDocumentNo => 'Nomor dokumen';
+
+  @override
+  String get fieldDocumentDate => 'Tanggal dokumen';
+
+  @override
+  String get fieldDocumentFile => 'Foto dokumen';
+
+  @override
+  String get documentNoHelp => 'Tagihan / memo dari PT penerima';
+
+  @override
+  String get documentAttached => 'Foto dokumen terlampir';
+
+  @override
+  String get documentOnServer => 'Dokumen tersimpan di server';
+
+  @override
+  String get documentMissing => 'Belum ada foto dokumen';
+
+  @override
+  String get sectionIntercompanyPayment => 'Pembayaran antar-PT';
+
+  @override
+  String intercompanyEntryLabel(String pt) {
+    return 'Kas masuk di PT $pt';
+  }
+
+  @override
+  String intercompanyEntryVoided(String no) {
+    return '$no (dibatalkan — jurnal balik tercatat)';
+  }
+
+  @override
+  String intercompanyBadge(String pt) {
+    return 'Antar PT: $pt';
+  }
+
+  @override
+  String transferIntercompanyNote(String pt) {
+    return 'Antar PT: kas masuk di PT $pt tercatat otomatis dengan tanggal transfer ini.';
+  }
+
+  @override
+  String transferRecordedIntercompany(String trf, String km, String pt) {
+    return 'Transfer $trf tercatat. Kas masuk $km dibuat di PT $pt.';
+  }
+
+  @override
+  String kpiCashFlowAntarPt(String masuk, String keluar) {
+    return 'Termasuk Antar PT: masuk $masuk · keluar $keluar';
+  }
+
+  @override
+  String get kpiCashFlowWithoutAntarPt => 'Tanpa antar-PT';
+
+  @override
+  String kpiCashFlowAntarPtExcluded(String masuk, String keluar) {
+    return 'Tanpa antar-PT: masuk $masuk · keluar $keluar tidak dihitung';
+  }
 }

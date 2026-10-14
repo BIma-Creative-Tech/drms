@@ -271,6 +271,9 @@ Duration backoffFor(int attempt, {Random? random}) {
 /// After this many attempts an item is shown as "Gagal dikirim" with a manual retry.
 const maxSyncAttempts = 20;
 
+/// ADR 0028: sync error code of a PT grup draft whose receiving PT has no designated receiving account.
+const intercompanyNoAccountSyncCode = 'INTERCOMPANY_NO_ACCOUNT';
+
 /// Bahasa Indonesia text for rejection codes (ADR 0010 "Per-item rules").
 /// For attendance and progress items the server's own (Indonesian) message is preferred: the draft
 /// texts below speak about expense drafts.
@@ -292,7 +295,14 @@ String rejectionMessage(List<SyncError> errors, {String? type}) {
     final m = e.message;
     if (m != null && m.isNotEmpty && e.code != 'MOCK_LOCATION') return m;
   }
+  // ADR 0028: the receiving PT designated no receiving account — the server's field message names the PT
+  if (errors.any((x) => x.code == intercompanyNoAccountSyncCode)) {
+    final m = errors.where((x) => (x.field ?? '').endsWith('payee_company_id')).firstOrNull?.message;
+    return m != null && m.isNotEmpty ? m : 'PT penerima belum menetapkan rekening penerimaan antar-PT. Pilih PT lain.';
+  }
   final known = switch (e.code) {
+    // ADR 0027 / 0028: filer-role refusal of a vendor / PT grup payment — the server's sentence says who may file
+    'FORBIDDEN' when (e.message?.startsWith('Pembayaran ') ?? false) => e.message,
     'NOT_EDITABLE' => 'Draft sudah tidak bisa diubah (sudah diajukan atau bukan milik Anda).',
     'MEDIA_MISSING' => 'Foto (nota/selfie) belum diterima server.',
     'MOCK_LOCATION' => 'Lokasi palsu (mock location) terdeteksi. Absensi ditolak.',
@@ -317,7 +327,8 @@ String rejectionMessage(List<SyncError> errors, {String? type}) {
 String mediaUploadPath(String localKind) => switch (localKind) {
   'selfie' => 'selfies',
   'progress' || 'field' => 'progress-photos',
-  // ADR 0027: the invoice of a vendor payment is a general attachment (photo; PDF from the web)
+  // ADR 0027 / 0028: the invoice of a vendor payment / document of a PT grup payment is a general attachment (photo;
+  // PDF from the web)
   'invoice' => 'attachments',
   _ => 'receipts',
 };

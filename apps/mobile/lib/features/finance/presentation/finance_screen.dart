@@ -297,6 +297,13 @@ class TransferQueueCard extends ConsumerWidget {
                   // ADR 0024: reached the queue without approval (web badge "Tanpa persetujuan (Direktur)")
                   if (it.noApproval)
                     _Pill(key: Key('tq-${it.id}-no-approval'), text: t.noApprovalBadge, color: context.pk.warnText),
+                  // ADR 0028: a PT grup payment (web badge "Antar PT: <PT>") — the transfer also posts its Kas Masuk
+                  if (it.payeeCompanyCode case final code?)
+                    _Pill(
+                      key: Key('tq-${it.id}-intercompany'),
+                      text: t.intercompanyBadge(code),
+                      color: theme.colorScheme.primary,
+                    ),
                 ],
               ),
               if (canTransfer) ...[

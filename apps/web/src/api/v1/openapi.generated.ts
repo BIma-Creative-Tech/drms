@@ -133,6 +133,10 @@ export const openapiDocument = {
               "dailyReportCreate": {
                 "type": "boolean",
                 "description": "P3: same rule → Laporan harian on projects of kind konstruksi."
+              },
+              "intercompanyPayment": {
+                "type": "boolean",
+                "description": "ADR 0028: may file a \"PT grup\" payment (Pembayaran antar-PT) — holds Finance, PM or Direktur (pk-owner) AS STORED (the server's filer rule). Unlike the effective `roles`, false for an Owner (pk-principal) without one of those roles. Absent on servers before this field (APK fallback: the payee directory)."
               }
             },
             "required": [
@@ -142,7 +146,8 @@ export const openapiDocument = {
               "serviceReportCreate",
               "unitTimesheetCreate",
               "aftersalesActivityCreate",
-              "dailyReportCreate"
+              "dailyReportCreate",
+              "intercompanyPayment"
             ],
             "description": "DEPRECATED (MC3): derived from the top-level `roles` (union over the selected PTs). Use companies[].capabilities."
           },
@@ -556,6 +561,10 @@ export const openapiDocument = {
           "dailyReportCreate": {
             "type": "boolean",
             "description": "P3: same rule → Laporan harian on projects of kind konstruksi."
+          },
+          "intercompanyPayment": {
+            "type": "boolean",
+            "description": "ADR 0028: may file a \"PT grup\" payment (Pembayaran antar-PT) — holds Finance, PM or Direktur (pk-owner) AS STORED (the server's filer rule). Unlike the effective `roles`, false for an Owner (pk-principal) without one of those roles. Absent on servers before this field (APK fallback: the payee directory)."
           }
         },
         "required": [
@@ -565,7 +574,8 @@ export const openapiDocument = {
           "serviceReportCreate",
           "unitTimesheetCreate",
           "aftersalesActivityCreate",
-          "dailyReportCreate"
+          "dailyReportCreate",
+          "intercompanyPayment"
         ],
         "description": "UI hints for the APK (E1); the server guards stay authoritative."
       },
@@ -28351,6 +28361,99 @@ export const openapiDocument = {
                                   "string",
                                   "null"
                                 ]
+                              },
+                              "intercompany": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "direction": {
+                                    "type": "string",
+                                    "enum": [
+                                      "in",
+                                      "out"
+                                    ],
+                                    "description": "in = this entry is the Kas Masuk of the receiving PT; out = the transfer KK of the paying PT."
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "posted",
+                                      "void"
+                                    ],
+                                    "description": "Link status (void after the paying PT voided its transfer)."
+                                  },
+                                  "counterpartCompany": {
+                                    "type": [
+                                      "object",
+                                      "null"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": 0
+                                      },
+                                      "shortCode": {
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "shortCode",
+                                      "name"
+                                    ]
+                                  },
+                                  "sourceDocNo": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ],
+                                    "description": "Number of the paying PT's request (PB/…)."
+                                  },
+                                  "sourceDocId": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0
+                                  },
+                                  "transferDocNo": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ],
+                                    "description": "Number of the paying PT's transfer (TRF/…)."
+                                  },
+                                  "counterpartEntryNo": {
+                                    "type": "string",
+                                    "description": "The other leg: KM of the receiving PT (direction out) or KK of the paying PT (direction in)."
+                                  },
+                                  "counterpartEntryId": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0
+                                  },
+                                  "canOpenCounterpart": {
+                                    "type": "boolean",
+                                    "description": "The caller holds Finance / Direktur / Admin in the other PT (else show the numbers as plain text)."
+                                  },
+                                  "canOpenSourceDoc": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "direction",
+                                  "status",
+                                  "counterpartCompany",
+                                  "sourceDocNo",
+                                  "sourceDocId",
+                                  "transferDocNo",
+                                  "counterpartEntryNo",
+                                  "counterpartEntryId",
+                                  "canOpenCounterpart",
+                                  "canOpenSourceDoc"
+                                ],
+                                "description": "ADR 0028: the other leg of an intercompany payment, as on GET /cash-entries (reversal rows: of their original). Non-null also on the paying PT's KK, whose sourceType stays `transfer` — label it \"Antar PT\"; null for every other entry."
                               }
                             },
                             "required": [
@@ -28365,7 +28468,8 @@ export const openapiDocument = {
                               "account",
                               "label",
                               "requestId",
-                              "requestDocNo"
+                              "requestDocNo",
+                              "intercompany"
                             ]
                           }
                         },
@@ -29570,6 +29674,99 @@ export const openapiDocument = {
                                   "string",
                                   "null"
                                 ]
+                              },
+                              "intercompany": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "direction": {
+                                    "type": "string",
+                                    "enum": [
+                                      "in",
+                                      "out"
+                                    ],
+                                    "description": "in = this entry is the Kas Masuk of the receiving PT; out = the transfer KK of the paying PT."
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "posted",
+                                      "void"
+                                    ],
+                                    "description": "Link status (void after the paying PT voided its transfer)."
+                                  },
+                                  "counterpartCompany": {
+                                    "type": [
+                                      "object",
+                                      "null"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": 0
+                                      },
+                                      "shortCode": {
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "shortCode",
+                                      "name"
+                                    ]
+                                  },
+                                  "sourceDocNo": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ],
+                                    "description": "Number of the paying PT's request (PB/…)."
+                                  },
+                                  "sourceDocId": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0
+                                  },
+                                  "transferDocNo": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ],
+                                    "description": "Number of the paying PT's transfer (TRF/…)."
+                                  },
+                                  "counterpartEntryNo": {
+                                    "type": "string",
+                                    "description": "The other leg: KM of the receiving PT (direction out) or KK of the paying PT (direction in)."
+                                  },
+                                  "counterpartEntryId": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0
+                                  },
+                                  "canOpenCounterpart": {
+                                    "type": "boolean",
+                                    "description": "The caller holds Finance / Direktur / Admin in the other PT (else show the numbers as plain text)."
+                                  },
+                                  "canOpenSourceDoc": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "direction",
+                                  "status",
+                                  "counterpartCompany",
+                                  "sourceDocNo",
+                                  "sourceDocId",
+                                  "transferDocNo",
+                                  "counterpartEntryNo",
+                                  "counterpartEntryId",
+                                  "canOpenCounterpart",
+                                  "canOpenSourceDoc"
+                                ],
+                                "description": "ADR 0028: the other leg of an intercompany payment, as on GET /cash-entries (reversal rows: of their original). Non-null also on the paying PT's KK, whose sourceType stays `transfer` — label it \"Antar PT\"; null for every other entry."
                               }
                             },
                             "required": [
@@ -29584,7 +29781,8 @@ export const openapiDocument = {
                               "account",
                               "label",
                               "requestId",
-                              "requestDocNo"
+                              "requestDocNo",
+                              "intercompany"
                             ]
                           }
                         },

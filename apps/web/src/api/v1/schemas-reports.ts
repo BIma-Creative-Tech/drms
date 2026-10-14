@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { CashEntryIntercompany } from './schemas-flow'
+
 /**
  * F3 dashboards & reports (docs/proyekkas/f3/kpi-definitions.md, wireframes.md). Amounts are
  * integer Rupiah; business dates 'YYYY-MM-DD' (company TZ); periods 'YYYY-MM'.
@@ -119,6 +121,10 @@ const RecentCashEntry = z.object({
   label: z.string(),
   requestId: z.number().int().nullable(),
   requestDocNo: z.string().nullable(),
+  intercompany: CashEntryIntercompany.nullable().meta({
+    description:
+      'ADR 0028: the other leg of an intercompany payment, as on GET /cash-entries (reversal rows: of their original). Non-null also on the paying PT\'s KK, whose sourceType stays `transfer` — label it "Antar PT"; null for every other entry.',
+  }),
 })
 const TransferTopItem = z.object({
   id: z.number().int(),

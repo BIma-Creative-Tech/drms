@@ -203,7 +203,8 @@ describe('MC3 — GET /me companies[] + deprecated single-PT fields', () => {
     expect(me.legacyCompanyId).toBe(A)
     expect([...me.roles].sort()).toEqual(['pk-finance', 'pk-pm', 'pk-staff'])
     // FR1: field-report capabilities stay false while no selected PT has companies.fieldReportsEnabled
-    expect(me.capabilities).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false, dailyReportCreate: false })
+    // ADR 0028: intercompanyPayment over the selected PTs (PM in CS6, Finance in CS7 → may file)
+    expect(me.capabilities).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false, dailyReportCreate: false, intercompanyPayment: true })
     expect(me.employee.id).toBe(X.empTriA)
     expect(me.settings.shortCode).toBe('DRMS')
     // narrowed read selection: companies[] still lists every membership, `selected` + legacy follow the selection

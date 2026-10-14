@@ -50,6 +50,10 @@ export const Capabilities = z
     unitTimesheetCreate: z.boolean().meta({ description: 'FR1: same rule → unit timesheets on projects of kind kontrak_unit.' }),
     aftersalesActivityCreate: z.boolean().meta({ description: 'FR1: same rule → aftersales activities on projects of kind aftersales.' }),
     dailyReportCreate: z.boolean().meta({ description: 'P3: same rule → Laporan harian on projects of kind konstruksi.' }),
+    intercompanyPayment: z.boolean().meta({
+      description:
+        'ADR 0028: may file a "PT grup" payment (Pembayaran antar-PT) — holds Finance, PM or Direktur (pk-owner) AS STORED (the server\'s filer rule). Unlike the effective `roles`, false for an Owner (pk-principal) without one of those roles. Absent on servers before this field (APK fallback: the payee directory).',
+    }),
   })
   .meta({ id: 'Capabilities', description: 'UI hints for the APK (E1); the server guards stay authoritative.' })
 

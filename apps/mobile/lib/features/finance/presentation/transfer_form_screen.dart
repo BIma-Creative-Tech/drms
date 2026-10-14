@@ -20,6 +20,7 @@ import '../../../shared/widgets/photo_viewer.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/application/expense_providers.dart';
+import '../../expense/domain/intercompany.dart';
 import '../../expense/presentation/receipt_capture.dart';
 import '../../expense/presentation/widgets/receipt_mismatch_chip.dart';
 import '../../masters/domain/master_item.dart';
@@ -177,13 +178,27 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
       ref.invalidate(inboxProvider);
       if (!mounted) return;
       final trf = detail.transfers.where((x) => !x.isVoid).lastOrNull?.docNo;
-      showSnack(context, trf == null ? t.transferRecorded : t.transferRecordedNo(trf));
+      // ADR 0028: a PT grup transfer also posted the receiving PT's Kas Masuk (number + PT from the request)
+      final km = detail.intercompany;
+      showSnack(
+        context,
+        km != null && !km.voided
+            ? t.transferRecordedIntercompany(
+                trf ?? '-',
+                km.targetEntryNo,
+                km.companyCode ?? widget.item.payeeCompanyCode ?? '-',
+              )
+            : trf == null
+            ? t.transferRecorded
+            : t.transferRecordedNo(trf),
+      );
       context.pop(true);
     } on ProblemException catch (e) {
       final prompt = _overridePrompt(t, e);
       if (!mounted) return;
       if (prompt == null) {
-        setState(() => _error = e.message);
+        // ADR 0028: the receiving PT's closed period / changed account / no account in Indonesian
+        setState(() => _error = intercompanyProblemMessage(e) ?? e.message);
         return;
       }
       setState(() => _busy = false);
@@ -274,6 +289,16 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
                       '${t.bankDestination}: ${it.bankText.isEmpty ? '-' : it.bankText}',
                       style: theme.textTheme.bodySmall,
                     ),
+                    // ADR 0028: Antar PT — the transfer also records the Kas Masuk in the receiving PT
+                    if (it.payeeCompanyCode case final code?)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          t.transferIntercompanyNote(code),
+                          key: const Key('transfer-intercompany-note'),
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 8,
