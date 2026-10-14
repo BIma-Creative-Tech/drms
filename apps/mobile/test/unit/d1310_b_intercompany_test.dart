@@ -112,7 +112,10 @@ void main() {
     await repo.save(sub, icDraft());
     final back = (await repo.load(sub, icDraft().clientUuid))!;
     expect((back.payeeType, back.payeeCompanyId), (PayeeType.ptGrup, 2));
-    expect((back.invoiceNo, back.invoiceDate, back.invoiceMediaUuid), (' TAG/LAS/2610/007 ', '2026-10-10', 'doc-photo-1'));
+    expect(
+      (back.invoiceNo, back.invoiceDate, back.invoiceMediaUuid),
+      (' TAG/LAS/2610/007 ', '2026-10-10', 'doc-photo-1'),
+    );
     expect(back.bankAccountId, isNull, reason: 'no employee account on a PT grup payment');
     expect(vendorToJson(icDraft()), contains('"payeeCompanyId":2'));
     final vendor = icDraft().copyWith(payeeType: PayeeType.vendor, vendorId: 3, vendorBankAccountId: 31);
@@ -171,15 +174,21 @@ void main() {
       'Jatuh tempo tidak boleh sebelum tanggal dokumen.',
     );
     // no employee account, no receipts needed; project or cost center
-    expect(validateForSubmit(icDraft().copyWith(projectId: null, costCenterId: 7, lines: const [])).map((i) => i.field), [
-      'lines',
-    ]);
+    expect(
+      validateForSubmit(icDraft().copyWith(projectId: null, costCenterId: 7, lines: const [])).map((i) => i.field),
+      ['lines'],
+    );
     expect(
       validateForSubmit(icDraft().copyWith(projectId: null)).single.message,
       'Pilih project atau pusat biaya (pembayaran antar-PT).',
     );
     // the vendor wording is unchanged
-    final vendor = icDraft().copyWith(payeeType: PayeeType.vendor, vendorId: 3, vendorBankAccountId: 31, invoiceNo: null);
+    final vendor = icDraft().copyWith(
+      payeeType: PayeeType.vendor,
+      vendorId: 3,
+      vendorBankAccountId: 31,
+      invoiceNo: null,
+    );
     expect(validateForSubmit(vendor).single.message, 'Nomor invoice wajib diisi.');
   });
 
@@ -189,11 +198,10 @@ void main() {
     expect((d.payeeCompany?.id, d.payeeCompany?.code, d.payeeCompany?.name), (2, 'LAS', 'PT Contoh Lestari'));
     expect((d.invoiceNo, d.invoiceFileId, d.invoiceFileName), ('TAG/LAS/2610/007', 78, 'tagihan.jpg'));
     expect(d.intercompany, isNotNull);
-    expect((d.intercompany!.targetEntryNo, d.intercompany!.voided, d.intercompany!.companyCode), (
-      'KM/LAS/2610/0003',
-      false,
-      'LAS',
-    ));
+    expect(
+      (d.intercompany!.targetEntryNo, d.intercompany!.voided, d.intercompany!.companyCode),
+      ('KM/LAS/2610/0003', false, 'LAS'),
+    );
     final steps = buildRequestStepper(d);
     expect(steps.map((s) => s.title), isNot(contains(lpjStepTitle)));
     expect(steps.last.title, doneStepTitle);
@@ -245,11 +253,10 @@ void main() {
       'accountNoMasked': '••••4321',
       'accountHolder': 'PT Contoh Lestari',
     })!;
-    expect((api.label, api.accountTitle, api.accountNoMasked), (
-      'LAS — PT Contoh Lestari',
-      'Mandiri · PT Contoh Lestari',
-      '••••4321',
-    ));
+    expect(
+      (api.label, api.accountTitle, api.accountNoMasked),
+      ('LAS — PT Contoh Lestari', 'Mandiri · PT Contoh Lestari', '••••4321'),
+    );
     expect(IntercompanyPayee.fromApiJson({'shortCode': 'X'}), isNull);
     final row = masterFromJson(MasterTypes.intercompanyPayees, {
       'id': 2,
@@ -283,7 +290,10 @@ void main() {
       });
       expect(intercompanyProblemMessage(e), 'PT LAS belum menetapkan rekening penerimaan antar-PT.');
       final bare = ProblemException.fromJson(409, {'title': 'Conflict', 'code': 'INTERCOMPANY_NO_ACCOUNT'});
-      expect(intercompanyProblemMessage(bare), startsWith('PT penerima belum menetapkan rekening penerimaan antar-PT.'));
+      expect(
+        intercompanyProblemMessage(bare),
+        startsWith('PT penerima belum menetapkan rekening penerimaan antar-PT.'),
+      );
     });
 
     test('409 INTERCOMPANY_PERIOD_CLOSED: server sentence, else the local text with the lock date', () {
@@ -302,7 +312,10 @@ void main() {
         'code': 'INTERCOMPANY_PERIOD_CLOSED',
         'lockDate': '2026-09-30',
       });
-      expect(intercompanyProblemMessage(bare), contains('Periode PT penerima sudah ditutup (tutup buku s/d 2026-09-30)'));
+      expect(
+        intercompanyProblemMessage(bare),
+        contains('Periode PT penerima sudah ditutup (tutup buku s/d 2026-09-30)'),
+      );
       expect(intercompanyProblemMessage(bare), contains('periode terbuka'));
     });
 

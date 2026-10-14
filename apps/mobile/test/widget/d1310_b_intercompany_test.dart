@@ -101,7 +101,11 @@ TransferQueueItem _icQueueItem() => transferQueueItemFromJson({
 /// Finance API whose transfer is refused because the receiving PT closed the period (as the server answers).
 class _ClosedPeriodFinanceApi extends FakeFinanceApi {
   @override
-  Future<ExpenseDetail> recordTransfer(int requestId, Map<String, dynamic> body, {required String idempotencyKey}) async {
+  Future<ExpenseDetail> recordTransfer(
+    int requestId,
+    Map<String, dynamic> body, {
+    required String idempotencyKey,
+  }) async {
     transfers.add((id: requestId, body: body, key: idempotencyKey));
     throw ProblemException.fromJson(409, {
       'title':
@@ -125,7 +129,9 @@ void main() {
         tester,
         DraftEditorScreen(initial: seedDraft(), masters: _masters, isNew: false),
         auth: AuthSignedIn(profile: profile(const {Role.finance}), sub: 's'),
-        overrides: [intercompanyPayeesProvider.overrideWith((ref, companyId) async => const [_las])],
+        overrides: [
+          intercompanyPayeesProvider.overrideWith((ref, companyId) async => const [_las]),
+        ],
       );
       expect(find.byKey(const Key('draft-payee-type')), findsOneWidget);
       expect(find.text('Vendor'), findsOneWidget);
@@ -210,7 +216,9 @@ void main() {
     });
   });
 
-  testWidgets('detail: receiving PT, document, KM number in the receiving PT, receiving account, no LPJ', (tester) async {
+  testWidgets('detail: receiving PT, document, KM number in the receiving PT, receiving account, no LPJ', (
+    tester,
+  ) async {
     await pumpScreen(
       tester,
       const RequestDetailScreen(id: 42),

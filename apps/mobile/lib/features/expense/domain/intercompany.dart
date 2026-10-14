@@ -111,8 +111,11 @@ String? intercompanyProblemMessage(ProblemException e) {
     return s.length > 10 && s.endsWith('.') && !s.startsWith('Data pengajuan tidak valid') ? s : null;
   }
 
-  String? fieldMessage(String path) =>
-      e.errors.where((f) => f.path == path || f.path.endsWith('.$path')).map((f) => sentence(f.message)).nonNulls.firstOrNull;
+  String? fieldMessage(String path) => e.errors
+      .where((f) => f.path == path || f.path.endsWith('.$path'))
+      .map((f) => sentence(f.message))
+      .nonNulls
+      .firstOrNull;
   final server = sentence(e.detail) ?? sentence(e.title);
   final lockDate = e.body['lockDate'] is String ? e.body['lockDate'] as String : null;
   switch (e.code) {

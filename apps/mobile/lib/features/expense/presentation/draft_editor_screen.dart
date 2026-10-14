@@ -594,7 +594,8 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                       key: const Key('draft-payee-type'),
                       segments: [
                         ButtonSegment(value: PayeeType.karyawan, label: Text(t.payeeKaryawan)),
-                        if (mayVendor || _d.isVendor) ButtonSegment(value: PayeeType.vendor, label: Text(t.payeeVendor)),
+                        if (mayVendor || _d.isVendor)
+                          ButtonSegment(value: PayeeType.vendor, label: Text(t.payeeVendor)),
                         if (mayIntercompany || _d.isPtGrup)
                           ButtonSegment(
                             value: PayeeType.ptGrup,
@@ -1215,10 +1216,7 @@ class IntercompanyAccountPreview extends StatelessWidget {
         leading: const Icon(Icons.account_balance),
         title: Text(payee.accountTitle.isEmpty ? payee.label : payee.accountTitle, key: const Key('ic-account-title')),
         subtitle: Text(
-          [
-            if (payee.accountNoMasked.isNotEmpty) payee.accountNoMasked,
-            t.intercompanyReceivingAccount,
-          ].join(' · '),
+          [if (payee.accountNoMasked.isNotEmpty) payee.accountNoMasked, t.intercompanyReceivingAccount].join(' · '),
           key: const Key('ic-account-number'),
           style: theme.textTheme.bodyMedium?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
         ),
