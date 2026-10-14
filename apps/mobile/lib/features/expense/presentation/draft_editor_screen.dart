@@ -169,11 +169,16 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
   }
 
   /// ADR 0028 (owner decision 2026-10-14): Finance, PM or Direktur of the draft's PT file a PT grup payment — an
-  /// Owner-only user does not (see [mayFileIntercompanyPayment]; the server re-checks on the stored roles).
+  /// Owner-only user does not. The server's `/me` capability of that PT decides; without it (older server) the payee
+  /// directory does (see [mayFileIntercompanyPayment]; the server re-checks on the stored roles).
   bool _mayFileIntercompanyPayment() {
-    final roles = ref.read(currentProfileProvider)?.forCompany(_d.companyId).roles ?? const <Role>{};
+    final here = ref.read(currentProfileProvider)?.forCompany(_d.companyId);
     final listed = (widget.masters[MasterTypes.intercompanyPayees] ?? const <MasterItem>[]).isNotEmpty;
-    return mayFileIntercompanyPayment(roles, directoryListed: listed);
+    return mayFileIntercompanyPayment(
+      here?.roles ?? const <Role>{},
+      capability: here?.capabilities.intercompanyPayment,
+      directoryListed: listed,
+    );
   }
 
   /// ADR 0027 / 0028: switching the payee type — vendor / PT grup = Pengajuan Baru, Pemohon = the filer, no employee

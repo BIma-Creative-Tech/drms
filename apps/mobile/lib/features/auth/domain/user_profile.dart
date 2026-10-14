@@ -80,6 +80,12 @@ abstract class Capabilities with _$Capabilities {
 
     /// P3: Laporan Harian on konstruksi projects (same rule; server ≥ 0.8 — older servers omit it → false).
     @Default(false) bool dailyReportCreate,
+
+    /// ADR 0028: may file a "PT grup" payment — the server's filer rule on the STORED roles (Finance / PM / Direktur).
+    /// Unlike the effective [UserProfile.roles] it is false for an Owner (`pk-principal`) without one of those roles.
+    /// null = a server before this field (the APK then falls back to the payee directory, see
+    /// `mayFileIntercompanyPayment`).
+    bool? intercompanyPayment,
   }) = _Capabilities;
 
   /// FR1: any field-report create right.
@@ -242,6 +248,7 @@ abstract class UserProfile with _$UserProfile {
         unitTimesheetCreate: scope.any((c) => c.capabilities.unitTimesheetCreate),
         aftersalesActivityCreate: scope.any((c) => c.capabilities.aftersalesActivityCreate),
         dailyReportCreate: scope.any((c) => c.capabilities.dailyReportCreate),
+        intercompanyPayment: _anyFlag([for (final c in scope) c.capabilities.intercompanyPayment]),
       ),
       employee: primary.employee,
       timezone: primary.timezone,
@@ -362,4 +369,11 @@ abstract class UserProfile with _$UserProfile {
 
   /// E6 US-15 (T10): correct a team member's attendance time (PM of the location or Admin).
   bool get canCorrectAttendance => has(Role.pm) || has(Role.admin);
+}
+
+/// Union of an optional capability over several PTs: true when any PT says true, false when every PT that sends it
+/// says false, null when no PT sends it (server before the field).
+bool? _anyFlag(Iterable<bool?> flags) {
+  if (flags.any((f) => f == true)) return true;
+  return flags.any((f) => f != null) ? false : null;
 }

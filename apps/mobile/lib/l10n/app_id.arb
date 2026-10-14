@@ -2800,5 +2800,20 @@
         "type": "String"
       }
     }
+  },
+  "kpiCashFlowWithoutAntarPt": "Tanpa antar-PT",
+  "@kpiCashFlowWithoutAntarPt": {
+    "description": "ADR 0028: chip on the Direktur cash-flow card that leaves both legs of payments between PTs out (web: Tampilkan tanpa antar-PT)."
+  },
+  "kpiCashFlowAntarPtExcluded": "Tanpa antar-PT: masuk {masuk} · keluar {keluar} tidak dihitung",
+  "@kpiCashFlowAntarPtExcluded": {
+    "placeholders": {
+      "masuk": {
+        "type": "String"
+      },
+      "keluar": {
+        "type": "String"
+      }
+    }
   }
 }

@@ -29,6 +29,13 @@ class CashFlowPoint {
   bool get hasAntarPt => masukAntarPt != 0 || keluarAntarPt != 0;
 }
 
+/// ADR 0028 (owner decision 3) "tanpa antar-PT": the rows without both legs of payments between PTs — the web Direktur
+/// card's `withoutIntercompany` (masuk − masukAntarPt, keluar − keluarAntarPt; no other elimination). The Antar PT parts
+/// become 0 (nothing left to name).
+List<CashFlowPoint> withoutIntercompany(List<CashFlowPoint> rows) => [
+  for (final r in rows) CashFlowPoint(r.period, r.masuk - r.masukAntarPt, r.keluar - r.keluarAntarPt),
+];
+
 /// One month of a single series (saldo akhir bulan, pencairan bersih, jumlah pengajuan).
 class TrendPoint {
   const TrendPoint(this.period, this.value);
@@ -508,8 +515,9 @@ class RecentCashEntry {
   /// ADR 0028: the other leg of a payment between PTs, when the server sends it (`intercompany`).
   final CashCounterpart? counterpart;
 
-  /// "Sumber" label (web `SOURCE`): "Antar PT" for the Kas Masuk of a payment from another PT.
-  String get sourceLabel => cashSourceLabels[sourceType] ?? sourceType;
+  /// "Sumber" label (web `SOURCE`): "Antar PT" for the Kas Masuk of a payment from another PT and for the paying PT's
+  /// KK (source type `transfer`, marked by its counterpart).
+  String get sourceLabel => isIntercompany ? cashSourceLabels['intercompany']! : (cashSourceLabels[sourceType] ?? sourceType);
 
   bool get isIntercompany => sourceType == 'intercompany' || counterpart != null;
 

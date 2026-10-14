@@ -141,6 +141,7 @@ class CashFlowChart extends StatefulWidget {
     required this.labelIn,
     required this.labelOut,
     this.intercompanyNote,
+    this.withoutIntercompanyToggle,
   });
   final List<CashFlowPoint> rows;
   final String labelIn;
@@ -150,6 +151,12 @@ class CashFlowChart extends StatefulWidget {
   /// keluar as rupiah text); shown only when that month has any.
   final String Function(String masuk, String keluar)? intercompanyNote;
 
+  /// ADR 0028 (owner decision 3, web Direktur card "Tampilkan tanpa antar-PT"): a chip that leaves both legs of payments
+  /// between PTs out of the bars and the readout ([withoutIntercompany]); `label` names the chip, `excludedNote` the
+  /// line naming what was left out of the selected month. Local view state (default: counted, as the web). Shown only
+  /// when some month has "Antar PT" figures; null = no chip.
+  final ({String label, String Function(String masuk, String keluar) excludedNote})? withoutIntercompanyToggle;
+
   @override
   State<CashFlowChart> createState() => _CashFlowChartState();
 }
@@ -157,13 +164,19 @@ class CashFlowChart extends StatefulWidget {
 class _CashFlowChartState extends State<CashFlowChart> {
   int? _selected;
 
+  /// ADR 0028 "tanpa antar-PT" (local view state).
+  bool _withoutIntercompany = false;
+
   @override
   Widget build(BuildContext context) {
-    final rows = widget.rows;
     final theme = Theme.of(context);
-    if (rows.isEmpty) return const SizedBox.shrink();
+    if (widget.rows.isEmpty) return const SizedBox.shrink();
+    final toggle = widget.rows.any((p) => p.hasAntarPt) ? widget.withoutIntercompanyToggle : null;
+    final excluded = toggle != null && _withoutIntercompany;
+    final rows = excluded ? withoutIntercompany(widget.rows) : widget.rows;
     final sel = (_selected ?? rows.length - 1).clamp(0, rows.length - 1);
     final r = rows[sel];
+    final original = widget.rows[sel];
     Widget legend(Color c, String label) => Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -181,7 +194,20 @@ class _CashFlowChartState extends State<CashFlowChart> {
       children: [
         Wrap(
           spacing: 16,
-          children: [legend(VizColors.series1, widget.labelIn), legend(VizColors.series2, widget.labelOut)],
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            legend(VizColors.series1, widget.labelIn),
+            legend(VizColors.series2, widget.labelOut),
+            if (toggle != null)
+              FilterChip(
+                key: const Key('cashflow-without-antar-pt'),
+                label: Text(toggle.label),
+                selected: excluded,
+                visualDensity: VisualDensity.compact,
+                onSelected: (v) => setState(() => _withoutIntercompany = v),
+              ),
+          ],
         ),
         const SizedBox(height: 8),
         LayoutBuilder(
@@ -234,6 +260,12 @@ class _CashFlowChartState extends State<CashFlowChart> {
           Text(
             note(formatRupiah(r.masukAntarPt), formatRupiah(r.keluarAntarPt)),
             key: const Key('cashflow-antar-pt'),
+            style: theme.textTheme.bodySmall,
+          ),
+        if (toggle != null && excluded && original.hasAntarPt)
+          Text(
+            toggle.excludedNote(formatRupiah(original.masukAntarPt), formatRupiah(original.keluarAntarPt)),
+            key: const Key('cashflow-antar-pt-excluded'),
             style: theme.textTheme.bodySmall,
           ),
       ],

@@ -98,6 +98,8 @@ Capabilities _capabilities(Json? caps, Set<Role> roles) => caps == null
         unitTimesheetCreate: caps['unitTimesheetCreate'] == true,
         aftersalesActivityCreate: caps['aftersalesActivityCreate'] == true,
         dailyReportCreate: caps['dailyReportCreate'] == true,
+        // ADR 0028: absent on a server before the field → null (fallback in mayFileIntercompanyPayment)
+        intercompanyPayment: caps['intercompanyPayment'] is bool ? caps['intercompanyPayment'] as bool : null,
       );
 
 /// `GET /me` `companies[]` item (openapi `MeCompany`, MC3).

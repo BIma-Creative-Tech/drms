@@ -269,6 +269,11 @@ class DirekturKpis extends ConsumerWidget {
                 labelIn: t.kpiIn,
                 labelOut: t.kpiOut,
                 intercompanyNote: t.kpiCashFlowAntarPt,
+                // ADR 0028: the web Direktur card's "tanpa antar-PT" toggle
+                withoutIntercompanyToggle: (
+                  label: t.kpiCashFlowWithoutAntarPt,
+                  excludedNote: t.kpiCashFlowAntarPtExcluded,
+                ),
               ),
             ),
           // DRMS 13/10 Wave 3: the rest of the web "Ringkasan Direktur", same order as Dashboard.tsx Owner().

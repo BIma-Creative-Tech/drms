@@ -85,10 +85,12 @@ List<IntercompanyPayee> payeesFor(List<IntercompanyPayee> all, int? payingCompan
 
 /// ADR 0028 owner decision 1 (2026-10-14): Finance, PM or Direktur (`pk-owner`) of the paying PT file a PT grup
 /// payment; Staff, Admin and an Owner (`pk-principal`) without one of these roles do not. The server decides on the
-/// STORED roles, but `/me` lists EFFECTIVE roles (an Owner also carries `pk-owner`), so for an Owner the APK asks the
-/// payee directory: the server lists it (masters `intercompany-payees`) only to a stored Finance / PM / Direktur
-/// ([directoryListed]). The server re-checks every write (403).
-bool mayFileIntercompanyPayment(Set<Role> roles, {required bool directoryListed}) {
+/// STORED roles and says so per PT in `/me` `companies[].capabilities.intercompanyPayment` ([capability]) — that
+/// answer wins. Fallback for a server before that field (null): `/me` lists EFFECTIVE roles (an Owner also carries
+/// `pk-owner`), so for an Owner the APK asks the payee directory: the server lists it (masters `intercompany-payees`)
+/// only to a stored Finance / PM / Direktur ([directoryListed]). The server re-checks every write (403).
+bool mayFileIntercompanyPayment(Set<Role> roles, {bool? capability, required bool directoryListed}) {
+  if (capability != null) return capability;
   if (roles.contains(Role.finance) || roles.contains(Role.pm)) return true;
   if (!roles.contains(Role.owner)) return false;
   return !roles.contains(Role.principal) || directoryListed;

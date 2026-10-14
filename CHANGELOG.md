@@ -36,14 +36,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `sourceType`, `GET /api/v1/intercompany/payees?company=`, masters type `intercompany-payees`, bank preview
   `payeeCompany`, dashboard cash flow `masukAntarPt` / `keluarAntarPt`. Migrations `20261014_100000`–`100300`
   (`d1310_intercompany_*`). APK: see "Added (APK, DRMS 13/10 Phase B)" below.
+- API (APK follow-up): `GET /me` `capabilities.intercompanyPayment` (each `companies[]` entry and the deprecated
+  top-level object) — the PT grup filer rule on the **stored** roles (`mayFileIntercompany`), so an Owner-only account
+  (effective roles list `pk-owner` too) reads `false`. Dashboard `viz.recentCash[]` rows carry the same `intercompany`
+  counterpart as `GET /cash-entries` (`counterpartsOf`; reversal rows: of their original) — non-null also on the paying
+  PT's KK (`sourceType` stays `transfer`), which the web "Transaksi kas terbaru" now labels "Antar PT" as well.
 
 ### Added (APK, DRMS 13/10 Phase B — pembayaran antar-PT)
 
 - **APK "PT grup"** ([ADR 0028](docs/proyekkas/adr/0028-intercompany.md), branch `feat/d1310-b-intercompany-apk`):
   Jenis penerima gets a third segment **PT grup** for **Finance, PM and Direktur** of the draft's PT (owner decision 1;
-  Staff / Admin get none; an Owner-only account does not either — `/me` lists effective roles, so for an Owner the
-  APK shows it only when the server lists him the payee directory, i.e. he also holds a filer role; the server
-  re-checks with 403). The editor: **PT penerima** picker (online `GET /intercompany/payees?company=`, offline the new
+  Staff / Admin get none; an Owner-only account does not either — the APK follows the PT's `/me`
+  `capabilities.intercompanyPayment`; only against a server without that field it falls back to the roles + the payee
+  directory, which the server lists only to a stored filer; the server re-checks with 403). The editor: **PT penerima** picker (online `GET /intercompany/payees?company=`, offline the new
   masters type `intercompany-payees`), the receiving account as a masked preview, and the **document of the receiving
   PT** — number, date and photo **mandatory**, due date optional (owner decision 2) — reusing the vendor invoice
   fields (photo → `POST /media/attachments`, offline placeholder → `invoice_file_id`); always Pengajuan Baru, Pemohon =
@@ -59,9 +64,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   names the receiving PT's KM; `INTERCOMPANY_PERIOD_CLOSED` / `INTERCOMPANY_ACCOUNT_CHANGED` / `INTERCOMPANY_NO_ACCOUNT`,
   the duplicate document (409 `errors[invoiceNo]`) and the filer-role 403 are shown in Indonesian (the server's sentence
   when it sends one) — online and for rejected offline drafts.
-- **Reports (owner decision 3, "Antar PT"):** "Transaksi kas terbaru" labels `sourceType: intercompany` "Antar PT" (+
-  the counterpart "Dari PT … · PB/… · TRF/… · KK/…" / "Ke PT … · KM/…" when the row carries `intercompany`); the cash
-  flow card names the month's `masukAntarPt` / `keluarAntarPt` under the readout.
+- **Reports (owner decision 3, "Antar PT"):** "Transaksi kas terbaru" labels `sourceType: intercompany` and the paying
+  PT's KK (`sourceType: transfer` with a non-null `intercompany`) "Antar PT", with the counterpart "Dari PT … · PB/… ·
+  TRF/… · KK/…" / "Ke PT … · KM/…"; the cash flow card names the month's `masukAntarPt` / `keluarAntarPt` under the
+  readout, and the Direktur card has the web's **"Tanpa antar-PT"** chip (local view state; shown when the range has
+  Antar PT figures) that leaves both legs out of the bars and the readout (masuk − masukAntarPt, keluar −
+  keluarAntarPt) and names what was left out.
 - **Release:** needs the server of ADR 0028 first (masters type `intercompany-payees` is unknown to older servers). The
   APK version is bumped in `apps/mobile/pubspec.yaml` at the release tag (`mobile-vX.Y.Z`, with
   `docs/release-notes/apk/<version>.md`) as for the vendor release; **after** that APK is published a group admin

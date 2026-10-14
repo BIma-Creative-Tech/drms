@@ -244,6 +244,48 @@ void main() {
     expect(may(Role.effective({Role.principal, Role.finance})), isTrue);
   });
 
+  test('who may file: the /me capability intercompanyPayment wins; the directory is only the older-server fallback', () {
+    bool may(Set<Role> r, bool? cap, {bool listed = false}) =>
+        mayFileIntercompanyPayment(r, capability: cap, directoryListed: listed);
+    final ownerOnly = Role.effective({Role.principal});
+    expect(may(ownerOnly, false, listed: true), isFalse, reason: 'a stale cached directory does not override it');
+    expect(may(ownerOnly, true), isTrue, reason: 'Owner who also holds Direktur / Finance / PM');
+    expect(may({Role.finance}, false), isFalse);
+    expect(may({Role.staff}, true), isTrue, reason: 'the server answer, not the local role guess');
+    expect(may(ownerOnly, null), isFalse);
+    expect(may(ownerOnly, null, listed: true), isTrue);
+  });
+
+  test('/me capability intercompanyPayment per PT: parsed (absent → null), PT scope = union, forCompany per PT', () {
+    Map<String, dynamic> company(int id, List<String> roles, Object? may) => {
+      'id': id,
+      'code': 'PT$id',
+      'name': 'PT Contoh $id',
+      'roles': roles,
+      'capabilities': {'approvalInbox': true, 'teamMonitor': false, 'progressReportCreate': true, 'intercompanyPayment': ?may},
+    };
+    final p = userProfileFromJson({
+      ...meJson(roles: const ['pk-owner', 'pk-principal', 'pk-finance']),
+      'capabilities': {'approvalInbox': true, 'intercompanyPayment': true},
+      'companies': [
+        company(1, const ['pk-owner', 'pk-principal'], false), // Owner only: effective pk-owner, but may not file
+        company(2, const ['pk-finance'], true),
+        company(3, const ['pk-owner'], null), // older server: field absent
+      ],
+    });
+    expect(p.capabilities.intercompanyPayment, isTrue);
+    expect([for (final c in p.companies) c.capabilities.intercompanyPayment], [false, true, null]);
+    expect(p.company(1)!.roles, contains(Role.owner));
+    expect(p.forCompany(1).capabilities.intercompanyPayment, isFalse);
+    expect(p.forCompany(2).capabilities.intercompanyPayment, isTrue);
+    expect(p.forCompany(3).capabilities.intercompanyPayment, isNull);
+    expect(p.scopedTo(const [1, 3]).capabilities.intercompanyPayment, isFalse);
+    expect(p.scopedTo(const [1, 2]).capabilities.intercompanyPayment, isTrue);
+    expect(p.forCompany(99).capabilities.intercompanyPayment, isNull, reason: 'not a membership');
+    // a cached /me from before E1 (no capabilities at all)
+    expect(userProfileFromJson(meJson()).capabilities.intercompanyPayment, isNull);
+  });
+
   test('payee directory: endpoint item, masters row (offline), never the paying PT itself', () {
     final api = IntercompanyPayee.fromApiJson({
       'companyId': 2,
@@ -416,6 +458,14 @@ void main() {
     expect((rows[0].isIntercompany, rows[0].sourceLabel), (true, 'Antar PT'));
     expect(rows[0].counterpart!.text, 'Dari PT DRMS · PB/DRMS/2610/0012 · TRF/DRMS/2610/0007 · KK/DRMS/2610/0009');
     expect(rows[1].counterpart!.text, 'Ke PT LAS · KM/LAS/2610/0003 (dibatalkan)');
+    // the paying PT's KK keeps source type `transfer` on the server; its counterpart makes it "Antar PT"
+    expect((rows[1].sourceType, rows[1].isIntercompany, rows[1].sourceLabel), ('transfer', true, 'Antar PT'));
+    expect(
+      RecentCashEntry.listFromJson([
+        {'id': 35, 'sourceType': 'transfer', 'direction': 'out', 'intercompany': null},
+      ]).single.sourceLabel,
+      'Transfer',
+    );
     expect((rows[2].isIntercompany, rows[2].sourceLabel), (false, 'Manual'));
     // the server's recentCash without the counterpart object: still "Antar PT" from the source type
     final plain = RecentCashEntry.listFromJson([
@@ -435,5 +485,11 @@ void main() {
     });
     expect([for (final r in d.cashFlow) r.hasAntarPt], [false, true]);
     expect((d.cashFlow.last.masukAntarPt, d.cashFlow.last.keluarAntarPt), (7500, 2500));
+    // "tanpa antar-PT" (web Direktur card withoutIntercompany): both legs out, nothing else eliminated
+    final without = withoutIntercompany(d.cashFlow);
+    expect([for (final r in without) (r.period, r.masuk, r.keluar, r.hasAntarPt)], [
+      ('2026-09', 1000, 500, false),
+      ('2026-10', 1500, 5500, false),
+    ]);
   });
 }

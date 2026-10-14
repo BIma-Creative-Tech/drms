@@ -396,7 +396,14 @@ keep the renumber prelude where it exists (integration test `d1310-w4-renumber` 
 - `PayeeType.ptGrup` (`pt_grup`); the editor offers it to Finance / PM / Direktur of the draft's PT. `/me` carries
   EFFECTIVE roles (an Owner also holds `pk-owner`), so for an Owner the APK offers "PT grup" only when the server lists
   him the payee directory (masters `intercompany-payees`, filtered on the stored roles); the server's 403 stays the
-  authority.
+  authority. *Superseded as the primary check (follow-up below); kept as the fallback for a server without the
+  capability.*
+- **Follow-up (same branch):** `/me` `companies[].capabilities.intercompanyPayment` (and the deprecated top-level
+  `capabilities`) = `mayFileIntercompany` on the stored roles — the APK uses it per PT and falls back to the directory
+  rule only when it is absent. Dashboard `viz.recentCash[]` rows carry the `intercompany` counterpart of
+  `counterpartsOf` (as `GET /cash-entries`); non-null marks the paying PT's KK (`sourceType` stays `transfer`), labelled
+  "Antar PT" on the web and the APK. The APK Direktur cash-flow card has the web's "tanpa antar-PT" toggle (local
+  state; masuk − `masukAntarPt`, keluar − `keluarAntarPt`).
 - No drift schema bump: `payeeCompanyId` lives in the existing payee JSON `local_drafts.vendor_json` (schema 10).
 - PT penerima picker: `GET /intercompany/payees` online, masters `intercompany-payees` offline; masked account preview;
   document number / date / photo required (the vendor invoice fields under document labels).

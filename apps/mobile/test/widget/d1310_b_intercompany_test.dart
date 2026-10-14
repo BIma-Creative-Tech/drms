@@ -4,10 +4,14 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proyekkas/app/providers.dart';
+import 'package:proyekkas/core/format/rupiah.dart';
 import 'package:proyekkas/core/network/api_exception.dart';
 import 'package:proyekkas/features/approvals/application/inbox_providers.dart';
 import 'package:proyekkas/features/auth/application/auth_controller.dart';
 import 'package:proyekkas/features/auth/domain/user_profile.dart';
+import 'package:proyekkas/features/dashboard/domain/dashboard.dart';
+import 'package:proyekkas/features/dashboard/presentation/charts.dart';
+import 'package:proyekkas/features/dashboard/presentation/kpi_home.dart';
 import 'package:proyekkas/features/expense/application/expense_providers.dart';
 import 'package:proyekkas/features/expense/data/expense_mappers.dart';
 import 'package:proyekkas/features/expense/domain/expense_request.dart';
@@ -119,6 +123,75 @@ class _ClosedPeriodFinanceApi extends FakeFinanceApi {
   }
 }
 
+/// [profile] with the server's ADR 0028 `/me` capability `intercompanyPayment` (null = a server before the field).
+UserProfile _withIcCapability(Set<Role> roles, bool? may) {
+  final p = profile(roles);
+  return p.copyWith(capabilities: p.capabilities.copyWith(intercompanyPayment: may));
+}
+
+/// Direktur dashboard whose latest month carries "Antar PT" parts and whose recent cash lists both legs of a payment
+/// between PTs: the paying PT's KK (source type `transfer`, counterpart set) and a receiving PT's KM.
+Map<String, dynamic> _icOwnerJson() {
+  final j = direkturDashboardJson();
+  return {
+    ...j,
+    'cashFlow': {
+      'basis': 'K-02b',
+      'months': 2,
+      'rows': [
+        {'period': '2026-09', 'masuk': 30000000, 'keluar': 20000000},
+        {'period': '2026-10', 'masuk': 40000000, 'keluar': 12500000, 'masukAntarPt': 7500000, 'keluarAntarPt': 2500000},
+      ],
+    },
+    'viz': {
+      ...(j['viz'] as Map<String, dynamic>),
+      'recentCash': [
+        {
+          'id': 32,
+          'companyId': 1,
+          'entryNo': 'KK/DRMS/2610/0009',
+          'entryDate': '2026-10-12',
+          'direction': 'out',
+          'amount': 2500000,
+          'status': 'posted',
+          'sourceType': 'transfer',
+          'account': 'Bank Operasional',
+          'label': 'Transfer TRF/DRMS/2610/0007',
+          'requestId': 46,
+          'requestDocNo': 'PB/DRMS/2610/0012',
+          'intercompany': {
+            'direction': 'out',
+            'status': 'posted',
+            'counterpartCompany': {'id': 2, 'shortCode': 'LAS', 'name': 'PT Contoh Lestari'},
+            'sourceDocNo': 'PB/DRMS/2610/0012',
+            'sourceDocId': 46,
+            'transferDocNo': 'TRF/DRMS/2610/0007',
+            'counterpartEntryNo': 'KM/LAS/2610/0003',
+            'counterpartEntryId': 31,
+            'canOpenCounterpart': false,
+            'canOpenSourceDoc': true,
+          },
+        },
+        {
+          'id': 33,
+          'companyId': 1,
+          'entryNo': 'KK/DRMS/2610/0010',
+          'entryDate': '2026-10-12',
+          'direction': 'out',
+          'amount': 900000,
+          'status': 'posted',
+          'sourceType': 'transfer',
+          'account': 'Kas Kecil',
+          'label': 'Transfer pengajuan',
+          'requestId': 47,
+          'requestDocNo': 'PB/DRMS/2610/0013',
+          'intercompany': null,
+        },
+      ],
+    },
+  };
+}
+
 Finder _submitButton() =>
     find.descendant(of: find.byKey(const Key('submit-draft')), matching: find.bySubtype<FilledButton>());
 
@@ -204,6 +277,40 @@ void main() {
         auth: AuthSignedIn(profile: profile(const {Role.staff}), sub: 's'),
       );
       expect(find.byKey(const Key('draft-payee-type')), findsNothing);
+    });
+
+    testWidgets('/me capability intercompanyPayment false (Owner-only): no "PT grup" even with a cached directory', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        DraftEditorScreen(initial: seedDraft(), masters: _mastersWithDirectory, isNew: false),
+        auth: AuthSignedIn(profile: _withIcCapability(Role.effective({Role.principal}), false), sub: 's'),
+      );
+      expect(find.byKey(const Key('draft-payee-pt-grup')), findsNothing);
+      expect(find.byKey(const Key('draft-payee-type')), findsNothing);
+    });
+
+    testWidgets('/me capability intercompanyPayment true (Owner + Direktur): "PT grup" without a cached directory', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        DraftEditorScreen(initial: seedDraft(), masters: _masters, isNew: false),
+        auth: AuthSignedIn(profile: _withIcCapability(Role.effective({Role.principal}), true), sub: 's'),
+      );
+      expect(find.byKey(const Key('draft-payee-pt-grup')), findsOneWidget);
+      expect(find.text('Vendor'), findsNothing, reason: 'vendor payments stay Finance / PM');
+    });
+
+    testWidgets('capability false wins over the roles: Finance keeps "Vendor" but no "PT grup"', (tester) async {
+      await pumpScreen(
+        tester,
+        DraftEditorScreen(initial: seedDraft(), masters: _mastersWithDirectory, isNew: false),
+        auth: AuthSignedIn(profile: _withIcCapability(const {Role.finance}, false), sub: 's'),
+      );
+      expect(find.text('Vendor'), findsOneWidget);
+      expect(find.byKey(const Key('draft-payee-pt-grup')), findsNothing);
     });
 
     testWidgets('Owner who also holds Direktur (directory listed by the server): "PT grup"', (tester) async {
@@ -294,5 +401,69 @@ void main() {
     expect(find.byKey(const Key('transfer-error')), findsOneWidget);
     expect(find.textContaining('Periode 2026-10 PT LAS sudah ditutup (tutup buku s/d 2026-10-31)'), findsOneWidget);
     expect(find.byType(TransferFormScreen), findsOneWidget, reason: 'stays on the form');
+  });
+
+  group('dashboard "Antar PT"', () {
+    testWidgets('recent cash: the paying PT\'s KK (source type transfer) is labelled "Antar PT" with its counterpart', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        const Scaffold(body: SingleChildScrollView(child: DirekturKpis())),
+        auth: AuthSignedIn(profile: profile(const {Role.owner}), sub: 's'),
+        overrides: [direkturDashboardProvider.overrideWith((ref) async => DirekturDashboard.fromJson(_icOwnerJson()))],
+      );
+      final kk = find.byKey(const Key('dash-cash-32-ic'));
+      await tester.ensureVisible(kk);
+      expect(tester.widget<Text>(kk).data, 'Antar PT · Ke PT LAS · KM/LAS/2610/0003');
+      expect(find.byKey(const Key('dash-cash-33-ic')), findsNothing, reason: 'an ordinary transfer');
+    });
+
+    testWidgets('Direktur cash flow: "Tanpa antar-PT" leaves both legs out of the readout (web toggle); off again '
+        'restores', (tester) async {
+      await pumpScreen(
+        tester,
+        const Scaffold(body: SingleChildScrollView(child: DirekturKpis())),
+        auth: AuthSignedIn(profile: profile(const {Role.owner}), sub: 's'),
+        overrides: [direkturDashboardProvider.overrideWith((ref) async => DirekturDashboard.fromJson(_icOwnerJson()))],
+      );
+      String readout() => tester.widget<Text>(find.byKey(const Key('cashflow-readout'))).data!;
+      final chip = find.byKey(const Key('cashflow-without-antar-pt'));
+      expect(chip, findsOneWidget);
+      expect(find.descendant(of: chip, matching: find.text('Tanpa antar-PT')), findsOneWidget);
+      expect(readout(), allOf(contains(formatRupiah(40000000)), contains(formatRupiah(12500000))));
+      expect(find.byKey(const Key('cashflow-antar-pt')), findsOneWidget);
+
+      await tester.ensureVisible(chip);
+      await tester.tap(chip);
+      await tester.pumpAndSettle();
+      expect(readout(), allOf(contains(formatRupiah(32500000)), contains(formatRupiah(10000000))));
+      expect(find.byKey(const Key('cashflow-antar-pt')), findsNothing);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('cashflow-antar-pt-excluded'))).data,
+        'Tanpa antar-PT: masuk ${formatRupiah(7500000)} · keluar ${formatRupiah(2500000)} tidak dihitung',
+      );
+
+      await tester.tap(chip);
+      await tester.pumpAndSettle();
+      expect(readout(), contains(formatRupiah(40000000)));
+      expect(find.byKey(const Key('cashflow-antar-pt-excluded')), findsNothing);
+    });
+
+    testWidgets('no "Antar PT" figures in the range: no toggle', (tester) async {
+      await pumpScreen(
+        tester,
+        Scaffold(
+          body: CashFlowChart(
+            rows: const [CashFlowPoint('2026-10', 1000, 500)],
+            labelIn: 'Masuk',
+            labelOut: 'Keluar',
+            withoutIntercompanyToggle: (label: 'Tanpa antar-PT', excludedNote: (m, k) => '$m $k'),
+          ),
+        ),
+      );
+      expect(find.byKey(const Key('cashflow-readout')), findsOneWidget);
+      expect(find.byKey(const Key('cashflow-without-antar-pt')), findsNothing);
+    });
   });
 }
