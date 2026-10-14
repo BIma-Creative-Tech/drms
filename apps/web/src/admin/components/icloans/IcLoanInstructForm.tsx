@@ -1,6 +1,6 @@
 'use client'
 import { useRouter } from 'next/navigation'
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
+import React, { useEffect, useId, useRef, useState } from 'react'
 
 import { formatRupiah } from '@/lib/money'
 
@@ -40,28 +40,32 @@ export function IcLoanInstructForm({ borrowers, initialBorrower, initialRequestI
   const [errs, setErrs] = useState<Record<string, string>>({})
   const key = useRef<string | undefined>(undefined)
 
-  const load = useCallback(
-    async (b: number, need: number | null) => {
-      if (!b) return
-      const q = new URLSearchParams({ borrower: String(b), ...(need && need > 0 ? { amount: String(need) } : {}) })
-      const res = await fetch(`/api/v1/intercompany-loans/lenders?${q}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-      const body = await res.json().catch(() => null)
-      if (!res.ok) {
-        setData(null)
-        setLoadError(problemText(body, res.status))
-        return
-      }
-      setLoadError(null)
-      setData(body as Lenders)
-      setDue((d) => d || (body as Lenders).defaultDueDate)
-    },
-    [],
-  )
-
+  const need = amount.parsed.value
   useEffect(() => {
     // the lender list follows the borrower and the amount (sufficient = available ≥ amount)
-    void load(borrower, amount.parsed.value)
-  }, [borrower, amount.parsed.value, load])
+    if (!borrower) return
+    let alive = true
+    const q = new URLSearchParams({ borrower: String(borrower), ...(need && need > 0 ? { amount: String(need) } : {}) })
+    fetch(`/api/v1/intercompany-loans/lenders?${q}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(async (res) => {
+        const body = await res.json().catch(() => null)
+        if (!alive) return
+        if (!res.ok) {
+          setData(null)
+          setLoadError(problemText(body, res.status))
+          return
+        }
+        setLoadError(null)
+        setData(body as Lenders)
+        setDue((d) => d || (body as Lenders).defaultDueDate)
+      })
+      .catch(() => {
+        if (alive) setLoadError('Gagal memuat daftar PT pemberi pinjaman.')
+      })
+    return () => {
+      alive = false
+    }
+  }, [borrower, need])
 
   const touch = () => {
     key.current = newIdemKey()

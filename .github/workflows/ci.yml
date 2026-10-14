@@ -131,6 +131,13 @@ jobs:
             echo "PK_TEST_MAILPIT_API=http://127.0.0.1:8025"
             echo "NODE_EXTRA_CA_CERTS=$d/ca.crt"
           } >> "$GITHUB_ENV"
+      - name: TEMP migrate with visible output
+        if: matrix.part == 'f3'
+        continue-on-error: true
+        run: |
+          cd apps/web
+          psql "postgres://pk_test_owner:${PK_F1_OWNER_PASSWORD}@127.0.0.1:5432/pk_test" -c 'DROP SCHEMA IF EXISTS public CASCADE' -c 'CREATE SCHEMA public' -c 'REVOKE CREATE ON SCHEMA public FROM PUBLIC' -c 'GRANT USAGE ON SCHEMA public TO pk_test_app, pk_test_ro'
+          DATABASE_URL="postgres://pk_test_owner:${PK_F1_OWNER_PASSWORD}@127.0.0.1:5432/pk_test" PAYLOAD_SECRET=integration-test-secret-not-used-anywhere-else-0123 PK_SKIP_ENV_CHECK=true npx payload migrate 2>&1 | tail -150
       - name: Integration tests
         env:
           PART: ${{ matrix.part }}

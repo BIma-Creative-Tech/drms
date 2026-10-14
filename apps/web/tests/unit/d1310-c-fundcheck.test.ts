@@ -226,7 +226,7 @@ describe('ADR 0029 §3 loan rules', () => {
     expect(IC_LOAN_DOC_TYPE).toBe('intercompany_loan')
     const s = DEFAULT_SEQUENCES.find((x) => x.docType === 'intercompany_loan')!
     expect(s).toMatchObject({ docCode: 'PJA', pattern: 'PJA/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 })
-    expect(formatDocNo({ ...s, timezone: 'Asia/Makassar' }, 1, parseBusinessDate('2026-10-15'), 'DRMS')).toBe('PJA/DRMS/2610/0001')
+    expect(formatDocNo(s, 1, parseBusinessDate('2026-10-15'), 'DRMS')).toBe('PJA/DRMS/2610/0001')
   })
 
   it('links: notification + report cells open the loan detail', () => {
