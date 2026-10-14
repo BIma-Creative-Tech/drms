@@ -78,7 +78,10 @@ export type ModuleDef = {
   manage?: true
 }
 
-/** ADR 0013: decisions + cash = Direktur (pk-owner) / Finance. */
+/**
+ * ADR 0013: decisions + cash = Direktur (pk-owner) / Finance. ADR 0026: the Owner (pk-principal) sees every module
+ * of the Direktur — its effective roles carry pk-owner (access/roles.ts ROLE_IMPLIES), so no list names it twice.
+ */
 const OFFICE: readonly Role[] = ['pk-finance', 'pk-owner']
 const OFFICE_PM: readonly Role[] = [...OFFICE, 'pk-pm']
 const OFFICE_PM_ADMIN: readonly Role[] = [...OFFICE_PM, 'pk-admin']

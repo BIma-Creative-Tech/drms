@@ -2,7 +2,7 @@ import Link from 'next/link'
 import type { AdminViewServerProps } from 'payload'
 import React from 'react'
 
-import { userId } from '@/access/roles'
+import { isGroupAdmin, userId } from '@/access/roles'
 import { loadUserOnboarding, mayOnboard, OnboardingError } from '@/domain/user-onboarding/service'
 
 import { UserOnboardingForm } from '../components/users/UserOnboardingForm'
@@ -58,7 +58,7 @@ export async function PenggunaView(props: AdminViewServerProps) {
           {back}
         </div>
       </DashHead>
-      <UserOnboardingForm key={u?.id ?? 'baru'} mode={create ? 'create' : 'update'} detail={detail} self={u !== null && u.id === userId(req)} />
+      <UserOnboardingForm key={u?.id ?? 'baru'} mode={create ? 'create' : 'update'} detail={detail} self={u !== null && u.id === userId(req)} groupAdmin={isGroupAdmin(req)} />
     </Frame>
   )
 }

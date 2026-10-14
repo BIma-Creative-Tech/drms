@@ -22934,6 +22934,7 @@
         "pk-pm",
         "pk-finance",
         "pk-owner",
+        "pk-principal",
         "pk-admin",
         "pk-operator"
       ]
@@ -22998,6 +22999,7 @@
       "schema": "public",
       "values": [
         "pk-owner",
+        "pk-principal",
         "pk-pm",
         "pk-staff",
         "pk-finance",
@@ -23012,6 +23014,7 @@
         "pk-pm",
         "pk-finance",
         "pk-owner",
+        "pk-principal",
         "pk-admin",
         "pk-operator"
       ]
@@ -23059,6 +23062,7 @@
         "pk-pm",
         "pk-finance",
         "pk-owner",
+        "pk-principal",
         "pk-admin",
         "pk-operator"
       ]

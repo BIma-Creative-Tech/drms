@@ -60,7 +60,7 @@ const audit = async (id: number, action: string) =>
 describe('AC-1 / AC-3: Direktur (Diketahui) → Finance; notifications to Direktur, never to the PM', () => {
   it('submit → pending_ack; every active Direktur (not requester) is notified, PM and Finance are not; then Finance is notified', async () => {
     const { id, body } = await submitted()
-    expect(body).toMatchObject({ status: 'pending_ack', statusLabel: 'Menunggu Diketahui (Direktur)', approvalRule: { acknowledgeRole: 'pk-owner', decisionRoles: ['pk-owner', 'pk-finance'] } })
+    expect(body).toMatchObject({ status: 'pending_ack', statusLabel: 'Menunggu Diketahui (Direktur)', approvalRule: { acknowledgeRole: 'pk-owner', decisionRoles: ['pk-owner', 'pk-finance', 'pk-principal'] } })
     const notified = async (event: string) =>
       (await sqlAs('app', 'SELECT user_id::int AS u FROM notifications WHERE event = $1 AND doc_id = $2', [event, String(id)])).rows.map((r) => r.u as number)
     const ack = await notified('expense.pending_ack')

@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
-import { relId } from '@/access/roles'
+import { relId, ROLE_LABELS, type Role } from '@/access/roles'
 import { approvalsOf, settings, type ApprovalRow, type RequestDoc } from '@/domain/expense/common'
 import { displayNames } from '@/domain/companies'
 import { COMPANY_SIGNATURE_SOURCE, direkturLabel } from '@/domain/direktur-rules'
@@ -29,7 +29,24 @@ export function printedName(r: Pick<ApprovalRow, 'actorName' | 'signatureSource'
   return r.actorName ?? ''
 }
 
+/** "Nama (Direktur)" — the actor of an approval level with its role (ADR 0026: several levels in one box). */
+export function approverWithRole(name: string | null | undefined, role: Role | null): string {
+  const n = (name ?? '').trim()
+  if (!n) return ''
+  return role ? `${n} (${ROLE_LABELS[role]})` : n
+}
+
+/**
+ * Name printed for an approval level in the Approval box: ADR 0025 company-signed rows print the definitive Direktur
+ * ("Nama (Jabatan)", role suffix only when no title is recorded); every other row = `actorName` + role (ADR 0026).
+ */
+export function approvalPrintedName(r: Pick<ApprovalRow, 'actorName' | 'signatureSource' | 'representedDirektur'>, role: Role | null): string {
+  if (r.signatureSource === COMPANY_SIGNATURE_SOURCE && r.representedDirektur?.title?.trim()) return printedName(r)
+  return approverWithRole(printedName(r), role)
+}
+
 /** Latest cycle's signature rows per position (US-46: unsigned positions stay empty). */
+
 function latestCycle(rows: ApprovalRow[]): ApprovalRow[] {
   const max = rows.reduce((m, r) => Math.max(m, r.cycle), 0)
   return rows.filter((r) => r.cycle === max)
@@ -71,6 +88,7 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
   const skippedAck = skipped.some((x) => x.position === 'diketahui')
   const skippedApproval = skipped.some((x) => x.position === 'approval') && (doc.approvalSnapshot?.steps.length ?? 0) === 0
   const noApproval = isNoApproval(doc.approvalSnapshot)
+  const levelRole = (level: number): Role | null => doc.approvalSnapshot?.steps.find((x) => x.level === level && x.approverUserId === null)?.approverRole ?? null
   const approvalImages: PdfImage[] = []
   for (const a of approvals.slice(-2)) approvalImages.push(...(await sig(a)))
 
@@ -97,7 +115,10 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     },
     {
       label: 'Approval',
-      names: pdfSafe(approvals.map((a) => printedName(a)).filter(Boolean).join(', ')),
+      // ADR 0026: every approval level is listed; with several levels each name carries its role ("… (Direktur), … (Owner)").
+      // ADR 0025: a representative's decision prints the PT's definitive Direktur ("Nama (Jabatan)" — the title already
+      // names the position, so no role suffix then).
+      names: pdfSafe(approvals.map((a) => approvalPrintedName(a, approvals.length > 1 ? levelRole(a.level) : null)).filter(Boolean).join(', ')),
       images: approvals.some((a) => a.decision === 'rejected') ? [] : approvalImages,
       time: formatServerTime(approvals.at(-1)?.decidedAt, tz),
       note: approvals.some((a) => a.decision === 'rejected')

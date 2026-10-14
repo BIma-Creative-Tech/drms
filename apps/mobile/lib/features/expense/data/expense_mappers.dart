@@ -39,7 +39,7 @@ UserProfile userProfileFromJson(Json j) {
   final settings = _map(j['settings']) ?? const {};
   final targets = _map(settings['imageTargets']);
   final emp = _map(j['employee']);
-  final roles = {for (final r in _list(j['roles'])) ?Role.fromCode('$r')};
+  final roles = Role.effective({for (final r in _list(j['roles'])) ?Role.fromCode('$r')});
   final caps = _map(j['capabilities']);
   return UserProfile(
     id: _int(j['id']),
@@ -82,7 +82,7 @@ Capabilities _capabilities(Json? caps, Set<Role> roles) => caps == null
 
 /// `GET /me` `companies[]` item (openapi `MeCompany`, MC3).
 CompanyMembership companyMembershipFromJson(Json j) {
-  final roles = {for (final r in _list(j['roles'])) ?Role.fromCode('$r')};
+  final roles = Role.effective({for (final r in _list(j['roles'])) ?Role.fromCode('$r')});
   final emp = _map(j['employee']);
   final s = _map(j['settings']) ?? const {};
   final empId = _intN(j['employeeId']);

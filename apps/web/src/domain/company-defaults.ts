@@ -199,7 +199,7 @@ function notCopyable(r: Row): boolean {
     acknowledgeRole: (r.acknowledgeRole ?? null) as never,
     acknowledgeUser: null,
     steps: steps.map((s) => ({ level: Number(s.level), approverRole: (s.approverRole ?? null) as never, approverUser: null })),
-    // ADR 0024: "Peran pemohon" (a zero-step rule is copyable only as the Direktur rule)
+    // ADR 0024: "Peran pemohon" (ADR 0026: a zero-step rule is copyable only as the Owner rule)
     requesterRoles: (Array.isArray(r.requesterRoles) ? r.requesterRoles : []) as never,
   }
   const max = typeof r.maxAmount === 'number' ? r.maxAmount : null

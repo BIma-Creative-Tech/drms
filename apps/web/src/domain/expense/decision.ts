@@ -8,22 +8,35 @@
  * expense-request rule whose requester role is EXACTLY Direktur may have zero steps ("Tanpa persetujuan —
  * langsung ke antrian transfer Finance"): a Direktur's own request then goes to Finance with no decision
  * (`direktur_no_approval`, audited); the PM no longer files for a Direktur (`direktur_via_pm*` = legacy).
+ * ADR 0026 (owner 2026-10-13): new decision role Owner (`pk-principal`) one level ABOVE the Direktur — expense
+ * rules end with an Owner level (Staff → PM → Direktur → Owner → Finance transfer queue); a Direktur's own request
+ * now goes to the Owner (no longer zero-step); the zero-step rule ("Pengajuan Owner") is allowed ONLY for requester
+ * role = Owner (`principal_no_approval`). Addendum RAB / inter-project loans stay Direktur-only (no Owner position).
  * Pure module (unit-tested): rule validation shared by the `approval-rules` hook and the submit
  * check, and the submit-time position plan (who may decide each position, which positions are
  * skipped because their only holders are requester/creator).
  */
-import { ROLE_LABELS, type Role } from '@/access/roles'
+import { PRINCIPAL_ROLE, ROLE_LABELS, type Role } from '@/access/roles'
 
 import type { ApprovalSnapshot, RuleInput } from './rules'
 
-/** The only roles that may take a decision (acknowledge / approve / reject) on an ADR 0013 snapshot. */
-export const DECISION_ROLES = ['pk-owner', 'pk-finance'] as const satisfies readonly Role[]
+/**
+ * The only roles that may take a decision (acknowledge / approve / reject) on an ADR 0013 snapshot. ADR 0026:
+ * + Owner (`pk-principal`). Snapshots taken earlier keep their stored list (an Owner is not a decider there).
+ * Compared with the caller's EXACT roles (`exactRolesIn`): the Owner's implied Direktur access never decides.
+ */
+export const DECISION_ROLES = ['pk-owner', 'pk-finance', 'pk-principal'] as const satisfies readonly Role[]
+
+/** ADR 0026: decision roles of an Addendum RAB snapshot (Direktur → Finance, no Owner position). */
+export const ADDENDUM_DECISION_ROLES = ['pk-owner', 'pk-finance'] as const satisfies readonly Role[]
 
 export function isDecisionRole(r: unknown): r is (typeof DECISION_ROLES)[number] {
   return (DECISION_ROLES as readonly unknown[]).includes(r)
 }
 
 export const DIREKTUR_ROLE: Role = 'pk-owner'
+/** ADR 0026: the Owner approval level (shown "Owner"; the key is not "owner" — `pk-owner` is the Direktur). */
+export const OWNER_ROLE: Role = PRINCIPAL_ROLE
 
 /** A decision position left out at submit (G1-2): recorded in the snapshot, the audit and the PDF. */
 export type SkippedPosition = {
@@ -67,38 +80,67 @@ export function isSelfApproval(v: unknown): v is SelfApproval {
  * check before money leaves. Snapshot `selfApproval` + column `expense_requests.g1_exception` (DB-checked).
  */
 export const DIREKTUR_NO_APPROVAL = 'direktur_no_approval' as const
-export type G1Exception = SelfApproval | typeof DIREKTUR_NO_APPROVAL
-export const G1_EXCEPTIONS: readonly G1Exception[] = [DIREKTUR_VIA_PM, DIREKTUR_VIA_PM_SELF, DIREKTUR_NO_APPROVAL]
+/**
+ * ADR 0026 (owner decision 2026-10-13): the Owner's OWN request under the zero-step rule "Pengajuan Owner"
+ * (requester role = Owner) — straight to the Finance transfer queue, audited like ADR 0024. Since ADR 0026 the only
+ * no-approval value set for NEW submissions (`direktur_no_approval` stays on the requests that carry it).
+ */
+export const PRINCIPAL_NO_APPROVAL = 'principal_no_approval' as const
+export type NoApproval = typeof DIREKTUR_NO_APPROVAL | typeof PRINCIPAL_NO_APPROVAL
+export const NO_APPROVALS: readonly NoApproval[] = [DIREKTUR_NO_APPROVAL, PRINCIPAL_NO_APPROVAL]
+export type G1Exception = SelfApproval | NoApproval
+export const G1_EXCEPTIONS: readonly G1Exception[] = [DIREKTUR_VIA_PM, DIREKTUR_VIA_PM_SELF, DIREKTUR_NO_APPROVAL, PRINCIPAL_NO_APPROVAL]
 
-/** Snapshot of a Direktur's own request without approval (ADR 0024). */
+/** Snapshot of a request without approval: a Direktur's own request (ADR 0024, legacy) or the Owner's (ADR 0026). */
 export function isNoApproval(s: { selfApproval?: unknown } | null | undefined): boolean {
-  return s?.selfApproval === DIREKTUR_NO_APPROVAL
+  return (NO_APPROVALS as readonly unknown[]).includes(s?.selfApproval)
 }
 
-/** Panel / timeline / PDF / report text of the ADR 0024 exception. */
+/** Panel / timeline / PDF / report text of the ADR 0024 exception (requests that carry `direktur_no_approval`). */
 export const NO_APPROVAL_NOTE = 'Tanpa persetujuan — pengajuan Direktur (kebijakan PT)'
+/** ADR 0026: text of the Owner's own request without approval. */
+export const PRINCIPAL_NO_APPROVAL_NOTE = 'Tanpa persetujuan — pengajuan Owner (kebijakan PT)'
+
+/** Note of a no-approval snapshot by its exception (null = not a no-approval snapshot). */
+export function noApprovalNote(s: { selfApproval?: unknown } | null | undefined): string | null {
+  return s?.selfApproval === PRINCIPAL_NO_APPROVAL ? PRINCIPAL_NO_APPROVAL_NOTE : s?.selfApproval === DIREKTUR_NO_APPROVAL ? NO_APPROVAL_NOTE : null
+}
+
+/** Requester role of a no-approval snapshot ("Owner" / "Direktur"; null = not one). */
+export function noApprovalRequesterRole(s: { selfApproval?: unknown } | null | undefined): Role | null {
+  return s?.selfApproval === PRINCIPAL_NO_APPROVAL ? OWNER_ROLE : s?.selfApproval === DIREKTUR_NO_APPROVAL ? DIREKTUR_ROLE : null
+}
 /** Rule form / list label of a zero-step rule. */
 export const NO_APPROVAL_RULE_LABEL = 'Tanpa persetujuan — langsung ke antrian transfer Finance'
 /** PDF box text of the decision positions of such a request. */
 export const NO_APPROVAL_PDF_LABEL = '(tidak berlaku — tanpa persetujuan)'
 
-/** Requester roles offered in "Peran pemohon" (ADR 0024; Operator never files expense requests). */
-export const REQUESTER_ROLE_OPTIONS = ['pk-owner', 'pk-pm', 'pk-staff', 'pk-finance', 'pk-admin'] as const satisfies readonly Role[]
+/** Requester roles offered in "Peran pemohon" (ADR 0024; Operator never files expense requests; ADR 0026 + Owner). */
+export const REQUESTER_ROLE_OPTIONS = ['pk-owner', 'pk-principal', 'pk-pm', 'pk-staff', 'pk-finance', 'pk-admin'] as const satisfies readonly Role[]
+
+/** ADR 0026: the requester role a zero-step rule must have — exactly Owner (was Direktur under ADR 0024). */
+export const NO_APPROVAL_REQUESTER_ROLE: Role = OWNER_ROLE
 
 /**
- * ADR 0024 guardrail: why a ZERO-STEP rule may not be saved / used (null = fine or not zero-step). Only an
- * expense-request rule whose requester role is EXACTLY Direktur and without "Diketahui" — so an Admin can
- * never open a no-approval path for Staff / PM / Finance. Mirrored by the DB trigger `approval_rules_zero_step`.
+ * ADR 0024 guardrail, ADR 0026 role: why a ZERO-STEP rule may not be saved / used (null = fine or not zero-step).
+ * Only an expense-request rule whose requester role is EXACTLY Owner and without "Diketahui" — so an Admin can
+ * never open a no-approval path for Direktur / Staff / PM / Finance. Mirrored by the DB trigger `approval_rules_zero_step`.
  */
 export function zeroStepRuleError(rule: Pick<RuleInput, 'steps' | 'requesterRoles' | 'acknowledge'>, docType: string = 'expense_request'): string | null {
   if (rule.steps.length > 0) return null
   if (docType !== 'expense_request') return 'Aturan Addendum RAB harus punya minimal 1 level approval.'
   const roles = [...new Set(rule.requesterRoles ?? [])]
-  if (roles.length !== 1 || roles[0] !== DIREKTUR_ROLE) {
-    return `Aturan tanpa level approval ("${NO_APPROVAL_RULE_LABEL}") hanya boleh untuk Peran pemohon = ${ROLE_LABELS[DIREKTUR_ROLE]} saja (ADR 0024). Tambahkan level approval atau ubah Peran pemohon.`
+  if (roles.length !== 1 || roles[0] !== NO_APPROVAL_REQUESTER_ROLE) {
+    return `Aturan tanpa level approval ("${NO_APPROVAL_RULE_LABEL}") hanya boleh untuk Peran pemohon = ${ROLE_LABELS[NO_APPROVAL_REQUESTER_ROLE]} saja (ADR 0026; pengajuan ${ROLE_LABELS[DIREKTUR_ROLE]} disetujui ${ROLE_LABELS[OWNER_ROLE]}). Tambahkan level approval atau ubah Peran pemohon.`
   }
   if (rule.acknowledge !== 'none') return `Aturan "${NO_APPROVAL_RULE_LABEL}" tidak memakai "Diketahui Oleh": pilih "Tidak dipakai" (ADR 0024).`
   return null
+}
+
+/** ADR 0026: a zero-step rule that is valid as the Owner's no-approval rule (requester role exactly Owner, no "Diketahui"). */
+export function isNoApprovalRule(rule: Pick<RuleInput, 'steps' | 'requesterRoles' | 'acknowledge'>): boolean {
+  const roles = [...new Set(rule.requesterRoles ?? [])]
+  return rule.steps.length === 0 && rule.acknowledge === 'none' && roles.length === 1 && roles[0] === NO_APPROVAL_REQUESTER_ROLE
 }
 
 /** Printed in the PDF / shown in the panel when the snapshot carries the ADR 0021 G1 exception. */
@@ -107,7 +149,7 @@ export const DIREKTUR_VIA_PM_SELF_NOTE = 'Pengajuan Direktur — diajukan oleh P
 
 /** Panel / PDF / audit text of the exception (null = none); ADR 0021 wording kept for those requests. */
 export function selfApprovalNote(v: unknown): string | null {
-  return v === DIREKTUR_VIA_PM ? DIREKTUR_VIA_PM_NOTE : v === DIREKTUR_VIA_PM_SELF ? DIREKTUR_VIA_PM_SELF_NOTE : v === DIREKTUR_NO_APPROVAL ? NO_APPROVAL_NOTE : null
+  return v === DIREKTUR_VIA_PM ? DIREKTUR_VIA_PM_NOTE : v === DIREKTUR_VIA_PM_SELF ? DIREKTUR_VIA_PM_SELF_NOTE : noApprovalNote({ selfApproval: v })
 }
 
 /** Label of the ADR 0021 "Diketahui" filler (rule form, panel). */
@@ -123,7 +165,11 @@ export function ruleDecisionError(rule: RuleShape, rolesOfUser: (id: number) => 
   if (zero) return zero
   if (docType !== 'expense_request' && (rule.requesterRoles ?? []).length > 0) return 'Peran pemohon hanya untuk aturan Pengajuan biaya (ADR 0024).'
   const label = (r: Role) => ROLE_LABELS[r]
-  const allowed = `${label('pk-owner')} atau ${label('pk-finance')}`
+  const allowed = `${label('pk-owner')}, ${label(OWNER_ROLE)} atau ${label('pk-finance')}`
+  // ADR 0026: Addendum RAB stays Direktur → Finance — no Owner position on an addendum rule.
+  if (docType !== 'expense_request' && (rule.acknowledgeRole === OWNER_ROLE || rule.steps.some((s) => s.approverRole === OWNER_ROLE))) {
+    return `Aturan Addendum RAB tetap ${label('pk-owner')} lalu ${label('pk-finance')}: peran ${label(OWNER_ROLE)} hanya untuk aturan Pengajuan biaya (ADR 0026).`
+  }
   if (rule.acknowledge !== 'none') {
     const by = rule.acknowledgeBy ?? 'scope_manager'
     if (by === 'scope_manager') {
@@ -134,9 +180,9 @@ export function ruleDecisionError(rule: RuleShape, rolesOfUser: (id: number) => 
     }
     if (by === 'role') {
       if (!rule.acknowledgeRole) return 'Pilih peran "Diketahui Oleh".'
-      if (!isDecisionRole(rule.acknowledgeRole)) return `Peran "Diketahui Oleh" harus ${allowed} (ADR 0013: PM/Staff/Admin tidak memberi keputusan).`
-      if (rule.acknowledge === 'optional' && rule.acknowledgeRole === DIREKTUR_ROLE) {
-        return `"Diketahui" oleh ${label('pk-owner')} adalah persetujuan dan tidak boleh opsional (ADR 0013). Pilih "Wajib".`
+      if (!isDecisionRole(rule.acknowledgeRole)) return `Peran "Diketahui Oleh" harus ${allowed} (ADR 0013/0026: PM/Staff/Admin tidak memberi keputusan).`
+      if (rule.acknowledge === 'optional' && (rule.acknowledgeRole === DIREKTUR_ROLE || rule.acknowledgeRole === OWNER_ROLE)) {
+        return `"Diketahui" oleh ${label(rule.acknowledgeRole)} adalah persetujuan dan tidak boleh opsional (ADR 0013). Pilih "Wajib".`
       }
     }
     if (by === 'user') {
@@ -148,7 +194,7 @@ export function ruleDecisionError(rule: RuleShape, rolesOfUser: (id: number) => 
     if (s.approverUser) {
       if (!(rolesOfUser(s.approverUser) ?? []).some(isDecisionRole)) return `Approver level ${s.level} harus memegang peran ${allowed} (ADR 0013).`
     } else if (s.approverRole && !isDecisionRole(s.approverRole)) {
-      return `Peran approver level ${s.level} harus ${allowed} (ADR 0013: PM/Staff/Admin tidak memberi keputusan).`
+      return `Peran approver level ${s.level} harus ${allowed} (ADR 0013/0026: PM/Staff/Admin tidak memberi keputusan).`
     }
   }
   return null

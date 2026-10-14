@@ -9,6 +9,10 @@ enum Role {
   pm('pk-pm'),
   finance('pk-finance'),
   owner('pk-owner'),
+
+  /// ADR 0026 (owner decision 2026-10-13): "Owner", the approval level above the Direktur (key `pk-principal`;
+  /// `owner` above stays the Direktur). Same view and permissions as the Direktur — see [effective].
+  principal('pk-principal'),
   admin('pk-admin'),
 
   /// Owner decision 2026-10-09: attendance only ("Operator/Anggota").
@@ -23,6 +27,7 @@ enum Role {
     pm => 'PM',
     finance => 'Finance',
     owner => 'Direktur',
+    principal => 'Owner',
     admin => 'Admin',
     operator => 'Operator/Anggota',
   };
@@ -33,6 +38,16 @@ enum Role {
     }
     return null;
   }
+
+  /// ADR 0026: roles + the roles they imply — an Owner ([principal]) has every Direktur ([owner]) view and permission
+  /// (the server lists both in `/me`; older caches may hold only `pk-principal`). Deciding stays the server's.
+  static Set<Role> effective(Iterable<Role> roles) => {...roles, if (roles.contains(principal)) owner};
+
+  /// UI labels of [roles]: the Direktur implied by the Owner role is not repeated ("Owner", not "Direktur, Owner").
+  static String labelsOf(Set<Role> roles) => [
+    for (final r in Role.values)
+      if (roles.contains(r) && !(r == owner && roles.contains(principal))) r.label,
+  ].join(', ');
 }
 
 /// Home variant chosen from the roles (union of permissions; the server re-checks every action).
@@ -153,10 +168,7 @@ abstract class CompanyMembership with _$CompanyMembership {
   bool get staffOnly => roles.isNotEmpty && roles.every((r) => r == Role.staff);
 
   /// "DRMS — Direktur, Finance" (switcher rows).
-  String get roleLabels => [
-    for (final r in Role.values)
-      if (has(r)) r.label,
-  ].join(', ');
+  String get roleLabels => Role.labelsOf(roles);
 }
 
 /// `GET /api/v1/me` (openapi `Me`).
@@ -280,7 +292,8 @@ abstract class UserProfile with _$UserProfile {
     return local.isEmpty ? 'Pengguna' : local;
   }
 
-  /// Direktur first, then Finance (both: approval inbox + KPI home), PM (team monitor), Staff.
+  /// Direktur first, then Finance (both: approval inbox + KPI home), PM (team monitor), Staff. ADR 0026: the Owner gets
+  /// the Direktur home (his roles carry `pk-owner`, [Role.effective]).
   HomeKind get homeKind {
     if (has(Role.owner)) return HomeKind.direktur;
     if (has(Role.finance)) return HomeKind.finance;
@@ -294,11 +307,8 @@ abstract class UserProfile with _$UserProfile {
   /// PM team list / team dashboard (US-17, read-only).
   bool get hasTeamMonitor => capabilities.teamMonitor;
 
-  /// Roles as UI labels ("Direktur", "Finance", …).
-  String get roleLabels => [
-    for (final r in Role.values)
-      if (has(r)) r.label,
-  ].join(', ');
+  /// Roles as UI labels ("Direktur", "Finance", "Owner", …).
+  String get roleLabels => Role.labelsOf(roles);
 
   /// Who may create requests on the APK (requirements §4: Staff and PM create own requests).
   /// ADR 0024 (owner 2026-10-11): the Direktur files his own requests (straight to the Finance transfer queue).

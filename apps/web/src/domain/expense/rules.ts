@@ -33,7 +33,8 @@ export type RuleInput = {
   steps: Array<{ level: number; approverRole?: Role | null; approverUser?: number | null }>
   /**
    * ADR 0024 "Peran pemohon": the rule applies only when EVERY requester holds one of these roles in the
-   * request's PT (empty / absent = any requester). A zero-step rule requires exactly ['pk-owner'].
+   * request's PT (empty / absent = any requester; STORED roles — an Owner is not a "Direktur" requester).
+   * A zero-step rule requires exactly ['pk-principal'] (ADR 0026; was ['pk-owner'] under ADR 0024).
    */
   requesterRoles?: readonly Role[] | null
 }
@@ -161,8 +162,8 @@ export function stepsError(steps: RuleInput['steps'], opts: { allowEmpty?: boole
 export type AckDelegation = { to: AckDelegate; userIds: number[]; reason: string; originalUserId: number | null }
 
 export function buildSnapshot(r: RuleInput, acknowledgerUserId: number | null, delegation?: AckDelegation | null): ApprovalSnapshot {
-  // ADR 0024: a zero-step rule is valid only as the Direktur no-approval rule (requester role = Direktur only)
-  const zero = r.steps.length === 0 && r.acknowledge === 'none' && (r.requesterRoles ?? []).length === 1 && r.requesterRoles![0] === 'pk-owner'
+  // ADR 0024 / 0026: a zero-step rule is valid only as the Owner's no-approval rule (requester role = Owner only)
+  const zero = r.steps.length === 0 && r.acknowledge === 'none' && [...new Set(r.requesterRoles ?? [])].length === 1 && r.requesterRoles![0] === 'pk-principal'
   const err = stepsError(r.steps, { allowEmpty: zero })
   if (err) throw new Error(err)
   const delegated = delegation
@@ -246,6 +247,10 @@ export function resolveAckDelegation(input: {
   return null
 }
 
+/**
+ * The deciding caller. ADR 0026: `roles` are the caller's STORED roles in the document's PT (`exactRolesIn`) —
+ * never the effective roles: the Owner's implied Direktur access must not match a Direktur step (and vice versa).
+ */
 export type Caller = { id: number; roles: readonly Role[] }
 
 /** G2: caller matches the approval step (a named user wins over the role). */

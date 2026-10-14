@@ -1,7 +1,7 @@
 /**
  * DRMS 10/10 9c (WA-06): readable approval timeline of a request — the web counterpart of the APK
  * `turn_timeline.dart` (buildTimeline + TimelineView): Diajukan → Persetujuan PM / Diketahui →
- * Persetujuan Direktur / Approval → Transfer Finance, per step the role, the planned approver, the
+ * Persetujuan Direktur → Persetujuan Owner (ADR 0026) / Approval → Transfer Finance, per step the role, the planned approver, the
  * state (selesai / saat ini / menunggu / dilewati / ditolak), who acted, when and the note. Replaces
  * the raw JSON snapshot for everyone (raw JSON stays for Admin only, collapsed).
  * Pure module (unit-tested): derived from the snapshot stored at submit + the decision rows of the
@@ -9,7 +9,7 @@
  */
 import { ROLE_LABELS, type Role } from '@/access/roles'
 
-import { DIREKTUR_ROLE, isDecisionSnapshot, isNoApproval, NO_APPROVAL_NOTE, selfApprovalNote, SKIPPED_LABEL, type SkippedPosition } from './decision'
+import { DIREKTUR_ROLE, isDecisionSnapshot, isNoApproval, noApprovalNote, noApprovalRequesterRole, OWNER_ROLE, selfApprovalNote, SKIPPED_LABEL, type SkippedPosition } from './decision'
 import type { AckBy, AckDelegate, AckMode } from './rules'
 import type { RequestStatus, RequestType } from './types'
 
@@ -81,6 +81,7 @@ const DELEGATE_LABELS: Record<AckDelegate, string> = { owner: ROLE_LABELS['pk-ow
 /** Title + role of the "Diketahui" position (APK acknowledgeTitle). */
 export function ackPosition(s: TimelineSnapshot | null): { title: string; role: string } {
   if (pmFlow(s)) return { title: 'Persetujuan PM', role: 'PM project' }
+  if (s?.acknowledgeBy === 'role' && s.acknowledgeRole === OWNER_ROLE) return { title: 'Persetujuan Owner (Diketahui)', role: ROLE_LABELS[OWNER_ROLE] }
   if (s && (isDecisionSnapshot(s) || s.acknowledgeRole === DIREKTUR_ROLE)) return { title: 'Persetujuan Direktur (Diketahui)', role: ROLE_LABELS[DIREKTUR_ROLE] }
   if (s?.acknowledgeBy === 'scope_manager') return { title: 'Diketahui (PM / penanggung jawab)', role: 'PM / penanggung jawab' }
   if (s?.acknowledgeBy === 'role' && s.acknowledgeRole) return { title: 'Diketahui Oleh', role: ROLE_LABELS[s.acknowledgeRole] }
@@ -91,7 +92,10 @@ export function ackPosition(s: TimelineSnapshot | null): { title: string; role: 
 export function approvalPosition(s: TimelineSnapshot | null, level: number, multi: boolean): { title: string; role: string } {
   const role = s?.steps.find((x) => x.level === level)?.approverRole ?? null
   const suffix = multi ? ` (level ${level})` : ''
-  if (role === DIREKTUR_ROLE) return { title: `Persetujuan Direktur${suffix}`, role: ROLE_LABELS[DIREKTUR_ROLE] }
+  // ADR 0026: Direktur → Owner — a role that holds ONE level is named without "(level n)"
+  const own = role && (s?.steps.filter((x) => x.approverRole === role && x.approverUserId === null).length ?? 0) <= 1 ? '' : suffix
+  if (role === DIREKTUR_ROLE) return { title: `Persetujuan Direktur${own}`, role: ROLE_LABELS[DIREKTUR_ROLE] }
+  if (role === OWNER_ROLE) return { title: `Persetujuan Owner${own}`, role: ROLE_LABELS[OWNER_ROLE] }
   if (role === 'pk-finance' || (!role && s && isDecisionSnapshot(s))) return { title: `Approval Finance${suffix}`, role: ROLE_LABELS['pk-finance'] }
   return { title: multi ? `Approval level ${level}` : 'Approval', role: role ? ROLE_LABELS[role] : 'Approver' }
 }
@@ -101,9 +105,10 @@ export function g1ExceptionText(v: unknown): string | null {
   return selfApprovalNote(v)
 }
 
-/** ADR 0024 step of a request without approval (web = APK). */
+/** ADR 0024 step of a request without approval (web = APK). ADR 0026: the requester role follows the exception. */
 export const NO_APPROVAL_STEP_TITLE = 'Persetujuan'
 export const NO_APPROVAL_STEP_ROLE = 'Direktur (pemohon)'
+export const PRINCIPAL_NO_APPROVAL_STEP_ROLE = 'Owner (pemohon)'
 
 export function buildApprovalTimeline(d: TimelineInput): ApprovalTimelineStep[] {
   const snap = d.snapshot
@@ -133,10 +138,11 @@ export function buildApprovalTimeline(d: TimelineInput): ApprovalTimelineStep[] 
     note: submitted ? creatorNote : ['belum diajukan', creatorNote].filter(Boolean).join(' · '),
   })
 
-  // ADR 0024: a Direktur's own request without approval → one "Persetujuan" step, skipped by policy
-  // (APK turn_timeline.dart builds the same step).
+  // ADR 0024 / 0026: a Direktur's (legacy) / the Owner's own request without approval → one "Persetujuan" step,
+  // skipped by policy (APK turn_timeline.dart builds the same step).
   if (isNoApproval(snap)) {
-    steps.push({ key: 'no-approval', title: NO_APPROVAL_STEP_TITLE, role: NO_APPROVAL_STEP_ROLE, planned: null, state: 'skipped', actor: null, at: null, note: NO_APPROVAL_NOTE })
+    const role = noApprovalRequesterRole(snap) === OWNER_ROLE ? PRINCIPAL_NO_APPROVAL_STEP_ROLE : NO_APPROVAL_STEP_ROLE
+    steps.push({ key: 'no-approval', title: NO_APPROVAL_STEP_TITLE, role, planned: null, state: 'skipped', actor: null, at: null, note: noApprovalNote(snap) })
   }
 
   // 2. Persetujuan PM / Diketahui
@@ -180,11 +186,13 @@ export function buildApprovalTimeline(d: TimelineInput): ApprovalTimelineStep[] 
   if (!snap && !submitted) {
     // Draft: the rule is chosen at submit — show the usual next positions without names.
     steps.push({ key: 'approval-1', title: 'Persetujuan Direktur', role: ROLE_LABELS[DIREKTUR_ROLE], planned: null, state: 'pending', actor: null, at: null, note: 'aturan approval ditetapkan saat diajukan' })
+    // ADR 0026: the default rules end with the Owner level
+    steps.push({ key: 'approval-2', title: 'Persetujuan Owner', role: ROLE_LABELS[OWNER_ROLE], planned: null, state: 'pending', actor: null, at: null, note: null })
   }
   for (const s of snap?.skipped ?? []) {
     if (s.position !== 'approval') continue
     const pos = approvalPosition(snap, s.level, false)
-    steps.push({ key: `skipped-${s.level}`, title: s.role === DIREKTUR_ROLE ? 'Persetujuan Direktur' : s.role === 'pk-finance' ? 'Approval Finance' : pos.title, role: s.role ? ROLE_LABELS[s.role] : pos.role, planned: name(s.userId) ?? (s.role ? ROLE_LABELS[s.role] : null), state: 'skipped', actor: null, at: null, note: `${SKIPPED_LABEL} — ${s.reason}` })
+    steps.push({ key: `skipped-${s.level}`, title: s.role === DIREKTUR_ROLE ? 'Persetujuan Direktur' : s.role === OWNER_ROLE ? 'Persetujuan Owner' : s.role === 'pk-finance' ? 'Approval Finance' : pos.title, role: s.role ? ROLE_LABELS[s.role] : pos.role, planned: name(s.userId) ?? (s.role ? ROLE_LABELS[s.role] : null), state: 'skipped', actor: null, at: null, note: `${SKIPPED_LABEL} — ${s.reason}` })
   }
 
   // 4. Transfer Finance (posted Pengajuan Baru / Reimburse transfers; voided ones are listed in the note)

@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import { APIError, type PayloadRequest } from 'payload'
 
-import { employeeIn, relId, rolesIn, userId, userRoles } from '@/access/roles'
+import { employeeIn, exactRolesIn, exactRolesOf, relId, rolesIn, userId, userRoles } from '@/access/roles'
 import { writeAuditDetached } from '@/audit/writer'
 import { displayNames, settings } from '@/domain/companies'
 import { DEFAULT_TZ, localDateInTz } from '@/lib/time'
@@ -157,12 +157,14 @@ export async function actorContext(req: PayloadRequest, doc: RequestDoc): Promis
   // THE DOCUMENT's PT (Finance in PT A is nobody in PT B), and "requester" = the caller's employee there.
   const company = relId((doc as { company?: unknown }).company)
   const roles = company !== undefined ? rolesIn(req, company) : userRoles(req)
+  // ADR 0026: deciding is matched on the STORED roles (the Owner's implied Direktur access never decides a Direktur step)
+  const decisionRoles = company !== undefined ? exactRolesIn(req, company) : exactRolesOf(req.user)
   const emp = company !== undefined ? employeeIn(req, company) : relId((req.user as { employee?: unknown } | null)?.employee)
   const cycle = doc.approvalCycle ?? 0
   const rows = cycle > 0 ? await approvalsOf(req, doc.id, cycle) : []
   const decisions = rows.filter((r) => r.decision !== 'signed')
   const snap = doc.approvalSnapshot ?? null
-  const caller = { id: uid, roles }
+  const caller = { id: uid, roles: decisionRoles }
   const acknowledged = rows.some((r) => r.position === 'diketahui' && r.decision === 'acknowledged')
   const step = snap?.steps.find((s) => s.level === (doc.currentLevel ?? 0))
   const isCreator = relId(doc.createdBy) === uid
@@ -182,7 +184,7 @@ export async function actorContext(req: PayloadRequest, doc: RequestDoc): Promis
     alreadyDecided: decisions.some((r) => relId(r.actor) === uid && (r.position === 'diketahui' || r.position === 'approval')),
     pmFlow: snap?.acknowledgeBy === 'scope_manager' && isDecisionSnapshot(snap),
     // ADR 0021: the PM project decides ONLY the request where he is the snapshot's acknowledger.
-    lacksDecisionRole: lacksDecisionRole(snap, roles) && !isAcknowledger,
+    lacksDecisionRole: lacksDecisionRole(snap, decisionRoles) && !isAcknowledger,
     selfApprovalAllowed: selfApprovalAllowed(doc, { isCreator, isRequester, isAcknowledger, matchesCurrentStep }),
   }
 }

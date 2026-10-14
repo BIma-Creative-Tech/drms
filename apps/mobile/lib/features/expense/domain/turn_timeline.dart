@@ -47,7 +47,7 @@ List<TimelineStep> buildTimeline(ExpenseDetail d) {
   final submitted = d.status != RequestStatus.draft;
   final pmFlow = d.approvalRule?.pmApproval ?? false;
   // ADR 0024: a Direktur's own request without approval reads like the web: Diajukan → Persetujuan (dilewati,
-  // "Tanpa persetujuan — pengajuan Direktur (kebijakan PT)") → Transfer Finance.
+  // "Tanpa persetujuan — pengajuan Direktur (kebijakan PT)") → Transfer Finance. ADR 0026: the Owner's own request.
   final noApproval = d.approvalRule?.noApproval ?? false;
   final approvalFlow = d.approvalRule?.decisionFlow ?? false;
 
@@ -80,7 +80,8 @@ List<TimelineStep> buildTimeline(ExpenseDetail d) {
   }
 
   if (noApproval) {
-    steps.add(const TimelineStep(title: noApprovalStepTitle, state: TurnState.skipped, note: noApprovalNote));
+    final note = (d.approvalRule?.ownerNoApproval ?? false) ? ownerNoApprovalNote : noApprovalNote;
+    steps.add(TimelineStep(title: noApprovalStepTitle, state: TurnState.skipped, note: note));
     steps.add(transferStep(d, submitted: submitted, rejected: false));
     return steps;
   }
@@ -291,6 +292,15 @@ const skippedNote = '(tidak berlaku — pemohon)';
 const noApprovalStepTitle = 'Persetujuan';
 const noApprovalNote = 'Tanpa persetujuan — pengajuan Direktur (kebijakan PT)';
 
+/// ADR 0026: the Owner's own request without approval (web `PRINCIPAL_NO_APPROVAL_NOTE`).
+const ownerNoApprovalNote = 'Tanpa persetujuan — pengajuan Owner (kebijakan PT)';
+
+/// ADR 0026 (owner decision 2026-10-13): the approval level above the Direktur — role code and step title (web
+/// `OWNER_STEP_LABEL`).
+const ownerRoleCode = 'pk-principal';
+const ownerStepTitle = 'Persetujuan Owner';
+const ownerApproveTitle = 'Setujui sebagai Owner';
+
 /// "Diketahui" position title: PM project approval since ADR 0021 (checked FIRST — those snapshots
 /// also carry decision roles), Direktur approval under ADR 0013, PM on pre-E1 snapshots.
 String acknowledgeTitle(ApprovalRuleInfo? rule) {
@@ -302,13 +312,15 @@ String acknowledgeTitle(ApprovalRuleInfo? rule) {
 }
 
 /// Approval position title: Finance since ADR 0013; pre-E1 snapshots name the role of the level;
-/// ADR 0021 (PM project → Direktur): the Direktur level is "Persetujuan Direktur".
+/// ADR 0021 (PM project → Direktur): the Direktur level is "Persetujuan Direktur"; ADR 0026: the Owner level is
+/// "Persetujuan Owner". A role that holds a single level is named without "(level n)" (web approval-timeline.ts).
 String approvalTitle(ApprovalRuleInfo? rule, int level, {required bool multi}) {
   final base = multi ? 'Approval level $level' : 'Approval';
   final role = rule?.roleOfLevel(level);
-  if ((rule?.pmApproval ?? false) && role == 'pk-owner') {
-    return multi ? 'Persetujuan Direktur (level $level)' : 'Persetujuan Direktur';
-  }
+  final levelsOfRole = rule?.steps.where((s) => s.approverRole == role && s.approverUserId == null).length ?? 0;
+  final suffix = multi && levelsOfRole > 1 ? ' (level $level)' : '';
+  if (role == ownerRoleCode) return '$ownerStepTitle$suffix';
+  if ((rule?.pmApproval ?? false) && role == 'pk-owner') return 'Persetujuan Direktur$suffix';
   final label = switch (role) {
     'pk-finance' => 'Finance',
     'pk-owner' => 'Direktur',

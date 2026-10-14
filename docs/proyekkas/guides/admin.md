@@ -233,6 +233,28 @@ sampai selesai).
   itu sendiri; PM/Admin/Finance atas namanya ditolak.
 - Setiap perubahan aturan wajib alasan dan tercatat di Audit Log; hanya berlaku untuk pengajuan baru.
 
+**Sejak 13 Okt 2026 (keputusan owner, ADR 0026): level Owner di atas Direktur.**
+
+- Peran baru **Owner** (kode `pk-principal`; "Direktur" tetap kode `pk-owner`). Owner melihat dan boleh melakukan semua
+  yang boleh Direktur (dashboard, daftar, kas, laporan) di PT tempat ia memegang peran Owner; bedanya hanya di alur
+  persetujuan. Centang **Owner** untuk orangnya di **setiap PT** (Pengguna → Akses & Peran, atau matriks Akses PT).
+  **Hanya Admin grup** yang dapat memberi atau mencabut peran Owner (keputusan owner 14 Okt 2026); Admin PT tidak
+  melihat pilihan Owner (bila sudah dipegang: tampil tetapi terkunci), dan server menolak ("Peran Owner hanya dapat
+  diberikan atau dicabut oleh Admin grup."). Admin PT tetap boleh mengubah peran lain orang tersebut.
+- Alur pengajuan biaya: **Staff → PM project → Direktur → Owner → Finance (transfer)**. Migrasi menambahkan **level
+  Owner tepat sesudah level Direktur** (tanpa level Direktur: sebelum level Finance pertama — aturan lama "Diketahui
+  Direktur → Finance" menjadi Diketahui Direktur → level 1 Owner → level 2 Finance; tanpa keduanya: di akhir; level
+  berikutnya dinomori ulang) pada setiap aturan pengajuan biaya yang aktif (nama aturan tidak diubah) dan pada "Pengajuan
+  Direktur", serta membuat aturan **"Pengajuan Owner"** (Peran pemohon = Owner, tanpa level, Prioritas 5) di setiap PT.
+  Aturan tidak aktif lain tidak diubah — tambahkan level Owner sendiri bila diaktifkan lagi.
+- **Tanpa level approval** sekarang hanya boleh untuk Peran pemohon = **Owner saja** (bukan Direktur lagi). Pengajuan
+  Owner sendiri langsung ke antrian transfer Finance ("Tanpa persetujuan — pengajuan Owner (kebijakan PT)", tercatat).
+- Level Owner **tidak pernah dilewati diam-diam**: bila satu-satunya Owner PT adalah pemohon/pembuat pengajuan dengan
+  level Owner (mis. Owner membuat pengajuan untuk orang lain), pengiriman ditolak dengan pesan. Bila belum ada Owner
+  aktif di PT, pengiriman ditolak "Tidak ada pengguna aktif untuk posisi Approval level n (peran Owner)".
+- **Addendum RAB** dan **pinjaman antar project** tetap hanya Direktur; aturan Addendum RAB tidak boleh berisi Owner.
+- Pengajuan yang sudah diajukan sebelum perubahan tetap memakai snapshot lama (Direktur = keputusan terakhir).
+
 ### 4a. Mengubah aturan setelah deploy (sekali, setiap PT: DRMS, LAS, TBK, CS1)
 
 1. Pilih PT di tombol PT bar atas. Periksa **Proyek → Project**: setiap project aktif punya **Project Manager**; dan
