@@ -129,6 +129,7 @@ export const PER_PT_DOC_TYPES: Readonly<Record<string, readonly [table: string, 
   budget_line: ['budget_lines', 'company_id'],
   client: ['clients', 'company_id'],
   vendor: ['vendors', 'company_id'],
+  vendor_bank_account: ['vendor_bank_accounts', 'company_id'], // ADR 0027
   stage_template: ['stage_templates', 'company_id'],
   expense_category: ['expense_categories', 'company_id'],
   cash_in_source: ['cash_in_sources', 'company_id'],
@@ -163,7 +164,7 @@ export const PER_PT_DOC_TYPES: Readonly<Record<string, readonly [table: string, 
 }
 
 /** Doc types added after the MC4 audit backfill (migration 20261003): absent from its frozen BY_ID copy. */
-export const POST_MC4_DOC_TYPES: readonly string[] = ['contract_unit', 'service_report', 'unit_timesheet', 'aftersales_activity', 'daily_report', 'rap_item', 'rap_template', 'resource_type', 'project_loan', 'project_loan_repayment', 'site']
+export const POST_MC4_DOC_TYPES: readonly string[] = ['contract_unit', 'service_report', 'unit_timesheet', 'aftersales_activity', 'daily_report', 'rap_item', 'rap_template', 'resource_type', 'project_loan', 'project_loan_repayment', 'site', 'vendor_bank_account']
 
 async function derivedCompany(tx: Awaited<ReturnType<typeof getRequestTx>>, row: AuditRow, cache: Map<string, number | null>): Promise<number | null | undefined> {
   if (row.companyId !== undefined) return row.companyId

@@ -6,7 +6,7 @@
 import type { Role } from '@/access/roles'
 
 import type { G1Exception, SkippedPosition } from './decision'
-import type { RequestType } from './types'
+import type { PayeeType, RequestType } from './types'
 
 export type AckMode = 'required' | 'optional' | 'none'
 export type AckBy = 'scope_manager' | 'role' | 'user'
@@ -37,6 +37,11 @@ export type RuleInput = {
    * A zero-step rule requires exactly ['pk-principal'] (ADR 0026; was ['pk-owner'] under ADR 0024).
    */
   requesterRoles?: readonly Role[] | null
+  /**
+   * ADR 0027 "Jenis penerima": the rule applies only to requests paid to that payee type (`any` / absent = every
+   * request). E.g. "Pembayaran vendor oleh Finance → Direktur → Owner" (payee vendor + Peran pemohon Finance).
+   */
+  payeeType?: 'any' | PayeeType | null
 }
 
 export type RequestFacts = {
@@ -53,6 +58,8 @@ export type RequestFacts = {
    * without an active account has []). Absent → rules with a requester-role condition never match.
    */
   requesterRoles?: ReadonlyArray<readonly Role[]>
+  /** ADR 0027: payee type of the request (absent = karyawan; addenda: rules with a payee condition never match). */
+  payeeType?: PayeeType | null
 }
 
 export type ApprovalSnapshot = {
@@ -108,7 +115,12 @@ export const ACK_DELEGATION_REASON = 'PM/penanggung jawab adalah pemohon/pembuat
 export const ACK_DELEGATION_REASON_MISSING = 'PM/penanggung jawab belum diatur (Q-07)'
 
 function specificity(r: RuleInput): number {
-  return (r.category ? 1 : 0) + (r.project ? 1 : 0) + (r.costCenter ? 1 : 0) + (r.requestType !== 'any' ? 1 : 0) + ((r.requesterRoles?.length ?? 0) > 0 ? 1 : 0)
+  return (r.category ? 1 : 0) + (r.project ? 1 : 0) + (r.costCenter ? 1 : 0) + (r.requestType !== 'any' ? 1 : 0) + ((r.requesterRoles?.length ?? 0) > 0 ? 1 : 0) + (payeeCondition(r) ? 1 : 0)
+}
+
+/** ADR 0027: the rule's payee-type condition (null = any payee). */
+export function payeeCondition(r: Pick<RuleInput, 'payeeType'>): PayeeType | null {
+  return r.payeeType === 'karyawan' || r.payeeType === 'vendor' ? r.payeeType : null
 }
 
 /** ADR 0024: every requester holds at least one of the rule's requester roles (no condition = true). */
@@ -128,12 +140,14 @@ export function ruleMatches(r: RuleInput, f: RequestFacts): boolean {
   if (r.project && r.project !== f.projectId) return false
   if (r.costCenter && r.costCenter !== f.costCenterId) return false
   if (!requesterRolesMatch(r.requesterRoles, f.requesterRoles)) return false
+  const payee = payeeCondition(r)
+  if (payee !== null && ((f.docType ?? 'expense_request') !== 'expense_request' || payee !== (f.payeeType ?? 'karyawan'))) return false
   return true
 }
 
 /**
  * Best matching rule: lowest `priority` first, then the most specific (category/project/cost
- * center/request type/requester role), then the highest `minAmount` (the narrower amount band), then lowest id.
+ * center/request type/requester role/payee type), then the highest `minAmount` (the narrower amount band), then lowest id.
  */
 export function selectRule(rules: readonly RuleInput[], f: RequestFacts): RuleInput | null {
   const candidates = rules.filter((r) => ruleMatches(r, f))

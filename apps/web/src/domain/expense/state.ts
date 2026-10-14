@@ -6,7 +6,7 @@
  */
 import type { Role } from '@/access/roles'
 
-import { receiptsEditable, type RequestStatus, type RequestType } from './types'
+import { receiptsEditable, type PayeeType, type RequestStatus, type RequestType } from './types'
 
 export const ACTIONS = [
   'edit',
@@ -37,7 +37,8 @@ export const ACTIONS = [
 ] as const
 export type Action = (typeof ACTIONS)[number]
 
-type Row = { from: RequestStatus[]; action: Action; to: RequestStatus[]; types?: RequestType[] }
+/** `payees` absent = every payee type (ADR 0027: rows limited to `karyawan` are the LPJ path a vendor payment never takes). */
+type Row = { from: RequestStatus[]; action: Action; to: RequestStatus[]; types?: RequestType[]; payees?: PayeeType[] }
 
 /**
  * `to` lists every target the action may produce (e.g. submit → pending_ack when the approval
@@ -54,8 +55,12 @@ export const TRANSITIONS: readonly Row[] = [
   { from: ['pending_ack', 'pending_approval'], action: 'reject', to: ['rejected'] },
   // Pengajuan Baru (advance)
   { types: ['advance'], from: ['approved'], action: 'cancel', to: ['cancelled'] },
-  { types: ['advance'], from: ['approved'], action: 'transfer', to: ['transferred'] },
-  { types: ['advance'], from: ['transferred'], action: 'transfer_void', to: ['approved'] },
+  { types: ['advance'], payees: ['karyawan'], from: ['approved'], action: 'transfer', to: ['transferred'] },
+  { types: ['advance'], payees: ['karyawan'], from: ['transferred'], action: 'transfer_void', to: ['approved'] },
+  // ADR 0027 "Pembayaran vendor" (always advance): the invoice is the proof — the transfer completes the request (no
+  // receipts / LPJ / settlement); a void of that transfer re-opens it in the transfer queue.
+  { types: ['advance'], payees: ['vendor'], from: ['approved'], action: 'transfer', to: ['completed'] },
+  { types: ['advance'], payees: ['vendor'], from: ['completed'], action: 'transfer_void', to: ['approved'] },
   // Reimburse
   { types: ['reimburse'], from: ['approved', 'receipts_verified'], action: 'receipt_reject', to: ['receipt_revision'] },
   // E1 (ADR 0013): changed total → re-approval starts again at "Menunggu Diketahui" (Direktur) when the
@@ -68,12 +73,12 @@ export const TRANSITIONS: readonly Row[] = [
   { types: ['reimburse'], from: ['transferred'], action: 'complete', to: ['completed'] },
   // Pengajuan Baru LPJ (T5): receipts complete → LPJ submitted ⇄ revision → verified → settled.
   // lpj_verify → completed directly when the difference is 0 (nothing to settle).
-  { types: ['advance'], from: ['transferred'], action: 'receipts_complete', to: ['receipts_complete'] },
-  { types: ['advance'], from: ['receipts_complete', 'lpj_revision'], action: 'lpj_submit', to: ['lpj_submitted'] },
-  { types: ['advance'], from: ['lpj_submitted'], action: 'lpj_request_revision', to: ['lpj_revision'] },
-  { types: ['advance'], from: ['lpj_submitted'], action: 'lpj_verify', to: ['lpj_verified', 'completed'] },
-  { types: ['advance'], from: ['lpj_verified'], action: 'settle', to: ['completed'] },
-  { types: ['advance'], from: ['completed'], action: 'settle_reverse', to: ['lpj_verified'] },
+  { types: ['advance'], payees: ['karyawan'], from: ['transferred'], action: 'receipts_complete', to: ['receipts_complete'] },
+  { types: ['advance'], payees: ['karyawan'], from: ['receipts_complete', 'lpj_revision'], action: 'lpj_submit', to: ['lpj_submitted'] },
+  { types: ['advance'], payees: ['karyawan'], from: ['lpj_submitted'], action: 'lpj_request_revision', to: ['lpj_revision'] },
+  { types: ['advance'], payees: ['karyawan'], from: ['lpj_submitted'], action: 'lpj_verify', to: ['lpj_verified', 'completed'] },
+  { types: ['advance'], payees: ['karyawan'], from: ['lpj_verified'], action: 'settle', to: ['completed'] },
+  { types: ['advance'], payees: ['karyawan'], from: ['completed'], action: 'settle_reverse', to: ['lpj_verified'] },
 ]
 
 export class TransitionError extends Error {
@@ -87,12 +92,13 @@ export class TransitionError extends Error {
   }
 }
 
-/** Targets reachable from `from` via `action` for `type` (empty = not allowed). */
-export function targets(type: RequestType, from: RequestStatus, action: Action): RequestStatus[] {
+/** Targets reachable from `from` via `action` for `type` / payee type (empty = not allowed). */
+export function targets(type: RequestType, from: RequestStatus, action: Action, payee: PayeeType = 'karyawan'): RequestStatus[] {
   const out = new Set<RequestStatus>()
   for (const r of TRANSITIONS) {
     if (r.action !== action) continue
     if (r.types && !r.types.includes(type)) continue
+    if (r.payees && !r.payees.includes(payee)) continue
     if (!r.from.includes(from)) continue
     for (const t of r.to) out.add(t)
   }
@@ -100,13 +106,15 @@ export function targets(type: RequestType, from: RequestStatus, action: Action):
 }
 
 /** Throws TransitionError unless `from --action--> to` is in the table. */
-export function assertTransition(type: RequestType, from: RequestStatus, action: Action, to: RequestStatus): void {
-  if (!targets(type, from, action).includes(to)) throw new TransitionError(type, from, action, to)
+export function assertTransition(type: RequestType, from: RequestStatus, action: Action, to: RequestStatus, payee: PayeeType = 'karyawan'): void {
+  if (!targets(type, from, action, payee).includes(to)) throw new TransitionError(type, from, action, to)
 }
 
 /** Facts about the caller and the document that the actor guards need (computed by the service). */
 export type ActorContext = {
   type: RequestType
+  /** ADR 0027: `vendor` = vendor payment (no LPJ path). Absent = karyawan. */
+  payeeType?: PayeeType
   status: RequestStatus
   roles: readonly Role[]
   /** "Dibuat Oleh" (server-set creator). */
@@ -154,7 +162,7 @@ export function allowedActions(ctx: ActorContext): Action[] {
   const selfInvolved = ctx.isCreator || ctx.isRequester // G1 / Q-08: may not acknowledge or approve
   const out: Action[] = []
   const add = (a: Action, ok: boolean) => {
-    if (ok && (NON_TRANSITION.has(a) || targets(ctx.type, ctx.status, a).length > 0)) out.push(a)
+    if (ok && (NON_TRANSITION.has(a) || targets(ctx.type, ctx.status, a, ctx.payeeType).length > 0)) out.push(a)
   }
   add('edit', (ctx.status === 'draft' || (ctx.status === 'receipt_revision' && ctx.type === 'reimburse')) && own)
   add('submit', own)

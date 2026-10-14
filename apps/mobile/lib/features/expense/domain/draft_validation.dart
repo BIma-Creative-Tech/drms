@@ -61,13 +61,17 @@ enum RapCheck {
 /// Everything required before "Ajukan" (online submit).
 List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee, RapCheck rap = RapCheck.strict}) {
   final issues = <DraftIssue>[...validateForSave(d), ...requesterIssues(d, selfOnlyEmployee: selfOnlyEmployee)];
-  // D2: project required (no non-project requests; Finance sets the cost center at transfer).
-  if (d.projectId == null) {
-    issues.add(const DraftIssue('projectId', 'Project wajib dipilih.'));
-  } else if (rap == RapCheck.missing) {
+  // D2: project required (no non-project requests; Finance sets the cost center at transfer). ADR 0027 (client
+  // 2026-10-14): a vendor payment may name a cost center instead (e.g. office bills).
+  if (d.projectId == null && !(d.isVendor && d.costCenterId != null)) {
+    final message = d.isVendor ? 'Pilih project atau pusat biaya (pembayaran vendor).' : 'Project wajib dipilih.';
+    issues.add(DraftIssue('projectId', message));
+  } else if (d.projectId != null && rap == RapCheck.missing) {
     issues.add(const DraftIssue('projectId', rapMissingMessage));
   }
-  if (d.bankAccountId == null) {
+  if (d.isVendor) {
+    issues.addAll(vendorIssues(d));
+  } else if (d.bankAccountId == null) {
     issues.add(const DraftIssue('bankAccountId', 'Rekening tujuan wajib dipilih.'));
   }
   if (d.lines.isEmpty) {
@@ -97,7 +101,8 @@ List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee, RapCh
     } else if ((l.computedTotal ?? 0) <= 0) {
       issues.add(DraftIssue('total', 'Total harus lebih dari 0.', lineNo: l.no));
     }
-    if (d.type == RequestType.reimburse && l.receipts.isEmpty) {
+    // a vendor payment is always Pengajuan Baru (no receipts before the transfer, ADR 0027)
+    if (d.type == RequestType.reimburse && !d.isVendor && l.receipts.isEmpty) {
       issues.add(DraftIssue('receipts', 'Reimburse wajib melampirkan minimal 1 nota.', lineNo: l.no));
     }
     for (final r in l.receipts) {
@@ -111,6 +116,24 @@ List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee, RapCh
   }
   return issues;
 }
+
+/// ADR 0027 "Pembayaran vendor": vendor, vendor account, invoice number / date / photo before "Ajukan" (same rules as
+/// the server; the server also refuses a duplicate invoice of the same vendor).
+List<DraftIssue> vendorIssues(DraftRequest d) => [
+  if (d.vendorId == null) const DraftIssue('vendorId', 'Vendor wajib dipilih.'),
+  if (d.vendorBankAccountId == null) const DraftIssue('vendorBankAccountId', 'Rekening vendor wajib dipilih.'),
+  if ((d.invoiceNo ?? '').trim().isEmpty)
+    const DraftIssue('invoiceNo', 'Nomor invoice wajib diisi.')
+  else if (normalizeInvoiceNo(d.invoiceNo).isEmpty)
+    const DraftIssue('invoiceNo', 'Nomor invoice harus memuat huruf atau angka.'),
+  if (d.invoiceDate == null) const DraftIssue('invoiceDate', 'Tanggal invoice wajib diisi.'),
+  if (d.invoiceDate != null && d.invoiceDueDate != null && d.invoiceDueDate!.compareTo(d.invoiceDate!) < 0)
+    const DraftIssue('invoiceDueDate', 'Jatuh tempo tidak boleh sebelum tanggal invoice.'),
+  if (!d.hasInvoiceFile) const DraftIssue('invoiceFile', 'Foto invoice wajib dilampirkan.'),
+];
+
+/// ADR 0027: invoice key of the duplicate check (web `normalizeInvoiceNo`): letters + digits, upper case.
+String normalizeInvoiceNo(String? v) => (v ?? '').replaceAll(RegExp('[^A-Za-z0-9]'), '').toUpperCase();
 
 /// Renumbers lines 1..n after add/remove (the "No" column is automatic, US-37).
 List<DraftLine> renumber(List<DraftLine> lines) => [

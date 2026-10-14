@@ -75,6 +75,7 @@ export interface Config {
     banks: Bank;
     clients: Client;
     vendors: Vendor;
+    'vendor-bank-accounts': VendorBankAccount;
     projects: Project;
     'project-stages': ProjectStage;
     'stage-templates': StageTemplate;
@@ -134,7 +135,11 @@ export interface Config {
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
   };
-  collectionsJoins: {};
+  collectionsJoins: {
+    vendors: {
+      bankAccounts: 'vendor-bank-accounts';
+    };
+  };
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     companies: CompaniesSelect<false> | CompaniesSelect<true>;
@@ -144,6 +149,7 @@ export interface Config {
     banks: BanksSelect<false> | BanksSelect<true>;
     clients: ClientsSelect<false> | ClientsSelect<true>;
     vendors: VendorsSelect<false> | VendorsSelect<true>;
+    'vendor-bank-accounts': VendorBankAccountsSelect<false> | VendorBankAccountsSelect<true>;
     projects: ProjectsSelect<false> | ProjectsSelect<true>;
     'project-stages': ProjectStagesSelect<false> | ProjectStagesSelect<true>;
     'stage-templates': StageTemplatesSelect<false> | StageTemplatesSelect<true>;
@@ -796,6 +802,37 @@ export interface Vendor {
   odooPartnerRef?: string | null;
   active?: boolean | null;
   uuid?: string | null;
+  bankAccounts?: {
+    docs?: (number | VendorBankAccount)[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "vendor-bank-accounts".
+ */
+export interface VendorBankAccount {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  vendor: number | Vendor;
+  bank: number | Bank;
+  accountNo: string;
+  accountHolder: string;
+  label?: string | null;
+  isDefault?: boolean | null;
+  verificationStatus: 'unverified' | 'verified';
+  active?: boolean | null;
+  uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -1099,6 +1136,10 @@ export interface ApprovalRule {
    */
   requesterRoles?: ('pk-owner' | 'pk-principal' | 'pk-pm' | 'pk-staff' | 'pk-finance' | 'pk-admin')[] | null;
   /**
+   * Aturan hanya untuk pengajuan dengan jenis penerima ini (Semua = tanpa syarat).
+   */
+  payeeType: 'any' | 'karyawan' | 'vendor';
+  /**
    * Angka kecil dievaluasi lebih dulu (aturan "Pengajuan Direktur" = 10, default = 100).
    */
   priority?: number | null;
@@ -1284,6 +1325,10 @@ export interface ExpenseRequest {
    */
   company?: (number | null) | Company;
   docNo?: string | null;
+  /**
+   * Vendor: Finance / PM membayar invoice vendor ke rekening vendor (tanpa LPJ).
+   */
+  payeeType: 'karyawan' | 'vendor';
   type: 'advance' | 'reimburse';
   status:
     | 'draft'
@@ -1316,6 +1361,18 @@ export interface ExpenseRequest {
    * Hanya rekening milik pemohon. Kosongkan untuk memakai rekening default pemohon pertama.
    */
   bankAccount?: (number | null) | EmployeeBankAccount;
+  vendor?: (number | null) | Vendor;
+  /**
+   * Rekening tujuan transfer = rekening vendor yang dipilih (dicatat saat diajukan).
+   */
+  vendorBankAccount?: (number | null) | VendorBankAccount;
+  invoiceNo?: string | null;
+  invoiceDate?: string | null;
+  invoiceDueDate?: string | null;
+  /**
+   * Wajib sebelum dikirim. Invoice = bukti pembayaran vendor (tanpa LPJ).
+   */
+  invoiceFile?: (number | null) | MediaAttachment;
   bankSnapshot?: {
     bankName?: string | null;
     accountNo?: string | null;
@@ -2862,6 +2919,10 @@ export interface PayloadLockedDocument {
         value: number | Vendor;
       } | null)
     | ({
+        relationTo: 'vendor-bank-accounts';
+        value: number | VendorBankAccount;
+      } | null)
+    | ({
         relationTo: 'projects';
         value: number | Project;
       } | null)
@@ -3272,6 +3333,26 @@ export interface VendorsSelect<T extends boolean = true> {
   odooPartnerRef?: T;
   active?: T;
   uuid?: T;
+  bankAccounts?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "vendor-bank-accounts_select".
+ */
+export interface VendorBankAccountsSelect<T extends boolean = true> {
+  company?: T;
+  vendor?: T;
+  bank?: T;
+  accountNo?: T;
+  accountHolder?: T;
+  label?: T;
+  isDefault?: T;
+  verificationStatus?: T;
+  active?: T;
+  uuid?: T;
   changeReason?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3478,6 +3559,7 @@ export interface ApprovalRulesSelect<T extends boolean = true> {
   project?: T;
   costCenter?: T;
   requesterRoles?: T;
+  payeeType?: T;
   priority?: T;
   acknowledge?: T;
   acknowledgeBy?: T;
@@ -3636,6 +3718,7 @@ export interface DocumentSequencesSelect<T extends boolean = true> {
 export interface ExpenseRequestsSelect<T extends boolean = true> {
   company?: T;
   docNo?: T;
+  payeeType?: T;
   type?: T;
   status?: T;
   title?: T;
@@ -3645,6 +3728,12 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
   urgencyLevel?: T;
   requesters?: T;
   bankAccount?: T;
+  vendor?: T;
+  vendorBankAccount?: T;
+  invoiceNo?: T;
+  invoiceDate?: T;
+  invoiceDueDate?: T;
+  invoiceFile?: T;
   bankSnapshot?:
     | T
     | {

@@ -114,6 +114,13 @@ export const DIREKTUR_RULE_NAME = 'Pengajuan Direktur'
 /** ADR 0026: name of the seeded no-approval rule for the Owner's own requests (also migration 20261013_630200_d1310_owner_role_data). */
 export const OWNER_RULE_NAME = 'Pengajuan Owner'
 
+/**
+ * ADR 0027 (DRMS 13/10 Wave 4, D3): a vendor payment filed by Finance → Direktur → Owner (ADR 0026; no PM project step). A PM's vendor
+ * payment needs no rule of its own: the default rule applies and the PM step is skipped because he is its PM (G1-2).
+ * Also inserted per PT by migration 20261013_700200_d1310_vendor_payments_data.
+ */
+export const VENDOR_FINANCE_RULE_NAME = 'Pembayaran vendor oleh Finance — Direktur lalu Owner'
+
 export const DEFAULT_APPROVAL_RULES = [
   {
     // ADR 0021 (owner decision 2026-10-10): Staff → PM project ("Diketahui" = Persetujuan PM) → Direktur;
@@ -169,6 +176,27 @@ export const DEFAULT_APPROVAL_RULES = [
     signDiajukan: 'required',
     signDibuat: 'required',
     steps: [{ level: 1, approverRole: 'pk-principal' }],
+    active: true,
+  },
+  {
+    // ADR 0027: vendor payment filed by Finance (Peran pemohon = Finance, Jenis penerima = Vendor) → Direktur → Owner (ADR 0026).
+    name: VENDOR_FINANCE_RULE_NAME,
+    docType: 'expense_request',
+    requestType: 'any',
+    payeeType: 'vendor',
+    minAmount: 0,
+    maxAmount: null,
+    priority: 20,
+    requesterRoles: ['pk-finance'],
+    acknowledge: 'none',
+    acknowledgeBy: 'role',
+    acknowledgeRole: null,
+    signDiajukan: 'required',
+    signDibuat: 'required',
+    steps: [
+      { level: 1, approverRole: 'pk-owner' },
+      { level: 2, approverRole: 'pk-principal' },
+    ],
     active: true,
   },
   {

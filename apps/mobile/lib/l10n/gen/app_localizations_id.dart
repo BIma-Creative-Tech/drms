@@ -3830,4 +3830,59 @@ class AppLocalizationsId extends AppLocalizations {
   String loanDueOn(String date) {
     return 'Jatuh tempo $date';
   }
+
+  @override
+  String get fieldPayeeType => 'Jenis penerima';
+
+  @override
+  String get payeeKaryawan => 'Karyawan';
+
+  @override
+  String get payeeVendor => 'Vendor';
+
+  @override
+  String get fieldVendor => 'Vendor';
+
+  @override
+  String get fieldVendorBankAccount => 'Rekening vendor';
+
+  @override
+  String get fieldInvoiceNo => 'Nomor invoice';
+
+  @override
+  String get fieldInvoiceDate => 'Tanggal invoice';
+
+  @override
+  String get fieldInvoiceDueDate => 'Jatuh tempo';
+
+  @override
+  String get fieldInvoiceFile => 'Foto invoice';
+
+  @override
+  String get invoiceCamera => 'Kamera';
+
+  @override
+  String get invoiceGallery => 'Galeri';
+
+  @override
+  String get invoiceAttached => 'Foto invoice terlampir';
+
+  @override
+  String get invoiceOnServer => 'Invoice tersimpan di server';
+
+  @override
+  String get invoiceMissing => 'Belum ada foto invoice';
+
+  @override
+  String get vendorPaymentHint =>
+      'Pembayaran vendor: Finance mentransfer ke rekening vendor; invoice = bukti — tanpa nota per baris dan tanpa LPJ.';
+
+  @override
+  String get sectionVendorPayment => 'Pembayaran vendor';
+
+  @override
+  String get vendorAccountsNone => 'Vendor ini belum punya rekening aktif — minta Finance / Admin menambahkannya.';
+
+  @override
+  String get vendorCostCenterHint => 'Tanpa project: pilih pusat biaya (mis. tagihan kantor).';
 }

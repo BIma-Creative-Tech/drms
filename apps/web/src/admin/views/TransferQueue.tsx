@@ -130,6 +130,14 @@ export async function TransferQueue(props: AdminViewServerProps) {
                       </span>
                     </div>
                   ) : null}
+                  {/* ADR 0027: vendor payment — paid to the vendor's account, done with this transfer (no LPJ) */}
+                  {r.payeeType === 'vendor' ? (
+                    <div style={{ marginTop: 2 }}>
+                      <span style={badge('muted')} data-pk-queue-vendor={r.id} title="Pembayaran vendor: selesai setelah transfer (invoice = bukti, tanpa LPJ)">
+                        Pembayaran vendor{r.vendorName ? `: ${r.vendorName}` : ''}
+                      </span>
+                    </div>
+                  ) : null}
                 </td>
                 <td style={{ ...td, overflowWrap: 'anywhere' }} data-label="Rekening tujuan" data-span="full">
                   {r.bank ? `${r.bank.bankName ?? ''} · ${r.bank.accountHolder ?? ''} · ${r.bank.accountNo ?? ''}` : '—'}

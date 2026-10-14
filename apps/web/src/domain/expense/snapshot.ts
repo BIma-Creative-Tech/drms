@@ -25,6 +25,7 @@ import {
   type SelfApproval,
 } from './decision'
 import { buildSnapshot, selectRule, type ApprovalSnapshot, type RuleInput } from './rules'
+import { payeeOf } from './types'
 
 /**
  * Rule resolution at submit / re-approval (US-34, G2). ADR 0013 (E1): "Diketahui" = approval by the
@@ -58,6 +59,7 @@ export async function selectAndSnapshot(req: PayloadRequest, doc: RequestDoc, op
     projectId,
     costCenterId,
     requesterRoles: await requesterRolesIn(req, requesterEmployeeIds, companyId),
+    payeeType: payeeOf(doc.payeeType), // ADR 0027
   })
   if (!rule) fail(409, 'Tidak ada aturan approval yang berlaku untuk pengajuan ini. Hubungi Admin.')
 
@@ -290,6 +292,7 @@ export async function loadActiveRules(req: PayloadRequest, docType: 'expense_req
     costCenter: relId(r.costCenter) ?? null,
     priority: (r.priority as number | null) ?? 100,
     requesterRoles: ((r.requesterRoles as Role[] | null | undefined) ?? []).filter((x) => typeof x === 'string'),
+    payeeType: (r.payeeType as RuleInput['payeeType']) ?? 'any',
     acknowledge: (r.acknowledge as RuleInput['acknowledge']) ?? 'none',
     acknowledgeBy: (r.acknowledgeBy as RuleInput['acknowledgeBy']) ?? 'scope_manager',
     acknowledgeRole: (r.acknowledgeRole as RuleInput['acknowledgeRole']) ?? null,

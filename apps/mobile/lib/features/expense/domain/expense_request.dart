@@ -29,6 +29,9 @@ abstract class ExpenseSummary with _$ExpenseSummary {
 
     /// MC3: PT of the request (`companyId`); null from a server before MC3.
     int? companyId,
+
+    /// ADR 0027: vendor payment (`payeeType`); karyawan from a server before Wave 4.
+    @Default(PayeeType.karyawan) PayeeType payeeType,
   }) = _ExpenseSummary;
 }
 
@@ -342,9 +345,25 @@ abstract class ExpenseDetail with _$ExpenseDetail {
     /// MC3: PT of the request (`companyId`).
     int? companyId,
 
+    /// ADR 0027 "Pembayaran vendor": payee type, vendor, chosen vendor account (the destination snapshot is in
+    /// `bankName` / `bankAccountNo` / `bankAccountHolder` after submit) and the invoice (the proof — no LPJ).
+    @Default(PayeeType.karyawan) PayeeType payeeType,
+    RefItem? vendor,
+    int? vendorBankAccountId,
+    String? invoiceNo,
+    String? invoiceDate,
+    String? invoiceDueDate,
+    int? invoiceFileId,
+    String? invoiceFileName,
+
     /// ADR 0025: the caller's next decision is signed as the PT's definitive Direktur (`direkturSignature`).
     DirekturSignature? direkturSignature,
   }) = _ExpenseDetail;
+}
+
+/// ADR 0027: a vendor payment — no receipts, no LPJ (the transfer completes it).
+extension ExpenseDetailVendor on ExpenseDetail {
+  bool get isVendor => payeeType == PayeeType.vendor;
 }
 
 /// ADR 0025 `ExpenseRequestDetail.direkturSignature`: the caller is a designated representative deciding a Direktur

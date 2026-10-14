@@ -37,6 +37,7 @@ import { CostCenters } from './collections/CostCenters'
 import { Devices } from './collections/Devices'
 import { DocumentSequences } from './collections/DocumentSequences'
 import { EmployeeBankAccounts } from './collections/EmployeeBankAccounts'
+import { VendorBankAccounts } from './collections/VendorBankAccounts'
 import { Employees } from './collections/Employees'
 import { ExpenseCategories } from './collections/ExpenseCategories'
 import { ExpenseLineSnapshots } from './collections/ExpenseLineSnapshots'
@@ -99,6 +100,8 @@ export const MASTER_COLLECTIONS = [
   Banks,
   Clients,
   Vendors,
+  // ADR 0027: rekening vendor (destination of a vendor payment)
+  VendorBankAccounts,
   Projects,
   ProjectStages,
   StageTemplates,

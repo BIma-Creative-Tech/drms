@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added (DRMS 13/10 Wave 4 — pembayaran vendor)
+
+- **Pembayaran vendor** (client: "kelola vendor dan rekening vendor; finance memilih vendor dan upload invoice"),
+  [ADR 0027](docs/proyekkas/adr/0027-vendor-payments.md). New per-PT master **Rekening vendor**
+  (`vendor-bank-accounts`: vendor, bank, number, holder, default, verification by Admin / Finance, reason on change,
+  audited, no delete) and a **Rekening** tab on the vendor form. Expense requests get **Jenis penerima**
+  (`payeeType`: `karyawan` default — unchanged — / `vendor`): vendor, vendor account (of that vendor, same PT), invoice
+  number / date / due date / file (required to submit). Vendor payments are filed by **Finance or PM only** (Staff 403),
+  always type Pengajuan Baru, Pemohon = the filer. **Project or cost center** (client 2026-10-14): without a project a
+  vendor payment names a cost center (pusat biaya, e.g. office bills) — vendor payee only; employee requests keep D2
+  (DB rule `pk_expense_requests_project_rules` widened for the vendor payee only).
+- **Approval through the generic rule engine**: new rule condition "Jenis penerima"; seeded per PT "Pembayaran vendor
+  oleh Finance — Direktur lalu Owner" (Finance → Direktur → Owner, ADR 0026); a PM's vendor payment takes the default
+  rule (PM project → Direktur → Owner) with the PM step skipped. **Duplicate invoice** (same vendor + normalized number on a request not cancelled / rejected) → 409 field
+  error, DB unique index.
+- **Transfer = snapshot of the vendor account**, unverified account → same confirmation as employee accounts; the
+  transfer **completes** the vendor payment (no receipts / LPJ / selisih; void → back to the queue). DB guards: payee
+  consistency CHECK, no receipt / LPJ status, no settlement for a vendor payment.
+- Web: form fields (label-left grid), read-only summary, stepper without LPJ steps, PDF box "Pembayaran Vendor" + invoice
+  as first Lampiran, transfer-queue badge, list filter "Jenis penerima". API / OpenAPI: `payeeType`, `vendorId`,
+  `vendorBankAccountId`, `invoice*` on drafts, list filter `payeeType`, detail `vendor` / `invoice`, transfer queue
+  `vendorName`, masters type `vendor-bank-accounts`, bank preview `vendorAccount`. Migrations
+  `20261013_700000_d1310_vendor_payments` (+ `_guard`, `_data`). Guides: finance, pm, admin.
+
 ### Added (DRMS — Owner approval level)
 
 - **Role "Owner" (`pk-principal`) one approval level above the Direktur** (owner decision 2026-10-13, ADR 0026):

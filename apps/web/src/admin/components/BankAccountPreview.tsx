@@ -27,10 +27,14 @@ const EYE_OFF = 'M3 3l18 18M10.6 5.1A10.9 10.9 0 0 1 12 5c6.4 0 10 7 10 7a17.6 1
 export function BankAccountPreview() {
   const { id } = useDocumentInfo()
   const requestId = typeof id === 'number' ? id : typeof id === 'string' && /^\d+$/.test(id) ? Number(id) : null
-  const accountId = useFormFields(([f]) => relValue(f.bankAccount?.value))
+  // ADR 0027: a vendor payment previews the chosen vendor account
+  const vendor = useFormFields(([f]) => f.payeeType?.value === 'vendor')
+  const employeeAccount = useFormFields(([f]) => relValue(f.bankAccount?.value))
+  const vendorAccount = useFormFields(([f]) => relValue(f.vendorBankAccount?.value))
+  const accountId = vendor ? vendorAccount : employeeAccount
   const status = useFormFields(([f]) => (typeof f.status?.value === 'string' ? f.status.value : null))
   const draft = status === null || status === 'draft'
-  const url = previewQuery({ requestId, accountId, draft })
+  const url = previewQuery({ requestId, accountId, draft, vendor })
   // results are keyed by the query URL → a changed picker value never shows the previous account / number
   const [res, setRes] = useState<{ url: string; data: Preview | null; status: 'ok' | 'none' | 'error' } | null>(null)
   const [revealed, setRevealed] = useState<{ url: string; no: string } | null>(null)
@@ -60,7 +64,7 @@ export function BankAccountPreview() {
 
   const toggle = async () => {
     if (full) return setRevealed(null)
-    const u = previewQuery({ requestId, accountId, draft, reveal: true })
+    const u = previewQuery({ requestId, accountId, draft, reveal: true, vendor })
     if (!u || !url) return
     setRevealing(true)
     try {
@@ -73,11 +77,15 @@ export function BankAccountPreview() {
   }
 
   const box: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '10px 12px', border: '1px solid var(--theme-elevation-150)', borderRadius: 4, marginBottom: 'var(--spacing-field, 16px)', fontSize: 13 }
-  const title = draft ? 'Rekening dipilih' : 'Rekening tujuan (dicatat saat diajukan)'
+  const title = draft ? (vendor ? 'Rekening vendor dipilih' : 'Rekening dipilih') : 'Rekening tujuan (dicatat saat diajukan)'
   if (state === 'none') {
     return draft ? (
       <div className="field-type" data-pk-bank-preview="none" style={{ ...box, color: 'var(--theme-elevation-600)' }}>
-        {accountId === null ? 'Belum ada rekening dipilih — kosongkan untuk memakai rekening default pemohon pertama.' : 'Detail rekening tidak dapat ditampilkan.'}
+        {accountId === null
+          ? vendor
+            ? 'Belum ada rekening vendor dipilih — pilih vendor lalu rekeningnya.'
+            : 'Belum ada rekening dipilih — kosongkan untuk memakai rekening default pemohon pertama.'
+          : 'Detail rekening tidak dapat ditampilkan.'}
       </div>
     ) : null
   }

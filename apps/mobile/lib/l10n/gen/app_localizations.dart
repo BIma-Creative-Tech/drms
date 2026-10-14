@@ -6822,6 +6822,114 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Jatuh tempo {date}'**
   String loanDueOn(String date);
+
+  /// No description provided for @fieldPayeeType.
+  ///
+  /// In id, this message translates to:
+  /// **'Jenis penerima'**
+  String get fieldPayeeType;
+
+  /// No description provided for @payeeKaryawan.
+  ///
+  /// In id, this message translates to:
+  /// **'Karyawan'**
+  String get payeeKaryawan;
+
+  /// No description provided for @payeeVendor.
+  ///
+  /// In id, this message translates to:
+  /// **'Vendor'**
+  String get payeeVendor;
+
+  /// No description provided for @fieldVendor.
+  ///
+  /// In id, this message translates to:
+  /// **'Vendor'**
+  String get fieldVendor;
+
+  /// No description provided for @fieldVendorBankAccount.
+  ///
+  /// In id, this message translates to:
+  /// **'Rekening vendor'**
+  String get fieldVendorBankAccount;
+
+  /// No description provided for @fieldInvoiceNo.
+  ///
+  /// In id, this message translates to:
+  /// **'Nomor invoice'**
+  String get fieldInvoiceNo;
+
+  /// No description provided for @fieldInvoiceDate.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanggal invoice'**
+  String get fieldInvoiceDate;
+
+  /// No description provided for @fieldInvoiceDueDate.
+  ///
+  /// In id, this message translates to:
+  /// **'Jatuh tempo'**
+  String get fieldInvoiceDueDate;
+
+  /// No description provided for @fieldInvoiceFile.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto invoice'**
+  String get fieldInvoiceFile;
+
+  /// No description provided for @invoiceCamera.
+  ///
+  /// In id, this message translates to:
+  /// **'Kamera'**
+  String get invoiceCamera;
+
+  /// No description provided for @invoiceGallery.
+  ///
+  /// In id, this message translates to:
+  /// **'Galeri'**
+  String get invoiceGallery;
+
+  /// No description provided for @invoiceAttached.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto invoice terlampir'**
+  String get invoiceAttached;
+
+  /// No description provided for @invoiceOnServer.
+  ///
+  /// In id, this message translates to:
+  /// **'Invoice tersimpan di server'**
+  String get invoiceOnServer;
+
+  /// No description provided for @invoiceMissing.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada foto invoice'**
+  String get invoiceMissing;
+
+  /// No description provided for @vendorPaymentHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Pembayaran vendor: Finance mentransfer ke rekening vendor; invoice = bukti — tanpa nota per baris dan tanpa LPJ.'**
+  String get vendorPaymentHint;
+
+  /// No description provided for @sectionVendorPayment.
+  ///
+  /// In id, this message translates to:
+  /// **'Pembayaran vendor'**
+  String get sectionVendorPayment;
+
+  /// No description provided for @vendorAccountsNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Vendor ini belum punya rekening aktif — minta Finance / Admin menambahkannya.'**
+  String get vendorAccountsNone;
+
+  /// No description provided for @vendorCostCenterHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanpa project: pilih pusat biaya (mis. tagihan kantor).'**
+  String get vendorCostCenterHint;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

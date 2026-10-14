@@ -6,7 +6,7 @@ import type { Condition } from 'payload'
  * system and workflow fields appear once the request is submitted. Conditions only hide UI — field
  * access (`access: system`) and the domain service stay the authority.
  */
-type FormData = { status?: string | null; docNo?: string | null } | undefined | null
+type FormData = { status?: string | null; docNo?: string | null; payeeType?: string | null } | undefined | null
 
 /** New (unsaved) or Draft. */
 export function isDraftForm(data: FormData): boolean {
@@ -46,6 +46,21 @@ export const shownInHeader: Condition = () => false
 /** "Alasan perubahan" (audit reason of a save): only in "Revisi Nota" — the Draft needs none (Phase C polish). */
 export const revisionOnly: Condition = (data) => (data as FormData)?.status === 'receipt_revision'
 
+/** ADR 0027: the form is a vendor payment ("Jenis penerima" = Vendor). */
+export function isVendorForm(data: FormData): boolean {
+  return data?.payeeType === 'vendor'
+}
+
+/** ADR 0027: `cond` AND a vendor payment (vendor, rekening vendor, invoice inputs). */
+export function vendorPayee(cond: Condition): Condition {
+  return (data, sibling, ctx) => isVendorForm(data as FormData) && cond(data, sibling, ctx)
+}
+
+/** ADR 0027: `cond` AND paid to an employee (Pemohon picker, rekening karyawan). */
+export function employeePayee(cond: Condition): Condition {
+  return (data, sibling, ctx) => !isVendorForm(data as FormData) && cond(data, sibling, ctx)
+}
+
 /** Field shown only when it has a value (docNo before the first submit is empty). */
 export function whenSet(name: string): Condition {
   return (data) => {
@@ -66,11 +81,14 @@ export function draftOrSet(name: string): Condition {
  */
 export const PLACEHOLDERS = {
   type: 'Pilih jenis pengajuan…',
+  payeeType: 'Pilih jenis penerima…',
   project: 'Pilih project…',
   costCenter: 'Pilih pusat biaya…',
   urgencyLevel: 'Pilih tingkat urgensi…',
   requesters: 'Pilih pemohon…',
   bankAccount: 'Pilih rekening tujuan…',
+  vendor: 'Pilih vendor…',
+  vendorBankAccount: 'Pilih rekening vendor…',
   uom: 'Pilih satuan…',
   category: 'Pilih kategori…',
   vehicle: 'Pilih kendaraan…',

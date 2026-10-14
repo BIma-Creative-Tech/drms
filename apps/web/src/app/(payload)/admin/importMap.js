@@ -22,6 +22,7 @@ import { ApprovalRulePreview as ApprovalRulePreview_d1fda995effefe011ec359f37cc8
 import { SiteFromCostCenterLink as SiteFromCostCenterLink_57dfe94c9146c60f785b1649b36e1df1 } from '@/admin/components/SiteFromCostCenterLink'
 import { WorkflowPanel as WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e } from '@/admin/components/WorkflowPanel'
 import { StepperField as StepperField_6be3f0fd04aad5a2714b7b6cfd3f6a9e } from '@/admin/components/request/StepperField'
+import { PayeeTypeField as PayeeTypeField_a356a4ed347478242de628aded3440b3 } from '@/admin/components/EditableOnlyFields'
 import { RequestTypeField as RequestTypeField_a356a4ed347478242de628aded3440b3 } from '@/admin/components/EditableOnlyFields'
 import { RequestStatusCell as RequestStatusCell_08836769fece85e42fb05beb6c632414 } from '@/admin/components/RequestStatusCell'
 import { RequestStatusField as RequestStatusField_3f8d5a55b1fcbc79eb9e47f3583cb1ed } from '@/admin/components/RequestStatusField'
@@ -123,6 +124,7 @@ export const importMap = {
   "@/admin/components/SiteFromCostCenterLink#SiteFromCostCenterLink": SiteFromCostCenterLink_57dfe94c9146c60f785b1649b36e1df1,
   "@/admin/components/WorkflowPanel#WorkflowPanel": WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e,
   "@/admin/components/request/StepperField#StepperField": StepperField_6be3f0fd04aad5a2714b7b6cfd3f6a9e,
+  "@/admin/components/EditableOnlyFields#PayeeTypeField": PayeeTypeField_a356a4ed347478242de628aded3440b3,
   "@/admin/components/EditableOnlyFields#RequestTypeField": RequestTypeField_a356a4ed347478242de628aded3440b3,
   "@/admin/components/RequestStatusCell#RequestStatusCell": RequestStatusCell_08836769fece85e42fb05beb6c632414,
   "@/admin/components/RequestStatusField#RequestStatusField": RequestStatusField_3f8d5a55b1fcbc79eb9e47f3583cb1ed,

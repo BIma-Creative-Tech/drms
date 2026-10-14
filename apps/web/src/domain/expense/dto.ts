@@ -8,7 +8,7 @@ import { actorContext, approvalsOf, displayName, loadRaw, projectCommitted, type
 import { displayUnitPrice, receiptMismatch } from './lines'
 import { budgetImpact, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
-import { REQUEST_TYPE_LABELS, FLAG_LABELS, type FlagKind } from './types'
+import { FLAG_LABELS, payeeOf, requestKindLabel, type FlagKind } from './types'
 import { withFlagVisibility } from './flag-visibility'
 import { receiptsOf } from './receipts'
 import { settlementOfRequest } from './lpj'
@@ -32,7 +32,9 @@ export function listItem(doc: RequestDoc & { project?: unknown; costCenter?: unk
     id: doc.id,
     docNo: doc.docNo ?? null,
     type: doc.type,
-    typeLabel: REQUEST_TYPE_LABELS[doc.type],
+    // ADR 0027: "Pembayaran vendor" for a vendor payment, else Pengajuan Baru / Reimburse
+    typeLabel: requestKindLabel(doc.type, doc.payeeType),
+    payeeType: payeeOf(doc.payeeType),
     status: doc.status,
     // ADR 0021: "Menunggu persetujuan PM" / "Menunggu persetujuan Direktur" from the request's snapshot
     statusLabel: requestStatusLabel(doc.type, doc.status, doc.approvalSnapshot ?? null, doc.currentLevel ?? null),
@@ -128,7 +130,9 @@ export async function detail(req: PayloadRequest, id: number) {
     budget = { basis: projectDoc.budget ? 'project' : 'none', pctBefore: b.before, pctAfter: b.after }
   }
   const snap = (doc.approvalSnapshot ?? null) as ApprovalSnapshot | null
-  const lpj = doc.type === 'advance' ? await settlementOfRequest(req, id) : null
+  const vendorPay = payeeOf(doc.payeeType) === 'vendor'
+  // ADR 0027: a vendor payment has no LPJ
+  const lpj = doc.type === 'advance' && !vendorPay ? await settlementOfRequest(req, id) : null
   // QA-06 / ADR 0019: shortfall vs approved + tolerance and its re-approval (office roles only)
   // ADR 0021: also the PM project acknowledger of the shortfall approval (it decides "Persetujuan PM")
   const shortfallAck = (lpj?.shortfallApprovalSnapshot as ApprovalSnapshot | null | undefined)?.acknowledgerUserId
@@ -144,7 +148,7 @@ export async function detail(req: PayloadRequest, id: number) {
     .map((r) => (r && typeof r === 'object' ? String((r as { name?: string }).name ?? '') : ''))
     .filter(Boolean)
     .join(', ')
-  const next = nextActor({ type: doc.type, status: doc.status, currentLevel: doc.currentLevel ?? null, snapshot: snap, requesters: requesterNames, names })
+  const next = nextActor({ type: doc.type, payeeType: doc.payeeType, status: doc.status, currentLevel: doc.currentLevel ?? null, snapshot: snap, requesters: requesterNames, names })
   // E9: reversal only for a settled LPJ that posted a refund KM / shortfall transfer (UI hint; the service re-checks).
   const allowed = allowedActions(ctx).filter((a) => a !== 'settle_reverse' || (lpj?.status === 'settled' && (lpj.settlementType === 'refund' || lpj.settlementType === 'shortfall')))
   // ADR 0025: the caller's next decision is signed as the PT's definitive Direktur (representative on a Direktur step)
@@ -160,6 +164,19 @@ export async function detail(req: PayloadRequest, id: number) {
     requesters: (doc.requesters ?? []).map((r) => ref(r, (d) => ({ code: d.code, name: d.name }))),
     createdBy: ref(doc.createdBy, (d) => ({ name: (d.name as string) || (d.email as string) })),
     bankAccountId: relId(doc.bankAccount) ?? null,
+    // ADR 0027: vendor payment — vendor, its account (the destination; snapshot in `bank` after submit) and the invoice
+    vendor: vendorPay ? ref(doc.vendor, (d) => ({ name: d.name, code: null })) : null,
+    vendorBankAccountId: vendorPay ? (relId(doc.vendorBankAccount) ?? null) : null,
+    invoice: vendorPay
+      ? {
+          no: doc.invoiceNo ?? null,
+          date: doc.invoiceDate ?? null,
+          dueDate: doc.invoiceDueDate ?? null,
+          fileId: relId(doc.invoiceFile) ?? null,
+          fileName: doc.invoiceFile && typeof doc.invoiceFile === 'object' ? String((doc.invoiceFile as { filename?: string }).filename ?? '') || null : null,
+          mimeType: doc.invoiceFile && typeof doc.invoiceFile === 'object' ? String((doc.invoiceFile as { mimeType?: string }).mimeType ?? '') || null : null,
+        }
+      : null,
     bank: doc.bankSnapshot?.accountNo
       ? { bankName: doc.bankSnapshot.bankName ?? null, accountNo: maskAccountNo(doc.bankSnapshot.accountNo, fullBank), accountHolder: doc.bankSnapshot.accountHolder ?? null }
       : null,
@@ -306,7 +323,7 @@ export async function detail(req: PayloadRequest, id: number) {
     clientUuid: doc.clientUuid ?? null,
     createdAt: doc.createdAt ?? null,
     rev: typeof doc.syncRev === 'number' && doc.syncRev > 0 ? doc.syncRev : 1,
-    timeline: timeline(doc.type, doc.status, { skipAck: snap?.acknowledge === 'none', snapshot: snap, currentLevel: doc.currentLevel ?? null }),
+    timeline: timeline(doc.type, doc.status, { skipAck: snap?.acknowledge === 'none', snapshot: snap, currentLevel: doc.currentLevel ?? null, payeeType: doc.payeeType }),
     nextActor: next,
   }
 }

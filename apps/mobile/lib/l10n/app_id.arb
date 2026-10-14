@@ -2710,5 +2710,23 @@
         "type": "String"
       }
     }
-  }
+  },
+  "fieldPayeeType": "Jenis penerima",
+  "payeeKaryawan": "Karyawan",
+  "payeeVendor": "Vendor",
+  "fieldVendor": "Vendor",
+  "fieldVendorBankAccount": "Rekening vendor",
+  "fieldInvoiceNo": "Nomor invoice",
+  "fieldInvoiceDate": "Tanggal invoice",
+  "fieldInvoiceDueDate": "Jatuh tempo",
+  "fieldInvoiceFile": "Foto invoice",
+  "invoiceCamera": "Kamera",
+  "invoiceGallery": "Galeri",
+  "invoiceAttached": "Foto invoice terlampir",
+  "invoiceOnServer": "Invoice tersimpan di server",
+  "invoiceMissing": "Belum ada foto invoice",
+  "vendorPaymentHint": "Pembayaran vendor: Finance mentransfer ke rekening vendor; invoice = bukti — tanpa nota per baris dan tanpa LPJ.",
+  "sectionVendorPayment": "Pembayaran vendor",
+  "vendorAccountsNone": "Vendor ini belum punya rekening aktif — minta Finance / Admin menambahkannya.",
+  "vendorCostCenterHint": "Tanpa project: pilih pusat biaya (mis. tagihan kantor)."
 }

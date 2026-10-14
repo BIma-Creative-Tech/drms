@@ -55,6 +55,9 @@ export const RENUMBER_NEUTRAL_FUNCTIONS = [
   'pk_expense_requests_project_rules',
   'pk_expense_requests_approval_guard',
   'pk_receipt_flags_self_review_guard',
+  // ADR 0027 (20261013_700100, vendor payments): its status check covers statuses a vendor row never reaches and its
+  // vendor-account check runs only when vendor / account change → a number-only change passes
+  'pk_expense_vendor_guard',
 ] as const
 
 const PRELUDE = `

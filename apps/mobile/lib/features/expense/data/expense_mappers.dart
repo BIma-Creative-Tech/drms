@@ -126,6 +126,7 @@ ExpenseSummary summaryFromJson(Json j) {
     updatedAt: _strN(j['updatedAt']),
     openWarningFlags: _int(j['openWarningFlags']),
     companyId: companyIdOf(j),
+    payeeType: PayeeType.fromCode(_strN(j['payeeType'])),
   );
 }
 
@@ -150,6 +151,7 @@ ExpenseDetail detailFromJson(Json j) {
   final type = RequestType.fromCode(j['type'] as String?);
   final bank = _map(j['bank']);
   final rule = _map(j['approvalRule']);
+  final invoice = _map(j['invoice']);
   return ExpenseDetail(
     id: _int(j['id']),
     docNo: _strN(j['docNo']),
@@ -301,6 +303,15 @@ ExpenseDetail detailFromJson(Json j) {
     createdById: _intN(j['createdById']),
     urgencyLevel: refFromJson(j['urgencyLevel']),
     bankAccountId: _intN(j['bankAccountId']),
+    // ADR 0027 (absent on servers before Wave 4 → an employee payment)
+    payeeType: PayeeType.fromCode(_strN(j['payeeType'])),
+    vendor: refFromJson(j['vendor']),
+    vendorBankAccountId: _intN(j['vendorBankAccountId']),
+    invoiceNo: _strN(invoice?['no']),
+    invoiceDate: _strN(invoice?['date']),
+    invoiceDueDate: _strN(invoice?['dueDate']),
+    invoiceFileId: _intN(invoice?['fileId']),
+    invoiceFileName: _strN(invoice?['fileName']),
   );
 }
 
@@ -379,17 +390,36 @@ InboxItem inboxItemFromJson(Json j) {
   );
 }
 
+/// ADR 0027: vendor fields of the create body (`invoiceFileId` = the uploaded invoice; DraftService uploads it first).
+Json _vendorCreateFields(DraftRequest d) => d.isVendor
+    ? {
+        'payeeType': PayeeType.vendor.code,
+        'vendorId': d.vendorId,
+        'vendorBankAccountId': d.vendorBankAccountId,
+        'invoiceNo': _trimmed(d.invoiceNo),
+        'invoiceDate': d.invoiceDate,
+        'invoiceDueDate': d.invoiceDueDate,
+        'invoiceFileId': d.invoiceFileId,
+      }
+    : const {};
+
+String? _trimmed(String? v) => (v == null || v.trim().isEmpty) ? null : v.trim();
+
 /// Local draft → `POST /api/v1/expense-requests` body (openapi `ExpenseRequestCreate`).
 Json draftToCreateBody(DraftRequest d) => {
-  'type': d.type.code,
+  // ADR 0027: a vendor payment is always Pengajuan Baru (the server sets it too)
+  'type': d.isVendor ? RequestType.advance.code : d.type.code,
   'title': d.title.trim(),
-  // D2: project only — the requester no longer sends a cost center (Finance sets it at transfer).
+  // D2: project only — the requester no longer sends a cost center (Finance sets it at transfer). ADR 0027: a vendor
+  // payment without a project sends its cost center.
   'projectId': d.projectId,
+  if (d.isVendor && d.projectId == null && d.costCenterId != null) 'costCenterId': d.costCenterId,
   'neededDate': d.neededDate,
   'urgencyLevelId': d.urgencyLevelId,
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),
   if (d.requesterIds.isNotEmpty) 'requesterIds': d.requesterIds,
-  'bankAccountId': d.bankAccountId,
+  'bankAccountId': d.isVendor ? null : d.bankAccountId,
+  ..._vendorCreateFields(d),
   'lines': [for (final l in d.lines) lineToInput(l)],
   'clientUuid': d.clientUuid,
 };
@@ -419,14 +449,28 @@ Json draftToSyncPayload(DraftRequest d, {bool includeDraftId = false}) => {
   // A draft imported from the server (withdrawn / "Ajukan ulang" clone, E3-d) may have been created on
   // the web without this phone's id: the server id then identifies it (SyncDraftUpsertPayload.request_id).
   if (d.serverId != null) 'request_id': d.serverId,
-  'kind': d.type.code,
+  'kind': d.isVendor ? RequestType.advance.code : d.type.code,
   'title': d.title.trim(),
   'project_id': d.projectId,
+  if (d.isVendor && d.projectId == null && d.costCenterId != null) 'cost_center_id': d.costCenterId,
   'needed_date': d.neededDate,
   'urgency_level_id': d.urgencyLevelId,
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),
   'requester_ids': d.requesterIds,
-  'bank_account_id': d.bankAccountId,
+  'bank_account_id': d.isVendor ? null : d.bankAccountId,
+  // ADR 0027: vendor payment only (an employee draft stays byte-compatible with servers before Wave 4; the payee
+  // type of a draft the server knows is fixed in the editor)
+  if (d.isVendor) ...{
+    'payee_type': PayeeType.vendor.code,
+    'vendor_id': d.vendorId,
+    'vendor_bank_account_id': d.vendorBankAccountId,
+    'invoice_no': _trimmed(d.invoiceNo),
+    'invoice_date': d.invoiceDate,
+    'invoice_due_date': d.invoiceDueDate,
+    if (d.invoiceFileId != null) 'invoice_file_id': d.invoiceFileId,
+    // local invoice photo: uploaded by the sync engine (POST /media/attachments), replaced by `invoice_file_id`
+    if (d.invoiceFileId == null && d.invoiceMediaUuid != null) invoicePlaceholderKey: d.invoiceMediaUuid,
+  },
   'client_grand_total': d.previewGrandTotal,
   'lines': [
     for (final l in d.lines)
@@ -484,6 +528,14 @@ DraftRequest draftFromServer(
   notes: d.notes,
   requesterIds: [for (final r in d.requesters) r.id],
   bankAccountId: d.bankAccountId,
+  // ADR 0027: vendor payment — the invoice stays on the server (its media id)
+  payeeType: d.payeeType,
+  vendorId: d.vendor?.id,
+  vendorBankAccountId: d.vendorBankAccountId,
+  invoiceNo: d.invoiceNo,
+  invoiceDate: d.invoiceDate,
+  invoiceDueDate: d.invoiceDueDate,
+  invoiceFileId: d.invoiceFileId,
   serverId: d.id,
   serverRev: d.rev,
   syncState: DraftSyncState.synced,
@@ -535,9 +587,23 @@ const progressPhotosPlaceholderKey = 'pk_photo_uuids';
 /// Local-only key of a `unit_timesheet.upsert` item (FR1): the HM meter photo, replaced by `hm_photo_media_id`.
 const hmPhotoPlaceholderKey = 'pk_hm_photo_uuid';
 
+/// ADR 0027: local-only key of a vendor-payment draft item: the invoice photo, replaced by `invoice_file_id`.
+const invoicePlaceholderKey = 'pk_invoice_uuid';
+
 /// Replaces [mediaPlaceholderKey] by `media_id` using [mediaIds] (local uuid → server id).
 /// Returns null when a photo has no server id yet.
 Json? resolveMediaIds(Json payload, Map<String, int> mediaIds) {
+  // ADR 0027: the invoice photo of a vendor-payment draft (then the draft's receipts as usual).
+  if (payload.containsKey(invoicePlaceholderKey)) {
+    final out = Map<String, dynamic>.of(payload);
+    final local = out.remove(invoicePlaceholderKey);
+    if (local != null) {
+      final id = mediaIds['$local'];
+      if (id == null) return null;
+      out['invoice_file_id'] = id;
+    }
+    return resolveMediaIds(out, mediaIds);
+  }
   // Progress report: local photos are appended to the ids already known on the server.
   if (payload.containsKey(progressPhotosPlaceholderKey)) {
     final out = Map<String, dynamic>.of(payload);

@@ -193,7 +193,20 @@ class _DetailBody extends ConsumerWidget {
       section(t.sectionRequester, key: const Key('section-requester')),
       row(t.requesters, d.requesters.map((r) => r.name ?? '-').join(', ')),
       if (d.createdByName != null) row(t.createdBy, d.createdByName!),
-      section(t.bankAccount, key: const Key('section-bank')),
+      // ADR 0027: a vendor payment — vendor + invoice (the proof; no receipts / LPJ), paid to the vendor account
+      if (d.isVendor) ...[
+        section(t.sectionVendorPayment, key: const Key('section-vendor')),
+        row(t.fieldVendor, d.vendor?.name ?? '-', key: const Key('detail-vendor')),
+        row(t.fieldInvoiceNo, d.invoiceNo ?? '-', key: const Key('detail-invoice-no')),
+        row(t.fieldInvoiceDate, formatDateOnly(d.invoiceDate)),
+        if (d.invoiceDueDate != null) row(t.fieldInvoiceDueDate, formatDateOnly(d.invoiceDueDate)),
+        row(
+          t.fieldInvoiceFile,
+          d.invoiceFileName ?? (d.invoiceFileId == null ? '-' : '#${d.invoiceFileId}'),
+          key: const Key('detail-invoice-file'),
+        ),
+      ],
+      section(d.isVendor ? t.fieldVendorBankAccount : t.bankAccount, key: const Key('section-bank')),
       if (d.bankName == null && d.bankAccountNo == null && d.bankAccountHolder == null)
         Text('-', style: theme.textTheme.bodyMedium)
       else ...[

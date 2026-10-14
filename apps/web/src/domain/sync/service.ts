@@ -21,6 +21,7 @@ import {
 } from '@/api/v1/schemas-sync'
 import { writeAudit } from '@/audit/writer'
 import { ids, loadRaw, loadVisible, lockRequest, settings, type RequestDoc } from '@/domain/expense/common'
+import { payeeOf } from '@/domain/expense/types'
 import { createDraft, updateDraft, type DraftInput, type LineInputApi } from '@/domain/expense/drafts'
 import { addReceipt, editReceipt } from '@/domain/expense/receipts'
 import { cancel } from '@/domain/expense/workflow'
@@ -235,6 +236,14 @@ export async function draftCopy(req: PayloadRequest, id: number): Promise<SyncDr
     notes: doc.notes ?? null,
     requester_ids: ids(doc.requesters),
     bank_account_id: relId(doc.bankAccount) ?? null,
+    // ADR 0027
+    payee_type: payeeOf(doc.payeeType),
+    vendor_id: relId(doc.vendor) ?? null,
+    vendor_bank_account_id: relId(doc.vendorBankAccount) ?? null,
+    invoice_no: doc.invoiceNo ?? null,
+    invoice_date: doc.invoiceDate ?? null,
+    invoice_due_date: doc.invoiceDueDate ?? null,
+    invoice_file_id: relId(doc.invoiceFile) ?? null,
     grand_total: doc.grandTotal ?? 0,
     updated_at: doc.updatedAt ?? null,
     lines: (doc.lines ?? []).map((l, i) => ({
@@ -322,6 +331,14 @@ function toDraftInput(p: SyncDraftUpsert): DraftInput {
   if (p.notes !== undefined) input.notes = p.notes
   if (p.requester_ids !== undefined) input.requesterIds = p.requester_ids
   if (p.bank_account_id !== undefined) input.bankAccountId = p.bank_account_id
+  // ADR 0027 vendor payment
+  if (p.payee_type !== undefined) input.payeeType = p.payee_type
+  if (p.vendor_id !== undefined) input.vendorId = p.vendor_id
+  if (p.vendor_bank_account_id !== undefined) input.vendorBankAccountId = p.vendor_bank_account_id
+  if (p.invoice_no !== undefined) input.invoiceNo = p.invoice_no
+  if (p.invoice_date !== undefined) input.invoiceDate = p.invoice_date
+  if (p.invoice_due_date !== undefined) input.invoiceDueDate = p.invoice_due_date
+  if (p.invoice_file_id !== undefined) input.invoiceFileId = p.invoice_file_id
   if (p.lines !== undefined) {
     input.lines = p.lines.map(
       (l): LineInputApi => ({

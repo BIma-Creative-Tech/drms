@@ -58,7 +58,8 @@ export const FILTER_TARGETS: ReadonlySet<string> = new Set([
 
 /** Explicit filter / date choices where the generic rule (defaultColumns) would pick too little or too much. */
 const EXPLICIT: Record<string, { filters?: readonly string[]; dates?: readonly string[] }> = {
-  'expense-requests': { filters: ['status', 'type', 'project', 'urgencyLevel', 'costCenter'], dates: ['requestDate'] },
+  // ADR 0027: "Jenis penerima" (karyawan / vendor) filter
+  'expense-requests': { filters: ['status', 'type', 'payeeType', 'project', 'urgencyLevel', 'costCenter'], dates: ['requestDate'] },
   projects: { filters: ['status', 'kind', 'client', 'site', 'pm'], dates: ['startDate'] },
   employees: { filters: ['attendanceType', 'homeSite', 'workSchedule', 'active'] },
   sites: { filters: ['isHeadOffice', 'costCenter', 'active'] },

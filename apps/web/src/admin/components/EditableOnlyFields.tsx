@@ -17,6 +17,19 @@ const useEditable = () => {
   return linesEditable({ status })
 }
 
-export const RequestTypeField: SelectFieldClientComponent = (props) => (useEditable() ? <SelectField {...props} /> : null)
+/** ADR 0027: a vendor payment is always "Pengajuan Baru" (set by the server) — no "Jenis" input then. */
+const useVendor = () => useFormFields(([f]) => f.payeeType?.value === 'vendor')
+
+export const RequestTypeField: SelectFieldClientComponent = (props) => {
+  const editable = useEditable()
+  const vendor = useVendor()
+  return editable && !vendor ? <SelectField {...props} /> : null
+}
+
+/** ADR 0027 "Jenis penerima": only while the request is a Draft (it never changes afterwards). */
+export const PayeeTypeField: SelectFieldClientComponent = (props) => {
+  const status = useFormFields(([f]) => (typeof f.status?.value === 'string' ? f.status.value : null))
+  return status === null || status === 'draft' ? <SelectField {...props} /> : null
+}
 
 export const RequestTitleField: TextFieldClientComponent = (props) => (useEditable() ? <TextField {...props} /> : null)

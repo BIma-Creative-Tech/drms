@@ -12,7 +12,7 @@ import { withFlagVisibility } from './flag-visibility'
 import { budgetImpact, lastLevel, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
 import { ackStepLabel, approvalStepLabel, decisionByOf, requestStatusLabel } from './timeline'
-import { REQUEST_TYPE_LABELS, TRANSFER_QUEUE_WHERE } from './types'
+import { payeeOf, requestKindLabel, TRANSFER_QUEUE_WHERE } from './types'
 
 export { TRANSFER_QUEUE_WHERE }
 
@@ -26,10 +26,11 @@ export { TRANSFER_QUEUE_WHERE }
  * `company { id, shortCode, name }`; thresholds (budget warn %) are those of the item's PT. The
  * optional `companyIds` filter narrows further (UI PT filter) — it never widens.
  */
-type Populated = Omit<RequestDoc, 'project' | 'costCenter' | 'requesters'> & {
+type Populated = Omit<RequestDoc, 'project' | 'costCenter' | 'requesters' | 'vendor'> & {
   project?: { id: number; code?: string; name?: string; budget?: number | null } | number | null
   costCenter?: { id: number; code?: string; name?: string } | number | null
   requesters?: Array<{ id: number; name?: string } | number> | null
+  vendor?: { id: number; name?: string } | number | null
 }
 
 export type QueueFilter = { companyIds?: readonly number[] | null }
@@ -98,7 +99,10 @@ const base = (d: Populated, refs: Map<number, CompanyRef>) => ({
   company: refs.get(relId((d as { company?: unknown }).company) ?? -1) ?? null,
   docNo: d.docNo ?? null,
   type: d.type,
-  typeLabel: REQUEST_TYPE_LABELS[d.type],
+  typeLabel: requestKindLabel(d.type, d.payeeType),
+  // ADR 0027: vendor payment (+ the vendor's name for the queues)
+  payeeType: payeeOf(d.payeeType),
+  vendorName: payeeOf(d.payeeType) === 'vendor' && d.vendor && typeof d.vendor === 'object' ? (d.vendor.name ?? null) : null,
   status: d.status,
   statusLabel: requestStatusLabel(d.type, d.status, (d.approvalSnapshot ?? null) as ApprovalSnapshot | null, d.currentLevel ?? null),
   title: d.title,
@@ -172,7 +176,8 @@ export async function transferQueue(req: PayloadRequest, f?: QueueFilter) {
       // D2: cost center proposed to Finance (the project's default, else a legacy request's own); null = Finance picks
       costCenter: await suggestedCostCenter(req, { project: p?.id ?? d.project, costCenter: d.costCenter && typeof d.costCenter === 'object' ? d.costCenter.id : d.costCenter }),
       bank: d.bankSnapshot ?? null,
-      bankVerification: verification((d as { bankAccount?: unknown }).bankAccount),
+      // ADR 0027: a vendor payment's destination is the vendor account (same confirmation rule)
+      bankVerification: verification(payeeOf(d.payeeType) === 'vendor' ? (d as { vendorBankAccount?: unknown }).vendorBankAccount : (d as { bankAccount?: unknown }).bankAccount),
       flags: await flagCounts(req, d.id),
       sla: { approvedAt, slaHours, ageHours: age?.hours ?? null, over: age?.over ?? false },
       // ADR 0024 / 0026: a Direktur's (legacy) / the Owner's own request that reached the queue without any approval (badge)

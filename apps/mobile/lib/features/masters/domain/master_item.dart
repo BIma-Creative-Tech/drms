@@ -32,6 +32,12 @@ abstract final class MasterTypes {
   /// Owner decision 2026-10-09: "Tingkat urgensi" of an expense draft (server ≥ 0.7 knows this type).
   static const urgencyLevels = 'urgency-levels';
 
+  /// ADR 0027 "Pembayaran vendor": vendors of the PT and their accounts (Finance / PM / Direktur / Admin read them;
+  /// Staff get none). `vendor-bank-accounts` needs a server with ADR 0027 (an older one answers 400 for the type) —
+  /// the APK with this change is released after that server.
+  static const vendors = 'vendors';
+  static const vendorBankAccounts = 'vendor-bank-accounts';
+
   static const forExpense = [
     projects,
     costCenters,
@@ -42,6 +48,8 @@ abstract final class MasterTypes {
     bankAccounts,
     banks,
     urgencyLevels,
+    vendors,
+    vendorBankAccounts,
   ];
 
   /// Everything the APK caches (expense pickers + E4 stages + E6 team assignments for on-behalf offline + FR1
@@ -66,7 +74,7 @@ MasterItem masterFromJson(String type, Map<String, dynamic> j, {Map<int, String>
       s('plateDisplay').isNotEmpty ? s('plateDisplay') : s('plateNo'),
       s('type'),
     ].where((e) => e.isNotEmpty).join(' · '),
-    MasterTypes.bankAccounts => () {
+    MasterTypes.bankAccounts || MasterTypes.vendorBankAccounts => () {
       final acc = s('accountNo');
       final masked = acc.length > 4 ? '•••${acc.substring(acc.length - 4)}' : acc;
       final bankId = (j['bank'] as num?)?.toInt();

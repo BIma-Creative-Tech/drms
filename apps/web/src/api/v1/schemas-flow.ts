@@ -30,6 +30,10 @@ const qty = z
   .refine((v) => Math.abs(Math.round(v * 1000) - v * 1000) < 1e-6, 'maks. 3 desimal')
 
 export const RequestTypeEnum = z.enum(['advance', 'reimburse']).meta({ id: 'RequestType', description: 'advance = Pengajuan Baru (label until 2026-10: Uang Muka), reimburse = Reimburse' })
+export const PayeeTypeEnum = z
+  .enum(['karyawan', 'vendor'])
+  .meta({ id: 'PayeeType', description: 'ADR 0027 "Jenis penerima": karyawan = the requester\'s employee account (default, every request before ADR 0027); vendor = "Pembayaran vendor" (Finance / PM only): vendor + vendor account + invoice, type always advance, no LPJ (transfer → completed).' })
+
 export const RequestStatusEnum = z
   .enum([
     'draft',
@@ -97,7 +101,7 @@ export const LineInput = z
 const draftFields = {
   title: z.string().trim().min(1).max(200),
   projectId: id.nullable().optional().meta({ description: 'D2 (DRMS 10/10): required to submit (no non-project requests).' }),
-  costCenterId: id.nullable().optional().meta({ description: 'D2: IGNORED since DRMS 10/10 (Finance sets the cost center at the transfer). Still accepted so older apps keep working.' }),
+  costCenterId: id.nullable().optional().meta({ description: 'D2: IGNORED since DRMS 10/10 for employee payments (Finance sets the cost center at the transfer; still accepted so older apps keep working). ADR 0027: a vendor payment (payeeType vendor) WITHOUT a project names its cost center here (active, of the request PT; project OR cost center required to submit).' }),
   neededDate: businessDate.nullable().optional(),
   urgencyLevelId: id.nullable().optional().meta({ description: 'urgency-levels id of the request PT ("Tingkat urgensi", owner decision 2026-10-09).' }),
   periodFrom: businessDate.nullable().optional().meta({ description: 'Ignored since 2026-10-09: "Periode kegiatan" was replaced by the urgency level. Still accepted so older apps keep working.' }),
@@ -107,6 +111,14 @@ const draftFields = {
   bankAccountId: id.nullable().optional().meta({ description: 'employee-bank-accounts id of one of the requesters (Q-11).' }),
   lines: z.array(LineInput).max(200).optional(),
   attachmentIds: z.array(id).max(20).optional(),
+  // ADR 0027 (DRMS 13/10 Wave 4) "Pembayaran vendor"
+  payeeType: PayeeTypeEnum.optional().meta({ description: 'Default karyawan. vendor: only a Finance / PM caller of the request PT (403 otherwise); `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself.' }),
+  vendorId: id.nullable().optional().meta({ description: 'ADR 0027: active vendor of the request PT (GET /masters?types=vendors). Required to submit a vendor payment.' }),
+  vendorBankAccountId: id.nullable().optional().meta({ description: 'ADR 0027: active account OF THAT vendor (GET /masters?types=vendor-bank-accounts). Required to submit; snapshotted at submit = the transfer destination.' }),
+  invoiceNo: z.string().trim().max(64).nullable().optional().meta({ description: 'ADR 0027: required to submit. Unique per vendor among requests that are not cancelled / rejected (compared upper case, letters + digits only) → else 409 with errors[invoiceNo].' }),
+  invoiceDate: businessDate.nullable().optional().meta({ description: 'ADR 0027: required to submit; not in the future.' }),
+  invoiceDueDate: businessDate.nullable().optional().meta({ description: 'ADR 0027: optional; not before invoiceDate.' }),
+  invoiceFileId: id.nullable().optional().meta({ description: 'ADR 0027: media-attachments id (photo / PDF, POST /media/attachments) of the invoice. Required to submit; linked to the request at submit.' }),
 }
 
 export const ExpenseRequestCreate = z
@@ -199,6 +211,7 @@ export const ListQuery = z
     scope: z.enum(['mine', 'team', 'inbox', 'all']).default('all'),
     status: z.string().regex(/^[a-z_]+(,[a-z_]+)*$/).optional(),
     type: RequestTypeEnum.optional(),
+    payeeType: PayeeTypeEnum.optional().meta({ description: 'ADR 0027: vendor = vendor payments only, karyawan = requests paid to employees.' }),
     limit: z.coerce.number().int().min(1).max(100).default(50),
     cursor: z.string().max(64).optional(),
     company: companyFilterParam,
@@ -215,7 +228,8 @@ export const ExpenseRequestListItem = z
     id,
     docNo: z.string().nullable(),
     type: RequestTypeEnum,
-    typeLabel: z.string(),
+    typeLabel: z.string().meta({ description: 'Pengajuan Baru / Reimburse; "Pembayaran vendor" for payeeType vendor (ADR 0027).' }),
+    payeeType: PayeeTypeEnum,
     status: RequestStatusEnum,
     statusLabel: z.string(),
     title: z.string(),
@@ -254,6 +268,7 @@ export const TransferQueueItem = ExpenseRequestListItem.extend({
   sla: z.object({ approvedAt: z.string().nullable(), slaHours: z.number(), ageHours: z.number().nullable(), over: z.boolean() }).meta({ description: 'Item 11: age since the final approval vs the PT transfer SLA.' }),
   noApproval: z.boolean().meta({ description: 'ADR 0024: a Direktur\'s own request without any approval (kebijakan PT) — show the badge "Tanpa persetujuan (Direktur)"; Finance\'s transfer checks are the only check. ADR 0026: also the Owner\'s own request (see noApprovalBy).' }),
   noApprovalBy: z.enum(['direktur', 'owner']).nullable().meta({ description: 'ADR 0026: whose own request went without approval — "owner" (rule "Pengajuan Owner") or "direktur" (ADR 0024, older requests); null when noApproval is false. Badge "Tanpa persetujuan (Owner|Direktur)".' }),
+  vendorName: z.string().nullable().meta({ description: 'ADR 0027: vendor of a vendor payment (the transfer completes it; destination = the vendor account in `bank`).' }),
 }).meta({ id: 'TransferQueueItem' })
 
 export const TransferQueueList = z.object({ items: z.array(TransferQueueItem), nextCursor: z.string().nullable() }).meta({ id: 'TransferQueueList' })
@@ -267,9 +282,23 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
   requesters: z.array(Ref.nullable()),
   createdBy: z.object({ id, name: z.string().nullish() }).nullable(),
   bankAccountId: id.nullable(),
+  vendor: Ref.nullable().meta({ description: 'ADR 0027: vendor of a vendor payment (null for payeeType karyawan).' }),
+  vendorBankAccountId: id.nullable().meta({ description: 'ADR 0027: chosen vendor account (vendor payment); after submit the destination is `bank` (snapshot).' }),
+  invoice: z
+    .object({
+      no: z.string().nullable(),
+      date: z.string().nullable(),
+      dueDate: z.string().nullable(),
+      fileId: id.nullable().meta({ description: 'media-attachments id (GET /api/v1/media/attachments/{id}/file).' }),
+      fileName: z.string().nullable(),
+      mimeType: z.string().nullable(),
+    })
+    .nullable()
+    .meta({ id: 'VendorInvoice', description: 'ADR 0027: the vendor invoice (the proof of a vendor payment — no LPJ). null for payeeType karyawan.' }),
   bank: z
     .object({ bankName: z.string().nullable(), accountNo: z.string().nullable().meta({ description: 'Masked (last 4) unless own request or Finance/Owner/Admin.' }), accountHolder: z.string().nullable() })
-    .nullable(),
+    .nullable()
+    .meta({ description: 'Destination snapshot taken at submit: the requester\'s account, or (ADR 0027) the vendor account.' }),
   lines: z.array(
     z.object({
       id: z.string(),
@@ -752,6 +781,7 @@ export const BankPreviewQuery = z
   .object({
     request: z.coerce.number().int().positive().optional().meta({ description: 'Expense request id. Draft → live account (`account` = picker value, default the saved one); submitted → the snapshot taken at submit.' }),
     account: z.coerce.number().int().positive().optional().meta({ description: 'Employee bank account id (picker value). Without `request`: only an account readable through the collection access.' }),
+    vendorAccount: z.coerce.number().int().positive().optional().meta({ description: 'ADR 0027: vendor bank account id (vendor-payment picker value) instead of `account`. Draft: an account of the request PT and of its chosen vendor (or readable); submitted → the snapshot.' }),
     reveal: z.enum(['1']).optional().meta({ description: '1 = include the full number when `canReveal` (creator/requesters, Finance/Direktur/Admin of the PT — same rule as the detail DTO).' }),
   })
   .meta({ id: 'BankPreviewQuery' })

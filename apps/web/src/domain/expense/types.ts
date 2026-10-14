@@ -14,6 +14,49 @@ export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
 }
 
 /**
+ * DRMS 13/10 Wave 4 (ADR 0027) "Jenis penerima": who receives the money. `karyawan` (default, every request before
+ * ADR 0027) = the requester's employee bank account; `vendor` = "Pembayaran vendor": a vendor's bank account, the
+ * vendor's invoice is the proof, no LPJ (transfer → Selesai). A vendor payment is always type `advance` (paid after
+ * approval, before any receipt) — the server sets it.
+ */
+export const PAYEE_TYPES = ['karyawan', 'vendor'] as const
+export type PayeeType = (typeof PAYEE_TYPES)[number]
+
+export const PAYEE_TYPE_LABELS: Record<PayeeType, string> = {
+  karyawan: 'Karyawan',
+  vendor: 'Vendor',
+}
+
+/** Kind label of a vendor payment (list "Jenis", PDF title, APK). */
+export const VENDOR_PAYMENT_LABEL = 'Pembayaran vendor'
+
+export function isPayeeType(v: unknown): v is PayeeType {
+  return (PAYEE_TYPES as readonly unknown[]).includes(v)
+}
+
+/** Stored / legacy value → payee type (rows before ADR 0027 have none = karyawan). */
+export function payeeOf(v: unknown): PayeeType {
+  return v === 'vendor' ? 'vendor' : 'karyawan'
+}
+
+/** "Jenis" shown for a request: Pengajuan Baru / Reimburse, or "Pembayaran vendor" (ADR 0027). */
+export function requestKindLabel(type: RequestType, payeeType?: unknown): string {
+  return payeeOf(payeeType) === 'vendor' ? VENDOR_PAYMENT_LABEL : REQUEST_TYPE_LABELS[type]
+}
+
+/**
+ * ADR 0027 duplicate-invoice key: upper case, only letters and digits ("inv/2026-01 " = "INV202601"). Same rule as the
+ * SQL function `pk_invoice_key` behind the unique index `expense_requests_vendor_invoice_uq`.
+ */
+export function normalizeInvoiceNo(v: string | null | undefined): string {
+  // strip first, then upper case — the order of the SQL function (non-ASCII letters never become ASCII ones)
+  return (v ?? '').replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+}
+
+/** Statuses that never take part in an LPJ (vendor payments, ADR 0027) — DB-guarded too. */
+export const VENDOR_FORBIDDEN_STATUSES: readonly RequestStatus[] = ['receipt_revision', 'receipts_verified', 'transferred', 'receipts_complete', 'lpj_submitted', 'lpj_revision', 'lpj_verified']
+
+/**
  * One Postgres enum for both request types. LPJ values (lpj_*, receipts_complete) are declared now
  * as extension points for F2b (T5) so that F2b needs no enum migration for them.
  */

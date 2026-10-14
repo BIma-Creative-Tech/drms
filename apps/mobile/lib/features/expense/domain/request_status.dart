@@ -10,6 +10,22 @@ enum RequestType {
   static RequestType fromCode(String? c) => c == 'advance' ? advance : reimburse;
 }
 
+/// ADR 0027 (DRMS 13/10 Wave 4) "Jenis penerima": `karyawan` (default, the requester's account) or `vendor` =
+/// "Pembayaran vendor" (Finance / PM only: vendor + vendor account + invoice, always Pengajuan Baru, no LPJ).
+enum PayeeType {
+  karyawan('karyawan', 'Karyawan'),
+  vendor('vendor', 'Vendor');
+
+  const PayeeType(this.code, this.label);
+  final String code;
+  final String label;
+
+  static PayeeType fromCode(String? c) => c == 'vendor' ? vendor : karyawan;
+}
+
+/// ADR 0027: kind label of a vendor payment (server `typeLabel`; fallback).
+const vendorPaymentLabel = 'Pembayaran vendor';
+
 /// Status codes of openapi `RequestStatus`; labels are a fallback — the server's `statusLabel` wins.
 /// Same wording as the web (`apps/web/src/domain/expense/types.ts` STATUS_LABELS, ADR 0021).
 enum RequestStatus {

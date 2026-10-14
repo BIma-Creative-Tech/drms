@@ -8,13 +8,16 @@ import { ROLE_LABELS, type Role } from '@/access/roles'
 
 import { DIREKTUR_ROLE, isDecisionSnapshot, isNoApproval, OWNER_ROLE } from './decision'
 import { ACK_DELEGATE_ROLE, type ApprovalSnapshot } from './rules'
-import { LEGACY_WAITING_LABELS, NO_APPROVAL_STATUS_LABELS, OWNER_WAITING_LABEL, statusLabel, type RequestStatus, type RequestType } from './types'
+import { LEGACY_WAITING_LABELS, NO_APPROVAL_STATUS_LABELS, OWNER_WAITING_LABEL, payeeOf, statusLabel, type PayeeType, type RequestStatus, type RequestType } from './types'
 
 /** Happy-path order per type (branches — rejected/cancelled/revisions — are shown as the current step). */
 export const STATUS_PATH: Record<RequestType, RequestStatus[]> = {
   advance: ['draft', 'pending_ack', 'pending_approval', 'approved', 'transferred', 'receipts_complete', 'lpj_submitted', 'lpj_verified', 'completed'],
   reimburse: ['draft', 'pending_ack', 'pending_approval', 'approved', 'receipts_verified', 'transferred', 'completed'],
 }
+
+/** ADR 0027: a vendor payment's happy path — the transfer completes it (no LPJ). */
+export const VENDOR_STATUS_PATH: RequestStatus[] = ['draft', 'pending_ack', 'pending_approval', 'approved', 'completed']
 
 /** Where a side status sits on the happy path (for "done" marking). */
 const SIDE_ANCHOR: Partial<Record<RequestStatus, RequestStatus>> = {
@@ -24,10 +27,10 @@ const SIDE_ANCHOR: Partial<Record<RequestStatus, RequestStatus>> = {
 
 export type TimelineStep = { status: RequestStatus; label: string; state: 'done' | 'current' | 'todo' }
 
-export function timeline(type: RequestType, status: RequestStatus, opts: { skipAck?: boolean; snapshot?: LabelSnapshot | null; currentLevel?: number | null } = {}): TimelineStep[] {
+export function timeline(type: RequestType, status: RequestStatus, opts: { skipAck?: boolean; snapshot?: LabelSnapshot | null; currentLevel?: number | null; payeeType?: PayeeType | null } = {}): TimelineStep[] {
   // ADR 0024: a Direktur's own request without approval never waits for a decision
   const noApproval = isNoApproval(opts.snapshot)
-  const path = STATUS_PATH[type].filter((s) => !((opts.skipAck || noApproval) && s === 'pending_ack') && !(noApproval && s === 'pending_approval'))
+  const path = (payeeOf(opts.payeeType) === 'vendor' ? VENDOR_STATUS_PATH : STATUS_PATH[type]).filter((s) => !((opts.skipAck || noApproval) && s === 'pending_ack') && !(noApproval && s === 'pending_approval'))
   const anchor = SIDE_ANCHOR[status] ?? status
   const idx = path.indexOf(anchor)
   const steps: TimelineStep[] = path.map((s, i) => ({
@@ -128,6 +131,8 @@ const roleLabel = (r: Role | null | undefined) => (r ? ROLE_LABELS[r] : 'approve
  */
 export function nextActor(input: {
   type: RequestType
+  /** ADR 0027: vendor payment texts (Finance pays the vendor; nothing after the transfer). */
+  payeeType?: PayeeType | null
   status: RequestStatus
   currentLevel: number | null
   snapshot: SnapshotLike | null
@@ -136,9 +141,11 @@ export function nextActor(input: {
 }): NextActor | null {
   const { type, status, snapshot } = input
   const requester = input.requesters ? `Pemohon (${input.requesters})` : 'Pemohon / pembuat'
+  const vendor = payeeOf(input.payeeType) === 'vendor'
   const user = (id: number | null | undefined) => (id ? (input.names[id] ?? `user #${id}`) : null)
   switch (status) {
     case 'draft':
+      if (vendor) return { who: requester, what: 'pilih vendor + rekening vendor, isi data invoice dan unggah file invoice, lengkapi baris item, lalu Kirim pengajuan' }
       return { who: requester, what: type === 'reimburse' ? 'lengkapi baris item, upload nota per baris, lalu Kirim pengajuan' : 'lengkapi baris item lalu Kirim pengajuan' }
     case 'pending_ack': {
       if (snapshot?.acknowledgeDelegatedTo) {
@@ -164,6 +171,7 @@ export function nextActor(input: {
       return { who: `${who} — approval level ${input.currentLevel ?? 1}`, what: 'setujui atau tolak' }
     }
     case 'approved':
+      if (vendor) return { who: 'Finance', what: 'transfer ke rekening vendor (Antrian Transfer) — pembayaran selesai setelah transfer' }
       return type === 'advance' ? { who: 'Finance', what: 'catat transfer pengajuan baru (Antrian Transfer)' } : { who: 'Finance', what: 'verifikasi nota (valid / tolak)' }
     case 'receipt_revision':
       return { who: requester, what: 'perbaiki nota yang ditolak lalu Kirim ulang nota' }

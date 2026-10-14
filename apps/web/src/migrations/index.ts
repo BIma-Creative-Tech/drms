@@ -69,6 +69,9 @@ import * as migration_20261013_620100_d1310_onsite_guard from './20261013_620100
 import * as migration_20261013_630000_d1310_owner_role from './20261013_630000_d1310_owner_role';
 import * as migration_20261013_630100_d1310_owner_role_guard from './20261013_630100_d1310_owner_role_guard';
 import * as migration_20261013_630200_d1310_owner_role_data from './20261013_630200_d1310_owner_role_data';
+import * as migration_20261013_700000_d1310_vendor_payments from './20261013_700000_d1310_vendor_payments';
+import * as migration_20261013_700100_d1310_vendor_payments_guard from './20261013_700100_d1310_vendor_payments_guard';
+import * as migration_20261013_700200_d1310_vendor_payments_data from './20261013_700200_d1310_vendor_payments_data';
 import * as migration_20261013_910000_d1310_direktur_ttd from './20261013_910000_d1310_direktur_ttd';
 import * as migration_20261013_910100_d1310_direktur_ttd_guard from './20261013_910100_d1310_direktur_ttd_guard';
 
@@ -427,6 +430,21 @@ export const migrations = [
     up: migration_20261013_630200_d1310_owner_role_data.up,
     down: migration_20261013_630200_d1310_owner_role_data.down,
     name: '20261013_630200_d1310_owner_role_data',
+  },
+  {
+    up: migration_20261013_700000_d1310_vendor_payments.up,
+    down: migration_20261013_700000_d1310_vendor_payments.down,
+    name: '20261013_700000_d1310_vendor_payments',
+  },
+  {
+    up: migration_20261013_700100_d1310_vendor_payments_guard.up,
+    down: migration_20261013_700100_d1310_vendor_payments_guard.down,
+    name: '20261013_700100_d1310_vendor_payments_guard',
+  },
+  {
+    up: migration_20261013_700200_d1310_vendor_payments_data.up,
+    down: migration_20261013_700200_d1310_vendor_payments_data.down,
+    name: '20261013_700200_d1310_vendor_payments_data',
   },
   {
     up: migration_20261013_910000_d1310_direktur_ttd.up,

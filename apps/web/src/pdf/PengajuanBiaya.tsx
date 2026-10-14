@@ -54,6 +54,8 @@ export type PdfData = {
   /** ADR 0021: policy note printed under the signatures (e.g. a Direktur's request filed by the PM). */
   policyNote?: string
   transfer: { bankName: string; accountHolder: string; accountNo: string } | null
+  /** ADR 0027: vendor payment — vendor + invoice (no LPJ; the invoice is the proof, attached as the first Lampiran). */
+  vendorInvoice?: { vendor: string; invoiceNo: string; invoiceDate: string; dueDate: string } | null
   receipts: PdfReceipt[]
   attachments: PdfAttachment[]
   internal: boolean
@@ -254,9 +256,30 @@ export function PengajuanBiaya({ d }: { d: PdfData }) {
         </View>
         {d.policyNote ? <Text style={s.sigNote}>{d.policyNote}</Text> : null}
 
+        {d.vendorInvoice ? (
+          <View style={s.transfer} wrap={false}>
+            <Text style={s.transferHead}>Pembayaran Vendor</Text>
+            <View style={s.transferRow}>
+              <Text style={s.transferLabel}>Vendor</Text>
+              <Text>: {d.vendorInvoice.vendor}</Text>
+            </View>
+            <View style={s.transferRow}>
+              <Text style={s.transferLabel}>No. invoice</Text>
+              <Text>: {d.vendorInvoice.invoiceNo}</Text>
+            </View>
+            <View style={s.transferRow}>
+              <Text style={s.transferLabel}>Tgl. invoice</Text>
+              <Text>: {d.vendorInvoice.invoiceDate}</Text>
+            </View>
+            <View style={s.transferRow}>
+              <Text style={s.transferLabel}>Jatuh tempo</Text>
+              <Text>: {d.vendorInvoice.dueDate}</Text>
+            </View>
+          </View>
+        ) : null}
         {d.transfer ? (
           <View style={s.transfer} wrap={false}>
-            <Text style={s.transferHead}>Info Transfer</Text>
+            <Text style={s.transferHead}>{d.vendorInvoice ? 'Info Transfer (rekening vendor)' : 'Info Transfer'}</Text>
             <View style={s.transferRow}>
               <Text style={s.transferLabel}>Transfer via</Text>
               <Text>: {d.transfer.bankName}</Text>

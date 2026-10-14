@@ -6,6 +6,7 @@ import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnAnyUpdate, withAudit } from '@/audit/hooks'
 import { isDecisionRole, REQUESTER_ROLE_OPTIONS, ruleDecisionError, SCOPE_MANAGER_LABEL } from '@/domain/expense/decision'
 import { stepsError, type AckBy, type AckMode } from '@/domain/expense/rules'
+import { PAYEE_TYPE_LABELS } from '@/domain/expense/types'
 import { activeField, rupiahField } from '@/fields/common'
 import { companyField, companyHook } from '@/fields/company'
 import { userPicker } from '@/fields/users'
@@ -28,6 +29,7 @@ const decisionRoleOptions = ({ options }: { options: Option[] }): Option[] => op
  * empty = any) and zero approval levels ("Tanpa persetujuan — langsung ke antrian transfer Finance") ONLY
  * when the requester role is exactly Owner (ADR 0026; was Direktur) — hook (400) + DB trigger `approval_rules_zero_step`.
  * ADR 0026: expense rules end with the Owner level (`pk-principal`); Addendum RAB rules never name the Owner.
+ * ADR 0027: condition "Jenis penerima" (Semua / Karyawan / Vendor) — expense-request rules only.
  */
 export const ApprovalRules: CollectionConfig = withAudit(
   {
@@ -56,6 +58,8 @@ export const ApprovalRules: CollectionConfig = withAudit(
             // E5: addenda have no request type / expense category — such a rule would never match.
             if ((data.requestType ?? originalDoc?.requestType ?? 'any') !== 'any') throw new APIError('Aturan Addendum RAB: jenis pengajuan harus "Semua".', 400, null, true)
             if (relId(data.category !== undefined ? data.category : originalDoc?.category)) throw new APIError('Aturan Addendum RAB tidak memakai kategori biaya.', 400, null, true)
+            // ADR 0027: an addendum has no payee — such a rule would never match
+            if ((data.payeeType ?? originalDoc?.payeeType ?? 'any') !== 'any') throw new APIError('Aturan Addendum RAB: jenis penerima harus "Semua".', 400, null, true)
           }
           // ADR 0024 / 0026: zero steps only for "Peran pemohon = Owner" (ruleDecisionError → zeroStepRuleError)
           const requesterRoles = ((data.requesterRoles !== undefined ? data.requesterRoles : originalDoc?.requesterRoles) ?? []) as Role[]
@@ -123,6 +127,20 @@ export const ApprovalRules: CollectionConfig = withAudit(
         label: 'Peran pemohon',
         options: requesterRoleOptions,
         admin: { description: 'Aturan berlaku bila SETIAP pemohon memegang salah satu peran ini di PT pengajuan. Kosong = semua pemohon.' },
+      },
+      {
+        // ADR 0027 (DRMS 13/10 Wave 4): rule selection by "Jenis penerima" — e.g. vendor payments filed by Finance → Direktur
+        name: 'payeeType',
+        type: 'select',
+        label: 'Jenis penerima',
+        required: true,
+        defaultValue: 'any',
+        options: [
+          { label: 'Semua', value: 'any' },
+          { label: PAYEE_TYPE_LABELS.karyawan, value: 'karyawan' },
+          { label: `${PAYEE_TYPE_LABELS.vendor} (pembayaran vendor)`, value: 'vendor' },
+        ],
+        admin: { description: 'Aturan hanya untuk pengajuan dengan jenis penerima ini (Semua = tanpa syarat).' },
       },
       { name: 'priority', type: 'number', label: 'Prioritas', defaultValue: 100, min: 0, admin: { description: 'Angka kecil dievaluasi lebih dulu (aturan "Pengajuan Owner" = 5, "Pengajuan Direktur" = 10, default = 100).' } },
       {
