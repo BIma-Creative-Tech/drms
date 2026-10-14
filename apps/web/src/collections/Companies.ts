@@ -8,6 +8,8 @@ import { SELFIE_RETENTION_DEFAULT_MONTHS } from '@/domain/attendance/retention-p
 import { copyCompanyDefaults, ensureDefaultResourceTypes, ensureDefaultUrgencyLevels, ensureSystemCashInSources, SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
 import { DEFAULT_TZ, isValidTimeZone } from '@/lib/time'
 
+import { DIREKTUR_FIELDS, linkDirekturSignature, validateDirektur } from './companies-direktur'
+
 const intField = (name: string, label: string, def: number, min: number, max: number) => ({
   name,
   type: 'number' as const,
@@ -314,7 +316,7 @@ export const Companies: CollectionConfig = withAudit(
       },
       delete: denyAll,
     },
-    hooks: { beforeChange: [shortCodeGuard, captureCopyDefaults], afterChange: [copyDefaultsOnCreate] },
+    hooks: { beforeChange: [shortCodeGuard, captureCopyDefaults, validateDirektur], afterChange: [copyDefaultsOnCreate, linkDirekturSignature] },
     fields: [
       // MC2-4 (wireframe §3): tabs = the groups moved from "Setting perusahaan" (unnamed tabs: no schema change)
       {
@@ -367,6 +369,8 @@ export const Companies: CollectionConfig = withAudit(
           { label: 'Operasional', fields: settingFields(OPERATIONAL) },
           { label: 'Absensi & retensi', fields: settingFields(ATTENDANCE) },
           { label: 'Pengingat & notifikasi', fields: settingFields(REMINDERS) },
+          // ADR 0025: the PT's definitive Direktur (name, title, signature) + designated representatives
+          { label: 'Direktur definitif', fields: DIREKTUR_FIELDS },
         ],
       },
       {

@@ -438,6 +438,21 @@ export interface Company {
    */
   approvalEmailEnabled?: boolean | null;
   /**
+   * Direktur sah PT ini yang tidak memakai aplikasi. Saat salah satu wakil di bawah memutuskan langkah Direktur (Persetujuan/Diketahui Direktur, Addendum RAB, pinjaman antar project), PDF, riwayat dan aplikasi menampilkan nama dan tanda tangan Direktur ini. Kosong = setiap Direktur menandatangani dengan tanda tangannya sendiri.
+   */
+  direktur?: {
+    name?: string | null;
+    title?: string | null;
+    /**
+     * PNG latar transparan, maks. 800 × 300 px. Unggah file baru (bukan tanda tangan profil pengguna). Hanya Admin, Direktur dan Finance PT ini yang dapat melihatnya.
+     */
+    signature?: (number | null) | MediaSignature;
+    /**
+     * Pengguna dengan peran Direktur di PT ini yang memutuskan langkah Direktur atas nama Direktur definitif. Langkah lain (mis. sebagai PM) tetap memakai tanda tangan pribadinya.
+     */
+    representatives?: (number | User)[] | null;
+  };
+  /**
    * Hanya Admin grup yang dapat membuat atau menonaktifkan PT (alasan wajib).
    */
   active?: boolean | null;
@@ -1496,7 +1511,11 @@ export interface Approval {
   openFlags?: number | null;
   signature?: (number | null) | MediaSignature;
   signatureSha256?: string | null;
-  signatureSource?: ('profile' | 'captured' | 'none') | null;
+  signatureSource?: ('profile' | 'captured' | 'none' | 'company') | null;
+  representedDirektur?: {
+    name?: string | null;
+    title?: string | null;
+  };
   deviceId?: string | null;
   source?: ('web' | 'apk' | 'system' | 'job') | null;
   updatedAt: string;
@@ -2587,7 +2606,8 @@ export interface AuditLog {
     | '2fa_disabled'
     | 'privacy_ack'
     | 'overdraft_confirmed'
-    | 'bank_unverified_confirmed';
+    | 'bank_unverified_confirmed'
+    | 'renumbered';
   field?: string | null;
   lineNo?: number | null;
   oldValue?:
@@ -2612,6 +2632,7 @@ export interface AuditLog {
   statusTo?: string | null;
   reason?: string | null;
   userId?: number | null;
+  actorDisplayName?: string | null;
   company?: (number | null) | Company;
   userRoles?: string | null;
   source?: ('web' | 'apk' | 'system' | 'job') | null;
@@ -3136,6 +3157,14 @@ export interface CompaniesSelect<T extends boolean = true> {
   reminderLoanOverdueEnabled?: T;
   notifyRequesterStatusEnabled?: T;
   approvalEmailEnabled?: T;
+  direktur?:
+    | T
+    | {
+        name?: T;
+        title?: T;
+        signature?: T;
+        representatives?: T;
+      };
   active?: T;
   copyDefaults?: T;
   copyDefaultsFrom?: T;
@@ -3708,6 +3737,12 @@ export interface ApprovalsSelect<T extends boolean = true> {
   signature?: T;
   signatureSha256?: T;
   signatureSource?: T;
+  representedDirektur?:
+    | T
+    | {
+        name?: T;
+        title?: T;
+      };
   deviceId?: T;
   source?: T;
   updatedAt?: T;
@@ -4415,6 +4450,7 @@ export interface AuditLogsSelect<T extends boolean = true> {
   statusTo?: T;
   reason?: T;
   userId?: T;
+  actorDisplayName?: T;
   company?: T;
   userRoles?: T;
   source?: T;

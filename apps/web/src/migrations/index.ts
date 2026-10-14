@@ -63,8 +63,11 @@ import * as migration_20261013_300000_d1010_approval_config_data from './2026101
 import * as migration_20261013_400000_d1010_rap_all from './20261013_400000_d1010_rap_all';
 import * as migration_20261013_400100_d1010_rap_all_guard from './20261013_400100_d1010_rap_all_guard';
 import * as migration_20261013_500000_attachments_owner_link from './20261013_500000_attachments_owner_link';
+import * as migration_20261013_610000_d1310_renumber from './20261013_610000_d1310_renumber';
 import * as migration_20261013_620000_d1310_onsite from './20261013_620000_d1310_onsite';
 import * as migration_20261013_620100_d1310_onsite_guard from './20261013_620100_d1310_onsite_guard';
+import * as migration_20261013_910000_d1310_direktur_ttd from './20261013_910000_d1310_direktur_ttd';
+import * as migration_20261013_910100_d1310_direktur_ttd_guard from './20261013_910100_d1310_direktur_ttd_guard';
 
 export const migrations = [
   {
@@ -393,6 +396,11 @@ export const migrations = [
     name: '20261013_500000_attachments_owner_link',
   },
   {
+    up: migration_20261013_610000_d1310_renumber.up,
+    down: migration_20261013_610000_d1310_renumber.down,
+    name: '20261013_610000_d1310_renumber',
+  },
+  {
     up: migration_20261013_620000_d1310_onsite.up,
     down: migration_20261013_620000_d1310_onsite.down,
     name: '20261013_620000_d1310_onsite',
@@ -401,5 +409,15 @@ export const migrations = [
     up: migration_20261013_620100_d1310_onsite_guard.up,
     down: migration_20261013_620100_d1310_onsite_guard.down,
     name: '20261013_620100_d1310_onsite_guard',
+  },
+  {
+    up: migration_20261013_910000_d1310_direktur_ttd.up,
+    down: migration_20261013_910000_d1310_direktur_ttd.down,
+    name: '20261013_910000_d1310_direktur_ttd',
+  },
+  {
+    up: migration_20261013_910100_d1310_direktur_ttd_guard.up,
+    down: migration_20261013_910100_d1310_direktur_ttd_guard.down,
+    name: '20261013_910100_d1310_direktur_ttd_guard',
   },
 ];

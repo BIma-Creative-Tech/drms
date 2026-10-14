@@ -567,6 +567,12 @@ class AppLocalizationsId extends AppLocalizations {
   String get signatureTooLarge => 'Tanda tangan terlalu besar. Ulangi dengan goresan lebih sederhana.';
 
   @override
+  String get direkturSignatureTitle => 'Tanda tangan Direktur PT';
+
+  @override
+  String get direkturSignatureHint => 'Ditandatangani dengan tanda tangan dan nama Direktur definitif PT.';
+
+  @override
   String get confirm => 'Konfirmasi';
 
   @override

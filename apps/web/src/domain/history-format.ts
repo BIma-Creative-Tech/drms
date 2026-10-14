@@ -31,9 +31,14 @@ export const ACTION_LABELS: Record<string, string> = {
   access_denied: 'aksi ditolak (hak akses)',
   approval_skipped: 'posisi dilewati (tidak berlaku — pemohon)',
   privacy_ack: 'pemberitahuan privasi dibaca',
+  // DRMS 13/10 Wave 4: one-time renumbering (ADR 0007 amendment 2026-10-13)
+  renumbered: 'nomor diubah',
 }
 
 export const DOC_LABELS: Record<string, string> = { expense_request: 'Pengajuan', receipt: 'Nota', transfer: 'Transfer', settlement: 'LPJ', cash_entry: 'Kas' }
+
+/** DRMS 13/10 Wave 4: fields of a `renumbered` row — the document number, or a cash-entry description that quoted one. */
+const RENUMBER_FIELDS: Readonly<Record<string, string>> = { docNo: 'Nomor diubah', entryNo: 'Nomor diubah', description: 'Keterangan (nomor diubah)' }
 
 /** DRMS 13/10 Persetujuan #12: audit field of the duplicate endpoint (on the NEW draft; value = the source request). */
 export const DUPLICATED_FROM_FIELD = 'duplicated_from'
@@ -69,7 +74,11 @@ export type HistoryEntry = {
 
 /** A history row as the change log shows it (labels in Bahasa Indonesia, status codes as their labels). */
 export function historyEntry(r: HistoryRow, tz: string): HistoryEntry {
-  const field = r.field === DUPLICATED_FROM_FIELD ? 'Disalin dari' : r.field ? `${fieldLabel(r.field) ?? r.field}${r.lineNo ? ` (baris ${r.lineNo})` : ''}` : r.lineNo ? `baris ${r.lineNo}` : null
+  // DRMS 13/10 Wave 4: "Nomor diubah: PB/X/2610/0003 → PB/X/2610/0001" (the change log prints `field: change`)
+  const renumberField = r.action === 'renumbered' && r.field !== null && Object.hasOwn(RENUMBER_FIELDS, r.field) ? RENUMBER_FIELDS[r.field] : undefined
+  const field =
+    renumberField ??
+    (r.field === DUPLICATED_FROM_FIELD ? 'Disalin dari' : r.field ? `${fieldLabel(r.field) ?? r.field}${r.lineNo ? ` (baris ${r.lineNo})` : ''}` : r.lineNo ? `baris ${r.lineNo}` : null)
   const dup = r.field === DUPLICATED_FROM_FIELD ? (r.newValue as { docNo?: unknown; id?: unknown } | null) : null
   const change =
     r.statusFrom || r.statusTo

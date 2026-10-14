@@ -48,6 +48,16 @@ class ApprovalsApi {
     (data) => ((data as Map<String, dynamic>)['id'] as num).toInt(),
   );
 
+  /// ADR 0025: the PT's definitive Direktur signature (PNG) through the authorized file endpoint — readable by the
+  /// office roles of that PT only; never cached on disk.
+  Future<Uint8List> signatureImage(int id) => client.run(
+    (d) => d.get<dynamic>(
+      '/media/signatures/$id/file',
+      options: ApiClient.allCompanies(Options(responseType: ResponseType.bytes)),
+    ),
+    (data) => Uint8List.fromList(data as List<int>),
+  );
+
   /// `signatureMediaId` null → the server uses the profile signature (SignBody default).
   Future<ExpenseDetail> decide(
     int requestId,

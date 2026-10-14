@@ -23,3 +23,6 @@ impor-commit-*.json
 *-keycloak-users.csv
 kc-map*.csv
 *.klien.xlsx
+# one-time renumbering (DRMS 13/10 Wave 4): dry-run / apply / verify reports hold real document numbers — never commit
+penomoran-ulang-*.json
+penomoran-ulang-*.csv

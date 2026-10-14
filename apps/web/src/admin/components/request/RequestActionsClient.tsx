@@ -80,6 +80,7 @@ export function RequestActionsClient({ id, decision, flowLinks, pdfs, canDuplica
         <>
           <span className="pk-er-actions__turn" data-pk-decision-bar>
             Menunggu keputusan Anda: <strong>{decision.stepLabel}</strong>
+            {decision.signAs ? <span data-pk-sign-as> · ditandatangani sebagai Direktur PT: {decision.signAs}</span> : null}
           </span>
           {decision.canReject ? <ActionButton url={`/api/v1/expense-requests/${id}/reject`} label="Tolak" prompt={REJECT_PROMPT} testId="reject" /> : null}
           {decision.step ? <ActionButton url={`/api/v1/expense-requests/${id}/${decision.step}`} label={decision.label} variant="primary" confirm={decision.confirm} testId={decision.step} /> : null}
