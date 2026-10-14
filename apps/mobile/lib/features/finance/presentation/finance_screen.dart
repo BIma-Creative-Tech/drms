@@ -15,6 +15,8 @@ import '../../companies/presentation/company_chip.dart';
 import '../../expense/domain/expense_request.dart';
 import '../../expense/domain/request_status.dart';
 import '../../expense/presentation/widgets/receipt_mismatch_chip.dart';
+import '../../loans/presentation/intercompany_loan_providers.dart';
+import '../../loans/presentation/intercompany_loan_screens.dart';
 import '../application/finance_providers.dart';
 import '../domain/transfer_queue.dart';
 
@@ -139,7 +141,11 @@ class _TransferQueueViewState extends ConsumerState<TransferQueueView> {
         ),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: () => ref.refresh(transferQueueProvider.future),
+            onRefresh: () {
+              // ADR 0029: the "Pencairan pinjaman antar-PT" section above the queue reloads with it
+              ref.invalidate(icLoanQueueProvider);
+              return ref.refresh(transferQueueProvider.future);
+            },
             child: AsyncBody(
               value: value,
               onRetry: () => ref.invalidate(transferQueueProvider),
@@ -155,7 +161,9 @@ class _TransferQueueViewState extends ConsumerState<TransferQueueView> {
                     .toList();
                 if (items.isEmpty) {
                   return ListView(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
                     children: [
+                      const IcLoanQueueSection(),
                       Padding(
                         padding: const EdgeInsets.all(32),
                         child: Column(
@@ -174,8 +182,23 @@ class _TransferQueueViewState extends ConsumerState<TransferQueueView> {
                 return ListView.builder(
                   key: const Key('transfer-queue'),
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
-                  itemCount: shown.length + 1,
-                  itemBuilder: (_, i) => i == shown.length
+                  // ADR 0029: index 0 = "Pencairan pinjaman antar-PT" (Finance of a lender PT; hidden when empty)
+                  itemCount: shown.length + 2,
+                  itemBuilder: (_, j) => j == 0
+                      ? const IcLoanQueueSection()
+                      : _queueRow(j - 1, shown, items.length, more),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _queueRow(int i, List<TransferQueueItem> shown, int total, bool more) {
+    final t = AppLocalizations.of(context);
+    return i == shown.length
                       ? more
                             ? LoadMoreTrigger(
                                 key: ValueKey('more-${shown.length}'),
@@ -184,19 +207,12 @@ class _TransferQueueViewState extends ConsumerState<TransferQueueView> {
                             : Padding(
                                 padding: const EdgeInsets.all(12),
                                 child: Text(
-                                  t.listShownOf(shown.length, items.length),
+                                  t.listShownOf(shown.length, total),
                                   textAlign: TextAlign.center,
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               )
-                      : TransferQueueCard(item: shown[i]),
-                );
-              },
-            ),
-          ),
-        ),
-      ],
-    );
+                      : TransferQueueCard(item: shown[i]);
   }
 }
 
@@ -379,7 +395,9 @@ class _LpjQueueViewState extends ConsumerState<_LpjQueueView> {
                     .toList();
                 if (items.isEmpty) {
                   return ListView(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
                     children: [
+                      const IcLoanQueueSection(),
                       Padding(
                         padding: const EdgeInsets.all(32),
                         child: Center(child: Text(all.isEmpty ? t.lpjQueueEmpty : t.projectsNoMatch)),

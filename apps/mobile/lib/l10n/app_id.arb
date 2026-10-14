@@ -2815,5 +2815,251 @@
         "type": "String"
       }
     }
+  },
+  "fundPanelTitle": "Ketersediaan dana PT {pt}",
+  "@fundPanelTitle": {
+    "description": "ADR 0029: title of the fund panel on the request detail / decision sheet.",
+    "placeholders": {
+      "pt": {
+        "type": "String"
+      }
+    }
+  },
+  "fundNotEnabled": "Cek dana PT ini belum aktif (informasi saja).",
+  "fundNotFinal": "Cek akhir di persetujuan Owner.",
+  "fundBalance": "Saldo dana",
+  "fundAccounts": "{count} akun, tanpa akun site",
+  "@fundAccounts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "fundSiteExcluded": "{count} akun site {amount} tidak dihitung",
+  "@fundSiteExcluded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "fundCommitments": "Komitmen",
+  "fundCommitmentDetails": "Rincian komitmen ({count})",
+  "@fundCommitmentDetails": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "fundAvailable": "Dana tersedia",
+  "fundNeeded": "Dibutuhkan",
+  "fundShortLabel": "Kurang",
+  "fundStatusLabel": "Status",
+  "fundGap": "Kurang {amount}",
+  "@fundGap": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "fundEnough": "Cukup",
+  "fundWaiting": "Pengajuan lain menunggu persetujuan akhir di PT ini: {count}, total {amount} (belum dicadangkan — yang disetujui lebih dulu memakai dana lebih dulu).",
+  "@fundWaiting": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "fundLoansTitle": "Pinjaman antar-PT untuk pengajuan ini",
+  "fundInstructLoan": "Perintahkan pinjaman antar-PT",
+  "fundShortBadge": "Dana kurang {amount}",
+  "@fundShortBadge": {
+    "description": "ADR 0029: approval inbox badge (fundShort).",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanTitle": "Pinjaman antar-PT",
+  "icLoanInstructTitle": "Perintahkan pinjaman antar-PT",
+  "icLoanInstructNote": "Nomor PJA dari PT pemberi. Finance PT pemberi mencairkan dari Antrian Transfer; Owner menyetujui ulang pengajuan setelah dana masuk.",
+  "icLoanBorrower": "PT peminjam",
+  "icLoanLender": "PT pemberi",
+  "icLoanAvailable": "Dana tersedia {amount}",
+  "@icLoanAvailable": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanBorrowerNoAccount": "PT peminjam belum menetapkan rekening penerimaan antar-PT — pinjaman tidak dapat diterima.",
+  "icLoanNoLenders": "Tidak ada PT lain di mana Anda Owner.",
+  "icLoanLenderShort": "Dana tersedia tidak cukup untuk nilai ini",
+  "icLoanLenderNoAccount": "Pengembalian belum dapat dicatat sampai PT ini menetapkan rekening penerimaan antar-PT.",
+  "icLoanAmount": "Nilai pinjaman",
+  "icLoanAmountGap": "Default = kekurangan dana {amount}",
+  "@icLoanAmountGap": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanAmountAbove": "Di atas kekurangan dana — sisanya menambah dana tersedia PT peminjam.",
+  "icLoanAmountBelow": "Di bawah kekurangan dana — masih kurang {amount}; pinjaman dari PT lain dapat menutupnya.",
+  "@icLoanAmountBelow": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanDueDate": "Jatuh tempo",
+  "icLoanDueHelp": "Default 30 hari · tanpa bunga",
+  "icLoanReason": "Alasan",
+  "icLoanRequests": "Pengajuan terkait",
+  "icLoanRequestsNone": "Tidak ada pengajuan yang menunggu persetujuan akhir di PT ini.",
+  "icLoanCalcAll": "Hitung untuk semua ({amount})",
+  "@icLoanCalcAll": {
+    "description": "ADR 0029: sets the amount to Σ needed − available of every waiting request and ticks them.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanSubmit": "Perintahkan pinjaman",
+  "icLoanConfirmTitle": "Perintahkan pinjaman antar-PT?",
+  "icLoanConfirmBody": "PT {lender} meminjamkan {amount} ke PT {borrower}. Nilai dicadangkan di PT pemberi sampai Finance-nya mencairkan.",
+  "@icLoanConfirmBody": {
+    "placeholders": {
+      "lender": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      },
+      "borrower": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanInstructed": "Perintah pinjaman {docNo} dikirim ke Finance PT pemberi.",
+  "@icLoanInstructed": {
+    "placeholders": {
+      "docNo": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanFlow": "PT {lender} → PT {borrower}",
+  "@icLoanFlow": {
+    "placeholders": {
+      "lender": {
+        "type": "String"
+      },
+      "borrower": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanSideLender": "Piutang antar-PT",
+  "icLoanSideBorrower": "Hutang antar-PT",
+  "icLoanRepaid": "Sudah kembali",
+  "icLoanOutstanding": "Sisa pinjaman",
+  "icLoanInstructionDate": "Tanggal perintah",
+  "icLoanNoInterest": "tanpa bunga",
+  "icLoanCreatedBy": "Diperintahkan oleh",
+  "icLoanG1Blocked": "Anda yang memerintahkan pinjaman ini — pencairan harus dicatat Finance lain (G1).",
+  "icLoanNoLenderAccount": "PT {pt} belum menetapkan rekening penerimaan antar-PT — pengembalian belum dapat dicatat.",
+  "@icLoanNoLenderAccount": {
+    "placeholders": {
+      "pt": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanCancelledBecause": "Perintah dibatalkan: {reason}",
+  "@icLoanCancelledBecause": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanMovements": "Pencairan & pengembalian",
+  "icLoanMovementsEmpty": "Belum dicairkan.",
+  "icLoanMovementVoid": "Dibatalkan (void)",
+  "icLoanMovementVoidReason": "Dibatalkan (void): {reason}",
+  "@icLoanMovementVoidReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanWebOnlyHint": "Pembatalan perintah, pengembalian dan void dicatat di web (Keuangan → Pinjaman antar-PT).",
+  "icLoanDisburse": "Catat pencairan",
+  "icLoanDisburseTitle": "Pencairan pinjaman antar-PT",
+  "icLoanDisburseAmount": "Transfer {amount} dari PT {lender} ke rekening penerimaan antar-PT PT {borrower}",
+  "@icLoanDisburseAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "lender": {
+        "type": "String"
+      },
+      "borrower": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanDisburseHelp": "Nilai = nilai pinjaman (satu kali pencairan). KK di PT pemberi; kas masuk \"Antar PT\" di PT peminjam tercatat otomatis.",
+  "icLoanDestinationNone": "PT peminjam belum menetapkan rekening penerimaan antar-PT — pencairan akan ditolak.",
+  "icLoanAccountHelp": "Hanya akun kantor pusat (tanpa site).",
+  "icLoanNoAccounts": "Tidak ada akun kas aktif tanpa site di PT pemberi.",
+  "icLoanNotInQueue": "Pinjaman ini tidak (lagi) menunggu pencairan oleh Anda.",
+  "icLoanDisbursed": "Pencairan {docNo} tercatat: {kk} di PT pemberi, {km} di PT peminjam.",
+  "@icLoanDisbursed": {
+    "placeholders": {
+      "docNo": {
+        "type": "String"
+      },
+      "kk": {
+        "type": "String"
+      },
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanDisbursedShort": "Pencairan {docNo} tercatat.",
+  "@icLoanDisbursedShort": {
+    "placeholders": {
+      "docNo": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanQueueTitle": "Pencairan pinjaman antar-PT ({count})",
+  "@icLoanQueueTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

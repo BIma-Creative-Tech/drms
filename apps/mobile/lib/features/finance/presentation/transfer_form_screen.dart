@@ -100,32 +100,8 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
   );
 
   Future<void> _pickAt() async {
-    // Now in the PT zone (the picker shows the PT wall clock).
-    final now = DateTime.now().toUtc().add(_zoneOffset);
-    final today = DateTime(now.year, now.month, now.day);
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _at ?? today,
-      firstDate: today.subtract(const Duration(days: 90)),
-      lastDate: today,
-      helpText: AppLocalizations.of(context).transferAtLabel,
-    );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_at ?? now),
-      builder: (c, child) => MediaQuery(data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: true), child: child!),
-    );
-    if (time == null) return;
-    setState(() => _at = DateTime(date.year, date.month, date.day, time.hour, time.minute));
-  }
-
-  /// "22 Sep 2026 14.05 WITA" of the picked transfer time.
-  String _atText(String zone) {
-    final at = _at!;
-    final hh = at.hour.toString().padLeft(2, '0');
-    final mm = at.minute.toString().padLeft(2, '0');
-    return '${formatDateOnly(toYmd(at))} $hh.$mm $zone';
+    final at = await pickTransferAt(context, zoneOffset: _zoneOffset, current: _at);
+    if (at != null && mounted) setState(() => _at = at);
   }
 
   Future<void> _addProof({required bool fromCamera}) async {
@@ -194,7 +170,7 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
       );
       context.pop(true);
     } on ProblemException catch (e) {
-      final prompt = _overridePrompt(t, e);
+      final prompt = transferOverridePrompt(t, e);
       if (!mounted) return;
       if (prompt == null) {
         // ADR 0028: the receiving PT's closed period / changed account / no account in Indonesian
@@ -354,7 +330,7 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
                         suffixIcon: const Icon(Icons.event),
                       ),
                       child: Text(
-                        _at == null ? t.transferAtHint : _atText(zone),
+                        _at == null ? t.transferAtHint : transferAtText(_at!, zone),
                         key: const Key('transfer-at-value'),
                         style: _at == null ? theme.textTheme.bodyLarge?.copyWith(color: theme.hintColor) : null,
                       ),
@@ -399,7 +375,7 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
                   label: t.transferProofLabel,
                   full: true,
                   stackedLabel: true,
-                  child: _ProofPicker(
+                  child: TransferProofPicker(
                     proof: _proof,
                     error: issues['proof'],
                     onAdd: (fromCamera) => _addProof(fromCamera: fromCamera),
@@ -429,9 +405,39 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
   }
 }
 
-/// 5. Bukti transfer: thumbnail (tap = viewer), camera / gallery, help line.
-class _ProofPicker extends StatelessWidget {
-  const _ProofPicker({required this.proof, required this.error, required this.onAdd});
+/// Date + time of the bank proof in the paying PT's zone (the picker shows the PT wall clock), at most 90 days back;
+/// null when cancelled. Shared by "Catat transfer" and the inter-PT loan disbursement (ADR 0029).
+Future<DateTime?> pickTransferAt(BuildContext context, {required Duration zoneOffset, DateTime? current}) async {
+  final now = DateTime.now().toUtc().add(zoneOffset);
+  final today = DateTime(now.year, now.month, now.day);
+  final date = await showDatePicker(
+    context: context,
+    initialDate: current ?? today,
+    firstDate: today.subtract(const Duration(days: 90)),
+    lastDate: today,
+    helpText: AppLocalizations.of(context).transferAtLabel,
+  );
+  if (date == null || !context.mounted) return null;
+  final time = await showTimePicker(
+    context: context,
+    initialTime: TimeOfDay.fromDateTime(current ?? now),
+    builder: (c, child) => MediaQuery(data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: true), child: child!),
+  );
+  if (time == null) return null;
+  return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+}
+
+/// "22 Sep 2026 14.05 WITA" of a picked transfer time.
+String transferAtText(DateTime at, String zone) {
+  final hh = at.hour.toString().padLeft(2, '0');
+  final mm = at.minute.toString().padLeft(2, '0');
+  return '${formatDateOnly(toYmd(at))} $hh.$mm $zone';
+}
+
+/// 5. Bukti transfer: thumbnail (tap = viewer), camera / gallery, help line. Also the proof of an inter-PT loan
+/// disbursement (ADR 0029).
+class TransferProofPicker extends StatelessWidget {
+  const TransferProofPicker({super.key, required this.proof, required this.error, required this.onAdd});
   final Uint8List? proof;
   final String? error;
   final void Function(bool fromCamera) onAdd;
@@ -499,7 +505,7 @@ class _ProofPicker extends StatelessWidget {
 }
 
 /// Dialog of a confirmable 409 (same texts as the web OverrideDialog, QA-04 / QA-17); null for other problems.
-({String flag, String title, List<String> lines})? _overridePrompt(AppLocalizations t, ProblemException e) {
+({String flag, String title, List<String> lines})? transferOverridePrompt(AppLocalizations t, ProblemException e) {
   if (e.status != 409) return null;
   final b = e.body;
   int? n(Object? v) => v is num ? v.toInt() : null;

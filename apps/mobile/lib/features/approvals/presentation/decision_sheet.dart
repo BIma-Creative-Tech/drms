@@ -12,6 +12,8 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/online_only_button.dart';
 import '../../expense/domain/expense_request.dart';
+import '../../expense/domain/fund_check.dart';
+import '../../expense/presentation/widgets/fund_check_panel.dart';
 import '../../expense/domain/turn_timeline.dart' show ownerApproveTitle, ownerRoleCode;
 import '../data/approvals_api.dart';
 
@@ -99,7 +101,8 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
       // 403: the server refused the decision (ADR 0013/0021: only the request's PM project, Direktur or
       // Finance decide, each on their own step; also a request that moved on meanwhile). Show a clear
       // reason; the caller reloads the detail and the inbox.
-      if (mounted) setState(() => _error = e.status == 403 ? t.decisionForbidden : errorText(e));
+      // ADR 0029: 409 FUND_INSUFFICIENT — the PT's available funds dropped since the detail was loaded (race).
+      if (mounted) setState(() => _error = fundProblemMessage(e) ?? (e.status == 403 ? t.decisionForbidden : errorText(e)));
     } on Object catch (e) {
       if (mounted) setState(() => _error = errorText(e));
     } finally {
@@ -123,6 +126,8 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
     final ownerFinal = ownerStep && level >= (d.approvalRule?.lastLevel ?? 0);
     var approveTitle = direkturStep ? t.decisionTitleApproveDirektur : t.decisionTitleApprove;
     if (ownerStep) approveTitle = ownerApproveTitle;
+    // ADR 0029: the decision that makes the request "Disetujui" is refused while the PT is short (Tolak stays).
+    final blocked = widget.decision == Decision.reject ? null : d.fundCheck?.blockedReason;
     final title = switch (widget.decision) {
       Decision.acknowledge =>
         pm
@@ -162,6 +167,8 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(t.decisionHintDirekturFinal, key: const Key('decision-hint-owner-final')),
               ),
+            // ADR 0029: "Ketersediaan dana PT" (compact) for Finance / Direktur / Owner of the PT
+            if (d.fundCheck != null) FundCheckPanel(detail: d, compact: true),
             const SizedBox(height: 12),
             if (widget.decision == Decision.reject)
               TextField(
@@ -214,7 +221,7 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
               label: title,
               icon: widget.decision == Decision.reject ? Icons.close : Icons.check,
               danger: widget.decision == Decision.reject,
-              onPressed: _busy ? null : _confirm,
+              onPressed: _busy || blocked != null ? null : _confirm,
             ),
             TextButton(onPressed: _busy ? null : () => Navigator.of(context).pop(false), child: Text(t.cancel)),
           ],

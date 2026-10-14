@@ -7,7 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 **DRMS 13/10 Phase C — cek dana di persetujuan Owner + Pinjaman antar-PT** ([ADR 0029](docs/proyekkas/adr/0029-fund-check-and-inter-pt-loans.md),
-accepted 2026-10-14: "setuju" on every recommended default). Web / server only; the APK part follows.
+accepted 2026-10-14: "setuju" on every recommended default). Web / server, and the APK part (Owner shortfall panel,
+loan instruction, Finance disbursement — below).
 
 **Database migrations** (in order, additive): `20261015_100000_d1310_fundcheck_enums` (own transaction),
 `…100100_d1310_fundcheck_loans` (+ Payload snapshot), `…100200_d1310_fundcheck_guard`, `…100300_d1310_fundcheck_data`
@@ -51,6 +52,27 @@ lend or borrow designates its **Rekening penerimaan antar-PT** (ADR 0028) first.
   "Pinjaman antar-PT diberikan / diterima", "Pengembalian pinjaman antar-PT diterima", "Pembayaran hutang antar-PT";
   Kas counterpart line with the PJA number; Direktur / Owner dashboard card "Dana tersedia & pinjaman antar-PT". Loans
   never count as cost (outside realisation, RAP and budgets).
+- **APK** (online only; no new drift schema, no `minAppVersion` bump):
+  - Request detail and decision sheet: panel **"Ketersediaan dana PT"** from `fundCheck` (saldo dana with the account /
+    site note, komitmen with the expandable list, dana tersedia, dibutuhkan, "Kurang Rp X" / "Cukup", other requests
+    waiting at the final step, linked PJA loans); while `blocked` "Setujui" (or the final "Diketahui") is disabled with
+    `blockedText`, "Tolak" stays; a 409 `FUND_INSUFFICIENT` (race, or the Owner's own submit) is shown in Indonesian —
+    on the Owner's own Draft with the action "Perintahkan pinjaman antar-PT". Persetujuan inbox: badge **"Dana kurang
+    Rp X"** (`fundShort`).
+  - **"Perintahkan pinjaman antar-PT"** (`instruct_loan`, Owner): lender list from `GET /intercompany-loans/lenders`
+    (each PT's dana tersedia; PTs short of the amount disabled; the receiving-account warning), amount default = the
+    gap ("Hitung untuk semua" = Σ waiting − available), due date default `defaultDueDate`, reason required, the
+    waiting requests as links (the request pre-ticked) → `POST /intercompany-loans` → the loan detail.
+  - Loan detail (`/intercompany-loans/{id}`, also from every `icloan.*` notification): figures, notes (Owner's own
+    request, dropped request, G1), linked requests, movements with the KK / KM numbers; cancel, repayments and voids
+    read-only (recorded on the web in this phase).
+  - Finance → Antrian Transfer: section **"Pencairan pinjaman antar-PT"** (`GET /intercompany-loans/queue`, capability
+    `disburseIntercompanyLoan`; destination, G1 note) and "Catat pencairan" with the transfer form (head-office
+    account without site, date + time of the bank proof, bank reference, proof photo, overdraft confirmation) →
+    `POST /intercompany-loans/{id}/disburse`. Loan refusals (`LOAN_LENDER_INSUFFICIENT`, `LOAN_HAS_REPAYMENTS`,
+    `LOAN_VOID_BORROWER_SHORTFALL_CONFIRM_REQUIRED`, `LOAN_REPAYMENT_EXCEEDS_OUTSTANDING`, `INTERCOMPANY_NO_ACCOUNT`,
+    `INTERCOMPANY_PERIOD_CLOSED`) in Indonesian. `/me` capabilities `instructIntercompanyLoan`,
+    `disburseIntercompanyLoan`, `fundCheckEnabled` parsed per PT.
 
 ## [0.10.1] - 2026-10-14
 

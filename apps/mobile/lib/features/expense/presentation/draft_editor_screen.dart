@@ -21,6 +21,7 @@ import '../application/draft_service.dart';
 import '../application/expense_providers.dart';
 import '../domain/draft.dart';
 import '../domain/draft_validation.dart';
+import '../domain/fund_check.dart';
 import '../domain/intercompany.dart';
 import '../domain/request_status.dart';
 import 'line_editor_screen.dart';
@@ -386,12 +387,48 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
           if (_payeeIssueField(f.path) case final field?) DraftIssue(field, f.message),
       ];
       if (mounted && fields.isNotEmpty) setState(() => _issues = fields);
-      if (mounted) showSnack(context, intercompanyAwareError(e, errorText));
+      // ADR 0029: the Owner's own request is fund-checked at submit (409 FUND_INSUFFICIENT; it stays Draft) — the
+      // message offers "Perintahkan pinjaman antar-PT" to the Owner of the PT
+      final fund = fundProblemMessage(e, draft: true);
+      if (mounted && fund != null) {
+        _showFundShortSnack(fund, e);
+      } else if (mounted) {
+        showSnack(context, intercompanyAwareError(e, errorText));
+      }
     } on Object catch (e) {
       if (mounted) showSnack(context, errorText(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// ADR 0029: 409 FUND_INSUFFICIENT at the Owner's own submit — the message plus, for the Owner of the PT
+  /// (`instructIntercompanyLoan`), an action opening the loan instruction (borrower = the PT, amount = the gap).
+  void _showFundShortSnack(String message, ProblemException e) {
+    final t = AppLocalizations.of(context);
+    final b = e.body;
+    final companyId = b['companyId'] is num ? (b['companyId'] as num).toInt() : _d.companyId;
+    final gap = b['gap'] is num ? (b['gap'] as num).toInt() : null;
+    final may =
+        companyId != null &&
+        (ref.read(accountProfileProvider)?.company(companyId)?.capabilities.instructIntercompanyLoan ?? false);
+    final router = GoRouter.maybeOf(context);
+    final path = Uri(
+      path: '/intercompany-loans/new',
+      queryParameters: {'borrower': '$companyId', if (gap != null && gap > 0) 'amount': '$gap'},
+    ).toString();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const Key('draft-fund-short'),
+          content: Text(message),
+          duration: const Duration(seconds: 10),
+          action: may && router != null
+              ? SnackBarAction(label: t.fundInstructLoan, onPressed: () => router.push(path))
+              : null,
+        ),
+      );
   }
 
   /// Server field path → editor field of the payee block (null = shown in the snack only).

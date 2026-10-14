@@ -165,11 +165,22 @@ TransferQueueItem transferQueueItemFromJson(Map<String, dynamic> j) {
 
 /// Cash account of a PT (`GET /cash-accounts/balances` items).
 class CashAccountOption {
-  const CashAccountOption({required this.id, required this.name, this.companyId, this.balance, this.active = true});
+  const CashAccountOption({
+    required this.id,
+    required this.name,
+    this.companyId,
+    this.balance,
+    this.active = true,
+    this.siteId,
+  });
   final int id;
   final String name;
   final int? companyId;
   final int? balance;
+
+  /// ADR 0023 site flag (kas kecil / rekening kantor cabang); null = head-office account. ADR 0029: only accounts
+  /// without a site belong to the PT's fund pool — an inter-PT loan is paid from them only.
+  final int? siteId;
 
   /// Inactive accounts keep their balance in the list but take no new transfer (server 400 `cashAccountId`);
   /// a server without the field lists active ones only as far as the APK knows → true.
@@ -182,6 +193,7 @@ CashAccountOption cashAccountFromJson(Map<String, dynamic> j) => CashAccountOpti
   companyId: _intN(j['companyId']),
   balance: _intN(j['balance']),
   active: j['active'] != false,
+  siteId: _intN(j['siteId']),
 );
 
 /// `GET /cost-centers` `docs[]`.
@@ -240,6 +252,9 @@ DateTime wallToUtc(DateTime wall, Duration zoneOffset) =>
 Map<String, String> validateTransferForm({
   required int? cashAccountId,
   required int? costCenterId,
+
+  /// ADR 0029: the inter-PT loan disbursement reuses the form without a cost center (a loan is never a cost).
+  bool requireCostCenter = true,
   required DateTime? transferAt,
   required Duration zoneOffset,
   required String bankRef,
@@ -252,7 +267,7 @@ Map<String, String> validateTransferForm({
   // server: "not in the future" with 2 minutes of clock skew
   else if (wallToUtc(transferAt, zoneOffset).isAfter(nowUtc.add(const Duration(minutes: 2))))
     'transferAt': 'Tanggal & jam transfer tidak boleh di masa depan.',
-  if (costCenterId == null) 'costCenterId': 'Pilih pusat biaya.',
+  if (requireCostCenter && costCenterId == null) 'costCenterId': 'Pilih pusat biaya.',
   if (bankRef.trim().isEmpty)
     'bankRef': 'No. referensi bank wajib diisi.'
   else if (bankRef.trim().length > 64)

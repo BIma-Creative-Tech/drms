@@ -671,6 +671,40 @@ Ringkas, masing-masing dengan usulan default (dipakai bila owner setuju / tidak 
     title, S3e S-07).
 - **Not done here (follow-up):** the APK part (Owner shortfall panel + decision sheet, loan instruction screen, Finance
   disbursement section) — the contract is ready (`fundCheck`, `fundShort`, `/intercompany-loans/*`, capabilities).
+  *Done in `feat/d1310-c-fundcheck-apk`, see "As implemented (APK)".*
+
+## As implemented (APK, `feat/d1310-c-fundcheck-apk`)
+
+- **Contract:** no web change was needed. The APK reads `fundCheck` (request detail), `fundShort` (inbox rows), the
+  `/me` capabilities `instructIntercompanyLoan` / `disburseIntercompanyLoan` / `fundCheckEnabled` (per PT; absent on an
+  older server = false, PT scope = union) and `/intercompany-loans` `queue`, `lenders`, `{id}`, `POST`,
+  `{id}/disburse`. No drift schema change (nothing is stored offline: loans are online only), no `minAppVersion` bump.
+- **Shortfall panel** (`expense/presentation/widgets/fund_check_panel.dart`) on the request detail (after the
+  "Tahapan saat ini" card) and, compact, in the decision sheet: the web panel's lines and texts; "cek akhir di
+  persetujuan Owner" while `applies` is false, "informasi saja" while the PT's switch is off. While `blocked` the
+  primary decision ("Setujui", or a final "Diketahui") is disabled with `blockedText` (built locally with the web
+  sentence when absent), "Tolak" stays. `instruct_loan` adds "Perintahkan pinjaman antar-PT" →
+  `/intercompany-loans/new?borrower=<PT>&requests=<id>&amount=<gap>`. A 409 `FUND_INSUFFICIENT` (race in the sheet,
+  the Owner's own submit) shows the server's sentence, else a local one with the figures; after the Owner's own submit
+  the message carries the instruction action (borrower and gap from the problem body).
+- **Instruction** (`loans/presentation/intercompany_loan_screens.dart`): the lender list is fetched once with the
+  initial amount; when the Owner edits the amount the APK re-evaluates `sufficient` locally with the server's rule
+  (available ≥ amount) instead of refetching per keystroke — the server re-checks at `POST` (409
+  `LOAN_LENDER_INSUFFICIENT` reloads the list). Requests waiting at their final step are offered as links (the one the
+  form came from pre-ticked; opened without an amount, the default is the gap of the ticked requests); a pre-linked
+  request no longer listed as waiting (e.g. the Owner's own server Draft) stays linked. After the `POST` the screen is
+  replaced by the loan detail.
+- **Loan detail** read-only (also the target of `docType = intercompany_loan` notifications): figures, notes,
+  linked requests (openable for the borrower's people), movements with KK / KM numbers, void marks; a hint that
+  cancel, repayments and voids are recorded on the web. The only APK action is `disburse`.
+- **Disbursement:** "Pencairan pinjaman antar-PT" is a section above the transfer queue (shown with the capability,
+  hidden when empty or unreachable); the form reuses the transfer form's pieces (`pickTransferAt`,
+  `TransferProofPicker`, the overdraft prompt, `validateTransferForm` without a cost center). The source account list
+  is `GET /cash-accounts/balances?company=<lender>` filtered to active accounts **without a site** (`siteId`, now parsed),
+  the server's rule for loan movements. The borrower's receiving account comes from the queue item (`destination`);
+  the loan detail does not carry it, so a form opened from a notification shows it only once the queue has loaded.
+- **Not in the APK (this phase, as decided):** cancel of an instruction, repayments, both voids, the loans list and
+  report, the fund-availability page and the company switch.
 
 ## Amendments (applied 2026-10-14 to ADR 0005, 0007, 0016, 0022, 0026, 0028)
 

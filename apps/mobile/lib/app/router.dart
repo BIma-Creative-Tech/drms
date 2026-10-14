@@ -36,6 +36,7 @@ import '../features/notifications/presentation/notifications_screen.dart';
 import '../features/privacy/application/privacy_providers.dart';
 import '../features/privacy/presentation/privacy_notice_screen.dart';
 import '../features/progress/presentation/progress_conflict_screen.dart';
+import '../features/loans/presentation/intercompany_loan_screens.dart';
 import '../features/loans/presentation/loan_screens.dart';
 import '../features/projects/presentation/project_detail_screen.dart';
 import '../features/projects/presentation/projects_screen.dart';
@@ -212,6 +213,31 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'edit',
             builder: (_, s) => LoanEditRoute(id: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),
+          ),
+        ],
+      ),
+      // ADR 0029: inter-PT loans — the Owner's instruction (`?borrower=&amount=&requests=1,2`), the read-only detail
+      // (notifications icloan.*) and Finance's disbursement (online only; repayments / voids on the web)
+      GoRoute(
+        path: '/intercompany-loans/new',
+        builder: (_, s) {
+          final q = s.uri.queryParameters;
+          final borrower = int.tryParse(q['borrower'] ?? '');
+          if (borrower == null) return const RouteErrorScreen();
+          return IcLoanInstructScreen(
+            borrowerId: borrower,
+            amount: int.tryParse(q['amount'] ?? ''),
+            requestIds: [for (final r in (q['requests'] ?? '').split(',')) ?int.tryParse(r)],
+          );
+        },
+      ),
+      GoRoute(
+        path: '/intercompany-loans/:id',
+        builder: (_, s) => IcLoanDetailScreen(id: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),
+        routes: [
+          GoRoute(
+            path: 'disburse',
+            builder: (_, s) => IcLoanDisburseRoute(id: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),
           ),
         ],
       ),

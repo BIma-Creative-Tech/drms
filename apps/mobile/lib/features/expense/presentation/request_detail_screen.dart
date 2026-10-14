@@ -18,6 +18,7 @@ import '../application/expense_providers.dart';
 import '../domain/expense_request.dart';
 import '../domain/turn_timeline.dart';
 import 'requester_actions.dart';
+import 'widgets/fund_check_panel.dart';
 import 'widgets/rap_item_picker.dart';
 import 'widgets/request_stepper.dart';
 import 'widgets/receipt_mismatch_chip.dart';
@@ -161,6 +162,17 @@ class _DetailBody extends ConsumerWidget {
               Expanded(child: Text(t.noApprovalNote, key: const Key('no-approval-note'))),
             ],
           ),
+        ),
+      // ADR 0029: "Ketersediaan dana PT" (Finance / Direktur / Owner of the PT) + "Perintahkan pinjaman antar-PT"
+      if (d.fundCheck != null)
+        FundCheckPanel(
+          detail: d,
+          onInstructLoan: d.allowedActions.contains(instructLoanAction)
+              ? () async {
+                  await GoRouter.maybeOf(context)?.push(icLoanInstructPath(d));
+                  ref.invalidate(requestDetailProvider(d.id));
+                }
+              : null,
         ),
     ];
     final summary = <Widget>[
@@ -562,11 +574,27 @@ class _DecisionBar extends ConsumerWidget {
 
     final pm = detail.approvalRule?.pmApproval ?? false;
     final direktur = detail.approvalRule?.decisionFlow ?? false;
+    // ADR 0029: the PT is short at the decision that makes the request "Disetujui" — the server refuses it (409
+    // FUND_INSUFFICIENT); "Setujui" stays visible but disabled with the reason, "Tolak" stays.
+    final blocked = detail.fundCheck?.blockedReason;
 
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (blocked != null && (canAck || canApprove))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  blocked,
+                  key: const Key('decision-blocked-text'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+            Row(
           children: [
             if (canReject)
               Expanded(
@@ -582,7 +610,7 @@ class _DecisionBar extends ConsumerWidget {
               Expanded(
                 child: FilledButton.icon(
                   key: Key(canApprove ? 'action-approve' : 'action-acknowledge'),
-                  onPressed: () => open(canApprove ? Decision.approve : Decision.acknowledge),
+                  onPressed: blocked != null ? null : () => open(canApprove ? Decision.approve : Decision.acknowledge),
                   icon: const Icon(Icons.check),
                   label: Text(
                     canApprove
@@ -591,6 +619,8 @@ class _DecisionBar extends ConsumerWidget {
                   ),
                 ),
               ),
+          ],
+            ),
           ],
         ),
       ),

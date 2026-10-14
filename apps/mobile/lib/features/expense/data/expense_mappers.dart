@@ -2,6 +2,7 @@ import '../../auth/domain/user_profile.dart';
 import '../../privacy/domain/privacy.dart';
 import '../domain/draft.dart';
 import '../domain/expense_request.dart';
+import '../domain/fund_check.dart';
 import '../domain/request_status.dart';
 
 /// JSON (openapi v1) → domain. Tolerant: unknown/missing optional fields never crash the app.
@@ -100,6 +101,10 @@ Capabilities _capabilities(Json? caps, Set<Role> roles) => caps == null
         dailyReportCreate: caps['dailyReportCreate'] == true,
         // ADR 0028: absent on a server before the field → null (fallback in mayFileIntercompanyPayment)
         intercompanyPayment: caps['intercompanyPayment'] is bool ? caps['intercompanyPayment'] as bool : null,
+        // ADR 0029: absent on a server before the fields → false (no instruction / disbursement UI)
+        instructIntercompanyLoan: caps['instructIntercompanyLoan'] == true,
+        disburseIntercompanyLoan: caps['disburseIntercompanyLoan'] == true,
+        fundCheckEnabled: caps['fundCheckEnabled'] == true,
       );
 
 /// `GET /me` `companies[]` item (openapi `MeCompany`, MC3).
@@ -166,6 +171,58 @@ DirekturSignature? direkturSignatureFromJson(Object? v) {
   final id = _intN(m?['signatureId']);
   if (name == null || name.isEmpty || id == null) return null;
   return DirekturSignature(name: name, title: _strN(m?['title']), signatureId: id);
+}
+
+/// ADR 0029 `fundCheck` (null when absent / malformed, or from a server before ADR 0029).
+FundCheck? fundCheckFromJson(Object? v) {
+  final m = _map(v);
+  final companyId = _intN(m?['companyId']);
+  if (m == null || companyId == null) return null;
+  final company = _map(m['company']);
+  final excluded = _map(m['excludedSiteAccounts']);
+  final waiting = _map(m['waitingAtOwner']);
+  return FundCheck(
+    companyId: companyId,
+    companyCode: _strN(company?['shortCode'] ?? company?['code']),
+    companyName: _strN(company?['name']),
+    enabled: m['enabled'] == true,
+    applies: m['applies'] == true,
+    status: FundCheckStatus.fromCode(_strN(m['status'])),
+    blocked: m['blocked'] == true,
+    blockedText: _strN(m['blockedText']),
+    balance: _int(m['balance']),
+    commitments: _int(m['commitments']),
+    available: _int(m['available']),
+    needed: _int(m['needed']),
+    gap: _int(m['gap']),
+    accountCount: _int(m['accountCount']),
+    excludedSiteCount: _int(excluded?['count']),
+    excludedSiteBalance: _int(excluded?['balance']),
+    waitingCount: _int(waiting?['count']),
+    waitingAmount: _int(waiting?['amount']),
+    commitmentItems: [
+      for (final c in _list(m['commitmentItems']))
+        if (_map(c) case final x? when _intN(x['id']) != null)
+          FundCommitmentItem(
+            kind: '${x['kind'] ?? ''}',
+            id: _int(x['id']),
+            docNo: _strN(x['docNo']),
+            amount: _int(x['amount']),
+            status: '${x['status'] ?? ''}',
+          ),
+    ],
+    loans: [
+      for (final l in _list(m['loans']))
+        if (_map(l) case final x? when _intN(x['id']) != null)
+          FundLoanRef(
+            id: _int(x['id']),
+            docNo: '${x['docNo'] ?? '#${x['id']}'}',
+            status: '${x['status'] ?? ''}',
+            amount: _int(x['amount']),
+            lenderCode: _strN(_map(x['lender'])?['shortCode']),
+          ),
+    ],
+  );
 }
 
 ExpenseDetail detailFromJson(Json j) {
@@ -315,6 +372,7 @@ ExpenseDetail detailFromJson(Json j) {
     settlement: settlementFromJson(j['settlement']),
     allowedActions: {for (final a in _list(j['allowedActions'])) '$a'},
     direkturSignature: direkturSignatureFromJson(j['direkturSignature']),
+    fundCheck: fundCheckFromJson(j['fundCheck']),
     companyId: companyIdOf(j),
     rejectReason: _strN(j['rejectReason']),
     cancelReason: _strN(j['cancelReason']),
@@ -412,6 +470,11 @@ InboxItem inboxItemFromJson(Json j) {
     infoFlags: _int(flags?['info']),
     receiptMismatchFlags: _int(flags?['receiptMismatch']),
     companyId: companyIdOf(j),
+    // ADR 0029: positive gap only (null / 0 = no badge)
+    fundShort: switch (_intN(j['fundShort'])) {
+      final g? when g > 0 => g,
+      _ => null,
+    },
   );
 }
 
