@@ -44,6 +44,13 @@ const stats: Record<string, number> = {}
 const bump = (k: string) => void (stats[k] = (stats[k] ?? 0) + 1)
 let cc2: number // second cost center (other PM) for scope tests
 let form228Id: number
+/**
+ * The form 228 request's own dates (company TZ, stored on the rows): `request_date` (rekap-pengajuan filters on it) and
+ * its first posted `transfer_date` (K-14). Set in beforeAll; `today` is re-read per test and may be the next day once
+ * the suite crosses midnight (CI 2026-10-13 16:00 UTC = 00:00 WITA), so the "form 228 only" filters use these.
+ */
+let form228Requested: string
+let form228Transferred: string
 
 // deterministic PRNG (mulberry32) → reproducible data set
 let seed = 0x5eed_f3
@@ -268,6 +275,13 @@ beforeAll(async () => {
   for (const fl of again.flags ?? []) if (fl.status === 'open' && fl.level === 'warning') await must(call('POST', `${E}/${f.id}/flags/${fl.id}/review`, w.users.finance, { note: 'ok' }))
   await must(call('POST', `${E}/${f.id}/verify-receipts`, w.users.finance, {}))
   await must(call('POST', `${E}/${f.id}/transfer`, w.users.finance, { cashAccountId: w.cashAccount, bankRef: 'F3-228', proofMediaId: await proof() }), 201)
+  const d228 = await sqlAs(
+    'app',
+    "SELECT er.request_date::text AS requested, (SELECT min(t.transfer_date)::text FROM transfers t WHERE t.request_id = er.id AND t.status = 'posted') AS transferred FROM expense_requests er WHERE er.id = $1",
+    [f.id],
+  )
+  form228Requested = d228.rows[0].requested
+  form228Transferred = d228.rows[0].transferred
 
   // --- the generated body: N requests over all statuses and three scopes --------------------
   const scopes: Array<[Scope, number]> = [
@@ -620,7 +634,7 @@ describe('K-14 biaya per kendaraan / K-15 pusat biaya / K-17 per kategori', () =
     for (const x of man.rows) expect(v.vehicles.find((y) => y.id === x.vehicle_id)?.fromManual).toBe(n(x.s))
     // MC4: scopes are per PT (a company-blind literal matches nothing)
     const ccScope = fromCompanies([{ company: await companyId(), kind: 'team', projects: [], costCenters: [w.costCenter] }])
-    const form = await asFinance((req) => vehicleCosts(req, ccScope, { from: today, to: today, vehicleId: w.vehicle }))
+    const form = await asFinance((req) => vehicleCosts(req, ccScope, { from: form228Transferred, to: form228Transferred, vehicleId: w.vehicle }))
     const own228 = await sqlAs('app', `SELECT sum(l.total)::text AS s FROM expense_requests_lines l WHERE l._parent_id = $1 AND l.vehicle_id = $2`, [form228Id, w.vehicle])
     expect(n(own228.rows[0].s)).toBe(600_000)
     expect(form.vehicles[0]!.fromRequests).toBeGreaterThanOrEqual(600_000)
@@ -773,7 +787,7 @@ async function download(path: string, user: FlowUser): Promise<{ status: number;
 describe('exports (Q-F3-3/Q-F3-5)', () => {
   it('CSV: BOM, ";" separator, title rows, amounts as integers, formula injection neutralised, audit row', async () => {
     const before = await sqlAs('app', "SELECT count(*)::int AS n FROM audit_logs WHERE action='export' AND doc_type='report' AND doc_no='rekap-pengajuan'")
-    const r = await download(`/api/v1/reports/rekap-pengajuan/csv?dari=${today}&sampai=${today}&pusat=${w.costCenter}`, w.users.finance)
+    const r = await download(`/api/v1/reports/rekap-pengajuan/csv?dari=${form228Requested}&sampai=${form228Requested}&pusat=${w.costCenter}`, w.users.finance)
     expect(r.status).toBe(200)
     expect(r.headers.get('content-type')).toContain('text/csv')
     expect(r.headers.get('content-disposition')).toMatch(/^attachment; filename="rekap-pengajuan_\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}\.csv"$/)
@@ -798,7 +812,7 @@ describe('exports (Q-F3-3/Q-F3-5)', () => {
   })
 
   it('XLSX: numeric amounts with #,##0, title sheet + extra sheets, formula-looking title stays text', async () => {
-    const r = await download(`/api/v1/reports/rekap-pengajuan/xlsx?dari=${today}&sampai=${today}&pusat=${w.costCenter}`, w.users.owner)
+    const r = await download(`/api/v1/reports/rekap-pengajuan/xlsx?dari=${form228Requested}&sampai=${form228Requested}&pusat=${w.costCenter}`, w.users.owner)
     expect(r.status).toBe(200)
     expect(r.headers.get('content-type')).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     const files = unzipSync(r.bytes)
