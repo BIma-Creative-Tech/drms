@@ -778,7 +778,7 @@ export const openapiDocument = {
       "MasterItem": {
         "type": "object",
         "additionalProperties": {},
-        "description": "Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur — or, ADR 0026, Owner — in that PT; not offered as requester to others)."
+        "description": "Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur — or, ADR 0026, Owner — in that PT; not offered as requester to others). ADR 0028: `intercompany-payees` items = the receiving PTs a request of PT `company` may pay (id = the RECEIVING PT id — unique per (company, id) —, payeeCompanyId, shortCode, name, bankName, accountNoMasked, accountHolder, active); only for Finance / PM / Direktur of `company`."
       },
       "Device": {
         "type": "object",
@@ -1005,7 +1005,7 @@ export const openapiDocument = {
           },
           "typeLabel": {
             "type": "string",
-            "description": "Pengajuan Baru / Reimburse; \"Pembayaran vendor\" for payeeType vendor (ADR 0027)."
+            "description": "Pengajuan Baru / Reimburse; \"Pembayaran vendor\" for payeeType vendor (ADR 0027); \"Pembayaran antar-PT\" for payeeType pt_grup (ADR 0028)."
           },
           "payeeType": {
             "$ref": "#/components/schemas/PayeeType"
@@ -1115,9 +1115,10 @@ export const openapiDocument = {
         "type": "string",
         "enum": [
           "karyawan",
-          "vendor"
+          "vendor",
+          "pt_grup"
         ],
-        "description": "ADR 0027 \"Jenis penerima\": karyawan = the requester's employee account (default, every request before ADR 0027); vendor = \"Pembayaran vendor\" (Finance / PM only): vendor + vendor account + invoice, type always advance, no LPJ (transfer → completed)."
+        "description": "ADR 0027 \"Jenis penerima\": karyawan = the requester's employee account (default, every request before ADR 0027); vendor = \"Pembayaran vendor\" (Finance / PM only): vendor + vendor account + invoice, type always advance, no LPJ (transfer → completed). ADR 0028: pt_grup = \"Pembayaran antar-PT\" (Finance / PM / Direktur of the paying PT): another PT of the group (payeeCompanyId) paid to its designated receiving account + the receiving PT's document (invoice / memo, required), type always advance, no LPJ; the transfer completes it AND posts a Kas Masuk in the receiving PT. Older apps that do not know a value show it as karyawan and must not send payeeType on such a draft (the server keeps the stored one)."
       },
       "RequestStatus": {
         "type": "string",
@@ -1156,7 +1157,7 @@ export const openapiDocument = {
           },
           "typeLabel": {
             "type": "string",
-            "description": "Pengajuan Baru / Reimburse; \"Pembayaran vendor\" for payeeType vendor (ADR 0027)."
+            "description": "Pengajuan Baru / Reimburse; \"Pembayaran vendor\" for payeeType vendor (ADR 0027); \"Pembayaran antar-PT\" for payeeType pt_grup (ADR 0028)."
           },
           "payeeType": {
             "$ref": "#/components/schemas/PayeeType"
@@ -1358,6 +1359,37 @@ export const openapiDocument = {
           "invoice": {
             "$ref": "#/components/schemas/VendorInvoice"
           },
+          "payeeCompany": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "shortCode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "description": "ADR 0028: receiving PT of a PT grup payment (null otherwise)."
+          },
+          "intercompany": {
+            "$ref": "#/components/schemas/RequestIntercompany"
+          },
           "bank": {
             "type": [
               "object",
@@ -1389,7 +1421,7 @@ export const openapiDocument = {
               "accountNo",
               "accountHolder"
             ],
-            "description": "Destination snapshot taken at submit: the requester's account, or (ADR 0027) the vendor account."
+            "description": "Destination snapshot taken at submit: the requester's account, or (ADR 0027) the vendor account, or (ADR 0028) the receiving PT's designated account."
           },
           "lines": {
             "type": "array",
@@ -2352,6 +2384,8 @@ export const openapiDocument = {
           "vendor",
           "vendorBankAccountId",
           "invoice",
+          "payeeCompany",
+          "intercompany",
           "bank",
           "lines",
           "transferredTotal",
@@ -2460,7 +2494,63 @@ export const openapiDocument = {
           "fileName",
           "mimeType"
         ],
-        "description": "ADR 0027: the vendor invoice (the proof of a vendor payment — no LPJ). null for payeeType karyawan."
+        "description": "ADR 0027: the vendor invoice (the proof of a vendor payment — no LPJ); ADR 0028: the receiving PT's document (invoice / memo) of a PT grup payment. null for payeeType karyawan."
+      },
+      "RequestIntercompany": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "posted",
+              "void"
+            ]
+          },
+          "targetEntryNo": {
+            "type": "string",
+            "description": "Number of the Kas Masuk in the receiving PT (KM/<PT>/…)."
+          },
+          "targetCompany": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "shortCode": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "shortCode",
+              "name"
+            ]
+          },
+          "transferId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": [
+          "status",
+          "targetEntryNo",
+          "targetCompany",
+          "transferId"
+        ],
+        "description": "ADR 0028: the receiving PT's Kas Masuk of the (latest) transfer of a PT grup payment — numbers and PT only; null before the transfer / for other payee types. status void = the transfer was voided (reversal posted in the receiving PT)."
       },
       "Settlement": {
         "type": [
@@ -2938,9 +3028,10 @@ export const openapiDocument = {
             "type": "string",
             "enum": [
               "karyawan",
-              "vendor"
+              "vendor",
+              "pt_grup"
             ],
-            "description": "Default karyawan. vendor: only a Finance / PM caller of the request PT (403 otherwise); `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself."
+            "description": "Default karyawan. vendor: only a Finance / PM caller of the request PT (403 otherwise); pt_grup (ADR 0028): only Finance / PM / Direktur of the request PT (403 otherwise). Both: `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself. Omitted on PATCH / sync = the stored payee type stays."
           },
           "vendorId": {
             "type": [
@@ -2964,7 +3055,7 @@ export const openapiDocument = {
               "null"
             ],
             "maxLength": 64,
-            "description": "ADR 0027: required to submit. Unique per vendor among requests that are not cancelled / rejected (compared upper case, letters + digits only) → else 409 with errors[invoiceNo]."
+            "description": "ADR 0027: required to submit. Unique per vendor among requests that are not cancelled / rejected (compared upper case, letters + digits only) → else 409 with errors[invoiceNo]. ADR 0028 (pt_grup): the receiving PT's document number (invoice / memo), required to submit, unique per receiving PT the same way."
           },
           "invoiceDate": {
             "type": [
@@ -2972,7 +3063,7 @@ export const openapiDocument = {
               "null"
             ],
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
-            "description": "ADR 0027: required to submit; not in the future."
+            "description": "ADR 0027 / 0028: required to submit; not in the future."
           },
           "invoiceDueDate": {
             "type": [
@@ -2980,7 +3071,7 @@ export const openapiDocument = {
               "null"
             ],
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
-            "description": "ADR 0027: optional; not before invoiceDate."
+            "description": "ADR 0027 / 0028: optional; not before invoiceDate."
           },
           "invoiceFileId": {
             "type": [
@@ -2988,7 +3079,15 @@ export const openapiDocument = {
               "null"
             ],
             "exclusiveMinimum": 0,
-            "description": "ADR 0027: media-attachments id (photo / PDF, POST /media/attachments) of the invoice. Required to submit; linked to the request at submit."
+            "description": "ADR 0027 / 0028: media-attachments id (photo / PDF, POST /media/attachments) of the invoice / document. Required to submit; linked to the request at submit."
+          },
+          "payeeCompanyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "ADR 0028 (pt_grup): the receiving PT — another active PT of the group with a designated receiving account (GET /intercompany/payees?company=<request PT>). Required to submit; none designated → 400 code INTERCOMPANY_NO_ACCOUNT (errors[payeeCompanyId]). Ignored for other payee types."
           },
           "clientUuid": {
             "type": "string",
@@ -3190,9 +3289,10 @@ export const openapiDocument = {
             "type": "string",
             "enum": [
               "karyawan",
-              "vendor"
+              "vendor",
+              "pt_grup"
             ],
-            "description": "Default karyawan. vendor: only a Finance / PM caller of the request PT (403 otherwise); `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself."
+            "description": "Default karyawan. vendor: only a Finance / PM caller of the request PT (403 otherwise); pt_grup (ADR 0028): only Finance / PM / Direktur of the request PT (403 otherwise). Both: `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself. Omitted on PATCH / sync = the stored payee type stays."
           },
           "vendorId": {
             "type": [
@@ -3216,7 +3316,7 @@ export const openapiDocument = {
               "null"
             ],
             "maxLength": 64,
-            "description": "ADR 0027: required to submit. Unique per vendor among requests that are not cancelled / rejected (compared upper case, letters + digits only) → else 409 with errors[invoiceNo]."
+            "description": "ADR 0027: required to submit. Unique per vendor among requests that are not cancelled / rejected (compared upper case, letters + digits only) → else 409 with errors[invoiceNo]. ADR 0028 (pt_grup): the receiving PT's document number (invoice / memo), required to submit, unique per receiving PT the same way."
           },
           "invoiceDate": {
             "type": [
@@ -3224,7 +3324,7 @@ export const openapiDocument = {
               "null"
             ],
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
-            "description": "ADR 0027: required to submit; not in the future."
+            "description": "ADR 0027 / 0028: required to submit; not in the future."
           },
           "invoiceDueDate": {
             "type": [
@@ -3232,7 +3332,7 @@ export const openapiDocument = {
               "null"
             ],
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
-            "description": "ADR 0027: optional; not before invoiceDate."
+            "description": "ADR 0027 / 0028: optional; not before invoiceDate."
           },
           "invoiceFileId": {
             "type": [
@@ -3240,7 +3340,15 @@ export const openapiDocument = {
               "null"
             ],
             "exclusiveMinimum": 0,
-            "description": "ADR 0027: media-attachments id (photo / PDF, POST /media/attachments) of the invoice. Required to submit; linked to the request at submit."
+            "description": "ADR 0027 / 0028: media-attachments id (photo / PDF, POST /media/attachments) of the invoice / document. Required to submit; linked to the request at submit."
+          },
+          "payeeCompanyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "ADR 0028 (pt_grup): the receiving PT — another active PT of the group with a designated receiving account (GET /intercompany/payees?company=<request PT>). Required to submit; none designated → 400 code INTERCOMPANY_NO_ACCOUNT (errors[payeeCompanyId]). Ignored for other payee types."
           }
         },
         "additionalProperties": false,
@@ -3609,6 +3717,47 @@ export const openapiDocument = {
           },
           "cashEntryNo": {
             "type": "string"
+          },
+          "intercompany": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "cashEntryId": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "cashEntryNo": {
+                "type": "string"
+              },
+              "company": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                  },
+                  "shortCode": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "shortCode",
+                  "name"
+                ]
+              }
+            },
+            "required": [
+              "cashEntryId",
+              "cashEntryNo",
+              "company"
+            ],
+            "description": "ADR 0028: the Kas Masuk posted in the receiving PT (PT grup payment); null otherwise."
           }
         },
         "required": [
@@ -3616,7 +3765,8 @@ export const openapiDocument = {
           "transferId",
           "transferDocNo",
           "cashEntryId",
-          "cashEntryNo"
+          "cashEntryNo",
+          "intercompany"
         ]
       },
       "TransferCreate": {
@@ -3676,6 +3826,57 @@ export const openapiDocument = {
         ],
         "additionalProperties": false
       },
+      "IntercompanyPayeeList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IntercompanyPayee"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "description": "ADR 0028 payee directory: every other active PT of the group with a designated receiving account."
+      },
+      "IntercompanyPayee": {
+        "type": "object",
+        "properties": {
+          "companyId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "shortCode": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "bankName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "accountNoMasked": {
+            "type": "string",
+            "description": "\"••••1234\" — the full number is only in the request's submit snapshot."
+          },
+          "accountHolder": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "companyId",
+          "shortCode",
+          "name",
+          "bankName",
+          "accountNoMasked",
+          "accountHolder"
+        ]
+      },
       "TransferQueueList": {
         "type": "object",
         "properties": {
@@ -3715,7 +3916,7 @@ export const openapiDocument = {
           },
           "typeLabel": {
             "type": "string",
-            "description": "Pengajuan Baru / Reimburse; \"Pembayaran vendor\" for payeeType vendor (ADR 0027)."
+            "description": "Pengajuan Baru / Reimburse; \"Pembayaran vendor\" for payeeType vendor (ADR 0027); \"Pembayaran antar-PT\" for payeeType pt_grup (ADR 0028)."
           },
           "payeeType": {
             "$ref": "#/components/schemas/PayeeType"
@@ -3933,6 +4134,37 @@ export const openapiDocument = {
               "null"
             ],
             "description": "ADR 0027: vendor of a vendor payment (the transfer completes it; destination = the vendor account in `bank`)."
+          },
+          "payeeCompany": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "shortCode": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "shortCode",
+              "name"
+            ],
+            "description": "ADR 0028: receiving PT of a PT grup payment (badge \"Antar PT: <shortCode>\"; destination = its designated account in `bank`; the transfer also posts its Kas Masuk — closed period there → 409 INTERCOMPANY_PERIOD_CLOSED)."
+          },
+          "payeeCompanyName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ADR 0028: name of the receiving PT (null unless pt_grup)."
           }
         },
         "required": [
@@ -3961,7 +4193,9 @@ export const openapiDocument = {
           "sla",
           "noApproval",
           "noApprovalBy",
-          "vendorName"
+          "vendorName",
+          "payeeCompany",
+          "payeeCompanyName"
         ]
       },
       "LpjQueue": {
@@ -4244,14 +4478,7 @@ export const openapiDocument = {
             ]
           },
           "sourceType": {
-            "type": "string",
-            "enum": [
-              "transfer",
-              "settlement_refund",
-              "manual",
-              "reversal",
-              "opening"
-            ]
+            "$ref": "#/components/schemas/CashSourceType"
           },
           "expenseRequestId": {
             "type": [
@@ -4315,6 +4542,99 @@ export const openapiDocument = {
             ],
             "exclusiveMinimum": 0,
             "description": "MC3: PT of the entry."
+          },
+          "intercompany": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "in",
+                  "out"
+                ],
+                "description": "in = this entry is the Kas Masuk of the receiving PT; out = the transfer KK of the paying PT."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "posted",
+                  "void"
+                ],
+                "description": "Link status (void after the paying PT voided its transfer)."
+              },
+              "counterpartCompany": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                  },
+                  "shortCode": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "shortCode",
+                  "name"
+                ]
+              },
+              "sourceDocNo": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Number of the paying PT's request (PB/…)."
+              },
+              "sourceDocId": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "transferDocNo": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Number of the paying PT's transfer (TRF/…)."
+              },
+              "counterpartEntryNo": {
+                "type": "string",
+                "description": "The other leg: KM of the receiving PT (direction out) or KK of the paying PT (direction in)."
+              },
+              "counterpartEntryId": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "canOpenCounterpart": {
+                "type": "boolean",
+                "description": "The caller holds Finance / Direktur / Admin in the other PT (else show the numbers as plain text)."
+              },
+              "canOpenSourceDoc": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "direction",
+              "status",
+              "counterpartCompany",
+              "sourceDocNo",
+              "sourceDocId",
+              "transferDocNo",
+              "counterpartEntryNo",
+              "counterpartEntryId",
+              "canOpenCounterpart",
+              "canOpenSourceDoc"
+            ],
+            "description": "ADR 0028: the other leg of an intercompany payment (KK of the paying PT ↔ KM of the receiving PT); null for every other entry."
           }
         },
         "required": [
@@ -4340,7 +4660,19 @@ export const openapiDocument = {
           "voidReason",
           "proofId",
           "postedAt",
-          "companyId"
+          "companyId",
+          "intercompany"
+        ]
+      },
+      "CashSourceType": {
+        "type": "string",
+        "enum": [
+          "transfer",
+          "settlement_refund",
+          "manual",
+          "reversal",
+          "opening",
+          "intercompany"
         ]
       },
       "CashEntryCreate": {
@@ -5838,9 +6170,18 @@ export const openapiDocument = {
             "type": "string",
             "enum": [
               "karyawan",
-              "vendor"
+              "vendor",
+              "pt_grup"
             ],
-            "description": "ADR 0027."
+            "description": "ADR 0027 / 0028."
+          },
+          "payee_company_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "ADR 0028: receiving PT of a pt_grup draft."
           },
           "vendor_id": {
             "type": [
@@ -6083,6 +6424,7 @@ export const openapiDocument = {
           "requester_ids",
           "bank_account_id",
           "payee_type",
+          "payee_company_id",
           "vendor_id",
           "vendor_bank_account_id",
           "invoice_no",
@@ -6912,9 +7254,18 @@ export const openapiDocument = {
             "type": "string",
             "enum": [
               "karyawan",
-              "vendor"
+              "vendor",
+              "pt_grup"
             ],
-            "description": "ADR 0027: default karyawan. vendor = vendor payment (Finance / PM only): vendor + vendor account + invoice, no employee account, no LPJ."
+            "description": "ADR 0027: default karyawan. vendor = vendor payment (Finance / PM only): vendor + vendor account + invoice, no employee account, no LPJ. ADR 0028: pt_grup = payment to another PT of the group (Finance / PM / Direktur): payee_company_id + the receiving PT's document (invoice_*), no LPJ. Omitted on an existing draft = the stored payee type stays (older apps never reset a pt_grup draft)."
+          },
+          "payee_company_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "ADR 0028: receiving PT of a pt_grup draft (masters type intercompany-payees / GET /intercompany/payees). Omitted = unchanged."
           },
           "vendor_id": {
             "type": [
@@ -17545,10 +17896,10 @@ export const openapiDocument = {
             "schema": {
               "type": "string",
               "pattern": "^[a-z-]+(,[a-z-]+)*$",
-              "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels, clients, sites, vendor-bank-accounts. Default: all."
+              "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels, clients, sites, vendor-bank-accounts, intercompany-payees. Default: all."
             },
             "required": false,
-            "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels, clients, sites, vendor-bank-accounts. Default: all.",
+            "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels, clients, sites, vendor-bank-accounts, intercompany-payees. Default: all.",
             "name": "types",
             "in": "query"
           },
@@ -18066,12 +18417,13 @@ export const openapiDocument = {
               "type": "string",
               "enum": [
                 "karyawan",
-                "vendor"
+                "vendor",
+                "pt_grup"
               ],
-              "description": "ADR 0027: vendor = vendor payments only, karyawan = requests paid to employees."
+              "description": "ADR 0027: vendor = vendor payments only, karyawan = requests paid to employees; ADR 0028: pt_grup = payments to another PT of the group."
             },
             "required": false,
-            "description": "ADR 0027: vendor = vendor payments only, karyawan = requests paid to employees.",
+            "description": "ADR 0027: vendor = vendor payments only, karyawan = requests paid to employees; ADR 0028: pt_grup = payments to another PT of the group.",
             "name": "payeeType",
             "in": "query"
           },
@@ -18209,7 +18561,7 @@ export const openapiDocument = {
         }
       },
       "post": {
-        "summary": "Create a Draft (Pengajuan Baru / Reimburse); creator, status and grand total are server-set",
+        "summary": "Create a Draft (Pengajuan Baru / Reimburse; ADR 0027 payeeType vendor, ADR 0028 payeeType pt_grup — filer roles 403, no designated receiving account → 400 code INTERCOMPANY_NO_ACCOUNT, duplicate document → 409 errors[invoiceNo]); creator, status and grand total are server-set",
         "security": [
           {
             "bearer": []
@@ -18628,6 +18980,17 @@ export const openapiDocument = {
             "required": false,
             "description": "ADR 0027: vendor bank account id (vendor-payment picker value) instead of `account`. Draft: an account of the request PT and of its chosen vendor (or readable); submitted → the snapshot.",
             "name": "vendorAccount",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "ADR 0028: receiving PT (PT grup picker value): its designated receiving account, always masked before submit (Finance / PM / Direktur only); submitted → the snapshot."
+            },
+            "required": false,
+            "description": "ADR 0028: receiving PT (PT grup picker value): its designated receiving account, always masked before submit (Finance / PM / Direktur only); submitted → the snapshot.",
+            "name": "payeeCompany",
             "in": "query"
           },
           {
@@ -21398,7 +21761,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/transfer": {
       "post": {
-        "summary": "Finance: record the transfer (amount = approved amount, proof, bank ref, DRMS 10/10 D2 cost center: costCenterId, default = the project default, none → 400) → KK posted. QA-17: destination account not verified → 409 code BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED (bankAccountId, verificationStatus, bankName, accountNo, accountHolder) unless confirmUnverifiedAccount (audited bank_unverified_confirmed); QA-04: cash account balance would go below 0 → 409 code CASH_OVERDRAFT_CONFIRM_REQUIRED (cashAccountId, balance, after) unless confirmOverdraft (audited overdraft_confirmed); QA-05: date before the account opening-balance date → 400",
+        "summary": "Finance: record the transfer (amount = approved amount, proof, bank ref, DRMS 10/10 D2 cost center: costCenterId, default = the project default, none → 400) → KK posted. QA-17: destination account not verified → 409 code BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED (bankAccountId, verificationStatus, bankName, accountNo, accountHolder) unless confirmUnverifiedAccount (audited bank_unverified_confirmed); QA-04: cash account balance would go below 0 → 409 code CASH_OVERDRAFT_CONFIRM_REQUIRED (cashAccountId, balance, after) unless confirmOverdraft (audited overdraft_confirmed); QA-05: date before the account opening-balance date → 400. ADR 0028 (payeeType pt_grup): the transfer also posts the Kas Masuk in the receiving PT (result `intercompany`) and completes the request; the receiving PT's period of the transfer date closed → 409 code INTERCOMPANY_PERIOD_CLOSED (payeeCompanyId, lockDate); its designated account changed since submit → 409 code INTERCOMPANY_ACCOUNT_CHANGED (withdraw + resubmit); none designated → 409 code INTERCOMPANY_NO_ACCOUNT; no unverified-account confirmation (own group account)",
         "security": [
           {
             "bearer": []
@@ -21548,7 +21911,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/transfers/{tid}/void": {
       "post": {
-        "summary": "Finance: void a transfer (reversal entry, reason)",
+        "summary": "Finance: void a transfer (reversal entry, reason). ADR 0027 / 0028: a vendor / PT grup payment goes back from Selesai to the transfer queue (Finance is notified); a PT grup transfer also reverses the receiving PT's Kas Masuk (dated per the ledger rule — a closed period there never blocks the void)",
         "security": [
           {
             "bearer": []
@@ -21673,6 +22036,118 @@ export const openapiDocument = {
             }
           },
           "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/intercompany/payees": {
+      "get": {
+        "summary": "ADR 0028: payee directory of a \"PT grup\" payment — every other active PT of the group with a designated receiving account (\"Rekening penerimaan antar-PT\"): short code, name, bank, MASKED number, holder. Caller: Finance / PM / Direktur of the paying PT (?company=), else 403. Also as masters type intercompany-payees.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "The PAYING PT (the request's PT); the caller must hold Finance / PM / Direktur there."
+            },
+            "required": true,
+            "description": "The PAYING PT (the request's PT); the caller must hold Finance / PM / Direktur there.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payees",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntercompanyPayeeList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
             "description": "Problem",
             "content": {
               "application/problem+json": {
@@ -22102,6 +22577,24 @@ export const openapiDocument = {
             },
             "required": false,
             "name": "costCenterId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "transfer",
+                "settlement_refund",
+                "manual",
+                "reversal",
+                "opening",
+                "intercompany"
+              ],
+              "description": "ADR 0028: only entries of this source type (e.g. intercompany)."
+            },
+            "required": false,
+            "description": "ADR 0028: only entries of this source type (e.g. intercompany).",
+            "name": "sourceType",
             "in": "query"
           },
           {
@@ -26965,6 +27458,14 @@ export const openapiDocument = {
                               "koreksi": {
                                 "type": "integer",
                                 "description": "Rupiah (integer)"
+                              },
+                              "masukAntarPt": {
+                                "type": "integer",
+                                "description": "ADR 0028: part of masuk that are Kas Masuk of payments from another PT of the group (\"Antar PT\"); masuk − masukAntarPt = \"tanpa antar-PT\"."
+                              },
+                              "keluarAntarPt": {
+                                "type": "integer",
+                                "description": "ADR 0028: part of keluar that are transfers to another PT of the group (and reversals of either leg)."
                               }
                             },
                             "required": [
@@ -28561,6 +29062,14 @@ export const openapiDocument = {
                               "koreksi": {
                                 "type": "integer",
                                 "description": "Rupiah (integer)"
+                              },
+                              "masukAntarPt": {
+                                "type": "integer",
+                                "description": "ADR 0028: part of masuk that are Kas Masuk of payments from another PT of the group (\"Antar PT\"); masuk − masukAntarPt = \"tanpa antar-PT\"."
+                              },
+                              "keluarAntarPt": {
+                                "type": "integer",
+                                "description": "ADR 0028: part of keluar that are transfers to another PT of the group (and reversals of either leg)."
                               }
                             },
                             "required": [

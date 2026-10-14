@@ -71,6 +71,9 @@ export const WITHDRAWN_NOTE = 'ditarik kembali ke Draft — perbaiki lalu Kirim 
 /** ADR 0027: note of the final step of a vendor payment. */
 export const VENDOR_END_NOTE = 'pembayaran vendor selesai saat ditransfer — invoice = bukti, tanpa LPJ'
 
+/** ADR 0028: note of the final step of a payment to a PT of the group. */
+export const INTERCOMPANY_END_NOTE = 'pembayaran antar-PT selesai saat ditransfer — kas masuk di PT penerima tercatat otomatis, tanpa LPJ'
+
 export const isCurrentStep = (s: Pick<StepperStep, 'state'>) => s.state === 'current' || s.state === 'revision'
 
 export function buildRequestStepper(d: StepperInput): RequestStepper {
@@ -95,9 +98,10 @@ export function buildRequestStepper(d: StepperInput): RequestStepper {
     insertBefore(steps, 'transfer', { key: 'verify-receipts', title: 'Verifikasi nota', role: 'Finance', planned: 'Finance', state, actor: null, at: null, note })
   }
 
-  const vendor = payeeOf(d.payeeType) === 'vendor'
+  const payee = payeeOf(d.payeeType)
+  const vendor = payee !== 'karyawan'
   // Pengajuan Baru: receipts + LPJ by the requester, verification + settlement by Finance (§5.1, ADR 0019).
-  // ADR 0027: not for a vendor payment — the vendor's invoice is the proof, the transfer completes it.
+  // ADR 0027: not for a vendor payment — the vendor's invoice is the proof, the transfer completes it (ADR 0028: PT grup too).
   if (d.type === 'advance' && !vendor) {
     const lpj = d.settlement ?? null
     const lpjState: StepperState =
@@ -162,7 +166,7 @@ export function buildRequestStepper(d: StepperInput): RequestStepper {
       state: d.status === 'completed' ? 'done' : confirm ? 'current' : 'pending',
       actor: null,
       at: null,
-      note: confirm ? 'pemohon (atau Finance) mengonfirmasi dana sudah diterima' : vendor ? VENDOR_END_NOTE : null,
+      note: confirm ? 'pemohon (atau Finance) mengonfirmasi dana sudah diterima' : payee === 'vendor' ? VENDOR_END_NOTE : payee === 'pt_grup' ? INTERCOMPANY_END_NOTE : null,
     })
   }
 

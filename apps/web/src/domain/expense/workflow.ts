@@ -28,6 +28,7 @@ import {
 } from './common'
 import { fromDocLines, validateContent, vendorOfDoc } from './drafts'
 import { payeeOf } from './types'
+import { designatedAccount } from '@/domain/intercompany/service'
 import { approveWithoutDecision, assertEveryLineHasReceipt, claimAttachments, recomputeFlags, syncProjectRapFlags, syncRapFlags } from './receipts'
 import { isNoApproval } from './decision'
 import { ACK_DELEGATE_ROLE, budgetImpact, lastLevel, type AckDelegate, type ApprovalSnapshot } from './rules'
@@ -202,12 +203,24 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
     }
   }
 
-  // US-44 bank snapshot = the destination of the transfer: the requester's account, or (ADR 0027) the vendor's account
-  const vendor = payeeOf(doc.payeeType) === 'vendor'
-  const acc = vendor
-    ? await req.payload.findByID({ collection: 'vendor-bank-accounts', id: relId(doc.vendorBankAccount)!, depth: 1, overrideAccess: true /* SYSTEM-READ: vendor account snapshot (ADR 0027) */, req })
-    : await req.payload.findByID({ collection: 'employee-bank-accounts', id: relId(doc.bankAccount)!, depth: 1, overrideAccess: true /* SYSTEM-READ: bank snapshot (US-44) */, req })
-  const bankName = acc.bank && typeof acc.bank === 'object' ? (acc.bank as { name?: string }).name : null
+  // US-44 bank snapshot = the destination of the transfer: the requester's account, or (ADR 0027) the vendor's account,
+  // or (ADR 0028) the receiving PT's designated intercompany account (re-checked against it at the transfer)
+  const payee = payeeOf(doc.payeeType)
+  let acc: { accountNo: string; accountHolder: string }
+  let bankName: string | null | undefined
+  if (payee === 'pt_grup') {
+    const ic = await designatedAccount(req, relId(doc.payeeCompany)!)
+    if (!ic) fail(400, 'Data pengajuan tidak valid.', [{ path: 'payeeCompanyId', message: 'PT penerima belum menetapkan rekening penerimaan antar-PT.' }])
+    acc = { accountNo: ic!.accountNo, accountHolder: ic!.accountHolder }
+    bankName = ic!.bankName
+  } else {
+    const a =
+      payee === 'vendor'
+        ? await req.payload.findByID({ collection: 'vendor-bank-accounts', id: relId(doc.vendorBankAccount)!, depth: 1, overrideAccess: true /* SYSTEM-READ: vendor account snapshot (ADR 0027) */, req })
+        : await req.payload.findByID({ collection: 'employee-bank-accounts', id: relId(doc.bankAccount)!, depth: 1, overrideAccess: true /* SYSTEM-READ: bank snapshot (US-44) */, req })
+    acc = { accountNo: a.accountNo, accountHolder: a.accountHolder }
+    bankName = a.bank && typeof a.bank === 'object' ? (a.bank as { name?: string }).name : null
+  }
   const cycle = (doc.approvalCycle ?? 0) + 1
   const needsAck = snapshot.acknowledge === 'required'
   const updated = await updateRequest(req, id, {

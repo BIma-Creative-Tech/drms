@@ -7,6 +7,8 @@ import { withEffectiveRadius } from '@/domain/attendance/calendar'
 import { companyById } from '@/domain/companies'
 import { today } from '@/domain/expense/common'
 import { siteFlagsFor, type SiteFlags } from '@/domain/sites'
+import { mayFileIntercompany } from '@/domain/expense/drafts'
+import { payeeDirectory } from '@/domain/intercompany/service'
 
 import { companyQuery } from '../company-query'
 import { MASTER_TYPES, MastersQuery, SHARED_MASTER_TYPES, type MasterType } from '../schemas'
@@ -14,8 +16,8 @@ import { HttpError, problem, v1 } from '../http'
 
 const LIMIT = 500
 
-/** type → collection + whitelisted fields (never internal/sensitive columns like odoo refs). */
-const MAP: Record<MasterType, { collection: CollectionSlug; fields: string[] }> = {
+/** type → collection + whitelisted fields (never internal/sensitive columns like odoo refs). ADR 0028: `intercompany-payees` is computed. */
+const MAP: Record<Exclude<MasterType, 'intercompany-payees'>, { collection: CollectionSlug; fields: string[] }> = {
   projects: { collection: 'projects', fields: ['code', 'name', 'kind', 'client', 'site', 'address', 'lat', 'lng', 'radiusM', 'pm', 'status', 'startDate', 'targetDate', 'progressPct'] },
   'project-stages': { collection: 'project-stages', fields: ['project', 'name', 'weightPct', 'sequence', 'progressPct', 'active'] },
   'cost-centers': { collection: 'cost-centers', fields: ['code', 'name', 'type', 'manager', 'lat', 'lng', 'radiusM', 'active'] },
@@ -53,7 +55,23 @@ function pick(doc: Record<string, unknown>, fields: string[], shared: boolean): 
   return out
 }
 
+/**
+ * ADR 0028: per requested paying PT where the caller is Finance / PM / Direktur, the payee directory (other active PTs
+ * with a designated receiving account; masked numbers). Not delta-synced (`since` ignored: a small, computed list).
+ */
+async function intercompanyPayees(req: PayloadRequest, companies: number[]) {
+  const items: Item[] = []
+  for (const company of companies) {
+    if (!mayFileIntercompany(req, company)) continue
+    for (const p of await payeeDirectory(req, company)) {
+      items.push({ id: p.companyId, company, shared: false, payeeCompanyId: p.companyId, shortCode: p.shortCode, name: p.name, bankName: p.bankName, accountNoMasked: p.accountNoMasked, accountHolder: p.accountHolder, active: true })
+    }
+  }
+  return { items, hasMore: false }
+}
+
 async function loadType(req: PayloadRequest, type: MasterType, companies: number[], since?: string) {
+  if (type === 'intercompany-payees') return intercompanyPayees(req, companies)
   const { collection, fields } = MAP[type]
   const shared = SHARED.has(type)
   const and: Where[] = []

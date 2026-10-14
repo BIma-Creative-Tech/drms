@@ -139,6 +139,8 @@ export const ApprovalRules: CollectionConfig = withAudit(
           { label: 'Semua', value: 'any' },
           { label: PAYEE_TYPE_LABELS.karyawan, value: 'karyawan' },
           { label: `${PAYEE_TYPE_LABELS.vendor} (pembayaran vendor)`, value: 'vendor' },
+          // ADR 0028: payments to another PT of the group (e.g. "Pembayaran antar-PT oleh Finance — Direktur lalu Owner")
+          { label: `${PAYEE_TYPE_LABELS.pt_grup} (pembayaran antar-PT)`, value: 'pt_grup' },
         ],
         admin: { description: 'Aturan hanya untuk pengajuan dengan jenis penerima ini (Semua = tanpa syarat).' },
       },

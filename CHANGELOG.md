@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added (DRMS 13/10 Phase B — transfer antar-PT)
+
+- **Pembayaran antar-PT** (owner 2026-10-13: "kas keluar dari DRMS ke LAS → kas masuk ke LAS setelah ditransfer
+  finance"), [ADR 0028](docs/proyekkas/adr/0028-intercompany.md) — accepted with the owner decisions of 2026-10-14.
+  New **Jenis penerima "PT grup"** (`payeeType: pt_grup`): another active PT of the group, paid to its designated
+  **Rekening penerimaan antar-PT** (new checkbox on cash accounts: one active bank account per PT, reason on change,
+  audited). Filed by **Finance, PM or Direktur** of the paying PT (Staff / Admin / Owner-only → 403); always Pengajuan
+  Baru, Pemohon = the filer, project **or** cost center. The receiving PT's **document (tagihan / memo) is mandatory**:
+  number, date and file; the number is unique per receiving PT among live requests (409 field error + DB index).
+- **Approval** through the rule engine: seeded per PT "Pembayaran antar-PT oleh Finance — Direktur lalu Owner" (Jenis
+  penerima = PT grup, Peran pemohon = Finance); a Direktur's own payment follows "Pengajuan Direktur" (→ Owner), a PM's
+  the default rule with the PM step skipped.
+- **Transfer** (Finance of the paying PT): KK in the paying PT and — a system write inside the same transaction — the
+  **Kas Masuk in the receiving PT** (source "Antar PT", system cash-in source `ANTAR-PT`, its own KM number), paired in
+  the new two-PT table `intercompany_links` (DB-guarded: sides, immutability, deferred status consistency). The
+  receiving PT's closed period refuses the transfer (409 `INTERCOMPANY_PERIOD_CLOSED`), a changed receiving account too
+  (409 `INTERCOMPANY_ACCOUNT_CHANGED`); the payment completes with the transfer (no LPJ). **Void** of the transfer
+  reverses the KM as well (the receiving PT cannot void it alone). Finance and Direktur of the receiving PT are notified
+  (`cash.intercompany_received` / `cash.intercompany_reversed`).
+- Web: form ("PT grup", PT penerima picker from the payee directory, masked account preview, document fields), read-only
+  summary + stepper, transfer-queue badge "Antar PT: <PT>", PDF box "Pembayaran Antar-PT" with the receiving PT's KM
+  number, Kas: filter "Sumber" and per-row counterpart ("Dari PT … · PB/… · TRF/… · KK/…", "Ke PT … · KM/…"), Buku Kas
+  "Antar PT" + column "Lawan PT", Rekap Kas lines "Antar PT (masuk)" / "Transfer antar PT (keluar)" + filter "Tanpa
+  antar-PT", Direktur cash-flow card toggle "tanpa antar-PT" (count + label, no elimination).
+- API / OpenAPI: `payeeType` `pt_grup`, `payeeCompanyId` (drafts, sync `payee_company_id`; an older app that omits the
+  payee type keeps the stored one), detail `payeeCompany` / `intercompany`, transfer queue `payeeCompany`, transfer
+  result `intercompany`, cash entries `sourceType` `intercompany` + `intercompany` counterpart + list filter
+  `sourceType`, `GET /api/v1/intercompany/payees?company=`, masters type `intercompany-payees`, bank preview
+  `payeeCompany`, dashboard cash flow `masukAntarPt` / `keluarAntarPt`. Migrations `20261014_100000`–`100300`
+  (`d1310_intercompany_*`). APK: follow-up release.
+
+### Fixed
+
+- A voided transfer of a vendor (and PT grup) payment notified the requester "Disetujui"; it now tells Finance that the
+  request is back in the transfer queue (`expense.transfer_queue`).
+
 ### Added (DRMS 13/10 Wave 4 — pembayaran vendor)
 
 - **Pembayaran vendor** (client: "kelola vendor dan rekening vendor; finance memilih vendor dan upload invoice"),

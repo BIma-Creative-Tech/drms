@@ -132,6 +132,11 @@ klik foto untuk ukuran penuh. Anda juga boleh membuat laporan dari HP (sama sepe
   [runbook tutup buku](../runbooks/tutup-buku.md) §B.
 - **Audit Log**: siapa melakukan apa, kapan, dari perangkat apa.
 
+- **Pembayaran antar-PT** (ADR 0028): Anda boleh mengajukan sendiri pembayaran ke PT lain di grup (Jenis penerima *PT
+  grup*; keputusan Owner). Pengajuan Finance → Anda lalu Owner. Di PT penerima Anda (bila juga Direktur di sana)
+  mendapat notifikasi "Kas masuk antar-PT". Dashboard → kartu **Arus kas bulanan** → *Tampilkan tanpa antar-PT* untuk
+  melihat arus kas gabungan tanpa transfer antar PT (tidak dieliminasi otomatis; Rekap Kas: filter **Antar PT**).
+
 ## 7. Absensi & data pribadi
 
 **Absensi → Tim hari ini / Rekap bulanan**. Membuka **selfie** karyawan lain tercatat di audit log (UU PDP) —

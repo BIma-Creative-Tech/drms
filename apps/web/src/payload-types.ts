@@ -1064,6 +1064,10 @@ export interface CashAccount {
    * Opsional: kas kecil / rekening kantor cabang ini (saldo per site di dashboard).
    */
   site?: (number | null) | Site;
+  /**
+   * Tandai satu rekening bank aktif per PT. PT lain di grup hanya dapat membayar PT ini (Pengajuan "PT grup") bila rekening ini ditetapkan; kas masuknya tercatat otomatis di sini.
+   */
+  intercompanyReceiving?: boolean | null;
   odooJournalCode?: string | null;
   active?: boolean | null;
   uuid?: string | null;
@@ -1138,24 +1142,26 @@ export interface ApprovalRule {
   /**
    * Aturan hanya untuk pengajuan dengan jenis penerima ini (Semua = tanpa syarat).
    */
-  payeeType: 'any' | 'karyawan' | 'vendor';
+  payeeType: 'any' | 'karyawan' | 'vendor' | 'pt_grup';
   /**
-   * Angka kecil dievaluasi lebih dulu (aturan "Pengajuan Direktur" = 10, default = 100).
+   * Angka kecil dievaluasi lebih dulu (aturan "Pengajuan Owner" = 5, "Pengajuan Direktur" = 10, default = 100).
    */
   priority?: number | null;
   acknowledge: 'required' | 'optional' | 'none';
   acknowledgeBy: 'scope_manager' | 'role' | 'user';
-  acknowledgeRole?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator') | null;
+  acknowledgeRole?:
+    ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator') | null;
   acknowledgeUser?: (number | null) | User;
   signDiajukan: 'required' | 'optional' | 'none';
   signDibuat: 'required' | 'optional' | 'none';
   /**
-   * Kosongkan HANYA untuk aturan Peran pemohon = Direktur: "Tanpa persetujuan — langsung ke antrian transfer Finance".
+   * Urutan pengajuan biaya: Direktur → Owner → Finance (level Owner sesudah Direktur, sebelum level Finance, ADR 0026). Kosongkan HANYA untuk aturan Peran pemohon = Owner: "Tanpa persetujuan — langsung ke antrian transfer Finance".
    */
   steps?:
     | {
         level: number;
-        approverRole?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator') | null;
+        approverRole?:
+          ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator') | null;
         approverUser?: (number | null) | User;
         id?: string | null;
       }[]
@@ -1326,9 +1332,9 @@ export interface ExpenseRequest {
   company?: (number | null) | Company;
   docNo?: string | null;
   /**
-   * Vendor: Finance / PM membayar invoice vendor ke rekening vendor (tanpa LPJ).
+   * Vendor: Finance / PM membayar invoice vendor ke rekening vendor (tanpa LPJ). PT grup: Finance / PM / Direktur membayar PT lain di grup ke rekening penerimaan antar-PT-nya; kas masuk di PT itu tercatat otomatis saat ditransfer.
    */
-  payeeType: 'karyawan' | 'vendor';
+  payeeType: 'karyawan' | 'vendor' | 'pt_grup';
   type: 'advance' | 'reimburse';
   status:
     | 'draft'
@@ -1351,7 +1357,7 @@ export interface ExpenseRequest {
    */
   project?: (number | null) | Project;
   /**
-   * Pengajuan lama tanpa project. Pengajuan baru: pusat biaya diisi Finance saat transfer.
+   * Pembayaran vendor / antar-PT tanpa project: pilih pusat biaya (mis. tagihan kantor). Pengajuan lama tanpa project menampilkan pusat biayanya di sini.
    */
   costCenter?: (number | null) | CostCenter;
   neededDate?: string | null;
@@ -1366,11 +1372,15 @@ export interface ExpenseRequest {
    * Rekening tujuan transfer = rekening vendor yang dipilih (dicatat saat diajukan).
    */
   vendorBankAccount?: (number | null) | VendorBankAccount;
+  /**
+   * PT lain di grup yang menerima pembayaran — ditransfer ke rekening penerimaan antar-PT yang ditetapkan PT itu.
+   */
+  payeeCompany?: (number | null) | Company;
   invoiceNo?: string | null;
   invoiceDate?: string | null;
   invoiceDueDate?: string | null;
   /**
-   * Wajib sebelum dikirim. Invoice = bukti pembayaran vendor (tanpa LPJ).
+   * Wajib sebelum dikirim. Invoice vendor / tagihan atau memo PT penerima = bukti pembayaran (tanpa LPJ).
    */
   invoiceFile?: (number | null) | MediaAttachment;
   bankSnapshot?: {
@@ -1750,7 +1760,7 @@ export interface CashEntry {
   vehicle?: (number | null) | Vehicle;
   description?: string | null;
   proof?: (number | null) | MediaAttachment;
-  sourceType: 'transfer' | 'settlement_refund' | 'manual' | 'reversal' | 'opening';
+  sourceType: 'transfer' | 'settlement_refund' | 'manual' | 'reversal' | 'opening' | 'intercompany';
   expenseRequest?: (number | null) | ExpenseRequest;
   transfer?: (number | null) | Transfer;
   status: 'posted' | 'void';
@@ -3483,6 +3493,7 @@ export interface CashAccountsSelect<T extends boolean = true> {
   openingBalance?: T;
   openingBalanceDate?: T;
   site?: T;
+  intercompanyReceiving?: T;
   odooJournalCode?: T;
   active?: T;
   uuid?: T;
@@ -3730,6 +3741,7 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
   bankAccount?: T;
   vendor?: T;
   vendorBankAccount?: T;
+  payeeCompany?: T;
   invoiceNo?: T;
   invoiceDate?: T;
   invoiceDueDate?: T;

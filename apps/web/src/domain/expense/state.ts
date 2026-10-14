@@ -37,7 +37,7 @@ export const ACTIONS = [
 ] as const
 export type Action = (typeof ACTIONS)[number]
 
-/** `payees` absent = every payee type (ADR 0027: rows limited to `karyawan` are the LPJ path a vendor payment never takes). */
+/** `payees` absent = every payee type (ADR 0027 / 0028: rows limited to `karyawan` are the LPJ path a vendor / PT grup payment never takes). */
 type Row = { from: RequestStatus[]; action: Action; to: RequestStatus[]; types?: RequestType[]; payees?: PayeeType[] }
 
 /**
@@ -59,8 +59,9 @@ export const TRANSITIONS: readonly Row[] = [
   { types: ['advance'], payees: ['karyawan'], from: ['transferred'], action: 'transfer_void', to: ['approved'] },
   // ADR 0027 "Pembayaran vendor" (always advance): the invoice is the proof — the transfer completes the request (no
   // receipts / LPJ / settlement); a void of that transfer re-opens it in the transfer queue.
-  { types: ['advance'], payees: ['vendor'], from: ['approved'], action: 'transfer', to: ['completed'] },
-  { types: ['advance'], payees: ['vendor'], from: ['completed'], action: 'transfer_void', to: ['approved'] },
+  // ADR 0028 "Pembayaran antar-PT" (PT grup): the same rows (the transfer also posts the KM in the receiving PT).
+  { types: ['advance'], payees: ['vendor', 'pt_grup'], from: ['approved'], action: 'transfer', to: ['completed'] },
+  { types: ['advance'], payees: ['vendor', 'pt_grup'], from: ['completed'], action: 'transfer_void', to: ['approved'] },
   // Reimburse
   { types: ['reimburse'], from: ['approved', 'receipts_verified'], action: 'receipt_reject', to: ['receipt_revision'] },
   // E1 (ADR 0013): changed total → re-approval starts again at "Menunggu Diketahui" (Direktur) when the
@@ -113,7 +114,7 @@ export function assertTransition(type: RequestType, from: RequestStatus, action:
 /** Facts about the caller and the document that the actor guards need (computed by the service). */
 export type ActorContext = {
   type: RequestType
-  /** ADR 0027: `vendor` = vendor payment (no LPJ path). Absent = karyawan. */
+  /** ADR 0027: `vendor` = vendor payment (no LPJ path); ADR 0028: `pt_grup` = payment to a PT of the group (same). Absent = karyawan. */
   payeeType?: PayeeType
   status: RequestStatus
   roles: readonly Role[]

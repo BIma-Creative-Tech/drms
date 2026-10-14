@@ -96,6 +96,8 @@ export async function Dashboard(props: AdminViewServerProps) {
   // ADR 0023 §5: dashboard "Site" filter (owner / finance / PM layouts; only narrows, the server re-checks the scope)
   const siteId = typeof sp.site === 'string' && /^\d{1,9}$/.test(sp.site) ? Number(sp.site) : undefined
   const siteQs = siteId ? `&site=${siteId}` : ''
+  // ADR 0028 (owner 2026-10-14): Direktur cash-flow card "tanpa antar-PT" (both legs of intercompany payments left out)
+  const withoutIc = sp.antarpt === 'tanpa'
   return (
     <Gutter>
       <F3Root name={`beranda-${layout ?? 'none'}`}>
@@ -128,7 +130,7 @@ export async function Dashboard(props: AdminViewServerProps) {
         ) : (
           <ChartHover>
             <Suspense fallback={<DashboardSkeleton />}>
-              <Body layout={layout} req={req} months={months} siteId={siteId} />
+              <Body layout={layout} req={req} months={months} siteId={siteId} withoutIc={withoutIc} />
             </Suspense>
           </ChartHover>
         )}
@@ -137,12 +139,12 @@ export async function Dashboard(props: AdminViewServerProps) {
   )
 }
 
-async function Body({ layout, req, months, siteId }: { layout: Layout; req: PayloadRequest; months: 6 | 12; siteId?: number }) {
+async function Body({ layout, req, months, siteId, withoutIc }: { layout: Layout; req: PayloadRequest; months: 6 | 12; siteId?: number; withoutIc?: boolean }) {
   try {
     switch (layout) {
       // awaited here (not rendered as <Owner/>) so a failing query is caught by this try
       case 'owner':
-        return await Owner({ req, months, siteId })
+        return await Owner({ req, months, siteId, withoutIc })
       case 'finance':
         return await Finance({ req, siteId })
       case 'pm':
@@ -370,6 +372,11 @@ function TrendCard({ id, rows, title, sub, span, i }: { id: string; rows: Array<
   )
 }
 
+/** ADR 0028: cash-flow rows without the legs of intercompany payments ("tanpa antar-PT"; no elimination otherwise). */
+function withoutIntercompany<T extends { masuk: number; keluar: number; masukAntarPt?: number; keluarAntarPt?: number }>(rows: T[]): T[] {
+  return rows.map((r) => ({ ...r, masuk: r.masuk - (r.masukAntarPt ?? 0), keluar: r.keluar - (r.keluarAntarPt ?? 0) }))
+}
+
 function CashFlowCard({ id, rows, title, sub, foot, span, i, withKoreksi }: { id: string; rows: Array<{ period: string; masuk: number; keluar: number; koreksi?: number }>; title: string; sub: string; foot?: React.ReactNode; span: 7 | 8 | 12; i: number; withKoreksi?: boolean }) {
   return (
     <Card id={id} title={title} sub={sub} span={span} i={i} foot={foot} action={{ href: '/admin/laporan/rekap-kas', label: 'Rekap Kas' }}>
@@ -588,7 +595,7 @@ function TeamWaitingCard({ id, data, span, i }: { id: string; data: TeamWaiting;
 }
 
 type CashRow = Awaited<ReturnType<typeof ownerDashboard>>['viz']['recentCash'][number]
-const SOURCE: Record<string, string> = { transfer: 'Transfer', settlement_refund: 'Pengembalian LPJ', manual: 'Manual', reversal: 'Jurnal balik', opening: 'Saldo awal' }
+const SOURCE: Record<string, string> = { transfer: 'Transfer', settlement_refund: 'Pengembalian LPJ', manual: 'Manual', reversal: 'Jurnal balik', opening: 'Saldo awal', intercompany: 'Antar PT' }
 
 function RecentCashCard({ id, rows, span, i }: { id: string; rows: CashRow[]; span: 6 | 8 | 12; i: number }) {
   const cols: Col<CashRow>[] = [
@@ -683,7 +690,7 @@ function LatestProgressReports({ rows }: { rows: Awaited<ReturnType<typeof listR
 
 // ---------------------------------------------------------------- Owner (wireframe §1)
 
-async function Owner({ req, months, siteId }: { req: PayloadRequest; months: 6 | 12; siteId?: number }) {
+async function Owner({ req, months, siteId, withoutIc }: { req: PayloadRequest; months: 6 | 12; siteId?: number; withoutIc?: boolean }) {
   const d = await withReqTransaction(req, () => ownerDashboard(req, { months, siteId }))
   // MC2: per-PT rows of the payload (`mc2-contract.md` §2, typed — Σ byCompany = combined total)
   const pt = await ptView(req)
@@ -768,7 +775,23 @@ async function Owner({ req, months, siteId }: { req: PayloadRequest; months: 6 |
           </KpiTile>
         </KpiRow>
 
-        <CashFlowCard id="owner-cashflow" rows={d.cashFlow.rows} title="Arus kas bulanan" sub="Masuk vs keluar, tanpa transaksi yang di-void (K-02b)" span={8} i={4} foot="Grafik operasional: void dan jurnal baliknya disembunyikan. Laporan resmi = Rekap Kas." />
+        <CashFlowCard
+          id="owner-cashflow"
+          rows={withoutIc ? withoutIntercompany(d.cashFlow.rows) : d.cashFlow.rows}
+          title="Arus kas bulanan"
+          sub={withoutIc ? 'Masuk vs keluar tanpa transfer antar-PT, tanpa transaksi yang di-void (K-02b)' : 'Masuk vs keluar, tanpa transaksi yang di-void (K-02b)'}
+          span={8}
+          i={4}
+          foot={
+            <>
+              Grafik operasional: void dan jurnal baliknya disembunyikan. Laporan resmi = Rekap Kas.{' '}
+              {/* ADR 0028: consolidated view — intercompany legs are counted ("Antar PT") unless left out here */}
+              <a href={`/admin/dashboard?peran=owner&bulan=${months}${siteId ? `&site=${siteId}` : ''}${withoutIc ? '' : '&antarpt=tanpa'}`} data-pk-toggle="antarpt">
+                {withoutIc ? 'Tampilkan termasuk antar-PT' : 'Tampilkan tanpa antar-PT'}
+              </a>
+            </>
+          }
+        />
         <PipelineCard id="owner-pipeline" pipeline={v.pipeline} title="Status pengajuan" sub="Posisi semua pengajuan saat ini" span={4} i={5} />
 
         <BudgetCard id="owner-budget" projects={d.projects} warnPct={v.warnPct} span={7} i={6} progress={progressMap(k09)} />

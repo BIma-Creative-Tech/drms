@@ -47,9 +47,10 @@ export type CopyDefaultsReport = {
 /**
  * QA-11: cash-in sources the workflow itself posts with (lpj.ts settle → KM "Pengembalian LPJ"). Same
  * code/name as the seed (seed/data.ts CASH_IN_SOURCES); backfilled for existing PTs by migration
- * 20261008_120100_qa_flow_lpj_source.
+ * 20261008_120100_qa_flow_lpj_source. ADR 0028: + "Antar PT" (code `ANTAR-PT`, the automatic Kas Masuk of a payment
+ * from another PT of the group; backfilled by migration 20261014_100300_d1310_intercompany_data).
  */
-export const SYSTEM_CASH_IN_SOURCES = CASH_IN_SOURCES.filter((s) => s.code === 'LPJ')
+export const SYSTEM_CASH_IN_SOURCES = CASH_IN_SOURCES.filter((s) => s.code === 'LPJ' || s.code === 'ANTAR-PT')
 
 /**
  * Creates the missing SYSTEM_CASH_IN_SOURCES of PT `target` (create-only by code, any active flag:

@@ -1,7 +1,8 @@
 # ADR 0028 — Transfer antar-PT (penerima "PT grup" + Kas Masuk otomatis)
 
-- **Status:** Proposed — draft for owner review (DRMS 13/10 Phase B). **No code yet.** Staging first; no production
-  deploy without separate owner approval.
+- **Status:** Accepted (owner decisions 2026-10-14, see "Owner decisions" below) — implemented on the web / server
+  side in `feat/d1310-b-intercompany` (migrations `20261014_1000xx`–`1003xx`); the APK part is a separate follow-up.
+  Staging first; no production deploy without separate owner approval.
 - **Date:** 2026-10-14
 - **Author:** nextjs developer (branch `feat/d1310-b-intercompany`, from `main` `58ca6d0`)
 - **Extends:** [ADR 0027](0027-vendor-payments.md) (payee type `karyawan | vendor` → `karyawan | vendor | pt_grup`).
@@ -77,12 +78,20 @@ Fields of a `pt_grup` request:
 |---|---|
 | `payeeCompany` (`payee_company_id` → `companies`) | required to submit; an **active** PT ≠ the request's PT that has a designated receiving account (§2). `companies` is app-wide (ADR 0016 §4 class "group"), so this FK is not a cross-PT reference and `pk_same_company` is untouched. DB CHECK `payee_company_id IS DISTINCT FROM company_id`. |
 | `bankSnapshot` | taken at submit from B's designated account (bank name, account no., holder) — the same columns as the vendor / employee snapshot, so `transfers.destination` is filled unchanged. |
-| `invoiceNo` / `invoiceDate` / `invoiceFile` | **optional** (a service bill from B, a memo); when a number is given, duplicate check per `(payee_company_id, pk_invoice_key(invoice_no))` like ADR 0027 §5 (partial unique index). |
+| `invoiceNo` / `invoiceDate` / `invoiceFile` | **required to submit** (owner decision 2026-10-14: the receiving PT's document — service bill / memo — number, date and file, the same fields and rules as the vendor invoice; due date optional); the number is unique per receiving PT among live requests: `(payee_company_id, pk_invoice_key(invoice_no))` partial unique index `expense_requests_ic_invoice_uq` + 409 field error `invoiceNo`, like ADR 0027 §5. |
 | project **or** cost center | as ADR 0027 decision 2 (project wins; PM only on his own scope). |
 | lines | normal lines and categories of A (e.g. "Jasa antar PT"); they drive A's KK category as today. |
 
-**Who may file:** Finance or PM **in A** (same as vendor, `VENDOR_PAYMENT_ROLES` renamed `PAYEE_FILER_ROLES`),
-403 "Pembayaran antar-PT hanya dapat diajukan oleh Finance atau PM di PT ini." — see Q1.
+**Who may file (owner decision 2026-10-14):** Finance, PM or **Direktur (`pk-owner`)** **in A**
+(`INTERCOMPANY_PAYMENT_ROLES`; vendor payments stay Finance + PM, `VENDOR_PAYMENT_ROLES`; `payeeFilerRoles(payee)`
+picks the list), else 403 "Pembayaran antar-PT hanya dapat diajukan oleh Finance, PM atau Direktur di PT ini." Staff,
+Admin and an **Owner (`pk-principal`) without one of these roles cannot** (the owner's answer names Finance, PM and
+Direktur only; "if unclear, not allowed") — checked on the STORED roles (`mayFileIntercompany`, ADR 0026
+`exactRolesIn`), since the Owner otherwise carries the Direktur's access; the form option, the payee directory and the
+masters type follow the same rule. A Direktur's own `pt_grup` request goes through the rule engine like any of
+his requests: "Pengajuan Direktur" (priority 10, Peran pemohon = Direktur) → Owner — it wins over the Finance rule
+(priority 20) even when the Direktur also holds Finance; G1 holds (the Direktur is the requester, the Owner decides; a
+user who is both is skipped per ADR 0013 G1-2).
 
 "Duplikat" / "Ajukan ulang" copy `payeeCompany` but not the invoice; withdraw → resubmit takes a fresh snapshot.
 
@@ -115,6 +124,10 @@ levels Direktur then Owner, priority 20). Approvers are those of **A only**; B t
 depends on it.
 
 ### 4. Pairing: dedicated table `intercompany_links` (decision)
+
+*As implemented:* a **plain SQL table** (like `document_sequence_counters`), not a Payload collection — the domain
+module `domain/intercompany/service.ts` reads / writes it with SQL; text columns with CHECKs instead of enum types, so
+the Payload schema snapshot never sees it. Nothing is lost: it had no admin UI ("hidden") anyway.
 
 Options considered: (a) a plain integer "counterpart id" on `cash_entries` / `transfers` without FK; (b) relax
 `pk_same_company` for some columns; (c) a dedicated pair table. **Chosen: (c).** Per-PT tables keep their rule "no
@@ -223,8 +236,8 @@ keep the renumber prelude where it exists (integration test `d1310-w4-renumber` 
 
 ## API
 
-- `POST` / `PATCH /expense-requests`: `payeeType: 'pt_grup'`, `payeeCompanyId`, optional `invoiceNo`,
-  `invoiceDate`, `invoiceFileId`. Sync (`domain/sync/service.ts:240,335`): `payee_type`, `payee_company_id`; when an
+- `POST` / `PATCH /expense-requests`: `payeeType: 'pt_grup'`, `payeeCompanyId`, `invoiceNo`, `invoiceDate`,
+  `invoiceFileId` (required to submit, owner 2026-10-14; `invoiceDueDate` optional). Sync (`domain/sync/service.ts:240,335`): `payee_type`, `payee_company_id`; when an
   existing draft is synced **without** `payee_type` (old APK), the stored payee type is kept, never reset.
 - Detail: `payeeType`, `payeeCompany { id, shortCode, name }`, `intercompany { status, targetEntryNo, targetCompany }`
   (after transfer). List filter `payeeType` accepts `pt_grup`. Transfer queue: `payeeType`, `payeeCompanyName`.
@@ -241,7 +254,8 @@ keep the renumber prelude where it exists (integration test `d1310-w4-renumber` 
 **Web**
 
 - Pengajuan form: "Jenis penerima" gets "PT grup" (Finance / PM in the form's PT) → "PT penerima" select (payee
-  directory) → preview of the receiving account (masked, eye toggle) → optional invoice / memo fields; read-only
+  directory) → preview of the receiving account (masked; full number after submit, eye toggle) → required document
+  fields (number, date, file); read-only
   summary, stepper, list filter, transfer-queue badge "Antar PT: <PT>".
 - Master Data → Akun kas: checkbox "Rekening penerimaan antar-PT" + list badge; Kas page header shows the designated
   account per PT.
@@ -270,8 +284,8 @@ keep the renumber prelude where it exists (integration test `d1310-w4-renumber` 
   request's `payee_type`. Buku Kas: filter "Sumber" + column "Lawan PT".
 - Project figures in A: a `pt_grup` payment is a **cost** of A's project / cost center (like a vendor payment;
   `spending()` unchanged). Loans (Phase C) are a separate document and never enter `spending()`.
-- Consolidated views (several PTs selected): see Q3 — proposal v1 = label, no elimination; a toggle "tanpa antar-PT"
-  on Rekap Kas and the Direktur / Owner cash-flow card filters both legs out.
+- Consolidated views (several PTs selected): owner decision 3 — count and label ("Antar PT"), no elimination; a
+  filter "tanpa antar-PT" on Rekap Kas and a toggle on the Direktur cash-flow card leave both legs out.
 - Odoo (F7, not built): a link maps naturally to an inter-company pair of moves (`res.company` per PT); noted in the
   ADR 0009 backlog, nothing now.
 
@@ -346,20 +360,41 @@ keep the renumber prelude where it exists (integration test `d1310-w4-renumber` 
 | Approval by B (Direktur B) as well | Two PTs' role sets in one approval; not asked; B's control is the designated account. |
 | New `source_type` also on A's KK | Would change every report / KPI that counts `transfer` KKs; the request already tells the payee. |
 
-## Open questions (with recommended answers)
+## Owner decisions (2026-10-14; were the open questions of the draft)
 
-1. **Who may file a "PT grup" payment?** Recommended: **Finance and PM of the paying PT** (as vendor payments);
-   Staff / Admin / Direktur cannot. Alternative: Finance only.
-2. **Is a supporting document (tagihan / memo from the receiving PT) required to submit?** Recommended: **optional**
-   (invoice number, date, file); when an invoice number is given it must be unique per receiving PT.
-3. **Consolidated reports (several PTs at once): count intercompany in/out or eliminate them?** Recommended: **count
-   and label** them ("Antar PT") in v1, with a filter "tanpa antar-PT" on Rekap Kas and the cash-flow card; no
-   automatic elimination. Per-PT views always count them.
+1. **Who may file a "PT grup" payment?** **Finance, PM and Direktur (`pk-owner`) of the paying PT** (vendor payments
+   remain Finance + PM). Staff / Admin / an Owner (`pk-principal`) without one of these roles cannot (§1).
+2. **Is a supporting document (tagihan / memo from the receiving PT) required?** **Mandatory**: document number, date
+   and file at submit (same fields as the vendor invoice); the number is unique per receiving PT among live requests
+   (DB index + 409 field error `invoiceNo`).
+3. **Consolidated reports:** **count and label** intercompany in/out ("Antar PT") with a filter **"tanpa antar-PT"** on
+   Rekap Kas and the Direktur cash-flow card; no automatic elimination. Per-PT views always count them.
+
+## As implemented (web / server, `feat/d1310-b-intercompany`)
+
+- **Migrations** `20261014_100000_d1310_intercompany_enums`, `…_100100_d1310_intercompany` (+ the latest Payload
+  snapshot `.json`), `…_100200_d1310_intercompany_guard`, `…_100300_d1310_intercompany_data` — as listed under
+  "Migrations / rollout", with `intercompany_links` as a plain SQL table (§4) and the document fields required (CHECK
+  `expense_requests_payee`, third shape). Renumber: the new trigger functions `pk_ic_consistency` /
+  `pk_ic_entry_linked` are on the neutral list (`RENUMBER_NEUTRAL_FUNCTIONS`).
+- **Payee directory** also as masters type `intercompany-payees` (APK offline cache): per paying PT `company` where the
+  caller is Finance / PM / Direktur, items `{ id = payeeCompanyId, shortCode, name, bankName, accountNoMasked,
+  accountHolder }` (unique per `(company, id)`).
+- **Receiving account check at the transfer** compares the designated account's number with the submit snapshot; a
+  missing designation at the transfer is 409 `INTERCOMPANY_NO_ACCOUNT` (at draft / submit: 400 with the same code).
+- **Notifications** of B use events `cash.intercompany_received` / `cash.intercompany_reversed` (doc type
+  `cash_entry`; the link opens the cash entry). The void fix (§9) covers every `completed → approved`.
+- **Reports**: Rekap Kas columns "Masuk / Keluar antar PT" (when any), breakdown lines "Antar PT (masuk)" /
+  "Transfer antar PT (keluar)", filter "Antar PT: Tanpa antar-PT" (balances hidden then — they would not reconcile);
+  Buku Kas "Jenis" Antar PT + column "Lawan PT"; Kas page filter "Sumber" + counterpart line per row; dashboard cash
+  flow rows carry `masukAntarPt` / `keluarAntarPt` and the Direktur card has the toggle "tanpa antar-PT".
+- **Kas page** names the designated receiving account per shown PT ("belum ditetapkan" otherwise).
+- **Not done in this change** (follow-up): the APK (enum, editor, detail, queue badge — the API contract is ready).
 
 Decided by the owner already (not asked again): payee type "PT grup", rule-engine approval with Owner, system KM on
 B's designated account, void cascades, closed period in B refuses, no LPJ.
 
-## Proposed amendments (draft text; applied to the ADRs when this ADR is accepted)
+## Amendments (applied 2026-10-14 to ADR 0005, ADR 0016 and ADR 0022)
 
 ### ADR 0005 — new section "Amendment 2026-10-14 (ADR 0028)"
 
@@ -391,3 +426,5 @@ B's designated account, void cascades, closed period in B refuses, no LPJ.
 ## Revision history
 
 - **2026-10-14:** proposed (draft for owner review).
+- **2026-10-14:** accepted with the owner decisions above (Direktur may file; document mandatory; count + label +
+  "tanpa antar-PT"); web / server implementation; amendments applied to ADR 0005, 0016 and 0022.

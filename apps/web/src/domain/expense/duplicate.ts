@@ -6,7 +6,8 @@ import { DUPLICATED_FROM_FIELD } from '@/domain/history-format'
 
 import { ids, loadRaw, loadVisible, type RequestDoc } from './common'
 import { createDraft, fromDocLines, type DraftInput, type LineInputApi } from './drafts'
-import { payeeOf, type RequestType } from './types'
+import { isDirectPayment, payeeOf, type RequestType } from './types'
+import { designatedAccount } from '@/domain/intercompany/service'
 
 /**
  * DRMS 13/10 Persetujuan #12: "Duplikat" on the request page = a clean NEW Draft with the same PT, project, title,
@@ -21,6 +22,7 @@ import { payeeOf, type RequestType } from './types'
  * any new draft (createDraft → validateContent) and audited on the new draft (`create`, field `duplicated_from`).
  * ADR 0027: a vendor payment keeps its vendor and vendor account; the invoice (number, dates, file) is NOT copied — one
  * invoice is paid once (the duplicate-invoice rule would refuse it anyway); the new draft needs its own invoice.
+ * ADR 0028: a PT grup payment keeps its receiving PT (not its document — same rule as the vendor invoice).
  */
 export function duplicateDraftInput(src: RequestDoc): DraftInput & { type: RequestType; title: string } {
   return {
@@ -40,7 +42,13 @@ export function duplicateDraftInput(src: RequestDoc): DraftInput & { type: Reque
           // ADR 0027: a vendor payment on a cost center (no project) keeps it
           ...(!relId(src.project) && relId(src.costCenter) ? { costCenterId: relId(src.costCenter)! } : {}),
         }
-      : {}),
+      : payeeOf(src.payeeType) === 'pt_grup'
+        ? {
+            payeeType: 'pt_grup' as const,
+            payeeCompanyId: relId(src.payeeCompany) ?? null,
+            ...(!relId(src.project) && relId(src.costCenter) ? { costCenterId: relId(src.costCenter)! } : {}),
+          }
+        : {}),
   }
 }
 
@@ -63,7 +71,12 @@ export async function duplicateAsDraft(req: PayloadRequest, id: number): Promise
     const v = await req.payload.findByID({ collection: 'vendors', id: input.vendorId, depth: 0, overrideAccess: true /* SYSTEM-READ: is the copied vendor still active */, req }).catch(() => null)
     if (!v || v.active === false) input.vendorId = input.vendorBankAccountId = null
   }
-  if (input.bankAccountId) {
+  if (input.payeeCompanyId) {
+    // ADR 0028: a receiving PT that is no longer usable (inactive, no designated account) is dropped — picked again before submit
+    const c = await req.payload.findByID({ collection: 'companies', id: input.payeeCompanyId, depth: 0, select: { active: true }, overrideAccess: true /* SYSTEM-READ: is the copied receiving PT still usable */, req, disableErrors: true })
+    if (!c || (c as { active?: boolean | null }).active === false || !(await designatedAccount(req, input.payeeCompanyId))) input.payeeCompanyId = null
+  }
+  if (input.bankAccountId && !isDirectPayment(input.payeeType)) {
     const acc = await req.payload
       .findByID({ collection: 'employee-bank-accounts', id: input.bankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: is the copied account still usable (G9) */, req })
       .catch(() => null)

@@ -9,6 +9,7 @@ import { CASH_ENDPOINTS } from './endpoints/cash'
 import { DAILY_ENDPOINTS } from './endpoints/daily'
 import { EXPENSE_ENDPOINTS } from './endpoints/expense-requests'
 import { FIELD_ENDPOINTS } from './endpoints/field'
+import { INTERCOMPANY_ENDPOINTS } from './endpoints/intercompany'
 import { LOAN_ENDPOINTS } from './endpoints/loans'
 import { mastersEndpoint } from './endpoints/masters'
 import { membershipBatchEndpoint } from './endpoints/memberships'
@@ -43,6 +44,8 @@ export const v1Endpoints: Endpoint[] = [
   // F2a expense-request flow (T1–T4, T6–T8, period closing)
   ...EXPENSE_ENDPOINTS,
   ...CASH_ENDPOINTS,
+  // ADR 0028: payee directory of a "PT grup" payment
+  ...INTERCOMPANY_ENDPOINTS,
   // MC2: atomic role-matrix save
   membershipBatchEndpoint,
   uploadMediaEndpoint,

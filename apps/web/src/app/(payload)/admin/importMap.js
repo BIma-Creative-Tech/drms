@@ -18,6 +18,7 @@ import { ProjectRapTab as ProjectRapTab_477bcbaacaa37a019b46a0d40f873f32 } from 
 import { ProjectRequestsTab as ProjectRequestsTab_477bcbaacaa37a019b46a0d40f873f32 } from '@/admin/views/ProjectTabs'
 import { ProjectLoansTab as ProjectLoansTab_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
 import { BusinessDateField as BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f } from '@/admin/components/BusinessDateField'
+import { IntercompanyReceivingCell as IntercompanyReceivingCell_9d714d06e18fcaca14fd7fd6bd195f83 } from '@/admin/components/IntercompanyReceivingCell'
 import { ApprovalRulePreview as ApprovalRulePreview_d1fda995effefe011ec359f37cc8493e } from '@/admin/components/ApprovalRulePreview'
 import { SiteFromCostCenterLink as SiteFromCostCenterLink_57dfe94c9146c60f785b1649b36e1df1 } from '@/admin/components/SiteFromCostCenterLink'
 import { WorkflowPanel as WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e } from '@/admin/components/WorkflowPanel'
@@ -28,6 +29,7 @@ import { RequestStatusCell as RequestStatusCell_08836769fece85e42fb05beb6c632414
 import { RequestStatusField as RequestStatusField_3f8d5a55b1fcbc79eb9e47f3583cb1ed } from '@/admin/components/RequestStatusField'
 import { RequestTitleField as RequestTitleField_a356a4ed347478242de628aded3440b3 } from '@/admin/components/EditableOnlyFields'
 import { CompanyScopedField as CompanyScopedField_17980260c895f93f0d171a2dbc0f4023 } from '@/admin/components/companies/CompanyScopedField'
+import { IntercompanyPayeeField as IntercompanyPayeeField_573b4ed864973b67f00d4339fc8ca048 } from '@/admin/components/IntercompanyPayeeField'
 import { BankAccountPreview as BankAccountPreview_1615d70b0243139e3dffd45ad2617f07 } from '@/admin/components/BankAccountPreview'
 import { RupiahNumberField as RupiahNumberField_d552ada140febbfef2d7dea921fde6df } from '@/admin/components/RupiahNumberField'
 import { LinesTableField as LinesTableField_652f9839b87cfebdbb6f1faba6b58e18 } from '@/admin/components/lines/LinesTableField'
@@ -120,6 +122,7 @@ export const importMap = {
   "@/admin/views/ProjectTabs#ProjectRequestsTab": ProjectRequestsTab_477bcbaacaa37a019b46a0d40f873f32,
   "@/admin/views/Loans#ProjectLoansTab": ProjectLoansTab_e5d452935824a68d96fdc373e55d7f95,
   "@/admin/components/BusinessDateField#BusinessDateField": BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f,
+  "@/admin/components/IntercompanyReceivingCell#IntercompanyReceivingCell": IntercompanyReceivingCell_9d714d06e18fcaca14fd7fd6bd195f83,
   "@/admin/components/ApprovalRulePreview#ApprovalRulePreview": ApprovalRulePreview_d1fda995effefe011ec359f37cc8493e,
   "@/admin/components/SiteFromCostCenterLink#SiteFromCostCenterLink": SiteFromCostCenterLink_57dfe94c9146c60f785b1649b36e1df1,
   "@/admin/components/WorkflowPanel#WorkflowPanel": WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e,
@@ -130,6 +133,7 @@ export const importMap = {
   "@/admin/components/RequestStatusField#RequestStatusField": RequestStatusField_3f8d5a55b1fcbc79eb9e47f3583cb1ed,
   "@/admin/components/EditableOnlyFields#RequestTitleField": RequestTitleField_a356a4ed347478242de628aded3440b3,
   "@/admin/components/companies/CompanyScopedField#CompanyScopedField": CompanyScopedField_17980260c895f93f0d171a2dbc0f4023,
+  "@/admin/components/IntercompanyPayeeField#IntercompanyPayeeField": IntercompanyPayeeField_573b4ed864973b67f00d4339fc8ca048,
   "@/admin/components/BankAccountPreview#BankAccountPreview": BankAccountPreview_1615d70b0243139e3dffd45ad2617f07,
   "@/admin/components/RupiahNumberField#RupiahNumberField": RupiahNumberField_d552ada140febbfef2d7dea921fde6df,
   "@/admin/components/lines/LinesTableField#LinesTableField": LinesTableField_652f9839b87cfebdbb6f1faba6b58e18,

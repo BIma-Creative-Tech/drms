@@ -118,9 +118,9 @@ function specificity(r: RuleInput): number {
   return (r.category ? 1 : 0) + (r.project ? 1 : 0) + (r.costCenter ? 1 : 0) + (r.requestType !== 'any' ? 1 : 0) + ((r.requesterRoles?.length ?? 0) > 0 ? 1 : 0) + (payeeCondition(r) ? 1 : 0)
 }
 
-/** ADR 0027: the rule's payee-type condition (null = any payee). */
+/** ADR 0027: the rule's payee-type condition (null = any payee). ADR 0028: + `pt_grup`. */
 export function payeeCondition(r: Pick<RuleInput, 'payeeType'>): PayeeType | null {
-  return r.payeeType === 'karyawan' || r.payeeType === 'vendor' ? r.payeeType : null
+  return r.payeeType === 'karyawan' || r.payeeType === 'vendor' || r.payeeType === 'pt_grup' ? r.payeeType : null
 }
 
 /** ADR 0024: every requester holds at least one of the rule's requester roles (no condition = true). */

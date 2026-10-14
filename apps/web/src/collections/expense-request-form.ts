@@ -56,9 +56,24 @@ export function vendorPayee(cond: Condition): Condition {
   return (data, sibling, ctx) => isVendorForm(data as FormData) && cond(data, sibling, ctx)
 }
 
-/** ADR 0027: `cond` AND paid to an employee (Pemohon picker, rekening karyawan). */
+/** ADR 0028: the form is a payment to another PT of the group ("Jenis penerima" = PT grup). */
+export function isIntercompanyForm(data: FormData): boolean {
+  return data?.payeeType === 'pt_grup'
+}
+
+/** ADR 0028: `cond` AND a payment to a PT of the group (PT penerima input). */
+export function intercompanyPayee(cond: Condition): Condition {
+  return (data, sibling, ctx) => isIntercompanyForm(data as FormData) && cond(data, sibling, ctx)
+}
+
+/** ADR 0027 / 0028: `cond` AND a payment without LPJ (vendor or PT grup: invoice / document inputs, cost center without project). */
+export function directPayee(cond: Condition): Condition {
+  return (data, sibling, ctx) => (isVendorForm(data as FormData) || isIntercompanyForm(data as FormData)) && cond(data, sibling, ctx)
+}
+
+/** ADR 0027: `cond` AND paid to an employee (Pemohon picker, rekening karyawan) — ADR 0028: not to a PT of the group either. */
 export function employeePayee(cond: Condition): Condition {
-  return (data, sibling, ctx) => !isVendorForm(data as FormData) && cond(data, sibling, ctx)
+  return (data, sibling, ctx) => !isVendorForm(data as FormData) && !isIntercompanyForm(data as FormData) && cond(data, sibling, ctx)
 }
 
 /** Field shown only when it has a value (docNo before the first submit is empty). */
@@ -89,6 +104,7 @@ export const PLACEHOLDERS = {
   bankAccount: 'Pilih rekening tujuan…',
   vendor: 'Pilih vendor…',
   vendorBankAccount: 'Pilih rekening vendor…',
+  payeeCompany: 'Pilih PT penerima…',
   uom: 'Pilih satuan…',
   category: 'Pilih kategori…',
   vehicle: 'Pilih kendaraan…',

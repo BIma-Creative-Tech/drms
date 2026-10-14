@@ -189,10 +189,11 @@ describe('ADR 0027 drafts: vendor columns', () => {
   const doc = { id: 5, type: 'advance', status: 'rejected', title: 'Semen', payeeType: 'vendor', vendor: 3, vendorBankAccount: { id: 9 }, invoiceNo: 'INV-1', invoiceDate: '2026-10-01', invoiceDueDate: null, invoiceFile: 11, requesters: [2], lines: [] } as unknown as RequestDoc
 
   it('vendorOfDoc / vendorData round trip; karyawan clears every vendor column', () => {
-    expect(vendorOfDoc(doc)).toEqual({ payeeType: 'vendor', vendorId: 3, vendorBankAccountId: 9, invoiceNo: 'INV-1', invoiceDate: '2026-10-01', invoiceDueDate: null, invoiceFileId: 11 })
-    expect(vendorData(vendorOfDoc(doc), true)).toEqual({ payeeType: 'vendor', vendor: 3, vendorBankAccount: 9, invoiceNo: 'INV-1', invoiceDate: '2026-10-01', invoiceDueDate: null, invoiceFile: 11 })
-    expect(vendorData(vendorOfDoc(doc), false)).toEqual({ payeeType: 'karyawan', vendor: null, vendorBankAccount: null, invoiceNo: null, invoiceDate: null, invoiceDueDate: null, invoiceFile: null })
-    expect(vendorData({ invoiceNo: '   ' }, true).invoiceNo).toBeNull()
+    // ADR 0028: + payeeCompanyId / payeeCompany (null for a vendor payment); vendorData takes the payee type
+    expect(vendorOfDoc(doc)).toEqual({ payeeType: 'vendor', vendorId: 3, vendorBankAccountId: 9, payeeCompanyId: null, invoiceNo: 'INV-1', invoiceDate: '2026-10-01', invoiceDueDate: null, invoiceFileId: 11 })
+    expect(vendorData(vendorOfDoc(doc), 'vendor')).toEqual({ payeeType: 'vendor', vendor: 3, vendorBankAccount: 9, payeeCompany: null, invoiceNo: 'INV-1', invoiceDate: '2026-10-01', invoiceDueDate: null, invoiceFile: 11 })
+    expect(vendorData(vendorOfDoc(doc), 'karyawan')).toEqual({ payeeType: 'karyawan', vendor: null, vendorBankAccount: null, payeeCompany: null, invoiceNo: null, invoiceDate: null, invoiceDueDate: null, invoiceFile: null })
+    expect(vendorData({ invoiceNo: '   ' }, 'vendor').invoiceNo).toBeNull()
   })
 
   it('client 2026-10-14: the cost center is writable only on a vendor payment (employee requests keep D2)', () => {

@@ -12,8 +12,8 @@ import { CONTENT_VALIDATED, fromDocLines, validateContent } from '@/domain/expen
 import { grandTotal, normalizeLines, unlockLine, validateLines, type LineInput } from '@/domain/expense/lines'
 import { diffLines, type AuditLine } from '@/domain/expense/line-audit'
 import { recomputeFlags } from '@/domain/expense/receipts'
-import { isContentEditable, PAYEE_TYPE_LABELS, payeeOf, REQUEST_STATUSES, REQUEST_TYPE_LABELS, STATUS_LABELS, VENDOR_PAYMENT_LABEL, type RequestStatus, type RequestType } from '@/domain/expense/types'
-import { VENDOR_PAYMENT_ROLES } from '@/domain/expense/drafts'
+import { INTERCOMPANY_PAYMENT_LABEL, isContentEditable, isDirectPayment, PAYEE_TYPE_LABELS, payeeOf, REQUEST_STATUSES, REQUEST_TYPE_LABELS, STATUS_LABELS, VENDOR_PAYMENT_LABEL, type RequestStatus, type RequestType } from '@/domain/expense/types'
+import { mayFileIntercompany, VENDOR_PAYMENT_ROLES } from '@/domain/expense/drafts'
 import { changeReasonField, rupiahField, uuidField } from '@/fields/common'
 import { requestMeta } from '@/lib/request-meta'
 import { forceDeferredChecks } from '@/lib/system-tx'
@@ -23,7 +23,7 @@ import { hasRole, hasRoleAny } from '@/access/roles'
 import { select as selectValidation } from 'payload/shared'
 import { validationError } from '@/lib/validation'
 
-import { draftOnly, editableInput, employeePayee, linesCondition, linesEditable, notOnRequestPage, PLACEHOLDERS, revisionOnly, shownInHeader, vendorPayee, whenSet } from './expense-request-form'
+import { directPayee, draftOnly, editableInput, employeePayee, intercompanyPayee, linesCondition, linesEditable, notOnRequestPage, PLACEHOLDERS, revisionOnly, shownInHeader, vendorPayee, whenSet } from './expense-request-form'
 import { businessDateField } from './fields-f2'
 import { USER_NAME_VIEW } from '@/fields/users'
 
@@ -98,10 +98,11 @@ export const requesterOptions = ({ data, user }: Pick<FilterOptionsProps, 'data'
 /**
  * ADR 0027 (client 2026-10-14): the requester's cost center is writable only on a vendor payment (a vendor payment
  * without a project names its cost center); employee requests keep D2 (no cost center, Finance sets it at the transfer).
+ * ADR 0028: the same for a payment to a PT of the group (project OR cost center, ADR 0027 decision 2).
  */
 export const vendorCostCenterAccess = ({ data, siblingData, doc }: { data?: unknown; siblingData?: unknown; doc?: unknown }): boolean => {
   const payee = (data as { payeeType?: unknown } | undefined)?.payeeType ?? (siblingData as { payeeType?: unknown } | undefined)?.payeeType ?? (doc as { payeeType?: unknown } | undefined)?.payeeType
-  return payeeOf(payee) === 'vendor'
+  return isDirectPayment(payee)
 }
 
 /**
@@ -111,8 +112,10 @@ export const vendorCostCenterAccess = ({ data, siblingData, doc }: { data?: unkn
 export const payeeTypeOptions = ({ options, data, req }: { options: Array<string | { label: unknown; value: string }>; data?: unknown; req: PayloadRequest }) => {
   const stored = (data as { payeeType?: unknown } | undefined)?.payeeType
   const company = formCompany(data, req.user, REQUEST_CREATE_ROLES)
-  const may = company !== undefined ? hasRole(req, VENDOR_PAYMENT_ROLES, company) : hasRoleAny(req, ...VENDOR_PAYMENT_ROLES)
-  return may || stored === 'vendor' ? options : options.filter((o) => (typeof o === 'string' ? o : o.value) !== 'vendor')
+  const may = (roles: readonly Role[]) => (company !== undefined ? hasRole(req, roles, company) : hasRoleAny(req, ...roles))
+  // ADR 0028 (owner 2026-10-14): "PT grup" for Finance, PM and Direktur of the form's PT (server: drafts.ts payeeFilerErrors)
+  const hidden = new Set<string>([...(may(VENDOR_PAYMENT_ROLES) || stored === 'vendor' ? [] : ['vendor']), ...(mayFileIntercompany(req, company) || stored === 'pt_grup' ? [] : ['pt_grup'])])
+  return hidden.size === 0 ? options : options.filter((o) => !hidden.has(typeof o === 'string' ? o : o.value))
 }
 
 /** ADR 0027: vendor picker — ACTIVE vendors of the form's PT (locked until the PT is known; list filter: every readable vendor). */
@@ -197,16 +200,19 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
 
   // ADR 0027: payee type coercion on every content write of a Draft — vendor = Pengajuan Baru without an employee account;
   // karyawan = no vendor / invoice data (a switch back never leaves stale vendor columns, DB CHECK expense_requests_payee).
+  // ADR 0028: PT grup = Pengajuan Baru without employee / vendor account, receiving PT + its document (invoice fields).
   const payee = payeeOf(d.payeeType !== undefined ? d.payeeType : prev.payeeType)
   if (!transition && (operation === 'create' || prev.status === 'draft')) {
     d.payeeType = payee
-    if (payee === 'vendor') {
+    if (payee !== 'karyawan') {
       d.type = 'advance'
       d.bankAccount = null
+      if (payee === 'vendor') d.payeeCompany = null
+      else for (const k of ['vendor', 'vendorBankAccount']) d[k] = null
     } else {
-      for (const k of ['vendor', 'vendorBankAccount', 'invoiceNo', 'invoiceDate', 'invoiceDueDate', 'invoiceFile']) d[k] = null
-      // a vendor draft switched back to an employee payment drops its cost center (D2: employee requests have none)
-      if (payeeOf(prev.payeeType) === 'vendor') d.costCenter = null
+      for (const k of ['vendor', 'vendorBankAccount', 'payeeCompany', 'invoiceNo', 'invoiceDate', 'invoiceDueDate', 'invoiceFile']) d[k] = null
+      // a vendor / PT grup draft switched back to an employee payment drops its cost center (D2: employee requests have none)
+      if (isDirectPayment(prev.payeeType)) d.costCenter = null
     }
   }
 
@@ -242,7 +248,7 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
   // Only the admin form path (the /api/v1 + APK path sends its own choice and is validated as-is).
   if (!transition && req.user && context?.[CONTENT_VALIDATED] !== true && (operation === 'create' || isContentEditable((prev.status ?? 'draft') as RequestStatus))) {
     const current = d.bankAccount !== undefined ? d.bankAccount : prev.bankAccount
-    if ((current === null || current === undefined || current === '') && prev.status !== 'receipt_revision' && payee !== 'vendor') {
+    if ((current === null || current === undefined || current === '') && prev.status !== 'receipt_revision' && payee === 'karyawan') {
       const def = await defaultBankAccount(req, ids((d.requesters !== undefined ? d.requesters : prev.requesters) as unknown[] | null))
       if (def !== null) d.bankAccount = def
     }
@@ -270,6 +276,8 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
           payeeType: payee,
           vendorId: relId(pick('vendor')) ?? null,
           vendorBankAccountId: relId(pick('vendorBankAccount')) ?? null,
+          // ADR 0028
+          payeeCompanyId: relId(pick('payeeCompany')) ?? null,
           invoiceNo: pick<string | null>('invoiceNo'),
           invoiceDate: pick<string | null>('invoiceDate'),
           invoiceDueDate: pick<string | null>('invoiceDueDate'),
@@ -297,6 +305,7 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
           .replace(/^bankAccountId$/, 'bankAccount')
           .replace(/^vendorId$/, 'vendor')
           .replace(/^vendorBankAccountId$/, 'vendorBankAccount')
+          .replace(/^payeeCompanyId$/, 'payeeCompany')
           .replace(/^invoiceFileId$/, 'invoiceFile')
           .replace(/\.(uom|category|vehicle|rapItem)Id$/, '.$1')
       throw validationError(
@@ -402,9 +411,15 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         options: [
           { label: PAYEE_TYPE_LABELS.karyawan, value: 'karyawan' },
           { label: `${PAYEE_TYPE_LABELS.vendor} (${VENDOR_PAYMENT_LABEL.toLowerCase()})`, value: 'vendor' },
+          // ADR 0028: payment to another PT of the group (Finance / PM / Direktur of this PT) — Kas Masuk in that PT at the transfer
+          { label: `${PAYEE_TYPE_LABELS.pt_grup} (${INTERCOMPANY_PAYMENT_LABEL.toLowerCase()})`, value: 'pt_grup' },
         ],
         filterOptions: payeeTypeOptions as never,
-        admin: { placeholder: PLACEHOLDERS.payeeType, description: 'Vendor: Finance / PM membayar invoice vendor ke rekening vendor (tanpa LPJ).', components: { Field: '@/admin/components/EditableOnlyFields#PayeeTypeField' } },
+        admin: {
+          placeholder: PLACEHOLDERS.payeeType,
+          description: 'Vendor: Finance / PM membayar invoice vendor ke rekening vendor (tanpa LPJ). PT grup: Finance / PM / Direktur membayar PT lain di grup ke rekening penerimaan antar-PT-nya; kas masuk di PT itu tercatat otomatis saat ditransfer.',
+          components: { Field: '@/admin/components/EditableOnlyFields#PayeeTypeField' },
+        },
       },
       {
         name: 'type',
@@ -415,8 +430,8 @@ export const ExpenseRequests: CollectionConfig = withAudit(
           { label: REQUEST_TYPE_LABELS.advance, value: 'advance' },
           { label: REQUEST_TYPE_LABELS.reimburse, value: 'reimburse' },
         ],
-        // ADR 0027: a vendor payment is always "Pengajuan Baru" — set by the hook, so the (hidden) input may stay empty
-        validate: (value: unknown, options: { siblingData?: unknown }) => (payeeOf((options.siblingData as { payeeType?: unknown } | undefined)?.payeeType) === 'vendor' ? true : selectValidation(value as never, options as never)),
+        // ADR 0027 / 0028: a vendor / PT grup payment is always "Pengajuan Baru" — set by the hook, so the (hidden) input may stay empty
+        validate: (value: unknown, options: { siblingData?: unknown }) => (isDirectPayment((options.siblingData as { payeeType?: unknown } | undefined)?.payeeType) ? true : selectValidation(value as never, options as never)),
         // B-2 item 3: required → no admin.condition (schema drift); the wrapper renders nothing on a locked request
         admin: { placeholder: PLACEHOLDERS.type, components: { Field: '@/admin/components/EditableOnlyFields#RequestTypeField' } },
       },
@@ -451,9 +466,9 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         ...pickerSameCompany({ createRoles: REQUEST_CREATE_ROLES }),
         admin: {
           placeholder: PLACEHOLDERS.costCenter,
-          description: 'Pembayaran vendor tanpa project: pilih pusat biaya (mis. tagihan kantor). Pengajuan lama tanpa project menampilkan pusat biayanya di sini.',
+          description: 'Pembayaran vendor / antar-PT tanpa project: pilih pusat biaya (mis. tagihan kantor). Pengajuan lama tanpa project menampilkan pusat biayanya di sini.',
           condition: (d, s, c) =>
-            (vendorPayee(editableInput())(d, s, c) && !whenSet('project')(d, s, c)) || (linesEditable(d as Parameters<typeof linesEditable>[0]) && whenSet('costCenter')(d, s, c)),
+            (directPayee(editableInput())(d, s, c) && !whenSet('project')(d, s, c)) || (linesEditable(d as Parameters<typeof linesEditable>[0]) && whenSet('costCenter')(d, s, c)),
           components: { Field: COMPANY_SCOPED_FIELD },
         },
       },
@@ -492,12 +507,32 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         validate: () => true as const,
         admin: { description: 'Rekening tujuan transfer = rekening vendor yang dipilih (dicatat saat diajukan).', placeholder: PLACEHOLDERS.vendorBankAccount, condition: vendorPayee(draftOnly), components: { Field: COMPANY_SCOPED_FIELD } },
       },
+      {
+        // ADR 0028 "PT penerima": another ACTIVE PT of the group with a designated receiving account (payee directory
+        // GET /api/v1/intercompany/payees — a filer of PT A cannot read PT B's companies row or cash accounts, so the
+        // picker is a custom select over that directory). `companies` is the app-wide group master (not a per-PT
+        // reference: no companyHook check); validated by validateContent (active, ≠ own PT, designated account).
+        name: 'payeeCompany',
+        type: 'relationship',
+        relationTo: 'companies',
+        label: 'PT penerima',
+        index: true,
+        validate: () => true as const,
+        admin: {
+          placeholder: PLACEHOLDERS.payeeCompany,
+          description: 'PT lain di grup yang menerima pembayaran — ditransfer ke rekening penerimaan antar-PT yang ditetapkan PT itu.',
+          condition: intercompanyPayee(draftOnly),
+          components: { Field: '@/admin/components/IntercompanyPayeeField#IntercompanyPayeeField' },
+        },
+      },
       // DRMS 10/10 8e (WA-04): chosen account (draft) / snapshot (after submit) — bank · holder · masked no. + eye toggle.
       { name: 'bankAccountPreview', type: 'ui', label: 'Rekening tujuan', admin: { condition: editableInput(), components: { Field: '@/admin/components/BankAccountPreview#BankAccountPreview' } } },
-      { name: 'invoiceNo', type: 'text', label: 'Nomor invoice', maxLength: 64, index: true, admin: { placeholder: 'mis. INV/2026/0012', condition: vendorPayee(editableInput('invoiceNo')) } },
-      businessDateField('invoiceDate', 'Tanggal invoice', { admin: { condition: vendorPayee(editableInput('invoiceDate')) } }),
-      businessDateField('invoiceDueDate', 'Jatuh tempo', { admin: { condition: vendorPayee(editableInput('invoiceDueDate')) } }),
-      { name: 'invoiceFile', type: 'upload', relationTo: 'media-attachments', label: 'File invoice (foto / PDF)', admin: { description: 'Wajib sebelum dikirim. Invoice = bukti pembayaran vendor (tanpa LPJ).', condition: vendorPayee(editableInput('invoiceFile')) } },
+      // ADR 0028 (owner 2026-10-14): a payment to a PT of the group needs the receiving PT's document (invoice / memo) the
+      // same way — number, date and file required to send, number unique per receiving PT
+      { name: 'invoiceNo', type: 'text', label: 'Nomor invoice / dokumen', maxLength: 64, index: true, admin: { placeholder: 'mis. INV/2026/0012', condition: directPayee(editableInput('invoiceNo')) } },
+      businessDateField('invoiceDate', 'Tanggal invoice / dokumen', { admin: { condition: directPayee(editableInput('invoiceDate')) } }),
+      businessDateField('invoiceDueDate', 'Jatuh tempo', { admin: { condition: directPayee(editableInput('invoiceDueDate')) } }),
+      { name: 'invoiceFile', type: 'upload', relationTo: 'media-attachments', label: 'File invoice / dokumen (foto / PDF)', admin: { description: 'Wajib sebelum dikirim. Invoice vendor / tagihan atau memo PT penerima = bukti pembayaran (tanpa LPJ).', condition: directPayee(editableInput('invoiceFile')) } },
       {
         name: 'bankSnapshot',
         type: 'group',

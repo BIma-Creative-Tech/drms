@@ -160,6 +160,8 @@ export const MASTER_TYPES = [
   'sites',
   // ADR 0027: vendor accounts — destination picker of a vendor payment (Finance / PM / Direktur / Admin read; Staff: none)
   'vendor-bank-accounts',
+  // ADR 0028: payee directory of a "PT grup" payment per paying PT (Finance / PM / Direktur of that PT; others: none)
+  'intercompany-payees',
 ] as const
 export type MasterType = (typeof MASTER_TYPES)[number]
 
@@ -203,7 +205,7 @@ export const MastersQuery = z
 
 const MasterItem = z
   .record(z.string(), z.unknown())
-  .meta({ id: 'MasterItem', description: 'Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur — or, ADR 0026, Owner — in that PT; not offered as requester to others).' })
+  .meta({ id: 'MasterItem', description: 'Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur — or, ADR 0026, Owner — in that PT; not offered as requester to others). ADR 0028: `intercompany-payees` items = the receiving PTs a request of PT `company` may pay (id = the RECEIVING PT id — unique per (company, id) —, payeeCompanyId, shortCode, name, bankName, accountNoMasked, accountHolder, active); only for Finance / PM / Direktur of `company`.' })
 
 export const Masters = z
   .object({

@@ -138,13 +138,21 @@ export async function TransferQueue(props: AdminViewServerProps) {
                       </span>
                     </div>
                   ) : null}
+                  {/* ADR 0028: payment to another PT of the group — its Kas Masuk is posted with this transfer (no LPJ) */}
+                  {r.payeeType === 'pt_grup' ? (
+                    <div style={{ marginTop: 2 }}>
+                      <span style={badge('muted')} data-pk-queue-intercompany={r.id} title="Pembayaran antar-PT: selesai setelah transfer; kas masuk di PT penerima tercatat otomatis (periode PT penerima harus terbuka)">
+                        Antar PT{r.payeeCompany ? `: ${r.payeeCompany.shortCode}` : ''}
+                      </span>
+                    </div>
+                  ) : null}
                 </td>
                 <td style={{ ...td, overflowWrap: 'anywhere' }} data-label="Rekening tujuan" data-span="full">
                   {r.bank ? `${r.bank.bankName ?? ''} · ${r.bank.accountHolder ?? ''} · ${r.bank.accountNo ?? ''}` : '—'}
                   {/* QA-17: verification state of the employee account; unverified → the transfer asks for a confirmation */}
                   <div style={{ marginTop: 2 }}>
                     <span style={badge(r.bankVerification === 'verified' ? 'ok' : 'warn')} data-pk-bank-verification={r.bankVerification}>
-                      {r.bankVerification === 'verified' ? 'Terverifikasi' : 'Belum diverifikasi'}
+                      {r.payeeType === 'pt_grup' ? 'Rekening penerimaan antar-PT' : r.bankVerification === 'verified' ? 'Terverifikasi' : 'Belum diverifikasi'}
                     </span>
                   </div>
                 </td>

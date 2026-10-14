@@ -284,7 +284,9 @@ function baseEventsFor(prev: { status: RequestStatus; currentLevel?: number | nu
     case 'pending_approval':
       return [{ event: 'expense.pending_approval', to: 'approval' }, ...submitted]
     case 'approved':
-      if (prev?.status === 'receipt_revision' || prev?.status === 'receipts_verified' || prev?.status === 'transferred') {
+      // back to the queue: Revisi Nota / voided transfer (ADR 0027 / 0028: a voided vendor / PT grup transfer comes back
+      // from "Selesai") → Finance again, not "Disetujui" to the people
+      if (prev?.status === 'receipt_revision' || prev?.status === 'receipts_verified' || prev?.status === 'transferred' || prev?.status === 'completed') {
         return doc.type === 'advance' ? [{ event: 'expense.transfer_queue', to: 'finance' }] : [{ event: 'expense.receipts_to_verify', to: 'finance' }]
       }
       return [
@@ -468,6 +470,9 @@ export function notificationHref(docType: string | null | undefined, docId: stri
       return `/admin/addendum/detail/${docId}`
     case 'project_loan':
       return `/admin/pinjaman/detail/${docId}`
+    // ADR 0028: the receiving PT's automatic Kas Masuk (Finance / Direktur of that PT read cash entries)
+    case 'cash_entry':
+      return `/admin/collections/cash-entries/${docId}`
     // FR1: field reports → the custom detail views (ADR 0020 web views)
     case 'service_report':
       return `/admin/laporan-servis/detail/${docId}`

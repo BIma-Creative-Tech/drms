@@ -266,3 +266,9 @@ production use, keep the tables (read-only) — loans are approval evidence.
 ## Pertanyaan untuk owner
 
 All answered on 2026-10-11 (section "Decisions"): Q-L1…Q-L7 = the proposed defaults. No open questions.
+
+## Note 2026-10-14 (ADR 0028)
+
+Q-L2 (same-PT loans only) is unchanged by ADR 0028. Phase C's inter-PT loan document will reuse `intercompany_links`
+(`source_doc_type = intercompany_loan` / `intercompany_loan_repayment`) for its disbursement and repayments, which then
+are real cash movements between PTs (unlike same-PT loans, §5 option B).

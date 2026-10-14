@@ -1,10 +1,12 @@
 import type { PayloadRequest } from 'payload'
 
 import { employeeIn, hasRole, relId, userId } from '@/access/roles'
+import { designatedAccount } from '@/domain/intercompany/service'
 
 import { fail, ids, loadVisible } from './common'
 import { maskAccountNo } from './dto'
 import { payeeOf } from './types'
+import { mayFileIntercompany } from './drafts'
 
 /**
  * DRMS 10/10 8e (WA-04): the destination account shown under the "Rekening tujuan" picker (draft) and
@@ -61,8 +63,23 @@ function out(source: BankPreview['source'], acc: { bankName: string | null; acco
   }
 }
 
-export async function bankPreview(req: PayloadRequest, input: { requestId?: number; accountId?: number; vendorAccountId?: number; reveal: boolean }): Promise<BankPreview> {
+/**
+ * ADR 0028: preview of a receiving PT's designated intercompany account BEFORE submit — always MASKED (the full number
+ * is only in the submit snapshot, shown like a vendor account to the filer / office roles of the request's PT).
+ */
+async function intercompanyPreview(req: PayloadRequest, payeeCompanyId: number): Promise<BankPreview> {
+  const acc = await designatedAccount(req, payeeCompanyId)
+  if (!acc) fail(404, 'PT penerima belum menetapkan rekening penerimaan antar-PT.')
+  return out('account', { bankName: acc!.bankName, accountNo: acc!.accountNo, accountHolder: acc!.accountHolder }, false, false)
+}
+
+export async function bankPreview(req: PayloadRequest, input: { requestId?: number; accountId?: number; vendorAccountId?: number; payeeCompanyId?: number; reveal: boolean }): Promise<BankPreview> {
   const { requestId, accountId, reveal } = input
+  // ADR 0028: a new PT grup form — only a filer role (Finance / PM / Direktur) sees the payee directory's accounts
+  if (input.payeeCompanyId !== undefined && requestId === undefined) {
+    if (!mayFileIntercompany(req)) fail(404, 'Rekening tidak ditemukan.')
+    return intercompanyPreview(req, input.payeeCompanyId)
+  }
   // ADR 0027: a vendor account (vendor payment) — readable through the collection access (Admin / Finance / Direktur / PM of its PT)
   if (input.vendorAccountId !== undefined) return vendorPreview(req, { requestId, accountId: input.vendorAccountId, reveal })
   if (requestId === undefined) {
@@ -80,6 +97,12 @@ export async function bankPreview(req: PayloadRequest, input: { requestId?: numb
     const s = doc.bankSnapshot
     if (!s?.accountNo) fail(404, 'Rekening tujuan belum tercatat.')
     return out('snapshot', { bankName: s.bankName ?? null, accountNo: s.accountNo, accountHolder: s.accountHolder }, full, reveal)
+  }
+  // ADR 0028: a PT grup Draft — the (picked, else saved) receiving PT's designated account, masked
+  if (payeeOf(doc.payeeType) === 'pt_grup') {
+    const pc = input.payeeCompanyId ?? relId(doc.payeeCompany)
+    if (pc === undefined) fail(404, 'Belum ada PT penerima.')
+    return intercompanyPreview(req, pc!)
   }
   // ADR 0027: a vendor-payment Draft shows its saved vendor account
   if (payeeOf(doc.payeeType) === 'vendor') {

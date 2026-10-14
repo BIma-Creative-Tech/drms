@@ -2,7 +2,8 @@ import type { PayloadRequest } from 'payload'
 
 import { relId, ROLE_LABELS, type Role } from '@/access/roles'
 import { approvalsOf, settings, type ApprovalRow, type RequestDoc } from '@/domain/expense/common'
-import { displayNames } from '@/domain/companies'
+import { companyById, displayNames } from '@/domain/companies'
+import { intercompanyOfRequest } from '@/domain/intercompany/service'
 import { COMPANY_SIGNATURE_SOURCE, direkturLabel } from '@/domain/direktur-rules'
 import { isNoApproval, NO_APPROVAL_PDF_LABEL, selfApprovalNote, SKIPPED_LABEL } from '@/domain/expense/decision'
 import { withFlagVisibility } from '@/domain/expense/flag-visibility'
@@ -167,8 +168,10 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
   let imageBudget = Math.max(0, MAX_RECEIPT_IMAGES - Math.min(receiptRows.length, MAX_RECEIPT_IMAGES))
   const attachments: PdfAttachment[] = []
   // ADR 0027: the vendor invoice (the proof of a vendor payment) is the first attachment page
+  // ADR 0028: likewise the receiving PT's document (tagihan / memo) of a PT grup payment
   const vendorPay = payeeOf(doc.payeeType) === 'vendor'
-  const invoiceId = vendorPay ? relId(doc.invoiceFile) : undefined
+  const icPay = payeeOf(doc.payeeType) === 'pt_grup'
+  const invoiceId = vendorPay || icPay ? relId(doc.invoiceFile) : undefined
   const attachmentIds = [...(invoiceId !== undefined ? [invoiceId] : []), ...(doc.attachments ?? []).map((a) => relId(a)).filter((x): x is number => x !== undefined && x !== invoiceId)]
   for (const [i, a] of attachmentIds.entries()) {
     const id = relId(a)
@@ -184,11 +187,16 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     const image = isImage && imageBudget > 0 ? await loadImage(req, 'media-attachments', id) : null
     if (image) imageBudget--
     attachments.push({
-      heading: pdfSafe(invoiceId !== undefined && i === 0 ? `Invoice vendor ${doc.invoiceNo ?? ''}`.trim() : `Lampiran ${invoiceId !== undefined ? i : i + 1}`),
+      heading: pdfSafe(invoiceId !== undefined && i === 0 ? `${icPay ? 'Dokumen PT penerima' : 'Invoice vendor'} ${doc.invoiceNo ?? ''}`.trim() : `Lampiran ${invoiceId !== undefined ? i : i + 1}`),
       details: pdfSafe(isImage ? `Gambar ${m.width ?? '?'}×${m.height ?? '?'} px` : 'Berkas PDF'),
       image,
     })
   }
+
+  // ADR 0028: receiving PT (short code, legal name) and — after the transfer — its Kas Masuk number
+  const payeeCompanyId = icPay ? relId(doc.payeeCompany) : undefined
+  const payeePt = payeeCompanyId !== undefined ? await companyById(req, payeeCompanyId).catch(() => null) : null
+  const icLink = icPay ? await intercompanyOfRequest(req, requestId) : null
 
   const kop = [s.pdfHeader, s.address, s.phone ? `Telp. ${s.phone}` : null]
     .flatMap((x) => (x ? String(x).split(/\r?\n/) : []))
@@ -234,6 +242,17 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
           invoiceNo: pdfSafe(doc.invoiceNo ?? '-'),
           invoiceDate: doc.invoiceDate ? formatDateLong(doc.invoiceDate) : '-',
           dueDate: doc.invoiceDueDate ? formatDateLong(doc.invoiceDueDate) : '-',
+        }
+      : null,
+    // ADR 0028: payment to another PT of the group (printed with the transfer info)
+    intercompany: icPay
+      ? {
+          company: pdfSafe(payeePt ? `${payeePt.shortCode} — ${payeePt.name}` : '-'),
+          legalName: pdfSafe((payeePt as { legalName?: string | null } | null)?.legalName ?? ''),
+          documentNo: pdfSafe(doc.invoiceNo ?? '-'),
+          documentDate: doc.invoiceDate ? formatDateLong(doc.invoiceDate) : '-',
+          kmNo: icLink && icLink.status === 'posted' ? pdfSafe(`${icLink.targetEntryNo}`) : null,
+          kmCompany: pdfSafe(icLink?.targetCompany?.shortCode ?? payeePt?.shortCode ?? ''),
         }
       : null,
     receipts,

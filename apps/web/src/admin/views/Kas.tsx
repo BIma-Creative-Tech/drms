@@ -95,7 +95,7 @@ const PAGE_STYLE = `
 }
 `
 
-const SOURCE: Record<CashEntryDoc['sourceType'], string> = { transfer: 'Transfer', settlement_refund: 'Pengembalian LPJ', manual: 'Manual', reversal: 'Jurnal balik', opening: 'Saldo awal' }
+const SOURCE: Record<CashEntryDoc['sourceType'], string> = { transfer: 'Transfer', settlement_refund: 'Pengembalian LPJ', manual: 'Manual', reversal: 'Jurnal balik', opening: 'Saldo awal', intercompany: 'Antar PT' }
 const dayMonth = (date: string) => `${Number(date.slice(8, 10))} ${MONTHS_SHORT[Number(date.slice(5, 7)) - 1] ?? ''} ${date.slice(0, 4)}`
 const SR: React.CSSProperties = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }
 
@@ -243,7 +243,7 @@ export async function KasBook(props: AdminViewServerProps) {
   const byPt = shown.map((c) => ({ companyId: c, total: bal.filter((a) => a.companyId === c && inSite(a)).reduce((s, a) => s + a.balance, 0) }))
   const activeIds = new Set(lk.accounts.filter((a) => a.active).map((a) => a.id))
   const tiles = bal.filter((a) => (activeIds.has(a.cashAccountId) || a.balance !== 0) && inSite(a))
-  const filtered = Boolean(q.akun || q.periode || q.project || q.pusat || q.arah || q.status || q.pt || q.site || q.q)
+  const filtered = Boolean(q.akun || q.periode || q.project || q.pusat || q.arah || q.status || q.sumber || q.pt || q.site || q.q)
   const flashAcc = flash ? bal.find((a) => a.cashAccountId === relId(flash.cashAccount)) : undefined
   return (
     <Frame props={props} name="kas">
@@ -281,6 +281,16 @@ export async function KasBook(props: AdminViewServerProps) {
             </p>
           </div>
         ) : null}
+        {/* ADR 0028: where payments from the other PTs of the group arrive (automatic Kas Masuk "Antar PT") */}
+        <p className="pk-note" data-pk-ic-receiving-note style={{ margin: '0 0 12px' }}>
+          Rekening penerimaan antar-PT:{' '}
+          {shown
+            .map((c) => {
+              const a = d.lk.accounts.find((x) => x.companyId === c && x.active && x.intercompanyReceiving)
+              return `${multi ? `${ptCode(pt, c)}: ` : ''}${a ? a.label : 'belum ditetapkan (Master Data › Akun kas/bank)'}`
+            })
+            .join(' · ')}
+        </p>
         {!canWrite ? (
           <div className="pk-alert info">
             <b aria-hidden>i</b>
@@ -367,6 +377,8 @@ function FilterBar({ q, lk, filtered, pt, pts }: { q: BookQuery; lk: Lookups; fi
       {multi('pusat', 'Pusat biaya', ids(lk.costCenters), q.pusat, 'Semua pusat biaya')}
       {multi('arah', 'Arah', [{ value: 'masuk', label: 'Masuk' }, { value: 'keluar', label: 'Keluar' }], q.arah, 'Masuk & keluar')}
       {multi('status', 'Status', [{ value: 'posted', label: 'Posted' }, { value: 'void', label: 'Void' }], q.status, 'Semua')}
+      {/* ADR 0028: "Sumber" — e.g. only the automatic Kas Masuk of payments from another PT (Antar PT) */}
+      {multi('sumber', 'Sumber', (Object.keys(SOURCE) as Array<CashEntryDoc['sourceType']>).map((k) => ({ value: k, label: SOURCE[k] })), q.sumber, 'Semua sumber')}
       <label>
         Per halaman
         <select name="per" defaultValue={String(q.per ?? 50)} data-pk-page-size="kas">
@@ -387,6 +399,32 @@ function FilterBar({ q, lk, filtered, pt, pts }: { q: BookQuery; lk: Lookups; fi
       ) : null}
       <AutoSubmit />
     </form>
+  )
+}
+
+/**
+ * ADR 0028: the other leg of an intercompany payment — KM of the receiving PT: "Dari PT DRMS · PB/… · TRF/… · KK/…";
+ * KK of the paying PT: "Ke PT LAS · KM/LAS/…". Numbers and PT only; a link only where the caller may open it.
+ */
+function IntercompanyLinks({ ic }: { ic: NonNullable<BookRow['intercompany']> }) {
+  const pt = ic.counterpartCompany?.shortCode ?? 'lain'
+  const entry = ic.canOpenCounterpart ? <a href={`/admin/collections/cash-entries/${ic.counterpartEntryId}`}>{ic.counterpartEntryNo}</a> : <span>{ic.counterpartEntryNo}</span>
+  if (ic.direction === 'out') {
+    return (
+      <span className="links" data-pk-ic="out">
+        Ke PT {pt} · {entry}
+        {ic.status === 'void' ? ' (dibatalkan)' : ''}
+      </span>
+    )
+  }
+  const req = ic.sourceDocNo ? ic.canOpenSourceDoc ? <a href={`/admin/collections/expense-requests/${ic.sourceDocId}`}>{ic.sourceDocNo}</a> : <span>{ic.sourceDocNo}</span> : null
+  return (
+    <span className="links" data-pk-ic="in">
+      Dari PT {pt}
+      {req ? <> · {req}</> : null}
+      {ic.transferDocNo ? <> · {ic.transferDocNo}</> : null} · {entry}
+      {ic.status === 'void' ? ' (dibatalkan)' : ''}
+    </span>
   )
 }
 
@@ -463,6 +501,7 @@ function LedgerTable({
               Pengajuan <a href={`/admin/collections/expense-requests/${r.request.id}`}>{r.request.docNo ?? `#${r.request.id}`}</a>
             </span>
           ) : null}
+          {r.intercompany ? <IntercompanyLinks ic={r.intercompany} /> : null}
         </>
       ),
     },
