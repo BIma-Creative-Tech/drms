@@ -52,6 +52,17 @@ lend or borrow designates its **Rekening penerimaan antar-PT** (ADR 0028) first.
   Kas counterpart line with the PJA number; Direktur / Owner dashboard card "Dana tersedia & pinjaman antar-PT". Loans
   never count as cost (outside realisation, RAP and budgets).
 
+## [0.10.1] - 2026-10-14
+
+**0.10.0 plus "the Owner does not sign the document"** (owner decision 2026-10-14). Production goes 0.9.1 → 0.10.1:
+the notes and the deploy checklist of **0.10.0 below apply** (same 15 migrations; no new migration). APK stays 0.6.0.
+
+### Changed
+
+- **PDF Pengajuan Biaya: signatures stop at the Direktur.** The Owner level (ADR 0026) remains a full approval step in
+  the system (inbox, stepper, notifications, Log perubahan, audit, SLA) but the Approval box no longer prints it — no
+  name, no signature; an Owner rejection still marks the box "DITOLAK". ADR 0026 "Amendment 2026-10-14", Owner guide.
+
 ## [0.10.0] - 2026-10-14
 
 **DRMS 13/10 feedback, Waves 1–4 + Phase A (Owner level, OnSite / Non-OnSite, Direktur signature per PT) + Phase B

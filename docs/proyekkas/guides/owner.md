@@ -19,6 +19,8 @@ Alur pengajuan biaya: **Staff → PM project → Direktur → Owner (Anda) → F
 - Anda **tidak** memutuskan langkah Direktur (walau melihat semua yang dilihat Direktur), dan Direktur tidak memutuskan
   langkah Anda. Pengajuan yang diajukan sebelum 13 Okt 2026 tetap selesai di Direktur — tidak masuk ke kotak Anda.
 - Kekurangan LPJ di atas nominal disetujui mengikuti alur yang sama (PM → Direktur → Owner), di web → Persetujuan.
+- Persetujuan Owner hanya ada di alur sistem: **PDF Pengajuan Biaya tidak mencetak nama maupun tanda tangan Owner** —
+  tanda tangan dokumen berhenti di Direktur. Bila Anda menolak, kotak Approval di PDF tetap bertanda DITOLAK.
 
 ## 2. Pengajuan Anda sendiri
 

@@ -102,7 +102,8 @@ level goes to another Direktur.
 
 "Persetujuan Owner" (step), "Menunggu persetujuan Owner" (status of the Owner level, derived from the snapshot's
 current level), `decisionBy: owner`, KPI `teamWaiting.owner`, transfer-queue `noApprovalBy`, "Tanpa persetujuan —
-pengajuan Owner (kebijakan PT)", PDF Approval box lists every level with its role. `STATUS_LABELS.pending_approval`
+pengajuan Owner (kebijakan PT)", PDF Approval box lists every level with its role — **except the Owner's** (amendment
+2026-10-14 below). `STATUS_LABELS.pending_approval`
 stays "Menunggu persetujuan Direktur" (level 1 of the default rule; rows without a snapshot).
 
 ### 5. Data migration (`…630200_d1310_owner_role_data`, idempotent)
@@ -124,6 +125,15 @@ leaving a rule without a level), renumbers the following levels back and deletes
   labels (`statusLabel`, `stepLabel`) name the Owner.
 - New code that needs "acts as Direktur" uses the normal role helpers; code that decides an approval position must use
   the exact-role helpers.
+
+## Amendment 2026-10-14 — the Owner does not sign the document
+
+Owner decision 2026-10-14: "penandatanganan dokumen hanya sampai Direktur, Owner hanya alur approval di sistem". The
+Owner level stays a full approval step in the system (inbox, stepper, notifications, Log perubahan, audit, SLA), but
+the PDF Pengajuan Biaya never prints it: the Approval box shows the levels up to the Direktur (name, signature, time
+of the last printed level); an Owner rejection still marks the box "DITOLAK" (no signature images). The note "Tanpa
+persetujuan — pengajuan Owner (kebijakan PT)" for the Owner's own request is unchanged. Code: `pdf/data.ts`
+(`approvals` without `PRINCIPAL_ROLE` levels); test `d1310-a-owner`.
 
 ## Amendment 2026-10-14 (ADR 0029)
 
