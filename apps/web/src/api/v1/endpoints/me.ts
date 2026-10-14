@@ -3,6 +3,7 @@ import type { PayloadRequest } from 'payload'
 import { companyContextOf, membershipsOf, relId, userRoles, type Membership, type Role } from '@/access/roles'
 import { appSettings, companyById, settings } from '@/domain/companies'
 import { isNoApprovalRule } from '@/domain/expense/decision'
+import { mayFileIntercompany } from '@/domain/expense/drafts'
 import { loadActiveRules } from '@/domain/expense/snapshot'
 import { resolveDisplayName } from '@/domain/user-display-name'
 import { privacyStatusOf } from '@/legal/privacy-notice'
@@ -44,6 +45,21 @@ export function capabilitiesOf(roles: readonly Role[], opts: { fieldReportsEnabl
     // P3: Laporan harian on projects of kind konstruksi
     dailyReportCreate: field,
   }
+}
+
+/**
+ * `/me` capabilities: the role hints of [capabilitiesOf] (EFFECTIVE roles) + ADR 0028 `intercompanyPayment` — the filer
+ * rule of a PT grup payment, checked like the server's own guard on the STORED roles (`mayFileIntercompany`, ADR 0026
+ * `exactRolesIn`). The effective roles cannot tell an Owner-only account (`pk-principal`, listed with `pk-owner` too:
+ * false) from an Owner who also holds Direktur / Finance / PM (true). `company` undefined = any selected PT (the
+ * deprecated top-level object). Hint only; the 403 of the request endpoints stays the authority.
+ */
+export function meCapabilities(
+  req: Parameters<typeof mayFileIntercompany>[0],
+  roles: readonly Role[],
+  opts: { fieldReportsEnabled?: boolean; company?: number } = {},
+) {
+  return { ...capabilitiesOf(roles, { fieldReportsEnabled: opts.fieldReportsEnabled }), intercompanyPayment: mayFileIntercompany(req, opts.company) }
 }
 
 /**
@@ -121,7 +137,7 @@ export const meEndpoint = v1({
         roles,
         employeeId: m.employee,
         employee: m.employee !== null ? (employees.get(m.employee) ?? null) : null,
-        capabilities: capabilitiesOf(roles, { fieldReportsEnabled: c.fieldReportsEnabled === true }),
+        capabilities: meCapabilities(req, roles, { fieldReportsEnabled: c.fieldReportsEnabled === true, company: m.company }),
         // ADR 0024 / 0026: the caller's own requests in this PT go straight to the Finance transfer queue (APK hint) —
         // since ADR 0026 only an Owner (STORED role) under the zero-step rule "Pengajuan Owner"
         ownRequestNoApproval: (m.exactRoles ?? m.roles).includes('pk-principal') && (await loadActiveRules(req, 'expense_request', m.company)).some(isNoApprovalRule),
@@ -160,7 +176,7 @@ export const meEndpoint = v1({
       // local part → "Pengguna", domain/user-display-name.ts). Additive; `name` keeps the stored account name.
       displayName: await resolveDisplayName(req.payload, req.user),
       roles,
-      capabilities: capabilitiesOf(roles, { fieldReportsEnabled: companies.some((c) => c.selected && c.settings.fieldReportsEnabled) }),
+      capabilities: meCapabilities(req, roles, { fieldReportsEnabled: companies.some((c) => c.selected && c.settings.fieldReportsEnabled) }),
       employee: legacyEmployeeId !== null ? (employees.get(legacyEmployeeId) ?? null) : null,
       authMethod: u._strategy ?? 'oidcSession',
       device: u._pkDevice ?? null,

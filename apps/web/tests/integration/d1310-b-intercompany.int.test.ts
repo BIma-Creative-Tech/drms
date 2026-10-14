@@ -150,6 +150,26 @@ describe('b. payee directory', () => {
   })
 })
 
+describe('b2. GET /me capability intercompanyPayment (the filer rule on the STORED roles)', () => {
+  it('Finance / Direktur of A → true; an Owner-only user (effective roles list pk-owner too) and Staff → false', async () => {
+    const capsIn = async (u: FlowUser) => {
+      const me = await ok(api('GET', '/api/v1/me', u))
+      const c = me.companies.find((x: { id: number }) => x.id === A)
+      return { roles: c.roles as string[], caps: c.capabilities, top: me.capabilities }
+    }
+    for (const u of [financeA, direkturA]) {
+      const { caps, top } = await capsIn(u)
+      expect(caps.intercompanyPayment).toBe(true)
+      expect(top.intercompanyPayment).toBe(true)
+    }
+    const owner = await capsIn(principalA)
+    expect(owner.roles).toEqual(expect.arrayContaining(['pk-owner', 'pk-principal'])) // effective roles: Owner ⊃ Direktur
+    expect(owner.caps).toMatchObject({ approvalInbox: true, intercompanyPayment: false })
+    expect(owner.top.intercompanyPayment).toBe(false)
+    expect((await capsIn(w.users.staffA)).caps.intercompanyPayment).toBe(false)
+  })
+})
+
 describe('c. who files a PT grup payment (owner 2026-10-14: Finance, PM, Direktur)', () => {
   it('Staff, Admin and an Owner-only user → 403; Finance → Draft "Pembayaran antar-PT" (advance, Pemohon = the filer, receiving PT)', async () => {
     expect((await api('POST', E, w.users.staffA, { ...(await icBody(w.users.staffA)), projectId: w.project }, key())).status).toBe(403)
@@ -206,6 +226,7 @@ describe('d. approval routing', () => {
 let paidId = 0
 let transferId = 0
 let kmId = 0
+let kkId = 0
 
 describe('e. transfer: KK in A + automatic Kas Masuk in B', () => {
   it('queue badge data; the transfer completes the request and posts the KM in B (paired link)', async () => {
@@ -218,6 +239,7 @@ describe('e. transfer: KK in A + automatic Kas Masuk in B', () => {
     expect(t.intercompany).toMatchObject({ company: { id: B, shortCode: codeB } })
     expect(t.intercompany.cashEntryNo).toMatch(/^KM\//)
     kmId = t.intercompany.cashEntryId
+    kkId = t.cashEntryId
     expect(t.request.intercompany).toMatchObject({ status: 'posted', targetEntryNo: t.intercompany.cashEntryNo })
     const km = (await sqlAs('app', 'SELECT company_id, direction::text AS direction, source_type::text AS source_type, cash_account_id, amount::int AS amount, project_id FROM cash_entries WHERE id = $1', [kmId])).rows[0]
     expect(km).toMatchObject({ company_id: B, direction: 'in', source_type: 'intercompany', cash_account_id: accB, amount: 2_500_000, project_id: null })
@@ -240,6 +262,18 @@ describe('e. transfer: KK in A + automatic Kas Masuk in B', () => {
     const a = await ok(api('GET', '/api/v1/cash-entries?sourceType=transfer', w.users.finance))
     const kk = a.items.find((i: { transferId: number | null }) => i.transferId === transferId)
     expect(kk.intercompany).toMatchObject({ direction: 'out', counterpartCompany: { id: B }, counterpartEntryId: kmId })
+  })
+
+  it('dashboard "Transaksi kas terbaru" rows carry the same counterpart: KM in B, and A\'s KK (sourceType transfer)', async () => {
+    const b = await ok(api('GET', '/api/v1/dashboard/finance', financeB))
+    const km = b.viz.recentCash.find((r: { id: number }) => r.id === kmId)
+    expect(km).toMatchObject({ sourceType: 'intercompany', intercompany: { direction: 'in', status: 'posted', counterpartCompany: { id: A, shortCode: codeA }, counterpartEntryId: kkId, canOpenCounterpart: false } })
+    const a = await ok(api('GET', '/api/v1/dashboard/finance', w.users.finance))
+    const kk = a.viz.recentCash.find((r: { id: number }) => r.id === kkId)
+    expect(kk).toMatchObject({ sourceType: 'transfer', intercompany: { direction: 'out', counterpartCompany: { id: B, shortCode: codeB }, counterpartEntryId: kmId } })
+    expect(kk.intercompany.counterpartEntryNo).toMatch(/^KM\//)
+    // every other row of A: no counterpart (only this file pairs entries; nothing voided yet)
+    expect(a.viz.recentCash.filter((r: { id: number; intercompany: unknown }) => r.id !== kkId && r.intercompany !== null)).toEqual([])
   })
 })
 

@@ -619,7 +619,8 @@ function RecentCashCard({ id, rows, span, i }: { id: string; rows: CashRow[]; sp
       ),
     },
     { key: 'acc', label: 'Akun', sec: true, cell: (r) => r.account },
-    { key: 'src', label: 'Sumber', sec: true, cell: (r) => (r.status === 'void' ? <StatusPill tone="bad" label="Void" /> : (SOURCE[r.sourceType] ?? r.sourceType)) },
+    // ADR 0028: the paying PT's KK (source type `transfer`) of an intercompany payment is "Antar PT" too (counterpart set)
+    { key: 'src', label: 'Sumber', sec: true, cell: (r) => (r.status === 'void' ? <StatusPill tone="bad" label="Void" /> : r.intercompany ? SOURCE.intercompany : (SOURCE[r.sourceType] ?? r.sourceType)) },
     {
       key: 'amt',
       label: 'Nominal',
