@@ -272,3 +272,10 @@ All answered on 2026-10-11 (section "Decisions"): Q-L1…Q-L7 = the proposed def
 Q-L2 (same-PT loans only) is unchanged by ADR 0028. Phase C's inter-PT loan document will reuse `intercompany_links`
 (`source_doc_type = intercompany_loan` / `intercompany_loan_repayment`) for its disbursement and repayments, which then
 are real cash movements between PTs (unlike same-PT loans, §5 option B).
+
+## Note 2026-10-14 (ADR 0029)
+
+Money lent **between PTs** is the "Pinjaman antar-PT" of [ADR 0029](0029-fund-check-and-inter-pt-loans.md) (`PJA`,
+real cash movements through `intercompany_links`, doc types `intercompany_loan_disbursement` /
+`intercompany_loan_repayment` — these replace the provisional names `intercompany_loan` / `intercompany_loan_repayment`
+of the 2026-10-14 note above). Same-PT project loans (`PJ`, Q-L2) are unchanged.

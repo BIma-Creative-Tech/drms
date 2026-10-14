@@ -209,6 +209,17 @@ expense request with payee **PT grup** are posted automatically: the transfer's 
 receiving PT — a closed period refuses the transfer —, immutability); it is voided only through the transfer void,
 which posts its reversal. Other inter-PT movements (loans until Phase C) stay manual KK + KM.
 
+## Amendment 2026-10-14 (ADR 0029)
+
+Inter-PT **loans** ("Pinjaman antar-PT", `PJA/{LENDER}/{YY}{MM}/{seq}`) are posted automatically too: the disbursement
+as a KK (`source_type = intercompany`, no project / cost center / category) in the lender PT plus the system KM
+(`intercompany`, source `ANTAR-PT`) on the borrower's designated receiving account, each repayment the other way round,
+every pair linked in `intercompany_links` (`source_doc_type = intercompany_loan_disbursement` /
+`intercompany_loan_repayment`). Both legs follow every ledger rule of this ADR (per-PT numbering, both PTs' period
+locks refuse the movement, immutability) and are voided only through the loan (Finance of the paying PT), never from
+the cash book. Every posting takes its PT's fund lock (ADR 0029 §1) before the account lock. Other inter-PT movements
+stay manual KK + KM.
+
 ## Revision history
 
 - **2026-09-23 (F0 gate):** accepted by user.
@@ -232,3 +243,4 @@ which posts its reversal. Other inter-PT movements (loans until Phase C) stay ma
   `feat/s3b-e11-data-import`. Status stays accepted.
 - **2026-09-27 (ADR 0016, multi-company):** section "Revisi 2026-09-27 (ADR 0016)" added (proposed; takes effect with phase MC). Status stays accepted.
 - **2026-10-14 (ADR 0028):** amendment — automatic KM in the receiving PT for payments with payee "PT grup".
+- **2026-10-14 (ADR 0029):** amendment — inter-PT loan movements posted automatically as KK + KM pairs; fund lock per posting.

@@ -443,8 +443,19 @@ B's designated account, void cascades, closed period in B refuses, no LPJ.
 > `intercompany_links` (`source_doc_type = intercompany_loan` / `intercompany_loan_repayment`) for its disbursement
 > and repayments, which then are real cash movements between PTs (unlike same-PT loans, §5 option B).
 
+## Amendment 2026-10-14 (ADR 0029)
+
+**§4 / §5:** `intercompany_links.source_doc_type` gains `intercompany_loan_disbursement` and
+`intercompany_loan_repayment` (`source_doc_id` = the loan movement, `source_transfer_id` NULL, one link per movement).
+For those links the payer's KK is `source_type = intercompany` (direction out) — `intercompany` is no longer "the KM in
+B only"; `pk_ic_entry_linked` requires a link for every `intercompany` entry (KM as target, loan KK as source) and
+`pk_ic_consistency` keeps the loan movement's status equal to its link's. PT grup payments are unchanged (their KK stays
+`transfer`). The receiving-side checks are the generic `prepareReceiver` (used by `prepareReceipt` unchanged). A PT grup
+transfer and its void take both PTs' fund locks up front (ascending id).
+
 ## Revision history
 
 - **2026-10-14:** proposed (draft for owner review).
 - **2026-10-14:** accepted with the owner decisions above (Direktur may file; document mandatory; count + label +
   "tanpa antar-PT"); web / server implementation; amendments applied to ADR 0005, 0016 and 0022.
+- **2026-10-14 (ADR 0029):** amendment — loan doc types on `intercompany_links`; `intercompany` KK of a loan movement.

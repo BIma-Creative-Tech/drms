@@ -124,3 +124,11 @@ leaving a rule without a level), renumbers the following levels back and deletes
   labels (`statusLabel`, `stepLabel`) name the Owner.
 - New code that needs "acts as Direktur" uses the normal role helpers; code that decides an approval position must use
   the exact-role helpers.
+
+## Amendment 2026-10-14 (ADR 0029)
+
+**§3:** for a PT with "Cek dana saat persetujuan" switched on (`companies.fundCheckEnabled`), the decision that makes an
+expense request "Disetujui" (normally the Owner's; under a rule without an Owner level its last level) and the submit
+of the Owner's own request (no approval) are refused (409 `FUND_INSUFFICIENT`) when the paying PT's available funds —
+balance of its active accounts without a site minus its commitments — are short. Who decides is unchanged (G1 rules
+stand). The Owner may instruct a "Pinjaman antar-PT" and then approves again.

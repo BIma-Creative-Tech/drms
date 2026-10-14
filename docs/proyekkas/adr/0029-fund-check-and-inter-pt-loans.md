@@ -1,10 +1,12 @@
 # ADR 0029 — Cek dana di persetujuan Owner + Pinjaman antar-PT
 
-- **Status:** Proposed (draft for owner review). The owner decisions of 2026-10-13 are already built in (see
-  "Owner decisions already made"); the open points are under "Pertanyaan untuk owner". Staging first; no production
-  deploy without separate owner approval.
+- **Status:** Accepted — the owner answered "setuju" (2026-10-14) to every recommended default of "Pertanyaan untuk
+  owner" (recorded under "Owner decisions (2026-10-14)"); the decisions of 2026-10-13 were built in already. Web /
+  server implemented in `feat/d1310-c-fundcheck` (migrations `20261015_1000xx`–`1003xx`, see "As implemented"); the APK
+  part is a separate follow-up (contract below). Staging first; no production deploy without separate owner approval.
 - **Date:** 2026-10-14
-- **Author:** Analyst (branch `feat/d1310-c-fundcheck`, from `main` `9be31b3`; Phases A and B merged there)
+- **Author:** Analyst (draft, branch `feat/d1310-c-fundcheck`, from `main` `9be31b3`; Phases A and B merged there);
+  implementation by the nextjs developer on the same branch (merged with release 0.10.0, `00a02d0`)
 - **Extends:** [ADR 0026](0026-owner-approval-level-above-direktur.md) (the Owner level gets a fund check) and
   [ADR 0028](0028-intercompany.md) (the PT grup plumbing — designated receiving account, `intercompany_links`, system
   Kas Masuk, paired void — is reused for loans).
@@ -573,7 +575,7 @@ stays consistent; counterpart numbers are rendered live from the link.
 | Extend ADR 0022 project loans across PTs | Notional claims without cash entries; the inter-PT loan is a real bank movement with a ledger pair. |
 | Loan KK as `source_type = transfer` with a synthetic `transfers` row | `transfers` is tied to expense requests (FK, kind, guard, TRF numbering, renumber CLI); would count in request-transfer reports. |
 
-## Proposed amendments (applied when this ADR is accepted)
+## Proposed amendments (applied 2026-10-14 — see "Amendments" below)
 
 - **ADR 0022 — note for Q-L2:** money lent between PTs is the "Pinjaman antar-PT" of ADR 0029 (`PJA`, real cash
   movements through `intercompany_links`, doc types `intercompany_loan_disbursement` / `intercompany_loan_repayment`
@@ -592,7 +594,8 @@ stays consistent; counterpart numbers are rendered live from the link.
 
 ## Pertanyaan untuk owner
 
-Ringkas, masing-masing dengan usulan default (dipakai bila owner setuju / tidak menjawab).
+Ringkas, masing-masing dengan usulan default (dipakai bila owner setuju / tidak menjawab). **Dijawab 2026-10-14:
+"setuju" untuk semua usulan** — see "Owner decisions (2026-10-14)" below.
 
 1. **Komitmen dikurangkan dari dana tersedia?** Dana tersedia = saldo semua akun kas/bank PT (tanpa akun site)
    **dikurangi** pengajuan yang sudah disetujui tetapi belum ditransfer, kekurangan LPJ yang belum dibayar, dan
@@ -612,6 +615,70 @@ Ringkas, masing-masing dengan usulan default (dipakai bila owner setuju / tidak 
    dicek dananya, Owner dapat notifikasi); **tanpa bunga**; jatuh tempo wajib, default **30 hari**; pengingat harian
    saat terlambat. *Usulan: seperti tertulis.*
 
+## Owner decisions (2026-10-14; were the open questions of the draft — "setuju" on every default)
+
+1. **Commitments are subtracted** from the available funds: requests approved but not transferred, unpaid LPJ
+   shortfalls (verified, type shortfall, not settled), loans instructed but not yet disbursed (§1).
+2. **The check also applies to** (a) the Owner's own request — at **submit**; short → 409, the request stays **Draft**;
+   and (b) a rule **without an Owner level** — at its final approval (Direktur / Finance), the Owner is notified (§1).
+3. **All site-flagged accounts are excluded** (kas kecil and rekening kantor cabang; untag an account to count it).
+4. **The loan is its own document** "Pinjaman antar-PT" `PJA/{LENDER}/{YY}{MM}/{seq}`, reusing the PT grup mechanism
+   (designated receiving account, automatic KM, `intercompany_links`, paired void) — not a PT grup payment request.
+5. **After the loan arrives the Owner approves again** with a fresh check; nothing is approved automatically.
+6. **Loan terms:** no interest; due date required, default 30 days; daily overdue reminder; repayments recorded by the
+   borrower's Finance without approval, partial allowed, fund-checked, the Owner notified.
+7. **Per-PT switch** `companies.fundCheckEnabled` ("Cek dana saat persetujuan"), default **OFF** (group admin, reason).
+
+## As implemented (web / server, `feat/d1310-c-fundcheck`)
+
+- **Migrations** `20261015_100000_d1310_fundcheck_enums` (own transaction: `enum_document_sequences_doc_type` +=
+  `intercompany_loan`, `enum_audit_logs_action` += `fund_insufficient`), `…_100100_d1310_fundcheck_loans` (+ the
+  latest Payload snapshot `.json`, based on `20261014_100100_d1310_intercompany.json`, every earlier enum value kept),
+  `…_100200_d1310_fundcheck_guard`, `…_100300_d1310_fundcheck_data` (PJA sequence per PT; `DEFAULT_SEQUENCES` carries
+  it for new PTs and the seed). `pk_expense_fund_guard` is on `RENUMBER_NEUTRAL_FUNCTIONS`; the loan tables are not
+  renumbered (their guards are on neither list).
+- **Domain:** `domain/fundcheck/{rules,service}.ts` (figures through the SQL functions, per-PT advisory lock
+  `pk:fund:<id>` in ascending id, `checkFundsForApproval` at the final `approve`, a final `acknowledge` and
+  `approveWithoutDecision` — the Owner's submit and receipt resubmit —, the detail panel, the inbox badge, the
+  notification `expense.fund_shortfall`); `postEntry` takes the PT's fund lock before the account lock; a PT grup
+  transfer / its void takes both PTs' locks up front. `domain/intercompany/{loan-rules,loans,loan-report}.ts`: the
+  loan document, its movements through the generic `prepareReceiver` + system KM + link of ADR 0028, report and
+  overdue query. The approval row stores `fundBalance` / `fundCommitments` / `fundAvailable` of a checked decision.
+- **API:** `GET /fund-availability`, `/intercompany-loans` (list, `queue`, `lenders`, detail, instruct, cancel,
+  disburse, disbursement void, repayments + void), request detail `fundCheck` + action `instruct_loan`, inbox
+  `fundShort`, `/me` capabilities `instructIntercompanyLoan` / `disburseIntercompanyLoan` / `fundCheckEnabled`, cash
+  entry counterpart `sourceDocType` / `loanLeg`, Owner dashboard block `intercompany`.
+- **Admin UI:** panel "Ketersediaan dana PT" on the request page (Setujui disabled with the reason; "Perintahkan
+  pinjaman antar-PT"), inbox badge "Dana kurang Rp X" (no Setujui in the row), Keuangan → **Pinjaman antar-PT** (list,
+  instruction form, detail with cancel / disbursement / repayment / both voids), section **"Pencairan pinjaman
+  antar-PT"** on Antrian Transfer, switch "Cek dana saat persetujuan" on the PT (Operasional tab), Kas counterpart
+  line "Pinjaman antar-PT diterima · PJA/… · dari PT …", Rekap Kas lines (four loan legs), report
+  `pinjaman-antar-pt`, Direktur / Owner dashboard card "Dana tersedia & pinjaman antar-PT".
+- **Deviations from the draft (reason):**
+  - The loan tables are **hand-written SQL tables, not Payload collections** (like `intercompany_links`): a two-PT
+    document has no `company` column, so the per-PT collection machinery (company hook, list PT filter, access by one
+    PT, admin list views, audit hook) does not fit; the domain module reads / writes with SQL and the admin views are
+    custom views. Consequently there is no `payload_locked_documents_rels` column and the linked requests are a plain
+    table `intercompany_loan_requests` (instead of a Payload `_rels` table). The Payload snapshot carries only the
+    Payload-managed columns (companies, approvals) and the enum values.
+  - **The loan steps are fund-checked whatever the PT switch says** (instruction / disbursement on the lender,
+    repayment on the borrower): the switch protects today's approvals from an unreconciled cash book; loans are new
+    and money leaving a PT must never strand its approved requests.
+  - Notification texts are **code defaults** (editable by creating a `notification-templates` row of the event), not
+    rows inserted by the data migration — the existing pattern of every other event.
+  - The disbursement queue count is shown on the section of Antrian Transfer and served by `GET
+    /intercompany-loans/queue`; the module nav badge stays the request transfer queue (its count is pinned to the page
+    title, S3e S-07).
+- **Not done here (follow-up):** the APK part (Owner shortfall panel + decision sheet, loan instruction screen, Finance
+  disbursement section) — the contract is ready (`fundCheck`, `fundShort`, `/intercompany-loans/*`, capabilities).
+
+## Amendments (applied 2026-10-14 to ADR 0005, 0007, 0016, 0022, 0026, 0028)
+
+The draft texts of "Proposed amendments" above were added as sections "Amendment 2026-10-14 (ADR 0029)" to the
+respective ADRs.
+
 ## Revision history
 
 - **2026-10-14:** proposed (draft for owner review).
+- **2026-10-14:** accepted ("setuju" on every default); web / server implementation in `feat/d1310-c-fundcheck`;
+  amendments applied to ADR 0005, 0007, 0016, 0022, 0026 and 0028.

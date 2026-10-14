@@ -437,6 +437,16 @@ Migration `20261002_080000_mc4_scope_rule`.
   in the payee directory) and counterpart document numbers.
 - **Requirements v1.2 §"Di luar cakupan" "Transaksi antar-PT"**: superseded for payee "PT grup" (ADR 0028).
 
+## Amendment 2026-10-14 (ADR 0029)
+
+**§4 classification:** the class **"Group link (two PTs)"** also covers `intercompany_loans` (lender / borrower PT)
+and `intercompany_loan_transfers` (from / to PT); each reference is checked against the company of its own side
+(`pk_icl_guard`, `pk_icl_transfer_guard`, `pk_ic_link_sides`). `intercompany_loan_requests` links a loan to requests of
+its borrower PT only. **§5 mutations:** the loan steps write into the other PT only through the named system functions
+of the intercompany module (the paired KM and its reversal), inside the Owner-authorised instruction or the
+Finance-executed movement of the paying PT; audited in both PTs. A user of PT A sees of PT B the PT name / code, the
+masked receiving account, counterpart numbers and the loan document itself.
+
 ## Revision history
 
 - **2026-10-14 (ADR 0028):** amendment — class "Group link (two PTs)" (`intercompany_links`), system write into the
@@ -453,3 +463,4 @@ Migration `20261002_080000_mc4_scope_rule`.
 - **2026-09-27 (MC0):** proposed; design approved by the user the same day; Analyst additions: `groupAdmin`,
   global vehicle plate, TZ = process TZ in MC1, `reminder_runs` per company, `period-closings/:period/reopen` needs a
   company parameter.
+- **2026-10-14 (ADR 0029):** amendment — inter-PT loan tables in the "group link (two PTs)" class.

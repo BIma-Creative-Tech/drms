@@ -250,6 +250,14 @@ our numbers (none integrated yet; ADR 0009 Odoo mirror not live) would need the 
 **Rollback.** Restore the pre-run dump (taken by the runbook right before `--apply`). There is no "un-renumber": the
 migration's `down` refuses once a run exists.
 
+## Amendment 2026-10-14 (ADR 0029)
+
+New doc type `intercompany_loan` ("Pinjaman antar-PT"): pattern `PJA/{COMPANY}/{YY}{MM}/{seq}`, monthly reset, padding
+4, start 1, `{COMPANY}` = the **lender** PT (it issues the money and holds the receivable); allocated at the Owner's
+instruction from the lender's counter; the number of a cancelled instruction is kept (§4). Seeded per PT by migration
+`20261015_100300_d1310_fundcheck_data` and part of `DEFAULT_SEQUENCES` (new PTs, seed). Born in the D5 shape — not
+part of the one-time renumbering.
+
 ## Revision history
 
 - **2026-09-23 (F0 gate):** accepted by user.
@@ -271,3 +279,4 @@ migration's `down` refuses once a run exists.
 - **2026-09-27 (ADR 0016, multi-company):** section "Revisi 2026-09-27 (ADR 0016)" added (proposed; takes effect with phase MC). Status stays accepted.
 - **2026-10-12 (D5, DRMS 10/10):** section "Revisi 2026-10-12 (D5)" added — all defaults carry `{COMPANY}`; migration of untouched default patterns; reset policies unchanged. Status stays accepted.
 - **2026-10-13 (DRMS 13/10 Umum #1, owner decision D1):** "Amendment 2026-10-13" added — one-time controlled renumbering (migration `20261013_610000_d1310_renumber`: session flag + owner run row; CLI `src/renumber/cli.ts`; runbook `runbooks/penomoran-ulang.md`). The never-rewrite rule stays in force afterwards. Status stays accepted.
+- **2026-10-14 (ADR 0029):** amendment — doc type `intercompany_loan`, `PJA/{COMPANY}/{YY}{MM}/{seq}` (lender PT). Status stays accepted.

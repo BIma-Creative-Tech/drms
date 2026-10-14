@@ -137,6 +137,14 @@ klik foto untuk ukuran penuh. Anda juga boleh membuat laporan dari HP (sama sepe
   mendapat notifikasi "Kas masuk antar-PT". Dashboard → kartu **Arus kas bulanan** → *Tampilkan tanpa antar-PT* untuk
   melihat arus kas gabungan tanpa transfer antar PT (tidak dieliminasi otomatis; Rekap Kas: filter **Antar PT**).
 
+### 6a. Cek dana & pinjaman antar-PT (ADR 0029)
+
+- Di pengajuan yang menunggu persetujuan Anda (dan Owner) tampil panel **"Ketersediaan dana PT"** (saldo tanpa akun
+  site − komitmen = dana tersedia) — informasi; **cek akhir di Owner**. Pada aturan tanpa level Owner, persetujuan
+  terakhir Anda sendiri yang ditolak bila dana PT kurang (Owner diberi tahu dan dapat memerintahkan pinjaman antar-PT).
+- Anda dapat melihat **Pinjaman antar-PT** PT Anda (Keuangan → Pinjaman antar-PT) dan diberi tahu saat pinjaman
+  diperintahkan / dicairkan / dikembalikan; perintah dan pembatalan hanya oleh Owner.
+
 ## 7. Absensi & data pribadi
 
 **Absensi → Tim hari ini / Rekap bulanan**. Membuka **selfie** karyawan lain tercatat di audit log (UU PDP) —
