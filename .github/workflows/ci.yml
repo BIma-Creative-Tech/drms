@@ -45,22 +45,8 @@ jobs:
           cache: ${{ runner.environment == 'github-hosted' && 'npm' || '' }}
           package-manager-cache: ${{ runner.environment == 'github-hosted' }}
       - run: npm ci --no-audit --no-fund
-      # TEMP (feat/d1310-c-fundcheck, removed before the branch is done): regenerate the OpenAPI contract on the runner
-      # (the host does not run node) and hand it back as an artifact; lint / typecheck non-blocking so the unit run shows too.
-      - name: TEMP regenerate OpenAPI
-        run: |
-          npm run gen:openapi -w apps/web
-          git diff > "$RUNNER_TEMP/openapi.patch"
-          git diff --stat
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: openapi-patch
-          path: ${{ runner.temp }}/openapi.patch
-          retention-days: 1
       - run: npm run lint
-        continue-on-error: true
       - run: npm run typecheck
-        continue-on-error: true
       # E9: unit tests with the coverage gate (thresholds in apps/web/vitest.config.ts)
       - run: npm run test:coverage
       - name: OpenAPI contract up to date (packages/api-contract/openapi.json)
@@ -131,13 +117,6 @@ jobs:
             echo "PK_TEST_MAILPIT_API=http://127.0.0.1:8025"
             echo "NODE_EXTRA_CA_CERTS=$d/ca.crt"
           } >> "$GITHUB_ENV"
-      - name: TEMP migrate with visible output
-        if: matrix.part == 'f3'
-        continue-on-error: true
-        run: |
-          cd apps/web
-          psql "postgres://pk_test_owner:${PK_F1_OWNER_PASSWORD}@127.0.0.1:5432/pk_test" -c 'DROP SCHEMA IF EXISTS public CASCADE' -c 'CREATE SCHEMA public' -c 'REVOKE CREATE ON SCHEMA public FROM PUBLIC' -c 'GRANT USAGE ON SCHEMA public TO pk_test_app, pk_test_ro'
-          DATABASE_URL="postgres://pk_test_owner:${PK_F1_OWNER_PASSWORD}@127.0.0.1:5432/pk_test" PAYLOAD_SECRET=integration-test-secret-not-used-anywhere-else-0123 PK_SKIP_ENV_CHECK=true npx payload migrate 2>&1 | tail -150
       - name: Integration tests
         env:
           PART: ${{ matrix.part }}
