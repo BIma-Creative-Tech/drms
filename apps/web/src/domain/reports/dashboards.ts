@@ -271,7 +271,8 @@ export async function ownerDashboard(req: PayloadRequest, opts: { months?: numbe
       byCompany: pending.byCompany,
       waitingForMeByCompany: mine.byCompany,
     },
-    cashFlow: { basis: 'K-02b' as const, months, rows: flows.map((f) => ({ period: f.period, masuk: f.masuk, keluar: f.keluar })) },
+    // ADR 0028: + the intercompany part of each month (consolidated toggle "tanpa antar-PT" subtracts it; no elimination)
+    cashFlow: { basis: 'K-02b' as const, months, rows: flows.map((f) => ({ period: f.period, masuk: f.masuk, keluar: f.keluar, masukAntarPt: f.masukAntarPt, keluarAntarPt: f.keluarAntarPt })) },
     projects,
     costCenters: costCenters.filter((c) => c.total !== 0 || c.fromRequests !== 0 || c.manualOut !== 0 || c.manualIn !== 0),
     transferQueue: queue,
@@ -338,7 +339,7 @@ export async function financeDashboard(req: PayloadRequest, opts: { siteId?: num
     cashByCompany: balances.byCompany,
     advancesWithoutLpj: lpj.rows,
     lpjDueDays: ctx.lpjDueDays,
-    cashFlow: { basis: 'K-02a' as const, months: 6, rows: flows.map((f) => ({ period: f.period, masuk: f.masuk, keluar: f.keluar, koreksi: f.koreksi })) },
+    cashFlow: { basis: 'K-02a' as const, months: 6, rows: flows.map((f) => ({ period: f.period, masuk: f.masuk, keluar: f.keluar, koreksi: f.koreksi, masukAntarPt: f.masukAntarPt, keluarAntarPt: f.keluarAntarPt })) },
     lastClosedPeriod: lastClosed.period,
     lastClosedByCompany: lastClosed.byCompany,
     nextClosable: addMonths(ctx.month, -1),

@@ -188,11 +188,23 @@ export const visibleAccounts = (list: AccountBalance[]) => list.filter((a) => a.
 // ================================================================ K-02 cash in/out per month
 
 export type FlowMode = 'book' | 'operational'
-export type FlowFilter = { from: string; to: string; accountId?: number; projectId?: number; costCenterId?: number }
+/**
+ * ADR 0028: a cash entry that is a leg of an intercompany payment — the receiving PT's KM, the paying PT's transfer KK,
+ * or a reversal of either (alias `ce`). Per-PT views count both legs as real cash; consolidated views label them
+ * ("Antar PT") and can leave them out ("tanpa antar-PT", owner decision 2026-10-14 — no automatic elimination).
+ */
+export const INTERCOMPANY_ENTRY_SQL = sql`EXISTS (SELECT 1 FROM intercompany_links icl
+  WHERE icl.source_cash_entry_id = coalesce(ce.reversal_of_id, ce.id) OR icl.target_cash_entry_id = coalesce(ce.reversal_of_id, ce.id))`
+
+/** `withoutIntercompany` (ADR 0028): leave the legs of intercompany payments out ("tanpa antar-PT"). */
+export type FlowFilter = { from: string; to: string; accountId?: number; projectId?: number; costCenterId?: number; withoutIntercompany?: boolean }
 export type FlowRow = {
   period: string
   masuk: number
   keluar: number
+  /** ADR 0028: part of masuk / keluar that are legs of intercompany payments ("Antar PT"); 0 with withoutIntercompany. */
+  masukAntarPt: number
+  keluarAntarPt: number
   net: number
   koreksi: number
   openingBalance: number | null
@@ -217,16 +229,20 @@ export async function cashFlowMonthly(req: PayloadRequest, scope: ReportScope, f
   if (f.projectId) where.push(sql`ce.project_id = ${f.projectId}`)
   if (f.costCenterId) where.push(sql`ce.cost_center_id = ${f.costCenterId}`)
   if (mode === 'operational') where.push(sql`ce.status = 'posted' AND ce.source_type <> 'reversal'`)
+  if (f.withoutIntercompany) where.push(sql`NOT ${INTERCOMPANY_ENTRY_SQL}`)
   const r = await rows(
     req,
     sql`SELECT ce.period,
           coalesce(sum(ce.amount) FILTER (WHERE ce.direction = 'in'), 0)::text AS masuk,
           coalesce(sum(ce.amount) FILTER (WHERE ce.direction = 'out'), 0)::text AS keluar,
+          coalesce(sum(ce.amount) FILTER (WHERE ce.direction = 'in' AND ${INTERCOMPANY_ENTRY_SQL}), 0)::text AS masuk_ic,
+          coalesce(sum(ce.amount) FILTER (WHERE ce.direction = 'out' AND ${INTERCOMPANY_ENTRY_SQL}), 0)::text AS keluar_ic,
           coalesce(sum(CASE WHEN ce.direction = 'in' THEN ce.amount ELSE -ce.amount END) FILTER (WHERE ce.status = 'void' OR ce.source_type = 'reversal'), 0)::text AS koreksi
         FROM cash_entries ce WHERE ${sql.join(where, sql` AND `)} GROUP BY ce.period`,
   )
   const byPeriod = new Map(r.map((x) => [String(x.period), x]))
-  const withBalance = mode === 'book' && !f.projectId && !f.costCenterId
+  // ADR 0028: balances are book figures — not shown when intercompany legs are left out (they would not reconcile)
+  const withBalance = mode === 'book' && !f.projectId && !f.costCenterId && !f.withoutIntercompany
   let running: number | null = null
   const golive = new Map<string, number>()
   if (withBalance) {
@@ -256,7 +272,7 @@ export async function cashFlowMonthly(req: PayloadRequest, scope: ReportScope, f
     const openingBalance = running
     const saldoAwalAkun = golive.get(period) ?? 0
     if (running !== null) running += saldoAwalAkun + masuk - keluar
-    return { period, masuk, keluar, net: masuk - keluar, koreksi: mode === 'book' ? num(x?.koreksi) : 0, openingBalance, saldoAwalAkun, closingBalance: running }
+    return { period, masuk, keluar, masukAntarPt: num(x?.masuk_ic), keluarAntarPt: num(x?.keluar_ic), net: masuk - keluar, koreksi: mode === 'book' ? num(x?.koreksi) : 0, openingBalance, saldoAwalAkun, closingBalance: running }
   })
 }
 
@@ -274,15 +290,22 @@ export async function accountMonthFlows(req: PayloadRequest, scope: ReportScope,
   return new Map(r.map((x) => [num(x.id), { masuk: num(x.masuk), keluar: num(x.keluar) }]))
 }
 
-/** Rekap Kas breakdown: in per cash-in source, out per source type (K-02a, all rows). */
+/**
+ * Rekap Kas breakdown: in per cash-in source, out per source type (K-02a, all rows). ADR 0028: the paying PT's KK of an
+ * intercompany transfer is its own line (`intercompany_transfer` "Transfer antar PT (keluar)"), split from the other
+ * transfers; the receiving PT's KM is source type `intercompany` ("Antar PT (masuk)").
+ */
 export async function cashBreakdown(req: PayloadRequest, scope: ReportScope, f: FlowFilter) {
   const where = [sql`ce.period BETWEEN ${f.from} AND ${f.to}`, ledgerScopeSql(scope)]
   if (f.accountId) where.push(sql`ce.cash_account_id = ${f.accountId}`)
   if (f.projectId) where.push(sql`ce.project_id = ${f.projectId}`)
   if (f.costCenterId) where.push(sql`ce.cost_center_id = ${f.costCenterId}`)
+  if (f.withoutIntercompany) where.push(sql`NOT ${INTERCOMPANY_ENTRY_SQL}`)
   const r = await rows(
     req,
-    sql`SELECT ce.direction::text AS direction, ce.source_type::text AS source_type, s.name AS source_name, count(*)::int AS n, sum(ce.amount)::text AS amount
+    sql`SELECT ce.direction::text AS direction,
+          CASE WHEN ce.source_type = 'transfer' AND EXISTS (SELECT 1 FROM intercompany_links icl WHERE icl.source_cash_entry_id = ce.id) THEN 'intercompany_transfer' ELSE ce.source_type::text END AS source_type,
+          s.name AS source_name, count(*)::int AS n, sum(ce.amount)::text AS amount
         FROM cash_entries ce LEFT JOIN cash_in_sources s ON s.id = ce.cash_in_source_id
         WHERE ${sql.join(where, sql` AND `)}
         GROUP BY 1, 2, 3 ORDER BY 1, 2, 3`,

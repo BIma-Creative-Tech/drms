@@ -37,7 +37,10 @@ export function RequestSummary({ d, ptName, attachments, canRevealBank, draftBan
   add('Jenis', d.typeLabel, 'type')
   // ADR 0027: vendor payment — the payee is the vendor (Pemohon = the Finance / PM filer)
   const vendorPay = d.payeeType === 'vendor'
+  // ADR 0028: payment to another PT of the group — the payee is that PT (its designated receiving account)
+  const icPay = d.payeeType === 'pt_grup'
   if (vendorPay) add('Jenis penerima', 'Vendor', 'payeeType')
+  if (icPay) add('Jenis penerima', 'PT grup (pembayaran antar-PT)', 'payeeType')
   add('Judul', d.title, 'title')
   add('PT', ptName, 'company')
   add(d.project ? 'Project' : 'Pusat biaya', scope, 'scope')
@@ -56,8 +59,9 @@ export function RequestSummary({ d, ptName, attachments, canRevealBank, draftBan
       ? { bankName: draftBank.bankName, accountHolder: draftBank.accountHolder, masked: draftBank.accountNoMasked, canReveal: draftBank.canReveal }
       : null
   if (vendorPay) add('Vendor', d.vendor && 'name' in d.vendor ? String(d.vendor.name ?? '') : '', 'vendor')
+  if (icPay) add('PT penerima', d.payeeCompany ? [d.payeeCompany.shortCode, d.payeeCompany.name].filter(Boolean).join(' — ') : '', 'payeeCompany')
   add(
-    vendorPay ? 'Rekening vendor' : 'Rekening tujuan',
+    vendorPay ? 'Rekening vendor' : icPay ? 'Rekening penerimaan antar-PT' : 'Rekening tujuan',
     bank ? (
       <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
         <span>
@@ -69,18 +73,31 @@ export function RequestSummary({ d, ptName, attachments, canRevealBank, draftBan
     ) : null,
     'bank',
   )
-  if (vendorPay && d.invoice) {
-    add('Nomor invoice', d.invoice.no ?? '', 'invoiceNo')
-    add('Tanggal invoice', d.invoice.date ? formatDateLong(d.invoice.date) : '', 'invoiceDate')
+  if ((vendorPay || icPay) && d.invoice) {
+    // ADR 0028: the receiving PT's document (tagihan / memo) of a PT grup payment
+    const docLabel = vendorPay ? 'invoice' : 'dokumen PT penerima'
+    add(`Nomor ${docLabel}`, d.invoice.no ?? '', 'invoiceNo')
+    add(`Tanggal ${docLabel}`, d.invoice.date ? formatDateLong(d.invoice.date) : '', 'invoiceDate')
     add('Jatuh tempo', d.invoice.dueDate ? formatDateLong(d.invoice.dueDate) : '', 'invoiceDueDate')
     add(
-      'File invoice',
+      `File ${docLabel}`,
       d.invoice.fileId ? (
         <a href={`/api/v1/media/attachments/${d.invoice.fileId}/file`} target="_blank" rel="noopener noreferrer" data-pk-invoice-file>
-          {d.invoice.fileName ?? 'Lihat invoice'}
+          {d.invoice.fileName ?? (vendorPay ? 'Lihat invoice' : 'Lihat dokumen')}
         </a>
       ) : null,
       'invoiceFile',
+    )
+  }
+  // ADR 0028: the receiving PT's Kas Masuk of the transfer (number only; the entry belongs to that PT)
+  if (icPay && d.intercompany) {
+    add(
+      `Kas masuk di PT ${d.intercompany.targetCompany?.shortCode ?? 'penerima'}`,
+      <span data-pk-ic-entry={d.intercompany.status}>
+        {d.intercompany.targetEntryNo}
+        {d.intercompany.status === 'void' ? ' (dibatalkan — jurnal balik tercatat)' : ''}
+      </span>,
+      'intercompany',
     )
   }
   if (d.approvedAmount !== null) add('Nominal disetujui', formatRupiah(d.approvedAmount), 'approvedAmount')

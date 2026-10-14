@@ -13,7 +13,9 @@ import { RAP_MISSING_MESSAGE } from '@/domain/rap/rules'
 
 import { normalizeLines, validateLines } from './lines'
 import { copyReceiptsForResubmit } from './receipts'
-import { INACTIVE_FOR_DUPLICATES, isBusinessDate, normalizeInvoiceNo, payeeOf, STATUS_LABELS, type PayeeType, type RequestStatus, type RequestType } from './types'
+import { INACTIVE_FOR_DUPLICATES, isBusinessDate, isDirectPayment, normalizeInvoiceNo, payeeOf, STATUS_LABELS, type PayeeType, type RequestStatus, type RequestType } from './types'
+import { assertDocumentUnused, INTERCOMPANY_NO_ACCOUNT, payeeCompanyErrors } from '@/domain/intercompany/service'
+import { failCoded } from '@/domain/coded-error'
 
 export type LineInputApi = {
   id?: string
@@ -55,6 +57,8 @@ export type DraftInput = {
   invoiceDueDate?: string | null
   /** media-attachments id of the invoice (photo / PDF), uploaded by the caller (POST /media/attachments). */
   invoiceFileId?: number | null
+  /** ADR 0028: receiving PT of a `pt_grup` payment (payee directory GET /intercompany/payees). */
+  payeeCompanyId?: number | null
 }
 
 /** ADR 0027 (D3): roles that may file a vendor payment, IN the request's PT. */
@@ -62,11 +66,28 @@ export const VENDOR_PAYMENT_ROLES: readonly Role[] = ['pk-finance', 'pk-pm']
 
 export const VENDOR_PAYMENT_ROLE_MESSAGE = 'Pembayaran vendor hanya dapat diajukan oleh Finance atau PM di PT ini.'
 
-/** Vendor fields of a draft (ADR 0027) — the part of `validateContent`'s input that only a vendor payment uses. */
+/**
+ * ADR 0028 (owner decision 2026-10-14): roles that may file a payment to another PT of the group, IN the paying PT —
+ * Finance, PM and Direktur (`pk-owner`). Staff, Admin and an Owner (`pk-principal`) without one of these roles cannot.
+ */
+export const INTERCOMPANY_PAYMENT_ROLES: readonly Role[] = ['pk-finance', 'pk-pm', 'pk-owner']
+
+export const INTERCOMPANY_PAYMENT_ROLE_MESSAGE = 'Pembayaran antar-PT hanya dapat diajukan oleh Finance, PM atau Direktur di PT ini.'
+
+/** Filer roles of a payment without LPJ (ADR 0027 / 0028), per payee type. */
+export function payeeFilerRoles(payee: PayeeType): readonly Role[] {
+  return payee === 'pt_grup' ? INTERCOMPANY_PAYMENT_ROLES : VENDOR_PAYMENT_ROLES
+}
+
+/**
+ * Payee fields of a draft (ADR 0027 vendor, ADR 0028 PT grup) — the part of `validateContent`'s input that only a
+ * payment without LPJ uses (the invoice fields hold the vendor's invoice / the receiving PT's document).
+ */
 export type VendorContent = {
   payeeType?: PayeeType | null
   vendorId?: number | null
   vendorBankAccountId?: number | null
+  payeeCompanyId?: number | null
   invoiceNo?: string | null
   invoiceDate?: string | null
   invoiceDueDate?: string | null
@@ -180,9 +201,14 @@ export async function validateContent(
   if (c.projectId && c.costCenterId) errors.push({ path: 'projectId', message: 'Pilih project ATAU pusat biaya, tidak keduanya.' })
   // D2 (owner 2026-10-11): no non-project requests — the project is mandatory to send (legacy cost-center rows aside).
   // ADR 0027 (client 2026-10-14): a vendor payment may name a cost center instead (e.g. office bills).
-  const vendorPay = payeeOf(c.payeeType) === 'vendor'
-  if (opts.forSubmit && !c.projectId && !(c.costCenterId && (opts.legacyCostCenter || vendorPay))) {
-    errors.push({ path: 'projectId', message: vendorPay ? 'Pilih project atau pusat biaya (pembayaran vendor).' : 'Project wajib diisi (pengajuan tanpa project tidak dapat dikirim).' })
+  // ADR 0028: the same for a payment to a PT of the group
+  const payee = payeeOf(c.payeeType)
+  const direct = payee !== 'karyawan'
+  if (opts.forSubmit && !c.projectId && !(c.costCenterId && (opts.legacyCostCenter || direct))) {
+    errors.push({
+      path: 'projectId',
+      message: payee === 'vendor' ? 'Pilih project atau pusat biaya (pembayaran vendor).' : payee === 'pt_grup' ? 'Pilih project atau pusat biaya (pembayaran antar-PT).' : 'Project wajib diisi (pengajuan tanpa project tidak dapat dikirim).',
+    })
   }
   if (opts.forSubmit && !(c.title ?? '').trim()) errors.push({ path: 'title', message: 'Judul wajib diisi.' })
   if (c.neededDate && !isBusinessDate(c.neededDate)) errors.push({ path: 'neededDate', message: 'Tanggal harus YYYY-MM-DD.' })
@@ -236,15 +262,18 @@ export async function validateContent(
     }
   }
 
-  const vendor = payeeOf(c.payeeType) === 'vendor'
-  // ADR 0027: a vendor payment pays the vendor's account — the requester's account plays no part
-  if (vendor) {
-    if (c.bankAccountId) errors.push({ path: 'bankAccountId', message: 'Pembayaran vendor memakai rekening vendor, bukan rekening karyawan.' })
-    errors.push(...(await vendorErrors(req, c, { ...opts, company: ownPt, requesters: uniq })))
+  // ADR 0027: a vendor payment pays the vendor's account — the requester's account plays no part. ADR 0028: a PT grup
+  // payment pays the receiving PT's designated account.
+  let noAccount = false
+  if (direct) {
+    if (c.bankAccountId) errors.push({ path: 'bankAccountId', message: payee === 'vendor' ? 'Pembayaran vendor memakai rekening vendor, bukan rekening karyawan.' : 'Pembayaran antar-PT memakai rekening penerimaan PT penerima, bukan rekening karyawan.' })
+    const payeeCheck = await directPaymentErrors(req, c, { ...opts, company: ownPt, requesters: uniq })
+    errors.push(...payeeCheck.errors)
+    noAccount = payeeCheck.noAccount
   }
   // G9 / US-44 / Q-11: account of one of the requesters, active.
-  if (!vendor && opts.forSubmit && !c.bankAccountId) errors.push({ path: 'bankAccountId', message: 'Rekening tujuan wajib diisi.' })
-  if (!vendor && c.bankAccountId) {
+  if (!direct && opts.forSubmit && !c.bankAccountId) errors.push({ path: 'bankAccountId', message: 'Rekening tujuan wajib diisi.' })
+  if (!direct && c.bankAccountId) {
     const acc = await req.payload
       .findByID({ collection: 'employee-bank-accounts', id: c.bankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: G9 */, req })
       .catch(() => null)
@@ -284,42 +313,63 @@ export async function validateContent(
     }
   })
   errors.push(...(await rapLineErrors(req, c.projectId ?? null, c.lines, opts.forSubmit)))
-  if (errors.length > 0) fail(400, 'Data pengajuan tidak valid.', errors)
+  if (errors.length > 0) {
+    // ADR 0028: the chosen PT designated no receiving account → stable code (the APK / form explain it)
+    if (noAccount) failCoded(400, INTERCOMPANY_NO_ACCOUNT, 'Data pengajuan tidak valid.', { payeeCompanyId: c.payeeCompanyId ?? null }, errors)
+    fail(400, 'Data pengajuan tidak valid.', errors)
+  }
   // ADR 0027: the same invoice of the same vendor on another live request → 409 (DB: expense_requests_vendor_invoice_uq)
-  if (vendor && c.vendorId && normalizeInvoiceNo(c.invoiceNo)) await assertInvoiceUnused(req, c.vendorId, c.invoiceNo!, opts.requestId)
+  if (payee === 'vendor' && c.vendorId && normalizeInvoiceNo(c.invoiceNo)) await assertInvoiceUnused(req, c.vendorId, c.invoiceNo!, opts.requestId)
+  // ADR 0028 (owner 2026-10-14): the same document of the same receiving PT → 409 (DB: expense_requests_ic_invoice_uq)
+  if (payee === 'pt_grup' && c.payeeCompanyId && normalizeInvoiceNo(c.invoiceNo)) await assertDocumentUnused(req, c.payeeCompanyId, c.invoiceNo!, opts.requestId)
 }
 
 /**
  * ADR 0027 (D3): vendor-payment rules of a draft / submit — filer = Finance or PM of the request's PT, the requester is
  * the filer himself, an active vendor of the PT and an active account OF THAT vendor, invoice number / date / file
  * (required to send), due date not before the invoice date.
+ * ADR 0028 (owner 2026-10-14): a PT grup payment the same way — filer = Finance, PM or Direktur of the paying PT, the
+ * receiving PT (active, another PT, with a designated receiving account) instead of vendor + account, and the receiving
+ * PT's document (invoice / memo: number, date, file required to send).
  */
-async function vendorErrors(
+async function directPaymentErrors(
   req: PayloadRequest,
   c: VendorContent & { type: RequestType },
   opts: { forSubmit: boolean; creatorId: number; company: number | undefined; requesters: number[] },
-): Promise<Array<{ path: string; message: string }>> {
+): Promise<{ errors: Array<{ path: string; message: string }>; noAccount: boolean }> {
   const errors: Array<{ path: string; message: string }> = []
-  // D3: Finance and PM only — checked for the CREATOR in the request's PT (no PT yet: the caller's roles in any selected PT)
+  const payee = payeeOf(c.payeeType)
+  const vendorPay = payee === 'vendor'
+  const roles = payeeFilerRoles(payee)
+  const roleMessage = vendorPay ? VENDOR_PAYMENT_ROLE_MESSAGE : INTERCOMPANY_PAYMENT_ROLE_MESSAGE
+  const kind = vendorPay ? 'Pembayaran vendor' : 'Pembayaran antar-PT'
+  // D3: Finance and PM only (ADR 0028: + Direktur) — checked for the CREATOR in the request's PT (no PT yet: the caller's roles in any selected PT)
   if (opts.company !== undefined) {
-    const { roles, employee } = await rolesOfUserIn(req, opts.creatorId, opts.company)
-    if (!roles.some((r) => VENDOR_PAYMENT_ROLES.includes(r))) fail(403, VENDOR_PAYMENT_ROLE_MESSAGE)
+    const mine = await rolesOfUserIn(req, opts.creatorId, opts.company)
+    if (!mine.roles.some((r) => roles.includes(r))) fail(403, roleMessage)
     // the filer is the applicant: "Pemohon" = exactly his own employee in the PT (routing by his role, ADR 0027)
-    if (opts.requesters.length > 0 && (employee === undefined || opts.requesters.length !== 1 || opts.requesters[0] !== employee)) {
-      errors.push({ path: 'requesterIds', message: 'Pembayaran vendor: pemohon adalah pembuat pengajuan sendiri (Finance / PM).' })
+    if (opts.requesters.length > 0 && (mine.employee === undefined || opts.requesters.length !== 1 || opts.requesters[0] !== mine.employee)) {
+      errors.push({ path: 'requesterIds', message: vendorPay ? 'Pembayaran vendor: pemohon adalah pembuat pengajuan sendiri (Finance / PM).' : 'Pembayaran antar-PT: pemohon adalah pembuat pengajuan sendiri (Finance / PM / Direktur).' })
     }
-  } else if (!hasRoleAny(req, ...VENDOR_PAYMENT_ROLES)) fail(403, VENDOR_PAYMENT_ROLE_MESSAGE)
-  if (c.type !== 'advance') errors.push({ path: 'type', message: 'Pembayaran vendor memakai jenis Pengajuan Baru.' })
+  } else if (!hasRoleAny(req, ...roles)) fail(403, roleMessage)
+  if (c.type !== 'advance') errors.push({ path: 'type', message: `${kind} memakai jenis Pengajuan Baru.` })
 
-  if (opts.forSubmit && !c.vendorId) errors.push({ path: 'vendorId', message: 'Vendor wajib dipilih.' })
+  let noAccount = false
   let vendorPt: number | undefined
-  if (c.vendorId) {
+  if (!vendorPay) {
+    // ADR 0028: receiving PT (≠ own PT, active, designated receiving account)
+    const pc = await payeeCompanyErrors(req, c.payeeCompanyId, { forSubmit: opts.forSubmit, ownCompany: opts.company })
+    errors.push(...pc.errors)
+    noAccount = pc.noAccount
+  }
+  if (vendorPay && opts.forSubmit && !c.vendorId) errors.push({ path: 'vendorId', message: 'Vendor wajib dipilih.' })
+  if (vendorPay && c.vendorId) {
     const v = (await req.payload.findByID({ collection: 'vendors', id: c.vendorId, depth: 0, overrideAccess: true /* SYSTEM-READ: vendor check (PT below) */, req, disableErrors: true })) as { company?: unknown; active?: boolean | null } | null
     vendorPt = relId(v?.company)
     if (!v || v.active === false || isForeign(req, vendorPt ?? -1) || (opts.company !== undefined && vendorPt !== opts.company)) errors.push({ path: 'vendorId', message: 'Vendor tidak ditemukan, nonaktif, atau bukan vendor PT pengajuan ini.' })
   }
-  if (opts.forSubmit && !c.vendorBankAccountId) errors.push({ path: 'vendorBankAccountId', message: 'Rekening vendor wajib dipilih.' })
-  if (c.vendorBankAccountId) {
+  if (vendorPay && opts.forSubmit && !c.vendorBankAccountId) errors.push({ path: 'vendorBankAccountId', message: 'Rekening vendor wajib dipilih.' })
+  if (vendorPay && c.vendorBankAccountId) {
     const a = (await req.payload.findByID({ collection: 'vendor-bank-accounts', id: c.vendorBankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: vendor account check (vendor + PT below) */, req, disableErrors: true })) as {
       company?: unknown
       vendor?: unknown
@@ -329,24 +379,26 @@ async function vendorErrors(
     else if (!c.vendorId || relId(a.vendor) !== c.vendorId) errors.push({ path: 'vendorBankAccountId', message: 'Rekening harus milik vendor yang dipilih.' })
   }
 
+  // vendor: "invoice"; PT grup: the receiving PT's "dokumen" (tagihan / memo)
+  const doc = vendorPay ? 'invoice' : 'dokumen (tagihan / memo PT penerima)'
   const invoiceNo = (c.invoiceNo ?? '').trim()
-  if (opts.forSubmit && !invoiceNo) errors.push({ path: 'invoiceNo', message: 'Nomor invoice wajib diisi.' })
-  else if (invoiceNo && !normalizeInvoiceNo(invoiceNo)) errors.push({ path: 'invoiceNo', message: 'Nomor invoice harus memuat huruf atau angka.' })
-  if (invoiceNo.length > 64) errors.push({ path: 'invoiceNo', message: 'Nomor invoice maksimal 64 karakter.' })
-  if (opts.forSubmit && !c.invoiceDate) errors.push({ path: 'invoiceDate', message: 'Tanggal invoice wajib diisi.' })
+  if (opts.forSubmit && !invoiceNo) errors.push({ path: 'invoiceNo', message: `Nomor ${doc} wajib diisi.` })
+  else if (invoiceNo && !normalizeInvoiceNo(invoiceNo)) errors.push({ path: 'invoiceNo', message: `Nomor ${doc} harus memuat huruf atau angka.` })
+  if (invoiceNo.length > 64) errors.push({ path: 'invoiceNo', message: `Nomor ${doc} maksimal 64 karakter.` })
+  if (opts.forSubmit && !c.invoiceDate) errors.push({ path: 'invoiceDate', message: `Tanggal ${doc} wajib diisi.` })
   if (c.invoiceDate && !isBusinessDate(c.invoiceDate)) errors.push({ path: 'invoiceDate', message: 'Tanggal harus YYYY-MM-DD.' })
   else if (c.invoiceDate) {
     const todayDate = await today(req, opts.company ?? vendorPt)
-    if (c.invoiceDate > todayDate) errors.push({ path: 'invoiceDate', message: `Tanggal invoice tidak boleh di masa depan (hari ini ${todayDate}).` })
+    if (c.invoiceDate > todayDate) errors.push({ path: 'invoiceDate', message: `Tanggal ${vendorPay ? 'invoice' : 'dokumen'} tidak boleh di masa depan (hari ini ${todayDate}).` })
   }
   if (c.invoiceDueDate && !isBusinessDate(c.invoiceDueDate)) errors.push({ path: 'invoiceDueDate', message: 'Tanggal harus YYYY-MM-DD.' })
-  else if (c.invoiceDueDate && c.invoiceDate && isBusinessDate(c.invoiceDate) && c.invoiceDueDate < c.invoiceDate) errors.push({ path: 'invoiceDueDate', message: 'Jatuh tempo tidak boleh sebelum tanggal invoice.' })
-  if (opts.forSubmit && !c.invoiceFileId) errors.push({ path: 'invoiceFileId', message: 'File invoice (foto / PDF) wajib diunggah.' })
+  else if (c.invoiceDueDate && c.invoiceDate && isBusinessDate(c.invoiceDate) && c.invoiceDueDate < c.invoiceDate) errors.push({ path: 'invoiceDueDate', message: `Jatuh tempo tidak boleh sebelum tanggal ${vendorPay ? 'invoice' : 'dokumen'}.` })
+  if (opts.forSubmit && !c.invoiceFileId) errors.push({ path: 'invoiceFileId', message: `File ${doc} (foto / PDF) wajib diunggah.` })
   if (c.invoiceFileId) {
     const m = (await req.payload.findByID({ collection: 'media-attachments', id: c.invoiceFileId, depth: 0, overrideAccess: true /* SYSTEM-READ: invoice file exists (owner link at submit) */, req, disableErrors: true })) as { id?: number } | null
-    if (!m) errors.push({ path: 'invoiceFileId', message: 'File invoice tidak ditemukan; unggah ulang.' })
+    if (!m) errors.push({ path: 'invoiceFileId', message: `File ${vendorPay ? 'invoice' : 'dokumen'} tidak ditemukan; unggah ulang.` })
   }
-  return errors
+  return { errors, noAccount }
 }
 
 /** Message of a duplicate invoice (ADR 0027): the other request by number (or id) and its status. */
@@ -443,12 +495,13 @@ async function assertStaffSelfOnly(req: PayloadRequest, requesters: number[], co
   if (caller !== undefined && caller !== opts.creatorId && opts.callerSetsRequesters) await check(caller)
 }
 
-/** ADR 0027: the vendor fields of a stored request in API shape. */
+/** ADR 0027: the vendor fields of a stored request in API shape (ADR 0028: + the receiving PT). */
 export function vendorOfDoc(doc: RequestDoc): Required<VendorContent> {
   return {
     payeeType: payeeOf(doc.payeeType),
     vendorId: relId(doc.vendor) ?? null,
     vendorBankAccountId: relId(doc.vendorBankAccount) ?? null,
+    payeeCompanyId: relId(doc.payeeCompany) ?? null,
     invoiceNo: doc.invoiceNo ?? null,
     invoiceDate: doc.invoiceDate ?? null,
     invoiceDueDate: doc.invoiceDueDate ?? null,
@@ -456,13 +509,14 @@ export function vendorOfDoc(doc: RequestDoc): Required<VendorContent> {
   }
 }
 
-/** ADR 0027: validateContent's vendor part of an API input (karyawan: nothing but the payee type). */
-function vendorInput(input: VendorContent, vendor: boolean): VendorContent {
-  if (!vendor) return { payeeType: 'karyawan' }
+/** ADR 0027 / 0028: validateContent's payee part of an API input (karyawan: nothing but the payee type). */
+function vendorInput(input: VendorContent, payee: PayeeType): VendorContent {
+  if (payee === 'karyawan') return { payeeType: 'karyawan' }
   return {
-    payeeType: 'vendor',
-    vendorId: input.vendorId ?? null,
-    vendorBankAccountId: input.vendorBankAccountId ?? null,
+    payeeType: payee,
+    vendorId: payee === 'vendor' ? (input.vendorId ?? null) : null,
+    vendorBankAccountId: payee === 'vendor' ? (input.vendorBankAccountId ?? null) : null,
+    payeeCompanyId: payee === 'pt_grup' ? (input.payeeCompanyId ?? null) : null,
     invoiceNo: input.invoiceNo ?? null,
     invoiceDate: input.invoiceDate ?? null,
     invoiceDueDate: input.invoiceDueDate ?? null,
@@ -470,16 +524,21 @@ function vendorInput(input: VendorContent, vendor: boolean): VendorContent {
   }
 }
 
-/** ADR 0027: the vendor columns written for a draft (karyawan → all empty, so a payee switch never leaves stale data). */
-export function vendorData(input: VendorContent, vendor: boolean): Record<string, unknown> {
+/**
+ * ADR 0027 / 0028: the payee columns written for a draft — only those of its payee type (karyawan → all empty), so a
+ * payee switch never leaves stale data (DB CHECK expense_requests_payee).
+ */
+export function vendorData(input: VendorContent, payee: PayeeType): Record<string, unknown> {
+  const direct = payee !== 'karyawan'
   return {
-    payeeType: vendor ? 'vendor' : 'karyawan',
-    vendor: vendor ? (input.vendorId ?? null) : null,
-    vendorBankAccount: vendor ? (input.vendorBankAccountId ?? null) : null,
-    invoiceNo: vendor ? (input.invoiceNo?.trim() || null) : null,
-    invoiceDate: vendor ? (input.invoiceDate ?? null) : null,
-    invoiceDueDate: vendor ? (input.invoiceDueDate ?? null) : null,
-    invoiceFile: vendor ? (input.invoiceFileId ?? null) : null,
+    payeeType: payee,
+    vendor: payee === 'vendor' ? (input.vendorId ?? null) : null,
+    vendorBankAccount: payee === 'vendor' ? (input.vendorBankAccountId ?? null) : null,
+    payeeCompany: payee === 'pt_grup' ? (input.payeeCompanyId ?? null) : null,
+    invoiceNo: direct ? (input.invoiceNo?.trim() || null) : null,
+    invoiceDate: direct ? (input.invoiceDate ?? null) : null,
+    invoiceDueDate: direct ? (input.invoiceDueDate ?? null) : null,
+    invoiceFile: direct ? (input.invoiceFileId ?? null) : null,
   }
 }
 
@@ -544,21 +603,22 @@ export async function createDraft(req: PayloadRequest, input: DraftInput & { typ
     }
   }
   // D2: a cost center sent by an old client is ignored (the requester no longer picks one) — ADR 0027: except on a
-  // vendor payment without a project
-  const vendorCc = payeeOf(input.payeeType) === 'vendor' && !input.projectId ? (input.costCenterId ?? null) : null
+  // vendor payment without a project (ADR 0028: or a PT grup payment)
+  const payee = payeeOf(input.payeeType)
+  const direct = payee !== 'karyawan'
+  const vendorCc = direct && !input.projectId ? (input.costCenterId ?? null) : null
   const company = await draftCompany(req, { projectId: input.projectId, costCenterId: vendorCc })
   const emp = company !== undefined ? employeeIn(req, company) : relId((req.user as { employee?: unknown } | null)?.employee)
   const requesterIds = input.requesterIds && input.requesterIds.length > 0 ? input.requesterIds : emp !== undefined ? [emp] : []
   const lines = input.lines ?? []
-  const vendor = payeeOf(input.payeeType) === 'vendor'
-  // ADR 0027: a vendor payment is always a Pengajuan Baru (type advance), without an employee account
-  const type: RequestType = vendor ? 'advance' : input.type
-  await validateContent(req, { ...input, type, costCenterId: vendorCc, requesterIds, lines, ...vendorInput(input, vendor) }, { forSubmit: false, creatorId: uid })
+  // ADR 0027 / 0028: a vendor / PT grup payment is always a Pengajuan Baru (type advance), without an employee account
+  const type: RequestType = direct ? 'advance' : input.type
+  await validateContent(req, { ...input, type, costCenterId: vendorCc, requesterIds, lines, ...vendorInput(input, payee) }, { forSubmit: false, creatorId: uid })
   const doc = await validated(req, () => req.payload.create({
     collection: 'expense-requests',
     data: {
       type,
-      ...vendorData(input, vendor),
+      ...vendorData(input, payee),
       ...(vendorCc ? { costCenter: vendorCc } : {}),
       title: input.title.trim(),
       project: input.projectId ?? null,
@@ -566,7 +626,7 @@ export async function createDraft(req: PayloadRequest, input: DraftInput & { typ
       urgencyLevel: input.urgencyLevelId ?? null,
       notes: input.notes ?? null,
       requesters: requesterIds,
-      bankAccount: vendor ? null : (input.bankAccountId ?? null),
+      bankAccount: direct ? null : (input.bankAccountId ?? null),
       lines: toDocLines(lines),
       attachments: input.attachmentIds ?? [],
       clientUuid: input.clientUuid ?? null,
@@ -595,16 +655,19 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
   const projectId = input.projectId !== undefined ? input.projectId : (relId(doc.project) ?? null)
   // D4: lines without `rapItemId` (old clients) keep the stored RAP item of the same line id
   const lines = input.lines !== undefined ? keepRapItems(input.lines, fromDocLines(doc)) : undefined
-  // ADR 0027: the payee type of a Draft may change (vendor ⇄ karyawan); vendor → type advance, no employee account
+  // ADR 0027: the payee type of a Draft may change (vendor ⇄ karyawan); vendor → type advance, no employee account.
+  // ADR 0028: the same for PT grup. A client that omits `payeeType` (APK before ADR 0028 editing a PT grup draft) keeps
+  // the STORED payee type and receiving PT — never reset to karyawan.
   const payee = payeeOf(input.payeeType ?? doc.payeeType)
-  const vendor = payee === 'vendor'
+  const direct = payee !== 'karyawan'
   if (doc.status === 'receipt_revision' && input.payeeType !== undefined && payeeOf(input.payeeType) !== payeeOf(doc.payeeType)) fail(409, 'Saat Revisi Nota jenis penerima tidak dapat diubah.')
   const stored = vendorOfDoc(doc)
-  const vendorNow = vendor
+  const vendorNow = direct
     ? {
         payeeType: payee,
-        vendorId: input.vendorId !== undefined ? input.vendorId : stored.vendorId,
-        vendorBankAccountId: input.vendorBankAccountId !== undefined ? input.vendorBankAccountId : stored.vendorBankAccountId,
+        vendorId: payee !== 'vendor' ? null : input.vendorId !== undefined ? input.vendorId : stored.vendorId,
+        vendorBankAccountId: payee !== 'vendor' ? null : input.vendorBankAccountId !== undefined ? input.vendorBankAccountId : stored.vendorBankAccountId,
+        payeeCompanyId: payee !== 'pt_grup' ? null : input.payeeCompanyId !== undefined ? input.payeeCompanyId : stored.payeeCompanyId,
         invoiceNo: input.invoiceNo !== undefined ? input.invoiceNo : stored.invoiceNo,
         invoiceDate: input.invoiceDate !== undefined ? input.invoiceDate : stored.invoiceDate,
         invoiceDueDate: input.invoiceDueDate !== undefined ? input.invoiceDueDate : stored.invoiceDueDate,
@@ -613,13 +676,13 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
     : { payeeType: payee }
   const current = {
     ...vendorNow,
-    type: vendor ? ('advance' as const) : ((input.type ?? doc.type) as RequestType),
+    type: direct ? ('advance' as const) : ((input.type ?? doc.type) as RequestType),
     title: input.title ?? doc.title,
     projectId,
-    // ADR 0027: a vendor payment without a project may change its cost center
-    costCenterId: projectId ? null : vendor && input.costCenterId !== undefined ? input.costCenterId : (relId(doc.costCenter) ?? null),
+    // ADR 0027 / 0028: a vendor / PT grup payment without a project may change its cost center
+    costCenterId: projectId ? null : direct && input.costCenterId !== undefined ? input.costCenterId : (relId(doc.costCenter) ?? null),
     requesterIds: input.requesterIds ?? ids(doc.requesters),
-    bankAccountId: vendor ? null : input.bankAccountId !== undefined ? input.bankAccountId : (relId(doc.bankAccount) ?? null),
+    bankAccountId: direct ? null : input.bankAccountId !== undefined ? input.bankAccountId : (relId(doc.bankAccount) ?? null),
     lines: lines ?? fromDocLines(doc),
     neededDate: input.neededDate !== undefined ? input.neededDate : doc.neededDate,
     urgencyLevelId: input.urgencyLevelId !== undefined ? input.urgencyLevelId : (relId(doc.urgencyLevel) ?? null),
@@ -627,11 +690,11 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
   await validateContent(req, current, { forSubmit: false, creatorId: relId(doc.createdBy) ?? -1, requestId: id, callerSetsRequesters: input.requesterIds !== undefined && input.requesterIds.join(',') !== ids(doc.requesters).join(',') })
   const data: Record<string, unknown> = {}
   if (input.type !== undefined) data.type = input.type
-  if (doc.status === 'draft' && vendor && input.costCenterId !== undefined) data.costCenter = projectId ? null : input.costCenterId
-  if (doc.status === 'draft' && (input.payeeType !== undefined || vendor)) {
-    // ADR 0027: payee type + vendor fields (karyawan clears them; vendor clears the employee account)
-    Object.assign(data, vendorData(vendor ? { ...input, ...vendorNow } : {}, vendor), { type: current.type })
-    if (vendor) data.bankAccount = null
+  if (doc.status === 'draft' && direct && input.costCenterId !== undefined) data.costCenter = projectId ? null : input.costCenterId
+  if (doc.status === 'draft' && (input.payeeType !== undefined || direct)) {
+    // ADR 0027 / 0028: payee type + its fields (karyawan clears them; vendor / PT grup clear the employee account)
+    Object.assign(data, vendorData(direct ? { ...input, ...vendorNow } : {}, payee), { type: current.type })
+    if (direct) data.bankAccount = null
   }
   if (input.title !== undefined) data.title = input.title.trim()
   if (input.projectId !== undefined) data.project = input.projectId
@@ -639,7 +702,7 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
   if (input.urgencyLevelId !== undefined) data.urgencyLevel = input.urgencyLevelId
   if (input.notes !== undefined) data.notes = input.notes
   if (input.requesterIds !== undefined) data.requesters = input.requesterIds
-  if (input.bankAccountId !== undefined && !vendor) data.bankAccount = input.bankAccountId
+  if (input.bankAccountId !== undefined && !direct) data.bankAccount = input.bankAccountId
   if (lines !== undefined) data.lines = toDocLines(lines)
   if (input.attachmentIds !== undefined) data.attachments = input.attachmentIds
   const updated = await validated(req, () => req.payload.update({
@@ -678,9 +741,9 @@ export async function resubmitAsDraft(req: PayloadRequest, id: number): Promise<
       requesters: ids(src.requesters),
       bankAccount: relId(src.bankAccount) ?? null,
       // ADR 0027: a rejected vendor payment comes back with its vendor + invoice (the rejected one no longer counts as a duplicate)
-      // and — without a project — its cost center
-      ...vendorData(vendorOfDoc(src), payeeOf(src.payeeType) === 'vendor'),
-      ...(payeeOf(src.payeeType) === 'vendor' && !relId(src.project) && relId(src.costCenter) ? { costCenter: relId(src.costCenter) } : {}),
+      // and — without a project — its cost center. ADR 0028: a PT grup payment with its receiving PT + document.
+      ...vendorData(vendorOfDoc(src), payeeOf(src.payeeType)),
+      ...(isDirectPayment(src.payeeType) && !relId(src.project) && relId(src.costCenter) ? { costCenter: relId(src.costCenter) } : {}),
       lines: toDocLines(fromDocLines(src).map(({ id: _id, ...l }) => l)),
       attachments: ids(src.attachments),
     } as never,

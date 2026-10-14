@@ -17,8 +17,8 @@ const useEditable = () => {
   return linesEditable({ status })
 }
 
-/** ADR 0027: a vendor payment is always "Pengajuan Baru" (set by the server) — no "Jenis" input then. */
-const useVendor = () => useFormFields(([f]) => f.payeeType?.value === 'vendor')
+/** ADR 0027 / 0028: a vendor / PT grup payment is always "Pengajuan Baru" (set by the server) — no "Jenis" input then. */
+const useVendor = () => useFormFields(([f]) => f.payeeType?.value === 'vendor' || f.payeeType?.value === 'pt_grup')
 
 export const RequestTypeField: SelectFieldClientComponent = (props) => {
   const editable = useEditable()

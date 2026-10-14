@@ -18,17 +18,24 @@ export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
  * ADR 0027) = the requester's employee bank account; `vendor` = "Pembayaran vendor": a vendor's bank account, the
  * vendor's invoice is the proof, no LPJ (transfer → Selesai). A vendor payment is always type `advance` (paid after
  * approval, before any receipt) — the server sets it.
+ * ADR 0028 (DRMS 13/10 Phase B): `pt_grup` = "Pembayaran antar-PT": another PT of the group, paid to its designated
+ * intercompany receiving account; the transfer also posts a Kas Masuk in that PT. Like a vendor payment: type
+ * `advance`, the receiving PT's document (invoice / memo) is the proof, no LPJ.
  */
-export const PAYEE_TYPES = ['karyawan', 'vendor'] as const
+export const PAYEE_TYPES = ['karyawan', 'vendor', 'pt_grup'] as const
 export type PayeeType = (typeof PAYEE_TYPES)[number]
 
 export const PAYEE_TYPE_LABELS: Record<PayeeType, string> = {
   karyawan: 'Karyawan',
   vendor: 'Vendor',
+  pt_grup: 'PT grup',
 }
 
 /** Kind label of a vendor payment (list "Jenis", PDF title, APK). */
 export const VENDOR_PAYMENT_LABEL = 'Pembayaran vendor'
+
+/** ADR 0028: kind label of a payment to another PT of the group (list "Jenis", PDF title, transfer queue, APK). */
+export const INTERCOMPANY_PAYMENT_LABEL = 'Pembayaran antar-PT'
 
 export function isPayeeType(v: unknown): v is PayeeType {
   return (PAYEE_TYPES as readonly unknown[]).includes(v)
@@ -36,12 +43,22 @@ export function isPayeeType(v: unknown): v is PayeeType {
 
 /** Stored / legacy value → payee type (rows before ADR 0027 have none = karyawan). */
 export function payeeOf(v: unknown): PayeeType {
-  return v === 'vendor' ? 'vendor' : 'karyawan'
+  return v === 'vendor' ? 'vendor' : v === 'pt_grup' ? 'pt_grup' : 'karyawan'
 }
 
-/** "Jenis" shown for a request: Pengajuan Baru / Reimburse, or "Pembayaran vendor" (ADR 0027). */
+/**
+ * ADR 0027 / 0028: a payment that is not to an employee (vendor, PT grup) — always Pengajuan Baru, filed by its payer
+ * (Pemohon = the filer), no employee account, the payee's document is the proof, no receipts / LPJ: the transfer
+ * completes it (`approved → completed`, void: back to the transfer queue).
+ */
+export function isDirectPayment(v: unknown): boolean {
+  return payeeOf(v) !== 'karyawan'
+}
+
+/** "Jenis" shown for a request: Pengajuan Baru / Reimburse, "Pembayaran vendor" (ADR 0027) or "Pembayaran antar-PT" (ADR 0028). */
 export function requestKindLabel(type: RequestType, payeeType?: unknown): string {
-  return payeeOf(payeeType) === 'vendor' ? VENDOR_PAYMENT_LABEL : REQUEST_TYPE_LABELS[type]
+  const payee = payeeOf(payeeType)
+  return payee === 'vendor' ? VENDOR_PAYMENT_LABEL : payee === 'pt_grup' ? INTERCOMPANY_PAYMENT_LABEL : REQUEST_TYPE_LABELS[type]
 }
 
 /**
@@ -53,7 +70,7 @@ export function normalizeInvoiceNo(v: string | null | undefined): string {
   return (v ?? '').replace(/[^A-Za-z0-9]/g, '').toUpperCase()
 }
 
-/** Statuses that never take part in an LPJ (vendor payments, ADR 0027) — DB-guarded too. */
+/** Statuses that never take part in an LPJ (vendor payments, ADR 0027; payments to a PT of the group, ADR 0028) — DB-guarded too. */
 export const VENDOR_FORBIDDEN_STATUSES: readonly RequestStatus[] = ['receipt_revision', 'receipts_verified', 'transferred', 'receipts_complete', 'lpj_submitted', 'lpj_revision', 'lpj_verified']
 
 /**

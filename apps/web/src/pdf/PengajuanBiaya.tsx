@@ -56,6 +56,8 @@ export type PdfData = {
   transfer: { bankName: string; accountHolder: string; accountNo: string } | null
   /** ADR 0027: vendor payment — vendor + invoice (no LPJ; the invoice is the proof, attached as the first Lampiran). */
   vendorInvoice?: { vendor: string; invoiceNo: string; invoiceDate: string; dueDate: string } | null
+  /** ADR 0028: payment to another PT of the group — receiving PT + its document; after the transfer its Kas Masuk number. */
+  intercompany?: { company: string; legalName: string; documentNo: string; documentDate: string; kmNo: string | null; kmCompany: string } | null
   receipts: PdfReceipt[]
   attachments: PdfAttachment[]
   internal: boolean
@@ -277,9 +279,40 @@ export function PengajuanBiaya({ d }: { d: PdfData }) {
             </View>
           </View>
         ) : null}
+        {d.intercompany ? (
+          <View style={s.transfer} wrap={false}>
+            <Text style={s.transferHead}>Pembayaran Antar-PT</Text>
+            <View style={s.transferRow}>
+              <Text style={s.transferLabel}>PT penerima</Text>
+              <Text>: {d.intercompany.company}</Text>
+            </View>
+            {d.intercompany.legalName ? (
+              <View style={s.transferRow}>
+                <Text style={s.transferLabel}>Nama resmi</Text>
+                <Text>: {d.intercompany.legalName}</Text>
+              </View>
+            ) : null}
+            <View style={s.transferRow}>
+              <Text style={s.transferLabel}>No. dokumen</Text>
+              <Text>: {d.intercompany.documentNo}</Text>
+            </View>
+            <View style={s.transferRow}>
+              <Text style={s.transferLabel}>Tgl. dokumen</Text>
+              <Text>: {d.intercompany.documentDate}</Text>
+            </View>
+            {d.intercompany.kmNo ? (
+              <View style={s.transferRow}>
+                <Text style={s.transferLabel}>Kas masuk</Text>
+                <Text>
+                  : di PT {d.intercompany.kmCompany}: {d.intercompany.kmNo}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
         {d.transfer ? (
           <View style={s.transfer} wrap={false}>
-            <Text style={s.transferHead}>{d.vendorInvoice ? 'Info Transfer (rekening vendor)' : 'Info Transfer'}</Text>
+            <Text style={s.transferHead}>{d.vendorInvoice ? 'Info Transfer (rekening vendor)' : d.intercompany ? 'Info Transfer (rekening PT penerima)' : 'Info Transfer'}</Text>
             <View style={s.transferRow}>
               <Text style={s.transferLabel}>Transfer via</Text>
               <Text>: {d.transfer.bankName}</Text>

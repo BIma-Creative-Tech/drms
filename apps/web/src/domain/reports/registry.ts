@@ -262,9 +262,12 @@ const rekapKas: ReportDef = {
   async run(req, scope, sp) {
     const ctx = await reportContext(req)
     const m = monthRange(sp.get('dari'), sp.get('sampai'), ctx.today)
-    const f = { from: m.from, to: m.to, accountId: idOf(sp, 'akun'), projectId: idOf(sp, 'project'), costCenterId: idOf(sp, 'pusat') }
+    // ADR 0028 (owner 2026-10-14): "tanpa antar-PT" leaves both legs of intercompany payments out (no elimination)
+    const withoutIntercompany = sp.get('antarpt') === 'tanpa'
+    const f = { from: m.from, to: m.to, accountId: idOf(sp, 'akun'), projectId: idOf(sp, 'project'), costCenterId: idOf(sp, 'pusat'), withoutIntercompany }
     const flows = await cashFlowMonthly(req, scope, f, 'book')
-    const withBalance = !f.projectId && !f.costCenterId
+    const withBalance = !f.projectId && !f.costCenterId && !withoutIntercompany
+    const anyIc = !withoutIntercompany && flows.some((x) => x.masukAntarPt !== 0 || x.keluarAntarPt !== 0)
     // QA-14: an account going live inside the range adds its opening balance in that month (own column)
     const golive = withBalance && flows.some((x) => x.saldoAwalAkun !== 0)
     const columns: Column[] = [
@@ -275,6 +278,8 @@ const rekapKas: ReportDef = {
       { key: 'keluar', label: 'Keluar (Rp)', type: 'money' },
       { key: 'selisih', label: 'Selisih (Rp)', type: 'money', primary: true },
       { key: 'koreksi', label: 'Koreksi void (Rp)', type: 'money' },
+      // ADR 0028: intercompany legs labelled "Antar PT" (counted in Masuk / Keluar)
+      ...(anyIc ? [{ key: 'masukIc', label: 'Masuk antar PT (Rp)', type: 'money' as const }, { key: 'keluarIc', label: 'Keluar antar PT (Rp)', type: 'money' as const }] : []),
       ...(withBalance ? [{ key: 'akhir', label: 'Saldo akhir (Rp)', type: 'money' as const }] : []),
     ]
     const main: Table = {
@@ -282,7 +287,7 @@ const rekapKas: ReportDef = {
       title: 'Arus kas per bulan (K-02a, semua baris termasuk void dan jurnal balik)',
       columns,
       rows: flows.map((x) => ({
-        cells: { bulan: periodLabel(x.period), awal: x.openingBalance, ...(golive ? { golive: x.saldoAwalAkun } : {}), masuk: x.masuk, keluar: x.keluar, selisih: x.net, koreksi: x.koreksi, akhir: x.closingBalance },
+        cells: { bulan: periodLabel(x.period), awal: x.openingBalance, ...(golive ? { golive: x.saldoAwalAkun } : {}), masuk: x.masuk, keluar: x.keluar, selisih: x.net, koreksi: x.koreksi, ...(anyIc ? { masukIc: x.masukAntarPt, keluarIc: x.keluarAntarPt } : {}), akhir: x.closingBalance },
         href: `/admin/laporan/buku-kas?${qs({ dari: `${x.period}-01`, sampai: lastDay(x.period), akun: f.accountId, project: f.projectId, pusat: f.costCenterId, site: siteParam(sp) ?? undefined })}`,
       })),
       totals: {
@@ -291,6 +296,7 @@ const rekapKas: ReportDef = {
         keluar: flows.reduce((s, x) => s + x.keluar, 0),
         selisih: flows.reduce((s, x) => s + x.net, 0),
         koreksi: flows.reduce((s, x) => s + x.koreksi, 0),
+        ...(anyIc ? { masukIc: flows.reduce((s, x) => s + x.masukAntarPt, 0), keluarIc: flows.reduce((s, x) => s + x.keluarAntarPt, 0) } : {}),
       },
       empty: 'Belum ada transaksi kas di rentang ini.',
     }
@@ -298,7 +304,16 @@ const rekapKas: ReportDef = {
     const bal = await cashBalances(req, scope, asOf, f.accountId)
     const acc = visibleAccounts(bal.accounts)
     const breakdown = await cashBreakdown(req, scope, f)
-    const SRC: Record<string, string> = { transfer: 'Transfer pengajuan', settlement_refund: 'Pengembalian LPJ', manual: 'Manual', reversal: 'Jurnal balik (void)', opening: 'Saldo awal' }
+    const SRC: Record<string, string> = {
+      transfer: 'Transfer pengajuan',
+      settlement_refund: 'Pengembalian LPJ',
+      manual: 'Manual',
+      reversal: 'Jurnal balik (void)',
+      opening: 'Saldo awal',
+      // ADR 0028
+      intercompany: 'Antar PT (masuk)',
+      intercompany_transfer: 'Transfer antar PT (keluar)',
+    }
     return {
       main,
       extra: [
@@ -332,6 +347,9 @@ const rekapKas: ReportDef = {
       notes: [
         'Dasar: buku kas (K-02a). Transaksi yang di-void tetap tercatat dan jurnal baliknya menetralkan; kolom "Koreksi void" = selisih pasangan void pada bulan itu.',
         'Bulan yang sudah tutup buku tidak berubah; void atas transaksi bulan tertutup dicatat di bulan berjalan (ADR 0005 §4).',
+        withoutIntercompany
+          ? 'Tanpa antar-PT: kas keluar transfer ke PT lain di grup dan kas masuk dari PT lain (beserta jurnal baliknya) tidak dihitung; saldo tidak ditampilkan (tidak sama dengan buku kas).'
+          : 'Transfer antar-PT dihitung di kedua PT (kas keluar di PT pengirim, kas masuk "Antar PT" di PT penerima); laporan gabungan beberapa PT tidak mengeliminasinya — pilih "Tanpa antar-PT" untuk melihat arus kas di luar transaksi antar-PT.',
       ],
       next: null,
       count: flows.length,
@@ -347,6 +365,8 @@ const rekapKas: ReportDef = {
       sel('akun', 'Akun kas', sp, await accountOptions(req, ledger)),
       sel('project', 'Project', sp, await projectOptions(req, ledger)),
       sel('pusat', 'Pusat biaya', sp, await costCenterOptions(req, ledger)),
+      // ADR 0028 (owner 2026-10-14): consolidated view without the intercompany legs (no automatic elimination)
+      sel('antarpt', 'Antar PT', sp, [{ value: 'tanpa', label: 'Tanpa antar-PT' }]),
     ]
   },
   fileStem(ctx, sp) {
@@ -357,8 +377,8 @@ const rekapKas: ReportDef = {
 
 // ================================================================ buku-kas (ledger rows)
 
-const SOURCE_TYPES = ['transfer', 'settlement_refund', 'manual', 'reversal', 'opening'] as const
-const SOURCE_LABELS: Record<string, string> = { transfer: 'Transfer pengajuan', settlement_refund: 'Pengembalian LPJ', manual: 'Manual', reversal: 'Jurnal balik', opening: 'Saldo awal' }
+const SOURCE_TYPES = ['transfer', 'settlement_refund', 'manual', 'reversal', 'opening', 'intercompany'] as const
+const SOURCE_LABELS: Record<string, string> = { transfer: 'Transfer pengajuan', settlement_refund: 'Pengembalian LPJ', manual: 'Manual', reversal: 'Jurnal balik', opening: 'Saldo awal', intercompany: 'Antar PT' }
 
 /** Only the `all` PTs of a scope (cash ledger reports: Finance/Owner of the PT). */
 function ledgerOnly(scope: ReportScope): ReportScope {
@@ -403,12 +423,15 @@ const bukuKas: ReportDef = {
       sql`SELECT ce.id, ce.company_id, ce.entry_no, ce.entry_date, ce.direction::text AS direction, ce.amount::text AS amount, ce.source_type::text AS source_type, ce.status::text AS status,
             a.name AS account, coalesce(cat.code || ' ' || cat.name, src.name) AS kategori,
             coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name) AS lingkup, coalesce(v.plate_display, v.plate_no) AS vehicle,
-            er.doc_no AS request_no, er.id AS request_id, ce.description, ce.void_reason, orig.entry_no AS reversal_of
+            er.doc_no AS request_no, er.id AS request_id, ce.description, ce.void_reason, orig.entry_no AS reversal_of,
+            icc.short_code AS lawan_pt
           FROM cash_entries ce JOIN cash_accounts a ON a.id = ce.cash_account_id
           LEFT JOIN expense_categories cat ON cat.id = ce.category_id LEFT JOIN cash_in_sources src ON src.id = ce.cash_in_source_id
           LEFT JOIN projects p ON p.id = ce.project_id LEFT JOIN cost_centers cc ON cc.id = ce.cost_center_id
           LEFT JOIN vehicles v ON v.id = ce.vehicle_id LEFT JOIN expense_requests er ON er.id = ce.expense_request_id
           LEFT JOIN cash_entries orig ON orig.id = ce.reversal_of_id
+          LEFT JOIN intercompany_links icl ON icl.source_cash_entry_id = coalesce(ce.reversal_of_id, ce.id) OR icl.target_cash_entry_id = coalesce(ce.reversal_of_id, ce.id)
+          LEFT JOIN companies icc ON icc.id = CASE WHEN icl.source_company_id = ce.company_id THEN icl.target_company_id ELSE icl.source_company_id END
           WHERE ${where} ${after}
           ORDER BY ce.entry_date DESC, ce.id DESC LIMIT ${page.limit + 1}`,
     )
@@ -433,6 +456,8 @@ const bukuKas: ReportDef = {
           { key: 'lingkup', label: 'Project / pusat biaya', type: 'text' },
           { key: 'kendaraan', label: 'Kendaraan', type: 'text' },
           { key: 'pengajuan', label: 'Pengajuan', type: 'text' },
+          // ADR 0028: the other PT of an intercompany payment
+          { key: 'lawan', label: 'Lawan PT', type: 'text' },
           { key: 'keterangan', label: 'Keterangan', type: 'text', width: 40 },
           { key: 'masuk', label: 'Masuk (Rp)', type: 'money', primary: true },
           { key: 'keluar', label: 'Keluar (Rp)', type: 'money', primary: true },
@@ -448,6 +473,7 @@ const bukuKas: ReportDef = {
             lingkup: (x.lingkup as string | null) ?? '',
             kendaraan: (x.vehicle as string | null) ?? '',
             pengajuan: (x.request_no as string | null) ?? '',
+            lawan: (x.lawan_pt as string | null) ?? '',
             keterangan: [(x.description as string | null) ?? '', x.reversal_of ? `(jurnal balik ${x.reversal_of})` : ''].filter(Boolean).join(' '),
             masuk: x.direction === 'in' ? num(x.amount) : null,
             keluar: x.direction === 'out' ? num(x.amount) : null,

@@ -240,6 +240,7 @@ export async function draftCopy(req: PayloadRequest, id: number): Promise<SyncDr
     payee_type: payeeOf(doc.payeeType),
     vendor_id: relId(doc.vendor) ?? null,
     vendor_bank_account_id: relId(doc.vendorBankAccount) ?? null,
+    payee_company_id: relId(doc.payeeCompany) ?? null, // ADR 0028
     invoice_no: doc.invoiceNo ?? null,
     invoice_date: doc.invoiceDate ?? null,
     invoice_due_date: doc.invoiceDueDate ?? null,
@@ -335,6 +336,8 @@ function toDraftInput(p: SyncDraftUpsert): DraftInput {
   if (p.payee_type !== undefined) input.payeeType = p.payee_type
   if (p.vendor_id !== undefined) input.vendorId = p.vendor_id
   if (p.vendor_bank_account_id !== undefined) input.vendorBankAccountId = p.vendor_bank_account_id
+  // ADR 0028 PT grup payment (an older app omits both → the stored payee type and receiving PT stay)
+  if (p.payee_company_id !== undefined) input.payeeCompanyId = p.payee_company_id
   if (p.invoice_no !== undefined) input.invoiceNo = p.invoice_no
   if (p.invoice_date !== undefined) input.invoiceDate = p.invoice_date
   if (p.invoice_due_date !== undefined) input.invoiceDueDate = p.invoice_due_date

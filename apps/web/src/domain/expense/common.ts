@@ -42,6 +42,8 @@ export type RequestDoc = {
   /** ADR 0027 vendor payment: vendor + its bank account (destination) + invoice (the proof). */
   vendor?: unknown
   vendorBankAccount?: unknown
+  /** ADR 0028 PT grup payment: the receiving PT (app-wide `companies`); its designated account is the destination. */
+  payeeCompany?: unknown
   invoiceNo?: string | null
   invoiceDate?: string | null
   invoiceDueDate?: string | null

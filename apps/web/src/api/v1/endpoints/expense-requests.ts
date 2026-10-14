@@ -450,7 +450,7 @@ export const transferEndpoint = v1({
     const id = idParam(params)
     const r = await recordTransfer(req, id, body)
     const t = r.transfer as { id: number; docNo: string }
-    return json({ request: await detail(req, id), transferId: t.id, transferDocNo: t.docNo, cashEntryId: r.cashEntry.id, cashEntryNo: r.cashEntry.entryNo }, 201)
+    return json({ request: await detail(req, id), transferId: t.id, transferDocNo: t.docNo, cashEntryId: r.cashEntry.id, cashEntryNo: r.cashEntry.entryNo, intercompany: r.intercompany }, 201)
   },
 })
 
@@ -622,7 +622,7 @@ export const bankPreviewEndpoint = v1({
   handler: async ({ req }) => {
     const q = BankPreviewQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
     if (!q.success) throw new HttpError(400, 'Bad Request', { errors: q.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) })
-    return json(await bankPreview(req, { requestId: q.data.request, accountId: q.data.account, vendorAccountId: q.data.vendorAccount, reveal: q.data.reveal === '1' }))
+    return json(await bankPreview(req, { requestId: q.data.request, accountId: q.data.account, vendorAccountId: q.data.vendorAccount, payeeCompanyId: q.data.payeeCompany, reveal: q.data.reveal === '1' }))
   },
 })
 

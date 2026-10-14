@@ -46,7 +46,14 @@ export const ProjectBudget = z.object({
   pctRealized: pct,
 })
 
-const CashFlowPoint = z.object({ period: z.string(), masuk: rp, keluar: rp, koreksi: rp.optional() })
+const CashFlowPoint = z.object({
+  period: z.string(),
+  masuk: rp,
+  keluar: rp,
+  koreksi: rp.optional(),
+  masukAntarPt: rp.optional().meta({ description: 'ADR 0028: part of masuk that are Kas Masuk of payments from another PT of the group ("Antar PT"); masuk − masukAntarPt = "tanpa antar-PT".' }),
+  keluarAntarPt: rp.optional().meta({ description: 'ADR 0028: part of keluar that are transfers to another PT of the group (and reversals of either leg).' }),
+})
 const CostCenterMonth = z.object({ id: z.number().int(), companyId: ptId, code: z.string(), name: z.string(), fromRequests: rp, manualOut: rp, manualIn: rp, total: rp.meta({ description: 'K-15' }) })
 const TransferQueueSummary = z.object({ count: z.number().int(), sum: rp, overdue: z.number().int(), reimburseToVerify: z.number().int(), reimburseToVerifyWarnings: z.number().int(), byCompany: CountSumByCompany })
 const AdvanceWithoutLpj = z.object({

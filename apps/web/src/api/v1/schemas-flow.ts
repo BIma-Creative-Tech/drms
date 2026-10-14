@@ -31,8 +31,12 @@ const qty = z
 
 export const RequestTypeEnum = z.enum(['advance', 'reimburse']).meta({ id: 'RequestType', description: 'advance = Pengajuan Baru (label until 2026-10: Uang Muka), reimburse = Reimburse' })
 export const PayeeTypeEnum = z
-  .enum(['karyawan', 'vendor'])
-  .meta({ id: 'PayeeType', description: 'ADR 0027 "Jenis penerima": karyawan = the requester\'s employee account (default, every request before ADR 0027); vendor = "Pembayaran vendor" (Finance / PM only): vendor + vendor account + invoice, type always advance, no LPJ (transfer → completed).' })
+  .enum(['karyawan', 'vendor', 'pt_grup'])
+  .meta({
+    id: 'PayeeType',
+    description:
+      'ADR 0027 "Jenis penerima": karyawan = the requester\'s employee account (default, every request before ADR 0027); vendor = "Pembayaran vendor" (Finance / PM only): vendor + vendor account + invoice, type always advance, no LPJ (transfer → completed). ADR 0028: pt_grup = "Pembayaran antar-PT" (Finance / PM / Direktur of the paying PT): another PT of the group (payeeCompanyId) paid to its designated receiving account + the receiving PT\'s document (invoice / memo, required), type always advance, no LPJ; the transfer completes it AND posts a Kas Masuk in the receiving PT. Older apps that do not know a value show it as karyawan and must not send payeeType on such a draft (the server keeps the stored one).',
+  })
 
 export const RequestStatusEnum = z
   .enum([
@@ -112,13 +116,17 @@ const draftFields = {
   lines: z.array(LineInput).max(200).optional(),
   attachmentIds: z.array(id).max(20).optional(),
   // ADR 0027 (DRMS 13/10 Wave 4) "Pembayaran vendor"
-  payeeType: PayeeTypeEnum.optional().meta({ description: 'Default karyawan. vendor: only a Finance / PM caller of the request PT (403 otherwise); `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself.' }),
+  payeeType: PayeeTypeEnum.optional().meta({ description: 'Default karyawan. vendor: only a Finance / PM caller of the request PT (403 otherwise); pt_grup (ADR 0028): only Finance / PM / Direktur of the request PT (403 otherwise). Both: `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself. Omitted on PATCH / sync = the stored payee type stays.' }),
   vendorId: id.nullable().optional().meta({ description: 'ADR 0027: active vendor of the request PT (GET /masters?types=vendors). Required to submit a vendor payment.' }),
   vendorBankAccountId: id.nullable().optional().meta({ description: 'ADR 0027: active account OF THAT vendor (GET /masters?types=vendor-bank-accounts). Required to submit; snapshotted at submit = the transfer destination.' }),
-  invoiceNo: z.string().trim().max(64).nullable().optional().meta({ description: 'ADR 0027: required to submit. Unique per vendor among requests that are not cancelled / rejected (compared upper case, letters + digits only) → else 409 with errors[invoiceNo].' }),
-  invoiceDate: businessDate.nullable().optional().meta({ description: 'ADR 0027: required to submit; not in the future.' }),
-  invoiceDueDate: businessDate.nullable().optional().meta({ description: 'ADR 0027: optional; not before invoiceDate.' }),
-  invoiceFileId: id.nullable().optional().meta({ description: 'ADR 0027: media-attachments id (photo / PDF, POST /media/attachments) of the invoice. Required to submit; linked to the request at submit.' }),
+  invoiceNo: z.string().trim().max(64).nullable().optional().meta({ description: 'ADR 0027: required to submit. Unique per vendor among requests that are not cancelled / rejected (compared upper case, letters + digits only) → else 409 with errors[invoiceNo]. ADR 0028 (pt_grup): the receiving PT\'s document number (invoice / memo), required to submit, unique per receiving PT the same way.' }),
+  invoiceDate: businessDate.nullable().optional().meta({ description: 'ADR 0027 / 0028: required to submit; not in the future.' }),
+  invoiceDueDate: businessDate.nullable().optional().meta({ description: 'ADR 0027 / 0028: optional; not before invoiceDate.' }),
+  invoiceFileId: id.nullable().optional().meta({ description: 'ADR 0027 / 0028: media-attachments id (photo / PDF, POST /media/attachments) of the invoice / document. Required to submit; linked to the request at submit.' }),
+  payeeCompanyId: id
+    .nullable()
+    .optional()
+    .meta({ description: 'ADR 0028 (pt_grup): the receiving PT — another active PT of the group with a designated receiving account (GET /intercompany/payees?company=<request PT>). Required to submit; none designated → 400 code INTERCOMPANY_NO_ACCOUNT (errors[payeeCompanyId]). Ignored for other payee types.' }),
 }
 
 export const ExpenseRequestCreate = z
@@ -211,7 +219,7 @@ export const ListQuery = z
     scope: z.enum(['mine', 'team', 'inbox', 'all']).default('all'),
     status: z.string().regex(/^[a-z_]+(,[a-z_]+)*$/).optional(),
     type: RequestTypeEnum.optional(),
-    payeeType: PayeeTypeEnum.optional().meta({ description: 'ADR 0027: vendor = vendor payments only, karyawan = requests paid to employees.' }),
+    payeeType: PayeeTypeEnum.optional().meta({ description: 'ADR 0027: vendor = vendor payments only, karyawan = requests paid to employees; ADR 0028: pt_grup = payments to another PT of the group.' }),
     limit: z.coerce.number().int().min(1).max(100).default(50),
     cursor: z.string().max(64).optional(),
     company: companyFilterParam,
@@ -228,7 +236,7 @@ export const ExpenseRequestListItem = z
     id,
     docNo: z.string().nullable(),
     type: RequestTypeEnum,
-    typeLabel: z.string().meta({ description: 'Pengajuan Baru / Reimburse; "Pembayaran vendor" for payeeType vendor (ADR 0027).' }),
+    typeLabel: z.string().meta({ description: 'Pengajuan Baru / Reimburse; "Pembayaran vendor" for payeeType vendor (ADR 0027); "Pembayaran antar-PT" for payeeType pt_grup (ADR 0028).' }),
     payeeType: PayeeTypeEnum,
     status: RequestStatusEnum,
     statusLabel: z.string(),
@@ -269,6 +277,11 @@ export const TransferQueueItem = ExpenseRequestListItem.extend({
   noApproval: z.boolean().meta({ description: 'ADR 0024: a Direktur\'s own request without any approval (kebijakan PT) — show the badge "Tanpa persetujuan (Direktur)"; Finance\'s transfer checks are the only check. ADR 0026: also the Owner\'s own request (see noApprovalBy).' }),
   noApprovalBy: z.enum(['direktur', 'owner']).nullable().meta({ description: 'ADR 0026: whose own request went without approval — "owner" (rule "Pengajuan Owner") or "direktur" (ADR 0024, older requests); null when noApproval is false. Badge "Tanpa persetujuan (Owner|Direktur)".' }),
   vendorName: z.string().nullable().meta({ description: 'ADR 0027: vendor of a vendor payment (the transfer completes it; destination = the vendor account in `bank`).' }),
+  payeeCompany: z
+    .object({ id, shortCode: z.string(), name: z.string() })
+    .nullable()
+    .meta({ description: 'ADR 0028: receiving PT of a PT grup payment (badge "Antar PT: <shortCode>"; destination = its designated account in `bank`; the transfer also posts its Kas Masuk — closed period there → 409 INTERCOMPANY_PERIOD_CLOSED).' }),
+  payeeCompanyName: z.string().nullable().meta({ description: 'ADR 0028: name of the receiving PT (null unless pt_grup).' }),
 }).meta({ id: 'TransferQueueItem' })
 
 export const TransferQueueList = z.object({ items: z.array(TransferQueueItem), nextCursor: z.string().nullable() }).meta({ id: 'TransferQueueList' })
@@ -294,11 +307,24 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       mimeType: z.string().nullable(),
     })
     .nullable()
-    .meta({ id: 'VendorInvoice', description: 'ADR 0027: the vendor invoice (the proof of a vendor payment — no LPJ). null for payeeType karyawan.' }),
+    .meta({ id: 'VendorInvoice', description: 'ADR 0027: the vendor invoice (the proof of a vendor payment — no LPJ); ADR 0028: the receiving PT\'s document (invoice / memo) of a PT grup payment. null for payeeType karyawan.' }),
+  payeeCompany: z
+    .object({ id, shortCode: z.string().nullish(), name: z.string().nullish() })
+    .nullable()
+    .meta({ description: 'ADR 0028: receiving PT of a PT grup payment (null otherwise).' }),
+  intercompany: z
+    .object({
+      status: z.enum(['posted', 'void']),
+      targetEntryNo: z.string().meta({ description: 'Number of the Kas Masuk in the receiving PT (KM/<PT>/…).' }),
+      targetCompany: z.object({ id, shortCode: z.string(), name: z.string() }).nullable(),
+      transferId: id.nullable(),
+    })
+    .nullable()
+    .meta({ id: 'RequestIntercompany', description: 'ADR 0028: the receiving PT\'s Kas Masuk of the (latest) transfer of a PT grup payment — numbers and PT only; null before the transfer / for other payee types. status void = the transfer was voided (reversal posted in the receiving PT).' }),
   bank: z
     .object({ bankName: z.string().nullable(), accountNo: z.string().nullable().meta({ description: 'Masked (last 4) unless own request or Finance/Owner/Admin.' }), accountHolder: z.string().nullable() })
     .nullable()
-    .meta({ description: 'Destination snapshot taken at submit: the requester\'s account, or (ADR 0027) the vendor account.' }),
+    .meta({ description: 'Destination snapshot taken at submit: the requester\'s account, or (ADR 0027) the vendor account, or (ADR 0028) the receiving PT\'s designated account.' }),
   lines: z.array(
     z.object({
       id: z.string(),
@@ -583,6 +609,24 @@ export const CashEntryUpdate = z
   .strict()
   .meta({ id: 'CashEntryUpdate', description: 'Manual entries of an open period only; amount/date/account changes = void + new entry.' })
 
+/** ADR 0028: the cash source types (`intercompany` = automatic Kas Masuk of a payment from another PT of the group). */
+export const CashSourceTypeEnum = z.enum(['transfer', 'settlement_refund', 'manual', 'reversal', 'opening', 'intercompany']).meta({ id: 'CashSourceType' })
+
+export const CashEntryIntercompany = z
+  .object({
+    direction: z.enum(['in', 'out']).meta({ description: 'in = this entry is the Kas Masuk of the receiving PT; out = the transfer KK of the paying PT.' }),
+    status: z.enum(['posted', 'void']).meta({ description: 'Link status (void after the paying PT voided its transfer).' }),
+    counterpartCompany: z.object({ id, shortCode: z.string(), name: z.string() }).nullable(),
+    sourceDocNo: z.string().nullable().meta({ description: 'Number of the paying PT\'s request (PB/…).' }),
+    sourceDocId: id,
+    transferDocNo: z.string().nullable().meta({ description: 'Number of the paying PT\'s transfer (TRF/…).' }),
+    counterpartEntryNo: z.string().meta({ description: 'The other leg: KM of the receiving PT (direction out) or KK of the paying PT (direction in).' }),
+    counterpartEntryId: id,
+    canOpenCounterpart: z.boolean().meta({ description: 'The caller holds Finance / Direktur / Admin in the other PT (else show the numbers as plain text).' }),
+    canOpenSourceDoc: z.boolean(),
+  })
+  .meta({ id: 'CashEntryIntercompany', description: 'ADR 0028: counterpart of an intercompany pair — numbers and PT only.' })
+
 export const CashEntry = z
   .object({
     id,
@@ -598,7 +642,7 @@ export const CashEntry = z
     costCenterId: id.nullable(),
     vehicleId: id.nullable(),
     description: z.string().nullable(),
-    sourceType: z.enum(['transfer', 'settlement_refund', 'manual', 'reversal', 'opening']),
+    sourceType: CashSourceTypeEnum,
     expenseRequestId: id.nullable(),
     transferId: id.nullable(),
     status: z.enum(['posted', 'void']),
@@ -608,6 +652,7 @@ export const CashEntry = z
     proofId: id.nullable().meta({ description: 'QA-31: current proof (media-attachments id; GET /media/attachments/{id}/file); PATCH proofId adds or replaces it.' }),
     postedAt: z.string().nullable(),
     companyId: id.nullable().meta({ description: 'MC3: PT of the entry.' }),
+    intercompany: CashEntryIntercompany.nullable().meta({ description: 'ADR 0028: the other leg of an intercompany payment (KK of the paying PT ↔ KM of the receiving PT); null for every other entry.' }),
   })
   .meta({ id: 'CashEntry' })
 
@@ -618,6 +663,7 @@ export const CashListQuery = z
     cashAccountId: z.coerce.number().int().positive().optional(),
     projectId: z.coerce.number().int().positive().optional(),
     costCenterId: z.coerce.number().int().positive().optional(),
+    sourceType: CashSourceTypeEnum.optional().meta({ description: 'ADR 0028: only entries of this source type (e.g. intercompany).' }),
     limit: z.coerce.number().int().min(1).max(100).default(50),
     cursor: z.string().max(64).optional(),
     company: companyFilterParam,
@@ -713,8 +759,29 @@ export const TransferResult = z
     transferDocNo: z.string(),
     cashEntryId: id,
     cashEntryNo: z.string(),
+    intercompany: z
+      .object({ cashEntryId: id, cashEntryNo: z.string(), company: z.object({ id, shortCode: z.string(), name: z.string() }) })
+      .nullable()
+      .meta({ description: 'ADR 0028: the Kas Masuk posted in the receiving PT (PT grup payment); null otherwise.' }),
   })
   .meta({ id: 'TransferResult' })
+
+export const IntercompanyPayeesQuery = z
+  .object({ company: z.coerce.number().int().positive().meta({ description: 'The PAYING PT (the request\'s PT); the caller must hold Finance / PM / Direktur there.' }) })
+  .meta({ id: 'IntercompanyPayeesQuery' })
+
+export const IntercompanyPayee = z
+  .object({
+    companyId: id,
+    shortCode: z.string(),
+    name: z.string(),
+    bankName: z.string().nullable(),
+    accountNoMasked: z.string().meta({ description: '"••••1234" — the full number is only in the request\'s submit snapshot.' }),
+    accountHolder: z.string(),
+  })
+  .meta({ id: 'IntercompanyPayee' })
+
+export const IntercompanyPayeeList = z.object({ items: z.array(IntercompanyPayee) }).meta({ id: 'IntercompanyPayeeList', description: 'ADR 0028 payee directory: every other active PT of the group with a designated receiving account.' })
 
 export const Created = z.object({ id }).meta({ id: 'Created' })
 
@@ -782,6 +849,7 @@ export const BankPreviewQuery = z
     request: z.coerce.number().int().positive().optional().meta({ description: 'Expense request id. Draft → live account (`account` = picker value, default the saved one); submitted → the snapshot taken at submit.' }),
     account: z.coerce.number().int().positive().optional().meta({ description: 'Employee bank account id (picker value). Without `request`: only an account readable through the collection access.' }),
     vendorAccount: z.coerce.number().int().positive().optional().meta({ description: 'ADR 0027: vendor bank account id (vendor-payment picker value) instead of `account`. Draft: an account of the request PT and of its chosen vendor (or readable); submitted → the snapshot.' }),
+    payeeCompany: z.coerce.number().int().positive().optional().meta({ description: 'ADR 0028: receiving PT (PT grup picker value): its designated receiving account, always masked before submit (Finance / PM / Direktur only); submitted → the snapshot.' }),
     reveal: z.enum(['1']).optional().meta({ description: '1 = include the full number when `canReveal` (creator/requesters, Finance/Direktur/Admin of the PT — same rule as the detail DTO).' }),
   })
   .meta({ id: 'BankPreviewQuery' })

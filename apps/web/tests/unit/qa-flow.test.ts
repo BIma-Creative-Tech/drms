@@ -124,8 +124,11 @@ describe('QA-19 Finance may complete a transferred Reimburse (button source = al
 })
 
 describe('QA-11 system cash-in source + orphan cleanup config', () => {
-  it('the LPJ source is a system default (code LPJ, "Pengembalian LPJ")', () => {
-    expect(SYSTEM_CASH_IN_SOURCES).toEqual([{ code: 'LPJ', name: 'Pengembalian LPJ' }])
+  it('the LPJ source is a system default (code LPJ, "Pengembalian LPJ"); ADR 0028: + "Antar PT" (code ANTAR-PT)', () => {
+    expect(SYSTEM_CASH_IN_SOURCES).toEqual([
+      { code: 'LPJ', name: 'Pengembalian LPJ' },
+      { code: 'ANTAR-PT', name: 'Antar PT' },
+    ])
   })
   it('orphan cleanup: dry run by default, 7 days, 200 per run; env parsed; invalid → throws names only', () => {
     expect(orphanConfig({})).toEqual({ enabled: false, minAgeDays: 7, batch: 200 })

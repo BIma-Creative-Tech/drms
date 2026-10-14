@@ -59,6 +59,8 @@ export const CashEntries: CollectionConfig = withAudit(
           { label: 'Manual', value: 'manual' },
           { label: 'Pembalikan', value: 'reversal' },
           { label: 'Saldo awal', value: 'opening' },
+          // ADR 0028: the automatic Kas Masuk of a payment from another PT of the group (paired in intercompany_links)
+          { label: 'Antar PT', value: 'intercompany' },
         ],
         admin: ro,
       },

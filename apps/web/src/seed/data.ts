@@ -61,6 +61,8 @@ export const CASH_IN_SOURCES = [
   { code: 'DP', name: 'DP klien' },
   { code: 'MODAL', name: 'Modal owner' },
   { code: 'LPJ', name: 'Pengembalian LPJ' },
+  // ADR 0028: system source of the automatic Kas Masuk of a payment from another PT of the group
+  { code: 'ANTAR-PT', name: 'Antar PT' },
   { code: 'LAIN', name: 'Lainnya' },
 ]
 
@@ -120,6 +122,13 @@ export const OWNER_RULE_NAME = 'Pengajuan Owner'
  * Also inserted per PT by migration 20261013_700200_d1310_vendor_payments_data.
  */
 export const VENDOR_FINANCE_RULE_NAME = 'Pembayaran vendor oleh Finance — Direktur lalu Owner'
+
+/**
+ * ADR 0028 (DRMS 13/10 Phase B): a payment to another PT of the group filed by Finance → Direktur → Owner (mirror of the
+ * vendor rule). A PM's follows the default rule (PM step skipped, G1-2), a Direktur's "Pengajuan Direktur" (→ Owner).
+ * Also inserted per PT by migration 20261014_100300_d1310_intercompany_data.
+ */
+export const INTERCOMPANY_FINANCE_RULE_NAME = 'Pembayaran antar-PT oleh Finance — Direktur lalu Owner'
 
 export const DEFAULT_APPROVAL_RULES = [
   {
@@ -184,6 +193,27 @@ export const DEFAULT_APPROVAL_RULES = [
     docType: 'expense_request',
     requestType: 'any',
     payeeType: 'vendor',
+    minAmount: 0,
+    maxAmount: null,
+    priority: 20,
+    requesterRoles: ['pk-finance'],
+    acknowledge: 'none',
+    acknowledgeBy: 'role',
+    acknowledgeRole: null,
+    signDiajukan: 'required',
+    signDibuat: 'required',
+    steps: [
+      { level: 1, approverRole: 'pk-owner' },
+      { level: 2, approverRole: 'pk-principal' },
+    ],
+    active: true,
+  },
+  {
+    // ADR 0028: PT grup payment filed by Finance (Peran pemohon = Finance, Jenis penerima = PT grup) → Direktur → Owner.
+    name: INTERCOMPANY_FINANCE_RULE_NAME,
+    docType: 'expense_request',
+    requestType: 'any',
+    payeeType: 'pt_grup',
     minAmount: 0,
     maxAmount: null,
     priority: 20,

@@ -9,6 +9,7 @@ import { displayUnitPrice, receiptMismatch } from './lines'
 import { budgetImpact, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
 import { FLAG_LABELS, payeeOf, requestKindLabel, type FlagKind } from './types'
+import { intercompanyOfRequest } from '@/domain/intercompany/service'
 import { withFlagVisibility } from './flag-visibility'
 import { receiptsOf } from './receipts'
 import { settlementOfRequest } from './lpj'
@@ -130,9 +131,12 @@ export async function detail(req: PayloadRequest, id: number) {
     budget = { basis: projectDoc.budget ? 'project' : 'none', pctBefore: b.before, pctAfter: b.after }
   }
   const snap = (doc.approvalSnapshot ?? null) as ApprovalSnapshot | null
-  const vendorPay = payeeOf(doc.payeeType) === 'vendor'
-  // ADR 0027: a vendor payment has no LPJ
-  const lpj = doc.type === 'advance' && !vendorPay ? await settlementOfRequest(req, id) : null
+  const payee = payeeOf(doc.payeeType)
+  const vendorPay = payee === 'vendor'
+  // ADR 0027: a vendor payment has no LPJ (ADR 0028: nor a PT grup payment)
+  const lpj = doc.type === 'advance' && payee === 'karyawan' ? await settlementOfRequest(req, id) : null
+  // ADR 0028: the receiving PT's Kas Masuk of the transfer (numbers + PT only)
+  const ic = payee === 'pt_grup' ? await intercompanyOfRequest(req, id) : null
   // QA-06 / ADR 0019: shortfall vs approved + tolerance and its re-approval (office roles only)
   // ADR 0021: also the PM project acknowledger of the shortfall approval (it decides "Persetujuan PM")
   const shortfallAck = (lpj?.shortfallApprovalSnapshot as ApprovalSnapshot | null | undefined)?.acknowledgerUserId
@@ -167,7 +171,11 @@ export async function detail(req: PayloadRequest, id: number) {
     // ADR 0027: vendor payment — vendor, its account (the destination; snapshot in `bank` after submit) and the invoice
     vendor: vendorPay ? ref(doc.vendor, (d) => ({ name: d.name, code: null })) : null,
     vendorBankAccountId: vendorPay ? (relId(doc.vendorBankAccount) ?? null) : null,
-    invoice: vendorPay
+    // ADR 0028: PT grup payment — the receiving PT (its designated account = the destination; snapshot in `bank`)
+    payeeCompany: payee === 'pt_grup' ? ref(doc.payeeCompany, (d) => ({ shortCode: d.shortCode ?? null, name: d.name ?? null })) : null,
+    intercompany: ic ? { status: ic.status, targetEntryNo: ic.targetEntryNo, targetCompany: ic.targetCompany, transferId: ic.transferId } : null,
+    // ADR 0027 vendor invoice; ADR 0028: the receiving PT's document (invoice / memo) of a PT grup payment
+    invoice: payee !== 'karyawan'
       ? {
           no: doc.invoiceNo ?? null,
           date: doc.invoiceDate ?? null,

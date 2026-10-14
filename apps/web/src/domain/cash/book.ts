@@ -7,6 +7,7 @@ import { parseRupiah } from '@/lib/rupiah-input'
 import { getRequestTx } from '@/lib/tx'
 
 import type { CashEntryDoc } from './ledger'
+import { counterpartsOf, type EntryCounterpart } from '@/domain/intercompany/service'
 import { isPeriod, periodEnd } from './periods'
 
 /**
@@ -83,6 +84,8 @@ export const BookQuery = z.object({
   /** ADR 0023 (Q-S7): rows of the cash accounts flagged with this site (petty cash of a branch). */
   site: optId,
   status: optEnums(['posted', 'void']),
+  /** ADR 0028: "Sumber" — source types (e.g. `intercompany` = Antar PT). */
+  sumber: optEnums(['transfer', 'settlement_refund', 'manual', 'reversal', 'opening', 'intercompany']),
   /** DRMS 10/10 D8: free text over number + description, page size 20 / 50 / 100 (default 50). */
   q: z.preprocess((v) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined), z.string().max(100).optional()).catch(undefined),
   per: z.coerce.number().int().refine((n) => n === 20 || n === 50 || n === 100).optional().catch(undefined),
@@ -114,6 +117,7 @@ export function bookWhere(q: BookQuery): Where | undefined {
   if (q.pusat?.length) and.push({ costCenter: { in: q.pusat } })
   if (q.arah?.length === 1) and.push({ direction: { equals: q.arah[0] === 'masuk' ? 'in' : 'out' } }) // both = no filter
   if (q.status?.length) and.push({ status: { in: q.status } })
+  if (q.sumber?.length) and.push({ sourceType: { in: q.sumber } })
   if (q.pt) and.push({ company: { equals: q.pt } })
   if (q.site) and.push({ 'cashAccount.site': { equals: q.site } })
   if (q.q) for (const t of q.q.split(/\s+/).filter(Boolean).slice(0, 5)) and.push({ or: [{ entryNo: { like: t } }, { description: { like: t } }] })
@@ -125,7 +129,7 @@ export function canEdit(e: Pick<CashEntryDoc, 'sourceType' | 'status' | 'entryDa
   return e.sourceType === 'manual' && e.status === 'posted' && !(lockDate && e.entryDate <= lockDate)
 }
 
-/** Same rules as ledger.ts voidEntry for a direct void (transfer postings go through the transfer). */
+/** Same rules as ledger.ts voidEntry for a direct void (transfer postings go through the transfer; ADR 0028: so does the intercompany KM). */
 export function canVoid(e: Pick<CashEntryDoc, 'sourceType' | 'status'>): boolean {
   return e.status === 'posted' && (e.sourceType === 'manual' || e.sourceType === 'opening')
 }
@@ -136,6 +140,8 @@ export function voidHint(e: Pick<CashEntryDoc, 'sourceType' | 'status'>): string
   if (e.sourceType === 'transfer') return 'Batalkan lewat transfer pengajuan'
   if (e.sourceType === 'reversal') return 'Jurnal balik tidak dapat di-void'
   if (e.sourceType === 'settlement_refund') return 'Bagian dari LPJ'
+  // ADR 0028: the receiving PT's automatic KM — voided only by the paying PT's transfer void
+  if (e.sourceType === 'intercompany') return 'Di-void lewat pembatalan transfer di PT pengirim'
   return null
 }
 
@@ -260,6 +266,8 @@ export type BookRow = {
   reversalOf: { id: number; entryNo: string } | null
   reversedBy: { id: number; entryNo: string } | null
   request: { id: number; docNo: string | null } | null
+  /** ADR 0028: the other leg of an intercompany payment ("Lawan PT"); reversal rows carry their original's. */
+  intercompany: EntryCounterpart | null
 }
 
 const PAGE_SIZE = 50
@@ -289,6 +297,7 @@ export async function cashBookPage(req: PayloadRequest, q: BookQuery, limit = q.
       : null,
   ])
   const noOf = new Map((links?.docs ?? []).map((d) => [d.id as number, String((d as { entryNo?: string }).entryNo ?? '')]))
+  const ic = await counterpartsOf(req, docs.flatMap((d) => [d.id, relId(d.reversalOf)]).filter((x): x is number => x !== undefined))
   const docNoOf = new Map((requests?.docs ?? []).map((d) => [d.id as number, ((d as { docNo?: string | null }).docNo ?? null) as string | null]))
   const link = (v: unknown) => {
     const id = relId(v)
@@ -318,6 +327,7 @@ export async function cashBookPage(req: PayloadRequest, q: BookQuery, limit = q.
       reversalOf: link(d.reversalOf),
       reversedBy: link(d.reversedBy),
       request: rid === undefined ? null : { id: rid, docNo: docNoOf.get(rid) ?? null },
+      intercompany: ic.get(d.id) ?? ic.get(relId(d.reversalOf) ?? -1) ?? null,
     }
   })
   return { rows, totalDocs: res.totalDocs, page: res.page ?? 1, totalPages: res.totalPages }

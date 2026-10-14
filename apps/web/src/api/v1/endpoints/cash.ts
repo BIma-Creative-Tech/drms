@@ -2,6 +2,7 @@ import type { PayloadRequest, Where } from 'payload'
 
 import { relId } from '@/access/roles'
 import { balances, closePeriod, createManualEntry, currentLockDate, editManualEntry, kasCompanies, lockDates, reopenPeriod, voidEntry, type CashEntryDoc } from '@/domain/cash/ledger'
+import { counterpartsOf, type EntryCounterpart } from '@/domain/intercompany/service'
 
 import { companyQuery, singleCompanyQuery } from '../company-query'
 import { HttpError, json, v1 } from '../http'
@@ -11,7 +12,8 @@ import { CashEntryCreate, CashEntryUpdate, CashListQuery, PeriodCloseBody, Reaso
 /** US-23 / US-24 / ADR 0005 — Finance writes; Finance/Direktur (pk-owner)/Admin read (requirements §4 "Kas & bank"). */
 const WRITE_LIMIT: [number, number] = [30, 60_000]
 
-export function cashDto(e: CashEntryDoc & { postedAt?: string | null }) {
+/** ADR 0028: `intercompany` = the other leg of an intercompany pair (reversal rows: of their original). */
+export function cashDto(e: CashEntryDoc & { postedAt?: string | null }, ic: Map<number, EntryCounterpart> = new Map()) {
   return {
     id: e.id,
     entryNo: e.entryNo,
@@ -36,7 +38,13 @@ export function cashDto(e: CashEntryDoc & { postedAt?: string | null }) {
     proofId: relId(e.proof) ?? null, // QA-31: current proof (media-attachments), replaceable via PATCH
     postedAt: e.postedAt ?? null,
     companyId: relId((e as { company?: unknown }).company) ?? null, // MC3
+    intercompany: ic.get(e.id) ?? ic.get(relId(e.reversalOf) ?? -1) ?? null,
   }
+}
+
+/** Counterparts of the entries (and of the originals of reversal rows) — one query (ADR 0028). */
+async function counterparts(req: PayloadRequest, docs: CashEntryDoc[]): Promise<Map<number, EntryCounterpart>> {
+  return counterpartsOf(req, docs.flatMap((d) => [d.id, relId(d.reversalOf)]).filter((x): x is number => x !== undefined))
 }
 
 function idParam(v: string | undefined): number {
@@ -45,14 +53,15 @@ function idParam(v: string | undefined): number {
 }
 
 async function reload(req: PayloadRequest, id: number) {
-  const e = await req.payload.findByID({ collection: 'cash-entries', id, depth: 0, overrideAccess: true /* SYSTEM-READ: role checked by the endpoint */, req })
-  return cashDto(e as unknown as CashEntryDoc)
+  const e = (await req.payload.findByID({ collection: 'cash-entries', id, depth: 0, overrideAccess: true /* SYSTEM-READ: role checked by the endpoint */, req })) as unknown as CashEntryDoc
+  return cashDto(e, await counterparts(req, [e]))
 }
 
 export const listCashEndpoint = v1({
   path: '/cash-entries',
   method: 'get',
   roles: ['pk-finance', 'pk-owner', 'pk-admin'],
+  transactional: true, // ADR 0028: counterparts of intercompany entries (raw SQL in the request transaction)
   handler: async ({ req }) => {
     const q = CashListQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
     if (!q.success) throw new HttpError(400, 'Bad Request', { errors: q.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) })
@@ -61,6 +70,7 @@ export const listCashEndpoint = v1({
     if (q.data.cashAccountId) and.push({ cashAccount: { equals: q.data.cashAccountId } })
     if (q.data.projectId) and.push({ project: { equals: q.data.projectId } })
     if (q.data.costCenterId) and.push({ costCenter: { equals: q.data.costCenterId } })
+    if (q.data.sourceType) and.push({ sourceType: { equals: q.data.sourceType } })
     const companies = await companyQuery(req) // MC3: narrows only
     if (companies) and.push({ company: { in: companies } })
     if (q.data.cursor) {
@@ -81,7 +91,8 @@ export const listCashEndpoint = v1({
     const docs = res.docs as unknown as CashEntryDoc[]
     const page = docs.slice(0, q.data.limit)
     const next = docs.length > q.data.limit ? Buffer.from(String(page[page.length - 1]!.id)).toString('base64url') : null
-    return json({ items: page.map(cashDto), nextCursor: next })
+    const ic = await counterparts(req, page)
+    return json({ items: page.map((e) => cashDto(e, ic)), nextCursor: next })
   },
 })
 

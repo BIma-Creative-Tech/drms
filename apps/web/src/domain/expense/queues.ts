@@ -88,9 +88,9 @@ const scopeName = (d: Populated) => {
 }
 const requesterNames = (d: Populated) => (d.requesters ?? []).map((r) => (typeof r === 'object' ? (r.name ?? '') : '')).filter(Boolean).join(', ')
 
-/** PT refs of the documents (one lookup per PT, request cache). */
+/** PT refs of the documents (one lookup per PT, request cache) — ADR 0028: also the receiving PTs of PT grup payments. */
 async function refsOf(req: PayloadRequest, docs: Populated[]): Promise<Map<number, CompanyRef>> {
-  const ids = [...new Set(docs.map((d) => relId((d as { company?: unknown }).company)).filter((x): x is number => x !== undefined))]
+  const ids = [...new Set(docs.flatMap((d) => [relId((d as { company?: unknown }).company), relId(d.payeeCompany)]).filter((x): x is number => x !== undefined))]
   return new Map((await companyRefs(req, ids)).map((r) => [r.id, r]))
 }
 
@@ -103,6 +103,9 @@ const base = (d: Populated, refs: Map<number, CompanyRef>) => ({
   // ADR 0027: vendor payment (+ the vendor's name for the queues)
   payeeType: payeeOf(d.payeeType),
   vendorName: payeeOf(d.payeeType) === 'vendor' && d.vendor && typeof d.vendor === 'object' ? (d.vendor.name ?? null) : null,
+  // ADR 0028: PT grup payment — the receiving PT (badge "Antar PT: <PT>")
+  payeeCompany: payeeOf(d.payeeType) === 'pt_grup' ? (refs.get(relId(d.payeeCompany) ?? -1) ?? null) : null,
+  payeeCompanyName: payeeOf(d.payeeType) === 'pt_grup' ? (refs.get(relId(d.payeeCompany) ?? -1)?.name ?? null) : null,
   status: d.status,
   statusLabel: requestStatusLabel(d.type, d.status, (d.approvalSnapshot ?? null) as ApprovalSnapshot | null, d.currentLevel ?? null),
   title: d.title,
@@ -177,7 +180,8 @@ export async function transferQueue(req: PayloadRequest, f?: QueueFilter) {
       costCenter: await suggestedCostCenter(req, { project: p?.id ?? d.project, costCenter: d.costCenter && typeof d.costCenter === 'object' ? d.costCenter.id : d.costCenter }),
       bank: d.bankSnapshot ?? null,
       // ADR 0027: a vendor payment's destination is the vendor account (same confirmation rule)
-      bankVerification: verification(payeeOf(d.payeeType) === 'vendor' ? (d as { vendorBankAccount?: unknown }).vendorBankAccount : (d as { bankAccount?: unknown }).bankAccount),
+      // ADR 0028: the receiving PT's designated account is an own group account — trusted (never asked)
+      bankVerification: payeeOf(d.payeeType) === 'pt_grup' ? ('verified' as const) : verification(payeeOf(d.payeeType) === 'vendor' ? (d as { vendorBankAccount?: unknown }).vendorBankAccount : (d as { bankAccount?: unknown }).bankAccount),
       flags: await flagCounts(req, d.id),
       sla: { approvedAt, slaHours, ageHours: age?.hours ?? null, over: age?.over ?? false },
       // ADR 0024 / 0026: a Direktur's (legacy) / the Owner's own request that reached the queue without any approval (badge)

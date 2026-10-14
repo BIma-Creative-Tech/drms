@@ -30,7 +30,8 @@ export type CashEntryDoc = {
   vehicle?: unknown
   description?: string | null
   proof?: unknown
-  sourceType: 'transfer' | 'settlement_refund' | 'manual' | 'reversal' | 'opening'
+  /** ADR 0028: `intercompany` = the automatic Kas Masuk of a payment from another PT of the group (domain/intercompany). */
+  sourceType: 'transfer' | 'settlement_refund' | 'manual' | 'reversal' | 'opening' | 'intercompany'
   expenseRequest?: unknown
   transfer?: unknown
   status: 'posted' | 'void'
@@ -164,10 +165,19 @@ async function checkOverdraft(req: PayloadRequest, account: CashAccountDoc, amou
 }
 
 /**
+ * INTERNAL options of a posting (never from request input).
+ * `systemCompany` (ADR 0028 §5): the posting is a SYSTEM write into a PT the caller may not be mapped to — the paired
+ * Kas Masuk of an intercompany transfer (domain/intercompany) or its reversal, inside the paying PT's authorised
+ * transfer / void. Skips ONLY the caller-membership check; lock, opening-date, account-active and numbering checks
+ * run for that PT exactly as for any posting.
+ */
+export type PostOptions = { systemCompany?: boolean }
+
+/**
  * Posts one ledger row (ADR 0005 §2–§3): KM/KK number by direction and date (ADR 0007), inside the
  * business transaction. The DB guard sets `period`/`posted_at` and rejects dates in a closed period.
  */
-export async function postEntry(req: PayloadRequest, input: PostInput): Promise<CashEntryDoc> {
+export async function postEntry(req: PayloadRequest, input: PostInput, opts: PostOptions = {}): Promise<CashEntryDoc> {
   if (!isBusinessDate(input.entryDate)) fail(400, 'Tanggal harus YYYY-MM-DD.')
   if (!(Number.isSafeInteger(input.amount) && input.amount > 0)) fail(400, 'Nominal harus bilangan bulat Rupiah > 0.')
   // DRMS 10/10 D2: a manual entry is charged to a project OR a cost center; an entry of a request flow (transfer KK,
@@ -179,7 +189,7 @@ export async function postEntry(req: PayloadRequest, input: PostInput): Promise<
   if (req.user && input.sourceType === 'manual' && !hasRole(req, 'pk-finance', companyId)) fail(400, 'Akun kas tidak ditemukan atau nonaktif.', [{ path: 'cashAccountId', message: 'Akun kas tidak valid.' }])
   // QA-MC4-10: account (and its PT) first — the lock date of a PT the caller is not mapped to is never answered
   const mapped = mappedCompanies(req)
-  if (companyId === undefined || (mapped !== null && !mapped.includes(companyId))) fail(400, 'Akun kas tidak ditemukan atau nonaktif.', [{ path: 'cashAccountId', message: 'Akun kas tidak valid.' }])
+  if (companyId === undefined || (!opts.systemCompany && mapped !== null && !mapped.includes(companyId))) fail(400, 'Akun kas tidak ditemukan atau nonaktif.', [{ path: 'cashAccountId', message: 'Akun kas tidak valid.' }])
   const account = await assertAccount(req, input.cashAccountId)
   assertOnOrAfterOpening(account, input.entryDate) // QA-05 (before any number is allocated)
   const lock = await currentLockDate(req, companyId)
@@ -345,14 +355,15 @@ export async function editManualEntry(req: PayloadRequest, id: number, patch: Ma
   })) as unknown as CashEntryDoc
 }
 
-export async function loadEntry(req: PayloadRequest, id: number): Promise<CashEntryDoc> {
+/** `system` (ADR 0028, internal): the paired KM of an intercompany transfer, voided by the paying PT's Finance through the transfer void. */
+export async function loadEntry(req: PayloadRequest, id: number, opts: { system?: boolean } = {}): Promise<CashEntryDoc> {
   if (!Number.isSafeInteger(id) || id <= 0) fail(404, 'Transaksi kas tidak ditemukan.')
   const tx = await getRequestTx(req)
   await tx.execute(sql`SELECT id FROM cash_entries WHERE id = ${id} FOR UPDATE`)
   const e = await req.payload.findByID({ collection: 'cash-entries', id, depth: 0, overrideAccess: true /* SYSTEM-READ: PT role checked below */, req }).catch(() => null)
   if (!e) fail(404, 'Transaksi kas tidak ditemukan.')
   // ADR 0016 §5 (MC2 fix): edit / void only by Finance OF THE ENTRY's PT (else 404, no existence leak)
-  if (req.user && !hasRole(req, 'pk-finance', relId((e as { company?: unknown }).company))) fail(404, 'Transaksi kas tidak ditemukan.')
+  if (req.user && !opts.system && !hasRole(req, 'pk-finance', relId((e as { company?: unknown }).company))) fail(404, 'Transaksi kas tidak ditemukan.')
   return e as unknown as CashEntryDoc
 }
 
@@ -361,14 +372,17 @@ export async function loadEntry(req: PayloadRequest, id: number): Promise<CashEn
  * reversal row (inverted direction, same amount/account, `reversalOf`) dated the original date
  * if its period is open, else today (Odoo-like), and mark the original `void` with reason.
  * Entries created by a transfer are voided only through the transfer (keeps T1/T3 consistent).
+ * ADR 0028: the automatic KM of an intercompany transfer only through the paying PT's transfer void
+ * (`viaIntercompany`, internal: a system write into the receiving PT — its reversal follows the same date rule, so a
+ * closed period of the receiving PT never blocks the void).
  */
 export async function voidEntry(
   req: PayloadRequest,
   id: number,
   reason: string,
-  opts: { viaTransfer?: boolean; viaSettlement?: boolean } = {},
+  opts: { viaTransfer?: boolean; viaSettlement?: boolean; viaIntercompany?: boolean } = {},
 ): Promise<{ original: CashEntryDoc; reversal: CashEntryDoc }> {
-  const e = await loadEntry(req, id)
+  const e = await loadEntry(req, id, { system: opts.viaIntercompany === true })
   if (e.status === 'void') fail(409, 'Transaksi sudah di-void.')
   if (e.sourceType === 'reversal') fail(409, 'Jurnal balik tidak dapat di-void.')
   if (e.sourceType === 'transfer' && !opts.viaTransfer) fail(409, 'Kas keluar dari transfer di-void lewat pembatalan transfer.')
@@ -376,6 +390,9 @@ export async function voidEntry(
   // settlement inconsistent → only through the settlement reversal (E9, lpj.ts reverseSettlement).
   if (e.sourceType === 'settlement_refund' && !opts.viaSettlement) {
     fail(409, 'Kas masuk pengembalian LPJ di-void lewat "Batalkan penyelesaian" pada LPJ, bukan dari buku kas.')
+  }
+  if (e.sourceType === 'intercompany' && !opts.viaIntercompany) {
+    fail(409, `Kas masuk antar-PT di-void lewat pembatalan transfer di PT ${(await intercompanySourceCode(req, e.id)) ?? 'pengirim'}.`)
   }
   const lock = await currentLockDate(req, relId((e as { company?: unknown }).company))
   const reversalDate = lock && e.entryDate <= lock ? await today(req) : e.entryDate
@@ -394,7 +411,7 @@ export async function voidEntry(
     expenseRequestId: relId(e.expenseRequest) ?? null,
     transferId: relId(e.transfer) ?? null,
     reversalOfId: e.id,
-  })
+  }, { systemCompany: opts.viaIntercompany === true })
   req.context.auditReason = reason
   const original = (await req.payload.update({
     collection: 'cash-entries',
@@ -405,6 +422,15 @@ export async function voidEntry(
     req,
   })) as unknown as CashEntryDoc
   return { original, reversal }
+}
+
+/** ADR 0028: short code of the PT that sent the intercompany KM `kmId` (message of a refused direct void). */
+async function intercompanySourceCode(req: PayloadRequest, kmId: number): Promise<string | null> {
+  const tx = await getRequestTx(req)
+  const r = (await tx.execute(sql`
+    SELECT c.short_code FROM intercompany_links l JOIN companies c ON c.id = l.source_company_id
+     WHERE l.target_cash_entry_id = ${kmId} LIMIT 1`)) as unknown as { rows: Array<{ short_code: string | null }> }
+  return r.rows[0]?.short_code ?? null
 }
 
 /**

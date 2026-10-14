@@ -12,7 +12,8 @@ import { getRequestTx } from '@/lib/tx'
 
 import { actorContext, fail, loadRaw, loadVisible, requireAction, settings, today, updateRequest } from './common'
 import { claimMedia, recomputeFlags } from './receipts'
-import { isBusinessDate, payeeOf } from './types'
+import { isBusinessDate, isDirectPayment, payeeOf } from './types'
+import { postReceipt, prepareReceipt, voidReceipt } from '@/domain/intercompany/service'
 
 export type TransferInput = {
   cashAccountId: number
@@ -38,8 +39,11 @@ export type TransferInput = {
   confirmUnverifiedAccount?: boolean
 }
 
-/** Verification state of the destination bank account of a request (QA-17; ADR 0027: a vendor account for a vendor payment). */
-export type DestinationCheck = { bankAccountId: number | null; verificationStatus: 'verified' | 'unverified'; accountKind?: 'employee' | 'vendor' }
+/**
+ * Verification state of the destination bank account of a request (QA-17; ADR 0027: a vendor account for a vendor
+ * payment; ADR 0028: the receiving PT's designated cash account — own group account, trusted, never asked).
+ */
+export type DestinationCheck = { bankAccountId: number | null; verificationStatus: 'verified' | 'unverified'; accountKind?: 'employee' | 'vendor' | 'intercompany' }
 
 /**
  * QA-17 (owner decision 2026-10-08: warning + confirmation, audited): money to an employee bank account
@@ -53,6 +57,9 @@ export async function checkDestination(
   doc: { bankAccount?: unknown; payeeType?: unknown; vendorBankAccount?: unknown; bankSnapshot?: { bankName?: string | null; accountNo?: string | null; accountHolder?: string | null } | null },
   confirmed: boolean,
 ): Promise<DestinationCheck> {
+  // ADR 0028: own cash accounts of the group are trusted — no "unverified account" confirmation (prepareReceipt checks
+  // that the designated account still carries the snapshot's number)
+  if (payeeOf(doc.payeeType) === 'pt_grup') return { bankAccountId: null, verificationStatus: 'verified', accountKind: 'intercompany' }
   // ADR 0027: a vendor payment's destination is the vendor account (same confirmation rule as an employee account)
   const vendor = payeeOf(doc.payeeType) === 'vendor'
   const bankAccountId = relId(vendor ? doc.vendorBankAccount : doc.bankAccount) ?? null
@@ -169,7 +176,8 @@ type TransferDoc = { id: number; docNo: string; request: unknown; amount: number
 /**
  * POST /expense-requests/{id}/transfer (US-20, T3): Pengajuan Baru "Disetujui (Antri Transfer)" or
  * Reimburse "Nota Terverifikasi (Antri Transfer)". ADR 0027: a vendor payment → "Selesai" at once (no LPJ); the
- * destination snapshot is the vendor account taken at submit. Amount copied from `approvedAmount` (G3, also
+ * destination snapshot is the vendor account taken at submit. ADR 0028: a PT grup payment the same way, and the receiving
+ * PT's Kas Masuk is posted in the same transaction (domain/intercompany: its period lock / account checked first). Amount copied from `approvedAmount` (G3, also
  * DB-checked on insert), destination = the request's bank snapshot (read-only), source account +
  * bank reference + proof required. Auto-posts ONE KK cash-out linked to request and transfer
  * (category = the lines' single category, else empty: category breakdown comes from the lines,
@@ -197,6 +205,9 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
   if (lock && transferDate <= lock) fail(409, `Periode ${transferDate.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
   const costCenterId = await transferCostCenter(req, doc, companyId, input.costCenterId ?? null) // D2
   const destination = await checkDestination(req, doc, input.confirmUnverifiedAccount === true) // QA-17
+  // ADR 0028 §6 step 2: the receiving PT's checks run BEFORE anything is written (closed period → 409, changed account → 409)
+  const payee = payeeOf(doc.payeeType)
+  const receiving = payee === 'pt_grup' ? await prepareReceipt(req, doc, transferDate) : null
 
   const { docNo } = await allocateDocNo(req, 'transfer', { companyId: relId((doc as { company?: unknown }).company)!, date: parseBusinessDate(transferDate) })
   await claimMedia(req, 'media-transfer-proofs', input.proofMediaId, id)
@@ -247,21 +258,32 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
     overrideAccess: true, // SYSTEM-WRITE: link the KK entry (DB: cash_entry_id set once)
     req,
   })
+  // ADR 0028 §6: the Kas Masuk in the receiving PT + the link (before the request changes: its hook runs the deferred checks)
+  const ic = receiving
+    ? await postReceipt(req, { prepared: receiving, request: { id, docNo: doc.docNo ?? null, title: doc.title }, transfer: { id: transfer.id, docNo }, kk: entry, transferDate, amount: approved })
+    : null
   // ADR 0027: a vendor payment is done with the transfer (the invoice is the proof — no receipts, LPJ or settlement)
-  const vendor = payeeOf(doc.payeeType) === 'vendor'
+  // ADR 0028: a PT grup payment too
+  const direct = isDirectPayment(doc.payeeType)
   const updated = await updateRequest(
     req,
     id,
-    { status: vendor ? 'completed' : 'transferred', transferredTotal: (doc.transferredTotal ?? 0) + approved },
-    vendor ? 'pembayaran vendor selesai dengan transfer (invoice = bukti, tanpa LPJ)' : undefined,
+    { status: direct ? 'completed' : 'transferred', transferredTotal: (doc.transferredTotal ?? 0) + approved },
+    payee === 'vendor' ? 'pembayaran vendor selesai dengan transfer (invoice = bukti, tanpa LPJ)' : payee === 'pt_grup' ? 'pembayaran antar-PT selesai dengan transfer' : undefined,
   )
-  if (doc.type === 'advance' && !vendor) await recomputeFlags(req, id) // receipt date rules use the transfer date
-  return { transfer: linked, cashEntry: entry, request: updated }
+  if (doc.type === 'advance' && !direct) await recomputeFlags(req, id) // receipt date rules use the transfer date
+  return {
+    transfer: linked,
+    cashEntry: entry,
+    request: updated,
+    intercompany: ic && receiving ? { cashEntryId: ic.km.id, cashEntryNo: ic.km.entryNo, company: { id: receiving.target.id, shortCode: receiving.target.shortCode, name: receiving.target.name } } : null,
+  }
 }
 
 /**
  * POST /expense-requests/{id}/transfers/{tid}/void (T8): reversal of the KK entry (original stays
  * visible), transfer `void` with reason, request back to its transfer queue status.
+ * ADR 0028 §7: an intercompany transfer also reverses the receiving PT's Kas Masuk and voids the link (system write).
  */
 export async function voidTransfer(req: PayloadRequest, id: number, transferId: number, reason: string) {
   const visible = await loadVisible(req, id, { lock: true })
@@ -274,6 +296,7 @@ export async function voidTransfer(req: PayloadRequest, id: number, transferId: 
   if (t.status !== 'posted') fail(409, 'Transfer sudah dibatalkan.')
   const entryId = relId(t.cashEntry)
   const voided = entryId ? await voidEntry(req, entryId, reason, { viaTransfer: true }) : null
+  const ic = await voidReceipt(req, transferId, reason) // ADR 0028: null for every other transfer
   req.context.auditReason = reason
   const transfer = await req.payload.update({
     collection: 'transfers',
@@ -285,7 +308,7 @@ export async function voidTransfer(req: PayloadRequest, id: number, transferId: 
   })
   const back = doc.type === 'advance' ? 'approved' : 'receipts_verified'
   const updated = await updateRequest(req, id, { status: back, transferredTotal: Math.max(0, (doc.transferredTotal ?? 0) - t.amount) }, reason)
-  return { transfer, reversal: voided?.reversal ?? null, request: updated }
+  return { transfer, reversal: voided?.reversal ?? null, intercompanyReversal: ic?.reversal ?? null, request: updated }
 }
 
 /**

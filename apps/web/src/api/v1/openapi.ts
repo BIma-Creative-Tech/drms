@@ -207,7 +207,7 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'post',
     path: '/expense-requests',
-    summary: 'Create a Draft (Pengajuan Baru / Reimburse); creator, status and grand total are server-set',
+    summary: 'Create a Draft (Pengajuan Baru / Reimburse; ADR 0027 payeeType vendor, ADR 0028 payeeType pt_grup — filer roles 403, no designated receiving account → 400 code INTERCOMPANY_NO_ACCOUNT, duplicate document → 409 errors[invoiceNo]); creator, status and grand total are server-set',
     security,
     request: { headers: idem, body: jsonBody(F.ExpenseRequestCreate) },
     responses: { ...res(201, 'Created', F.ExpenseRequestDetail, [400, 401, 403, 409, 422, 426, 429]), 200: { description: 'Existing draft for this clientUuid', content: { 'application/json': { schema: F.ExpenseRequestDetail } } } },
@@ -270,9 +270,18 @@ export function buildOpenApiDocument(version: string) {
   post('/expense-requests/{id}/flags/{fid}/review', 'Finance: mark a flag "sudah diperiksa"', F.FlagReviewBody, ['id', 'fid'], detailOk())
   post(
     '/expense-requests/{id}/transfer',
-    'Finance: record the transfer (amount = approved amount, proof, bank ref, DRMS 10/10 D2 cost center: costCenterId, default = the project default, none → 400) → KK posted. QA-17: destination account not verified → 409 code BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED (bankAccountId, verificationStatus, bankName, accountNo, accountHolder) unless confirmUnverifiedAccount (audited bank_unverified_confirmed); QA-04: cash account balance would go below 0 → 409 code CASH_OVERDRAFT_CONFIRM_REQUIRED (cashAccountId, balance, after) unless confirmOverdraft (audited overdraft_confirmed); QA-05: date before the account opening-balance date → 400',
+    'Finance: record the transfer (amount = approved amount, proof, bank ref, DRMS 10/10 D2 cost center: costCenterId, default = the project default, none → 400) → KK posted. QA-17: destination account not verified → 409 code BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED (bankAccountId, verificationStatus, bankName, accountNo, accountHolder) unless confirmUnverifiedAccount (audited bank_unverified_confirmed); QA-04: cash account balance would go below 0 → 409 code CASH_OVERDRAFT_CONFIRM_REQUIRED (cashAccountId, balance, after) unless confirmOverdraft (audited overdraft_confirmed); QA-05: date before the account opening-balance date → 400. ADR 0028 (payeeType pt_grup): the transfer also posts the Kas Masuk in the receiving PT (result `intercompany`) and completes the request; the receiving PT\'s period of the transfer date closed → 409 code INTERCOMPANY_PERIOD_CLOSED (payeeCompanyId, lockDate); its designated account changed since submit → 409 code INTERCOMPANY_ACCOUNT_CHANGED (withdraw + resubmit); none designated → 409 code INTERCOMPANY_NO_ACCOUNT; no unverified-account confirmation (own group account)',
     F.TransferCreate, ['id'], res(201, 'Transferred', F.TransferResult, [400, 401, 403, 404, 409, 422, 426, 429]))
-  post('/expense-requests/{id}/transfers/{tid}/void', 'Finance: void a transfer (reversal entry, reason)', F.ReasonBody, ['id', 'tid'], detailOk())
+  post('/expense-requests/{id}/transfers/{tid}/void', 'Finance: void a transfer (reversal entry, reason). ADR 0027 / 0028: a vendor / PT grup payment goes back from Selesai to the transfer queue (Finance is notified); a PT grup transfer also reverses the receiving PT\'s Kas Masuk (dated per the ledger rule — a closed period there never blocks the void)', F.ReasonBody, ['id', 'tid'], detailOk())
+  registry.registerPath({
+    method: 'get',
+    path: '/intercompany/payees',
+    summary:
+      'ADR 0028: payee directory of a "PT grup" payment — every other active PT of the group with a designated receiving account ("Rekening penerimaan antar-PT"): short code, name, bank, MASKED number, holder. Caller: Finance / PM / Direktur of the paying PT (?company=), else 403. Also as masters type intercompany-payees.',
+    security,
+    request: { headers: deviceHeader, query: F.IntercompanyPayeesQuery },
+    responses: res(200, 'Payees', F.IntercompanyPayeeList, [400, 401, 403, 426, 429]),
+  })
   registry.registerPath({
     method: 'get',
     path: '/transfer-queue',
