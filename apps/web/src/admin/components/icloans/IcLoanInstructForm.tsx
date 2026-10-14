@@ -43,7 +43,6 @@ export function IcLoanInstructForm({ borrowers, initialBorrower, initialRequestI
   const load = useCallback(
     async (b: number, need: number | null) => {
       if (!b) return
-      setLoadError(null)
       const q = new URLSearchParams({ borrower: String(b), ...(need && need > 0 ? { amount: String(need) } : {}) })
       const res = await fetch(`/api/v1/intercompany-loans/lenders?${q}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
       const body = await res.json().catch(() => null)
@@ -52,6 +51,7 @@ export function IcLoanInstructForm({ borrowers, initialBorrower, initialRequestI
         setLoadError(problemText(body, res.status))
         return
       }
+      setLoadError(null)
       setData(body as Lenders)
       setDue((d) => d || (body as Lenders).defaultDueDate)
     },
@@ -59,10 +59,9 @@ export function IcLoanInstructForm({ borrowers, initialBorrower, initialRequestI
   )
 
   useEffect(() => {
-    void load(borrower, amount.parsed.value)
     // the lender list follows the borrower and the amount (sufficient = available ≥ amount)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [borrower, amount.parsed.value])
+    void load(borrower, amount.parsed.value)
+  }, [borrower, amount.parsed.value, load])
 
   const touch = () => {
     key.current = newIdemKey()

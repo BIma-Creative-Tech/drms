@@ -127,7 +127,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
          OR kk.transfer_id IS DISTINCT FROM NEW.source_transfer_id THEN
         RAISE EXCEPTION 'intercompany link side mismatch: source entry % (PT %)', NEW.source_cash_entry_id, NEW.source_company_id USING ERRCODE = '23514';
       END IF;
-      -- the payer's KK: a request transfer (ADR 0028) or the loan movement's own KK `intercompany` on its source account (ADR 0029)
+      -- the payer's KK: a request transfer (ADR 0028) or the loan movement's own KK (source intercompany) on its source account (ADR 0029)
       IF loan_kind THEN
         IF kk.source_type <> 'intercompany' OR kk.cash_account_id <> mv.from_cash_account_id THEN
           RAISE EXCEPTION 'intercompany link side mismatch: source entry % is not the KK of loan movement %', NEW.source_cash_entry_id, NEW.source_doc_id USING ERRCODE = '23514';

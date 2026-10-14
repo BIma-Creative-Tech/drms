@@ -546,7 +546,7 @@ export const ITEM_ICONS: Readonly<Record<string, IconName>> = {
   '/tutup-buku': 'tLock',
   '/collections/period-closings': 'tArchiveTick',
   '/pinjaman': 'tMoneyChange',
-  '/pinjaman-antar-pt': 'tCardSend',
+  '/pinjaman-antar-pt': 'tCardReceive',
   '/collections/project-loans': 'tArchiveBook',
   '/collections/project-loan-repayments': 'tMoneyRecive',
   // Absensi
