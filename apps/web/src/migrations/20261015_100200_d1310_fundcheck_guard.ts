@@ -108,9 +108,10 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
         RAISE EXCEPTION 'intercompany link side mismatch: request % is not a PT grup payment of PT % to PT %', NEW.source_doc_id, NEW.source_company_id, NEW.target_company_id USING ERRCODE = '23514';
       END IF;
       IF loan_kind THEN
-        -- ADR 0029: the movement of an inter-PT loan (disbursement lender → borrower, repayment borrower → lender)
+        -- ADR 0029: the movement of an inter-PT loan (disbursement lender → borrower, repayment borrower → lender);
+        -- the CASE is parenthesized: PL/pgSQL reads an IF condition up to the first THEN
         SELECT * INTO mv FROM intercompany_loan_transfers m WHERE m.id = NEW.source_doc_id;
-        IF NOT FOUND OR mv.kind <> CASE NEW.source_doc_type WHEN 'intercompany_loan_disbursement' THEN 'disbursement' ELSE 'repayment' END
+        IF NOT FOUND OR mv.kind <> (CASE NEW.source_doc_type WHEN 'intercompany_loan_disbursement' THEN 'disbursement' ELSE 'repayment' END)
            OR mv.from_company_id <> NEW.source_company_id OR mv.to_company_id <> NEW.target_company_id
            OR mv.to_cash_account_id <> NEW.target_cash_account_id OR mv.amount <> NEW.amount OR mv.status <> 'posted'
            OR NEW.source_transfer_id IS NOT NULL THEN
@@ -336,7 +337,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
       END IF;
       IF TG_TABLE_NAME = 'intercompany_loan_transfers' AND TG_OP = 'INSERT' THEN
         IF NOT EXISTS (SELECT 1 FROM intercompany_links x
-                        WHERE x.source_doc_type = CASE nr ->> 'kind' WHEN 'disbursement' THEN 'intercompany_loan_disbursement' ELSE 'intercompany_loan_repayment' END
+                        WHERE x.source_doc_type = (CASE nr ->> 'kind' WHEN 'disbursement' THEN 'intercompany_loan_disbursement' ELSE 'intercompany_loan_repayment' END)
                           AND x.source_doc_id = (nr ->> 'id')::integer) THEN
           RAISE EXCEPTION 'intercompany_loan_transfers %: a loan movement needs its intercompany link (KK + KM)', nr ->> 'id' USING ERRCODE = '23514';
         END IF;
