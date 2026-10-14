@@ -34,6 +34,8 @@ export type DecisionProps = {
   stepLabel: string
   /** ADR 0025: the decision is signed as the PT's definitive Direktur ("Nama (Jabatan)"), else null. */
   signAs?: string | null
+  /** ADR 0029 §2: "Setujui" disabled with this text while the PT's available funds are short (the server answers 409). */
+  blocked?: string | null
 }
 
 export type RequestPanel = {
@@ -138,7 +140,7 @@ async function load(payload: Payload, user: NonNullable<PayloadRequest['user']>,
 }
 
 /** DRMS 10/10 9d: decision when the server allows one now (same texts as the inbox and the APK decision sheet). */
-export function decisionOf(d: Pick<Detail, 'allowedActions' | 'currentLevel' | 'status' | 'docNo' | 'grandTotal'> & { direkturSignature?: Detail['direkturSignature'] }, snap: ApprovalSnapshot | null): DecisionProps | null {
+export function decisionOf(d: Pick<Detail, 'allowedActions' | 'currentLevel' | 'status' | 'docNo' | 'grandTotal'> & { direkturSignature?: Detail['direkturSignature']; fundCheck?: Detail['fundCheck'] }, snap: ApprovalSnapshot | null): DecisionProps | null {
   const step = d.allowedActions.includes('approve') ? 'approve' : d.allowedActions.includes('acknowledge') ? 'acknowledge' : null
   const canReject = d.allowedActions.includes('reject')
   if (!step && !canReject) return null
@@ -156,7 +158,9 @@ export function decisionOf(d: Pick<Detail, 'allowedActions' | 'currentLevel' | '
   const stepLabel = step === 'approve' || (!step && d.status === 'pending_approval') ? approvalStepLabel(snap, level) : ackStepLabel(snap)
   const signAs = d.direkturSignature ? direkturLabel(d.direkturSignature.name, d.direkturSignature.title) : null
   const confirm = [text?.confirm ?? '', signAs ? `Ditandatangani dengan tanda tangan Direktur PT: ${signAs}.` : ''].filter(Boolean).join(' ')
-  return { step, label: text?.label ?? 'Setujui', confirm, canReject, stepLabel, signAs }
+  // ADR 0029: the next decision is the fund-checked one and the PT is short (switch on) → "Setujui" disabled with the reason
+  const blocked = step && d.fundCheck?.blocked ? (d.fundCheck.blockedText ?? 'Dana PT tidak cukup.') : null
+  return { step, label: text?.label ?? 'Setujui', confirm, canReject, stepLabel, signAs, blocked }
 }
 
 function isOwn(d: Detail, user: { id?: unknown }): boolean {

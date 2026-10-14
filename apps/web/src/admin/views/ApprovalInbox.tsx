@@ -124,6 +124,16 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
                     {(() => {
                       // ADR 0013/0021 labels + confirmations, shared with the request detail (decision-texts.ts)
                       const t = decisionText({ step: r.step, docNo: r.docNo, grandTotal: r.grandTotal, decisionFlow: r.decisionFlow, decisionBy: r.decisionBy, finalStep: r.finalStep })
+                      // ADR 0029 §2: the PT's available funds are short (fund check on) → no "Setujui" here; the detail explains + offers the loan
+                      if (r.fundShort) {
+                        return (
+                          <a href={`/admin/collections/expense-requests/${r.id}`} style={{ textDecoration: 'none' }} data-pk-fund-short={r.id}>
+                            <span style={badge('bad')} title="Dana tersedia PT kurang — lihat rincian, tolak atau perintahkan pinjaman antar-PT">
+                              Dana kurang {rp(r.fundShort)}
+                            </span>
+                          </a>
+                        )
+                      }
                       return <ActionButton url={`/api/v1/expense-requests/${r.id}/${r.step}`} label={t.label} variant="primary" confirm={t.confirm} />
                     })()}
                     <ActionButton url={`/api/v1/expense-requests/${r.id}/reject`} label="Tolak" prompt={REJECT_PROMPT} />

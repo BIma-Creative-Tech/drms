@@ -136,6 +136,18 @@
               "intercompanyPayment": {
                 "type": "boolean",
                 "description": "ADR 0028: may file a \"PT grup\" payment (Pembayaran antar-PT) — holds Finance, PM or Direktur (pk-owner) AS STORED (the server's filer rule). Unlike the effective `roles`, false for an Owner (pk-principal) without one of those roles. Absent on servers before this field (APK fallback: the payee directory)."
+              },
+              "instructIntercompanyLoan": {
+                "type": "boolean",
+                "description": "ADR 0029: Owner (pk-principal AS STORED) — may instruct a \"Pinjaman antar-PT\" (POST /intercompany-loans; the lender list GET /intercompany-loans/lenders) and sees `instruct_loan` on a short request. The server re-checks the Owner role in BOTH PTs."
+              },
+              "disburseIntercompanyLoan": {
+                "type": "boolean",
+                "description": "ADR 0029: Finance (stored) — the \"Pencairan pinjaman antar-PT\" queue (GET /intercompany-loans/queue) and the disbursement of loans whose LENDER is this PT (never one the caller instructed, G1)."
+              },
+              "fundCheckEnabled": {
+                "type": "boolean",
+                "description": "ADR 0029: companies.fundCheckEnabled of this PT (top level: any selected PT) — the final approval / the Owner's own submit is refused (409 FUND_INSUFFICIENT) when the PT's available funds are short. Off = the fund panel is information only."
               }
             },
             "required": [
@@ -146,7 +158,10 @@
               "unitTimesheetCreate",
               "aftersalesActivityCreate",
               "dailyReportCreate",
-              "intercompanyPayment"
+              "intercompanyPayment",
+              "instructIntercompanyLoan",
+              "disburseIntercompanyLoan",
+              "fundCheckEnabled"
             ],
             "description": "DEPRECATED (MC3): derived from the top-level `roles` (union over the selected PTs). Use companies[].capabilities."
           },
@@ -564,6 +579,18 @@
           "intercompanyPayment": {
             "type": "boolean",
             "description": "ADR 0028: may file a \"PT grup\" payment (Pembayaran antar-PT) — holds Finance, PM or Direktur (pk-owner) AS STORED (the server's filer rule). Unlike the effective `roles`, false for an Owner (pk-principal) without one of those roles. Absent on servers before this field (APK fallback: the payee directory)."
+          },
+          "instructIntercompanyLoan": {
+            "type": "boolean",
+            "description": "ADR 0029: Owner (pk-principal AS STORED) — may instruct a \"Pinjaman antar-PT\" (POST /intercompany-loans; the lender list GET /intercompany-loans/lenders) and sees `instruct_loan` on a short request. The server re-checks the Owner role in BOTH PTs."
+          },
+          "disburseIntercompanyLoan": {
+            "type": "boolean",
+            "description": "ADR 0029: Finance (stored) — the \"Pencairan pinjaman antar-PT\" queue (GET /intercompany-loans/queue) and the disbursement of loans whose LENDER is this PT (never one the caller instructed, G1)."
+          },
+          "fundCheckEnabled": {
+            "type": "boolean",
+            "description": "ADR 0029: companies.fundCheckEnabled of this PT (top level: any selected PT) — the final approval / the Owner's own submit is refused (409 FUND_INSUFFICIENT) when the PT's available funds are short. Off = the fund panel is information only."
           }
         },
         "required": [
@@ -574,7 +601,10 @@
           "unitTimesheetCreate",
           "aftersalesActivityCreate",
           "dailyReportCreate",
-          "intercompanyPayment"
+          "intercompanyPayment",
+          "instructIntercompanyLoan",
+          "disburseIntercompanyLoan",
+          "fundCheckEnabled"
         ],
         "description": "UI hints for the APK (E1); the server guards stay authoritative."
       },
@@ -1875,6 +1905,25 @@
                     "null"
                   ]
                 },
+                "fundAvailable": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "ADR 0029: \"Dana tersedia saat disetujui\" of a checked final decision (Kas roles of the PT only; else null)."
+                },
+                "fundBalance": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "fundCommitments": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
                 "signatureId": {
                   "type": [
                     "integer",
@@ -1911,6 +1960,9 @@
                 "budgetPctBefore",
                 "budgetPctAfter",
                 "openFlags",
+                "fundAvailable",
+                "fundBalance",
+                "fundCommitments",
                 "signatureId",
                 "signatureSha256",
                 "signatureSource"
@@ -2214,6 +2266,241 @@
             },
             "description": "UI hint; the server re-checks every action."
           },
+          "fundCheck": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "companyId": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "company": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                  },
+                  "shortCode": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "shortCode",
+                  "name"
+                ]
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "companies.fundCheckEnabled — off: information only (no block)."
+              },
+              "applies": {
+                "type": "boolean",
+                "description": "The request's NEXT decision makes it \"Disetujui\" (the Owner level / a final level without Owner) or this is the Owner's own Draft (checked at submit)."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "insufficient",
+                  "not_applicable"
+                ]
+              },
+              "blocked": {
+                "type": "boolean",
+                "description": "enabled ∧ applies ∧ insufficient."
+              },
+              "blockedText": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "\"Dana PT tidak cukup — kurang Rp X. Tolak, atau perintahkan pinjaman antar-PT.\""
+              },
+              "balance": {
+                "type": "integer",
+                "description": "Saldo dana: Σ balance of the PT's active accounts WITHOUT a site."
+              },
+              "commitments": {
+                "type": "integer",
+                "description": "Komitmen: approved-not-transferred + unpaid LPJ shortfalls + loans instructed with this PT as lender."
+              },
+              "available": {
+                "type": "integer",
+                "description": "Dana tersedia = balance − commitments (may be negative)."
+              },
+              "needed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000000000000,
+                "description": "Dibutuhkan: the request's grand total (not yet committed)."
+              },
+              "gap": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000000000000,
+                "description": "Kurang = max(0, needed − available)."
+              },
+              "accountCount": {
+                "type": "integer",
+                "description": "\"n akun, tanpa akun site\"."
+              },
+              "excludedSiteAccounts": {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer"
+                  },
+                  "balance": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "count",
+                  "balance"
+                ]
+              },
+              "waitingAtOwner": {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer"
+                  },
+                  "amount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000000000000
+                  }
+                },
+                "required": [
+                  "count",
+                  "amount"
+                ],
+                "description": "Other requests of the PT waiting at their final decision (not committed: first approved, first served)."
+              },
+              "commitmentItems": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "request",
+                        "shortfall",
+                        "loan"
+                      ]
+                    },
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "docNo": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "amount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10000000000000
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "id",
+                    "docNo",
+                    "amount",
+                    "status"
+                  ]
+                },
+                "description": "The commitments behind the figure, largest first (max 20). kind loan: id = the inter-PT loan."
+              },
+              "loans": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "docNo": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "amount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10000000000000
+                    },
+                    "lender": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
+                        "shortCode": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "shortCode"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "docNo",
+                    "status",
+                    "amount",
+                    "lender"
+                  ]
+                },
+                "description": "Inter-PT loans instructed for this request (linked)."
+              }
+            },
+            "required": [
+              "companyId",
+              "company",
+              "enabled",
+              "applies",
+              "status",
+              "blocked",
+              "blockedText",
+              "balance",
+              "commitments",
+              "available",
+              "needed",
+              "gap",
+              "accountCount",
+              "excludedSiteAccounts",
+              "waitingAtOwner",
+              "commitmentItems",
+              "loans"
+            ],
+            "description": "ADR 0029 §2 \"Ketersediaan dana PT\": for Finance / Direktur / Owner of the request's PT while the request waits for a decision (any step; read-only before the final one) or is the Owner's own Draft; null otherwise. `blocked` = the next decision (or the Owner's submit) is refused with 409 FUND_INSUFFICIENT — show \"Setujui\" disabled with `blockedText`, keep \"Tolak\"; `instruct_loan` in allowedActions opens the loan instruction (amount default = gap)."
+          },
           "direkturSignature": {
             "type": [
               "object",
@@ -2409,6 +2696,7 @@
           "settlement",
           "budget",
           "allowedActions",
+          "fundCheck",
           "direkturSignature",
           "resubmitOfId",
           "resubmitOf",
@@ -2928,7 +3216,8 @@
           "lpj_request_revision",
           "lpj_verify",
           "settle",
-          "settle_reverse"
+          "settle_reverse",
+          "instruct_loan"
         ]
       },
       "ExpenseRequestCreate": {
@@ -4597,16 +4886,39 @@
                   "name"
                 ]
               },
+              "sourceDocType": {
+                "type": "string",
+                "enum": [
+                  "expense_request",
+                  "intercompany_loan"
+                ],
+                "description": "ADR 0029: the document of the pair — a PT grup payment (request of the paying PT) or an inter-PT loan (PJA, belongs to both PTs)."
+              },
+              "loanLeg": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "given",
+                  "received",
+                  "repaid_in",
+                  "repaid_out",
+                  null
+                ],
+                "description": "ADR 0029: Pinjaman antar-PT diberikan / diterima, Pengembalian pinjaman antar-PT diterima, Pembayaran hutang antar-PT; null for a PT grup payment."
+              },
               "sourceDocNo": {
                 "type": [
                   "string",
                   "null"
                 ],
-                "description": "Number of the paying PT's request (PB/…)."
+                "description": "Number of the paying PT's request (PB/…) or the loan (PJA/…)."
               },
               "sourceDocId": {
                 "type": "integer",
-                "exclusiveMinimum": 0
+                "exclusiveMinimum": 0,
+                "description": "The request id, or (sourceDocType intercompany_loan) the loan id."
               },
               "transferDocNo": {
                 "type": [
@@ -4635,6 +4947,8 @@
               "direction",
               "status",
               "counterpartCompany",
+              "sourceDocType",
+              "loanLeg",
               "sourceDocNo",
               "sourceDocId",
               "transferDocNo",
@@ -5573,6 +5887,15 @@
                   "type": "boolean",
                   "description": "ADR 0021: approving this step makes the request \"Disetujui\" (Finance then transfers / verifies receipts)."
                 },
+                "fundShort": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 10000000000000,
+                  "description": "ADR 0029: \"Dana kurang Rp X\" — the gap of a final-step row of a PT with the fund check on (Kas roles of the PT); null when enough / not applicable. Approving it is refused (409 FUND_INSUFFICIENT)."
+                },
                 "selfApproval": {
                   "type": [
                     "string",
@@ -5665,6 +5988,7 @@
                 "decisionFlow",
                 "decisionBy",
                 "finalStep",
+                "fundShort",
                 "selfApproval",
                 "budget",
                 "flags"
@@ -16904,6 +17228,1445 @@
         ],
         "additionalProperties": false
       },
+      "FundAvailability": {
+        "type": "object",
+        "properties": {
+          "companyId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "company": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "shortCode": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "shortCode",
+              "name"
+            ]
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "companies.fundCheckEnabled."
+          },
+          "balance": {
+            "type": "integer"
+          },
+          "commitments": {
+            "type": "integer"
+          },
+          "available": {
+            "type": "integer"
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "name": {
+                  "type": "string"
+                },
+                "balance": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "balance"
+              ]
+            },
+            "description": "The accounts behind \"Saldo dana\" (active, without a site)."
+          },
+          "excludedSiteAccounts": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer"
+              },
+              "balance": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "count",
+              "balance"
+            ]
+          },
+          "commitmentItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "request",
+                    "shortfall",
+                    "loan"
+                  ]
+                },
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "docNo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "amount": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "docNo",
+                "amount",
+                "status"
+              ]
+            }
+          }
+        },
+        "required": [
+          "companyId",
+          "company",
+          "enabled",
+          "balance",
+          "commitments",
+          "available",
+          "accounts",
+          "excludedSiteAccounts",
+          "commitmentItems"
+        ]
+      },
+      "IntercompanyLoanList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IntercompanyLoanSummary"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          },
+          "totalDocs": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "totalPages",
+          "totalDocs",
+          "limit"
+        ]
+      },
+      "IntercompanyLoanSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "uuid": {
+            "type": "string"
+          },
+          "docNo": {
+            "type": "string",
+            "description": "PJA/{LENDER}/{YY}{MM}/#### (issued at the instruction, lender PT's counter)."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "instructed",
+              "disbursed",
+              "partially_repaid",
+              "repaid",
+              "cancelled"
+            ]
+          },
+          "statusLabel": {
+            "type": "string",
+            "description": "Menunggu pencairan | Dicairkan | Sebagian dikembalikan | Lunas | Dibatalkan."
+          },
+          "overdue": {
+            "type": "boolean"
+          },
+          "overdueLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "daysOverdue": {
+            "type": "integer"
+          },
+          "lender": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "shortCode": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "shortCode",
+              "name"
+            ]
+          },
+          "borrower": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "shortCode": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "shortCode",
+              "name"
+            ]
+          },
+          "amount": {
+            "type": "integer"
+          },
+          "repaidTotal": {
+            "type": "integer"
+          },
+          "outstanding": {
+            "type": "integer",
+            "description": "amount − posted repayments once disbursed; 0 while instructed / cancelled."
+          },
+          "instructionDate": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "lender",
+              "borrower",
+              "both"
+            ],
+            "description": "The caller's side: lender (piutang antar-PT), borrower (hutang antar-PT), both."
+          }
+        },
+        "required": [
+          "id",
+          "uuid",
+          "docNo",
+          "status",
+          "statusLabel",
+          "overdue",
+          "overdueLabel",
+          "daysOverdue",
+          "lender",
+          "borrower",
+          "amount",
+          "repaidTotal",
+          "outstanding",
+          "instructionDate",
+          "dueDate",
+          "reason",
+          "createdBy",
+          "createdAt",
+          "side"
+        ]
+      },
+      "IntercompanyLoanQueue": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Badge: instructed loans waiting for disbursement by the caller's (lender) Finance PTs."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "uuid": {
+                  "type": "string"
+                },
+                "docNo": {
+                  "type": "string",
+                  "description": "PJA/{LENDER}/{YY}{MM}/#### (issued at the instruction, lender PT's counter)."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "instructed",
+                    "disbursed",
+                    "partially_repaid",
+                    "repaid",
+                    "cancelled"
+                  ]
+                },
+                "statusLabel": {
+                  "type": "string",
+                  "description": "Menunggu pencairan | Dicairkan | Sebagian dikembalikan | Lunas | Dibatalkan."
+                },
+                "overdue": {
+                  "type": "boolean"
+                },
+                "overdueLabel": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "daysOverdue": {
+                  "type": "integer"
+                },
+                "lender": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "shortCode": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "shortCode",
+                    "name"
+                  ]
+                },
+                "borrower": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "shortCode": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "shortCode",
+                    "name"
+                  ]
+                },
+                "amount": {
+                  "type": "integer"
+                },
+                "repaidTotal": {
+                  "type": "integer"
+                },
+                "outstanding": {
+                  "type": "integer",
+                  "description": "amount − posted repayments once disbursed; 0 while instructed / cancelled."
+                },
+                "instructionDate": {
+                  "type": "string"
+                },
+                "dueDate": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "createdBy": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                },
+                "createdAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "lender",
+                    "borrower",
+                    "both"
+                  ],
+                  "description": "The caller's side: lender (piutang antar-PT), borrower (hutang antar-PT), both."
+                },
+                "canDisburse": {
+                  "type": "boolean",
+                  "description": "false for the instruction's creator (G1)."
+                },
+                "g1Note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "destination": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "bankName": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "accountNoMasked": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "accountHolder": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "bankName",
+                    "accountNoMasked",
+                    "accountHolder"
+                  ],
+                  "description": "The borrower's designated receiving account (masked); null = none designated (the disbursement answers 409 INTERCOMPANY_NO_ACCOUNT)."
+                }
+              },
+              "required": [
+                "id",
+                "uuid",
+                "docNo",
+                "status",
+                "statusLabel",
+                "overdue",
+                "overdueLabel",
+                "daysOverdue",
+                "lender",
+                "borrower",
+                "amount",
+                "repaidTotal",
+                "outstanding",
+                "instructionDate",
+                "dueDate",
+                "reason",
+                "createdBy",
+                "createdAt",
+                "side",
+                "canDisburse",
+                "g1Note",
+                "destination"
+              ]
+            }
+          }
+        },
+        "required": [
+          "count",
+          "items"
+        ]
+      },
+      "IntercompanyLenderOptions": {
+        "type": "object",
+        "properties": {
+          "borrower": {
+            "type": "object",
+            "properties": {
+              "company": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                  },
+                  "shortCode": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "shortCode",
+                  "name"
+                ]
+              },
+              "balance": {
+                "type": "integer"
+              },
+              "commitments": {
+                "type": "integer"
+              },
+              "available": {
+                "type": "integer"
+              },
+              "fundCheckEnabled": {
+                "type": "boolean"
+              },
+              "hasReceivingAccount": {
+                "type": "boolean",
+                "description": "false → the instruction is refused (400 INTERCOMPANY_NO_ACCOUNT)."
+              },
+              "waiting": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "docNo": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "needed": {
+                      "type": "integer"
+                    },
+                    "gap": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "docNo",
+                    "title",
+                    "needed",
+                    "gap"
+                  ]
+                },
+                "description": "Requests of the borrower PT waiting at their final decision (the \"Hitung untuk semua pengajuan yang menunggu\" list)."
+              },
+              "gapAll": {
+                "type": "integer",
+                "description": "Σ needed − available of every waiting request (≥ 0)."
+              }
+            },
+            "required": [
+              "company",
+              "balance",
+              "commitments",
+              "available",
+              "fundCheckEnabled",
+              "hasReceivingAccount",
+              "waiting",
+              "gapAll"
+            ]
+          },
+          "defaultDueDate": {
+            "type": "string",
+            "description": "Today (borrower PT) + 30 days."
+          },
+          "lenders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "company": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "shortCode": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "shortCode",
+                    "name"
+                  ]
+                },
+                "balance": {
+                  "type": "integer"
+                },
+                "commitments": {
+                  "type": "integer"
+                },
+                "available": {
+                  "type": "integer"
+                },
+                "sufficient": {
+                  "type": "boolean",
+                  "description": "available ≥ amount — short PTs are shown disabled (\"Dana tersedia Rp X\")."
+                },
+                "hasReceivingAccount": {
+                  "type": "boolean"
+                },
+                "warning": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "company",
+                "balance",
+                "commitments",
+                "available",
+                "sufficient",
+                "hasReceivingAccount",
+                "warning"
+              ]
+            }
+          }
+        },
+        "required": [
+          "borrower",
+          "defaultDueDate",
+          "lenders"
+        ]
+      },
+      "IntercompanyLoanDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "uuid": {
+            "type": "string"
+          },
+          "docNo": {
+            "type": "string",
+            "description": "PJA/{LENDER}/{YY}{MM}/#### (issued at the instruction, lender PT's counter)."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "instructed",
+              "disbursed",
+              "partially_repaid",
+              "repaid",
+              "cancelled"
+            ]
+          },
+          "statusLabel": {
+            "type": "string",
+            "description": "Menunggu pencairan | Dicairkan | Sebagian dikembalikan | Lunas | Dibatalkan."
+          },
+          "overdue": {
+            "type": "boolean"
+          },
+          "overdueLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "daysOverdue": {
+            "type": "integer"
+          },
+          "lender": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "shortCode": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "shortCode",
+              "name"
+            ]
+          },
+          "borrower": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "shortCode": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "shortCode",
+              "name"
+            ]
+          },
+          "amount": {
+            "type": "integer"
+          },
+          "repaidTotal": {
+            "type": "integer"
+          },
+          "outstanding": {
+            "type": "integer",
+            "description": "amount − posted repayments once disbursed; 0 while instructed / cancelled."
+          },
+          "instructionDate": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "lender",
+              "borrower",
+              "both"
+            ],
+            "description": "The caller's side: lender (piutang antar-PT), borrower (hutang antar-PT), both."
+          },
+          "snapshot": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {},
+            "description": "Evidence at the instruction: borrowerAvailable, borrowerGap, lenderAvailable (+ balances / commitments)."
+          },
+          "cancelReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cancelledAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cancelledBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "ownRequest": {
+            "type": "boolean",
+            "description": "G1 note: the loan is for the Owner's own request (the disbursement by Finance is the independent second person)."
+          },
+          "ownRequestNote": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "droppedRequestNote": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A linked request was cancelled / rejected while the loan waits (\"batalkan perintah bila tidak diperlukan\")."
+          },
+          "lenderHasReceivingAccount": {
+            "type": "boolean",
+            "description": "Repayments need the lender's designated receiving account."
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "docNo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Borrower-side readers only."
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "statusLabel": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "grandTotal": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "docNo",
+                "title",
+                "status",
+                "statusLabel",
+                "grandTotal"
+              ]
+            }
+          },
+          "movements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "disbursement",
+                    "repayment"
+                  ]
+                },
+                "label": {
+                  "type": "string",
+                  "description": "\"Pencairan\" | \"Pengembalian ke-n\"."
+                },
+                "seq": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "amount": {
+                  "type": "integer"
+                },
+                "transferDate": {
+                  "type": "string"
+                },
+                "transferAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "bankRef": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Paying-side readers only."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "posted",
+                    "void"
+                  ]
+                },
+                "voidReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "fromCompanyId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "toCompanyId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "fromAccount": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                },
+                "toAccount": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "accountNoMasked": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "accountNoMasked"
+                  ]
+                },
+                "kk": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "entryNo": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "entryNo"
+                  ],
+                  "description": "KK of the paying PT (id only for its Kas roles)."
+                },
+                "km": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "entryNo": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "entryNo"
+                  ],
+                  "description": "Automatic KM of the receiving PT (id only for its Kas roles)."
+                },
+                "proofId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
+                },
+                "executedBy": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                },
+                "voidedBy": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                },
+                "voidedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "label",
+                "seq",
+                "amount",
+                "transferDate",
+                "transferAt",
+                "bankRef",
+                "status",
+                "voidReason",
+                "fromCompanyId",
+                "toCompanyId",
+                "fromAccount",
+                "toAccount",
+                "kk",
+                "km",
+                "proofId",
+                "executedBy",
+                "voidedBy",
+                "voidedAt",
+                "createdAt"
+              ]
+            }
+          },
+          "allowedActions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "cancel",
+                "disburse",
+                "void_disbursement",
+                "repay",
+                "void_repayment"
+              ]
+            },
+            "description": "cancel: Owner (instructed); disburse: Finance of the lender, not the creator (G1); void_disbursement: Finance of the lender (no repayment); repay / void_repayment: Finance of the borrower."
+          },
+          "disburseBlockedByG1": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "uuid",
+          "docNo",
+          "status",
+          "statusLabel",
+          "overdue",
+          "overdueLabel",
+          "daysOverdue",
+          "lender",
+          "borrower",
+          "amount",
+          "repaidTotal",
+          "outstanding",
+          "instructionDate",
+          "dueDate",
+          "reason",
+          "createdBy",
+          "createdAt",
+          "side",
+          "snapshot",
+          "cancelReason",
+          "cancelledAt",
+          "cancelledBy",
+          "ownRequest",
+          "ownRequestNote",
+          "droppedRequestNote",
+          "lenderHasReceivingAccount",
+          "requests",
+          "movements",
+          "allowedActions",
+          "disburseBlockedByG1"
+        ]
+      },
+      "IntercompanyLoanCreate": {
+        "type": "object",
+        "properties": {
+          "borrowerCompanyId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "PT peminjam (the short PT) — the caller must be Owner (pk-principal) there."
+          },
+          "lenderCompanyId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "PT pemberi — another active PT where the caller is Owner (GET /intercompany-loans/lenders)."
+          },
+          "amount": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000000000,
+            "description": "Nilai (Rp > 0, ≤ the lender's \"Dana tersedia\" — else 409 LOAN_LENDER_INSUFFICIENT). Default in the form: the gap of the linked request(s)."
+          },
+          "dueDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Jatuh tempo (required in the form, ≥ today; omitted = today + 30 days, owner 2026-10-14)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Alasan (3–1000)."
+          },
+          "requestIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 50,
+            "description": "Requests of the BORROWER PT this loan is for (informational; not cancelled / rejected)."
+          }
+        },
+        "required": [
+          "borrowerCompanyId",
+          "lenderCompanyId",
+          "amount",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "IntercompanyLoanReason": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "IntercompanyLoanDisburse": {
+        "type": "object",
+        "properties": {
+          "cashAccountId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Source account of the PAYING PT: active, WITHOUT a site (the pool of the fund check)."
+          },
+          "bankRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "proofMediaId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "media-transfer-proofs id (POST /media/transfer-proofs), an unclaimed upload of the caller."
+          },
+          "transferAt": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,3})?)?(Z|[+-]\\d{2}:\\d{2})?$",
+            "description": "Date + time of the bank proof (ISO 8601 with offset, or wall clock in the PAYING PT zone). Not in the future; its date is the movement date (period lock of both PTs)."
+          },
+          "transferDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Date only (time unknown); with transferAt it must be its date."
+          },
+          "confirmOverdraft": {
+            "type": "boolean",
+            "description": "QA-04: confirm that the source account goes below 0 (else 409 CASH_OVERDRAFT_CONFIRM_REQUIRED); audited overdraft_confirmed."
+          }
+        },
+        "required": [
+          "cashAccountId",
+          "bankRef",
+          "proofMediaId"
+        ],
+        "additionalProperties": false,
+        "description": "Amount = the loan amount (one disbursement); destination = the borrower's designated receiving account."
+      },
+      "IntercompanyLoanVoidDisbursement": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          },
+          "confirmBorrowerShortfall": {
+            "type": "boolean",
+            "description": "Required when the borrower's \"Dana tersedia\" would go below 0 after the reversal (else 409 LOAN_VOID_BORROWER_SHORTFALL_CONFIRM_REQUIRED {borrowerCompanyId, available, after, amount}); audited."
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "IntercompanyLoanRepay": {
+        "type": "object",
+        "properties": {
+          "cashAccountId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Source account of the PAYING PT: active, WITHOUT a site (the pool of the fund check)."
+          },
+          "bankRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "proofMediaId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "media-transfer-proofs id (POST /media/transfer-proofs), an unclaimed upload of the caller."
+          },
+          "transferAt": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,3})?)?(Z|[+-]\\d{2}:\\d{2})?$",
+            "description": "Date + time of the bank proof (ISO 8601 with offset, or wall clock in the PAYING PT zone). Not in the future; its date is the movement date (period lock of both PTs)."
+          },
+          "transferDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Date only (time unknown); with transferAt it must be its date."
+          },
+          "confirmOverdraft": {
+            "type": "boolean",
+            "description": "QA-04: confirm that the source account goes below 0 (else 409 CASH_OVERDRAFT_CONFIRM_REQUIRED); audited overdraft_confirmed."
+          },
+          "amount": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000000000,
+            "description": "Nominal pengembalian (Rp > 0, ≤ outstanding — else 409 LOAN_REPAYMENT_EXCEEDS_OUTSTANDING; ≤ the borrower's \"Dana tersedia\" — else 409 FUND_INSUFFICIENT)."
+          }
+        },
+        "required": [
+          "cashAccountId",
+          "bankRef",
+          "proofMediaId",
+          "amount"
+        ],
+        "additionalProperties": false,
+        "description": "Destination = the lender's designated receiving account (none → 409 INTERCOMPANY_NO_ACCOUNT)."
+      },
       "UserOnboardingResult": {
         "type": "object",
         "properties": {
@@ -19196,7 +20959,7 @@
     },
     "/expense-requests/{id}/submit": {
       "post": {
-        "summary": "Submit (number, rule snapshot, signatures Diajukan/Dibuat, flags)",
+        "summary": "Submit (number, rule snapshot, signatures Diajukan/Dibuat, flags). ADR 0029: the Owner's own request without approval goes straight to Finance — for a PT with the fund check on it is checked HERE: short → 409 code FUND_INSUFFICIENT (companyId, balance, commitments, available, needed, gap), the request stays Draft (audited fund_insufficient)",
         "security": [
           {
             "bearer": []
@@ -19926,7 +21689,7 @@
     },
     "/expense-requests/{id}/acknowledge": {
       "post": {
-        "summary": "\"Diketahui Oleh\" = Direktur approval (US-42, ADR 0013); PM/Staff/Admin → 403 (audited)",
+        "summary": "\"Diketahui Oleh\" = Direktur approval (US-42, ADR 0013); PM/Staff/Admin → 403 (audited). ADR 0029: a final \"Diketahui\" (no approval level) is fund-checked like the final approval (409 FUND_INSUFFICIENT)",
         "security": [
           {
             "bearer": []
@@ -20076,7 +21839,7 @@
     },
     "/expense-requests/{id}/approve": {
       "post": {
-        "summary": "Approve the current level — Finance by default (G1/G2, ADR 0013; budget % before → after); PM/Staff/Admin → 403 (audited)",
+        "summary": "Approve the current level (G1/G2, ADR 0013 / 0026; budget % before → after); PM/Staff/Admin → 403 (audited). ADR 0029: the decision that makes the request \"Disetujui\" (normally the Owner level; a rule without an Owner level: its last level) is refused for a PT with the fund check on when the request's grand total exceeds the PT's \"Dana tersedia\" → 409 code FUND_INSUFFICIENT (companyId, balance, commitments, available, needed, gap; audited fund_insufficient); the request stays at its step. Checked decisions store fundBalance / fundCommitments / fundAvailable",
         "security": [
           {
             "bearer": []
@@ -27885,6 +29648,80 @@
                       ],
                       "description": "ADR 0022 §9 \"Pinjaman antar project\": loanScope (office roles: their PTs, PM: team projects as borrower or lender)."
                     },
+                    "intercompany": {
+                      "type": "object",
+                      "properties": {
+                        "funds": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "balance": {
+                                "type": "integer"
+                              },
+                              "commitments": {
+                                "type": "integer"
+                              },
+                              "available": {
+                                "type": "integer"
+                              },
+                              "fundCheckEnabled": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "balance",
+                              "commitments",
+                              "available",
+                              "fundCheckEnabled"
+                            ]
+                          },
+                          "description": "ADR 0029 §1 \"Dana tersedia\" per PT of the scope (active accounts without a site − commitments)."
+                        },
+                        "positions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "receivable": {
+                                "type": "integer"
+                              },
+                              "payable": {
+                                "type": "integer"
+                              },
+                              "overdue": {
+                                "type": "integer"
+                              },
+                              "instructed": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "receivable",
+                              "payable",
+                              "overdue",
+                              "instructed"
+                            ]
+                          },
+                          "description": "ADR 0029 §3.9 \"Hutang / piutang antar-PT\": outstanding per PT as lender (piutang) / borrower (hutang); instructed = reserved, not yet disbursed."
+                        }
+                      },
+                      "required": [
+                        "funds",
+                        "positions"
+                      ],
+                      "description": "ADR 0029: inter-PT funds and loans (Owner / Direktur layout)."
+                    },
                     "rapMonitoring": {
                       "type": "object",
                       "properties": {
@@ -28406,16 +30243,39 @@
                                       "name"
                                     ]
                                   },
+                                  "sourceDocType": {
+                                    "type": "string",
+                                    "enum": [
+                                      "expense_request",
+                                      "intercompany_loan"
+                                    ],
+                                    "description": "ADR 0029: the document of the pair — a PT grup payment (request of the paying PT) or an inter-PT loan (PJA, belongs to both PTs)."
+                                  },
+                                  "loanLeg": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ],
+                                    "enum": [
+                                      "given",
+                                      "received",
+                                      "repaid_in",
+                                      "repaid_out",
+                                      null
+                                    ],
+                                    "description": "ADR 0029: Pinjaman antar-PT diberikan / diterima, Pengembalian pinjaman antar-PT diterima, Pembayaran hutang antar-PT; null for a PT grup payment."
+                                  },
                                   "sourceDocNo": {
                                     "type": [
                                       "string",
                                       "null"
                                     ],
-                                    "description": "Number of the paying PT's request (PB/…)."
+                                    "description": "Number of the paying PT's request (PB/…) or the loan (PJA/…)."
                                   },
                                   "sourceDocId": {
                                     "type": "integer",
-                                    "exclusiveMinimum": 0
+                                    "exclusiveMinimum": 0,
+                                    "description": "The request id, or (sourceDocType intercompany_loan) the loan id."
                                   },
                                   "transferDocNo": {
                                     "type": [
@@ -28444,6 +30304,8 @@
                                   "direction",
                                   "status",
                                   "counterpartCompany",
+                                  "sourceDocType",
+                                  "loanLeg",
                                   "sourceDocNo",
                                   "sourceDocId",
                                   "transferDocNo",
@@ -28628,6 +30490,7 @@
                     "transferQueue",
                     "sla",
                     "loans",
+                    "intercompany",
                     "rapMonitoring",
                     "rapMissing",
                     "viz"
@@ -29719,16 +31582,39 @@
                                       "name"
                                     ]
                                   },
+                                  "sourceDocType": {
+                                    "type": "string",
+                                    "enum": [
+                                      "expense_request",
+                                      "intercompany_loan"
+                                    ],
+                                    "description": "ADR 0029: the document of the pair — a PT grup payment (request of the paying PT) or an inter-PT loan (PJA, belongs to both PTs)."
+                                  },
+                                  "loanLeg": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ],
+                                    "enum": [
+                                      "given",
+                                      "received",
+                                      "repaid_in",
+                                      "repaid_out",
+                                      null
+                                    ],
+                                    "description": "ADR 0029: Pinjaman antar-PT diberikan / diterima, Pengembalian pinjaman antar-PT diterima, Pembayaran hutang antar-PT; null for a PT grup payment."
+                                  },
                                   "sourceDocNo": {
                                     "type": [
                                       "string",
                                       "null"
                                     ],
-                                    "description": "Number of the paying PT's request (PB/…)."
+                                    "description": "Number of the paying PT's request (PB/…) or the loan (PJA/…)."
                                   },
                                   "sourceDocId": {
                                     "type": "integer",
-                                    "exclusiveMinimum": 0
+                                    "exclusiveMinimum": 0,
+                                    "description": "The request id, or (sourceDocType intercompany_loan) the loan id."
                                   },
                                   "transferDocNo": {
                                     "type": [
@@ -29757,6 +31643,8 @@
                                   "direction",
                                   "status",
                                   "counterpartCompany",
+                                  "sourceDocType",
+                                  "loanLeg",
                                   "sourceDocNo",
                                   "sourceDocId",
                                   "transferDocNo",
@@ -42154,6 +44042,1506 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProjectLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fund-availability": {
+      "get": {
+        "summary": "ADR 0029 §1 \"Dana tersedia\" of one PT = Σ balance of its ACTIVE accounts WITHOUT a site − commitments (approved-not-transferred requests, unpaid LPJ shortfalls, loans instructed with this PT as lender). Finance / Direktur / Owner of that PT within the selection (else 403 / COMPANY_NOT_ALLOWED)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "The PT (Finance / Direktur / Owner of it, within the selection)."
+            },
+            "required": true,
+            "description": "The PT (Finance / Direktur / Owner of it, within the selection).",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Availability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundAvailability"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/intercompany-loans": {
+      "get": {
+        "summary": "Inter-PT loans (PJA) of the caller's PTs as lender or borrower (Owner / Direktur / Finance / Admin of either PT), newest first, numbered pages",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "lender",
+                "borrower"
+              ],
+              "description": "Only loans where a PT of the filter / selection is the lender (piutang) or the borrower (hutang)."
+            },
+            "required": false,
+            "description": "Only loans where a PT of the filter / selection is the lender (piutang) or the borrower (hutang).",
+            "name": "role",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z_]+(,[a-z_]+)*$",
+              "description": "Comma separated: instructed, disbursed, partially_repaid, repaid, cancelled."
+            },
+            "required": false,
+            "description": "Comma separated: instructed, disbursed, partially_repaid, repaid, cancelled.",
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ],
+              "description": "Only \"Terlambat\" loans (due date before today, outstanding > 0)."
+            },
+            "required": false,
+            "description": "Only \"Terlambat\" loans (due date before today, outstanding > 0).",
+            "name": "overdue",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "Search in number, reason, PT codes."
+            },
+            "required": false,
+            "description": "Search in number, reason, PT codes.",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Loans",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntercompanyLoanList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Owner instruction \"Perintahkan pinjaman antar-PT\" (pk-principal STORED in both PTs, else 403 + access_denied): number PJA/{LENDER}/{YY}{MM}/#### → status instructed (the amount is reserved in the lender's commitments). Borrower without designated receiving account → 400 code INTERCOMPANY_NO_ACCOUNT; amount > the lender's \"Dana tersedia\" → 409 code LOAN_LENDER_INSUFFICIENT (lenderCompanyId, available, needed, gap); due date default + 30 days, ≥ today; linked requests of the borrower PT only. Notified: Finance of the lender (icloan.instructed) + Finance / Direktur of both PTs",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntercompanyLoanCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntercompanyLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/intercompany-loans/queue": {
+      "get": {
+        "summary": "\"Pencairan pinjaman antar-PT\": instructed loans whose LENDER is a PT where the caller is Finance (?company= narrows); count = badge. canDisburse false for the instruction's creator (G1)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntercompanyLoanQueue"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/intercompany-loans/lenders": {
+      "get": {
+        "summary": "Instruction form (Owner of the borrower PT, else 403): the borrower's availability + requests waiting at their final decision (gap per request, gapAll), and every other active PT where the caller is Owner with its \"Dana tersedia\" and `sufficient` (available ≥ amount); short PTs are shown disabled",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "PT peminjam (the caller must be Owner there)."
+            },
+            "required": true,
+            "description": "PT peminjam (the caller must be Owner there).",
+            "name": "borrower",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000000000000,
+              "description": "Needed amount — `sufficient` compares with it (omitted: available > 0)."
+            },
+            "required": false,
+            "description": "Needed amount — `sufficient` compares with it (omitted: available > 0).",
+            "name": "amount",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lenders",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntercompanyLenderOptions"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/intercompany-loans/{id}": {
+      "get": {
+        "summary": "Loan detail: movements (Pencairan / Pengembalian ke-n with KK / KM numbers), linked requests, notes, allowed actions (404 for a user of neither PT)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntercompanyLoanDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/intercompany-loans/{id}/cancel": {
+      "post": {
+        "summary": "Owner: cancel the instruction (reason) while waiting for the disbursement; the reservation is released (icloan.cancelled)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntercompanyLoanReason"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntercompanyLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/intercompany-loans/{id}/disburse": {
+      "post": {
+        "summary": "Finance of the LENDER executes the disbursement (never the instruction's creator: 403, G1; DB-checked). Re-check of the lender: \"Dana tersedia\" + this loan's reservation ≥ amount, else 409 code LOAN_LENDER_INSUFFICIENT (the instruction stays, the Owner gets icloan.lender_insufficient). Source account of the lender: active, without site, opening date, lock date (409 \"Periode … sudah ditutup\"), overdraft → 409 CASH_OVERDRAFT_CONFIRM_REQUIRED unless confirmOverdraft. Borrower: designated account (409 INTERCOMPANY_NO_ACCOUNT), its period of the date closed → 409 INTERCOMPANY_PERIOD_CLOSED. Writes KK (source intercompany) in the lender + automatic KM \"Antar PT\" in the borrower, paired in intercompany_links; status disbursed; icloan.disbursed to the Owner and the borrower's Finance + Direktur (the Owner then approves the short requests again — no automatic approval)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntercompanyLoanDisburse"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntercompanyLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/intercompany-loans/{id}/disbursement/void": {
+      "post": {
+        "summary": "Finance of the LENDER voids the disbursement (reason) while no repayment is posted (else 409 code LOAN_HAS_REPAYMENTS): both legs reversed (a closed period never blocks), back to instructed. Borrower \"Dana tersedia\" < 0 afterwards → 409 code LOAN_VOID_BORROWER_SHORTFALL_CONFIRM_REQUIRED (borrowerCompanyId, available, after, amount) unless confirmBorrowerShortfall (audited); approved requests stay approved",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntercompanyLoanVoidDisbursement"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntercompanyLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/intercompany-loans/{id}/repayments": {
+      "post": {
+        "summary": "Finance of the BORROWER records a repayment (no approval, partial allowed): amount ≤ outstanding (else 409 code LOAN_REPAYMENT_EXCEEDS_OUTSTANDING), ≤ the borrower's \"Dana tersedia\" (else 409 code FUND_INSUFFICIENT), date not before the disbursement; destination = the lender's designated account (none → 409 INTERCOMPANY_NO_ACCOUNT); lock dates of both PTs. KK in the borrower + automatic KM in the lender; status partially_repaid / repaid; icloan.repaid to the Owner and the lender's Finance + Direktur",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntercompanyLoanRepay"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntercompanyLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/intercompany-loans/{id}/repayments/{mid}/void": {
+      "post": {
+        "summary": "Finance of the BORROWER voids a posted repayment (reason): both legs reversed, the loan status recomputed",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "mid",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntercompanyLoanReason"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntercompanyLoanDetail"
                 }
               }
             }

@@ -32,6 +32,7 @@ import {
 } from '@/domain/cash/book'
 import { balances, booksStartDate, currentLockDate, lockDates, type CashEntryDoc } from '@/domain/cash/ledger'
 import { periodEnd } from '@/domain/cash/periods'
+import { IC_LOAN_LEG_LABELS } from '@/domain/intercompany/loan-rules'
 import { displayName, settings, today as businessToday } from '@/domain/expense/common'
 import { MONTHS_SHORT, periodLabel } from '@/domain/reports/rules'
 import type { PillTone } from '@/domain/reports/viz'
@@ -409,6 +410,18 @@ function FilterBar({ q, lk, filtered, pt, pts }: { q: BookQuery; lk: Lookups; fi
 function IntercompanyLinks({ ic }: { ic: NonNullable<BookRow['intercompany']> }) {
   const pt = ic.counterpartCompany?.shortCode ?? 'lain'
   const entry = ic.canOpenCounterpart ? <a href={`/admin/collections/cash-entries/${ic.counterpartEntryId}`}>{ic.counterpartEntryNo}</a> : <span>{ic.counterpartEntryNo}</span>
+  if (ic.sourceDocType === 'intercompany_loan') {
+    // ADR 0029 §3.9: "Pinjaman PJA/… · ke PT LAS" — the loan document (both PTs read it) + the other leg's number
+    const loan = ic.sourceDocNo ? ic.canOpenSourceDoc ? <a href={`/admin/pinjaman-antar-pt/detail/${ic.sourceDocId}`}>{ic.sourceDocNo}</a> : <span>{ic.sourceDocNo}</span> : null
+    const leg = ic.loanLeg ? IC_LOAN_LEG_LABELS[ic.loanLeg] : 'Pinjaman antar-PT'
+    return (
+      <span className="links" data-pk-ic={`loan-${ic.direction}`}>
+        {leg}
+        {loan ? <> · {loan}</> : null} · {ic.direction === 'out' ? 'ke' : 'dari'} PT {pt} · {entry}
+        {ic.status === 'void' ? ' (dibatalkan)' : ''}
+      </span>
+    )
+  }
   if (ic.direction === 'out') {
     return (
       <span className="links" data-pk-ic="out">
@@ -569,7 +582,7 @@ function LedgerTable({
               testId={`void-${r.id}`}
             />
           ) : null}
-          {writeIn(r.companyId) && voidHint(r) ? <span className="hint">{voidHint(r)}</span> : null}
+          {writeIn(r.companyId) && voidHint(r, r.intercompany) ? <span className="hint">{voidHint(r, r.intercompany)}</span> : null}
         </div>
       ),
     },

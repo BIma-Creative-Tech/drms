@@ -7,6 +7,8 @@ import { approvalInbox } from '@/domain/expense/queues'
 import { kindOf, PROJECT_KIND_LABELS } from '@/domain/field/rules'
 import { loanDashboard } from '@/domain/loans/report'
 import { loanInbox } from '@/domain/loans/service'
+import { fundCheckEnabled, fundFigures } from '@/domain/fundcheck/service'
+import { icLoanPositions, icLoanReportScope } from '@/domain/intercompany/loan-report'
 import { rapMissingProjects, rapMonitoring } from '@/domain/rap/budget'
 
 import { auditLogPage } from './audit-log'
@@ -185,6 +187,20 @@ export async function loanBlock(req: PayloadRequest) {
 export type LoanBlock = Awaited<ReturnType<typeof loanBlock>>
 
 /**
+ * ADR 0029 §3.9 (Owner / Direktur layout): "Dana tersedia per PT" (§1 figures of every PT of the scope — the PTs where
+ * the caller is Owner / Direktur) and "Hutang / piutang antar-PT" (outstanding per PT as lender / borrower).
+ */
+export async function intercompanyBlock(req: PayloadRequest, companyIds: readonly number[]) {
+  const funds = []
+  for (const c of [...companyIds].sort((a, b) => a - b)) {
+    const f = await fundFigures(req, c)
+    funds.push({ companyId: c, balance: f.balance, commitments: f.commitments, available: f.available, fundCheckEnabled: await fundCheckEnabled(req, c) })
+  }
+  return { funds, positions: await icLoanPositions(req, await icLoanReportScope(req)) }
+}
+export type IntercompanyBlock = Awaited<ReturnType<typeof intercompanyBlock>>
+
+/**
  * D4 (owner 2026-10-11) "Project ber-RAB belum punya RAP": Direktur = every project the caller may read in the
  * selected PTs, PM (`team`) = the PM's team projects only (nudge). Top 8 + `total`.
  */
@@ -236,6 +252,7 @@ export async function ownerDashboard(req: PayloadRequest, opts: { months?: numbe
     () => rapMissingBlock(req, false),
   )
   const completeness = await completenessByCompany(req, ALL, firstDay(ctx.month), lastDay(ctx.month), lpj)
+  const intercompany = await intercompanyBlock(req, scopeCompanies(BASE))
   const monthPt = flowsByCompany(balances.accounts, monthOps, pts)
   const siteOpts = await scopeSiteOptions(req, BASE)
   const siteCash = siteOpts.length ? cashBySite(siteOpts, visibleAccounts((await cashBalances(req, BASE, ctx.today)).accounts)) : []
@@ -278,6 +295,7 @@ export async function ownerDashboard(req: PayloadRequest, opts: { months?: numbe
     transferQueue: queue,
     sla,
     loans,
+    intercompany,
     rapMonitoring: rapMon,
     rapMissing,
     viz: {

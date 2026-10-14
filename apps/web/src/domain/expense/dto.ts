@@ -10,6 +10,7 @@ import { budgetImpact, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
 import { FLAG_LABELS, payeeOf, requestKindLabel, type FlagKind } from './types'
 import { intercompanyOfRequest } from '@/domain/intercompany/service'
+import { FUND_VIEW_ROLES, fundPanel } from '@/domain/fundcheck/service'
 import { withFlagVisibility } from './flag-visibility'
 import { receiptsOf } from './receipts'
 import { settlementOfRequest } from './lpj'
@@ -154,9 +155,14 @@ export async function detail(req: PayloadRequest, id: number) {
     .join(', ')
   const next = nextActor({ type: doc.type, payeeType: doc.payeeType, status: doc.status, currentLevel: doc.currentLevel ?? null, snapshot: snap, requesters: requesterNames, names })
   // E9: reversal only for a settled LPJ that posted a refund KM / shortfall transfer (UI hint; the service re-checks).
-  const allowed = allowedActions(ctx).filter((a) => a !== 'settle_reverse' || (lpj?.status === 'settled' && (lpj.settlementType === 'refund' || lpj.settlementType === 'shortfall')))
+  const baseAllowed = allowedActions(ctx).filter((a) => a !== 'settle_reverse' || (lpj?.status === 'settled' && (lpj.settlementType === 'refund' || lpj.settlementType === 'shortfall')))
+  // ADR 0029 §2 / §6: the PT's available funds (Kas roles of the PT, waiting request or the Owner's own Draft) and the
+  // Owner's "Perintahkan pinjaman antar-PT" (`instruct_loan`) while short. `approve` stays listed (old clients get the 409).
+  const fund = await fundPanel(req, { id, status: doc.status, grandTotal: doc.grandTotal ?? 0, company: doc.company, createdBy: doc.createdBy, currentLevel: doc.currentLevel ?? null, approvalSnapshot: snap })
+  const allowed: Array<(typeof baseAllowed)[number] | 'instruct_loan'> = fund?.instructLoan ? [...baseAllowed, 'instruct_loan'] : baseAllowed
+  const kasViewer = hasRole(req, FUND_VIEW_ROLES, company)
   // ADR 0025: the caller's next decision is signed as the PT's definitive Direktur (representative on a Direktur step)
-  const direkturSignature = await direkturSignatureHint(req, { companyId: company, callerId: userId(req) ?? -1, snapshot: snap, status: doc.status, currentLevel: doc.currentLevel ?? null, allowed })
+  const direkturSignature = await direkturSignatureHint(req, { companyId: company, callerId: userId(req) ?? -1, snapshot: snap, status: doc.status, currentLevel: doc.currentLevel ?? null, allowed: baseAllowed })
 
   return {
     ...listItem({ ...flat, project: doc.project, costCenter: doc.costCenter, createdBy: doc.createdBy } as RequestDoc),
@@ -244,6 +250,10 @@ export async function detail(req: PayloadRequest, id: number) {
       budgetPctBefore: rapViewer ? (a.budgetPctBefore ?? null) : null,
       budgetPctAfter: rapViewer ? (a.budgetPctAfter ?? null) : null,
       openFlags: a.openFlags ?? null,
+      // ADR 0029: "Dana tersedia saat disetujui" (a checked final decision) — Kas roles of the PT only
+      fundAvailable: kasViewer ? ((a as { fundAvailable?: number | null }).fundAvailable ?? null) : null,
+      fundBalance: kasViewer ? ((a as { fundBalance?: number | null }).fundBalance ?? null) : null,
+      fundCommitments: kasViewer ? ((a as { fundCommitments?: number | null }).fundCommitments ?? null) : null,
       signatureId: relId(a.signature) ?? null,
       signatureSha256: a.signatureSha256 ?? null,
       signatureSource: a.signatureSource ?? null,
@@ -317,6 +327,7 @@ export async function detail(req: PayloadRequest, id: number) {
     budget,
     openWarningFlags: visibleFlags.filter((f) => f.status === 'open' && f.level === 'warning').length,
     allowedActions: allowed,
+    fundCheck: fund?.panel ?? null,
     direkturSignature,
     resubmitOfId: relId(doc.resubmitOf) ?? null,
     // F2e: the previous (rejected) request by number + title ("Pengajuan ulang dari").

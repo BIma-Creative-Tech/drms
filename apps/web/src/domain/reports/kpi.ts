@@ -305,7 +305,16 @@ export async function cashBreakdown(req: PayloadRequest, scope: ReportScope, f: 
   const r = await rows(
     req,
     sql`SELECT ce.direction::text AS direction,
-          CASE WHEN ce.source_type = 'transfer' AND EXISTS (SELECT 1 FROM intercompany_links icl WHERE icl.source_cash_entry_id = ce.id) THEN 'intercompany_transfer' ELSE ce.source_type::text END AS source_type,
+          CASE WHEN ce.source_type = 'transfer' AND EXISTS (SELECT 1 FROM intercompany_links icl WHERE icl.source_cash_entry_id = ce.id) THEN 'intercompany_transfer'
+               -- ADR 0029 §3.9: the four legs of an inter-PT loan, split from the PT grup payment lines by the link's doc type
+               WHEN ce.source_type = 'intercompany' THEN coalesce((SELECT CASE
+                      WHEN icl.source_doc_type = 'intercompany_loan_disbursement' AND icl.source_cash_entry_id = ce.id THEN 'icloan_given'
+                      WHEN icl.source_doc_type = 'intercompany_loan_disbursement' THEN 'icloan_received'
+                      WHEN icl.source_doc_type = 'intercompany_loan_repayment' AND icl.source_cash_entry_id = ce.id THEN 'icloan_repaid_out'
+                      WHEN icl.source_doc_type = 'intercompany_loan_repayment' THEN 'icloan_repaid_in'
+                      ELSE 'intercompany' END
+                    FROM intercompany_links icl WHERE icl.source_cash_entry_id = ce.id OR icl.target_cash_entry_id = ce.id LIMIT 1), 'intercompany')
+               ELSE ce.source_type::text END AS source_type,
           s.name AS source_name, count(*)::int AS n, sum(ce.amount)::text AS amount
         FROM cash_entries ce LEFT JOIN cash_in_sources s ON s.id = ce.cash_in_source_id
         WHERE ${sql.join(where, sql` AND `)}

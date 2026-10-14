@@ -204,7 +204,8 @@ describe('MC3 — GET /me companies[] + deprecated single-PT fields', () => {
     expect([...me.roles].sort()).toEqual(['pk-finance', 'pk-pm', 'pk-staff'])
     // FR1: field-report capabilities stay false while no selected PT has companies.fieldReportsEnabled
     // ADR 0028: intercompanyPayment over the selected PTs (PM in CS6, Finance in CS7 → may file)
-    expect(me.capabilities).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false, dailyReportCreate: false, intercompanyPayment: true })
+    // ADR 0029: + the inter-PT loan / fund-check hints (Finance in CS7 → disburse; no Owner role; no PT with the check on)
+    expect(me.capabilities).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false, dailyReportCreate: false, intercompanyPayment: true, instructIntercompanyLoan: false, disburseIntercompanyLoan: true, fundCheckEnabled: false })
     expect(me.employee.id).toBe(X.empTriA)
     expect(me.settings.shortCode).toBe('DRMS')
     // narrowed read selection: companies[] still lists every membership, `selected` + legacy follow the selection
@@ -455,6 +456,19 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /project-loans/:id/repayments': 'document',
   'POST /project-loans/:id/repayments/:rid/void': 'document',
   'POST /project-loans': 'named-pt',
+  // ADR 0029: inter-PT loans (two PTs: read by Owner / Direktur / Finance / Admin of either; roles checked IN the loan's
+  // PTs) + the fund availability of a named PT
+  'GET /intercompany-loans': 'selection',
+  'GET /intercompany-loans/queue': 'selection',
+  'GET /intercompany-loans/lenders': 'named-pt',
+  'GET /intercompany-loans/:id': 'document',
+  'POST /intercompany-loans': 'named-pt',
+  'POST /intercompany-loans/:id/cancel': 'document',
+  'POST /intercompany-loans/:id/disburse': 'document',
+  'POST /intercompany-loans/:id/disbursement/void': 'document',
+  'POST /intercompany-loans/:id/repayments': 'document',
+  'POST /intercompany-loans/:id/repayments/:mid/void': 'document',
+  'GET /fund-availability': 'named-pt',
   // DRMS 13/10 W3 "Pengguna" onboarding: every PT of the body is checked (Admin of THAT PT / group admin); the account
   // is read with the caller's Users access; the form lists the caller's Admin PTs ∩ selection
   'POST /user-onboarding': 'named-pt',

@@ -134,3 +134,11 @@ the PDF Pengajuan Biaya never prints it: the Approval box shows the levels up to
 of the last printed level); an Owner rejection still marks the box "DITOLAK" (no signature images). The note "Tanpa
 persetujuan — pengajuan Owner (kebijakan PT)" for the Owner's own request is unchanged. Code: `pdf/data.ts`
 (`approvals` without `PRINCIPAL_ROLE` levels); test `d1310-a-owner`.
+
+## Amendment 2026-10-14 (ADR 0029)
+
+**§3:** for a PT with "Cek dana saat persetujuan" switched on (`companies.fundCheckEnabled`), the decision that makes an
+expense request "Disetujui" (normally the Owner's; under a rule without an Owner level its last level) and the submit
+of the Owner's own request (no approval) are refused (409 `FUND_INSUFFICIENT`) when the paying PT's available funds —
+balance of its active accounts without a site minus its commitments — are short. Who decides is unchanged (G1 rules
+stand). The Owner may instruct a "Pinjaman antar-PT" and then approves again.

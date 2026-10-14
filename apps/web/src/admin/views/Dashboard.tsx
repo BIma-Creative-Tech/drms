@@ -21,6 +21,7 @@ import { docHref } from '../doc-links'
 
 import { TeamTodayWidget } from './Absensi'
 import { LoanCard } from './dashboard-loans'
+import { IntercompanyCard } from './dashboard-intercompany'
 import { RapMissingCard, RapMonitorCard } from './dashboard-rap'
 import { SlaTransferCard } from './dashboard-sla'
 import { ChartHover } from './ChartHover'
@@ -803,6 +804,8 @@ async function Owner({ req, months, siteId, withoutIc }: { req: PayloadRequest; 
         <RapMonitorCard data={d.rapMonitoring} span={12} i={8} />
         {/* ADR 0022 §9: inter-project loans — outstanding / overdue per project, loans waiting for the Direktur */}
         <LoanCard data={d.loans} span={12} i={8} />
+        {/* ADR 0029 §3.9: "Dana tersedia per PT" + "Hutang / piutang antar-PT" */}
+        <IntercompanyCard data={d.intercompany} codeOf={(id) => pt.ref(id)?.shortCode ?? `#${id}`} span={12} i={8} />
         {/* D4 (owner 2026-10-11): projects with a RAB but no RAP yet — requests blocked until a PM fills the RAP */}
         <RapMissingCard data={d.rapMissing} span={12} i={9} />
         <TrendCard id="owner-trend" rows={v.requestTrend} title="Tren pengajuan" sub="Jumlah pengajuan per bulan (tanggal pengajuan)" span={6} i={8} />

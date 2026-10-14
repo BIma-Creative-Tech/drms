@@ -151,6 +151,34 @@ penerima tercatat otomatis** saat Anda mencatat transfer — Finance PT penerima
    TRF/… · KK/…"); filter **Sumber: Antar PT**. Rekap Kas memisahkan "Transfer antar PT (keluar)" dan "Antar PT
    (masuk)"; filter **Antar PT: Tanpa antar-PT** untuk laporan gabungan beberapa PT.
 
+## 3c. Pinjaman antar-PT (DRMS 13/10 Phase C, ADR 0029)
+
+Owner memerintahkan pinjaman dari PT yang punya dana ke PT yang kurang (nomor `PJA/<PT pemberi>/…`). Uangnya nyata:
+KK di PT pembayar, **KM "Antar PT" otomatis** di rekening penerimaan antar-PT PT penerima — keduanya bukan biaya.
+
+1. **Pencairan (Finance PT pemberi):** **Antrian Transfer** → bagian **"Pencairan pinjaman antar-PT"** (atau Keuangan →
+   Pinjaman antar-PT → detail) → pilih akun sumber (rekening kantor pusat, **bukan** akun site), tanggal & jam sesuai
+   bukti, no. referensi, bukti → **Catat pencairan**. Nilai = nilai perintah. Ditolak bila:
+   - Anda sendiri yang memerintahkan (G1) — minta Finance lain;
+   - dana tersedia PT Anda kini kurang (*"Dana tersedia PT … kurang untuk pencairan"*) — perintah tetap menunggu, Owner
+     diberi tahu;
+   - periode PT Anda / PT peminjam sudah tutup buku (*"Periode … sudah ditutup"*);
+   - PT peminjam belum menetapkan rekening penerimaan antar-PT.
+   Owner, Finance dan Direktur PT peminjam diberi tahu; Owner lalu menyetujui ulang pengajuan yang tertahan.
+2. **Pengembalian (Finance PT peminjam):** detail pinjaman → **Catat pengembalian** (boleh bertahap, maksimal sisa
+   pinjaman, tanpa persetujuan). Tujuan = rekening penerimaan antar-PT PT pemberi. Ditolak bila dana tersedia PT Anda
+   tidak cukup (pengembalian tidak boleh membuat pengajuan yang sudah disetujui tidak terbayar). Owner dan Finance /
+   Direktur PT pemberi diberi tahu.
+3. **Void:** salah catat pencairan → **Void pencairan** (Finance PT pemberi, alasan; hanya selama belum ada
+   pengembalian). Bila dana tersedia PT peminjam jadi minus Anda harus mencentang konfirmasi. Salah catat pengembalian
+   → **Void** di baris pengembalian (Finance PT peminjam). KK / KM pinjaman tidak bisa di-void dari buku kas.
+4. **Laporan:** Laporan **"Pinjaman antar-PT"** (piutang / hutang antar-PT per PT, terlambat); Rekap Kas memisahkan
+   "Pinjaman antar-PT diberikan / diterima", "Pengembalian pinjaman antar-PT diterima", "Pembayaran hutang antar-PT";
+   baris Kas menampilkan nomor PJA dan PT lawannya.
+5. **Cek dana di persetujuan:** bila PT Anda menyalakan "Cek dana saat persetujuan", panel **Ketersediaan dana PT** di
+   pengajuan menunjukkan saldo (tanpa akun site), komitmen dan dana tersedia; pengajuan disetujui yang lama tidak
+   ditransfer tetap menahan dana — transfer atau batalkan.
+
 ## 4. LPJ Pengajuan Baru
 
 **Verifikasi LPJ** → **LPJ diajukan**:

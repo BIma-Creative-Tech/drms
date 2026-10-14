@@ -6,6 +6,7 @@ import { registerAttendancePaths } from './openapi-attendance'
 import { registerCompanyPaths } from './openapi-companies'
 import { registerDailyPaths } from './openapi-daily'
 import { registerFieldPaths } from './openapi-field'
+import { registerIcLoanPaths } from './openapi-icloans'
 import { registerLoanPaths } from './openapi-loans'
 import { registerProjectPaths } from './openapi-projects'
 import { registerShortfallPaths } from './openapi-shortfall'
@@ -244,13 +245,25 @@ export function buildOpenApiDocument(version: string) {
     request: { headers: deviceHeader, params: idParams('id') },
     responses: res(200, 'History', F.History, [401, 404, 426]),
   })
-  post('/expense-requests/{id}/submit', 'Submit (number, rule snapshot, signatures Diajukan/Dibuat, flags)', F.SignBody, ['id'], detailOk())
+  post(
+    '/expense-requests/{id}/submit',
+    'Submit (number, rule snapshot, signatures Diajukan/Dibuat, flags). ADR 0029: the Owner\'s own request without approval goes straight to Finance — for a PT with the fund check on it is checked HERE: short → 409 code FUND_INSUFFICIENT (companyId, balance, commitments, available, needed, gap), the request stays Draft (audited fund_insufficient)',
+    F.SignBody,
+    ['id'],
+    detailOk(),
+  )
   post('/expense-requests/{id}/withdraw', 'Withdraw to Draft before any decision (reason)', F.ReasonBody, ['id'], detailOk())
   post('/expense-requests/{id}/cancel', 'Cancel (reason)', F.ReasonBody, ['id'], detailOk())
   post('/expense-requests/{id}/resubmit', 'Clone a rejected request into a new Draft (US-06)', F.EmptyBody, ['id'], res(201, 'New draft', F.ExpenseRequestDetail, [401, 403, 404, 409, 422, 426, 429]))
   post('/expense-requests/{id}/duplicate', 'Duplikat: a clean new Draft from a readable request (same PT, project, lines, requesters; no number, approvals, transfers, receipts, flags) — DRMS 13/10 Persetujuan #12', F.EmptyBody, ['id'], res(201, 'New draft', F.ExpenseRequestDetail, [401, 403, 404, 409, 422, 426, 429]))
-  post('/expense-requests/{id}/acknowledge', '"Diketahui Oleh" = Direktur approval (US-42, ADR 0013); PM/Staff/Admin → 403 (audited)', F.SignBody, ['id'], detailOk())
-  post('/expense-requests/{id}/approve', 'Approve the current level — Finance by default (G1/G2, ADR 0013; budget % before → after); PM/Staff/Admin → 403 (audited)', F.SignBody, ['id'], detailOk())
+  post('/expense-requests/{id}/acknowledge', '"Diketahui Oleh" = Direktur approval (US-42, ADR 0013); PM/Staff/Admin → 403 (audited). ADR 0029: a final "Diketahui" (no approval level) is fund-checked like the final approval (409 FUND_INSUFFICIENT)', F.SignBody, ['id'], detailOk())
+  post(
+    '/expense-requests/{id}/approve',
+    'Approve the current level (G1/G2, ADR 0013 / 0026; budget % before → after); PM/Staff/Admin → 403 (audited). ADR 0029: the decision that makes the request "Disetujui" (normally the Owner level; a rule without an Owner level: its last level) is refused for a PT with the fund check on when the request\'s grand total exceeds the PT\'s "Dana tersedia" → 409 code FUND_INSUFFICIENT (companyId, balance, commitments, available, needed, gap; audited fund_insufficient); the request stays at its step. Checked decisions store fundBalance / fundCommitments / fundAvailable',
+    F.SignBody,
+    ['id'],
+    detailOk(),
+  )
   post('/expense-requests/{id}/reject', 'Reject (reason) at "Diketahui" (Direktur) or an approval level (Finance); PM/Staff/Admin → 403 (audited)', F.RejectBody, ['id'], detailOk())
   post('/expense-requests/{id}/complete', 'Reimburse: Ditransfer → Selesai', F.EmptyBody, ['id'], detailOk())
   post('/expense-requests/{id}/receipts', 'Add a receipt to a line (image from POST /media/receipts); receiptDate after today (PT timezone) → 400 "Tanggal nota tidak boleh di masa depan" (QA-07)', F.ReceiptCreate, ['id'], res(201, 'Request with receipts and flags', F.ExpenseRequestDetail, [400, 401, 403, 404, 409, 422, 426, 429]))
@@ -645,6 +658,8 @@ export function buildOpenApiDocument(version: string) {
   registerProjectPaths(registry, { security, deviceHeader, res })
   // ---- ADR 0022: inter-project loans (Pinjaman antar project) ----------------------------------
   registerLoanPaths(registry, { security, deviceHeader, idem, res })
+  // ---- ADR 0029: inter-PT loans (Pinjaman antar-PT, PJA) + fund availability --------------------
+  registerIcLoanPaths(registry, { security, deviceHeader, idem, res })
   // ---- DRMS 13/10 W3: "Pengguna" tabbed onboarding (ADR 0003 revision 2026-10-13) ----------------
   registerUserOnboardingPaths(registry, { security, res })
 

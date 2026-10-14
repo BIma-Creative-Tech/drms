@@ -18,6 +18,7 @@ import { changeReasonField, rupiahField, uuidField } from '@/fields/common'
 import { requestMeta } from '@/lib/request-meta'
 import { forceDeferredChecks } from '@/lib/system-tx'
 import { notifyCreated, notifyTransition } from '@/domain/notifications'
+import { notifyFundShortfall } from '@/domain/fundcheck/service'
 import { companyField, companyHook, formCompany, isListFilter, pickerSameCompany } from '@/fields/company'
 import { hasRole, hasRoleAny } from '@/access/roles'
 import { select as selectValidation } from 'payload/shared'
@@ -354,6 +355,8 @@ const notify: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, 
   }
   if (operation !== 'update' || context?.pkTransition !== true || !previousDoc) return doc
   await notifyTransition(req, { status: previousDoc.status as RequestStatus, currentLevel: previousDoc.currentLevel as number | null }, doc as never)
+  // ADR 0029 §2: the request reached its final decision while the PT (fund check on) is short → the Owner is told
+  await notifyFundShortfall(req, { status: previousDoc.status as RequestStatus, currentLevel: previousDoc.currentLevel as number | null }, doc as never)
   return doc
 }
 

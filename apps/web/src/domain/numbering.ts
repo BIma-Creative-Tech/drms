@@ -23,6 +23,8 @@ export const DOC_TYPES = [
   'daily_report',
   // ADR 0022: Pinjaman antar project PJ/{COMPANY}/YYMM/#### (issued at submit)
   'project_loan',
+  // ADR 0029: Pinjaman antar-PT PJA/{LENDER}/YYMM/#### (issued at the Owner's instruction, lender PT's counter)
+  'intercompany_loan',
 ] as const
 export type DocType = (typeof DOC_TYPES)[number]
 
@@ -121,6 +123,8 @@ export const DEFAULT_SEQUENCES: ReadonlyArray<Omit<SequenceConfig, 'timezone' | 
   { docType: 'daily_report', docCode: 'LH', pattern: 'LH/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
   // ADR 0022 §6: inter-project loan, number at submit (date token = loan date)
   { docType: 'project_loan', docCode: 'PJ', pattern: 'PJ/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
+  // ADR 0029 §3.2: inter-PT loan, number at the Owner's instruction ({COMPANY} = the lender PT; seeded by 20261015_100300)
+  { docType: 'intercompany_loan', docCode: 'PJA', pattern: 'PJA/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
 ]
 
 /**

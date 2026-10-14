@@ -6,6 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**DRMS 13/10 Phase C — cek dana di persetujuan Owner + Pinjaman antar-PT** ([ADR 0029](docs/proyekkas/adr/0029-fund-check-and-inter-pt-loans.md),
+accepted 2026-10-14: "setuju" on every recommended default). Web / server only; the APK part follows.
+
+**Database migrations** (in order, additive): `20261015_100000_d1310_fundcheck_enums` (own transaction),
+`…100100_d1310_fundcheck_loans` (+ Payload snapshot), `…100200_d1310_fundcheck_guard`, `…100300_d1310_fundcheck_data`
+(PJA sequence per PT). The fund-check trigger is inert while a PT's switch is off (default). Take the pre-deploy dump.
+
+**Deploy checklist:** migrate; every PT keeps today's behaviour (switch OFF). Per PT, after Finance reconciled every
+non-site account with the bank statement (opening balances, all KM recorded), a **group admin** ticks **"Cek dana saat
+persetujuan"** on Perusahaan → Operasional (reason "saldo cocok dengan rekening koran per <tanggal>"). Every PT that may
+lend or borrow designates its **Rekening penerimaan antar-PT** (ADR 0028) first.
+
+### Added
+
+- **Cek dana** (per PT, switch default off, group admin + reason, audited): "Dana tersedia" = balance of the PT's
+  active cash / bank accounts **without a site** − commitments (requests approved but not transferred, verified but
+  unpaid LPJ shortfalls, loans instructed with the PT as lender). The decision that makes a request "Disetujui"
+  (normally the **Owner** level; a rule without an Owner level: its last level) is refused while the request's total
+  exceeds it — **409 `FUND_INSUFFICIENT`** with `balance / commitments / available / needed / gap`, audited
+  `fund_insufficient`; the request stays at its step (Tolak still possible). The **Owner's own request** is checked at
+  submit and stays **Draft**. Per-PT advisory lock: two approvals racing on the same money cannot both pass; DB backstop
+  trigger `pk_expense_fund_guard`. The checked decision stores the figures (`approvals.fund_*`).
+- Request page: panel **"Ketersediaan dana PT"** (Finance / Direktur / Owner of the PT: saldo, komitmen with the list,
+  dana tersedia, dibutuhkan, kurang; other requests waiting at the Owner), "Setujui" disabled with the reason, button
+  **"Perintahkan pinjaman antar-PT"** (Owner). Persetujuan inbox: badge **"Dana kurang Rp X"**. Owner notified
+  (`expense.fund_shortfall`) when a request reaches its final step while the PT is short.
+- **Pinjaman antar-PT** (`PJA/{LENDER}/{YY}{MM}/####`, Keuangan → Pinjaman antar-PT): the **Owner** instructs (lender
+  list with each PT's "Dana tersedia", amount default = the gap, due date default + 30 days, no interest, linked
+  requests); the amount is reserved in the lender's commitments. **Finance of the lender** executes the disbursement
+  (Antrian Transfer → "Pencairan pinjaman antar-PT"; never the instruction's creator — G1; lender re-checked, 409
+  `LOAN_LENDER_INSUFFICIENT`): KK in the lender + automatic KM "Antar PT" on the borrower's receiving account, paired
+  in `intercompany_links`; both PTs' closed periods refuse it. The Owner then **approves the request again** (no
+  automatic approval). **Finance of the borrower** records repayments (no approval, partial, ≤ outstanding — 409
+  `LOAN_REPAYMENT_EXCEEDS_OUTSTANDING` —, fund-checked); voids of the disbursement (no repayment — 409
+  `LOAN_HAS_REPAYMENTS`; a borrower going negative needs `confirmBorrowerShortfall`) and of a repayment; cancel by the
+  Owner while waiting. Notifications `icloan.*` (instructed, lender_insufficient, disbursed, disbursement_voided, repaid,
+  cancelled, overdue); daily **overdue reminder** (`reminderIcLoanOverdueEnabled`, default on).
+- API: `GET /fund-availability`, `/intercompany-loans` (list, `queue`, `lenders`, detail, instruct, cancel, disburse,
+  `disbursement/void`, `repayments`, `repayments/{mid}/void`); request detail `fundCheck` + action `instruct_loan`;
+  inbox `fundShort`; `/me` capabilities `instructIntercompanyLoan`, `disburseIntercompanyLoan`, `fundCheckEnabled`; cash
+  entry counterpart `sourceDocType` / `loanLeg`; Owner dashboard `intercompany` block.
+- Reports: **"Pinjaman antar-PT"** (per loan and PT side: piutang / hutang antar-PT, overdue); Rekap Kas lines
+  "Pinjaman antar-PT diberikan / diterima", "Pengembalian pinjaman antar-PT diterima", "Pembayaran hutang antar-PT";
+  Kas counterpart line with the PJA number; Direktur / Owner dashboard card "Dana tersedia & pinjaman antar-PT". Loans
+  never count as cost (outside realisation, RAP and budgets).
+
 ## [0.10.1] - 2026-10-14
 
 **0.10.0 plus "the Owner does not sign the document"** (owner decision 2026-10-14). Production goes 0.9.1 → 0.10.1:

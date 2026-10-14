@@ -83,7 +83,19 @@ export function RequestActionsClient({ id, decision, flowLinks, pdfs, canDuplica
             {decision.signAs ? <span data-pk-sign-as> · ditandatangani sebagai Direktur PT: {decision.signAs}</span> : null}
           </span>
           {decision.canReject ? <ActionButton url={`/api/v1/expense-requests/${id}/reject`} label="Tolak" prompt={REJECT_PROMPT} testId="reject" /> : null}
-          {decision.step ? <ActionButton url={`/api/v1/expense-requests/${id}/${decision.step}`} label={decision.label} variant="primary" confirm={decision.confirm} testId={decision.step} /> : null}
+          {decision.step && decision.blocked ? (
+            // ADR 0029 §2: short funds — "Setujui" disabled with the reason; "Tolak" stays
+            <>
+              <button type="button" className="btn btn--style-primary btn--size-small" disabled aria-describedby={`pk-fund-blocked-${id}`} data-pk-action={`${decision.step}-blocked`}>
+                {decision.label}
+              </button>
+              <span id={`pk-fund-blocked-${id}`} className="pk-er-actions__turn" role="note" data-pk-fund-blocked-reason>
+                {decision.blocked}
+              </span>
+            </>
+          ) : decision.step ? (
+            <ActionButton url={`/api/v1/expense-requests/${id}/${decision.step}`} label={decision.label} variant="primary" confirm={decision.confirm} testId={decision.step} />
+          ) : null}
         </>
       ) : null}
       {flowLinks.map((l) => (

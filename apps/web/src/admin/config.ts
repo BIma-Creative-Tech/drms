@@ -179,6 +179,18 @@ export const LOAN_ADMIN_VIEWS = {
 }
 
 /**
+ * ADR 0029: inter-PT loans ("Pinjaman antar-PT", PJA) — list (D8), the Owner's instruction form (`?borrower=&requests=&
+ * amount=` pre-filled from a request's fund panel), detail with cancel (Owner), disbursement + its void (Finance of the
+ * lender, G1), repayment + its void (Finance of the borrower). The disbursement queue is a section of /antrian-transfer.
+ * All exact; roles re-checked inside the views and /api/v1/intercompany-loans.
+ */
+export const IC_LOAN_ADMIN_VIEWS = {
+  icLoanList: { Component: '@/admin/views/IntercompanyLoans#IcLoanList', path: '/pinjaman-antar-pt' as const, exact: true, meta: { title: 'Pinjaman antar-PT' } },
+  icLoanNew: { Component: '@/admin/views/IntercompanyLoans#IcLoanNew', path: '/pinjaman-antar-pt/baru' as const, exact: true, meta: { title: 'Perintahkan pinjaman antar-PT' } },
+  icLoanDetail: { Component: '@/admin/views/IntercompanyLoans#IcLoanDetail', path: '/pinjaman-antar-pt/detail/:id' as const, exact: true, meta: { title: 'Pinjaman antar-PT' } },
+}
+
+/**
  * DRMS 13/10 Wave 3 — "Proyek › RAP" (own sub-menu under Proyek): RAP index of the visible projects and the RAP form +
  * Excel upload of one project. Both exact (`/rap` would prefix-match `/rap/<id>`). Role / project checks inside the
  * views; every write goes through /api/v1 (projects/{id}/rap/items, rap-items/{id}, rap import / templates).

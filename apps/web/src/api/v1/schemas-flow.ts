@@ -11,6 +11,8 @@ import { ShortfallApproval } from './schemas-shortfall'
 const id = z.number().int().positive()
 const rupiah = z.number().int().min(0).max(1e13)
 const rupiahPos = z.number().int().min(1).max(1e13)
+/** ADR 0029: a signed Rupiah figure (a balance / available funds may be negative). */
+const signedRupiah = z.number().int()
 const businessDate = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, 'YYYY-MM-DD')
 // S3e (S-06): specific Indonesian messages (the web shows them as-is; before: generic "Data tidak valid.").
 const reason = z
@@ -82,6 +84,8 @@ export const ActionEnum = z
     'lpj_verify',
     'settle',
     'settle_reverse',
+    // ADR 0029: the Owner orders an inter-PT loan for a short request (POST /intercompany-loans)
+    'instruct_loan',
   ])
   .meta({ id: 'RequestAction' })
 
@@ -286,6 +290,31 @@ export const TransferQueueItem = ExpenseRequestListItem.extend({
 
 export const TransferQueueList = z.object({ items: z.array(TransferQueueItem), nextCursor: z.string().nullable() }).meta({ id: 'TransferQueueList' })
 
+/** ADR 0029 §2 / §6: the fund panel of the request detail. */
+export const FundCheck = z
+  .object({
+    companyId: id,
+    company: z.object({ id, shortCode: z.string(), name: z.string() }).nullable(),
+    enabled: z.boolean().meta({ description: 'companies.fundCheckEnabled — off: information only (no block).' }),
+    applies: z.boolean().meta({ description: 'The request\'s NEXT decision makes it "Disetujui" (the Owner level / a final level without Owner) or this is the Owner\'s own Draft (checked at submit).' }),
+    status: z.enum(['ok', 'insufficient', 'not_applicable']),
+    blocked: z.boolean().meta({ description: 'enabled ∧ applies ∧ insufficient.' }),
+    blockedText: z.string().nullable().meta({ description: '"Dana PT tidak cukup — kurang Rp X. Tolak, atau perintahkan pinjaman antar-PT."' }),
+    balance: signedRupiah.meta({ description: 'Saldo dana: Σ balance of the PT\'s active accounts WITHOUT a site.' }),
+    commitments: signedRupiah.meta({ description: 'Komitmen: approved-not-transferred + unpaid LPJ shortfalls + loans instructed with this PT as lender.' }),
+    available: signedRupiah.meta({ description: 'Dana tersedia = balance − commitments (may be negative).' }),
+    needed: rupiah.meta({ description: 'Dibutuhkan: the request\'s grand total (not yet committed).' }),
+    gap: rupiah.meta({ description: 'Kurang = max(0, needed − available).' }),
+    accountCount: z.number().int().meta({ description: '"n akun, tanpa akun site".' }),
+    excludedSiteAccounts: z.object({ count: z.number().int(), balance: signedRupiah }),
+    waitingAtOwner: z.object({ count: z.number().int(), amount: rupiah }).meta({ description: 'Other requests of the PT waiting at their final decision (not committed: first approved, first served).' }),
+    commitmentItems: z
+      .array(z.object({ kind: z.enum(['request', 'shortfall', 'loan']), id, docNo: z.string().nullable(), amount: rupiah, status: z.string() }))
+      .meta({ description: 'The commitments behind the figure, largest first (max 20). kind loan: id = the inter-PT loan.' }),
+    loans: z.array(z.object({ id, docNo: z.string(), status: z.string(), amount: rupiah, lender: z.object({ id, shortCode: z.string() }).nullable() })).meta({ description: 'Inter-PT loans instructed for this request (linked).' }),
+  })
+  .meta({ id: 'FundCheck' })
+
 export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
   uuid: z.string().nullable(),
   project: Ref.nullable(),
@@ -389,6 +418,9 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       budgetPctBefore: z.number().nullable(),
       budgetPctAfter: z.number().nullable(),
       openFlags: z.number().int().nullable(),
+      fundAvailable: signedRupiah.nullable().meta({ description: 'ADR 0029: "Dana tersedia saat disetujui" of a checked final decision (Kas roles of the PT only; else null).' }),
+      fundBalance: signedRupiah.nullable(),
+      fundCommitments: signedRupiah.nullable(),
       signatureId: id.nullable(),
       signatureSha256: z.string().nullable(),
       signatureSource: z
@@ -478,6 +510,10 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
     .meta({ description: 'US-26 preview (committed % before → after); cost centers: "none" (Q-24). Owner 2026-10-11: "none" + nulls for callers without a money role in the PT (Staff) — the % with the total would reveal the RAB.' }),
   openWarningFlags: z.number().int(),
   allowedActions: z.array(ActionEnum).meta({ description: 'UI hint; the server re-checks every action.' }),
+  fundCheck: FundCheck.nullable().meta({
+    description:
+      'ADR 0029 §2 "Ketersediaan dana PT": for Finance / Direktur / Owner of the request\'s PT while the request waits for a decision (any step; read-only before the final one) or is the Owner\'s own Draft; null otherwise. `blocked` = the next decision (or the Owner\'s submit) is refused with 409 FUND_INSUFFICIENT — show "Setujui" disabled with `blockedText`, keep "Tolak"; `instruct_loan` in allowedActions opens the loan instruction (amount default = gap).',
+  }),
   direkturSignature: z
     .object({ name: z.string(), title: z.string().nullable(), signatureId: id })
     .nullable()
@@ -617,8 +653,10 @@ export const CashEntryIntercompany = z
     direction: z.enum(['in', 'out']).meta({ description: 'in = this entry is the Kas Masuk of the receiving PT; out = the transfer KK of the paying PT.' }),
     status: z.enum(['posted', 'void']).meta({ description: 'Link status (void after the paying PT voided its transfer).' }),
     counterpartCompany: z.object({ id, shortCode: z.string(), name: z.string() }).nullable(),
-    sourceDocNo: z.string().nullable().meta({ description: 'Number of the paying PT\'s request (PB/…).' }),
-    sourceDocId: id,
+    sourceDocType: z.enum(['expense_request', 'intercompany_loan']).meta({ description: 'ADR 0029: the document of the pair — a PT grup payment (request of the paying PT) or an inter-PT loan (PJA, belongs to both PTs).' }),
+    loanLeg: z.enum(['given', 'received', 'repaid_in', 'repaid_out']).nullable().meta({ description: 'ADR 0029: Pinjaman antar-PT diberikan / diterima, Pengembalian pinjaman antar-PT diterima, Pembayaran hutang antar-PT; null for a PT grup payment.' }),
+    sourceDocNo: z.string().nullable().meta({ description: 'Number of the paying PT\'s request (PB/…) or the loan (PJA/…).' }),
+    sourceDocId: id.meta({ description: 'The request id, or (sourceDocType intercompany_loan) the loan id.' }),
     transferDocNo: z.string().nullable().meta({ description: 'Number of the paying PT\'s transfer (TRF/…).' }),
     counterpartEntryNo: z.string().meta({ description: 'The other leg: KM of the receiving PT (direction out) or KK of the paying PT (direction in).' }),
     counterpartEntryId: id,
@@ -923,6 +961,7 @@ export const ApprovalInbox = z
         decisionFlow: z.boolean().meta({ description: 'ADR 0013/0021 decision flow (acknowledge = an approval, button "Setujui"); false = pre-E1 snapshot.' }),
         decisionBy: z.enum(['pm', 'direktur', 'owner', 'finance', 'other']).meta({ description: 'ADR 0021: who decides this step (APK decision sheet texts): pm = PM project, direktur, owner (ADR 0026: the Owner level above the Direktur), finance, other (named user / legacy).' }),
         finalStep: z.boolean().meta({ description: 'ADR 0021: approving this step makes the request "Disetujui" (Finance then transfers / verifies receipts).' }),
+        fundShort: rupiah.nullable().meta({ description: 'ADR 0029: "Dana kurang Rp X" — the gap of a final-step row of a PT with the fund check on (Kas roles of the PT); null when enough / not applicable. Approving it is refused (409 FUND_INSUFFICIENT).' }),
         selfApproval: z.enum(['direktur_via_pm', 'direktur_via_pm_self']).nullable().meta({ description: 'ADR 0021 narrow G1 exception (a Direktur\'s request filed by the PM project; _self = the requester Direktur is the PT\'s only Direktur). Legacy since ADR 0024 (a request without approval never reaches the inbox).' }),
         budget: z.object({
           basis: z.enum(['project', 'none']),

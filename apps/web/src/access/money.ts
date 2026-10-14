@@ -51,3 +51,22 @@ export function moneyRead(collection: CollectionSlug): FieldAccess {
     return company !== undefined ? seesMoney(req, company) : moneyInEverySelectedPt(req)
   }
 }
+
+/**
+ * ADR 0029: field read access of a CASH figure (the PT's available funds stored with a checked decision): the Kas roles
+ * of the row's PT only (Finance, Direktur — an Owner holds pk-owner as an effective role). Same row / probe rules as
+ * `moneyRead` (no row → a Kas role in every selected PT).
+ */
+export const KAS_FIGURE_ROLES: readonly Role[] = ['pk-finance', 'pk-owner']
+
+export function kasFigureRead(collection: CollectionSlug): FieldAccess {
+  return async ({ req, id, doc, data, siblingData }) => {
+    const row = (doc ?? data) as { id?: unknown; company?: unknown } | undefined
+    let company = relId(row?.company) ?? relId((siblingData as { company?: unknown } | undefined)?.company)
+    const rowId = row?.id ?? id
+    if (company === undefined && (typeof rowId === 'number' || typeof rowId === 'string')) company = await companyOfRow(req, collection, rowId)
+    if (company !== undefined) return hasRole(req, KAS_FIGURE_ROLES, company)
+    const ms = membershipsOf(req.user)
+    return ms.length > 0 && ms.every((m) => m.roles.some((r) => KAS_FIGURE_ROLES.includes(r)))
+  }
+}

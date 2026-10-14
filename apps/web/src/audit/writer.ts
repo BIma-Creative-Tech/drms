@@ -73,6 +73,9 @@ export const AUDIT_ACTIONS = [
   // renumbered document (field docNo / entryNo, old → new) and per rewritten cash-entry description; written by the
   // renumber CLI in its own transaction, never by the app.
   'renumbered',
+  // ADR 0029: an approval / Owner submit / loan step refused because the PT's available funds are short (written in its
+  // own transaction like `access_denied`: the refused attempt stays recorded).
+  'fund_insufficient',
 ] as const
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 

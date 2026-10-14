@@ -296,6 +296,22 @@ buat/ubah aturan sementara dengan level 1 = Direktur pengganti (user bernama), l
 - Notifikasi PT penerima: event `cash.intercompany_received` / `cash.intercompany_reversed` (teks dapat diubah di
   Template notifikasi; placeholder `{entryNo}` `{source}` `{amount}` `{account}` `{reversalNo}`).
 
+### 4d. Cek dana & pinjaman antar-PT (DRMS 13/10 Phase C, ADR 0029)
+
+- **Perusahaan (PT) → tab Operasional → "Cek dana saat persetujuan"** (default **mati**). Hanya **Admin grup**,
+  alasan wajib (tercatat di Audit Log). Nyalakan per PT **setelah** Finance memastikan saldo semua akun non-site cocok
+  dengan rekening koran (saldo awal, semua kas masuk tercatat), mis. alasan "saldo cocok dengan rekening koran per
+  <tanggal>". Mematikan = blokir hilang seketika (panel tetap tampil sebagai informasi).
+- Akun kas yang ditandai **site** tidak dihitung sebagai dana PT. Bila rekening cabang harus dihitung, hapus tanda
+  site-nya.
+- Setiap PT yang bisa meminjamkan / meminjam perlu **Rekening penerimaan antar-PT** (§4c).
+- Penomoran baru **Pinjaman antar-PT** `PJA/{COMPANY}/{YY}{MM}/{seq}` (PT pemberi), dibuat otomatis per PT.
+- Pengingat harian **"Pinjaman antar-PT terlambat"** per PT peminjam (tab Pengingat & notifikasi, default aktif).
+- Teks notifikasi baru dapat diubah di Template notifikasi: `expense.fund_shortfall` (placeholder `{company}` `{docNo}`
+  `{needed}` `{available}` `{gap}`), `icloan.instructed`, `icloan.lender_insufficient`, `icloan.disbursed`,
+  `icloan.disbursement_voided`, `icloan.repaid`, `icloan.cancelled`, `icloan.overdue` (placeholder `{docNo}` `{lender}`
+  `{borrower}` `{amount}` `{dueDate}` `{outstanding}`, plus `{available}` `{payment}` `{days}` `{requests}`).
+
 ## 5. Penomoran dokumen
 
 **Pengaturan → Penomoran dokumen**: pola nomor **per PT** dan per jenis dokumen (PB pengajuan, TRF, LPJ, KM, KK, LP,

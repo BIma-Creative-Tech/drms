@@ -10,6 +10,7 @@ import { allocateDocNo } from '@/domain/numbering-db'
 import { parseBusinessDate } from '@/domain/numbering'
 import { isBusinessDate } from '@/domain/expense/types'
 import { CASH_OVERDRAFT_CONFIRM_REQUIRED, failCoded } from '@/domain/coded-error'
+import { fundLockKey } from '@/domain/fundcheck/rules'
 import { formatRupiah } from '@/lib/money'
 import { getRequestTx } from '@/lib/tx'
 
@@ -194,6 +195,10 @@ export async function postEntry(req: PayloadRequest, input: PostInput, opts: Pos
   assertOnOrAfterOpening(account, input.entryDate) // QA-05 (before any number is allocated)
   const lock = await currentLockDate(req, companyId)
   if (lock && input.entryDate <= lock) fail(409, `Periode ${input.entryDate.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
+  // ADR 0029 §1: every posting of a PT's account takes the PT's fund lock (cheap, transaction scoped) BEFORE the account
+  // lock — so a fund check (approval / submit / loan step) never reads a balance another posting is about to lower.
+  // Re-entrant: a two-PT flow that already holds both locks (ascending id) takes nothing new here.
+  await (await getRequestTx(req)).execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${fundLockKey(companyId!)}, 0))`)
   const overdraft = input.direction === 'out' && input.sourceType !== 'reversal' ? await checkOverdraft(req, account, input.amount, input.confirmOverdraft === true) : null
   const { docNo } = await allocateDocNo(req, input.direction === 'in' ? 'cash_in' : 'cash_out', { companyId: companyId!, date: parseBusinessDate(input.entryDate) })
   const doc = await req.payload.create({
@@ -392,6 +397,9 @@ export async function voidEntry(
     fail(409, 'Kas masuk pengembalian LPJ di-void lewat "Batalkan penyelesaian" pada LPJ, bukan dari buku kas.')
   }
   if (e.sourceType === 'intercompany' && !opts.viaIntercompany) {
+    // ADR 0029: a loan movement's KK / KM is voided through its loan (PJA, by Finance of the paying PT)
+    const loan = await intercompanyLoanOf(req, e.id)
+    if (loan) fail(409, `Kas antar-PT di-void lewat pinjaman ${loan.docNo} di PT ${loan.payerCode ?? 'pembayar'}.`)
     fail(409, `Kas masuk antar-PT di-void lewat pembatalan transfer di PT ${(await intercompanySourceCode(req, e.id)) ?? 'pengirim'}.`)
   }
   const lock = await currentLockDate(req, relId((e as { company?: unknown }).company))
@@ -422,6 +430,20 @@ export async function voidEntry(
     req,
   })) as unknown as CashEntryDoc
   return { original, reversal }
+}
+
+/** ADR 0029: the PJA number and the paying PT of a loan movement's KK / KM (message of a refused direct void). */
+async function intercompanyLoanOf(req: PayloadRequest, entryId: number): Promise<{ docNo: string; payerCode: string | null } | null> {
+  const tx = await getRequestTx(req)
+  const r = (await tx.execute(sql`
+    SELECT ln.doc_no, c.short_code FROM intercompany_links l
+      JOIN intercompany_loan_transfers m ON m.id = l.source_doc_id
+      JOIN intercompany_loans ln ON ln.id = m.loan_id
+      JOIN companies c ON c.id = l.source_company_id
+     WHERE l.source_doc_type IN ('intercompany_loan_disbursement', 'intercompany_loan_repayment')
+       AND (l.source_cash_entry_id = ${entryId} OR l.target_cash_entry_id = ${entryId}) LIMIT 1`)) as unknown as { rows: Array<{ doc_no: string; short_code: string | null }> }
+  const x = r.rows[0]
+  return x ? { docNo: x.doc_no, payerCode: x.short_code } : null
 }
 
 /** ADR 0028: short code of the PT that sent the intercompany KM `kmId` (message of a refused direct void). */

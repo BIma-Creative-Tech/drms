@@ -5,7 +5,7 @@
 import { localHHMM } from '@/domain/attendance/schedule'
 import { localDateInTz } from '@/lib/time'
 
-export const REMINDER_RULES = ['late_progress', 'lpj_overdue', 'revision_pending', 'budget_threshold', 'aftersales_followup', 'loan_overdue'] as const
+export const REMINDER_RULES = ['late_progress', 'lpj_overdue', 'revision_pending', 'budget_threshold', 'aftersales_followup', 'loan_overdue', 'ic_loan_overdue'] as const
 export type ReminderRule = (typeof REMINDER_RULES)[number]
 
 export const REMINDER_EVENTS: Record<ReminderRule, string> = {
@@ -15,6 +15,8 @@ export const REMINDER_EVENTS: Record<ReminderRule, string> = {
   budget_threshold: 'reminder.budget_threshold',
   aftersales_followup: 'reminder.aftersales_followup', // FR1 (ADR 0020): quotation follow-up due → reporter + PM
   loan_overdue: 'project_loan.overdue', // ADR 0022 Q-L6: inter-project loan past due → borrower PM + Direktur, daily
+  // ADR 0029 §3.8: inter-PT loan (PJA) past due → Owner, Finance + Direktur of the borrower, Finance of the lender, daily
+  ic_loan_overdue: 'icloan.overdue',
 }
 
 export type ReminderSettings = {
@@ -32,6 +34,8 @@ export type ReminderSettings = {
   aftersalesFollowup: { enabled: boolean }
   /** ADR 0022 Q-L6: overdue inter-project loans, daily (companies.reminderLoanOverdueEnabled). */
   loanOverdue: { enabled: boolean }
+  /** ADR 0029 §3.8: overdue inter-PT loans of this BORROWER PT, daily (companies.reminderIcLoanOverdueEnabled). */
+  icLoanOverdue: { enabled: boolean }
 }
 
 const int = (v: unknown, def: number, min: number, max: number) => (typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max ? v : def)
@@ -53,6 +57,7 @@ export function reminderSettingsOf(s: Record<string, unknown>, fallbackTz: strin
     budget: { enabled: bool(s.reminderBudgetEnabled, true), thresholds: [...new Set([warn, over])].sort((a, b) => a - b) },
     aftersalesFollowup: { enabled: bool(s.fieldReportsEnabled, false) },
     loanOverdue: { enabled: bool(s.reminderLoanOverdueEnabled, true) },
+    icLoanOverdue: { enabled: bool(s.reminderIcLoanOverdueEnabled, true) },
   }
 }
 
@@ -82,7 +87,7 @@ export function fill(tpl: string, vars: Record<string, string>): string {
   return tpl.replace(/\{([a-zA-Z]+)\}/g, (_, k: string) => vars[k] ?? '')
 }
 
-export const DEFAULT_TEXTS: Record<Exclude<ReminderRule, 'late_progress' | 'loan_overdue'>, { title: string; body: string }> = {
+export const DEFAULT_TEXTS: Record<Exclude<ReminderRule, 'late_progress' | 'loan_overdue' | 'ic_loan_overdue'>, { title: string; body: string }> = {
   aftersales_followup: {
     title: 'Follow-up penawaran: {client}',
     body: 'Penawaran {docNo} ke {client} ({project}) jatuh tempo follow-up {date}.',

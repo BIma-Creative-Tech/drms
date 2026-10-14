@@ -14,6 +14,7 @@ import { actorContext, fail, loadRaw, loadVisible, requireAction, settings, toda
 import { claimMedia, recomputeFlags } from './receipts'
 import { isBusinessDate, isDirectPayment, payeeOf } from './types'
 import { postReceipt, prepareReceipt, voidReceipt } from '@/domain/intercompany/service'
+import { lockFunds } from '@/domain/fundcheck/service'
 
 export type TransferInput = {
   cashAccountId: number
@@ -208,6 +209,9 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
   // ADR 0028 §6 step 2: the receiving PT's checks run BEFORE anything is written (closed period → 409, changed account → 409)
   const payee = payeeOf(doc.payeeType)
   const receiving = payee === 'pt_grup' ? await prepareReceipt(req, doc, transferDate) : null
+  // ADR 0029 §1 lock order: a two-PT posting takes both PTs' fund locks up front, ascending id (no deadlock with a loan
+  // movement in the opposite direction); a one-PT transfer takes its PT's lock in postEntry
+  if (receiving) await lockFunds(req, [companyId, receiving.target.id])
 
   const { docNo } = await allocateDocNo(req, 'transfer', { companyId: relId((doc as { company?: unknown }).company)!, date: parseBusinessDate(transferDate) })
   await claimMedia(req, 'media-transfer-proofs', input.proofMediaId, id)
@@ -294,6 +298,8 @@ export async function voidTransfer(req: PayloadRequest, id: number, transferId: 
     .catch(() => null)) as TransferDoc | null
   if (!t || relId(t.request) !== id) fail(404, 'Transfer tidak ditemukan.')
   if (t.status !== 'posted') fail(409, 'Transfer sudah dibatalkan.')
+  // ADR 0029: a PT grup transfer reverses entries in two PTs → both fund locks first (ascending id)
+  if (payeeOf(doc.payeeType) === 'pt_grup') await lockFunds(req, [relId((doc as { company?: unknown }).company), relId(doc.payeeCompany)])
   const entryId = relId(t.cashEntry)
   const voided = entryId ? await voidEntry(req, entryId, reason, { viaTransfer: true }) : null
   const ic = await voidReceipt(req, transferId, reason) // ADR 0028: null for every other transfer

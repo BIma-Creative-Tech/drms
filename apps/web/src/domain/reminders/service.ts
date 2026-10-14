@@ -9,13 +9,15 @@ import { daysBetween } from '@/domain/reports/rules'
 import { statusLabel, type RequestStatus, type RequestType } from '@/domain/expense/types'
 import { daysOverdue } from '@/domain/loans/rules'
 import { LOAN_NOTIFICATION_DEFAULTS, loanVars, renderLoanText } from '@/domain/loans/service'
+import { daysOverdue as icDaysOverdue, IC_LOAN_NOTIFY_DEFAULTS, renderLoanText as renderIcLoanText } from '@/domain/intercompany/loan-rules'
+import { icLoanVars, overdueIcLoans } from '@/domain/intercompany/loans'
 import { formatRupiah } from '@/lib/money'
 import { withSystemTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
 import { companyClock, crossedThresholds, DEFAULT_TEXTS, fill, REMINDER_EVENTS, reminderSettingsOf, runDecision, type ReminderRule, type ReminderSettings } from './rules'
-import { activeCompanyIds, settingsOf } from '@/domain/companies'
+import { activeCompanyIds, companyRefs, settingsOf } from '@/domain/companies'
 
 /**
  * E7 — daily scheduled reminders (M12, US-11; plan fase1-golive §E7). Job `dailyReminders` fires
@@ -303,6 +305,31 @@ async function loanOverdue(run: Run) {
   }
 }
 
+/**
+ * ADR 0029 §3.8: inter-PT loans of this PT as BORROWER past their due date (borrower clock) with an outstanding balance →
+ * the Owner(s), Finance and Direktur of the borrower and Finance of the lender, once per business day while overdue.
+ * The lender's Finance gets the row tagged with the lender PT.
+ */
+async function icLoanOverdue(run: Run) {
+  const { req, s, date } = run
+  const loans = await overdueIcLoans(req, s.companyId, date)
+  if (loans.length === 0) return
+  const t = await notificationTemplate(req, REMINDER_EVENTS.ic_loan_overdue, IC_LOAN_NOTIFY_DEFAULTS['icloan.overdue'])
+  const borrowerSide = [...(await roleHolders(req, 'pk-principal', s.companyId)), ...(await roleHolders(req, 'pk-finance', s.companyId)), ...(await roleHolders(req, 'pk-owner', s.companyId))]
+  const refs = new Map((await companyRefs(req, [s.companyId, ...loans.map((l) => l.lenderId)])).map((c) => [c.id, c]))
+  for (const l of loans) {
+    const lenderFinance = await roleHolders(req, 'pk-finance', l.lenderId)
+    const vars = { ...icLoanVars(l, refs), days: String(icDaysOverdue(l, date)) }
+    await run.deliver('ic_loan_overdue', `icloan:${l.id}`, date, [...borrowerSide, ...lenderFinance], async (userIds) => {
+      const m: Msg = { title: renderIcLoanText(t.title, vars), body: renderIcLoanText(t.body, vars), docType: 'intercompany_loan', docId: String(l.id), docNo: l.docNo }
+      const lenderOnly = new Set(lenderFinance.filter((u) => !borrowerSide.includes(u)))
+      await inApp(req, REMINDER_EVENTS.ic_loan_overdue, userIds.filter((u) => !lenderOnly.has(u)), m, s.companyId)
+      await inApp(req, REMINDER_EVENTS.ic_loan_overdue, userIds.filter((u) => lenderOnly.has(u)), m, l.lenderId)
+      return m
+    })
+  }
+}
+
 async function budgetThreshold(run: Run) {
   const { req, s } = run
   const office = [...(await roleHolders(req, 'pk-owner', s.companyId)), ...(await roleHolders(req, 'pk-finance', s.companyId))]
@@ -364,6 +391,7 @@ async function runCompany(payload: Payload, companyId: number, now: Date, force:
       if (s.budget.enabled) await budgetThreshold(run)
       if (s.aftersalesFollowup.enabled) await aftersalesFollowup(run)
       if (s.loanOverdue.enabled) await loanOverdue(run)
+      if (s.icLoanOverdue.enabled) await icLoanOverdue(run)
       await tx.execute(
         sql`INSERT INTO reminder_runs (company_id, run_date, summary) VALUES (${companyId}, ${date}, ${JSON.stringify({ rules: run.rules, emails: run.emails })}::jsonb)
             ON CONFLICT (company_id, run_date) DO UPDATE SET summary = EXCLUDED.summary, finished_at = clock_timestamp()`,
