@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
-import { relId, ROLE_LABELS, type Role } from '@/access/roles'
+import { PRINCIPAL_ROLE, relId, ROLE_LABELS, type Role } from '@/access/roles'
 import { approvalsOf, settings, type ApprovalRow, type RequestDoc } from '@/domain/expense/common'
 import { companyById, displayNames } from '@/domain/companies'
 import { intercompanyOfRequest } from '@/domain/intercompany/service'
@@ -80,7 +80,12 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
   const diajukan = rows.find((r) => r.position === 'diajukan' && r.decision === 'signed')
   const dibuat = rows.find((r) => r.position === 'dibuat' && r.decision === 'signed')
   const diketahui = rows.find((r) => r.position === 'diketahui' && (r.decision === 'acknowledged' || r.decision === 'rejected'))
-  const approvals = rows.filter((r) => r.position === 'approval' && (r.decision === 'approved' || r.decision === 'rejected')).sort((a, b) => a.level - b.level)
+  const levelRole = (level: number): Role | null => doc.approvalSnapshot?.steps.find((x) => x.level === level && x.approverUserId === null)?.approverRole ?? null
+  const decidedLevels = rows.filter((r) => r.position === 'approval' && (r.decision === 'approved' || r.decision === 'rejected')).sort((a, b) => a.level - b.level)
+  // Owner 2026-10-14: document signatures stop at the Direktur — the Owner level (ADR 0026) is an approval step in the
+  // system only, never printed (no name, no signature); an Owner rejection still marks the box DITOLAK.
+  const approvals = decidedLevels.filter((r) => levelRole(r.level) !== PRINCIPAL_ROLE)
+  const approvalRejected = decidedLevels.some((a) => a.decision === 'rejected')
   const creator = typeof doc.createdBy === 'object' ? doc.createdBy : null
   // ADR 0016 D1: the creator's employee = membership link IN THE DOCUMENT's PT
   const creatorName =
@@ -89,7 +94,6 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
   const skippedAck = skipped.some((x) => x.position === 'diketahui')
   const skippedApproval = skipped.some((x) => x.position === 'approval') && (doc.approvalSnapshot?.steps.length ?? 0) === 0
   const noApproval = isNoApproval(doc.approvalSnapshot)
-  const levelRole = (level: number): Role | null => doc.approvalSnapshot?.steps.find((x) => x.level === level && x.approverUserId === null)?.approverRole ?? null
   const approvalImages: PdfImage[] = []
   for (const a of approvals.slice(-2)) approvalImages.push(...(await sig(a)))
 
@@ -116,13 +120,14 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     },
     {
       label: 'Approval',
-      // ADR 0026: every approval level is listed; with several levels each name carries its role ("… (Direktur), … (Owner)").
+      // ADR 0026: every printed approval level is listed (not the Owner's, see above); with several levels each name carries
+      // its role ("Nama (Peran), …").
       // ADR 0025: a representative's decision prints the PT's definitive Direktur ("Nama (Jabatan)" — the title already
       // names the position, so no role suffix then).
       names: pdfSafe(approvals.map((a) => approvalPrintedName(a, approvals.length > 1 ? levelRole(a.level) : null)).filter(Boolean).join(', ')),
-      images: approvals.some((a) => a.decision === 'rejected') ? [] : approvalImages,
+      images: approvalRejected ? [] : approvalImages,
       time: formatServerTime(approvals.at(-1)?.decidedAt, tz),
-      note: approvals.some((a) => a.decision === 'rejected')
+      note: approvalRejected
         ? 'DITOLAK'
         : approvals.length === 0 && skippedApproval
           ? pdfSafe(SKIPPED_LABEL)
