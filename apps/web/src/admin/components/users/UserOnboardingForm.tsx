@@ -277,9 +277,9 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                       const mode = ev.target.value as EmpDraft['mode']
                       patchEmp(c.id, (x) =>
                         mode === 'linked' && c.employee
-                          ? { mode, id: c.employee.id, code: c.employee.code, name: c.employee.name, nickname: c.employee.nickname ?? '', position: c.employee.position ?? '', phone: c.employee.phone ?? '', active: c.employee.active }
+                          ? { mode, id: c.employee.id, code: c.employee.code, name: c.employee.name, nickname: c.employee.nickname ?? '', position: c.employee.position ?? '', phone: c.employee.phone ?? '', attendanceType: c.employee.attendanceType, active: c.employee.active }
                           : mode === 'new'
-                            ? { ...x, mode, id: null, code: '', name: draft.user.name, nickname: '', position: '', phone: draft.user.phone, active: true }
+                            ? { ...x, mode, id: null, code: '', name: draft.user.name, nickname: '', position: '', phone: draft.user.phone, attendanceType: 'onsite', active: true }
                             : { ...x, mode, id: mode === 'pick' ? null : x.id },
                       )
                     }}
@@ -316,6 +316,15 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                     {field(`${k}.nickname`, 'Nama panggilan', <input type="text" value={e.nickname} maxLength={64} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, nickname: ev.target.value }))} />)}
                     {field(`${k}.position`, 'Jabatan', <input type="text" value={e.position} maxLength={128} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, position: ev.target.value }))} />)}
                     {field(`${k}.phone`, 'No. HP', <input type="tel" value={e.phone} maxLength={32} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, phone: ev.target.value }))} />)}
+                    {field(
+                      `${k}.attendanceType`,
+                      'Tipe absensi',
+                      <select value={e.attendanceType} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, attendanceType: ev.target.value === 'non_onsite' ? 'non_onsite' : 'onsite' }))}>
+                        <option value="onsite">Karyawan OnSite</option>
+                        <option value="non_onsite">Karyawan Non-OnSite</option>
+                      </select>,
+                      { help: 'OnSite: absen di semua lokasi terdaftar PT (site, kantor pusat, project, pusat biaya) tanpa penugasan. Non-OnSite (staf kantor): hanya kantor pusat dan kantor cabang.' },
+                    )}
                     {field(
                       `${k}.active`,
                       'Status karyawan',

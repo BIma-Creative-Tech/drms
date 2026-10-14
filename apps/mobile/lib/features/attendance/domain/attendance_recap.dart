@@ -36,11 +36,20 @@ class LocationRef {
 
 /// One attendance row of a location/day (id is needed for corrections and the selfie viewer).
 class AttendanceMark {
-  const AttendanceMark({required this.id, required this.time, required this.source, required this.corrected});
+  const AttendanceMark({
+    required this.id,
+    required this.time,
+    required this.source,
+    required this.corrected,
+    this.outsideArea = false,
+  });
   final int id;
   final String time; // UTC ISO
   final String source; // self | pm
   final bool corrected;
+
+  /// DRMS 13/10 A2: "Di luar area" (Non-OnSite outside every registered location; the location is the reference).
+  final bool outsideArea;
   static AttendanceMark? fromJson(Object? v) {
     final j = _map(v);
     if (_intN(j['id']) == null) return null;
@@ -49,6 +58,7 @@ class AttendanceMark {
       time: '${j['time'] ?? ''}',
       source: '${j['source'] ?? 'self'}',
       corrected: j['corrected'] == true,
+      outsideArea: j['outsideArea'] == true,
     );
   }
 }
@@ -58,6 +68,10 @@ class LocationDay {
   final LocationRef location;
   final AttendanceMark? checkIn;
   final AttendanceMark? checkOut;
+
+  /// DRMS 13/10 A2: a check-in / check-out of this location was "Di luar area".
+  bool get outsideArea => (checkIn?.outsideArea ?? false) || (checkOut?.outsideArea ?? false);
+
   factory LocationDay.fromJson(Map<String, dynamic> j) => LocationDay(
     location: LocationRef.fromJson(_map(j['location'])),
     checkIn: AttendanceMark.fromJson(j['checkIn']),

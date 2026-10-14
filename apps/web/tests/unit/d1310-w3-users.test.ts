@@ -207,7 +207,7 @@ const detail: OnboardingDetail = {
       name: 'PT Satu',
       canManageEmployees: true,
       membership: { id: 11, roles: ['pk-staff'], active: true },
-      employee: { id: 21, code: 'K-01', name: 'Rina', nickname: null, position: 'Staf', phone: null, active: true },
+      employee: { id: 21, code: 'K-01', name: 'Rina', nickname: null, position: 'Staf', phone: null, attendanceType: 'onsite', active: true },
       bankAccounts: [{ id: 31, bank: 1, bankName: 'Bank Satu', accountNo: '1234567', accountHolder: 'Rina', isDefault: true, verificationStatus: 'unverified', active: true }],
       employeeChoices: [{ id: 21, code: 'K-01', name: 'Rina', active: true }],
       assignments: [],
@@ -255,11 +255,11 @@ describe('form: draft → body', () => {
     const d = draftFromDetail(empty)
     d.user = { email: ' Rina@Example.test ', name: 'Rina', phone: '', active: true }
     d.companies['1']!.roles = ['pk-staff']
-    d.companies['1']!.emp = { mode: 'new', id: null, code: 'K-09', name: 'Rina', nickname: '', position: '', phone: '', active: true }
+    d.companies['1']!.emp = { mode: 'new', id: null, code: 'K-09', name: 'Rina', nickname: '', position: '', phone: '', attendanceType: 'non_onsite', active: true }
     const r = buildBody(empty, d, 'create')
     expect(r.body).toEqual({
       user: { email: 'Rina@Example.test', name: 'Rina', phone: null, active: true },
-      companies: [{ company: 1, roles: ['pk-staff'], employee: { code: 'K-09', name: 'Rina', nickname: null, position: null, phone: null, active: true } }],
+      companies: [{ company: 1, roles: ['pk-staff'], employee: { code: 'K-09', name: 'Rina', nickname: null, position: null, phone: null, attendanceType: 'non_onsite', active: true } }],
     })
     const e = draftFromDetail(detail)
     e.companies['1']!.emp = { ...e.companies['1']!.emp, mode: 'none' }

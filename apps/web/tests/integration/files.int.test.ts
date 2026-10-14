@@ -102,7 +102,10 @@ describe('GET /api/v1/media/{collection}/{id}/file', () => {
   })
 
   it('bad input: unknown collection, non-numeric id, traversal-looking ids, unknown variant, missing doc', async () => {
-    expect((await file(`/api/v1/media/selfies/${receiptImg}/file`, w.users.finance)).status).toBe(404)
+    // a receipt id under another collection → 404 — unless a selfie happens to have the same id (ids are per table;
+    // other files of the suite upload many selfies)
+    const sameIdSelfie = (await sqlAs('owner', 'SELECT 1 FROM media_selfies WHERE id = $1', [receiptImg])).rows.length > 0
+    if (!sameIdSelfie) expect((await file(`/api/v1/media/selfies/${receiptImg}/file`, w.users.finance)).status).toBe(404)
     expect((await file('/api/v1/media/receipts/abc/file', w.users.finance)).status).toBe(404)
     expect((await file('/api/v1/media/receipts/..%2F..%2Fetc%2Fpasswd/file', w.users.finance)).status).toBe(404)
     expect((await file(`/api/v1/media/receipts/${receiptImg}/file?variant=../../x`, w.users.finance)).status).toBe(400)

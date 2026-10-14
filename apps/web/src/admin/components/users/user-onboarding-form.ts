@@ -19,7 +19,8 @@ export const TABS: ReadonlyArray<{ id: TabId; label: string }> = [
 
 /** Employee of one PT: none / the linked one (editable) / pick an existing unlinked one / create a new one. */
 export type EmpMode = 'none' | 'linked' | 'pick' | 'new'
-export type EmpDraft = { mode: EmpMode; id: number | null; code: string; name: string; nickname: string; position: string; phone: string; active: boolean }
+/** `attendanceType` (DRMS 13/10 A2 "Tipe absensi"): onsite = any registered location of the PT, non_onsite = head office + branches. */
+export type EmpDraft = { mode: EmpMode; id: number | null; code: string; name: string; nickname: string; position: string; phone: string; attendanceType: 'onsite' | 'non_onsite'; active: boolean }
 export type BankDraft = { key: string; id?: number; bank: number | null; accountNo: string; accountHolder: string; isDefault: boolean; verificationStatus: 'unverified' | 'verified'; active: boolean }
 export type CompanyDraft = { roles: string[]; emp: EmpDraft; banks: BankDraft[] }
 export type Draft = {
@@ -28,7 +29,7 @@ export type Draft = {
   reason: string
 }
 
-const EMPTY_EMP: EmpDraft = { mode: 'none', id: null, code: '', name: '', nickname: '', position: '', phone: '', active: true }
+const EMPTY_EMP: EmpDraft = { mode: 'none', id: null, code: '', name: '', nickname: '', position: '', phone: '', attendanceType: 'onsite', active: true }
 
 export function draftFromDetail(detail: OnboardingDetail): Draft {
   const u = detail.user
@@ -37,7 +38,7 @@ export function draftFromDetail(detail: OnboardingDetail): Draft {
     const e = c.employee
     companies[String(c.id)] = {
       roles: c.membership ? [...c.membership.roles] : [],
-      emp: e ? { mode: 'linked', id: e.id, code: e.code, name: e.name, nickname: e.nickname ?? '', position: e.position ?? '', phone: e.phone ?? '', active: e.active } : { ...EMPTY_EMP },
+      emp: e ? { mode: 'linked', id: e.id, code: e.code, name: e.name, nickname: e.nickname ?? '', position: e.position ?? '', phone: e.phone ?? '', attendanceType: e.attendanceType, active: e.active } : { ...EMPTY_EMP },
       banks: c.bankAccounts.map((b) => ({ key: `b${b.id}`, id: b.id, bank: b.bank, accountNo: b.accountNo, accountHolder: b.accountHolder, isDefault: b.isDefault, verificationStatus: b.verificationStatus, active: b.active })),
     }
   }
@@ -70,7 +71,7 @@ function employeePart(stored: OnboardingDetail['companies'][number]['employee'],
   if (e.mode === 'none') return stored ? null : undefined
   if (e.mode === 'pick') return e.id !== null && e.id !== stored?.id ? { id: e.id } : undefined
   if (e.mode === 'new') {
-    return { code: e.code.trim(), name: e.name.trim(), nickname: opt(e.nickname), position: opt(e.position), phone: opt(e.phone), active: e.active }
+    return { code: e.code.trim(), name: e.name.trim(), nickname: opt(e.nickname), position: opt(e.position), phone: opt(e.phone), attendanceType: e.attendanceType, active: e.active }
   }
   // linked: only the changed fields
   if (!stored || e.id !== stored.id) return e.id !== null ? { id: e.id } : undefined
@@ -80,6 +81,7 @@ function employeePart(stored: OnboardingDetail['companies'][number]['employee'],
   if (opt(e.nickname) !== stored.nickname) out.nickname = opt(e.nickname)
   if (opt(e.position) !== stored.position) out.position = opt(e.position)
   if (opt(e.phone) !== stored.phone) out.phone = opt(e.phone)
+  if (e.attendanceType !== stored.attendanceType) out.attendanceType = e.attendanceType
   if (e.active !== stored.active) out.active = e.active
   return Object.keys(out).length ? { id: stored.id, ...out } : undefined
 }

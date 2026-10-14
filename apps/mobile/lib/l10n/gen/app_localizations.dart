@@ -1432,7 +1432,7 @@ abstract class AppLocalizations {
   /// No description provided for @attendanceNoProjects.
   ///
   /// In id, this message translates to:
-  /// **'Anda belum ditugaskan di site, project, atau pusat biaya mana pun. Hubungi PM/Admin.'**
+  /// **'Belum ada lokasi absen untuk Anda (lokasi terdaftar dengan titik sesuai tipe absensi, atau penugasan). Hubungi PM/Admin.'**
   String get attendanceNoProjects;
 
   /// No description provided for @attendanceProject.
@@ -2916,6 +2916,90 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Penempatan'**
   String get siteHomeBadge;
+
+  /// No description provided for @siteHeadOffice.
+  ///
+  /// In id, this message translates to:
+  /// **'Kantor pusat'**
+  String get siteHeadOffice;
+
+  /// No description provided for @siteHeadOfficeBadge.
+  ///
+  /// In id, this message translates to:
+  /// **'Pusat'**
+  String get siteHeadOfficeBadge;
+
+  /// No description provided for @attendanceDetect.
+  ///
+  /// In id, this message translates to:
+  /// **'Deteksi lokasi otomatis'**
+  String get attendanceDetect;
+
+  /// No description provided for @attendanceDetected.
+  ///
+  /// In id, this message translates to:
+  /// **'Lokasi terdeteksi otomatis: {name} ({distance} m dari titik).'**
+  String attendanceDetected(String name, int distance);
+
+  /// No description provided for @attendanceDetectedOverlap.
+  ///
+  /// In id, this message translates to:
+  /// **'Anda berada di {count} area absen yang bertumpuk. Dipilih yang terdekat; pilih lokasi lain di bawah bila perlu.'**
+  String attendanceDetectedOverlap(int count);
+
+  /// No description provided for @attendanceDetectNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Posisi Anda di luar semua area absen terdaftar. Terdekat: {name} ({distance} m). Mendekatlah ke lokasi atau pilih lokasi secara manual.'**
+  String attendanceDetectNone(String name, int distance);
+
+  /// No description provided for @attendanceDetectNoPoint.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada lokasi absen dengan titik koordinat. Hubungi Admin.'**
+  String get attendanceDetectNoPoint;
+
+  /// No description provided for @attendanceAreaChoice.
+  ///
+  /// In id, this message translates to:
+  /// **'Area absen di posisi Anda'**
+  String get attendanceAreaChoice;
+
+  /// No description provided for @attendanceTypeOnsite.
+  ///
+  /// In id, this message translates to:
+  /// **'Karyawan OnSite: boleh absen di semua lokasi terdaftar PT (site, kantor pusat, project, pusat biaya).'**
+  String get attendanceTypeOnsite;
+
+  /// No description provided for @attendanceTypeNonOnsite.
+  ///
+  /// In id, this message translates to:
+  /// **'Karyawan Non-OnSite: boleh absen di mana saja; di luar lokasi terdaftar dicatat \"Di luar area\".'**
+  String get attendanceTypeNonOnsite;
+
+  /// No description provided for @attendanceOutsideArea.
+  ///
+  /// In id, this message translates to:
+  /// **'Di luar area'**
+  String get attendanceOutsideArea;
+
+  /// No description provided for @attendanceOutsideAreaHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Karyawan Non-OnSite: di luar lokasi terdaftar, absen tetap bisa dan dicatat \"Di luar area\".'**
+  String get attendanceOutsideAreaHint;
+
+  /// No description provided for @attendanceDetectOutsideArea.
+  ///
+  /// In id, this message translates to:
+  /// **'Posisi Anda di luar semua lokasi terdaftar: absen dicatat \"Di luar area\" (ref. {name}).'**
+  String attendanceDetectOutsideArea(String name);
+
+  /// No description provided for @attendanceNoReference.
+  ///
+  /// In id, this message translates to:
+  /// **'Absen \"Di luar area\" belum bisa: site penempatan / kantor pusat PT belum ditetapkan Admin.'**
+  String get attendanceNoReference;
 
   /// No description provided for @distanceInside.
   ///

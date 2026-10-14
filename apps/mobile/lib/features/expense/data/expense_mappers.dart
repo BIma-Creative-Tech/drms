@@ -525,6 +525,9 @@ const mediaPlaceholderKey = 'pk_media_uuid';
 /// Local-only key of an attendance item's selfie (replaced by `selfie_media_id`).
 const selfiePlaceholderKey = 'pk_selfie_uuid';
 
+/// Local-only key of a "Di luar area" attendance item (DRMS 13/10 A2, history label); removed before sending.
+const outsideAreaHintKey = 'pk_outside_area';
+
 /// Local-only key of a progress report item: local photo ids, replaced by `photo_media_ids` (E4). FR1 service
 /// reports and aftersales activities use it too (same `photo_media_ids` field).
 const progressPhotosPlaceholderKey = 'pk_photo_uuids';
@@ -564,7 +567,7 @@ Json? resolveMediaIds(Json payload, Map<String, int> mediaIds) {
   }
   // Attendance: the selfie sits at the top level (`selfie_media_id`, SyncAttendancePayload).
   if (payload.containsKey(selfiePlaceholderKey)) {
-    final out = Map<String, dynamic>.of(payload);
+    final out = Map<String, dynamic>.of(payload)..remove(outsideAreaHintKey);
     final id = mediaIds[out.remove(selfiePlaceholderKey)];
     if (id == null) return null;
     out['selfie_media_id'] = id;

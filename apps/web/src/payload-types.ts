@@ -579,6 +579,10 @@ export interface Employee {
    * Kantor cabang tempat karyawan ditempatkan (opsional): boleh absen di site ini tanpa penugasan tim.
    */
   homeSite?: (number | null) | Site;
+  /**
+   * Karyawan OnSite: boleh absen di semua lokasi terdaftar PT yang punya titik (site, kantor pusat, project, pusat biaya) tanpa penugasan. Karyawan Non-OnSite (staf kantor): hanya di kantor pusat dan kantor cabang (site).
+   */
+  attendanceType: 'onsite' | 'non_onsite';
   faceRefPhoto?: (number | null) | MediaSelfy;
   /**
    * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
@@ -594,7 +598,7 @@ export interface Employee {
   createdAt: string;
 }
 /**
- * Kantor cabang PT (mis. Cabang Balikpapan). Satu site menangani beberapa project; absensi kantor cabang memakai titik + radius site.
+ * Kantor pusat dan kantor cabang PT (mis. Cabang Balikpapan). Satu site menangani beberapa project; absensi di kantor memakai titik + radius site. Tandai satu site sebagai Kantor pusat.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "sites".
@@ -607,6 +611,10 @@ export interface Site {
   company?: (number | null) | Company;
   code: string;
   name: string;
+  /**
+   * Centang untuk kantor pusat PT (maksimal 1 per PT). Karyawan Non-OnSite hanya boleh absen di kantor pusat dan kantor cabang; isi titik + radius agar absensi bisa dipakai.
+   */
+  isHeadOffice?: boolean | null;
   address?: string | null;
   lat?: number | null;
   lng?: number | null;
@@ -2331,6 +2339,7 @@ export interface Attendance {
   lng: number;
   accuracyM?: number | null;
   distanceM: number;
+  outsideArea?: boolean | null;
   selfie: number | MediaSelfy;
   device?: (number | null) | Device;
   flags?:
@@ -3192,6 +3201,7 @@ export interface EmployeesSelect<T extends boolean = true> {
   phone?: T;
   workSchedule?: T;
   homeSite?: T;
+  attendanceType?: T;
   faceRefPhoto?: T;
   odooEmployeeRef?: T;
   active?: T;
@@ -3588,6 +3598,7 @@ export interface SitesSelect<T extends boolean = true> {
   company?: T;
   code?: T;
   name?: T;
+  isHeadOffice?: T;
   address?: T;
   lat?: T;
   lng?: T;
@@ -4205,6 +4216,7 @@ export interface AttendancesSelect<T extends boolean = true> {
   lng?: T;
   accuracyM?: T;
   distanceM?: T;
+  outsideArea?: T;
   selfie?: T;
   device?: T;
   flags?: T;

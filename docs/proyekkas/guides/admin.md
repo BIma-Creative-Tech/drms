@@ -361,6 +361,25 @@ semua isian tab ini untuk kembali ke tanda tangan pribadi.
   Jadwal kerja default diatur per PT (**Perusahaan (PT) → Operasional → Jadwal kerja default**).
 - Titik & radius **project** diisi di **Proyek → Project**. Lokasi tanpa titik tidak bisa dipakai absen; titik tanpa
   radius memakai **Radius geofence default** PT itu. Server menambah toleransi akurasi GPS HP (maks. 50 m) ke radius.
+- **Tipe absensi karyawan** (DRMS 13/10 A2): di **Karyawan** (atau **Pengguna → tab Data Karyawan**) isi **Tipe
+  absensi**:
+  - **Karyawan OnSite** (default semua karyawan): boleh absen di **semua lokasi terdaftar PT** yang punya titik —
+    kantor pusat, kantor cabang (site), project, pusat biaya — **tanpa penugasan** (Team Assignment tidak perlu).
+  - **Karyawan Non-OnSite** (staf kantor): **tidak dibatasi lokasi** — boleh absen di site mana pun dan juga di luar
+    lokasi terdaftar (tanpa cek radius, tanpa penugasan). Bila posisinya di dalam lokasi terdaftar, absen dicatat di
+    lokasi itu; bila tidak, dicatat **"Di luar area"** dengan acuan **site penempatan** karyawan (bila kosong:
+    **kantor pusat**) dan jaraknya. Absen pulang menutup absen masuk hari itu. GPS tetap wajib, lokasi palsu tetap
+    ditolak. Tanpa site penempatan dan tanpa kantor pusat, absen di luar area ditolak — isi salah satunya.
+  - **"Di luar area"** terlihat di Rekap absensi (tanda **Di luar area**), di **Laporan Absensi** (kolom Lokasi
+    *Di luar area (ref. …)* dan Keterangan) dan di daftar **Absensi** (kolom/filter **Di luar area**).
+  - Daftar Karyawan bisa difilter per **Tipe absensi**.
+- **Kantor pusat:** di **Master Data → Site** centang **Kantor pusat** pada site kantor pusat PT (maksimal **1 per
+  PT**; untuk memindahkan, hapus centang di site lama dulu) dan isi **titik + radius**. Kantor pusat menjadi acuan
+  "Di luar area" untuk karyawan Non-OnSite yang belum punya site penempatan.
+- APK dan web **mengenali area otomatis**: lokasi yang geofence-nya memuat posisi GPS karyawan langsung terpilih;
+  bila beberapa area bertumpuk, karyawan memilih salah satu; di luar semua area, karyawan OnSite memilih manual
+  (server tetap menolak bila di luar radius), karyawan Non-OnSite otomatis memakai pilihan **"Di luar area"**. Lokasi baru/titik baru terbaca di APK setelah sinkron berikutnya (maks. ±15
+  menit saat online).
 - Bila lebih dari satu PT tampil, halaman absensi punya pilihan **PT** (mis. **Semua PT (DRMS, CS1)**) dan nama lokasi
   diberi awalan `[KODE PT]`.
 - **Laporan → Laporan Absensi**: Admin bisa melihat dan mengunduh (CSV/Excel) untuk semua karyawan PT tempat ia Admin.

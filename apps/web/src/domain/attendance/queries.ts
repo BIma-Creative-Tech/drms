@@ -9,6 +9,7 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
 import type { AttendanceFact, LocationRef, TeamMember } from './aggregate'
+import { OUTSIDE_AREA_FLAG } from './area'
 import { parseSnapshot, snapshotOf, type ScheduleSnapshot } from './schedule'
 
 /**
@@ -167,6 +168,7 @@ type FactRow = {
   schedule: unknown
   flags: unknown
   offline: boolean | null
+  outside_area: boolean | null
 }
 
 async function rows<T>(req: PayloadRequest, q: SQL): Promise<T[]> {
@@ -184,7 +186,7 @@ export function factsSql(f: { from: string; to: string; employeeIds?: number[]; 
            a.cost_center_id, cc.code AS cc_code, cc.name AS cc_name,
            a.site_id, st.code AS site_code, st.name AS site_name,
            a.source, CASE WHEN ru.id IS NULL THEN NULL ELSE coalesce(ru.name, 'PM #' || ru.id) END AS recorded_by_name,
-           (c.new_time IS NOT NULL) AS corrected, a.schedule, a.flags, a.offline
+           (c.new_time IS NOT NULL) AS corrected, a.schedule, a.flags, a.offline, a.outside_area
     FROM attendances a
     LEFT JOIN LATERAL (SELECT new_time FROM attendance_corrections x WHERE x.attendance_id = a.id ORDER BY x.id DESC LIMIT 1) c ON TRUE
     LEFT JOIN projects p ON p.id = a.project_id
@@ -215,8 +217,10 @@ export async function loadFacts(req: PayloadRequest, f: { from: string; to: stri
       recordedByName: x.recorded_by_name,
       corrected: x.corrected === true,
       schedule: parseSnapshot(x.schedule),
-      flags: Array.isArray(x.flags) ? x.flags.filter((v): v is string => typeof v === 'string') : [],
+      // DRMS 13/10 A2: "Di luar area" (Non-OnSite outside every registered location) as a flag of the fact / day
+      flags: [...(Array.isArray(x.flags) ? x.flags.filter((v): v is string => typeof v === 'string') : []), ...(x.outside_area === true ? [OUTSIDE_AREA_FLAG] : [])],
       offline: x.offline === true,
+      ...(x.outside_area === true ? { outsideArea: true } : {}),
     }
   })
 }
@@ -349,51 +353,4 @@ export async function teamMembers(req: PayloadRequest, scope: AttScope, fromDate
     by.set(x.employee_id, m)
   }
   return [...by.values()]
-}
-
-type OwnAssignmentRow = {
-  employee_id: number
-  project_id: number | null
-  project_code: string | null
-  project_name: string | null
-  cost_center_id: number | null
-  cc_code: string | null
-  cc_name: string | null
-  site_id: number | null
-  site_code: string | null
-  site_name: string | null
-  home: boolean
-}
-
-/**
- * Locations the caller's OWN employee(s) are assigned to on `date` (start/end inclusive), with the
- * assigned employee (one per PT, ADR 0016 D1) — always visible to oneself regardless of role/scope
- * (unlike `teamMembers`, which answers "who may I see"). Location picker of `/absensi/absen`. ADR 0023: plus the
- * site assignments and the home site ("Site penempatan", `home: true`, listed first); a site both assigned and home
- * appears once (as home).
- */
-export async function myAssignedLocations(req: PayloadRequest, employeeIds: readonly number[], date: string): Promise<Array<LocationRef & { employeeId: number; home?: boolean }>> {
-  if (employeeIds.length === 0) return []
-  const r = await rows<OwnAssignmentRow>(
-    req,
-    sql`SELECT employee_id, project_id, project_code, project_name, cost_center_id, cc_code, cc_name, site_id, site_code, site_name, bool_or(home) AS home
-        FROM (
-          SELECT ta.employee_id, ta.project_id, p.code AS project_code, p.name AS project_name, ta.cost_center_id, cc.code AS cc_code, cc.name AS cc_name,
-                 ta.site_id, st.code AS site_code, st.name AS site_name, FALSE AS home
-          FROM team_assignments ta
-          LEFT JOIN projects p ON p.id = ta.project_id
-          LEFT JOIN cost_centers cc ON cc.id = ta.cost_center_id
-          LEFT JOIN sites st ON st.id = ta.site_id
-          WHERE ${inList(sql`ta.employee_id`, employeeIds)}
-            AND (ta.start_date IS NULL OR to_char(ta.start_date AT TIME ZONE 'UTC', 'YYYY-MM-DD') <= ${date})
-            AND (ta.end_date IS NULL OR to_char(ta.end_date AT TIME ZONE 'UTC', 'YYYY-MM-DD') >= ${date})
-          UNION ALL
-          SELECT e.id, NULL, NULL, NULL, NULL, NULL, NULL, hs.id, hs.code, hs.name, TRUE
-          FROM employees e JOIN sites hs ON hs.id = e.home_site_id
-          WHERE ${inList(sql`e.id`, employeeIds)}
-        ) x
-        GROUP BY employee_id, project_id, project_code, project_name, cost_center_id, cc_code, cc_name, site_id, site_code, site_name
-        ORDER BY bool_or(home) DESC, project_code, cc_code, site_code`,
-  )
-  return r.map((x) => ({ employeeId: Number(x.employee_id), ...memberLocation(x), ...(x.home ? { home: true } : {}) }))
 }

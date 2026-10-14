@@ -73,7 +73,7 @@ describe('decisions (G1, G2, US-17)', () => {
   it('a requester (with the Direktur role) cannot approve their own request — API 403 and DB trigger', async () => {
     const ownerEmp = await (async () => {
       const p = await getTestPayload()
-      return (await p.create({ collection: 'employees', data: { code: 'AZ-OWN', name: 'AZ Owner-Pemohon' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })).id as number
+      return (await p.create({ collection: 'employees', data: { code: 'AZ-OWN', name: 'AZ Owner-Pemohon', attendanceType: 'onsite' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })).id as number
     })()
     const ownerRequester = await makeFlowUser(['pk-owner'], 'az-owner-req', ownerEmp)
     const c = await api('POST', E, w.users.admin, draftBody(w, { requesterIds: [w.emp.a, ownerEmp] })) // 2nd requester = an Owner

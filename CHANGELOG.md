@@ -37,6 +37,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Deploy step:** after migrating, a **group admin** ticks **Owner** for the Owner in every PT — until then submissions under a rule with
   an Owner level answer 409 ("Tidak ada pengguna aktif … (peran Owner)").
 
+### Added (DRMS — tipe absensi OnSite / Non-OnSite)
+
+- **Tipe absensi per karyawan** (ADR 0023 amendment 2026-10-13, owner DRMS 13/10 A2): `employees.attendanceType`
+  **Karyawan OnSite** / **Karyawan Non-OnSite** on the Karyawan form, the Pengguna form (tab Data Karyawan,
+  `user-onboarding` `employee.attendanceType`) and as a list filter. **OnSite** may check in at every registered
+  location of its PT that has a point (sites incl. the head office, projects, cost centers) **without a team
+  assignment** (outside the radius refused); **Non-OnSite** (office staff, owner 2026-10-14) has **no location
+  restriction**: inside a registered location → recorded there, else recorded **"Di luar area"** referenced to the
+  home site (else the head office) with the distance (`attendances.outside_area`); a check-out closes the day's open
+  check-in. GPS, mock refusal, selfie and privacy rules unchanged; own PT only. Existing and new employees default to
+  **OnSite** (nothing that worked before is refused).
+- **"Di luar area" everywhere it is read**: recap / API stamps `outsideArea` + day flag `OUTSIDE_AREA`, Laporan
+  Absensi (Lokasi `Di luar area (ref. …)`, Keterangan), web recap chip, Absensi list column / filter, APK recap and
+  history; web check-in result `{location, outsideArea, distanceM}`.
+- **"Kantor pusat" on sites** (`sites.isHeadOffice`, at most one per PT: field error + DB unique index), list
+  column / filter, `isHeadOffice` in the `sites` masters.
+- **`GET /api/v1/attendance/locations`**: the registered check-in locations of the caller's PT(s) (id, kind, code,
+  name, point, effective radius, head office / home flags) per own employee in the selected PTs, plus the "Di luar
+  area" `referenceSite` of a Non-OnSite employee — no money / budgets. OpenAPI `AttendanceLocations`.
+- **Automatic area detection** — APK: the Absen tab selects the location whose geofence contains the GPS fix (nearest
+  when several overlap, chips to pick another; none → OnSite: manual picker with the nearest as a hint, Non-OnSite:
+  the "Di luar area" entry), button "Deteksi lokasi otomatis", "Pusat" badge, type hint; the list is cached for
+  offline check-ins (server re-validates at sync). Web "Absensi · Absen": same list, detection and "Di luar area".
+- Migrations `20261013_620000_d1310_onsite`, `20261013_620100_d1310_onsite_guard`. **Deploy:** Admin flags the head
+  office of each PT (with point + radius) and sets office staff to Non-OnSite.
+
 ### Added (DRMS — tanda tangan Direktur definitif per PT)
 
 - **Per-PT definitive Direktur** (ADR 0025, owner requirement DRMS 13/10 A3). Perusahaan (PT) → new tab **"Direktur

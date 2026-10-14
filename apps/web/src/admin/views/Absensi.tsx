@@ -12,7 +12,9 @@ import { matchesQuery, spValue } from '@/admin/list-query'
 import { Icon as Glyph } from '@/admin/modules/Icon'
 import type { DayRecap, LocationDay, LocationRef, RecapSummary, TeamTodayRow } from '@/domain/attendance/aggregate'
 import { classCounts, classifyDay, DAY_CLASSES, LEGEND, minutesText, monthWeeks, offsetText, shiftMonth, type DayClass } from '@/domain/attendance/calendar'
-import { attendanceContext, attendanceScope, employeeRef, myAssignedLocations, narrowAttScope, narrowAttToCompanies, narrowAttToSite, type AttScope } from '@/domain/attendance/queries'
+import { attendanceContext, attendanceScope, employeeRef, narrowAttScope, narrowAttToCompanies, narrowAttToSite, type AttScope } from '@/domain/attendance/queries'
+import { OUTSIDE_AREA_LABEL } from '@/domain/attendance/area'
+import { eligibleLocations, employeeAttendance, referenceSite, type EmployeeAttendance } from '@/domain/attendance/eligibility'
 import { dayRowsAt } from '@/domain/attendance/record'
 import type { ScheduleSnapshot } from '@/domain/attendance/schedule'
 import { employeeRecap, myRecap, teamTodayFor, type MonthlyRecap, type TeamTodayResult } from '@/domain/attendance/service'
@@ -56,6 +58,12 @@ export const ABSENSI_STYLE = `
 .pk-sc-loc[data-state='hadir'] .st { color: var(--pk-primary); }
 .pk-sc-loc[data-state='selesai'] .st { color: var(--pk-tone-ok-text); }
 .pk-sc-go { width: 100%; min-height: 52px; font-size: 16px; border-radius: 999px; }
+.pk-sc-loc[data-area='in'] { border-color: var(--pk-tone-ok-text); }
+.pk-sc-loc .area { font-size: 12px; font-weight: 600; color: var(--pk-tone-ok-text); }
+.pk-chip.warn { color: var(--pk-tone-warn-text); border-color: currentColor; }
+.pk-sc-detect { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.pk-sc-detect .note { font-size: 13px; }
+.pk-sc-detect .note[data-tone='warn'] { color: var(--pk-tone-warn-text); }
 .pk-f3 {
   --dc-ok: var(--pk-tone-ok-text); --dc-warn: var(--pk-tone-warn-text); --dc-bad: var(--pk-tone-bad-text); --dc-info: var(--pk-primary);
 }
@@ -622,15 +630,23 @@ function Stamp({ loc, kind, d, tz }: { loc: LocationDay; kind: 'checkIn' | 'chec
       <b>{hhmm(s.time, tz)}</b>
       {s.source === 'pm' ? ' · PM' : ''}
       {s.corrected ? ' · dikoreksi' : ''}
+      {s.outsideArea ? (
+        <span className="pk-chip warn" data-pk-outside-area>
+          {' '}
+          {OUTSIDE_AREA_LABEL}
+        </span>
+      ) : null}
       <span className="pk-sr"> {d.date}</span>
     </span>
   )
 }
 
 /**
- * Owner decision 2026-10-09: web self check-in/out, every role. The location list is the caller's own
- * assignments (`myAssignedLocations`); POST /attendance/check-in|check-out re-check everything
- * (assignment, geofence, company-settings.syncAttendanceEnabled, ADR 0018 privacy ack).
+ * Owner decision 2026-10-09: web self check-in/out, every role. DRMS 13/10 A2: the location list is every registered
+ * location of the caller's PT(s) with its point (`eligibleLocations`), so the form can detect the area from the
+ * browser GPS; a Non-OnSite employee also gets a "Di luar area" entry (reference = home site, else head office).
+ * POST /attendance/check-in|check-out re-check everything (type rule, geofence for OnSite, Non-OnSite resolution,
+ * company-settings.syncAttendanceEnabled, ADR 0018 privacy ack).
  */
 export async function AbsensiAbsen(props: AdminViewServerProps) {
   const req = props.initPageResult.req
@@ -640,17 +656,46 @@ export async function AbsensiAbsen(props: AdminViewServerProps) {
       const scope = await attendanceScope(req)
       const ctx = await attendanceContext(req)
       const uid = userId(req)
-      const assigned = await myAssignedLocations(req, ownEmployees(req), ctx.today)
-      const locations: SelfCheckLocation[] = await Promise.all(
-        assigned.map(async (l) => {
-          const rows = await dayRowsAt(req, l.employeeId, { type: l.type, id: l.id }, ctx.today)
-          const at = (k: 'check_in' | 'check_out') => {
-            const r = rows.find((x) => x.kind === k)
-            return r ? formatServerTime(String(r.effective_time), ctx.timeZone) : null
-          }
-          return { type: l.type, id: l.id, label: `${l.code} ${l.name}`, checkIn: at('check_in'), checkOut: at('check_out'), ...(l.home ? { home: true } : {}) }
-        }),
-      )
+      // one after another: the request transaction has one connection (domain/reports/kpi.ts rows)
+      const employees: EmployeeAttendance[] = []
+      for (const e of ownEmployees(req)) {
+        const emp = await employeeAttendance(req, e)
+        if (emp) employees.push(emp)
+      }
+      const eligible = await eligibleLocations(req, employees)
+      const locations: SelfCheckLocation[] = []
+      for (const l of eligible) {
+        const rows = await dayRowsAt(req, l.employee, { type: l.kind, id: l.id }, ctx.today)
+        const at = (k: 'check_in' | 'check_out') => {
+          const r = rows.find((x) => x.kind === k)
+          return r ? formatServerTime(String(r.effective_time), ctx.timeZone) : null
+        }
+        locations.push({
+          type: l.kind,
+          id: l.id,
+          label: `${l.code} ${l.name}`,
+          checkIn: at('check_in'),
+          checkOut: at('check_out'),
+          lat: l.lat,
+          lng: l.lng,
+          radiusM: l.radiusM,
+          ...(l.home ? { home: true } : {}),
+          ...(l.isHeadOffice ? { headOffice: true } : {}),
+          ...(employees.find((e) => e.id === l.employee)?.type === 'non_onsite' ? { nonOnsite: true } : {}),
+        })
+      }
+      // DRMS 13/10 A2 (owner 2026-10-14): Non-OnSite has no location restriction — "Di luar area" at the reference site
+      for (const e of employees) {
+        if (e.type !== 'non_onsite') continue
+        const ref = await referenceSite(req, e)
+        if (!ref) continue
+        const rows = await dayRowsAt(req, e.id, { type: 'site', id: ref.id }, ctx.today)
+        const at = (k: 'check_in' | 'check_out') => {
+          const r = rows.find((x) => x.kind === k)
+          return r ? formatServerTime(String(r.effective_time), ctx.timeZone) : null
+        }
+        locations.push({ type: 'site', id: ref.id, label: `${OUTSIDE_AREA_LABEL} (ref. ${ref.code} ${ref.name})`, checkIn: at('check_in'), checkOut: at('check_out'), outsideArea: true, nonOnsite: true })
+      }
       const privacyBlocked = uid === undefined ? false : (await privacyAckCheck(req, uid)).required
       return { scope, locations, privacyBlocked }
     })
