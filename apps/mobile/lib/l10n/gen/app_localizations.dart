@@ -1129,6 +1129,18 @@ abstract class AppLocalizations {
   /// **'Tanda tangan terlalu besar. Ulangi dengan goresan lebih sederhana.'**
   String get signatureTooLarge;
 
+  /// No description provided for @direkturSignatureTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanda tangan Direktur PT'**
+  String get direkturSignatureTitle;
+
+  /// No description provided for @direkturSignatureHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Ditandatangani dengan tanda tangan dan nama Direktur definitif PT.'**
+  String get direkturSignatureHint;
+
   /// No description provided for @confirm.
   ///
   /// In id, this message translates to:

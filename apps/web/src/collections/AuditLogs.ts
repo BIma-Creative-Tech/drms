@@ -32,6 +32,9 @@ const fields: Field[] = [
   { name: 'statusTo', type: 'text', label: 'Status ke', admin: ro },
   { name: 'reason', type: 'text', label: 'Alasan', admin: ro },
   { name: 'userId', type: 'number', label: 'User ID', admin: ro },
+  // ADR 0025: name shown as the actor in the document history when a designated representative decided a Direktur
+  // step as the PT's definitive Direktur (`userId` stays the real user — forensics)
+  { name: 'actorDisplayName', type: 'text', label: 'Nama tampil pelaku', admin: ro },
   // ADR 0016 §4: PT of the document (nullable — logins, shared masters, app-wide settings)
   { name: 'company', type: 'relationship', relationTo: 'companies', label: 'PT', index: true, admin: ro },
   { name: 'userRoles', type: 'text', label: 'Peran', admin: ro },

@@ -9,6 +9,7 @@ import { inIds } from '@/access/scope'
 import { APPROVAL_DECISIONS, APPROVAL_POSITIONS } from '@/domain/expense/types'
 import { companyField, companyHook } from '@/fields/company'
 import { USER_NAME_VIEW } from '@/fields/users'
+import { COMPANY_SIGNATURE_SOURCE } from '@/domain/direktur-rules'
 
 const ro = { readOnly: true }
 const budgetPctRead = moneyRead('approvals')
@@ -27,6 +28,8 @@ const budgetPctRead = moneyRead('approvals')
  * settlement's request. Office roles read them through the `company` predicate of byVisibleRequest.
  * ADR 0022: rows of an inter-project loan carry docType `project_loan` + `loan` (one Direktur decision; G1 = the
  * loan's creator, except the recorded `direktur_self` case).
+ * ADR 0025: a designated representative deciding a Direktur step signs with the PT's definitive Direktur signature
+ * (`signatureSource = company`, `representedDirektur` snapshot, `actorName` = the Direktur); `actor` = the real user.
  */
 const readAccess: Access = async (args) => {
   const { req } = args
@@ -57,7 +60,16 @@ export const Approvals: CollectionConfig = {
     { name: 'cycle', type: 'number', label: 'Siklus', required: true, admin: ro },
     { name: 'position', type: 'select', label: 'Posisi', required: true, options: APPROVAL_POSITIONS.map((v) => ({ label: v, value: v })), admin: ro },
     { name: 'level', type: 'number', label: 'Level', required: true, defaultValue: 0, admin: ro },
-    { name: 'actor', type: 'relationship', relationTo: 'users', label: 'User', index: true, admin: { ...ro, components: USER_NAME_VIEW } },
+    // ADR 0025: on a decision signed as the PT's definitive Direktur the real user stays in the row (FK, G1, DB guards,
+    // forensics: audit log user id) but is not displayed — the form shows the Direktur (`actorName`) only
+    {
+      name: 'actor',
+      type: 'relationship',
+      relationTo: 'users',
+      label: 'User',
+      index: true,
+      admin: { ...ro, components: USER_NAME_VIEW, condition: (data) => (data as { signatureSource?: unknown } | undefined)?.signatureSource !== COMPANY_SIGNATURE_SOURCE },
+    },
     { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan (Diajukan Oleh)', admin: ro },
     { name: 'actorName', type: 'text', label: 'Nama tampil', admin: ro },
     { name: 'onBehalf', type: 'checkbox', label: 'Diwakili pembuat (Q-10/Q-28)', defaultValue: false, admin: ro },
@@ -70,7 +82,20 @@ export const Approvals: CollectionConfig = {
     { name: 'openFlags', type: 'number', label: 'Flag terbuka saat keputusan', admin: ro },
     { name: 'signature', type: 'upload', relationTo: 'media-signatures', label: 'Tanda tangan', admin: ro },
     { name: 'signatureSha256', type: 'text', label: 'SHA-256 tanda tangan', admin: ro },
-    { name: 'signatureSource', type: 'select', label: 'Sumber tanda tangan', options: ['profile', 'captured', 'none'].map((v) => ({ label: v, value: v })), admin: ro },
+    // ADR 0025: `company` = the PT's definitive Direktur signature, used by a designated representative on a Direktur step
+    { name: 'signatureSource', type: 'select', label: 'Sumber tanda tangan', options: ['profile', 'captured', 'none', COMPANY_SIGNATURE_SOURCE].map((v) => ({ label: v, value: v })), admin: ro },
+    {
+      // ADR 0025: snapshot of the PT's definitive Direktur at decision time (signature = `signature` + `signatureSha256`);
+      // never changes when the PT later edits its Direktur data (Class A row). DB: set ⇔ signatureSource = company.
+      name: 'representedDirektur',
+      type: 'group',
+      label: 'Ditandatangani sebagai Direktur definitif PT',
+      admin: { condition: (data) => (data as { signatureSource?: unknown } | undefined)?.signatureSource === COMPANY_SIGNATURE_SOURCE },
+      fields: [
+        { name: 'name', type: 'text', label: 'Nama Direktur', admin: ro },
+        { name: 'title', type: 'text', label: 'Jabatan', admin: ro },
+      ],
+    },
     { name: 'deviceId', type: 'text', label: 'Perangkat', admin: ro },
     { name: 'source', type: 'select', label: 'Sumber', options: ['web', 'apk', 'system', 'job'].map((s) => ({ label: s, value: s })), admin: ro },
   ],

@@ -119,7 +119,7 @@ export async function auditLogPage(req: PayloadRequest, f: AuditFilter, page: { 
     req,
     sql`SELECT a.id, a.company_id, to_char(a.server_time AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS server_time,
           to_char(a.server_time AT TIME ZONE ${ctx.tz}, 'YYYY-MM-DD HH24:MI:SS') AS local_time,
-          a.user_id, coalesce(e.name, u.name, u.email) AS user_name, a.user_roles, a.action::text AS action, a.doc_type, a.doc_id, a.doc_no,
+          a.user_id, coalesce(a.actor_display_name, e.name, u.name, u.email) AS user_name, a.user_roles, a.action::text AS action, a.doc_type, a.doc_id, a.doc_no,
           a.field, a.line_no, a.old_value, a.new_value, a.status_from, a.status_to, a.reason, a.source::text AS source, a.app_version,
           a.ip, a.device_id, a.request_id
         FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id

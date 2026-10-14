@@ -4,6 +4,7 @@ import { sql } from '@payloadcms/db-postgres'
 import { createLocalReq, type PayloadRequest } from 'payload'
 
 import { rolesIn, rolesOf } from '@/access/roles'
+import { AUDIT_ACTOR_DISPLAY } from '@/domain/direktur-rules'
 import { requestMeta } from '@/lib/request-meta'
 import { withReqTransaction } from '@/lib/system-tx'
 import { getRequestTx } from '@/lib/tx'
@@ -68,6 +69,10 @@ export const AUDIT_ACTIONS = [
   // (QA-04), a transfer confirmed to an employee bank account that is not verified (QA-17).
   'overdraft_confirmed',
   'bank_unverified_confirmed',
+  // DRMS 13/10 Wave 4 (ADR 0007 amendment 2026-10-13): the ONE-TIME controlled renumbering (src/renumber) — one row per
+  // renumbered document (field docNo / entryNo, old → new) and per rewritten cash-entry description; written by the
+  // renumber CLI in its own transaction, never by the app.
+  'renumbered',
 ] as const
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 
@@ -190,6 +195,10 @@ export async function writeAudit(req: PayloadRequest, rows: AuditRow[], user?: U
   const uid = typeof u?.id === 'number' ? u.id : typeof u?.id === 'string' && /^\d+$/.test(u.id) ? Number(u.id) : undefined
   const rolesAny = rolesOf(u).join(',')
   const eventId = randomUUID()
+  // ADR 0025: a representative deciding a Direktur step as the PT's definitive Direktur — the rows keep the real
+  // user id (forensics), the history shows the Direktur's name (only for rows of the request's own user)
+  const shown = user === undefined ? req.context?.[AUDIT_ACTOR_DISPLAY] : undefined
+  const actorDisplayName = typeof shown === 'string' && shown.trim() ? shown.trim().slice(0, 200) : undefined
   const companies = new Map<string, number | null>()
   for (const given of rows) {
     const row: AuditRow = { ...given, companyId: await derivedCompany(tx, given, companies) }
@@ -212,6 +221,7 @@ export async function writeAudit(req: PayloadRequest, rows: AuditRow[], user?: U
         statusTo: row.statusTo,
         reason: row.reason,
         userId: uid,
+        actorDisplayName,
         // actor roles IN the row's PT when known (ADR 0016), else in any selected PT
         userRoles: (typeof row.companyId === 'number' ? rolesIn({ user: u } as never, row.companyId).join(',') : rolesAny) || undefined,
         company: row.companyId ?? undefined,

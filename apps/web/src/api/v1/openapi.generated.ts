@@ -1848,7 +1848,8 @@ export const openapiDocument = {
                   "type": [
                     "string",
                     "null"
-                  ]
+                  ],
+                  "description": "profile | captured | none | company (ADR 0025: signed with the PT's definitive Direktur signature by a designated representative; actorName = that Direktur)."
                 }
               },
               "required": [
@@ -2169,6 +2170,33 @@ export const openapiDocument = {
             },
             "description": "UI hint; the server re-checks every action."
           },
+          "direkturSignature": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "signatureId": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "name",
+              "title",
+              "signatureId"
+            ],
+            "description": "ADR 0025: non-null when the decision the caller may take now is a Direktur step of a PT with a definitive Direktur and the caller is one of its designated representatives. The decision is then signed with the PT's Direktur signature (signatureId, media-signatures; readable by the office roles of the PT) and shown under `name` — show it read-only (\"Tanda tangan Direktur PT\") instead of asking for a signature; a sent signatureMediaId is ignored. The server decides again at the decision."
+          },
           "resubmitOfId": {
             "type": [
               "integer",
@@ -2335,6 +2363,7 @@ export const openapiDocument = {
           "settlement",
           "budget",
           "allowedActions",
+          "direkturSignature",
           "resubmitOfId",
           "resubmitOf",
           "submittedAt",

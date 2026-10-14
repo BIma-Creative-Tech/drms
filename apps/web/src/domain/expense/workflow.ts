@@ -5,6 +5,7 @@ import { writeAudit } from '@/audit/writer'
 import { allocateDocNo, loadSequence } from '@/domain/numbering-db'
 import { formatDocNo, parseBusinessDate } from '@/domain/numbering'
 import { requestMeta } from '@/lib/request-meta'
+import { isDirekturAckStep, isDirekturApprovalStep, signDecision, signerColumns, type DecisionSigner } from '@/domain/direktur-signature'
 
 import {
   actorContext,
@@ -49,6 +50,8 @@ async function insertApproval(
     onBehalf?: boolean
     reason?: string | null
     signature: Signature | null
+    /** ADR 0025: decision signer (signature + display name, possibly the PT's definitive Direktur); wins over `signature`. */
+    signer?: DecisionSigner
     budget?: { before: number | null; after: number | null }
     openFlags?: number
     /** F2e: "Diketahui" given by a delegated Owner/Admin (recorded in the audit row). */
@@ -66,16 +69,20 @@ async function insertApproval(
       level: row.level,
       actor: row.actor,
       employee: row.employee ?? null,
-      actorName: await displayName(req, row.actor),
       onBehalf: row.onBehalf ?? false,
       decision: row.decision,
       reason: row.reason ?? null,
       budgetPctBefore: row.budget?.before ?? null,
       budgetPctAfter: row.budget?.after ?? null,
       openFlags: row.openFlags ?? null,
-      signature: row.signature?.mediaId ?? null,
-      signatureSha256: row.signature?.sha256 ?? null,
-      signatureSource: row.signature ? row.signature.source : 'none',
+      ...(row.signer
+        ? signerColumns(row.signer)
+        : {
+            actorName: await displayName(req, row.actor),
+            signature: row.signature?.mediaId ?? null,
+            signatureSha256: row.signature?.sha256 ?? null,
+            signatureSource: row.signature ? row.signature.source : 'none',
+          }),
       deviceId: meta.deviceId ?? null,
       source: meta.source,
     } as never,
@@ -94,7 +101,7 @@ async function insertApproval(
       newValue: {
         level: row.level,
         decision: row.decision,
-        signatureSource: row.signature?.source ?? 'none',
+        signatureSource: (row.signer ? row.signer.signature : row.signature)?.source ?? 'none',
         budgetPctBefore: row.budget?.before ?? null,
         budgetPctAfter: row.budget?.after ?? null,
         openFlags: row.openFlags ?? null,
@@ -115,6 +122,8 @@ async function requireSignature(req: PayloadRequest, signer: number, mode: 'requ
   }
   return sig
 }
+
+const companyOfDoc = (doc: RequestDoc) => relId((doc as { company?: unknown }).company)
 
 async function budgetFor(req: PayloadRequest, doc: RequestDoc) {
   const projectId = relId(doc.project)
@@ -279,8 +288,9 @@ export async function acknowledge(req: PayloadRequest, id: number, opts: SignOpt
   await requireActionAudited(req, await actorContext(req, visible), 'acknowledge', visible)
   const doc = await loadRaw(req, id)
   const caller = userId(req)!
-  const sig = await requireSignature(req, caller, 'required', opts.signatureMediaId)
   const snap = doc.approvalSnapshot ?? null
+  // ADR 0025: a designated representative deciding the Direktur "Diketahui" signs as the PT's definitive Direktur
+  const signer = await signDecision(req, { companyId: companyOfDoc(doc), callerId: caller, direkturStep: isDirekturAckStep(snap), capturedId: opts.signatureMediaId, required: true })
   await syncRapFlags(req, id) // D4: "Melebihi RAP" as of this decision (counted in openFlags)
   await insertApproval(req, doc, {
     position: 'diketahui',
@@ -288,7 +298,8 @@ export async function acknowledge(req: PayloadRequest, id: number, opts: SignOpt
     decision: 'acknowledged',
     actor: caller,
     delegation: snap?.acknowledgeDelegatedTo ? { to: snap.acknowledgeDelegatedTo, reason: snap.acknowledgeDelegationReason ?? null } : null,
-    signature: sig,
+    signature: signer.signature,
+    signer,
     budget: await budgetFor(req, doc),
     openFlags: await openFlagCount(req, id),
   })
@@ -317,15 +328,17 @@ export async function approve(req: PayloadRequest, id: number, opts: SignOpts = 
   await requireActionAudited(req, await actorContext(req, visible), 'approve', visible)
   const doc = await loadRaw(req, id)
   const caller = userId(req)!
-  const sig = await requireSignature(req, caller, 'required', opts.signatureMediaId)
   const level = doc.currentLevel ?? 1
+  // ADR 0025: the Direktur level decided by a designated representative → the PT's definitive Direktur signature
+  const signer = await signDecision(req, { companyId: companyOfDoc(doc), callerId: caller, direkturStep: isDirekturApprovalStep(doc.approvalSnapshot, level), capturedId: opts.signatureMediaId, required: true })
   await syncRapFlags(req, id) // D4: "Melebihi RAP" as of this decision (counted in openFlags)
   await insertApproval(req, doc, {
     position: 'approval',
     level,
     decision: 'approved',
     actor: caller,
-    signature: sig,
+    signature: signer.signature,
+    signer,
     budget: await budgetFor(req, doc),
     openFlags: await openFlagCount(req, id),
   })
@@ -345,10 +358,19 @@ export async function reject(req: PayloadRequest, id: number, reason: string, op
   await requireActionAudited(req, await actorContext(req, visible), 'reject', visible)
   const doc = await loadRaw(req, id)
   const caller = userId(req)!
-  const sig = await resolveSignature(req, caller, opts.signatureMediaId)
+  const position = doc.status === 'pending_ack' ? 'diketahui' : 'approval'
+  const level = doc.status === 'pending_ack' ? 0 : (doc.currentLevel ?? 1)
+  // ADR 0025: a rejection of the Direktur step by a representative is the definitive Direktur's decision too
+  const signer = await signDecision(req, {
+    companyId: companyOfDoc(doc),
+    callerId: caller,
+    direkturStep: position === 'diketahui' ? isDirekturAckStep(doc.approvalSnapshot) : isDirekturApprovalStep(doc.approvalSnapshot, level),
+    capturedId: opts.signatureMediaId,
+    required: false,
+  })
   await insertApproval(req, doc, {
-    position: doc.status === 'pending_ack' ? 'diketahui' : 'approval',
-    level: doc.status === 'pending_ack' ? 0 : (doc.currentLevel ?? 1),
+    position,
+    level,
     decision: 'rejected',
     actor: caller,
     reason,
@@ -356,7 +378,8 @@ export async function reject(req: PayloadRequest, id: number, reason: string, op
       doc.status === 'pending_ack' && doc.approvalSnapshot?.acknowledgeDelegatedTo
         ? { to: doc.approvalSnapshot.acknowledgeDelegatedTo, reason: doc.approvalSnapshot.acknowledgeDelegationReason ?? null }
         : null,
-    signature: sig,
+    signature: signer.signature,
+    signer,
     budget: await budgetFor(req, doc),
     openFlags: await openFlagCount(req, id),
   })

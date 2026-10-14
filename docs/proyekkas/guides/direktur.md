@@ -47,6 +47,13 @@ baru juga muncul di lonceng **Notifikasi** (bar atas, kanan) dan — bila Admin 
   lama "Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)".
 - Pada pengajuan alur lama Anda tidak bisa menyetujui pengajuan di mana Anda tercantum sebagai pemohon; bila Anda
   satu-satunya Direktur, langkah "Diketahui" dilewati dan tercatat "(tidak berlaku — pemohon)".
+- **Wakil penanda tangan Direktur definitif** (ADR 0025): bila Admin mencatat Anda sebagai wakil Direktur definitif
+  PT (Perusahaan (PT) → tab **Direktur definitif**), keputusan Anda pada langkah Direktur PT itu (setuju atau tolak;
+  juga Addendum RAB, kekurangan LPJ, pinjaman antar project) memakai **tanda tangan dan nama Direktur definitif**. Di
+  HP lembar keputusan menampilkan **Tanda tangan Direktur PT** (tanpa pilihan tanda tangan); di web bar aksi menulis
+  "ditandatangani sebagai Direktur PT: …". PDF, alur persetujuan dan Log perubahan menampilkan nama Direktur
+  definitif; nama Anda tidak dicetak. Pada langkah lain (mis. Anda juga PM project) Anda menandatangani dengan tanda
+  tangan Anda sendiri.
 - Bila Anda berhalangan, semua pengajuan tertahan. Sepakati pengganti dengan Admin (aturan approval) sebelum cuti.
 - Notifikasi ke HP terkunci belum aktif — buka aplikasi beberapa kali sehari (atau minta Admin menyalakan email
   persetujuan).

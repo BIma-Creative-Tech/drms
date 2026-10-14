@@ -137,6 +137,15 @@ SignPosition _position(Object? v) => switch (v) {
   _ => SignPosition.approval,
 };
 
+/// ADR 0025 `direkturSignature` (null when absent, malformed, or from a server before ADR 0025).
+DirekturSignature? direkturSignatureFromJson(Object? v) {
+  final m = _map(v);
+  final name = _strN(m?['name']);
+  final id = _intN(m?['signatureId']);
+  if (name == null || name.isEmpty || id == null) return null;
+  return DirekturSignature(name: name, title: _strN(m?['title']), signatureId: id);
+}
+
 ExpenseDetail detailFromJson(Json j) {
   final status = RequestStatus.fromCode(j['status'] as String?);
   final type = RequestType.fromCode(j['type'] as String?);
@@ -283,6 +292,7 @@ ExpenseDetail detailFromJson(Json j) {
     transferredTotal: _int(j['transferredTotal']),
     settlement: settlementFromJson(j['settlement']),
     allowedActions: {for (final a in _list(j['allowedActions'])) '$a'},
+    direkturSignature: direkturSignatureFromJson(j['direkturSignature']),
     companyId: companyIdOf(j),
     rejectReason: _strN(j['rejectReason']),
     cancelReason: _strN(j['cancelReason']),

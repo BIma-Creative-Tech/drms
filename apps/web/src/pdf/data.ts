@@ -3,6 +3,7 @@ import type { PayloadRequest } from 'payload'
 import { relId } from '@/access/roles'
 import { approvalsOf, settings, type ApprovalRow, type RequestDoc } from '@/domain/expense/common'
 import { displayNames } from '@/domain/companies'
+import { COMPANY_SIGNATURE_SOURCE, direkturLabel } from '@/domain/direktur-rules'
 import { isNoApproval, NO_APPROVAL_PDF_LABEL, selfApprovalNote, SKIPPED_LABEL } from '@/domain/expense/decision'
 import { withFlagVisibility } from '@/domain/expense/flag-visibility'
 import { displayUnitPrice } from '@/domain/expense/lines'
@@ -17,6 +18,16 @@ import type { PdfAttachment, PdfData, PdfImage, PdfReceipt, PdfSignature } from 
 
 export { MAX_RECEIPT_IMAGES }
 
+
+/**
+ * Printed name of a decision: the stored `actorName`; ADR 0025 — signed as the PT's definitive Direktur → that
+ * Direktur with the title of the snapshot ("Nama (Jabatan)"), never the representative, and no "via app" note.
+ */
+export function printedName(r: Pick<ApprovalRow, 'actorName' | 'signatureSource' | 'representedDirektur'> | undefined): string {
+  if (!r) return ''
+  if (r.signatureSource === COMPANY_SIGNATURE_SOURCE) return direkturLabel(r.representedDirektur?.name ?? r.actorName, r.representedDirektur?.title)
+  return r.actorName ?? ''
+}
 
 /** Latest cycle's signature rows per position (US-46: unsigned positions stay empty). */
 function latestCycle(rows: ApprovalRow[]): ApprovalRow[] {
@@ -76,7 +87,8 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
       label: 'Diketahui Oleh',
       // ADR 0013: the Direktur's approval; ADR 0021: the PM project's approval (the actual acknowledger is
       // printed). F2e (legacy snapshots): delegated "Diketahui" → the actual person + "(dilimpahkan)".
-      names: pdfSafe(diketahui?.actorName ? `${diketahui.actorName}${doc.approvalSnapshot?.acknowledgeDelegatedTo ? ' (dilimpahkan)' : ''}` : ''),
+      // ADR 0025: a representative's decision prints the PT's definitive Direktur (no "via app" note)
+      names: pdfSafe(diketahui?.actorName ? `${printedName(diketahui)}${doc.approvalSnapshot?.acknowledgeDelegatedTo ? ' (dilimpahkan)' : ''}` : ''),
       images: diketahui?.decision === 'acknowledged' ? await sig(diketahui) : [],
       time: formatServerTime(diketahui?.decidedAt, tz),
       // ADR 0013 G1-2: the only Direktur was requester/creator → the position did not apply.
@@ -85,7 +97,7 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     },
     {
       label: 'Approval',
-      names: pdfSafe(approvals.map((a) => a.actorName ?? '').filter(Boolean).join(', ')),
+      names: pdfSafe(approvals.map((a) => printedName(a)).filter(Boolean).join(', ')),
       images: approvals.some((a) => a.decision === 'rejected') ? [] : approvalImages,
       time: formatServerTime(approvals.at(-1)?.decidedAt, tz),
       note: approvals.some((a) => a.decision === 'rejected')

@@ -27,7 +27,14 @@ Future<bool?> showDecisionSheet(BuildContext context, {required ExpenseDetail de
 
 enum SignatureMode { profile, draw }
 
+/// ADR 0025: image of the PT's definitive Direktur signature (authorized endpoint, never cached on disk).
+final direkturSignatureImageProvider = FutureProvider.autoDispose.family<Uint8List, int>(
+  (ref, id) => ref.watch(approvalsApiProvider).signatureImage(id),
+);
+
 /// Diketahui / Setujui / Tolak with signature (profile or drawn on screen, US-43). Online-only.
+/// ADR 0025: a designated representative deciding a Direktur step (`detail.direkturSignature`) gets no choice — the
+/// server signs with the PT's definitive Direktur signature, shown read-only.
 class DecisionSheet extends ConsumerStatefulWidget {
   const DecisionSheet({super.key, required this.detail, required this.decision});
   final ExpenseDetail detail;
@@ -61,7 +68,7 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
       return;
     }
     Uint8List? png;
-    if (_mode == SignatureMode.draw) {
+    if (_mode == SignatureMode.draw && widget.detail.direkturSignature == null) {
       if (_pad.isEmpty) {
         setState(() => _error = t.signatureEmpty);
         return;
@@ -154,28 +161,32 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
                 maxLines: 4,
                 decoration: InputDecoration(labelText: t.rejectReason),
               ),
-            Text(t.signatureMode, style: Theme.of(context).textTheme.titleSmall),
-            SegmentedButton<SignatureMode>(
-              segments: [
-                ButtonSegment(value: SignatureMode.profile, label: Text(t.signatureProfile)),
-                ButtonSegment(value: SignatureMode.draw, label: Text(t.signatureDraw)),
-              ],
-              selected: {_mode},
-              onSelectionChanged: (s) => setState(() => _mode = s.first),
-            ),
-            if (_mode == SignatureMode.draw) ...[
-              const SizedBox(height: 8),
-              AspectRatio(
-                aspectRatio: 8 / 3,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(border: Border.all(color: Theme.of(context).colorScheme.outline)),
-                  child: Signature(key: const Key('signature-pad'), controller: _pad, backgroundColor: Colors.white),
+            if (d.direkturSignature case final sig?)
+              DirekturSignatureCard(signature: sig)
+            else ...[
+              Text(t.signatureMode, style: Theme.of(context).textTheme.titleSmall),
+              SegmentedButton<SignatureMode>(
+                segments: [
+                  ButtonSegment(value: SignatureMode.profile, label: Text(t.signatureProfile)),
+                  ButtonSegment(value: SignatureMode.draw, label: Text(t.signatureDraw)),
+                ],
+                selected: {_mode},
+                onSelectionChanged: (s) => setState(() => _mode = s.first),
+              ),
+              if (_mode == SignatureMode.draw) ...[
+                const SizedBox(height: 8),
+                AspectRatio(
+                  aspectRatio: 8 / 3,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(border: Border.all(color: Theme.of(context).colorScheme.outline)),
+                    child: Signature(key: const Key('signature-pad'), controller: _pad, backgroundColor: Colors.white),
+                  ),
                 ),
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(onPressed: _pad.clear, child: Text(t.signatureClear)),
-              ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(onPressed: _pad.clear, child: Text(t.signatureClear)),
+                ),
+              ],
             ],
             if (_error != null)
               Padding(
@@ -195,6 +206,41 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
               onPressed: _busy ? null : _confirm,
             ),
             TextButton(onPressed: _busy ? null : () => Navigator.of(context).pop(false), child: Text(t.cancel)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// ADR 0025: the PT's definitive Direktur signature, read-only ("Tanda tangan Direktur PT" + "Nama (Jabatan)").
+class DirekturSignatureCard extends ConsumerWidget {
+  const DirekturSignatureCard({super.key, required this.signature});
+  final DirekturSignature signature;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppLocalizations.of(context);
+    final image = ref.watch(direkturSignatureImageProvider(signature.signatureId));
+    return Card(
+      key: const Key('direktur-signature'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(t.direkturSignatureTitle, style: Theme.of(context).textTheme.titleSmall),
+            if (image case AsyncData(:final value))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: SizedBox(
+                  height: 72,
+                  child: Image.memory(value, key: const Key('direktur-signature-image'), fit: BoxFit.contain),
+                ),
+              ),
+            Text(signature.label, key: const Key('direktur-signature-name')),
+            Text(t.direkturSignatureHint, style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
       ),

@@ -63,9 +63,12 @@ import * as migration_20261013_300000_d1010_approval_config_data from './2026101
 import * as migration_20261013_400000_d1010_rap_all from './20261013_400000_d1010_rap_all';
 import * as migration_20261013_400100_d1010_rap_all_guard from './20261013_400100_d1010_rap_all_guard';
 import * as migration_20261013_500000_attachments_owner_link from './20261013_500000_attachments_owner_link';
+import * as migration_20261013_610000_d1310_renumber from './20261013_610000_d1310_renumber';
 import * as migration_20261013_700000_d1310_vendor_payments from './20261013_700000_d1310_vendor_payments';
 import * as migration_20261013_700100_d1310_vendor_payments_guard from './20261013_700100_d1310_vendor_payments_guard';
 import * as migration_20261013_700200_d1310_vendor_payments_data from './20261013_700200_d1310_vendor_payments_data';
+import * as migration_20261013_910000_d1310_direktur_ttd from './20261013_910000_d1310_direktur_ttd';
+import * as migration_20261013_910100_d1310_direktur_ttd_guard from './20261013_910100_d1310_direktur_ttd_guard';
 
 export const migrations = [
   {
@@ -394,6 +397,11 @@ export const migrations = [
     name: '20261013_500000_attachments_owner_link',
   },
   {
+    up: migration_20261013_610000_d1310_renumber.up,
+    down: migration_20261013_610000_d1310_renumber.down,
+    name: '20261013_610000_d1310_renumber',
+  },
+  {
     up: migration_20261013_700000_d1310_vendor_payments.up,
     down: migration_20261013_700000_d1310_vendor_payments.down,
     name: '20261013_700000_d1310_vendor_payments',
@@ -407,5 +415,15 @@ export const migrations = [
     up: migration_20261013_700200_d1310_vendor_payments_data.up,
     down: migration_20261013_700200_d1310_vendor_payments_data.down,
     name: '20261013_700200_d1310_vendor_payments_data',
+  },
+  {
+    up: migration_20261013_910000_d1310_direktur_ttd.up,
+    down: migration_20261013_910000_d1310_direktur_ttd.down,
+    name: '20261013_910000_d1310_direktur_ttd',
+  },
+  {
+    up: migration_20261013_910100_d1310_direktur_ttd_guard.up,
+    down: migration_20261013_910100_d1310_direktur_ttd_guard.down,
+    name: '20261013_910100_d1310_direktur_ttd_guard',
   },
 ];

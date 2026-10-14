@@ -4,6 +4,7 @@ import type { Access, CollectionSlug, PayloadRequest, Where } from 'payload'
 import { anyRole, companiesWithRole, hasRoleAny, isGroupAdmin, mappedCompanies, type Role } from '@/access/roles'
 import { anyOf, byRoleAny, ownUser, rolesAllowedAny, type Rule } from '@/access/policies'
 import { allCompanyIds } from '@/domain/companies'
+import { COMPANY_DIREKTUR_OWNER } from '@/domain/direktur-rules'
 import { visibleRequestIds } from '@/domain/expense/access'
 import { FIELD_COLLECTIONS, fieldPhotoWhere, isFieldOwnerType, staffMayUploadFieldPhotos } from '@/domain/field/access'
 import { reportPhotoWhere } from '@/domain/progress/access'
@@ -156,9 +157,19 @@ function officeRule(where: (req: PayloadRequest, ids: number[]) => Promise<Where
 
 /** QA-MC4-07: one indexed predicate, whatever the number of owner documents. */
 const officeOwned = officeRule(async (_req, ids) => (ids.length ? { ownerCompany: { in: ids } } : false))
+/**
+ * ADR 0025: a PT's definitive Direktur signature (owner link `company_direktur` → the PT, set when the PT is
+ * saved) is read by the office roles of THAT PT only — never through the "uploads of members" rule (the uploading
+ * Admin may be a member of other PTs) and never by Staff / PM (also not through the approval-row fallback of
+ * GET /api/v1/media/signatures/{id}/file). Personal signatures keep the QA-MC4-12 rule.
+ */
+const notCompanyDirektur: Where = { or: [{ ownerDocType: { exists: false } }, { ownerDocType: { not_equals: COMPANY_DIREKTUR_OWNER } }] }
 const officeSignatures = officeRule(async (req, ids) => {
   const users = await membersOf(req, ids)
-  return users.length ? { uploadedBy: { in: users } } : false
+  const or: Where[] = []
+  if (users.length) or.push({ and: [{ uploadedBy: { in: users } }, notCompanyDirektur] })
+  if (ids.length) or.push({ and: [{ ownerDocType: { equals: COMPANY_DIREKTUR_OWNER } }, { ownerDocId: { in: ids.map(String) } }] })
+  return or.length === 0 ? false : or.length === 1 ? or[0]! : { or }
 })
 
 const ownOrOffice: Access = byRoleAny({

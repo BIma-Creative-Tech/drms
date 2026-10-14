@@ -101,6 +101,8 @@ export type ApprovalRow = {
   signature?: unknown
   signatureSha256?: string | null
   signatureSource?: string | null
+  /** ADR 0025: snapshot of the PT's definitive Direktur when a representative signed as that Direktur. */
+  representedDirektur?: { name?: string | null; title?: string | null } | null
 }
 
 export const ids = (v: unknown[] | null | undefined): number[] => (v ?? []).map((x) => relId(x)).filter((x): x is number => x !== undefined)
@@ -340,7 +342,8 @@ export async function openFlagCount(req: PayloadRequest, requestId: number): Pro
   return r.totalDocs
 }
 
-export type Signature = { mediaId: number; sha256: string | null; source: 'profile' | 'captured' }
+/** ADR 0025: `company` = the PT's definitive Direktur signature, used by a designated representative on a Direktur step. */
+export type Signature = { mediaId: number; sha256: string | null; source: 'profile' | 'captured' | 'company' }
 
 /**
  * US-43 / Q-15 default (both): a signature captured on screen (a `media-signatures` upload of the

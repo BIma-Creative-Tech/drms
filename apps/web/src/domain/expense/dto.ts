@@ -1,6 +1,7 @@
 import type { PayloadRequest } from 'payload'
 
 import { hasRole, relId, userId } from '@/access/roles'
+import { direkturSignatureHint } from '@/domain/direktur-signature'
 import { rapOverBudgetLines } from '@/domain/rap/budget'
 
 import { actorContext, approvalsOf, displayName, loadRaw, projectCommitted, type RequestDoc } from './common'
@@ -148,6 +149,10 @@ export async function detail(req: PayloadRequest, id: number) {
     .filter(Boolean)
     .join(', ')
   const next = nextActor({ type: doc.type, payeeType: doc.payeeType, status: doc.status, currentLevel: doc.currentLevel ?? null, snapshot: snap, requesters: requesterNames, names })
+  // E9: reversal only for a settled LPJ that posted a refund KM / shortfall transfer (UI hint; the service re-checks).
+  const allowed = allowedActions(ctx).filter((a) => a !== 'settle_reverse' || (lpj?.status === 'settled' && (lpj.settlementType === 'refund' || lpj.settlementType === 'shortfall')))
+  // ADR 0025: the caller's next decision is signed as the PT's definitive Direktur (representative on a Direktur step)
+  const direkturSignature = await direkturSignatureHint(req, { companyId: company, callerId: userId(req) ?? -1, snapshot: snap, status: doc.status, currentLevel: doc.currentLevel ?? null, allowed })
 
   return {
     ...listItem({ ...flat, project: doc.project, costCenter: doc.costCenter, createdBy: doc.createdBy } as RequestDoc),
@@ -303,8 +308,8 @@ export async function detail(req: PayloadRequest, id: number) {
       : null,
     budget,
     openWarningFlags: visibleFlags.filter((f) => f.status === 'open' && f.level === 'warning').length,
-    // E9: reversal only for a settled LPJ that posted a refund KM / shortfall transfer (UI hint; the service re-checks).
-    allowedActions: allowedActions(ctx).filter((a) => a !== 'settle_reverse' || (lpj?.status === 'settled' && (lpj.settlementType === 'refund' || lpj.settlementType === 'shortfall'))),
+    allowedActions: allowed,
+    direkturSignature,
     resubmitOfId: relId(doc.resubmitOf) ?? null,
     // F2e: the previous (rejected) request by number + title ("Pengajuan ulang dari").
     resubmitOf:

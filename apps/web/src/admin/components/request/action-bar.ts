@@ -3,7 +3,7 @@ import type { RequestPanel } from './panel-data'
 /** Props of the request page's action bar (RequestActionsClient). Pure module (unit-tested). */
 export type RequestActionsProps = {
   id: number
-  decision: { step: 'acknowledge' | 'approve' | null; label: string; confirm: string; canReject: boolean; stepLabel: string } | null
+  decision: { step: 'acknowledge' | 'approve' | null; label: string; confirm: string; canReject: boolean; stepLabel: string; signAs?: string | null } | null
   /** Finance flow links of this request (Catat transfer, Verifikasi nota) — the work happens in the queue views. */
   flowLinks: Array<{ href: string; label: string; testId: string }>
   /** "Cetak": one link, or a menu when there are several PDFs (internal copy for the office roles). */

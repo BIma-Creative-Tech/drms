@@ -351,12 +351,35 @@ abstract class ExpenseDetail with _$ExpenseDetail {
     String? invoiceDueDate,
     int? invoiceFileId,
     String? invoiceFileName,
+
+    /// ADR 0025: the caller's next decision is signed as the PT's definitive Direktur (`direkturSignature`).
+    DirekturSignature? direkturSignature,
   }) = _ExpenseDetail;
 }
 
 /// ADR 0027: a vendor payment — no receipts, no LPJ (the transfer completes it).
 extension ExpenseDetailVendor on ExpenseDetail {
   bool get isVendor => payeeType == PayeeType.vendor;
+}
+
+/// ADR 0025 `ExpenseRequestDetail.direkturSignature`: the caller is a designated representative deciding a Direktur
+/// step — the server signs with the PT's definitive Direktur signature ([signatureId], `media-signatures`) and shows
+/// [name]; the decision sheet shows it read-only instead of asking for a signature.
+class DirekturSignature {
+  const DirekturSignature({required this.name, this.title, required this.signatureId});
+  final String name;
+  final String? title;
+  final int signatureId;
+
+  /// "Nama (Jabatan)" as printed on the PDF.
+  String get label => title == null || title!.isEmpty ? name : '$name ($title)';
+
+  @override
+  bool operator ==(Object other) =>
+      other is DirekturSignature && other.name == name && other.title == title && other.signatureId == signatureId;
+
+  @override
+  int get hashCode => Object.hash(name, title, signatureId);
 }
 
 /// `ApprovalInbox.items[]`.
