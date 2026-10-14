@@ -811,7 +811,7 @@ export async function disburseIcLoan(req: PayloadRequest, id: number, input: Mov
     statusFrom: 'instructed',
     statusTo: 'disbursed',
   })
-  // linked requests now covered (still waiting at their final decision) — the Owner approves again (owner 2026-10-15)
+  // linked requests now covered (still waiting at their final decision) — the Owner approves again (owner 2026-10-14)
   const linked = await rowsOf<{ doc_no: string | null; id: number }>(
     req,
     sql`SELECT e.id, e.doc_no FROM intercompany_loan_requests x JOIN expense_requests e ON e.id = x.request_id WHERE x.loan_id = ${l.id} AND e.status::text IN ('pending_ack', 'pending_approval') ORDER BY e.id`,

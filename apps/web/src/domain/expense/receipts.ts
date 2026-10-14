@@ -400,7 +400,7 @@ export async function resubmitReceipts(req: PayloadRequest, requestId: number) {
  */
 export async function approveWithoutDecision(req: PayloadRequest, doc: RequestDoc): Promise<RequestDoc> {
   if (doc.status !== 'pending_approval' || !isNoApproval(doc.approvalSnapshot)) return doc
-  // ADR 0029 §1 (owner 2026-10-15): the Owner's own request is checked HERE (submit / receipt resubmit) — short funds
+  // ADR 0029 §1 (owner 2026-10-14): the Owner's own request is checked HERE (submit / receipt resubmit) — short funds
   // (switch on) → 409 FUND_INSUFFICIENT, the whole submit rolls back and the request stays Draft
   await checkFundsForApproval(req, doc, doc.approvalCycle && doc.approvalCycle > 1 ? 'receipts_resubmit' : 'submit')
   const approved = await updateRequest(req, doc.id, { status: 'approved', approvedAmount: doc.grandTotal ?? 0, approvedAt: new Date().toISOString() })

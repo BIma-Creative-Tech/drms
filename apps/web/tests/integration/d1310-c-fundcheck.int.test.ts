@@ -11,7 +11,7 @@ import { api, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser } f
 
 /**
  * ADR 0029 (DRMS 13/10 Phase C) "Cek dana di persetujuan Owner + Pinjaman antar-PT" through the real API + DB guards,
- * with the owner's answers of 2026-10-15 ("setuju" on every default). Three fresh fictional PTs: L (lender, Rp 500 jt),
+ * with the owner's answers of 2026-10-14 ("setuju" on every default). Three fresh fictional PTs: L (lender, Rp 500 jt),
  * M (borrower: bank Rp 100 jt + a SITE petty-cash account Rp 40 jt that never counts), N (no designated receiving
  * account). One Owner (pk-principal in L, M and N; also Finance in L for the G1 case).
  *  0. switch OFF (default): today's behaviour — the Owner approves beyond the funds; the panel is information only

@@ -2,7 +2,7 @@
  * ADR 0029 (DRMS 13/10 Phase C) "Cek dana di persetujuan Owner" — pure vocabulary and arithmetic (no Payload import:
  * unit-tested, bundled by the OpenAPI generator).
  *
- * Dana tersedia(PT) = Saldo dana(PT) − Komitmen(PT) (§1, owner 2026-10-15 "setuju" on every default):
+ * Dana tersedia(PT) = Saldo dana(PT) − Komitmen(PT) (§1, owner 2026-10-14 "setuju" on every default):
  * - Saldo dana = Σ balance of the PT's ACTIVE cash / bank accounts WITHOUT a site (every site-flagged account — kas kecil
  *   and rekening kantor cabang — is excluded);
  * - Komitmen = approved-but-not-transferred requests + verified, unsettled LPJ shortfalls + inter-PT loans instructed with

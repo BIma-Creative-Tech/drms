@@ -34,7 +34,7 @@ export const LOAN_REPAYMENT_EXCEEDS_OUTSTANDING = 'LOAN_REPAYMENT_EXCEEDS_OUTSTA
 
 /** Sanity bound of the amount (Rp 1 T, DB CHECK intercompany_loans_amount). */
 export const MAX_IC_LOAN_AMOUNT = 1_000_000_000_000
-/** Owner 2026-10-15: due date required, default instruction date + 30 days. */
+/** Owner 2026-10-14: due date required, default instruction date + 30 days. */
 export const DEFAULT_DUE_DAYS = 30
 export const REASON_MIN = 3
 export const REASON_MAX = 1000

@@ -279,7 +279,7 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
 ]
 
 /**
- * ADR 0029 (owner 2026-10-15): "Cek dana saat persetujuan" per PT, default OFF. On = the final approval of a request
+ * ADR 0029 (owner 2026-10-14): "Cek dana saat persetujuan" per PT, default OFF. On = the final approval of a request
  * (normally the Owner's), the submit of the Owner's own request and the final approval of a rule without an Owner level
  * are refused when the PT's available funds (bank + kas without site accounts − commitments) are short. Switched on per
  * PT by a group admin only, reason required (audited), after Finance reconciled the cash book with the bank statements.

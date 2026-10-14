@@ -5,7 +5,7 @@ import { type MigrateDownArgs, type MigrateUpArgs, sql } from '@payloadcms/db-po
  *
  * 1. "Dana tersedia" (ADR 0029 §1) as SQL — the service calls the SAME functions, so web and DB never disagree:
  *    - `pk_fund_balance(cid)` = Σ balance (opening + Σ in − Σ out over all rows) of the PT's ACTIVE cash accounts
- *      WITHOUT a site (site-flagged = kas kecil / rekening kantor cabang, owner 2026-10-15: all excluded);
+ *      WITHOUT a site (site-flagged = kas kecil / rekening kantor cabang, owner 2026-10-14: all excluded);
  *    - `pk_fund_commitments(cid)` = approved-but-not-transferred requests (advance `approved`; reimburse `approved` /
  *      `receipt_revision` / `receipts_verified`: approved − transferred) + verified, unsettled LPJ shortfalls +
  *      inter-PT loans INSTRUCTED with this PT as lender (not yet disbursed);

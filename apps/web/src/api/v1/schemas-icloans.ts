@@ -31,7 +31,7 @@ export const IcLoanCreate = z
     borrowerCompanyId: id.meta({ description: 'PT peminjam (the short PT) — the caller must be Owner (pk-principal) there.' }),
     lenderCompanyId: id.meta({ description: 'PT pemberi — another active PT where the caller is Owner (GET /intercompany-loans/lenders).' }),
     amount: amount.meta({ description: 'Nilai (Rp > 0, ≤ the lender\'s "Dana tersedia" — else 409 LOAN_LENDER_INSUFFICIENT). Default in the form: the gap of the linked request(s).' }),
-    dueDate: date.nullable().optional().meta({ description: 'Jatuh tempo (required in the form, ≥ today; omitted = today + 30 days, owner 2026-10-15).' }),
+    dueDate: date.nullable().optional().meta({ description: 'Jatuh tempo (required in the form, ≥ today; omitted = today + 30 days, owner 2026-10-14).' }),
     reason: reason.meta({ description: 'Alasan (3–1000).' }),
     requestIds: z.array(id).max(50).optional().meta({ description: 'Requests of the BORROWER PT this loan is for (informational; not cancelled / rejected).' }),
   })
