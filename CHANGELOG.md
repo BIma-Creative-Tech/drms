@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-14
+
+**DRMS 13/10 feedback, Waves 1–4 + Phase A (Owner level, OnSite / Non-OnSite, Direktur signature per PT) + Phase B
+(transfer antar-PT)** — PRs #51–#67. Production goes 0.9.1 → 0.10.0; APK **0.6.0** (`mobile-v0.6.0`) ships with it.
+
+**Database migrations** (in order, all additive — no column or table is dropped):
+`20261013_610000_d1310_renumber` (prerequisites only, renumbers nothing), `20261013_620000_d1310_onsite`,
+`…620100_…_onsite_guard`, `20261013_630000_d1310_owner_role`, `…630100_…_owner_role_guard`,
+`…630200_…_owner_role_data` (Owner level in every active expense rule, audited), `20261013_700000_d1310_vendor_payments`,
+`…700100_…_guard`, `…700200_…_data` (vendor rule per PT), `20261013_910000_d1310_direktur_ttd`, `…910100_…_guard`,
+`20261014_100000_d1310_intercompany_enums`, `…100100_d1310_intercompany`, `…100200_…_guard`, `…100300_…_data`
+(`ANTAR-PT` cash-in source + intercompany rule per PT). **Take the pre-deploy dump** (rollback = restore the dump + the
+0.9.1 image; the 0.9.1 image does not know the new enum values / columns).
+
+**Deploy checklist (prod, in this order):**
+
+1. Dump, migrate, smoke (as 0.9.1). Read the migrate log of `…630200_…_owner_role_data` (rules changed per PT).
+2. **Right after the migration — Owner role** (ADR 0026): every active rule now has an Owner level, and a submission
+   under it is refused (409 "Tidak ada pengguna aktif … (peran Owner)") until the PT has an Owner. A **group admin**
+   ticks **Owner** in Pengguna / Akses PT for the owner's accounts in every PT where requests are filed. PTs where
+   nobody holds Owner cannot submit requests.
+3. Admin of each PT: flag the **head office** (point + radius) and set office staff to **Non-OnSite** (Karyawan /
+   Pengguna); without a home site or head office a "Di luar area" check-in is refused.
+4. When wanted (no deadline): Perusahaan → tab **"Direktur definitif"** (name, title, signature PNG, representatives);
+   until then the personal signatures stay as in 0.9.1. Finance / Admin: **vendor accounts** (Vendor → tab Rekening,
+   verify) and, per PT, the **Rekening penerimaan antar-PT** (one active bank account) before the first PT grup payment.
+5. Publish APK 0.6.0 (`/unduh`, Pengaturan "Versi APK terbaru" 0.6.0), **then** a group admin raises **"Versi APK
+   minimum"** to 0.6.0 (older APKs show a PT grup draft as an employee draft — ADR 0028 rollout step 6).
+6. **Document renumbering is NOT part of the deploy**: the infra Lead runs `src/renumber/cli.ts` (migrate image, OWNER
+   DSN) staging → prod with the owner's go, per `docs/proyekkas/runbooks/penomoran-ulang.md` (dry-run → review →
+   `--apply --expect-sha256` → `--verify`).
+
 ### Added (DRMS 13/10 Phase B — transfer antar-PT)
 
 - **Pembayaran antar-PT** (owner 2026-10-13: "kas keluar dari DRMS ke LAS → kas masuk ke LAS setelah ditransfer
