@@ -244,17 +244,20 @@ void main() {
     expect(may(Role.effective({Role.principal, Role.finance})), isTrue);
   });
 
-  test('who may file: the /me capability intercompanyPayment wins; the directory is only the older-server fallback', () {
-    bool may(Set<Role> r, bool? cap, {bool listed = false}) =>
-        mayFileIntercompanyPayment(r, capability: cap, directoryListed: listed);
-    final ownerOnly = Role.effective({Role.principal});
-    expect(may(ownerOnly, false, listed: true), isFalse, reason: 'a stale cached directory does not override it');
-    expect(may(ownerOnly, true), isTrue, reason: 'Owner who also holds Direktur / Finance / PM');
-    expect(may({Role.finance}, false), isFalse);
-    expect(may({Role.staff}, true), isTrue, reason: 'the server answer, not the local role guess');
-    expect(may(ownerOnly, null), isFalse);
-    expect(may(ownerOnly, null, listed: true), isTrue);
-  });
+  test(
+    'who may file: the /me capability intercompanyPayment wins; the directory is only the older-server fallback',
+    () {
+      bool may(Set<Role> r, bool? cap, {bool listed = false}) =>
+          mayFileIntercompanyPayment(r, capability: cap, directoryListed: listed);
+      final ownerOnly = Role.effective({Role.principal});
+      expect(may(ownerOnly, false, listed: true), isFalse, reason: 'a stale cached directory does not override it');
+      expect(may(ownerOnly, true), isTrue, reason: 'Owner who also holds Direktur / Finance / PM');
+      expect(may({Role.finance}, false), isFalse);
+      expect(may({Role.staff}, true), isTrue, reason: 'the server answer, not the local role guess');
+      expect(may(ownerOnly, null), isFalse);
+      expect(may(ownerOnly, null, listed: true), isTrue);
+    },
+  );
 
   test('/me capability intercompanyPayment per PT: parsed (absent → null), PT scope = union, forCompany per PT', () {
     Map<String, dynamic> company(int id, List<String> roles, Object? may) => {
@@ -262,7 +265,12 @@ void main() {
       'code': 'PT$id',
       'name': 'PT Contoh $id',
       'roles': roles,
-      'capabilities': {'approvalInbox': true, 'teamMonitor': false, 'progressReportCreate': true, 'intercompanyPayment': ?may},
+      'capabilities': {
+        'approvalInbox': true,
+        'teamMonitor': false,
+        'progressReportCreate': true,
+        'intercompanyPayment': ?may,
+      },
     };
     final p = userProfileFromJson({
       ...meJson(roles: const ['pk-owner', 'pk-principal', 'pk-finance']),
@@ -487,9 +495,9 @@ void main() {
     expect((d.cashFlow.last.masukAntarPt, d.cashFlow.last.keluarAntarPt), (7500, 2500));
     // "tanpa antar-PT" (web Direktur card withoutIntercompany): both legs out, nothing else eliminated
     final without = withoutIntercompany(d.cashFlow);
-    expect([for (final r in without) (r.period, r.masuk, r.keluar, r.hasAntarPt)], [
-      ('2026-09', 1000, 500, false),
-      ('2026-10', 1500, 5500, false),
-    ]);
+    expect(
+      [for (final r in without) (r.period, r.masuk, r.keluar, r.hasAntarPt)],
+      [('2026-09', 1000, 500, false), ('2026-10', 1500, 5500, false)],
+    );
   });
 }

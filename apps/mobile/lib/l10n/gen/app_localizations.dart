@@ -7056,6 +7056,18 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Termasuk Antar PT: masuk {masuk} · keluar {keluar}'**
   String kpiCashFlowAntarPt(String masuk, String keluar);
+
+  /// ADR 0028: chip on the Direktur cash-flow card that leaves both legs of payments between PTs out (web: Tampilkan tanpa antar-PT).
+  ///
+  /// In id, this message translates to:
+  /// **'Tanpa antar-PT'**
+  String get kpiCashFlowWithoutAntarPt;
+
+  /// No description provided for @kpiCashFlowAntarPtExcluded.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanpa antar-PT: masuk {masuk} · keluar {keluar} tidak dihitung'**
+  String kpiCashFlowAntarPtExcluded(String masuk, String keluar);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

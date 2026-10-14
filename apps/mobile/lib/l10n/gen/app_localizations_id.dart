@@ -3963,4 +3963,12 @@ class AppLocalizationsId extends AppLocalizations {
   String kpiCashFlowAntarPt(String masuk, String keluar) {
     return 'Termasuk Antar PT: masuk $masuk · keluar $keluar';
   }
+
+  @override
+  String get kpiCashFlowWithoutAntarPt => 'Tanpa antar-PT';
+
+  @override
+  String kpiCashFlowAntarPtExcluded(String masuk, String keluar) {
+    return 'Tanpa antar-PT: masuk $masuk · keluar $keluar tidak dihitung';
+  }
 }

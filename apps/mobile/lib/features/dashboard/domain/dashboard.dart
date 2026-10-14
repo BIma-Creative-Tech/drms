@@ -517,7 +517,8 @@ class RecentCashEntry {
 
   /// "Sumber" label (web `SOURCE`): "Antar PT" for the Kas Masuk of a payment from another PT and for the paying PT's
   /// KK (source type `transfer`, marked by its counterpart).
-  String get sourceLabel => isIntercompany ? cashSourceLabels['intercompany']! : (cashSourceLabels[sourceType] ?? sourceType);
+  String get sourceLabel =>
+      isIntercompany ? cashSourceLabels['intercompany']! : (cashSourceLabels[sourceType] ?? sourceType);
 
   bool get isIntercompany => sourceType == 'intercompany' || counterpart != null;
 

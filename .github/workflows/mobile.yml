@@ -74,24 +74,7 @@ jobs:
           key: pub-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('apps/mobile/pubspec.lock') }}
       - run: flutter config --no-analytics && flutter --version
       - run: flutter pub get --enforce-lockfile
-      # TEMP (feat/d1310-b-intercompany-apk, removed before the PR): the host may not run Flutter locally — regenerate
-      # drift / freezed / l10n and format the hand-written files on the runner, hand the diff back as an artifact.
-      - name: TEMP regenerate + format
-        run: |
-          dart run build_runner build --delete-conflicting-outputs
-          flutter gen-l10n
-          git ls-files 'lib/*.dart' 'test/*.dart' | grep -v -e '\.g\.dart$' -e '\.freezed\.dart$' -e '^lib/l10n/gen/' | xargs dart format
-          git ls-files --others --exclude-standard 'lib/*.dart' 'test/*.dart' | xargs -r dart format
-          git add -N lib test
-          git diff > "$RUNNER_TEMP/mobile-generated.patch"
-          git diff --stat
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: mobile-generated-patch
-          path: ${{ runner.temp }}/mobile-generated.patch
-          retention-days: 1
       - name: Generated code is up to date (drift, freezed, l10n)
-        continue-on-error: true # TEMP (feat/d1310-b-intercompany-apk): the step above regenerated in place
         run: |
           dart run build_runner build --delete-conflicting-outputs
           flutter gen-l10n
