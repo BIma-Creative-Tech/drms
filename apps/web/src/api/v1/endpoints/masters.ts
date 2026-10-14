@@ -7,8 +7,7 @@ import { withEffectiveRadius } from '@/domain/attendance/calendar'
 import { companyById } from '@/domain/companies'
 import { today } from '@/domain/expense/common'
 import { siteFlagsFor, type SiteFlags } from '@/domain/sites'
-import { hasRole } from '@/access/roles'
-import { INTERCOMPANY_PAYMENT_ROLES } from '@/domain/expense/drafts'
+import { mayFileIntercompany } from '@/domain/expense/drafts'
 import { payeeDirectory } from '@/domain/intercompany/service'
 
 import { companyQuery } from '../company-query'
@@ -63,7 +62,7 @@ function pick(doc: Record<string, unknown>, fields: string[], shared: boolean): 
 async function intercompanyPayees(req: PayloadRequest, companies: number[]) {
   const items: Item[] = []
   for (const company of companies) {
-    if (!hasRole(req, INTERCOMPANY_PAYMENT_ROLES, company)) continue
+    if (!mayFileIntercompany(req, company)) continue
     for (const p of await payeeDirectory(req, company)) {
       items.push({ id: p.companyId, company, shared: false, payeeCompanyId: p.companyId, shortCode: p.shortCode, name: p.name, bankName: p.bankName, accountNoMasked: p.accountNoMasked, accountHolder: p.accountHolder, active: true })
     }

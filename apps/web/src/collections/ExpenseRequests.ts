@@ -13,7 +13,7 @@ import { grandTotal, normalizeLines, unlockLine, validateLines, type LineInput }
 import { diffLines, type AuditLine } from '@/domain/expense/line-audit'
 import { recomputeFlags } from '@/domain/expense/receipts'
 import { INTERCOMPANY_PAYMENT_LABEL, isContentEditable, isDirectPayment, PAYEE_TYPE_LABELS, payeeOf, REQUEST_STATUSES, REQUEST_TYPE_LABELS, STATUS_LABELS, VENDOR_PAYMENT_LABEL, type RequestStatus, type RequestType } from '@/domain/expense/types'
-import { INTERCOMPANY_PAYMENT_ROLES, VENDOR_PAYMENT_ROLES } from '@/domain/expense/drafts'
+import { mayFileIntercompany, VENDOR_PAYMENT_ROLES } from '@/domain/expense/drafts'
 import { changeReasonField, rupiahField, uuidField } from '@/fields/common'
 import { requestMeta } from '@/lib/request-meta'
 import { forceDeferredChecks } from '@/lib/system-tx'
@@ -114,7 +114,7 @@ export const payeeTypeOptions = ({ options, data, req }: { options: Array<string
   const company = formCompany(data, req.user, REQUEST_CREATE_ROLES)
   const may = (roles: readonly Role[]) => (company !== undefined ? hasRole(req, roles, company) : hasRoleAny(req, ...roles))
   // ADR 0028 (owner 2026-10-14): "PT grup" for Finance, PM and Direktur of the form's PT (server: drafts.ts payeeFilerErrors)
-  const hidden = new Set<string>([...(may(VENDOR_PAYMENT_ROLES) || stored === 'vendor' ? [] : ['vendor']), ...(may(INTERCOMPANY_PAYMENT_ROLES) || stored === 'pt_grup' ? [] : ['pt_grup'])])
+  const hidden = new Set<string>([...(may(VENDOR_PAYMENT_ROLES) || stored === 'vendor' ? [] : ['vendor']), ...(mayFileIntercompany(req, company) || stored === 'pt_grup' ? [] : ['pt_grup'])])
   return hidden.size === 0 ? options : options.filter((o) => !hidden.has(typeof o === 'string' ? o : o.value))
 }
 

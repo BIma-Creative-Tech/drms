@@ -1,12 +1,12 @@
 import type { PayloadRequest } from 'payload'
 
-import { employeeIn, hasRole, hasRoleAny, relId, userId } from '@/access/roles'
+import { employeeIn, hasRole, relId, userId } from '@/access/roles'
 import { designatedAccount } from '@/domain/intercompany/service'
 
 import { fail, ids, loadVisible } from './common'
 import { maskAccountNo } from './dto'
 import { payeeOf } from './types'
-import { INTERCOMPANY_PAYMENT_ROLES } from './drafts'
+import { mayFileIntercompany } from './drafts'
 
 /**
  * DRMS 10/10 8e (WA-04): the destination account shown under the "Rekening tujuan" picker (draft) and
@@ -77,7 +77,7 @@ export async function bankPreview(req: PayloadRequest, input: { requestId?: numb
   const { requestId, accountId, reveal } = input
   // ADR 0028: a new PT grup form — only a filer role (Finance / PM / Direktur) sees the payee directory's accounts
   if (input.payeeCompanyId !== undefined && requestId === undefined) {
-    if (!hasRoleAny(req, ...INTERCOMPANY_PAYMENT_ROLES)) fail(404, 'Rekening tidak ditemukan.')
+    if (!mayFileIntercompany(req)) fail(404, 'Rekening tidak ditemukan.')
     return intercompanyPreview(req, input.payeeCompanyId)
   }
   // ADR 0027: a vendor account (vendor payment) — readable through the collection access (Admin / Finance / Direktur / PM of its PT)

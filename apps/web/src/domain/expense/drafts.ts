@@ -3,7 +3,7 @@ import type { CollectionSlug, PayloadRequest } from 'payload'
 
 import { getRequestTx } from '@/lib/tx'
 
-import { employeeIn, hasRole, hasRoleAny, isRole, isStaffOnly, mappedCompanies, relId, rolesIn, soleCompany, userId, type Role } from '@/access/roles'
+import { employeeIn, exactRolesIn, exactRolesOf, hasRole, hasRoleAny, isRole, isStaffOnly, mappedCompanies, relId, rolesIn, soleCompany, userId, type Role } from '@/access/roles'
 import { companyOf } from '@/domain/companies'
 import { resolveScope } from '@/access/scope'
 
@@ -77,6 +77,16 @@ export const INTERCOMPANY_PAYMENT_ROLE_MESSAGE = 'Pembayaran antar-PT hanya dapa
 /** Filer roles of a payment without LPJ (ADR 0027 / 0028), per payee type. */
 export function payeeFilerRoles(payee: PayeeType): readonly Role[] {
   return payee === 'pt_grup' ? INTERCOMPANY_PAYMENT_ROLES : VENDOR_PAYMENT_ROLES
+}
+
+/**
+ * ADR 0028: may the CALLER file a PT grup payment in PT `company` (no PT yet: in any selected PT)? Checked on the
+ * STORED roles (ADR 0026 `exactRolesIn`): the Owner (`pk-principal`) carries the Direktur's access everywhere else, but
+ * the owner's decision names Finance, PM and Direktur only — an Owner without one of those roles cannot file.
+ */
+export function mayFileIntercompany(req: Parameters<typeof exactRolesIn>[0], company?: number): boolean {
+  const roles = company !== undefined ? exactRolesIn(req, company) : exactRolesOf(req.user)
+  return roles.some((r) => INTERCOMPANY_PAYMENT_ROLES.includes(r))
 }
 
 /**
@@ -346,12 +356,14 @@ async function directPaymentErrors(
   // D3: Finance and PM only (ADR 0028: + Direktur) — checked for the CREATOR in the request's PT (no PT yet: the caller's roles in any selected PT)
   if (opts.company !== undefined) {
     const mine = await rolesOfUserIn(req, opts.creatorId, opts.company)
-    if (!mine.roles.some((r) => roles.includes(r))) fail(403, roleMessage)
+    // ADR 0028: PT grup on the STORED roles (an Owner-only user is not a Direktur filer); another creator's are stored anyway
+    const filer = !vendorPay && opts.creatorId === userId(req) ? exactRolesIn(req, opts.company) : mine.roles
+    if (!filer.some((r) => roles.includes(r))) fail(403, roleMessage)
     // the filer is the applicant: "Pemohon" = exactly his own employee in the PT (routing by his role, ADR 0027)
     if (opts.requesters.length > 0 && (mine.employee === undefined || opts.requesters.length !== 1 || opts.requesters[0] !== mine.employee)) {
       errors.push({ path: 'requesterIds', message: vendorPay ? 'Pembayaran vendor: pemohon adalah pembuat pengajuan sendiri (Finance / PM).' : 'Pembayaran antar-PT: pemohon adalah pembuat pengajuan sendiri (Finance / PM / Direktur).' })
     }
-  } else if (!hasRoleAny(req, ...roles)) fail(403, roleMessage)
+  } else if (vendorPay ? !hasRoleAny(req, ...roles) : !mayFileIntercompany(req)) fail(403, roleMessage)
   if (c.type !== 'advance') errors.push({ path: 'type', message: `${kind} memakai jenis Pengajuan Baru.` })
 
   let noAccount = false

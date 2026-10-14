@@ -86,7 +86,9 @@ Fields of a `pt_grup` request:
 (`INTERCOMPANY_PAYMENT_ROLES`; vendor payments stay Finance + PM, `VENDOR_PAYMENT_ROLES`; `payeeFilerRoles(payee)`
 picks the list), else 403 "Pembayaran antar-PT hanya dapat diajukan oleh Finance, PM atau Direktur di PT ini." Staff,
 Admin and an **Owner (`pk-principal`) without one of these roles cannot** (the owner's answer names Finance, PM and
-Direktur only; "if unclear, not allowed"). A Direktur's own `pt_grup` request goes through the rule engine like any of
+Direktur only; "if unclear, not allowed") — checked on the STORED roles (`mayFileIntercompany`, ADR 0026
+`exactRolesIn`), since the Owner otherwise carries the Direktur's access; the form option, the payee directory and the
+masters type follow the same rule. A Direktur's own `pt_grup` request goes through the rule engine like any of
 his requests: "Pengajuan Direktur" (priority 10, Peran pemohon = Direktur) → Owner — it wins over the Finance rule
 (priority 20) even when the Direktur also holds Finance; G1 holds (the Direktur is the requester, the Owner decides; a
 user who is both is skipped per ADR 0013 G1-2).

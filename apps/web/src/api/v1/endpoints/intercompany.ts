@@ -1,5 +1,4 @@
-import { hasRole } from '@/access/roles'
-import { INTERCOMPANY_PAYMENT_ROLES } from '@/domain/expense/drafts'
+import { mayFileIntercompany } from '@/domain/expense/drafts'
 import { payeeDirectory } from '@/domain/intercompany/service'
 
 import { HttpError, json, v1 } from '../http'
@@ -19,7 +18,7 @@ export const intercompanyPayeesEndpoint = v1({
   handler: async ({ req }) => {
     const q = IntercompanyPayeesQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
     if (!q.success) throw new HttpError(400, 'Bad Request', { errors: q.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) })
-    if (!hasRole(req, INTERCOMPANY_PAYMENT_ROLES, q.data.company)) throw new HttpError(403, 'Forbidden', { detail: 'Pembayaran antar-PT hanya untuk Finance, PM atau Direktur PT ini.' })
+    if (!mayFileIntercompany(req, q.data.company)) throw new HttpError(403, 'Forbidden', { detail: 'Pembayaran antar-PT hanya untuk Finance, PM atau Direktur PT ini.' })
     return json({ items: await payeeDirectory(req, q.data.company) })
   },
 })
