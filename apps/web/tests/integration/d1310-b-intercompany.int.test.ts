@@ -62,7 +62,7 @@ beforeAll(async () => {
   direkturA = await makeFlowUser(['pk-owner'], 'ico-direktur', empDir)
   principalA = await makeFlowUser(['pk-principal'], 'ico-principal', empOwn) // ADR 0026 Owner level
   // own project without a world rule: the seeded PT grup rule (20) / "Pengajuan Direktur" (10) decide, not a scoped one
-  projectI = await sysCreate('projects', { company: A, code: 'ICO-P1', name: 'ICO Proyek Antar PT', pm: w.users.pm.id, budget: 0, status: 'berjalan', costCenter: w.projectCostCenter })
+  projectI = await sysCreate('projects', { company: A, code: 'ICO-PIC', name: 'ICO Proyek Antar PT', pm: w.users.pm.id, budget: 0, status: 'berjalan', costCenter: w.projectCostCenter })
 
   // 2. PT B (receiving, designated account) and PT C (no designated account) — explicit company from here on
   const n = Date.now() % 1000
