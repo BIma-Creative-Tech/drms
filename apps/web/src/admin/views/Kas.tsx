@@ -281,6 +281,16 @@ export async function KasBook(props: AdminViewServerProps) {
             </p>
           </div>
         ) : null}
+        {/* ADR 0028: where payments from the other PTs of the group arrive (automatic Kas Masuk "Antar PT") */}
+        <p className="pk-note" data-pk-ic-receiving-note style={{ margin: '0 0 12px' }}>
+          Rekening penerimaan antar-PT:{' '}
+          {shown
+            .map((c) => {
+              const a = d.lk.accounts.find((x) => x.companyId === c && x.active && x.intercompanyReceiving)
+              return `${multi ? `${ptCode(pt, c)}: ` : ''}${a ? a.label : 'belum ditetapkan (Master Data › Akun kas/bank)'}`
+            })
+            .join(' · ')}
+        </p>
         {!canWrite ? (
           <div className="pk-alert info">
             <b aria-hidden>i</b>

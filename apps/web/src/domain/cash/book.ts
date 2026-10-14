@@ -201,7 +201,8 @@ export function parseRupiahInput(v: string): number | null {
 // ---------------------------------------------------------------- DB reads
 
 /** `siteId` (accounts only, ADR 0023 Q-S7): the account's site flag. */
-export type Option = { id: number; label: string; active: boolean; companyId: number | null; openingDate?: string | null; siteId?: number | null }
+/** ADR 0028 `intercompanyReceiving` (accounts only): the PT's designated "Rekening penerimaan antar-PT". */
+export type Option = { id: number; label: string; active: boolean; companyId: number | null; openingDate?: string | null; siteId?: number | null; intercompanyReceiving?: boolean }
 export type Lookups = {
   accounts: Option[]
   /** ADR 0023: sites of the readable PTs (Kas "Site" filter). */
@@ -234,7 +235,7 @@ export async function cashLookups(req: PayloadRequest): Promise<Lookups> {
   ])
   return {
     // QA-05: the form's date `min` follows the picked account's opening-balance (go-live) date
-    accounts: accounts.map((d) => ({ id: d.id as number, companyId: cid(d), label: String(d.name ?? ''), active: d.active !== false, openingDate: (d.openingBalanceDate as string | null | undefined) ?? null, siteId: relId(d.site) ?? null })),
+    accounts: accounts.map((d) => ({ id: d.id as number, companyId: cid(d), label: String(d.name ?? ''), active: d.active !== false, openingDate: (d.openingBalanceDate as string | null | undefined) ?? null, siteId: relId(d.site) ?? null, intercompanyReceiving: d.intercompanyReceiving === true })),
     sites: sites.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false })),
     projects: projects.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.status !== 'selesai' && d.status !== 'arsip' })),
     costCenters: costCenters.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false })),

@@ -386,8 +386,8 @@ keep the renumber prelude where it exists (integration test `d1310-w4-renumber` 
   "Transfer antar PT (keluar)", filter "Antar PT: Tanpa antar-PT" (balances hidden then — they would not reconcile);
   Buku Kas "Jenis" Antar PT + column "Lawan PT"; Kas page filter "Sumber" + counterpart line per row; dashboard cash
   flow rows carry `masukAntarPt` / `keluarAntarPt` and the Direktur card has the toggle "tanpa antar-PT".
-- **Not done in this change** (follow-ups): the Kas page header naming the designated account per PT; the APK
-  (enum, editor, detail, queue badge — contract below is ready).
+- **Kas page** names the designated receiving account per shown PT ("belum ditetapkan" otherwise).
+- **Not done in this change** (follow-up): the APK (enum, editor, detail, queue badge — the API contract is ready).
 
 Decided by the owner already (not asked again): payee type "PT grup", rule-engine approval with Owner, system KM on
 B's designated account, void cascades, closed period in B refuses, no LPJ.
