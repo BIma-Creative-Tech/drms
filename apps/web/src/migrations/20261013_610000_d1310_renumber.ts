@@ -62,6 +62,13 @@ export const RENUMBER_NEUTRAL_FUNCTIONS = [
   // (`UPDATE OF status` + WHEN) on cash_entries / transfers; the KM link check runs on INSERT only
   'pk_ic_consistency',
   'pk_ic_entry_linked',
+  // ADR 0029 (20261015_100200, fund check): backstop on expense_requests — fired only on a status change INTO `approved`
+  // (`UPDATE OF status` + WHEN pending → approved), so a doc_no-only update never reaches it. `pk_ic_entry_linked` /
+  // `pk_ic_consistency` are re-created there with the same firing rules (INSERT only / status change only). The loan
+  // tables (`intercompany_loans`, `intercompany_loan_transfers`: pk_icl_guard, pk_icl_transfer_guard) are not renumbered
+  // — PJA numbers are issued in the D5 shape from day one; if they ever are, pk_icl_guard (it freezes doc_no) must move
+  // to RENUMBER_GUARDED_FUNCTIONS with the prelude.
+  'pk_expense_fund_guard',
 ] as const
 
 const PRELUDE = `

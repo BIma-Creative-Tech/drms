@@ -397,6 +397,10 @@ export interface Company {
    */
   fieldReportsEnabled?: boolean | null;
   /**
+   * Aktif = persetujuan terakhir (Owner) dan pengajuan Owner sendiri ditolak bila dana tersedia PT (saldo semua akun kas/bank tanpa akun site − pengajuan disetujui belum ditransfer − kekurangan LPJ belum dibayar − perintah pinjaman antar-PT belum dicairkan) kurang. Nyalakan hanya setelah saldo buku kas cocok dengan rekening koran. Hanya Admin grup; alasan wajib.
+   */
+  fundCheckEnabled?: boolean | null;
+  /**
    * Absen masuk/pulang sendiri di project/pusat biaya yang ditugaskan (geofence, selfie, lokasi palsu ditolak) dan "diabsenkan PM". Nonaktif → item absensi ditolak FEATURE_DISABLED. Nyalakan di prod setelah checklist go-live.
    */
   syncAttendanceEnabled?: boolean | null;
@@ -435,6 +439,10 @@ export interface Company {
    * Setiap hari selama pinjaman lewat jatuh tempo dan belum lunas.
    */
   reminderLoanOverdueEnabled?: boolean | null;
+  /**
+   * Setiap hari selama pinjaman antar-PT (PJA) PT ini sebagai peminjam lewat jatuh tempo dan belum lunas.
+   */
+  reminderIcLoanOverdueEnabled?: boolean | null;
   /**
    * Pemohon lain dan pembuat diberi tahu; pelaku aksi tidak diberi tahu tentang aksinya sendiri.
    */
@@ -1299,7 +1307,8 @@ export interface DocumentSequence {
     | 'reversal'
     | 'service_report'
     | 'daily_report'
-    | 'project_loan';
+    | 'project_loan'
+    | 'intercompany_loan';
   /**
    * Token {DOC}, mis. PB, TRF.
    */
@@ -1576,6 +1585,9 @@ export interface Approval {
   budgetPctBefore?: number | null;
   budgetPctAfter?: number | null;
   openFlags?: number | null;
+  fundBalance?: number | null;
+  fundCommitments?: number | null;
+  fundAvailable?: number | null;
   signature?: (number | null) | MediaSignature;
   signatureSha256?: string | null;
   signatureSource?: ('profile' | 'captured' | 'none' | 'company') | null;
@@ -2674,7 +2686,8 @@ export interface AuditLog {
     | 'privacy_ack'
     | 'overdraft_confirmed'
     | 'bank_unverified_confirmed'
-    | 'renumbered';
+    | 'renumbered'
+    | 'fund_insufficient';
   field?: string | null;
   lineNo?: number | null;
   oldValue?:
@@ -3214,6 +3227,7 @@ export interface CompaniesSelect<T extends boolean = true> {
   defaultWorkSchedule?: T;
   syncProgressReportsEnabled?: T;
   fieldReportsEnabled?: T;
+  fundCheckEnabled?: T;
   syncAttendanceEnabled?: T;
   selfieRetentionMonths?: T;
   selfieRetentionDeleteEnabled?: T;
@@ -3226,6 +3240,7 @@ export interface CompaniesSelect<T extends boolean = true> {
   reminderRevisionDays?: T;
   reminderBudgetEnabled?: T;
   reminderLoanOverdueEnabled?: T;
+  reminderIcLoanOverdueEnabled?: T;
   notifyRequesterStatusEnabled?: T;
   approvalEmailEnabled?: T;
   direktur?:
@@ -3835,6 +3850,9 @@ export interface ApprovalsSelect<T extends boolean = true> {
   budgetPctBefore?: T;
   budgetPctAfter?: T;
   openFlags?: T;
+  fundBalance?: T;
+  fundCommitments?: T;
+  fundAvailable?: T;
   signature?: T;
   signatureSha256?: T;
   signatureSource?: T;

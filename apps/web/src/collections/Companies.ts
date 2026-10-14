@@ -2,7 +2,7 @@ import { sql } from '@payloadcms/db-postgres'
 import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionConfig, type Field, type FieldAccess } from 'payload'
 
 import { companiesWithRole, denyAll, isGroupAdmin, memberCompanies, relId } from '@/access/roles'
-import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
+import { reasonOnChange, reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { percentField, rupiahField, uuidField } from '@/fields/common'
 import { SELFIE_RETENTION_DEFAULT_MONTHS } from '@/domain/attendance/retention-policy'
 import { copyCompanyDefaults, ensureDefaultResourceTypes, ensureDefaultUrgencyLevels, ensureSystemCashInSources, SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
@@ -239,6 +239,14 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
         defaultValue: true,
         admin: { description: 'Setiap hari selama pinjaman lewat jatuh tempo dan belum lunas.' },
       },
+      {
+        // ADR 0029 §3.8: daily while an inter-PT loan of this (borrower) PT is overdue
+        name: 'reminderIcLoanOverdueEnabled',
+        type: 'checkbox',
+        label: 'Pinjaman antar-PT terlambat → Owner, Finance + Direktur PT peminjam, Finance PT pemberi',
+        defaultValue: true,
+        admin: { description: 'Setiap hari selama pinjaman antar-PT (PJA) PT ini sebagai peminjam lewat jatuh tempo dan belum lunas.' },
+      },
     ],
   },
   // S3e (US-05, US-41, S-04): status notifications outside the scheduled reminders.
@@ -269,6 +277,25 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
     ],
   },
 ]
+
+/**
+ * ADR 0029 (owner 2026-10-15): "Cek dana saat persetujuan" per PT, default OFF. On = the final approval of a request
+ * (normally the Owner's), the submit of the Owner's own request and the final approval of a rule without an Owner level
+ * are refused when the PT's available funds (bank + kas without site accounts − commitments) are short. Switched on per
+ * PT by a group admin only, reason required (audited), after Finance reconciled the cash book with the bank statements.
+ * NOT a copied setting (outside COMPANY_SETTING_FIELDS): a new PT starts with the check off.
+ */
+export const FUND_CHECK_FIELD: Field = {
+  name: 'fundCheckEnabled',
+  type: 'checkbox',
+  label: 'Cek dana saat persetujuan (ADR 0029)',
+  defaultValue: false,
+  access: { create: ({ req }) => isGroupAdmin(req), update: ({ req }) => isGroupAdmin(req) },
+  admin: {
+    description:
+      'Aktif = persetujuan terakhir (Owner) dan pengajuan Owner sendiri ditolak bila dana tersedia PT (saldo semua akun kas/bank tanpa akun site − pengajuan disetujui belum ditransfer − kekurangan LPJ belum dibayar − perintah pinjaman antar-PT belum dicairkan) kurang. Nyalakan hanya setelah saldo buku kas cocok dengan rekening koran. Hanya Admin grup; alasan wajib.',
+  },
+}
 
 /** Top-level field names / labels of a setting field (rows/collapsibles are grouped by their first named field). */
 function settingKey(f: Field): string {
@@ -366,7 +393,8 @@ export const Companies: CollectionConfig = withAudit(
               },
             ],
           },
-          { label: 'Operasional', fields: settingFields(OPERATIONAL) },
+          // ADR 0029: the fund-check switch sits with the operational settings (group admin only, not copied)
+          { label: 'Operasional', fields: [...settingFields(OPERATIONAL), FUND_CHECK_FIELD] },
           { label: 'Absensi & retensi', fields: settingFields(ATTENDANCE) },
           { label: 'Pengingat & notifikasi', fields: settingFields(REMINDERS) },
           // ADR 0025: the PT's definitive Direktur (name, title, signature) + designated representatives
@@ -411,7 +439,7 @@ export const Companies: CollectionConfig = withAudit(
       uuidField(),
     ],
   },
-  { docType: 'company', reasonRules: [reasonOnDeactivate] },
+  { docType: 'company', reasonRules: [reasonOnDeactivate, reasonOnChange(['fundCheckEnabled'], 'Alasan wajib diisi saat mengubah "Cek dana saat persetujuan" (mis. saldo cocok dengan rekening koran per tanggal …).')] },
 )
 
 export const noCompanyError = () => new APIError('PT wajib dipilih.', 400, null, true)

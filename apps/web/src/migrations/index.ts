@@ -78,6 +78,10 @@ import * as migration_20261014_100000_d1310_intercompany_enums from './20261014_
 import * as migration_20261014_100100_d1310_intercompany from './20261014_100100_d1310_intercompany';
 import * as migration_20261014_100200_d1310_intercompany_guard from './20261014_100200_d1310_intercompany_guard';
 import * as migration_20261014_100300_d1310_intercompany_data from './20261014_100300_d1310_intercompany_data';
+import * as migration_20261015_100000_d1310_fundcheck_enums from './20261015_100000_d1310_fundcheck_enums';
+import * as migration_20261015_100100_d1310_fundcheck_loans from './20261015_100100_d1310_fundcheck_loans';
+import * as migration_20261015_100200_d1310_fundcheck_guard from './20261015_100200_d1310_fundcheck_guard';
+import * as migration_20261015_100300_d1310_fundcheck_data from './20261015_100300_d1310_fundcheck_data';
 
 export const migrations = [
   {
@@ -479,5 +483,25 @@ export const migrations = [
     up: migration_20261014_100300_d1310_intercompany_data.up,
     down: migration_20261014_100300_d1310_intercompany_data.down,
     name: '20261014_100300_d1310_intercompany_data',
+  },
+  {
+    up: migration_20261015_100000_d1310_fundcheck_enums.up,
+    down: migration_20261015_100000_d1310_fundcheck_enums.down,
+    name: '20261015_100000_d1310_fundcheck_enums',
+  },
+  {
+    up: migration_20261015_100100_d1310_fundcheck_loans.up,
+    down: migration_20261015_100100_d1310_fundcheck_loans.down,
+    name: '20261015_100100_d1310_fundcheck_loans',
+  },
+  {
+    up: migration_20261015_100200_d1310_fundcheck_guard.up,
+    down: migration_20261015_100200_d1310_fundcheck_guard.down,
+    name: '20261015_100200_d1310_fundcheck_guard',
+  },
+  {
+    up: migration_20261015_100300_d1310_fundcheck_data.up,
+    down: migration_20261015_100300_d1310_fundcheck_data.down,
+    name: '20261015_100300_d1310_fundcheck_data',
   },
 ];
