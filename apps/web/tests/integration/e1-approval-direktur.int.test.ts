@@ -262,9 +262,12 @@ describe('APK needs (E3 / AC-10 server side)', () => {
       const { serviceReportCreate: _s, unitTimesheetCreate: _u, aftersalesActivityCreate: _a, dailyReportCreate: _d, ...rest } = c
       return rest
     }
-    expect(await cap(w.users.owner)).toEqual({ approvalInbox: true, teamMonitor: false, progressReportCreate: true, intercompanyPayment: true })
-    expect(await cap(w.users.finance)).toEqual({ approvalInbox: true, teamMonitor: false, progressReportCreate: false, intercompanyPayment: true })
-    expect(await cap(w.users.pm)).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, intercompanyPayment: true })
-    expect(await cap(w.users.staffA)).toEqual({ approvalInbox: false, teamMonitor: false, progressReportCreate: false, intercompanyPayment: false })
+    // ADR 0029: instruct = STORED pk-principal (the Direktur here is not the Owner), disburse = STORED pk-finance; the
+    // fund check is off by default
+    const icl = (instruct: boolean, disburse: boolean) => ({ instructIntercompanyLoan: instruct, disburseIntercompanyLoan: disburse, fundCheckEnabled: false })
+    expect(await cap(w.users.owner)).toEqual({ approvalInbox: true, teamMonitor: false, progressReportCreate: true, intercompanyPayment: true, ...icl(false, false) })
+    expect(await cap(w.users.finance)).toEqual({ approvalInbox: true, teamMonitor: false, progressReportCreate: false, intercompanyPayment: true, ...icl(false, true) })
+    expect(await cap(w.users.pm)).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, intercompanyPayment: true, ...icl(false, false) })
+    expect(await cap(w.users.staffA)).toEqual({ approvalInbox: false, teamMonitor: false, progressReportCreate: false, intercompanyPayment: false, ...icl(false, false) })
   })
 })

@@ -155,7 +155,7 @@ async function request(project: number, amount: number, opts: { atOwner?: boolea
   return d.id as number
 }
 
-const statusOf = async (id: number) => (await sqlAs('app', 'SELECT status::text AS s, current_level AS l FROM expense_requests WHERE id = $1', [id])).rows[0] as { s: string; l: number | null }
+const statusOf = async (id: number) => (await sqlAs('app', 'SELECT status::text AS s, current_level::int AS l FROM expense_requests WHERE id = $1', [id])).rows[0] as { s: string; l: number | null }
 const notes = async (event: string, docId: number | string) => (await sqlAs('app', 'SELECT user_id::int AS u, title, body, company_id AS c FROM notifications WHERE event = $1 AND doc_id = $2 ORDER BY id', [event, String(docId)])).rows as Array<{ u: number; title: string; body: string; c: number }>
 async function proof(user: FlowUser): Promise<number> {
   return (await ok(upload('/api/v1/media/transfer-proofs', user, await png()), 201)).id as number
