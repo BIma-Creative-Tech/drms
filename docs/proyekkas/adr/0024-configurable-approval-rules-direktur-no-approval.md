@@ -120,3 +120,10 @@ the requester Direktur when he is the only one)". That path is withdrawn for new
 - Code: `git revert`; the data migration's down deletes / deactivates its rules; the guard migration's down restores
   the ADR 0021 trigger body and drops the new guards (the CHECK keeps the new value while rows carry it); the schema
   down drops the requester-role table.
+
+## Amendment 2026-10-15 owner decision
+
+The re-route of in-flight requests (migration `20261015_200000_d1510_approval_reroute`, ADR 0026 § Amendment
+2026-10-15) selects the rule by "Peran pemohon" like a submit: a Direktur's own request waiting for the Direktur's
+"Diketahui" under the old default rule moves to "Pengajuan Direktur" (→ Owner). An Owner's own request is never moved
+to the no-approval rule by the migration (left on its flow, listed for a manual decision).

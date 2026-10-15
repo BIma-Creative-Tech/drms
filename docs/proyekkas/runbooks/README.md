@@ -32,6 +32,7 @@
 | 10 | Menerbitkan APK di halaman unduh `/unduh` (tautan tetap `/unduh/proyekkas.apk`) | staging, prod | [`rilis-apk.md`](rilis-apk.md) | tersedia; butuh web ≥ 0.5.0 di lingkungan tujuan (halaman `/unduh` + syarat APK 0.3.0) |
 | 11 | Image & CI (GHCR, Trivy, runner self-hosted) | CI | [`ci-ghcr.md`](ci-ghcr.md) §1–§5, §9–§10 | tersedia |
 | 12 | Penomoran ulang dokumen **satu kali** (reset dari 1 per PT × jenis × bulan, urut tanggal dibuat; KM dengan kode PT) | staging → prod (infra Lead, *go* owner) | [`penomoran-ulang.md`](penomoran-ulang.md) (dry-run → review → apply → verify; ADR 0007 amandemen 2026-10-13) | tersedia |
+| 13 | Alur persetujuan keputusan owner 2026-10-15: aturan default → PM project → Direktur → Owner, pengajuan yang belum diputuskan Direktur dialihkan | staging → prod (infra Lead, *go* owner) | [`alur-persetujuan-2026-10-15.md`](alur-persetujuan-2026-10-15.md) (pratinjau psql / dry-run → backup → deploy biasa; ADR 0026 amandemen 2026-10-15) | tersedia |
 
 ## 1. Deploy / upgrade
 

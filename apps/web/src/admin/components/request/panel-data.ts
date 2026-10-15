@@ -16,6 +16,7 @@ import { ackStepLabel, approvalStepLabel, decisionByOf } from '@/domain/expense/
 import { requestHistory } from '@/domain/history'
 import { historyEntry, type HistoryEntry } from '@/domain/history-format'
 import { withSystemTransaction } from '@/lib/system-tx'
+import { rerouteNoteOf } from '@/reroute/plan'
 
 import type { DraftBank } from './RequestSummary'
 
@@ -112,6 +113,7 @@ async function load(payload: Payload, user: NonNullable<PayloadRequest['user']>,
       cancelReason: d.cancelReason,
     })
     const own = isOwn(d, user)
+    const history = await requestHistory(r, docId)
     return {
       d,
       snap,
@@ -129,10 +131,11 @@ async function load(payload: Payload, user: NonNullable<PayloadRequest['user']>,
       draftBank: d.status === 'draft' && (d.bankAccountId || d.vendorBankAccountId || d.payeeCompany) ? await bankPreview(r, { requestId: docId, reveal: false }).catch(() => null) : null,
       attachments,
       stepper,
-      stepperNote: g1ExceptionText(snap?.selfApproval),
+      // d1510: a request re-routed by the owner decision 2026-10-15 says so next to its stepper (while on that snapshot)
+      stepperNote: [g1ExceptionText(snap?.selfApproval), rerouteNoteOf(history, snap)].filter(Boolean).join(' · ') || null,
       ruleName: snap?.ruleName && hasRole(r, RULE_READERS, company) ? String(snap.ruleName) : null,
       decision: decisionOf(d, snap),
-      history: (await requestHistory(r, docId)).map((h) => historyEntry(h, tz)).reverse(),
+      history: history.map((h) => historyEntry(h, tz)).reverse(),
       createdAt: d.createdAt,
       updatedAt: d.updatedAt,
     }

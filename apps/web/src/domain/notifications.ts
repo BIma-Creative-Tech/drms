@@ -95,7 +95,7 @@ const PRINCIPAL_NO_APPROVAL_TEAM_DEFAULT = {
 }
 
 /** The waiting position (current level, or "Diketahui" by role) is the Owner's. */
-function ownerTurn(doc: Doc, event: NotifyEvent): boolean {
+function ownerTurn(doc: Pick<Doc, 'approvalSnapshot' | 'currentLevel'>, event: NotifyEvent): boolean {
   const snap = doc.approvalSnapshot
   if (!snap) return false
   if (event === 'expense.pending_ack') return snap.acknowledgeBy === 'role' && snap.acknowledgeRole === OWNER_ROLE
@@ -105,7 +105,7 @@ function ownerTurn(doc: Doc, event: NotifyEvent): boolean {
 }
 
 /** The waiting "Diketahui" is the PM project's (ADR 0021 snapshot). */
-function pmAck(doc: Doc): boolean {
+function pmAck(doc: Pick<Doc, 'approvalSnapshot'>): boolean {
   const snap = doc.approvalSnapshot
   return !!snap && snap.acknowledgeBy === 'scope_manager' && (snap.decisionRoles?.length ?? 0) > 0
 }
@@ -142,6 +142,9 @@ type Doc = {
   company?: unknown
   project?: unknown
 }
+
+/** The request fields notifications read (d1510 re-route builds one from SQL rows). */
+export type NotifyDoc = Doc
 
 /** Holders of `role` in the document's PT (ADR 0016 §5: recipients per PT). */
 async function usersWithRole(req: PayloadRequest, role: Role, doc: Doc): Promise<number[]> {
@@ -351,6 +354,26 @@ async function template(req: PayloadRequest, event: NotifyEvent): Promise<{ titl
   return notificationTemplate(req, event, DEFAULTS[event])
 }
 
+/** Built-in text of `event` when no active `notification-templates` row overrides it. */
+export function defaultText(event: NotifyEvent): { title: string; body: string } {
+  return DEFAULTS[event]
+}
+
+/**
+ * Text of `event` for `doc` that no template overrides (null = the template / default text applies): the PM project's
+ * "Diketahui" (ADR 0021), the Owner's level (ADR 0026), the team PM's note of a request without approval (ADR 0024 /
+ * 0026). Pure — shared by `deliver` and the d1510 re-route (owner decision 2026-10-15), which notifies the new first
+ * approver of a re-routed request exactly like a submit would.
+ */
+export function fixedText(event: NotifyEvent, doc: Pick<Doc, 'approvalSnapshot' | 'currentLevel'>): { title: string; body: string } | null {
+  if (event === 'expense.pending_ack' && pmAck(doc)) return PM_ACK_DEFAULT
+  if (ownerTurn(doc, event)) return OWNER_STEP_DEFAULT
+  if (event === 'expense.team_submitted' && isNoApproval(doc.approvalSnapshot)) {
+    return noApprovalRequesterRole(doc.approvalSnapshot) === OWNER_ROLE ? PRINCIPAL_NO_APPROVAL_TEAM_DEFAULT : NO_APPROVAL_TEAM_DEFAULT
+  }
+  return null
+}
+
 export function pushEnabled(): boolean {
   return process.env.PUSH_FCM_ENABLED === 'true'
 }
@@ -416,16 +439,7 @@ async function deliver(req: PayloadRequest, doc: Doc, events: Array<{ event: Not
     else if (e.to === 'finance') to = finance ??= await usersWithRole(req, 'pk-finance', doc)
     else if (e.to === 'pm') to = teamPmsFor(e.event, doc, (pms ??= await teamPms(req, doc)))
     else to = await stepUsers(req, doc, e.to)
-    const t =
-      e.event === 'expense.pending_ack' && pmAck(doc)
-        ? PM_ACK_DEFAULT
-        : ownerTurn(doc, e.event)
-          ? OWNER_STEP_DEFAULT
-          : e.event === 'expense.team_submitted' && isNoApproval(doc.approvalSnapshot)
-            ? noApprovalRequesterRole(doc.approvalSnapshot) === OWNER_ROLE
-              ? PRINCIPAL_NO_APPROVAL_TEAM_DEFAULT
-              : NO_APPROVAL_TEAM_DEFAULT
-            : await template(req, e.event)
+    const t = fixedText(e.event, doc) ?? (await template(req, e.event))
     for (const uid of to) {
       if (uid === actor || done.has(`${e.event}:${uid}`)) continue
       done.add(`${e.event}:${uid}`)

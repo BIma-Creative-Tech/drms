@@ -6,6 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**Owner decision 2026-10-15 — every PT on PM project → Direktur → Owner, in-flight requests re-routed (d1510)**
+([ADR 0026 § Amendment 2026-10-15](docs/proyekkas/adr/0026-owner-approval-level-above-direktur.md), notes in ADR 0021 /
+0024). Runbook: [`alur-persetujuan-2026-10-15.md`](docs/proyekkas/runbooks/alur-persetujuan-2026-10-15.md).
+
+**Database migration** (data only, idempotent, no schema change → no Payload snapshot): `20261015_200000_d1510_approval_reroute`.
+
+**Deploy notes (staging first, then prod after the owner's go on the PROD preview):**
+1. `backup.sh run` (dump before the migration; after the first decision in the new flow the dump is the only rollback).
+2. Preview, read-only: `psql … -c "BEGIN READ ONLY;" -f - -c "ROLLBACK;" < apps/web/src/reroute/preview.sql`, or the
+   exact dry-run with the new migrate image: `node /app/node_modules/payload/bin.js run src/reroute/cli.ts -- --dry-run`
+   (`docker compose run --rm --no-deps drms-pk-migrate …`). Show the owner which rules / requests change.
+3. Deploy as usual (migrate → web + worker); the migrate log repeats the preview (`rulesAligned`, `requestsRerouted`,
+   `notifications`). Check one re-routed request (stepper, Log perubahan, PM inbox).
+4. Rollback before any decision in the new flow: `payload migrate:down` (restores rules + snapshots from the audit
+   rows); after a decision `down` is refused → restore the dump.
+
+### Changed
+
+- **Default rules aligned in every PT**: "Default — Direktur lalu Finance (semua nominal)" and the inactive example
+  "Contoh — di atas Rp 10 juta: Direktur lalu Finance (Q-31, nonaktif)" — only while they still have exactly the ADR 0013
+  shape ("Diketahui" Direktur → Finance) or the ADR 0013 + Owner shape (Direktur → Owner → Finance) — become the seed
+  shape and name: "Diketahui" = **PM project**, level 1 **Direktur**, level 2 **Owner**; Finance only transfers. Ids,
+  priority, amounts and active flag kept; audited (`source: system`, "keputusan owner 2026-10-15"). Rules an Admin
+  changed to another shape are left alone (listed).
+- **In-flight requests re-routed**: requests under those rules still waiting for the Direktur's "Diketahui" with no
+  decision in the current cycle get the rule + snapshot a submit **today** produces (same code as Kirim): Persetujuan PM
+  first; PM step skipped as at submit when the requester / creator is the PM (→ "Menunggu persetujuan Direktur"); a
+  Direktur's own request → "Pengajuan Direktur" (→ Owner). Number, lines, amounts, attachments, signatures and cycle
+  unchanged. Kept (listed): a submit that would be refused today (409) and the Owner's own request (no approval —
+  manual). Per request: "Log perubahan" row **"Alur persetujuan"** (old → new), the stepper note "Alur persetujuan
+  diperbarui ke aturan terbaru (keputusan owner 2026-10-15)", the `approval_skipped` / status rows a submit writes, and
+  the notification + approval e-mail a submit sends to the new first approver. Requests past the Direktur keep their
+  flow. Down restores (refused once a re-routed request moved).
+- Code: the rule selection + snapshot of a submit moved to `domain/expense/snapshot-plan.ts` (pure, data access behind
+  `SnapshotSource`); `snapshot.ts` keeps its API (Payload source). Notification texts `fixedText` / `defaultText`
+  exported (same texts). New `src/reroute/` (plan, SQL facts source, apply / revert, read-only dry-run CLI, psql
+  preview). Audit field `approvalFlow` (label "Alur persetujuan").
+
+### Tests
+
+- Unit `d1510-reroute`: shape matcher, target = seed, request plan (PM first, PM skipped, Direktur's own → Pengajuan
+  Direktur, kept cases), stepper "Persetujuan PM" → "Persetujuan Direktur" → "Persetujuan Owner", notification texts.
+- Integration `d1510-reroute`: dry-run writes nothing, SQL preview = TS plan, up (rules aligned, snapshot = a twin
+  submitted after the migration, PM / Direktur / Owner inbox + notifications, decided request untouched), idempotent
+  re-run, down restores, PM → Direktur → Owner → transfer queue, down refused afterwards.
+
 ### Changed (DRMS 15/10 — alur pengajuan Finance; data migration)
 
 - **Pengajuan Finance** (owner decision 2026-10-15): a request Finance files for himself (Jenis penerima Karyawan —

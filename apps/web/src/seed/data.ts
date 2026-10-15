@@ -106,7 +106,9 @@ export const EMPLOYEE_BANK_ACCOUNTS = [
  * + "Pengajuan Direktur" (Peran pemohon = Direktur, priority 10). ADR 0026 (owner 2026-10-13): every expense rule
  * gets the Owner level (`pk-principal`, above the Direktur) right after the Direktur: Staff → PM project → Direktur → Owner → Finance
  * transfer; "Pengajuan Direktur" → Owner; "Pengajuan Owner" (Peran pemohon = Owner, no approval level → straight to
- * Finance, priority 5). Existing databases get the same shape from the data migration 20261013_630200 (names kept).
+ * Finance, priority 5). Existing databases get the same shape from the data migration 20261013_630200 (names kept);
+ * owner decision 2026-10-15: migration 20261015_200000_d1510_approval_reroute renames the two ADR 0013 rules to the names
+ * below and gives them this shape (PM project → Direktur → Owner) in every PT (src/reroute/plan.ts RULE_RENAMES).
  */
 /** Name of the seeded default addendum rule (shared with the E5 migration). */
 export const ADDENDUM_DEFAULT_RULE_NAME = 'Default Addendum RAB — Direktur lalu Finance'
