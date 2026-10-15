@@ -5,6 +5,7 @@ import { byRole, rolesAllowed, type Rule } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, odooRefField, uuidField } from '@/fields/common'
 import { companyField, companyHook } from '@/fields/company'
+import { PARTNER_REDIRECT_VIEWS } from '@/admin/partner-routes'
 import { contactsField, contactsHook, legacyContactColumn } from '@/fields/contacts'
 
 /**
@@ -37,7 +38,8 @@ export const Clients: CollectionConfig = withAudit(
   {
     slug: 'clients',
     labels: { singular: 'Klien', plural: 'Klien' },
-    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['name', 'contact', 'phone', 'active'] },
+    // DRMS 16/10 (b): the document pages /collections/clients/<create|id> → /admin/klien/<baru|id> (the drawer keeps this form)
+    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['name', 'contact', 'phone', 'active'], components: { views: PARTNER_REDIRECT_VIEWS } },
     access: {
       read: byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-finance': true, 'pk-pm': true, 'pk-staff': aftersalesStaff }),
       create: rolesAllowed('pk-admin', 'pk-owner'),

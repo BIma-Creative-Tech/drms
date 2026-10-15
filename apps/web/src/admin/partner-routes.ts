@@ -21,3 +21,21 @@ export function partnerFormHref(slug: string, id: string | number | 'baru', admi
 export function projectForClientHref(clientId: number, adminRoute = '/admin'): string {
   return `${adminRoute}/collections/projects/create?client=${encodeURIComponent(String(clientId))}`
 }
+
+/**
+ * DRMS 16/10 (b): Payload's document routes of clients / vendors (`/collections/<slug>/create`, `/collections/<slug>/<id>`
+ * — bookmarks, Payload's own links, the list's "Buat baru" of older tabs) redirect to the tabbed pages. A collection-level
+ * custom view (`admin.components.views.partnerPage`, path `/:id`) matches only those page routes; Payload's document
+ * DRAWER (relationship pickers, renderDocument server function) never goes through the router and keeps the collection
+ * form. `segments` = the admin route segments (`['collections', slug, x]`); anything else → null.
+ */
+export const PARTNER_REDIRECT_VIEW = '@/admin/views/PartnerRedirect#PartnerRedirect'
+
+export function partnerRedirectTarget(segments: readonly string[], adminRoute = '/admin'): string | null {
+  const [root, slug, seg, ...rest] = segments
+  if (root !== 'collections' || !slug || !seg || rest.length > 0 || !isPartnerSlug(slug)) return null
+  return partnerFormHref(slug, seg === 'create' ? 'baru' : seg, adminRoute)
+}
+
+/** The collection-level custom view entry (Clients / Vendors `admin.components.views`). Plain data. */
+export const PARTNER_REDIRECT_VIEWS = { partnerPage: { Component: PARTNER_REDIRECT_VIEW, path: '/:id' as const, exact: true } }
