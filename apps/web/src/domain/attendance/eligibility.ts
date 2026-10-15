@@ -67,7 +67,7 @@ async function locationRows(req: PayloadRequest, company: number): Promise<LocRo
     UNION ALL
     SELECT 'project', p.id, p.code, p.name, p.lat, p.lng, p.radius_m, FALSE
     FROM projects p
-    WHERE p.company_id = ${company} AND p.status IS DISTINCT FROM 'arsip' AND p.lat IS NOT NULL AND p.lng IS NOT NULL
+    WHERE p.company_id = ${company} AND coalesce(p.status::text, '') NOT IN ('arsip', 'dibatalkan') AND p.is_deleted IS NOT TRUE AND p.lat IS NOT NULL AND p.lng IS NOT NULL
     UNION ALL
     SELECT 'cost_center', cc.id, cc.code, cc.name, cc.lat, cc.lng, cc.radius_m, FALSE
     FROM cost_centers cc

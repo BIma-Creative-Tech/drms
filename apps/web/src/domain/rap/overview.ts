@@ -59,7 +59,7 @@ export function filterOverview(rows: readonly RapOverviewRow[], f: OverviewFilte
   return rows.filter(
     (r) =>
       (companies.length === 0 || companies.includes(r.companyId)) &&
-      (statuses.length === 0 ? r.status !== 'arsip' : statuses.includes(r.status ?? '')) &&
+      (statuses.length === 0 ? r.status !== 'arsip' && r.status !== 'dibatalkan' : statuses.includes(r.status ?? '')) &&
       (states.length === 0 || states.includes(r.state)),
   )
 }

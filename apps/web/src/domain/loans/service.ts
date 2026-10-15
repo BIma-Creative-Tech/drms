@@ -38,6 +38,7 @@ import {
   type LoanKind,
   type LoanStatus,
 } from './rules'
+import { closedProjectMessage, isClosedProjectStatus } from '@/domain/projects/status'
 
 /**
  * ADR 0022 Pinjaman antar project — the single write path behind /api/v1/project-loans. Every function runs inside
@@ -332,8 +333,8 @@ async function checkProjects(req: PayloadRequest, lenderId: number, borrowerId: 
   const company = relId(borrower.company)!
   if (mapped !== null && !mapped.includes(company)) fail(404, 'NOT_FOUND', 'Project tidak ditemukan.', 'borrowerProjectId')
   if (relId(lender.company) !== company) fail(400, 'COMPANY_MISMATCH', 'Project pemberi dan peminjam harus di PT yang sama.', 'lenderProjectId')
-  if (borrower.status === 'arsip') fail(409, 'STATE_CONFLICT', 'Project peminjam sudah diarsipkan.', 'borrowerProjectId')
-  if (lender.status === 'arsip') fail(409, 'STATE_CONFLICT', 'Project pemberi pinjaman sudah diarsipkan.', 'lenderProjectId')
+  if (isClosedProjectStatus(borrower.status)) fail(409, 'STATE_CONFLICT', borrower.status === 'dibatalkan' ? 'Project peminjam sudah dibatalkan.' : 'Project peminjam sudah diarsipkan.', 'borrowerProjectId')
+  if (isClosedProjectStatus(lender.status)) fail(409, 'STATE_CONFLICT', lender.status === 'dibatalkan' ? 'Project pemberi pinjaman sudah dibatalkan.' : 'Project pemberi pinjaman sudah diarsipkan.', 'lenderProjectId')
   return { lender, borrower, company }
 }
 
@@ -464,6 +465,28 @@ export async function cancelLoan(req: PayloadRequest, id: number, reason: string
   return cancelled
 }
 
+/**
+ * D1610 (ADR 0030) "Batalkan proyek" cascade: cancel a loan of the cancelled project (lender or borrower) as the
+ * system (the caller holds the project-cancel permission). Same rule as `cancelLoan` without the actor part: Draft /
+ * Menunggu, or Disetujui while nothing was repaid — a loan with a repayment must be settled first (409).
+ */
+export async function cancelLoanForProject(req: PayloadRequest, id: number, reason: string): Promise<LoanDoc> {
+  await lockLoan(req, id)
+  const doc = await loadRawLoan(req, id)
+  const r = reason.trim()
+  const repaidAny = doc.status === 'approved' && (repaid(doc) > 0 || (await repaymentsOf(req, doc.id)).some((x) => x.status === 'posted'))
+  if (!['draft', 'pending_approval', 'approved'].includes(doc.status) || repaidAny) {
+    fail(409, 'STATE_CONFLICT', `Pinjaman ${doc.docNo ?? `#${id}`} (${LOAN_STATUS_LABELS[doc.status]}) tidak dapat dibatalkan${repaidAny ? ': sudah ada pengembalian' : ''}.`)
+  }
+  const cancelled = await updateLoan(req, id, { status: 'cancelled', cancelReason: r, outstanding: 0 }, r)
+  if (doc.status === 'approved') {
+    const lender = await loadProject(req, relId(doc.lenderProject)!, 'lenderProjectId')
+    const borrower = await loadProject(req, relId(doc.borrowerProject)!, 'borrowerProjectId')
+    await notify(req, cancelled, 'project_loan.rejected', [relId(doc.createdBy)!, ...pmOf(lender)], loanVars(cancelled, lender, borrower))
+  }
+  return cancelled
+}
+
 // ---------------------------------------------------------------- decision (one Direktur level)
 
 type SignOpts = { signatureMediaId?: number | null }
@@ -510,7 +533,7 @@ async function decide(req: PayloadRequest, id: number, decision: 'approved' | 'r
   const doc = await loadRawLoan(req, id)
   const lender = await loadProject(req, relId(doc.lenderProject)!, 'lenderProjectId')
   const borrower = await loadProject(req, relId(doc.borrowerProject)!, 'borrowerProjectId')
-  if (decision === 'approved' && (lender.status === 'arsip' || borrower.status === 'arsip')) fail(409, 'STATE_CONFLICT', 'Project sudah diarsipkan; pinjaman tidak dapat disetujui.')
+  if (decision === 'approved' && (isClosedProjectStatus(lender.status) || isClosedProjectStatus(borrower.status))) fail(409, 'STATE_CONFLICT', `${closedProjectMessage(isClosedProjectStatus(lender.status) ? lender.status : borrower.status).replace(/\.$/, '')}; pinjaman tidak dapat disetujui.`)
   // ADR 0025: the loan decision IS the Direktur step — a designated representative signs as the PT's definitive Direktur
   const sig = await signDecision(req, { companyId: relId(doc.company), callerId: userId(req)!, direkturStep: true, capturedId: opts.signatureMediaId, required: false })
   await insertDecision(req, doc, decision, reason, sig)
@@ -802,7 +825,7 @@ export async function loanProjectOptions(req: PayloadRequest): Promise<{ borrowe
   const mapped = mappedCompanies(req)
   const res = await req.payload.find({
     collection: 'projects',
-    where: { and: [{ status: { not_equals: 'arsip' } }, ...(mapped !== null ? [{ company: { in: mapped } }] : [])] },
+    where: { and: [{ status: { not_in: ['arsip', 'dibatalkan'] } }, ...(mapped !== null ? [{ company: { in: mapped } }] : [])] },
     sort: 'code',
     depth: 0,
     pagination: false,

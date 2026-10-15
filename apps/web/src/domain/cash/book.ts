@@ -239,7 +239,7 @@ export async function cashLookups(req: PayloadRequest): Promise<Lookups> {
     // QA-05: the form's date `min` follows the picked account's opening-balance (go-live) date
     accounts: accounts.map((d) => ({ id: d.id as number, companyId: cid(d), label: String(d.name ?? ''), active: d.active !== false, openingDate: (d.openingBalanceDate as string | null | undefined) ?? null, siteId: relId(d.site) ?? null, intercompanyReceiving: d.intercompanyReceiving === true })),
     sites: sites.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false })),
-    projects: projects.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.status !== 'selesai' && d.status !== 'arsip' })),
+    projects: projects.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.status !== 'selesai' && d.status !== 'arsip' && d.status !== 'dibatalkan' })),
     costCenters: costCenters.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false })),
     categories: categories.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false, requiresVehicle: d.requiresVehicle === true })),
     sources: sources.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false })),

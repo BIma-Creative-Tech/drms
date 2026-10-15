@@ -88,7 +88,7 @@ export async function loadRapOverview(req: PayloadRequest): Promise<RapOverviewR
       items,
       state: rapState(items, rapRequiredFor({ kind, budget: withRab.has(d.id) ? 1 : null })),
       prices: roles.prices,
-      editor: (roles.director || roles.pm) && d.status !== 'arsip',
+      editor: (roles.director || roles.pm) && d.status !== 'arsip' && d.status !== 'dibatalkan',
       rapValue: roles.prices && a && Number(a.priced) > 0 && a.rap_value !== null ? Number(a.rap_value) : null,
       budget,
     })

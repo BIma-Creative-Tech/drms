@@ -19,7 +19,25 @@ export const PROJECT_STATUSES = [
   { label: 'Ditunda', value: 'ditunda' },
   { label: 'Selesai', value: 'selesai' },
   { label: 'Arsip', value: 'arsip' },
+  // D1610 (ADR 0030): set ONLY by "Batalkan proyek" (domain/projects/cancel.ts: reason, cascade); terminal
+  { label: 'Dibatalkan', value: 'dibatalkan' },
 ] as const
+
+export type ProjectStatus = (typeof PROJECT_STATUSES)[number]['value']
+
+/** D1610: `dibatalkan` only through the cancel action, and never left again (the cascade cannot be undone). */
+const cancelStatusGuard: CollectionBeforeChangeHook = ({ data, originalDoc, operation }) => {
+  const next = data.status
+  if (next === undefined) return data
+  const prev = operation === 'update' ? originalDoc?.status : undefined
+  if (next === 'dibatalkan' && prev !== 'dibatalkan') {
+    throw new APIError('Status "Dibatalkan" hanya lewat aksi "Batalkan proyek" (dengan alasan; pengajuan yang masih berjalan ikut dibatalkan).', 409, { errors: [{ path: 'status', message: 'Gunakan aksi Batalkan proyek.' }] }, true)
+  }
+  if (prev === 'dibatalkan' && next !== 'dibatalkan') {
+    throw new APIError('Project yang sudah dibatalkan tidak dapat diaktifkan kembali.', 409, { errors: [{ path: 'status', message: 'Project sudah dibatalkan.' }] }, true)
+  }
+  return data
+}
 
 /** Owner decision 2026-10-09: reverses QA-20(b) — PM and Admin gain the same project write rights as
  * Direktur (additive, Direktur keeps them too). */
@@ -93,7 +111,7 @@ export const Projects: CollectionConfig = withAudit(
       delete: denyAll,
     },
     hooks: {
-      beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'site', collection: 'sites' }] }), kindChangeGuard],
+      beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'site', collection: 'sites' }] }), kindChangeGuard, cancelStatusGuard],
       beforeOperation: [progressWriteGuard('projects'), readOnlyFieldsGuard('projects', (req, company) => hasRole(req, PROJECT_EDITOR_ROLES, company), 'Direktur, Admin, atau PM')],
     },
     fields: [
@@ -172,9 +190,15 @@ export const Projects: CollectionConfig = withAudit(
         required: true,
         defaultValue: 'perencanaan',
         options: [...PROJECT_STATUSES],
+        // D1610: "Dibatalkan" is not offered in the form (only the cancel action sets it); a cancelled project shows it
+        filterOptions: ({ options, data }) => (data?.status === 'dibatalkan' ? options : options.filter((o) => (typeof o === 'string' ? o : o.value) !== 'dibatalkan')),
         index: true,
         access: { update: projectEditors },
       },
+      // D1610 (ADR 0030): "Batalkan proyek" — reason / when / who (system fields, written by domain/projects/cancel.ts)
+      { name: 'cancelReason', type: 'text', label: 'Alasan pembatalan', maxLength: 1000, access: { create: () => false, update: () => false }, admin: { readOnly: true, condition: (d) => d?.status === 'dibatalkan' } },
+      { name: 'cancelledAt', type: 'date', label: 'Dibatalkan pada', access: { create: () => false, update: () => false }, admin: { readOnly: true, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' }, condition: (d) => d?.status === 'dibatalkan' } },
+      { name: 'cancelledBy', type: 'relationship', relationTo: 'users', label: 'Dibatalkan oleh', access: { create: () => false, update: () => false }, admin: { readOnly: true, position: 'sidebar', condition: (d) => d?.status === 'dibatalkan' } },
       {
         ...percentField('progressPct', 'Progress fisik (%)'),
         defaultValue: 0,

@@ -11,6 +11,7 @@ import { getRequestTx } from '@/lib/tx'
 
 import { canCorrectFieldOn, canFieldReportOn, FIELD_COLLECTIONS, fieldReportsEnabled } from './access'
 import { EDIT_WINDOW_HOURS, FIELD_REPORT_LABELS, kindAllows, kindOf, MAX_PHOTOS, reportDateError, type FieldReportType, type ProjectKind } from './rules'
+import { closedProjectMessage, isClosedProjectStatus } from '@/domain/projects/status'
 
 /**
  * FR1 shared machinery of the field-report services (ADR 0020 §6): coded errors, project gate
@@ -105,7 +106,7 @@ export async function requireReportableProject(req: PayloadRequest, projectId: n
   if (!p) return fail(404, 'NOT_FOUND', 'Project tidak ditemukan.', 'projectId')
   if (!(await fieldReportsEnabled(req, p.company))) return fail(403, 'FEATURE_DISABLED', 'Laporan lapangan belum diaktifkan untuk PT ini (Setting perusahaan).')
   if (!(await canFieldReportOn(req, projectId))) return denied(req, type, projectId, 'create')
-  if (p.status === 'arsip') return fail(409, 'STATE_CONFLICT', 'Project sudah diarsipkan.', 'projectId')
+  if (isClosedProjectStatus(p.status)) return fail(409, 'STATE_CONFLICT', closedProjectMessage(p.status), 'projectId')
   if (!kindAllows(p.kind, type)) {
     return fail(409, 'WRONG_PROJECT_KIND', `${FIELD_REPORT_LABELS[type]} tidak tersedia untuk project berjenis "${p.kind}".`, 'projectId', { projectKind: p.kind })
   }
