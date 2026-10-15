@@ -88,7 +88,7 @@ describe('which pickers get the drawer "+"', () => {
   })
 
   it("Payload's own \"+\" is off on them (no PT carried over); targets are known collections", () => {
-    const slugs = new Set(config.collections.map((c) => c.slug))
+    const slugs = new Set<string>(config.collections.map((c) => c.slug))
     for (const { at, f } of creatableIn()) {
       expect(f.admin?.allowCreate, at).toBe(false)
       expect(createTargetOf(f.relationTo), at).not.toBeNull()
@@ -117,7 +117,7 @@ describe('which pickers get the drawer "+"', () => {
   it('creatableRelationship keeps the other admin options and refuses an unknown target', () => {
     const f = creatableRelationship({ name: 'client', type: 'relationship', relationTo: 'clients', admin: { placeholder: 'Pilih…', description: 'd' } }, { company: 'form' })
     expect(f.admin).toMatchObject({ placeholder: 'Pilih…', description: 'd', allowCreate: false, components: { Field: { path: CREATABLE_RELATIONSHIP_FIELD, clientProps: { pkCreate: { company: 'form' } } } } })
-    expect(() => creatableRelationship({ name: 'x', type: 'relationship', relationTo: 'banks' }, { company: 'form' })).toThrow()
+    expect(() => creatableRelationship({ name: 'x', type: 'relationship', relationTo: 'banks' as never }, { company: 'form' })).toThrow()
     expect(() => creatableRelationship({ name: 'x', type: 'relationship', relationTo: ['clients', 'vendors'] }, { company: 'form' })).toThrow()
   })
 

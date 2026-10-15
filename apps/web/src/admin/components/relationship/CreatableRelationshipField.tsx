@@ -21,7 +21,8 @@ type Props = RelationshipFieldClientProps & { [CREATE_PROP]?: CreatableOptions }
  * form. Payload's own "+" is off on these fields (allowCreate: false). The drawer forms + server re-check everything.
  */
 export function CreatableRelationshipField(props: Props) {
-  const { [CREATE_PROP]: opts = { company: 'form' }, ...fieldProps } = props
+  const { [CREATE_PROP]: optsProp, ...fieldProps } = props
+  const opts: CreatableOptions = optsProp ?? { company: 'form' }
   const { field, path: pathProp, readOnly } = fieldProps
   const path = pathProp ?? field.name
   const target = createTargetOf(field.relationTo)
