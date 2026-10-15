@@ -270,6 +270,7 @@ export async function revertInflightTrim(db: Exec): Promise<TrimRevertResult> {
       await audit(db, { docId: t.id, docNo: t.docNo, companyId: t.companyId, action: 'update', field: TRIM_FIELD, old: t.neu, neu: { ...t.old, migration: TRIM_MIGRATION, kind: 'revert' }, reason: TRIM_REASON_REVERT })
     }
     await guardOn(db)
+    await db.execute(sql`SET CONSTRAINTS ALL IMMEDIATE`)
   }
   return { requestsRestored: todo.length }
 }
