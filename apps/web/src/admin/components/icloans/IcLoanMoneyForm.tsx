@@ -10,6 +10,7 @@ import { OverrideDialog, overridePromptOf, type OverridePrompt } from '../kas/Ov
 import { KAS_STYLE } from '../kas/style'
 import { newIdemKey, sendJson } from '../kas/client'
 import { RupiahInput, useRupiah } from '../RupiahInput'
+import { WrapSelect } from '../WrapSelect'
 
 /**
  * ADR 0029 §3.5 / §3.6: the money form of an inter-PT loan movement — "Cairkan pinjaman" (Finance of the LENDER, amount =
@@ -119,13 +120,13 @@ export function IcLoanMoneyForm({ url, submitLabel, accounts, amountText, amount
             <label htmlFor={`${uid}-acc`}>
               Akun kas sumber<span className="req" aria-hidden>*</span>
             </label>
-            <select id={`${uid}-acc`} name="cashAccountId" required defaultValue={accounts[0]?.id}>
+            <WrapSelect id={`${uid}-acc`} name="cashAccountId" required defaultValue={accounts[0]?.id}>
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
                 </option>
               ))}
-            </select>
+            </WrapSelect>
             <p className="help">Tanpa akun site (kas kecil / rekening cabang).</p>
           </div>
           {amount ? (

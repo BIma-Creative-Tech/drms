@@ -25,7 +25,7 @@ export const FIELD_STYLE = `
 .pk-f3 .pk-mx th, .pk-f3 .pk-mx td { padding: 0; text-align: center; border-bottom: 1px solid var(--pk-border); border-right: 1px solid color-mix(in oklab, var(--pk-border) 60%, transparent); }
 .pk-f3 .pk-mx thead th { font-size: 11.5px; font-weight: 600; color: var(--pk-muted-fg); padding: 6px 2px; background: var(--pk-card); }
 .pk-f3 .pk-mx thead th.we { color: var(--pk-fg); }
-.pk-f3 .pk-mx th.u, .pk-f3 .pk-mx td.u { position: sticky; left: 0; z-index: 1; background: var(--pk-card); text-align: left; padding: 6px 10px; min-width: 132px; max-width: 180px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pk-f3 .pk-mx th.u, .pk-f3 .pk-mx td.u { position: sticky; left: 0; z-index: 1; background: var(--pk-card); text-align: left; padding: 6px 10px; min-width: 132px; max-width: 180px; font-weight: 600; overflow-wrap: break-word; } /* DRMS 16/10: wraps inside 180 px, no ellipsis */
 .pk-f3 .pk-mx td.u small { display: block; font-weight: 400; color: var(--pk-muted-fg); font-size: 11px; }
 .pk-f3 .pk-mx td.t { padding: 6px 10px; text-align: right; font-weight: 700; white-space: nowrap; }
 .pk-f3 .pk-mx tbody tr:last-child td { border-bottom: 0; }
@@ -90,9 +90,10 @@ export const FIELD_STYLE = `
 .pk-f3 .pk-lines { display: grid; gap: 8px; }
 .pk-f3 .pk-lines-h, .pk-f3 .pk-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 120px) 76px 72px auto; gap: 6px; align-items: center; }
 .pk-f3 .pk-lines-h { font-size: 12px; font-weight: 600; color: var(--pk-muted-fg); }
-.pk-f3 .pk-line input:not([type='checkbox'], [type='radio']) { width: 100%; min-height: 40px; padding: 6px 8px; font: inherit; font-size: 14px; color: var(--theme-text); background: var(--theme-input-bg, var(--theme-elevation-0)); border: 1px solid var(--pk-input); border-radius: var(--style-radius-s); box-sizing: border-box; }
-.pk-f3 .pk-line input:focus-visible { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
-.pk-f3 .pk-line input[aria-invalid='true'] { border-color: var(--pk-tone-bad-text); }
+.pk-f3 .pk-line :is(input:not([type='checkbox'], [type='radio']), textarea) { width: 100%; min-height: 40px; padding: 6px 8px; font: inherit; font-size: 14px; color: var(--theme-text); background: var(--theme-input-bg, var(--theme-elevation-0)); border: 1px solid var(--pk-input); border-radius: var(--style-radius-s); box-sizing: border-box; }
+.pk-f3 .pk-line :is(input, textarea):focus-visible { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
+.pk-f3 .pk-line :is(input, textarea)[aria-invalid='true'] { border-color: var(--pk-tone-bad-text); }
+.pk-f3 .pk-line textarea { line-height: 26px; } /* DRMS 16/10 WrapText: one line = 40 px like the inputs */
 .pk-f3 .pk-line .note, .pk-f3 .pk-line .err { grid-column: 1 / -1; }
 .pk-f3 .pk-line .err { margin: 0; font-size: 12px; color: var(--pk-tone-bad-text); font-weight: 600; }
 .pk-f3 .pk-lines .pk-add { justify-self: start; border-style: dashed; }
@@ -100,10 +101,10 @@ export const FIELD_STYLE = `
 @media (max-width: 559px) {
   .pk-f3 .pk-lines-h { display: none; }
   .pk-f3 .pk-line { grid-template-columns: minmax(0, 1fr) 76px 72px; padding: 8px; border: 1px solid var(--pk-border); border-radius: var(--style-radius-m); }
-  .pk-f3 .pk-line > input:first-child { grid-column: 1 / -1; }
+  .pk-f3 .pk-line > :is(input, textarea):first-child { grid-column: 1 / -1; }
   .pk-f3 .pk-line > button { grid-column: 1 / -1; justify-self: start; }
 }
-@media (pointer: coarse) { .pk-f3 .pk-line input:not([type='checkbox'], [type='radio']) { min-height: 44px; } }
+@media (pointer: coarse) { .pk-f3 .pk-line :is(input:not([type='checkbox'], [type='radio']), textarea) { min-height: 44px; } }
 .pk-f3 .pk-photos { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
 .pk-f3 .pk-photos li { display: grid; gap: 6px; justify-items: start; }
 .pk-f3 .pk-photos img { width: 96px; height: 96px; object-fit: cover; border-radius: var(--style-radius-m); border: 1px solid var(--pk-border); background: var(--viz-track); display: block; }

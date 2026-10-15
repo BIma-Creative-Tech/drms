@@ -10,6 +10,8 @@ import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 import { getJson } from './client'
 import { decOut, DecimalField, PhotoPicker, usePhotos } from './parts'
 import { DateInput } from '../DateInput'
+import { WrapSelect } from '../WrapSelect'
+import { WrapText } from '../WrapText'
 
 /**
  * FR1 web input "Timesheet harian unit" (plan B; fields of the APK mockup Android-Timesheet): contract
@@ -185,7 +187,7 @@ export function TimesheetForm({ projects, today, minDate, initialProject, initia
             <label htmlFor={id('project')}>
               Kontrak (project)<span className="req" aria-hidden>*</span>
             </label>
-            <select
+            <WrapSelect
               id={id('project')}
               value={projectId}
               onChange={(e) => {
@@ -201,7 +203,7 @@ export function TimesheetForm({ projects, today, minDate, initialProject, initia
                   {p.label}
                 </option>
               ))}
-            </select>
+            </WrapSelect>
             {errEl('projectId')}
           </div>
           <div className="pk-fld">
@@ -215,7 +217,7 @@ export function TimesheetForm({ projects, today, minDate, initialProject, initia
             <label htmlFor={id('unit')}>
               Unit<span className="req" aria-hidden>*</span>
             </label>
-            <select
+            <WrapSelect
               id={id('unit')}
               value={unit ? String(unit.unitId) : ''}
               onChange={(e) => {
@@ -232,7 +234,7 @@ export function TimesheetForm({ projects, today, minDate, initialProject, initia
                   {u.label}
                 </option>
               ))}
-            </select>
+            </WrapSelect>
             <p className="help" id={id('unitId-h')}>
               Hanya unit yang aktif di kontrak pada {longDate(date)}.
             </p>
@@ -300,7 +302,7 @@ export function TimesheetForm({ projects, today, minDate, initialProject, initia
             <label htmlFor={id('reason')}>
               Alasan breakdown<span className="req" aria-hidden>*</span>
             </label>
-            <input id={id('reason')} value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} aria-invalid={err('breakdownReason') ? true : undefined} aria-describedby={err('breakdownReason') ? id('breakdownReason-e') : undefined} />
+            <WrapText id={id('reason')} value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} aria-invalid={err('breakdownReason') ? true : undefined} aria-describedby={err('breakdownReason') ? id('breakdownReason-e') : undefined} />
             {errEl('breakdownReason')}
           </div>
         ) : null}
@@ -336,12 +338,12 @@ export function TimesheetForm({ projects, today, minDate, initialProject, initia
         <div className="pk-kgrid">
           <div className="pk-fld">
             <label htmlFor={id('operator')}>Nama operator</label>
-            <input id={id('operator')} value={operator} maxLength={128} onChange={(e) => setOperator(e.target.value)} />
+            <WrapText id={id('operator')} value={operator} maxLength={128} onChange={(e) => setOperator(e.target.value)} />
           </div>
           <DecimalField id={id('fuel')} label="BBM" suffix="liter" value={fuel} onChange={setFuel} max={100_000} error={err('fuelLiters')} />
           <div className="pk-fld">
             <label htmlFor={id('location')}>Lokasi</label>
-            <input id={id('location')} value={location} maxLength={200} onChange={(e) => setLocation(e.target.value)} />
+            <WrapText id={id('location')} value={location} maxLength={200} onChange={(e) => setLocation(e.target.value)} />
           </div>
           <div className="pk-fld full">
             <label htmlFor={id('notes')}>Catatan</label>

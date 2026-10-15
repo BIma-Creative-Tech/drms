@@ -87,8 +87,7 @@ export async function PkListView(props: ListViewServerProps) {
   const actionsAt = shown.findIndex((c) => c.accessor === ROW_ACTIONS_FIELD)
   const fillAt = actionsAt < 0 ? shown.length : actionsAt
   const fill = () => <td key="pk-fill" className="pk-plist__fill" aria-hidden="true" />
-  // long texts: one line with an ellipsis; textareas wrap (both within 360 px, custom.scss .pk-plist__cell)
-  const wraps = (field: unknown) => ['textarea', 'richText'].includes((field as { type?: string } | undefined)?.type ?? '')
+  // DRMS 16/10: long texts wrap inside 360 px instead of ending in an ellipsis (custom.scss .pk-plist__cell)
   const colLabel = (name: string, field?: unknown) =>
     name === 'id' ? 'ID' : name === ROW_ACTIONS_FIELD ? 'Aksi' : label((field as { label?: unknown } | undefined)?.label ?? cfg.columns.find((c) => c.name === name)?.label, i18n, name)
 
@@ -199,7 +198,7 @@ export async function PkListView(props: ListViewServerProps) {
                         {shown.flatMap((c, ci) => [
                           ...(ci === fillAt ? [fill()] : []),
                           <td key={c.accessor} className={`cell-${c.accessor}`}>
-                            {c.accessor === ROW_ACTIONS_FIELD ? c.renderedCells[i] : <div className={wraps(c.field) ? 'pk-plist__cell pk-plist__cell--wrap' : 'pk-plist__cell'}>{c.renderedCells[i]}</div>}
+                            {c.accessor === ROW_ACTIONS_FIELD ? c.renderedCells[i] : <div className="pk-plist__cell">{c.renderedCells[i]}</div>}
                           </td>,
                         ])}
                         {fillAt === shown.length ? fill() : null}

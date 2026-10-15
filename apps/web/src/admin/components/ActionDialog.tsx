@@ -2,6 +2,7 @@
 import React, { useId, useRef, useState } from 'react'
 
 import { KAS_STYLE } from './kas/style'
+import { isMultilineText } from './WrapText'
 
 /**
  * QA-22 / QA-23: the app dialog for confirmations and reasons (replaces window.confirm / prompt /
@@ -77,7 +78,7 @@ export function ActionDialog({ label, title, description, confirmLabel, field, o
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       void confirm()
-    } else if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement) && !(e.target instanceof HTMLButtonElement)) e.preventDefault()
+    } else if (e.key === 'Enter' && !isMultilineText(e.target) && !(e.target instanceof HTMLButtonElement)) e.preventDefault()
   }
 
   return (

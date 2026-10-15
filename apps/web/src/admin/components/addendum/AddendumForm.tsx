@@ -6,6 +6,7 @@ import { formatRupiah } from '@/lib/money'
 
 import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
+import { WrapSelect } from '../WrapSelect'
 
 /**
  * E5 (US-18): PM form for an Addendum RAB — project (team projects only), nominal tambahan,
@@ -93,7 +94,7 @@ export function AddendumForm({ projects, initialProject, edit }: { projects: Pro
               *
             </span>
           </label>
-          <select
+          <WrapSelect
             id={`${uid}-p`}
             value={project}
             disabled={!!edit}
@@ -111,7 +112,7 @@ export function AddendumForm({ projects, initialProject, edit }: { projects: Pro
                 {x.code} {x.name}
               </option>
             ))}
-          </select>
+          </WrapSelect>
           {errs.projectId ? (
             <p id={`${uid}-pe`} className="err">
               {errs.projectId}

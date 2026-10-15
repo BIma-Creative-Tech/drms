@@ -18,6 +18,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   ↑/↓/Home/End inside, Esc closes and returns focus; rows ≥ 44 px; icon-only **+** ("Buat baru") under 640 px with a
   full-width panel. Staff and Operator panels are unchanged. Web only, no API or schema change.
 
+### Changed
+- **Admin loader blocks input (DRMS 16/10 #2).** From the first moment of a navigation or a save, a transparent shield
+  over the whole page absorbs clicks and Enter / Space until the loader hides (dots still after 180 ms; released by the
+  15 s safety timeout at the latest). Navigations stopped by Payload's "leave without saving?" guard no longer count.
+  ADR 0014 § Amendment 2026-10-16.
+
 ## [0.12.0] - 2026-10-15
 
 **DRMS 15/10 owner feedback: UI fixes, Pengguna with Penugasan in one form, and approval flow PM project → Direktur →
