@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (DRMS 15/10 — alur pengajuan Finance; data migration)
+
+- **Pengajuan Finance** (owner decision 2026-10-15): a request Finance files for himself (Jenis penerima Karyawan —
+  **Reimburse and Pengajuan Baru**) now goes **Direktur → Owner → Finance transfer**, without the PM project step — the
+  same shape as the Finance vendor / PT grup rules. New seeded rule "Pengajuan Finance — Direktur lalu Owner"
+  (priority 20), added to every existing PT by `20261015_150000_d1510_finance_rule_data` (idempotent, audited, skipped
+  where an Admin already made an active Karyawan rule for Finance). Already submitted requests keep their flow. ADR 0026
+  amendment 2026-10-15.
+
 ### Changed (DRMS 15/10 — owner UI feedback #2, #3, #5, #6, #7; web only, no migration)
 
 - **Checkbox / radio** ("terlalu besar dan tidak align kiri"): every native checkbox and radio is a 16 px box in the brand

@@ -142,3 +142,16 @@ expense request "Disetujui" (normally the Owner's; under a rule without an Owner
 of the Owner's own request (no approval) are refused (409 `FUND_INSUFFICIENT`) when the paying PT's available funds —
 balance of its active accounts without a site minus its commitments — are short. Who decides is unchanged (G1 rules
 stand). The Owner may instruct a "Pinjaman antar-PT" and then approves again.
+
+## Amendment 2026-10-15 — Finance's own requests skip the PM project
+
+Owner decision 2026-10-15: a request **filed by Finance for himself** (Jenis penerima = Karyawan; Reimburse and Pengajuan
+Baru) follows **Finance → Direktur → Owner → Finance (transfer instruction only)**, like the Finance vendor / PT grup
+rules (ADR 0027 / 0028) — no PM project step. Seeded rule **"Pengajuan Finance — Direktur lalu Owner"** (Peran pemohon
+= Finance, Jenis penerima = Karyawan, any request type, no "Diketahui", L1 Direktur, L2 Owner, priority 20) in
+`seed/data.ts` (`FINANCE_RULE_NAME`, also copied to new PTs) and per existing PT by the data migration
+`20261015_150000_d1510_finance_rule_data` (skipped where an active Karyawan rule for Finance requesters already exists).
+Unchanged: a requester who is also Direktur → "Pengajuan Direktur" (priority 10), the Owner → "Pengajuan Owner" (5); a
+request with several requesters takes the rule only when every requester holds Finance. Submitted requests keep their
+snapshot (the 2026-10-15 re-route, migration `…_200000_d1510_approval_reroute`, runs after this one and therefore
+re-routes a pending Finance request to this rule). Test: `tests/unit/d1510-finance-rule.test.ts`.
