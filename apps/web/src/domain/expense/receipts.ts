@@ -403,8 +403,22 @@ export async function approveWithoutDecision(req: PayloadRequest, doc: RequestDo
   // ADR 0029 §1 (owner 2026-10-14): the Owner's own request is checked HERE (submit / receipt resubmit) — short funds
   // (switch on) → 409 FUND_INSUFFICIENT, the whole submit rolls back and the request stays Draft
   await checkFundsForApproval(req, doc, doc.approvalCycle && doc.approvalCycle > 1 ? 'receipts_resubmit' : 'submit')
-  const approved = await updateRequest(req, doc.id, { status: 'approved', approvedAmount: doc.grandTotal ?? 0, approvedAt: new Date().toISOString() })
+  return finalizeApproved(req, doc)
+}
+
+/**
+ * "Menunggu persetujuan" → "Disetujui": the ONE finalisation of the decision that makes a request approved — the last
+ * approval level (`approve`), a final "Diketahui" (G1-2), a request without approval (`approveWithoutDecision`) and the
+ * d1510 in-flight trim (owner decision 2026-10-15, migration 20261015_210000: a request whose only undecided level was
+ * Finance's, after the Owner approved). approvedAmount := grandTotal (frozen, G3), approvedAt = start of the transfer
+ * SLA (item 11; the DB sets both only on pending_approval → approved), Class A snapshot, "Melebihi RAP" of the
+ * project's other pending requests (D4). Notifications (Finance transfer queue / receipt verification, the people)
+ * come from the status hook. The fund check (ADR 0029) is the CALLER's — it must run before anything is written.
+ */
+export async function finalizeApproved(req: PayloadRequest, doc: RequestDoc, reason?: string): Promise<RequestDoc> {
+  const approved = await updateRequest(req, doc.id, { status: 'approved', approvedAmount: doc.grandTotal ?? 0, approvedAt: new Date().toISOString() }, reason)
   await writeSnapshot(req, approved, 'approve')
+  // D4: this request now counts as RAP realisation → the project's other pending requests re-check "Melebihi RAP"
   await syncProjectRapFlags(req, doc.id)
   return approved
 }

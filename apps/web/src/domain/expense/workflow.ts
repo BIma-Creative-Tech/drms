@@ -31,7 +31,7 @@ import { payeeOf } from './types'
 import { designatedAccount } from '@/domain/intercompany/service'
 import { checkFundsForApproval } from '@/domain/fundcheck/service'
 import type { FundFigures } from '@/domain/fundcheck/rules'
-import { approveWithoutDecision, assertEveryLineHasReceipt, claimAttachments, recomputeFlags, syncProjectRapFlags, syncRapFlags } from './receipts'
+import { approveWithoutDecision, assertEveryLineHasReceipt, claimAttachments, finalizeApproved, recomputeFlags, syncRapFlags } from './receipts'
 import { isNoApproval } from './decision'
 import { ACK_DELEGATE_ROLE, budgetImpact, lastLevel, type AckDelegate, type ApprovalSnapshot } from './rules'
 import { auditSelfApproval, auditSkipped, involvedUserIds, selectAndSnapshot, writeSnapshot } from './snapshot'
@@ -331,10 +331,7 @@ export async function acknowledge(req: PayloadRequest, id: number, opts: SignOpt
     // ADR 0013 G1-2: the only approval position was skipped (the only Finance is requester/creator) →
     // the Direktur's decision is final. Through "Menunggu Approval" so the DB rule "approvedAmount only
     // on pending_approval → approved" (G3) holds; nobody is notified for the empty level.
-    const approved = await updateRequest(req, id, { status: 'approved', approvedAmount: next.grandTotal ?? 0, approvedAt: new Date().toISOString() })
-    await writeSnapshot(req, approved, 'approve')
-    await syncProjectRapFlags(req, id)
-    return approved
+    return finalizeApproved(req, next)
   }
   return next
 }
@@ -370,12 +367,8 @@ export async function approve(req: PayloadRequest, id: number, opts: SignOpts = 
     fund,
   })
   if (level < lastLevel(snap)) return updateRequest(req, id, { currentLevel: level + 1 })
-  // item 11: approvedAt = start of the transfer SLA (DB: set only on pending_approval → approved)
-  const updated = await updateRequest(req, id, { status: 'approved', approvedAmount: doc.grandTotal ?? 0, approvedAt: new Date().toISOString() })
-  await writeSnapshot(req, updated, 'approve')
-  // D4: this request now counts as RAP realisation → the project's other pending requests re-check "Melebihi RAP"
-  await syncProjectRapFlags(req, id)
-  return updated
+  // item 11: approvedAt = start of the transfer SLA; D4 RAP realisation — the shared finalisation (receipts.ts)
+  return finalizeApproved(req, doc)
 }
 
 /** POST …/reject — reason required (G7); at the Diketahui step or at an approval level. */
