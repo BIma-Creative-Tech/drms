@@ -15,6 +15,7 @@ import {
   ASG_ROLES,
   buildBody,
   draftFromDetail,
+  ensureEmployee,
   hasEmployee,
   LOCATION_KINDS,
   mapErrors,
@@ -28,6 +29,8 @@ import {
   type Draft,
   type EmpDraft,
   type TabId,
+  withAutoStaff,
+  withoutAutoStaff,
 } from './user-onboarding-form'
 import { WrapSelect } from '../WrapSelect'
 import { WrapText } from '../WrapText'
@@ -40,6 +43,9 @@ import { WrapText } from '../WrapText'
  * One "Simpan" → `POST /api/v1/user-onboarding` / `PATCH /api/v1/user-onboarding/{id}`: everything in ONE
  * transaction on the server (all-or-nothing); a refused save marks the fields and opens the first tab with an error.
  * D4 layout: label left of the input (`.pk-fgrid`), stacked on phones.
+ * DRMS 16/10: Data Karyawan / Rekening / Penugasan list every PT the editor manages, so records are added right on
+ * their tab — "+ Tambah …" creates the PT's employee when there is none and ticks Staff where the account has no role
+ * yet (`withAutoStaff`), instead of "Pilih dulu peran di tab Akses & Peran".
  */
 /** `groupAdmin`: ADR 0026 — only a group admin grants or removes the Owner role (the server refuses others, 403). */
 type Props = { mode: 'create' | 'update'; detail: OnboardingDetail; self: boolean; groupAdmin: boolean }
@@ -59,7 +65,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
   const seq = useRef(0)
 
   const { body, order, changed, needsReason } = useMemo(() => buildBody(detail, draft, mode), [detail, draft, mode])
-  const shownCompanies = activeCompanies(detail, draft)
+  const activeIds = new Set(activeCompanies(detail, draft).map((c) => c.id))
   const identityLocked = mode === 'update' && detail.user?.identityEditable === false
   const err = (key: string) => errors.get(key)
 
@@ -69,6 +75,20 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
   }
   const patchCompany = (cid: number, fn: (c: CompanyDraft) => CompanyDraft) => patch((d) => ({ ...d, companies: { ...d.companies, [String(cid)]: fn(d.companies[String(cid)]!) } }))
   const patchEmp = (cid: number, fn: (e: EmpDraft) => EmpDraft) => patchCompany(cid, (c) => ({ ...c, emp: fn(c.emp) }))
+  /** Employee for the PT (new one when missing) + Staff where the account has no role there, then `fn`. */
+  const withEmployee = (c: (typeof detail.companies)[number], fn: (d: CompanyDraft) => CompanyDraft = (d) => d) => patchCompany(c.id, (d) => fn(ensureEmployee(c, d, draft.user)))
+  const noCompanies = detail.companies.length === 0 ? <p className="pk-empty">Tidak ada PT yang Anda kelola dalam pilihan PT saat ini. Ubah pilihan di pemilih PT.</p> : null
+  const ptLegend = (c: (typeof detail.companies)[number]) => (
+    <legend>
+      <span className="pk-pt-chip">{c.shortCode}</span> {c.name}
+    </legend>
+  )
+  const autoStaffNote = (d: CompanyDraft) =>
+    d.autoStaff && d.roles.includes('pk-staff') ? (
+      <p className="pk-alert info" data-pk-auto-staff>
+        Akun ini belum punya peran di PT ini — peran <b>{ROLE_LABELS['pk-staff']}</b> otomatis ditambahkan. Ubah di tab Akses &amp; Peran bila perlu.
+      </p>
+    ) : null
 
   const save = async () => {
     if (busy || !changed) return
@@ -250,7 +270,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
           <div className="pk-fgrid">
             {detail.companies.map((c) => {
               const d = draft.companies[String(c.id)]!
-              const status = c.membership ? (d.roles.length === 0 ? 'akses akan dinonaktifkan' : c.membership.active ? 'anggota aktif' : 'nonaktif — pilih peran untuk mengaktifkan') : d.roles.length ? 'akses baru' : 'bukan anggota'
+              const status = c.membership ? (d.roles.length === 0 ? 'akses akan dinonaktifkan' : c.membership.active ? 'anggota aktif' : 'nonaktif — pilih peran untuk mengaktifkan') : d.roles.length ? (d.autoStaff ? 'akses baru — Staff otomatis karena ada data karyawan' : 'akses baru') : 'bukan anggota'
               const key = `c.${c.id}.roles`
               return (
                 <div className="pk-fgrid__row" key={c.id} data-pk-company={c.shortCode}>
@@ -258,7 +278,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                     <span className="pk-pt-chip">{c.shortCode}</span> {c.name}
                   </span>
                   <div className="pk-fgrid__ctl pk-fld">
-                    <MultiSelect name={`roles-${c.id}`} label={`Peran di ${c.shortCode}`} options={roleOptions(groupAdmin, d.roles as Role[])} value={d.roles} allLabel="Pilih peran…" onChange={(roles) => patchCompany(c.id, (x) => ({ ...x, roles: lockOwner(roles as Role[], x.roles as Role[], groupAdmin) }))} disabled={busy} invalid={!!err(key)} testKey={`roles-${c.shortCode}`} />
+                    <MultiSelect name={`roles-${c.id}`} label={`Peran di ${c.shortCode}`} options={roleOptions(groupAdmin, d.roles as Role[])} value={d.roles} allLabel="Pilih peran…" onChange={(roles) => patchCompany(c.id, (x) => ({ ...x, roles: lockOwner(roles as Role[], x.roles as Role[], groupAdmin), autoStaff: false }))} disabled={busy} invalid={!!err(key)} testKey={`roles-${c.shortCode}`} />
                     <span className="help">{status}</span>
                     {err(key) ? (
                       <span className="err" role="alert" data-pk-error={key}>
@@ -276,9 +296,23 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
       {/* ---- Data Karyawan ---- */}
       <section id="uo-panel-karyawan" role="tabpanel" aria-labelledby="uo-tab-karyawan" hidden={tab !== 'karyawan'} className="pk-uo__panel">
         <p className="pk-uo__lead">1 data karyawan = 1 PT. Data karyawan dibutuhkan untuk absensi dan pengajuan di PT itu.</p>
-        {shownCompanies.length === 0 ? <p className="pk-empty">Pilih dulu peran di tab Akses &amp; Peran.</p> : null}
-        {shownCompanies.map((c) => {
+        {noCompanies}
+        {detail.companies.map((c) => {
           const d = draft.companies[String(c.id)]!
+          if (!activeIds.has(c.id)) {
+            if (!c.canManageEmployees) return null
+            return (
+              <fieldset key={c.id} className="pk-uo__group pk-uo__group--compact" data-pk-employee-company={c.shortCode}>
+                {ptLegend(c)}
+                <p className="pk-uo__more">
+                  <span className="help">Belum terdaftar di PT ini. </span>
+                  <button type="button" className="pk-kbtn" disabled={busy} data-pk-add-employee={c.shortCode} onClick={() => withEmployee(c)}>
+                    + Tambah data karyawan
+                  </button>
+                </p>
+              </fieldset>
+            )
+          }
           const e = d.emp
           const k = `c.${c.id}.employee`
           const locked = !c.canManageEmployees || busy
@@ -294,6 +328,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                 <span className="pk-pt-chip">{c.shortCode}</span> {c.name}
               </legend>
               {!c.canManageEmployees ? <p className="pk-alert info">Data karyawan PT ini hanya dapat diubah oleh Admin PT ini.</p> : null}
+              {autoStaffNote(d)}
               <div className="pk-fgrid">
                 {field(
                   `${k}.mode`,
@@ -303,13 +338,18 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                     disabled={locked}
                     onChange={(ev) => {
                       const mode = ev.target.value as EmpDraft['mode']
-                      patchEmp(c.id, (x) =>
-                        mode === 'linked' && c.employee
-                          ? { mode, id: c.employee.id, code: c.employee.code, name: c.employee.name, nickname: c.employee.nickname ?? '', position: c.employee.position ?? '', phone: c.employee.phone ?? '', attendanceType: c.employee.attendanceType, active: c.employee.active }
-                          : mode === 'new'
-                            ? { ...x, mode, id: null, code: '', name: draft.user.name, nickname: '', position: '', phone: draft.user.phone, attendanceType: 'onsite', active: true }
-                            : { ...x, mode, id: mode === 'pick' ? null : x.id },
-                      )
+                      patchCompany(c.id, (cd) => {
+                        const x = cd.emp
+                        const emp: EmpDraft =
+                          mode === 'linked' && c.employee
+                            ? { mode, id: c.employee.id, code: c.employee.code, name: c.employee.name, nickname: c.employee.nickname ?? '', position: c.employee.position ?? '', phone: c.employee.phone ?? '', attendanceType: c.employee.attendanceType, active: c.employee.active }
+                            : mode === 'new'
+                              ? { ...x, mode, id: null, code: '', name: draft.user.name, nickname: '', position: '', phone: draft.user.phone, attendanceType: 'onsite', active: true }
+                              : { ...x, mode, id: mode === 'pick' ? null : x.id }
+                        // DRMS 16/10: an employee in a PT without a role ticks Staff; taking it away again undoes that and drops
+                        // the unsaved bank / assignment rows (they need an employee)
+                        return mode === 'none' ? withoutAutoStaff({ ...cd, emp, banks: cd.banks.filter((b) => b.id !== undefined), asg: cd.asg.filter((a) => a.id !== undefined) }) : withAutoStaff(c, { ...cd, emp })
+                      })
                     }}
                   >
                     {modes.map((m) => (
@@ -382,19 +422,26 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
       {/* ---- Rekening Karyawan ---- */}
       <section id="uo-panel-rekening" role="tabpanel" aria-labelledby="uo-tab-rekening" hidden={tab !== 'rekening'} className="pk-uo__panel">
         <p className="pk-uo__lead">Rekening tujuan transfer per data karyawan. Mengubah nomor, nama pemilik atau bank, dan menonaktifkan rekening, wajib dengan alasan.</p>
-        {shownCompanies.length === 0 ? <p className="pk-empty">Pilih dulu peran di tab Akses &amp; Peran.</p> : null}
-        {shownCompanies.map((c) => {
+        {noCompanies}
+        {detail.companies.map((c) => {
           const d = draft.companies[String(c.id)]!
-          const hasEmp = d.emp.mode === 'linked' || d.emp.mode === 'new' || (d.emp.mode === 'pick' && d.emp.id !== null)
+          const hasEmp = hasEmployee(d.emp)
+          if (!activeIds.has(c.id) && !c.canManageEmployees) return null
           const locked = !c.canManageEmployees || busy
           const bk = `c.${c.id}.bank`
+          const addBank = () => withEmployee(c, (x) => ({ ...x, banks: [...x.banks, newBank(`n${++seq.current}`, x.emp.name || draft.user.name)] }))
           return (
-            <fieldset key={c.id} className="pk-uo__group" data-pk-bank-company={c.shortCode}>
-              <legend>
-                <span className="pk-pt-chip">{c.shortCode}</span> {c.name}
-              </legend>
+            <fieldset key={c.id} className={`pk-uo__group${hasEmp ? '' : ' pk-uo__group--compact'}`} data-pk-bank-company={c.shortCode}>
+              {ptLegend(c)}
               {!hasEmp ? (
-                <p className="pk-empty">Belum ada data karyawan di PT ini — pilih atau buat di tab Data Karyawan.</p>
+                <p className="pk-uo__more">
+                  <span className="help">Belum ada data karyawan di PT ini{c.canManageEmployees ? ' — dibuat sekaligus saat menambah rekening (lengkapi Kode di tab Data Karyawan).' : '.'} </span>
+                  {c.canManageEmployees ? (
+                    <button type="button" className="pk-kbtn" disabled={busy} data-pk-add-bank={c.shortCode} onClick={addBank}>
+                      + Tambah rekening
+                    </button>
+                  ) : null}
+                </p>
               ) : (
                 <>
                   {d.banks.length === 0 ? <p className="pk-empty">Belum ada rekening.</p> : null}
@@ -467,13 +514,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                     </p>
                   ) : null}
                   {c.canManageEmployees ? (
-                    <button
-                      type="button"
-                      className="pk-kbtn"
-                      disabled={busy}
-                      data-pk-add-bank={c.shortCode}
-                      onClick={() => patchCompany(c.id, (x) => ({ ...x, banks: [...x.banks, newBank(`n${++seq.current}`, x.emp.name || draft.user.name)] }))}
-                    >
+                    <button type="button" className="pk-kbtn" disabled={busy} data-pk-add-bank={c.shortCode} onClick={addBank}>
                       + Tambah rekening
                     </button>
                   ) : null}
@@ -490,10 +531,13 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
           Penugasan tim data karyawan per PT: project, pusat biaya, atau site. Penugasan yang tersimpan tidak dihapus — ubah peran atau isi tanggal selesai
           untuk mengakhirinya (wajib dengan alasan).
         </p>
-        {shownCompanies.length === 0 ? <p className="pk-empty">Pilih dulu peran di tab Akses &amp; Peran.</p> : null}
-        {shownCompanies.map((c) => {
+        {noCompanies}
+        {detail.companies.map((c) => {
           const d = draft.companies[String(c.id)]!
           const withEmp = hasEmployee(d.emp)
+          if (!activeIds.has(c.id) && !(c.canManageAssignments && c.canManageEmployees)) return null
+          // without an employee, "+ Tambah penugasan" creates it too — only for who may manage employees of the PT
+          const canAdd = c.canManageAssignments && (withEmp || c.canManageEmployees)
           const saved = showsSavedAssignments(c, d.emp)
           const rows = d.asg.filter((a) => a.id === undefined || saved)
           const locked = !c.canManageAssignments || busy
@@ -501,12 +545,10 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
           const noEmpHelp = `uo-asg-noemp-${c.id}`
           const setRow = (key: string, fn: (x: AsgDraft) => AsgDraft) => patchCompany(c.id, (x) => ({ ...x, asg: x.asg.map((y) => (y.key === key ? fn(y) : y)) }))
           return (
-            <fieldset key={c.id} className="pk-uo__group" data-pk-asg-company={c.shortCode}>
-              <legend>
-                <span className="pk-pt-chip">{c.shortCode}</span> {c.name}
-              </legend>
+            <fieldset key={c.id} className={`pk-uo__group${withEmp ? '' : ' pk-uo__group--compact'}`} data-pk-asg-company={c.shortCode}>
+              {ptLegend(c)}
               {!c.canManageAssignments ? <p className="pk-alert info">Penugasan PT ini hanya dapat diubah oleh Admin atau PM PT ini.</p> : null}
-              {rows.length === 0 ? <p className="pk-empty">Belum ada penugasan.</p> : null}
+              {rows.length === 0 ? <p className="pk-empty">{withEmp ? 'Belum ada penugasan.' : 'Belum ada data karyawan di PT ini.'}</p> : null}
               {rows.map((a) => {
                 const p = `${ak}.${a.key}`
                 const stored = a.id !== undefined ? c.assignments.find((x) => x.id === a.id) : undefined
@@ -603,17 +645,17 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                   <button
                     type="button"
                     className="pk-kbtn"
-                    disabled={busy || !withEmp}
+                    disabled={busy || !canAdd}
                     aria-describedby={withEmp ? undefined : noEmpHelp}
                     data-pk-add-asg={c.shortCode}
-                    onClick={() => patchCompany(c.id, (x) => ({ ...x, asg: [...x.asg, newAssignment(`n${++seq.current}`, localToday())] }))}
+                    onClick={() => (withEmp ? patchCompany(c.id, (x) => ({ ...x, asg: [...x.asg, newAssignment(`n${++seq.current}`, localToday())] })) : withEmployee(c, (x) => ({ ...x, asg: [...x.asg, newAssignment(`n${++seq.current}`, localToday())] })))}
                   >
                     + Tambah penugasan
                   </button>
                   {!withEmp ? (
                     <span id={noEmpHelp} className="help">
                       {' '}
-                      Pilih atau buat data karyawan PT ini dulu di tab Data Karyawan.
+                      {c.canManageEmployees ? 'Data karyawan PT ini dibuat sekaligus (lengkapi Kode di tab Data Karyawan).' : 'Data karyawan PT ini hanya dapat dibuat oleh Admin PT ini.'}
                     </span>
                   ) : null}
                 </p>

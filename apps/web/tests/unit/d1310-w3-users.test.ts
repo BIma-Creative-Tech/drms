@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { setRoles, viewerOf, type CellDraft } from '@/admin/components/access/role-matrix'
 import { multiLabels, multiSummary } from '@/admin/components/list/MultiSelect'
-import { activeCompanies, buildBody, draftFromDetail, errorTarget, mapErrors, newBank, TABS } from '@/admin/components/users/user-onboarding-form'
+import { activeCompanies, buildBody, draftFromDetail, ensureEmployee, errorTarget, mapErrors, newBank, TABS, withAutoStaff, withoutAutoStaff } from '@/admin/components/users/user-onboarding-form'
 import { moduleForPath, MODULES, resolveModules } from '@/admin/modules/registry'
 import { customEditOf } from '@/admin/pk-list/edit-view'
 import { withCompanyContext } from '@/access/roles'
@@ -266,6 +266,35 @@ describe('form: draft → body', () => {
     const e = draftFromDetail(detail)
     e.companies['1']!.emp = { ...e.companies['1']!.emp, mode: 'none' }
     expect(buildBody(detail, e, 'update').body.companies).toEqual([{ company: 1, roles: ['pk-staff'], employee: null }])
+  })
+
+  it('DRMS 16/10: an employee added in a PT without a role ticks Staff (create body valid), undone with the employee', () => {
+    const empty: OnboardingDetail = { ...detail, user: null, companies: detail.companies.map((c) => ({ ...c, membership: null, employee: null, bankAccounts: [] })) }
+    const d = draftFromDetail(empty)
+    d.user = { email: 'rina@example.test', name: ' Rina ', phone: '0811', active: true }
+    expect(activeCompanies(empty, d)).toEqual([])
+    const c2 = empty.companies[1]!
+    const withEmp = ensureEmployee(c2, d.companies['2']!, d.user)
+    expect(withEmp.emp).toMatchObject({ mode: 'new', id: null, code: '', name: 'Rina', phone: '0811' })
+    expect(withEmp).toMatchObject({ roles: ['pk-staff'], autoStaff: true })
+    d.companies['2'] = { ...withEmp, emp: { ...withEmp.emp, code: 'K-10' }, banks: [{ ...newBank('n1', 'Rina'), bank: 1, accountNo: '1234567' }] }
+    expect(activeCompanies(empty, d).map((c) => c.id)).toEqual([2])
+    expect(buildBody(empty, d, 'create').body.companies).toEqual([
+      {
+        company: 2,
+        roles: ['pk-staff'],
+        employee: { code: 'K-10', name: 'Rina', nickname: null, position: null, phone: '0811', attendanceType: 'onsite', active: true },
+        bankAccounts: [{ bank: 1, accountNo: '1234567', accountHolder: 'Rina', isDefault: false, verificationStatus: 'unverified', active: true }],
+      },
+    ])
+    // an existing employee is kept, a role chosen by the admin is never replaced, a membership is never touched
+    expect(ensureEmployee(c2, d.companies['2']!, d.user).emp.code).toBe('K-10')
+    expect(withAutoStaff(c2, { ...d.companies['2']!, roles: ['pk-pm'], autoStaff: false }).roles).toEqual(['pk-pm'])
+    expect(withAutoStaff(detail.companies[0]!, { ...d.companies['1']!, roles: [] }).roles).toEqual([])
+    // undo only while Staff is still the sole automatic role
+    expect(withoutAutoStaff(d.companies['2']!)).toMatchObject({ roles: [], autoStaff: false })
+    expect(withoutAutoStaff({ ...d.companies['2']!, roles: ['pk-staff', 'pk-pm'] }).roles).toEqual(['pk-staff', 'pk-pm'])
+    expect(withoutAutoStaff({ ...d.companies['2']!, autoStaff: false }).roles).toEqual(['pk-staff'])
   })
 
   it('identity locked (account also in a foreign PT): no user part even if the draft differs', () => {

@@ -3523,6 +3523,12 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
   }
 
+  // DRMS 16/10: a PT without employee data yet — one line with "+ Tambah …" instead of the full section
+  .pk-uo__group--compact {
+    padding-block: 10px;
+    background: transparent;
+  }
+
   .pk-uo__bank {
     display: grid;
     gap: 10px;

@@ -89,14 +89,19 @@ Pengguna → Akses PT satu per satu.
    - **Akses & Peran:** satu baris per PT yang Anda kelola → pilih peran dari **dropdown pilihan ganda** (Staff, PM,
      Finance, Direktur, Admin, Operator/Anggota; boleh lebih dari satu) → **Selesai**. Mengosongkan semua peran di
      satu PT = akses di PT itu dinonaktifkan (riwayat tetap).
-   - **Data Karyawan:** per PT yang punya peran → **Buat data karyawan baru** (Kode, Nama lengkap, Nama panggilan,
+   - **Data Karyawan, Rekening Karyawan, Penugasan Proyek** menampilkan **semua PT yang Anda kelola** — tidak perlu
+     memilih peran dulu. PT yang belum punya data karyawan tampil satu baris dengan **+ Tambah data karyawan** /
+     **+ Tambah rekening** / **+ Tambah penugasan**: data karyawan baru PT itu dibuat sekaligus (lengkapi **Kode**), dan
+     bila akun belum punya peran di PT itu, peran **Staff lapangan** otomatis dicentang (terlihat dan bisa diubah di
+     **Akses & Peran**; memilih **Tanpa data karyawan** lagi membatalkannya).
+   - **Data Karyawan:** per PT → **Buat data karyawan baru** (Kode, Nama lengkap, Nama panggilan,
      Jabatan, No. HP, Status), **Pilih karyawan yang sudah ada** (hanya karyawan PT itu yang belum terhubung ke akun
      lain), atau **Tanpa data karyawan**. Karyawan yang sudah terhubung bisa diubah langsung, atau **Lepas tautan**
      (data karyawannya tetap ada). Jadwal kerja, site penempatan dan foto wajah: tautan **Buka data karyawan
      lengkap ↗**.
-   - **Rekening Karyawan:** per PT yang punya data karyawan → **+ Tambah rekening** (Bank, Nomor rekening — hanya
+   - **Rekening Karyawan:** per PT → **+ Tambah rekening** (Bank, Nomor rekening — hanya
      angka, Atas nama, Status verifikasi, Rekening default, Status). Rekening tidak pernah dihapus — nonaktifkan.
-   - **Penugasan Proyek:** per PT yang punya data karyawan (juga karyawan baru di simpan yang sama) → **+ Tambah
+   - **Penugasan Proyek:** per PT (juga karyawan baru di simpan yang sama) → **+ Tambah
      penugasan**: **Jenis lokasi** (Project / Pusat biaya / Site) lalu pilih satu lokasi aktif PT itu, **Peran** (PM /
      Staff / Mandor), **Mulai**, **Selesai** (boleh kosong). Penugasan yang tersimpan: ubah **Peran** atau isi
      **Selesai** untuk mengakhirinya (wajib alasan); tidak dapat dihapus. Detail lain: tautan **Buka ↗**.
