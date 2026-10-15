@@ -9,6 +9,7 @@ import { DateInput } from '../DateInput'
 import { KAS_STYLE } from '../kas/style'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 import { RupiahInput, useRupiah } from '../RupiahInput'
+import { WrapSelect } from '../WrapSelect'
 
 /**
  * ADR 0029 §3.4 "Perintahkan pinjaman antar-PT" (Owner): PT peminjam (pre-set from the request's fund panel), the
@@ -118,7 +119,7 @@ export function IcLoanInstructForm({ borrowers, initialBorrower, initialRequestI
         <label htmlFor={`${uid}-b`}>
           PT peminjam<span className="req" aria-hidden>*</span>
         </label>
-        <select
+        <WrapSelect
           id={`${uid}-b`}
           value={borrower}
           onChange={(e) => {
@@ -134,7 +135,7 @@ export function IcLoanInstructForm({ borrowers, initialBorrower, initialRequestI
               {c.shortCode} — {c.name}
             </option>
           ))}
-        </select>
+        </WrapSelect>
       </div>
       {loadError ? (
         <p className="pk-kerr" role="alert">

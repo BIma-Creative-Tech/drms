@@ -161,7 +161,7 @@ html[data-theme='dark'] .pk-f3 {
 .pk-f3 .pk-t tbody tr:hover td { background: color-mix(in oklab, var(--pk-primary) 4%, transparent); }
 .pk-f3 .pk-t .n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pk-f3 .pk-t td a { color: var(--pk-primary); font-weight: 600; text-decoration: none; } .pk-f3 .pk-t td a:hover { text-decoration: underline; }
-.pk-f3 .pk-t .sub { display: block; color: var(--pk-muted-fg); font-size: 12px; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-f3 .pk-t .sub { display: block; color: var(--pk-muted-fg); font-size: 12px; max-width: 32ch; overflow-wrap: break-word; } /* DRMS 16/10: wraps inside 32ch, no ellipsis */
 .pk-f3 .pk-t .dir { display: inline-block; width: 18px; font-weight: 700; }
 .pk-f3 .pk-t .dir.in { color: var(--pk-primary); background: none; } .pk-f3 .pk-t .dir.out { color: var(--pk-tone-warn-text); background: none; }
 .pk-f3 .pk-t tr.void td { color: var(--pk-muted-fg); } .pk-f3 .pk-t tr.void .amt { text-decoration: line-through; }
