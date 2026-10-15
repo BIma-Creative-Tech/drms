@@ -76,6 +76,13 @@ Semua dokumen: tidak bisa dihapus; pelapor mengedit ≤ 24 jam; sesudahnya hanya
 alasan** (tercatat di audit log, tanda "Dikoreksi"); tanggal laporan tidak di masa depan dan paling lama 14 hari ke
 belakang; data offline ditandai `OFFLINE`, tanggal mundur `BACKDATED`.
 
+> **[Diubah 2026-10-16, keputusan owner — ADR 0030]** "Tidak bisa dihapus" berarti tidak ada hapus **permanen**. Data
+> yang **belum dipakai** — baris master, project, draft pengajuan yang belum pernah diajukan — boleh **dihapus (soft
+> delete)** lewat aksi "Hapus" di baris tabel: ditandai `isDeleted` + siapa / kapan / alasan (wajib), tercatat di audit
+> log, disembunyikan dari daftar, pemilih, laporan dan aplikasi; Admin dapat menampilkan dan memulihkannya. Data yang
+> sudah dipakai tidak dihapus: master dinonaktifkan, pengajuan dibatalkan, project dibatalkan ("Batalkan proyek",
+> status Dibatalkan — dokumen yang masih berjalan ikut dibatalkan; ditolak bila dana sudah ditransfer / LPJ berjalan).
+
 ## 4. Matriks akses [Diubah v1.3 atas §4 v1.1 / §3 v1.2]
 
 **Baris baru** (per PT; "ditugaskan" = penugasan tim aktif; *team* = project tim PM):
