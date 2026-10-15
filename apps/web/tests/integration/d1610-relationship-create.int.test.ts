@@ -65,7 +65,8 @@ describe('"+ Vendor baru" on the vendor bank account / payment forms', () => {
     const bank = (await p.create({ collection: 'banks', data: { code: `RC${tag}`, name: `Bank RC ${tag}` }, depth: 0, overrideAccess: true /* SYSTEM-WRITE: fixture */ })).id as number
     const acc = await api('POST', '/api/vendor-bank-accounts', financeA, { vendor: vendorId, bank, accountNo: `7${String(Date.now() % 1e9).padStart(9, '0')}`, accountHolder: `Vendor Drawer ${tag}` })
     expect(acc.status, JSON.stringify(acc.body)).toBe(201)
-    expect((acc.body as Body).doc.company).toBe(A)
+    const company = (acc.body as Body).doc.company // populated by the REST default depth
+    expect(typeof company === 'object' ? company.id : company).toBe(A)
   })
 })
 
