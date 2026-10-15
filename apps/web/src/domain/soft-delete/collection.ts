@@ -1,6 +1,7 @@
 import { APIError, type CollectionBeforeChangeHook, type CollectionBeforeOperationHook, type CollectionConfig, type Field, type PayloadRequest, type Where } from 'payload'
 
 import { hasRoleAny, isGroupAdmin } from '@/access/roles'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 import { DELETE_REASON, DELETED_AT, DELETED_BY, INCLUDE_DELETED, IS_DELETED, softDeleteEntry } from './registry'
 import { NOT_DELETED, readWhere } from './where'
@@ -43,7 +44,7 @@ export function softDeleteFields(): Field[] {
       admin: { ...ro, description: 'Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.' },
     },
     { name: DELETED_AT, type: 'date', label: 'Dihapus pada', access: { create: never, update: never }, admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
-    { name: DELETED_BY, type: 'relationship', relationTo: 'users', label: 'Dihapus oleh', access: { create: never, update: never }, admin: ro },
+    { name: DELETED_BY, type: 'relationship', relationTo: 'users', label: 'Dihapus oleh', access: { create: never, update: never }, admin: { ...ro, components: USER_NAME_VIEW } },
     { name: DELETE_REASON, type: 'text', label: 'Alasan hapus', maxLength: 1000, access: { create: never, update: never }, admin: ro },
   ]
 }

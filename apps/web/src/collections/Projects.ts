@@ -11,7 +11,7 @@ import { PROJECT_KIND_LABELS, PROJECT_KINDS } from '@/domain/field/rules'
 import { progressWriteGuard } from '@/domain/progress/guards'
 import { codeField, odooRefField, percentField, rupiahField, uuidField } from '@/fields/common'
 import { companyField, companyHook, pickerSameCompany, siteOptions } from '@/fields/company'
-import { userPicker } from '@/fields/users'
+import { USER_NAME_VIEW, userPicker } from '@/fields/users'
 
 export const PROJECT_STATUSES = [
   { label: 'Perencanaan', value: 'perencanaan' },
@@ -198,7 +198,7 @@ export const Projects: CollectionConfig = withAudit(
       // D1610 (ADR 0030): "Batalkan proyek" — reason / when / who (system fields, written by domain/projects/cancel.ts)
       { name: 'cancelReason', type: 'text', label: 'Alasan pembatalan', maxLength: 1000, access: { create: () => false, update: () => false }, admin: { readOnly: true, condition: (d) => d?.status === 'dibatalkan' } },
       { name: 'cancelledAt', type: 'date', label: 'Dibatalkan pada', access: { create: () => false, update: () => false }, admin: { readOnly: true, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' }, condition: (d) => d?.status === 'dibatalkan' } },
-      { name: 'cancelledBy', type: 'relationship', relationTo: 'users', label: 'Dibatalkan oleh', access: { create: () => false, update: () => false }, admin: { readOnly: true, position: 'sidebar', condition: (d) => d?.status === 'dibatalkan' } },
+      { name: 'cancelledBy', type: 'relationship', relationTo: 'users', label: 'Dibatalkan oleh', access: { create: () => false, update: () => false }, admin: { readOnly: true, position: 'sidebar', condition: (d) => d?.status === 'dibatalkan', components: USER_NAME_VIEW } },
       {
         ...percentField('progressPct', 'Progress fisik (%)'),
         defaultValue: 0,
