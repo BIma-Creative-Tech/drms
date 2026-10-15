@@ -159,7 +159,7 @@ export function LoanForm({ borrowers, lenders, today, initialBorrower, edit }: {
           </legend>
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', paddingTop: 4 }}>
             {(['dana', 'barang'] as const).map((k) => (
-              <label key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 400 }}>
+              <label key={k} className="pk-check">
                 <input
                   type="radio"
                   name={`${uid}-k`}

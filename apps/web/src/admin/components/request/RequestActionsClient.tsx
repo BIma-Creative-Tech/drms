@@ -11,7 +11,8 @@ import { ActionDialog } from '../ActionDialog'
 import type { RequestActionsProps } from './action-bar'
 import { setRequestMode, useRequestMode } from './mode'
 
-const BTN = 'btn btn--style-secondary btn--size-small'
+// .pk-pbtn: the shared button box (custom.scss, DRMS 15/10 #5) — every control of this bar is 38 px, 13 px/600
+const BTN = 'btn btn--style-secondary btn--size-small pk-pbtn'
 const idemKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined)
 
 /**
@@ -86,7 +87,7 @@ export function RequestActionsClient({ id, decision, flowLinks, pdfs, canDuplica
           {decision.step && decision.blocked ? (
             // ADR 0029 §2: short funds — "Setujui" disabled with the reason; "Tolak" stays
             <>
-              <button type="button" className="btn btn--style-primary btn--size-small" disabled aria-describedby={`pk-fund-blocked-${id}`} data-pk-action={`${decision.step}-blocked`}>
+              <button type="button" className="btn btn--style-primary btn--size-small btn--disabled pk-pbtn" disabled aria-describedby={`pk-fund-blocked-${id}`} data-pk-action={`${decision.step}-blocked`}>
                 {decision.label}
               </button>
               <span id={`pk-fund-blocked-${id}`} className="pk-er-actions__turn" role="note" data-pk-fund-blocked-reason>
@@ -125,7 +126,7 @@ export function RequestActionsClient({ id, decision, flowLinks, pdfs, canDuplica
   )
 }
 
-/** "Cetak ▾" with the PDF variants (closes on an outside click / Escape). */
+/** "Cetak" + chevron with the PDF variants (closes on an outside click / Escape). */
 function PrintMenu({ pdfs }: { pdfs: Array<{ href: string; label: string }> }) {
   const ref = useRef<HTMLDetailsElement>(null)
   useEffect(() => {
@@ -143,7 +144,10 @@ function PrintMenu({ pdfs }: { pdfs: Array<{ href: string; label: string }> }) {
   }, [])
   return (
     <details ref={ref} className="pk-er-print" data-pk-action="print-menu">
-      <summary className={BTN}>Cetak ▾</summary>
+      <summary className={BTN}>
+        <span>Cetak</span>
+        <span className="pk-caret" aria-hidden="true" />
+      </summary>
       <ul className="pk-er-print__menu" role="list">
         {pdfs.map((p) => (
           <li key={p.href}>

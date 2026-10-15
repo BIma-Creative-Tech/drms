@@ -83,6 +83,12 @@ export async function PkListView(props: ListViewServerProps) {
   const byAccessor = new Map(columnState.map((c) => [c.accessor, c]))
   const shown = data.columns.map((a) => byAccessor.get(a)).filter((c): c is NonNullable<typeof c> => !!c && c.active && !(custom && c.accessor === ROW_ACTIONS_FIELD))
   const sortable = new Set(cfg.columns.filter((c) => c.sortable).map((c) => c.name))
+  // DRMS 15/10 #6: columns hug their content; the empty filler cell before "Aksi" (or last) takes the rest of the row
+  const actionsAt = shown.findIndex((c) => c.accessor === ROW_ACTIONS_FIELD)
+  const fillAt = actionsAt < 0 ? shown.length : actionsAt
+  const fill = () => <td key="pk-fill" className="pk-plist__fill" aria-hidden="true" />
+  // long texts: one line with an ellipsis; textareas wrap (both within 360 px, custom.scss .pk-plist__cell)
+  const wraps = (field: unknown) => ['textarea', 'richText'].includes((field as { type?: string } | undefined)?.type ?? '')
   const colLabel = (name: string, field?: unknown) =>
     name === 'id' ? 'ID' : name === ROW_ACTIONS_FIELD ? 'Aksi' : label((field as { label?: unknown } | undefined)?.label ?? cfg.columns.find((c) => c.name === name)?.label, i18n, name)
 
@@ -164,11 +170,12 @@ export async function PkListView(props: ListViewServerProps) {
                 <table>
                   <thead>
                     <tr>
-                      {shown.map((c) => {
+                      {shown.flatMap((c, ci) => {
                         const name = c.accessor
                         const text = colLabel(name, c.field)
                         const dir = query.sort === name ? 'ascending' : query.sort === `-${name}` ? 'descending' : undefined
-                        return (
+                        return [
+                          ...(ci === fillAt ? [fill()] : []),
                           <th key={name} scope="col" aria-sort={dir} className={`pk-plist__th cell-${name}`}>
                             {sortable.has(name) ? (
                               <Link href={listHref(base, searchParams, { [SORT_PARAM]: nextSort(query.sort, name) })} prefetch={false} className="pk-plist__sort" data-pk-sort={name}>
@@ -180,19 +187,22 @@ export async function PkListView(props: ListViewServerProps) {
                             ) : (
                               text
                             )}
-                          </th>
-                        )
+                          </th>,
+                        ]
                       })}
+                      {fillAt === shown.length ? fill() : null}
                     </tr>
                   </thead>
                   <tbody>
                     {docs.map((doc, i) => (
                       <ClickableRow key={String(doc.id)} href={rowHref(doc.id)} data-id={String(doc.id)} className={`row-${i + 1}`}>
-                        {shown.map((c) => (
+                        {shown.flatMap((c, ci) => [
+                          ...(ci === fillAt ? [fill()] : []),
                           <td key={c.accessor} className={`cell-${c.accessor}`}>
-                            {c.renderedCells[i]}
-                          </td>
-                        ))}
+                            {c.accessor === ROW_ACTIONS_FIELD ? c.renderedCells[i] : <div className={wraps(c.field) ? 'pk-plist__cell pk-plist__cell--wrap' : 'pk-plist__cell'}>{c.renderedCells[i]}</div>}
+                          </td>,
+                        ])}
+                        {fillAt === shown.length ? fill() : null}
                       </ClickableRow>
                     ))}
                   </tbody>

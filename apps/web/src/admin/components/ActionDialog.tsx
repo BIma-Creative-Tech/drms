@@ -86,7 +86,7 @@ export function ActionDialog({ label, title, description, confirmLabel, field, o
       <style href="pk-kas-style" precedence="default">
         {KAS_STYLE}
       </style>
-      <button type="button" className={buttonClassName ?? 'btn btn--style-secondary btn--size-small'} style={buttonStyle ?? { margin: 0 }} onClick={open} data-pk-action={testId}>
+      <button type="button" className={buttonClassName ?? 'btn btn--style-secondary btn--size-small pk-pbtn'} style={buttonStyle ?? { margin: 0 }} onClick={open} data-pk-action={testId}>
         {label}
       </button>
       <dialog ref={ref} className="pk-dlg" aria-labelledby={`${uid}-t`} aria-describedby={description ? `${uid}-d` : undefined} onCancel={(e) => busy && e.preventDefault()} onKeyDown={onKeyDown} data-pk-dialog={testId}>

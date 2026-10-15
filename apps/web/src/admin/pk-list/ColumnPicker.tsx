@@ -86,7 +86,7 @@ export function ColumnPicker({ slug, columns, visible, defaults, all }: Props) {
       }}
     >
       <button ref={btnRef} type="button" className="pk-ltb__btn pk-ms__colbtn" aria-expanded={open} aria-controls={panelId} aria-haspopup="true" onClick={() => (open ? close(false) : setOpen(true))} data-pk-columns={slug}>
-        Kolom <span aria-hidden="true">▾</span>
+        Kolom <span className="pk-caret" aria-hidden="true" />
       </button>
       {open ? (
         <div id={panelId} className="pk-ms__panel pk-ms__panel--end" role="group" aria-label="Kolom yang ditampilkan">

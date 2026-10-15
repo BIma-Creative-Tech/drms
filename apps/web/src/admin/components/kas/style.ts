@@ -6,9 +6,9 @@
  * focus ring on every control, reduced motion respected.
  */
 export const KAS_STYLE = `
-.pk-kbtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: var(--style-radius-m); border: 1px solid color-mix(in oklab, var(--pk-muted-fg) 60%, var(--pk-input)); background: var(--pk-card); color: var(--pk-fg); font: inherit; font-size: 13px; font-weight: 600; line-height: 1.2; cursor: pointer; text-decoration: none; white-space: nowrap; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+.pk-kbtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; min-height: 38px; padding: 0 14px; border-radius: var(--style-radius-m); border: 1px solid var(--pk-btn-border); background: var(--pk-card); color: var(--pk-fg); font: inherit; font-size: 13px; font-weight: 600; line-height: 1.2; cursor: pointer; text-decoration: none; white-space: nowrap; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
 .pk-kbtn:hover { border-color: var(--pk-primary); color: var(--pk-primary); }
-.pk-kbtn:focus-visible, .pk-fld :is(input, select, textarea):focus-visible, .pk-seg label:has(input:focus-visible) { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
+.pk-kbtn:focus-visible, .pk-fld :is(input:not([type='checkbox'], [type='radio']), select, textarea):focus-visible, .pk-seg label:has(input:focus-visible) { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
 .pk-kbtn[disabled] { opacity: .6; cursor: progress; }
 .pk-kbtn.primary { background: var(--pk-primary); border-color: var(--pk-primary); color: var(--pk-on-primary); }
 .pk-kbtn.primary:hover { background: var(--pk-primary-hover); border-color: var(--pk-primary-hover); color: var(--pk-on-primary); }
@@ -16,8 +16,8 @@ export const KAS_STYLE = `
 .pk-kbtn.danger:hover { background: color-mix(in oklab, var(--pk-tone-bad-text) 10%, transparent); color: var(--pk-tone-bad-text); border-color: var(--pk-tone-bad-text); }
 .pk-kbtn.danger-solid { background: var(--pk-tone-bad); border-color: var(--pk-tone-bad); color: #FFFFFF; }
 .pk-kbtn.danger-solid:hover { filter: brightness(1.08); color: #FFFFFF; }
-.pk-kbtn.sm { min-height: 32px; padding: 0 10px; font-size: 12px; }
-@media (pointer: coarse) { .pk-kbtn, .pk-kbtn.sm { min-height: 44px; } .pk-fld :is(input, select) { min-height: 44px; } }
+.pk-kbtn.sm { min-height: 32px; padding: 0 10px; }
+@media (pointer: coarse) { .pk-kbtn, .pk-kbtn.sm { min-height: 44px; } .pk-fld :is(input:not([type='checkbox'], [type='radio']), select) { min-height: 44px; } }
 .pk-kact { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .pk-kform { display: grid; gap: 16px; }
 .pk-kgrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
@@ -25,7 +25,8 @@ export const KAS_STYLE = `
 .pk-fld { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .pk-fld > label, .pk-fld > .lbl { font-size: 13px; font-weight: 600; color: var(--pk-fg); }
 .pk-fld .req { color: var(--pk-tone-bad-text); margin-left: 2px; }
-.pk-fld :is(input, select, textarea) { width: 100%; min-height: 40px; padding: 8px 10px; font: inherit; font-size: 14px; color: var(--theme-text); background: var(--theme-input-bg, var(--theme-elevation-0)); border: 1px solid var(--pk-input); border-radius: var(--style-radius-s); box-sizing: border-box; }
+/* DRMS 15/10 #2: checkboxes / radios inside a field keep their native 16 px box (custom.scss), never a 40 px input */
+.pk-fld :is(input:not([type='checkbox'], [type='radio']), select, textarea) { width: 100%; min-height: 40px; padding: 8px 10px; font: inherit; font-size: 14px; color: var(--theme-text); background: var(--theme-input-bg, var(--theme-elevation-0)); border: 1px solid var(--pk-input); border-radius: var(--style-radius-s); box-sizing: border-box; }
 .pk-fld textarea { min-height: 88px; resize: vertical; line-height: 1.5; }
 .pk-fld input[type='file'] { padding: 7px 8px; }
 .pk-fld [aria-invalid='true'] { border-color: var(--pk-tone-bad-text); }

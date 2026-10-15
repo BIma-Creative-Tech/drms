@@ -95,7 +95,7 @@ export function FundPanel({ d }: { d: Pick<Detail, 'id' | 'fundCheck' | 'allowed
       ) : null}
       {instruct ? (
         <p style={{ margin: '8px 0 0' }}>
-          <a className="btn btn--style-primary btn--size-small" href={href} data-pk-action="instruct-loan">
+          <a className="btn btn--style-primary btn--size-small pk-pbtn" href={href} data-pk-action="instruct-loan">
             Perintahkan pinjaman antar-PT
           </a>
         </p>
