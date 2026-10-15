@@ -6,6 +6,7 @@ import { resolveScope } from '@/access/scope'
 import { ProgressError } from './reports'
 import { CTX_STAGE_EDITOR, lockProject, projectStages, recalcProjectProgress, type StageRow } from './recalc'
 import { isComplete, round2, stageSetErrors, weightSum, type StageInput } from './rules'
+import { closedProjectMessage, isClosedProjectStatus } from '@/domain/projects/status'
 
 /**
  * Stage editor (US-29, G11): PUT /api/v1/projects/{id}/stages saves the WHOLE stage set of a project
@@ -62,7 +63,7 @@ export async function saveStageSet(req: PayloadRequest, projectId: number, body:
   if (!owner && !(hasRole(req, 'pk-pm', company) && (await resolveScope(req, company ?? null)).teamProjects.includes(projectId))) {
     fail(403, 'FORBIDDEN', 'Tahapan hanya dapat diubah oleh Direktur/Admin atau PM project ini.')
   }
-  if (project.status === 'arsip') fail(409, 'STATE_CONFLICT', 'Project sudah diarsipkan.')
+  if (isClosedProjectStatus(project.status)) fail(409, 'STATE_CONFLICT', closedProjectMessage(project.status))
   await lockProject(req, projectId)
   const existing = await projectStages(req, projectId)
 

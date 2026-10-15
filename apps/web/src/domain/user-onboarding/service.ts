@@ -79,7 +79,7 @@ export type OnboardingDetail = {
 }
 
 /** Project statuses that take no new assignment (the picker and the save agree). */
-const CLOSED_PROJECT = ['selesai', 'arsip'] as const
+const CLOSED_PROJECT = ['selesai', 'arsip', 'dibatalkan'] as const
 
 /** The three locations of a team assignment (exactly one per row — TeamAssignments guard + DB CHECK). */
 const LOCATIONS = [

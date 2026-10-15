@@ -15,6 +15,7 @@ import { effectiveRadiusM } from './calendar'
 import { geofenceRequired, NOT_ELIGIBLE_OTHER_PT, OUTSIDE_AREA_LABEL, pickContaining } from './area'
 import { eligibleLocations, employeeAttendance, referenceSite, type EmployeeAttendance } from './eligibility'
 import { companyOf, settings, userOfEmployee as userOfEmployeeLink } from '@/domain/companies'
+import { closedProjectMessage, isClosedProjectStatus } from '@/domain/projects/status'
 
 /**
  * E6 — the ONE write path of `attendances` (sync items attendance.check_in / check_out / on_behalf,
@@ -142,7 +143,7 @@ async function loadLocationDoc(req: PayloadRequest, loc: Location, field: string
   if (!doc || (mapped !== null && !mapped.includes(relId((doc as { company?: unknown }).company) ?? -1))) {
     return reject('NOT_FOUND', loc.type === 'project' ? 'Project tidak ditemukan.' : loc.type === 'site' ? 'Site tidak ditemukan.' : 'Pusat biaya tidak ditemukan.', field)
   }
-  if (loc.type === 'project' && doc.status === 'arsip') reject('VALIDATION', 'Project sudah diarsipkan.', field)
+  if (loc.type === 'project' && isClosedProjectStatus(doc.status)) reject('VALIDATION', closedProjectMessage(doc.status), field)
   if (loc.type === 'cost_center' && doc.active === false) reject('VALIDATION', 'Pusat biaya sudah dinonaktifkan.', field)
   if (loc.type === 'site' && doc.active === false) reject('VALIDATION', 'Site sudah dinonaktifkan.', field)
   return doc

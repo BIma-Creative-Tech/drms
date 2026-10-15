@@ -8,6 +8,7 @@ import { BUDGET_COMMITTED, type RequestStatus } from '@/domain/expense/types'
 import { getRequestTx } from '@/lib/tx'
 
 import { rapRequiredFor } from './rules'
+import { NOT_DELETED } from '@/domain/soft-delete/where'
 
 /**
  * D4 (DRMS 10/10, owner 2026-10-11): RAP cost realisation. Every expense line of a project request is charged to
@@ -243,7 +244,8 @@ export async function rapMonitoring(req: PayloadRequest, opts: { limit?: number 
   try {
     const res = await req.payload.find({
       collection: 'projects',
-      where: { and: [{ id: { in: ids } }, { status: { not_equals: 'arsip' } }] },
+      // D1610: an explicit id list skips the central read rule → the soft-delete condition is named here
+      where: { and: [{ id: { in: ids } }, { status: { not_in: ['arsip', 'dibatalkan'] } }, NOT_DELETED] },
       depth: 0,
       limit: 500,
       select: { code: true, name: true, company: true, status: true },
@@ -292,7 +294,7 @@ export async function rapMissingProjects(req: PayloadRequest, opts: { teamOnly?:
         // no `budget` condition here: RAB is a money field (moneyRead) and a caller who is Staff in one selected PT may
         // not query it at all ("path cannot be queried") — `rapRequiredFor` below filters on the budget the caller can
         // read (hidden budget = none → only konstruksi projects need a RAP there)
-        and: [{ status: { not_in: ['arsip', 'selesai'] } }, ...(team ? [{ id: { in: team } }] : [])],
+        and: [{ status: { not_in: ['arsip', 'selesai', 'dibatalkan'] } }, NOT_DELETED, ...(team ? [{ id: { in: team } }] : [])],
       },
       depth: 0,
       limit: 2000, // every open project (the RAB filter runs below)

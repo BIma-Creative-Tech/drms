@@ -92,7 +92,7 @@ export async function FieldContracts(props: AdminViewServerProps) {
       cell: (r) => (
         <>
           {d.pt.multi ? <PtChip pt={d.pt.ref(r.p.companyId)} /> : null} <b>{r.p.code}</b> {r.p.name}
-          <span className="sub">{r.p.status === 'arsip' ? 'arsip' : `${r.units} unit aktif hari ini`}</span>
+          <span className="sub">{r.p.status === 'arsip' || r.p.status === 'dibatalkan' ? r.p.status : `${r.units} unit aktif hari ini`}</span>
         </>
       ),
     },
@@ -204,7 +204,7 @@ export async function FieldContractDetail(props: AdminViewServerProps) {
   }
   const { project, today, month, contracts } = d
   const m = buildTimesheetMatrix({ month, today, contracts, timesheets: d.ts })
-  const creator = mayCreateIn(req, project.companyId) && project.status !== 'arsip'
+  const creator = mayCreateIn(req, project.companyId) && project.status !== 'arsip' && project.status !== 'dibatalkan'
   const q = (t: Tab, extra: Record<string, string> = {}) => `?${new URLSearchParams({ tab: t, ...(t === 'timesheet' || t === 'rekap' ? { bulan: month } : {}), ...extra }).toString()}`
   const activeNow = contracts.filter((c) => c.active && c.startDate <= today && (c.endDate === null || c.endDate >= today))
   const tabs = [
@@ -216,7 +216,7 @@ export async function FieldContractDetail(props: AdminViewServerProps) {
   const exportQ = new URLSearchParams({ bulan: month, project: String(project.id) })
   return (
     <FieldFrame props={props} name="kontrak-detail">
-      <DashHead title={`${project.code} ${project.name}`} note={<>Kontrak unit · {activeNow.length} unit aktif hari ini{project.status === 'arsip' ? ' · diarsipkan' : ''}</>}>
+      <DashHead title={`${project.code} ${project.name}`} note={<>Kontrak unit · {activeNow.length} unit aktif hari ini{project.status === 'arsip' ? ' · diarsipkan' : project.status === 'dibatalkan' ? ' · dibatalkan' : ''}</>}>
         <div className="pk-kact">
           {back}
           {creator ? (

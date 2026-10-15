@@ -385,7 +385,7 @@ export async function projectBudgets(req: PayloadRequest, scope: ReportScope, op
         LEFT JOIN LATERAL (SELECT ${DISBURSED} AS d, ${REFUND} AS rf, (${REALIZED}) AS rl) m ON er.id IS NOT NULL
         WHERE ${projectScopeSql(scope)}
           ${opts.projectId ? sql`AND p.id = ${opts.projectId}` : sql``}
-          ${opts.includeArchived ? sql`` : sql`AND p.status <> 'arsip'`}
+          ${opts.includeArchived ? sql`` : sql`AND p.status::text NOT IN ('arsip', 'dibatalkan')`}
         GROUP BY p.id ORDER BY p.code, p.id`,
   )
   return r.map((x) => {
@@ -975,7 +975,7 @@ export async function masterGaps(req: PayloadRequest, companyIds: readonly numbe
       companyIds.length
         ? rows(req, sql`SELECT count(*)::int AS n FROM users u WHERE coalesce(u.active, true) AND NOT EXISTS (SELECT 1 FROM company_memberships m WHERE m.user_id = u.id AND coalesce(m.active, true))`)
         : Promise.resolve([{ n: 0 }]),
-    () => rows(req, sql`SELECT p.company_id, count(*)::int AS n FROM projects p WHERE p.pm_id IS NULL AND p.status <> 'arsip' AND ${companyScopeSql(sql`p.company_id`, companyIds)} GROUP BY p.company_id`),
+    () => rows(req, sql`SELECT p.company_id, count(*)::int AS n FROM projects p WHERE p.pm_id IS NULL AND p.status::text NOT IN ('arsip', 'dibatalkan') AND p.is_deleted IS NOT TRUE AND ${companyScopeSql(sql`p.company_id`, companyIds)} GROUP BY p.company_id`),
     () => rows(req, sql`SELECT cc.company_id, count(*)::int AS n FROM cost_centers cc WHERE cc.manager_id IS NULL AND coalesce(cc.active, true) AND ${companyScopeSql(sql`cc.company_id`, companyIds)} GROUP BY cc.company_id`),
   )
   const sum = (list: Array<Record<string, unknown>>) => list.reduce((a, x) => a + num(x.n), 0)

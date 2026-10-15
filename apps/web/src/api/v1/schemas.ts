@@ -219,7 +219,7 @@ export const MastersQuery = z
 
 const MasterItem = z
   .record(z.string(), z.unknown())
-  .meta({ id: 'MasterItem', description: 'Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur — or, ADR 0026, Owner — in that PT; not offered as requester to others). ADR 0028: `intercompany-payees` items = the receiving PTs a request of PT `company` may pay (id = the RECEIVING PT id — unique per (company, id) —, payeeCompanyId, shortCode, name, bankName, accountNoMasked, accountHolder, active); only for Finance / PM / Direktur of `company`.' })
+  .meta({ id: 'MasterItem', description: 'Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur — or, ADR 0026, Owner — in that PT; not offered as requester to others). ADR 0028: `intercompany-payees` items = the receiving PTs a request of PT `company` may pay (id = the RECEIVING PT id — unique per (company, id) —, payeeCompanyId, shortCode, name, bankName, accountNoMasked, accountHolder, active); only for Finance / PM / Direktur of `company`. D1610 (ADR 0030): soft-deleted rows are never in a full read; a delta read (`since`) lists rows soft-deleted since then with `deleted: true, active: false` (drop them); a cancelled project (`status: dibatalkan`) has `active: false`.' })
 
 export const Masters = z
   .object({

@@ -2217,6 +2217,43 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
   }
 
+  // D1610 (ADR 0030): "Hapus" / "Batalkan" read as destructive (outline in the bad tone); "Pulihkan" / "Nonaktifkan" neutral.
+  button.pk-row-act {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .pk-row-act:is([data-kind='hapus'], [data-kind='batalkan']) {
+    border-color: color-mix(in oklab, var(--pk-tone-bad-text) 45%, var(--pk-input));
+    color: var(--pk-tone-bad-text);
+
+    &:hover {
+      border-color: var(--pk-tone-bad-text);
+      background: color-mix(in oklab, var(--pk-tone-bad-text) 10%, var(--pk-card));
+      color: var(--pk-tone-bad-text);
+    }
+  }
+
+  .pk-row-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--pk-tone-bad-text) 12%, var(--pk-card));
+    color: var(--pk-tone-bad-text);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  // a soft-deleted row (Admin filter "Tampilkan yang dihapus"): muted and struck through, the actions stay readable
+  tr.pk-plist__row--deleted td:not(.cell-rowActions) {
+    color: var(--pk-muted-fg);
+    text-decoration: line-through;
+  }
+
   @media (pointer: coarse) {
     .pk-row-act {
       min-height: 44px;

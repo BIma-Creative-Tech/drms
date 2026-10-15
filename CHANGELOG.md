@@ -77,6 +77,36 @@ first, primary contact row. The previous image keeps working (it never reads the
   15 s safety timeout at the latest). Navigations stopped by Payload's "leave without saving?" guard no longer count.
   ADR 0014 § Amendment 2026-10-16.
 
+### Added
+- **D1610 (owner 2026-10-16) — "Hapus" per baris (soft delete) dan "Batalkan proyek"**
+  ([ADR 0030](docs/proyekkas/adr/0030-soft-delete-row-action-and-project-cancel.md), amends requirements v1.3 §3).
+  - Row action **Hapus** on 18 master lists (bank, satuan, klien, vendor + rekening vendor, karyawan + rekening
+    karyawan, site, pusat biaya, kategori biaya, tingkat urgensi, jenis sumber daya, kendaraan, sumber kas masuk, akun
+    kas, jadwal kerja, template tahapan, template RAP), on **Project** and on **Pengajuan**: allowed only while nothing
+    references the row (generic FK check from `pg_catalog`; a request only as a Draft never submitted). Soft delete =
+    `isDeleted` + `deletedAt` / `deletedBy` / `deleteReason` (reason required) + audit `soft_delete`; hard delete stays
+    denied. Used rows: master → **Nonaktifkan** (dialog shows where it is used), request → the existing **Batalkan**,
+    project → **Batalkan proyek**.
+  - Deleted rows are hidden from every list, relationship picker, REST / `/api/v1` list, APK masters, dashboard and
+    report (one central read rule + the report scope helpers); old documents keep showing the deleted row's name.
+    Admin filter **"Data dihapus" → Tampilkan yang dihapus** and **Pulihkan** (audited `restore`). A deleted row is
+    read-only until restored.
+  - **Batalkan proyek** (Direktur / Admin): new project status **Dibatalkan** (reason required, terminal, closed like
+    Arsip). Dry run first (`GET /api/v1/projects/{id}/cancel-plan`); then, in ONE transaction, every in-flight request
+    (draft / waiting / approved before transfer), pending addendum RAB and project loan (no repayment yet) is cancelled
+    with "Proyek dibatalkan: <alasan>" and the normal notifications. Refused (409 + list) while a request is already
+    transferred / in LPJ or a loan has a repayment — settle those first.
+  - API: `GET /api/v1/records/{collection}/{id}/delete-check`, `POST …/delete`, `POST …/restore`,
+    `GET /api/v1/projects/{id}/cancel-plan`, `POST /api/v1/projects/{id}/cancel` (additive). `GET /api/v1/masters`:
+    deleted rows never in a full read, tombstones (`deleted: true`) on a `since` delta, cancelled projects
+    `active: false`. **No APK release needed** (follow-ups listed in ADR 0030).
+
+**Database migrations** (additive, one batch in this order): `20261016_200000_d1610_soft_delete_enums`
+(`enum_projects_status` += `dibatalkan`, `enum_audit_logs_action` += `soft_delete`, `restore`) →
+`20261016_200100_d1610_soft_delete` (soft-delete columns, FKs, indexes and CHECKs on 20 tables; project cancel columns;
+Payload snapshot `.json`). Nothing is deleted by the migration. Rollback before the first project cancel:
+`payload migrate:down` (newest first); after one → restore the dump.
+
 ## [0.12.0] - 2026-10-15
 
 **DRMS 15/10 owner feedback: UI fixes, Pengguna with Penugasan in one form, and approval flow PM project → Direktur →
