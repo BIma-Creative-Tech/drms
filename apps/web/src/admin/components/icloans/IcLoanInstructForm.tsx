@@ -152,7 +152,7 @@ export function IcLoanInstructForm({ borrowers, initialBorrower, initialRequestI
             <fieldset style={{ border: '1px solid var(--pk-border)', borderRadius: 6, padding: 8 }}>
               <legend>Pengajuan yang menunggu persetujuan akhir</legend>
               {b.waiting.map((w) => (
-                <label key={w.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                <label key={w.id} className="pk-check">
                   <input
                     type="checkbox"
                     checked={requestIds.includes(w.id)}
@@ -200,7 +200,7 @@ export function IcLoanInstructForm({ borrowers, initialBorrower, initialRequestI
         </legend>
         {(data?.lenders ?? []).length === 0 ? <p className="help">Tidak ada PT lain tempat Anda menjadi Owner.</p> : null}
         {(data?.lenders ?? []).map((x) => (
-          <label key={x.company.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', opacity: x.sufficient ? 1 : 0.6 }}>
+          <label key={x.company.id} className="pk-check" style={x.sufficient ? undefined : { opacity: 0.6 }}>
             <input
               type="radio"
               name="lender"

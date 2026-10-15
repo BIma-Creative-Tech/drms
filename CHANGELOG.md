@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (DRMS 15/10 — owner UI feedback #2, #3, #5, #6, #7; web only, no migration)
+
+- **Checkbox / radio** ("terlalu besar dan tidak align kiri"): every native checkbox and radio is a 16 px box in the brand
+  colour with its label left-aligned right next to it (8 px gap; 44 px touch row on coarse pointers). The generic field
+  rules of the custom views (`.pk-fld`, `.pk-filter`, `.pk-line`, `.pk-geo`, list toolbar, transfer-queue cards) no
+  longer stretch a checkbox to a 40 px full-width input (e.g. the role picker of the Pengguna form, the confirm box of
+  the reason dialog, the loan forms). Payload's own checkbox / radio fields are unchanged.
+- **Keuangan › Transfer & LPJ** now starts with **Antrian Transfer** (badge) and **Verifikasi LPJ**, so Finance monitors
+  what must be transferred from the Keuangan module; Persetujuan keeps both as shortcuts. Both pages now belong to
+  Keuangan (top bar, breadcrumb "Keuangan › Antrian Transfer"); registry items marked `alias` never claim a route
+  (unit test: one home module per view).
+- **Buttons** ("tombol cetak layoutnya aneh"): one box for every button family — 38 px (32 px in table rows, 44 px on
+  touch), 13 px/600, radius m, one border colour (`--pk-btn-border`), icon gap 6 px, no wrapping. "Cetak" on the
+  expense-request page is the same height as "Duplikat"/"Edit" with a drawn chevron that turns while the menu is open
+  (also "Kolom" and the checklist filters).
+- **Tables** ("jarak antar kolom terlalu lebar"): the generic list hugs its columns (an empty filler column before
+  "Aksi" takes the rest of the row; long texts end in an ellipsis at 360 px, textareas wrap); cell padding 8 × 12 px.
+  The custom-view and report tables no longer spread a few columns over the whole page (dashboard cards and editors keep
+  the full width; the transfer queue too, for its inline form).
+- **Frozen table header** ("saat scroll table, header harus freeze"): a tall table scrolls inside its own box (at most
+  the viewport below the module bar, at least 320 px) with a sticky, opaque header row; the "Aksi" header stays pinned in
+  the top-right corner. Short tables, the ≤ 640 px transfer-queue cards and printing are unaffected.
+
 ## [0.11.0] - 2026-10-15
 
 **DRMS 13/10 Phase C (cek dana + Pinjaman antar-PT) + the loan API follow-ups + the single-PT form fix** — PRs #70–#74.

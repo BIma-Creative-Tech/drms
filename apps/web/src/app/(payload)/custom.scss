@@ -39,6 +39,25 @@
   line-height: 1.3;
 }
 
+// DRMS 15/10 #5 (owner: "perbaiki seluruh tombol"): the one button box — same as .pk-kbtn (components/kas/style.ts),
+// .pk-ltb__btn and .pk-f3 .pk-btn: 38 px (small 32 px, 44 px on coarse pointers), 13 px/600, radius m, icon gap 6 px.
+@mixin pk-btn-box($h: 38px) {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: $h;
+  margin: 0;
+  padding-block: 0;
+  border-radius: var(--style-radius-m);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
 @layer payload {
   // ---------------------------------------------------------------------------------------------
   // Tokens → Payload variables
@@ -68,6 +87,9 @@
     --pk-tone-bad-text: var(--pk-light-bad-text);
     --pk-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08);
     --pk-shadow-hover: 0 2px 4px rgb(15 23 42 / 0.06), 0 12px 28px -8px rgb(37 99 235 / 0.18);
+    // DRMS 15/10 #5: one border colour for every outlined button (Payload secondary, .pk-kbtn, .pk-ltb__btn, .pk-row-act);
+    // resolved per theme on <html> (both mixed tokens are set again for html[data-theme='dark']).
+    --pk-btn-border: color-mix(in oklab, var(--pk-muted-fg) 60%, var(--pk-input));
 
     --theme-bg: var(--pk-bg);
     --theme-text: var(--pk-fg);
@@ -203,7 +225,7 @@
 
   .btn--style-secondary {
     --bg-color: var(--pk-card);
-    --btn-border: 1px solid var(--pk-input);
+    --btn-border: 1px solid var(--pk-btn-border);
     --hover-btn-border: 1px solid var(--pk-primary);
     --hover-color: var(--pk-primary);
   }
@@ -1150,7 +1172,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
       min-width: 0;
     }
 
-    .pk-rtable form :is(input, select) {
+    .pk-rtable form :is(input:not([type='checkbox'], [type='radio']), select) {
       box-sizing: border-box;
       width: 100%;
       max-width: 100%;
@@ -1266,12 +1288,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
       outline-offset: -2px;
     }
 
-    input {
-      width: 18px;
-      height: 18px;
-      margin: 0;
-      accent-color: var(--pk-primary);
-    }
+    // the box itself: the native checkbox normalisation (DRMS 15/10 #2, end of this file)
   }
 
   .pk-pt__opt--all {
@@ -1327,14 +1344,13 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   }
 
   .pk-pt__btn {
-    min-height: 38px;
-    padding: 0 16px;
-    border: 1px solid var(--pk-input);
-    border-radius: 9px;
+    @include pk-btn-box;
+
+    padding: 0 14px;
+    border: 1px solid var(--pk-btn-border);
     background: var(--pk-card);
     color: var(--pk-fg);
-    font: inherit;
-    font-weight: 600;
+    font-family: inherit;
     cursor: pointer;
 
     &:hover {
@@ -1539,9 +1555,11 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
+  }
 
-    input {
-      accent-color: var(--pk-primary);
+  @media (pointer: coarse) {
+    .pk-rmx__col {
+      min-height: 44px;
     }
   }
 
@@ -2022,6 +2040,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 @layer payload {
   .table {
     th#heading-rowActions,
+    th.cell-rowActions,
     td.cell-rowActions {
       position: sticky;
       right: 0;
@@ -2033,7 +2052,8 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
       box-shadow: inset 1px 0 0 var(--pk-border);
     }
 
-    th#heading-rowActions {
+    th#heading-rowActions,
+    th.cell-rowActions {
       color: var(--pk-muted-fg);
     }
 
@@ -2063,13 +2083,13 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     justify-content: center;
     min-height: 32px;
     padding: 0 12px 0 10px;
-    border: 1px solid color-mix(in oklab, var(--pk-muted-fg) 60%, var(--pk-input));
+    border: 1px solid var(--pk-btn-border);
     border-radius: var(--style-radius-m);
     background: var(--pk-card);
     color: var(--pk-fg);
     font-size: 13px;
     font-weight: 600;
-    line-height: 1;
+    line-height: 1.2;
     text-decoration: none;
     white-space: nowrap;
     cursor: pointer;
@@ -2190,16 +2210,15 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   }
 
   // "Simpan" / "Buat" = the page's primary action, sized like the shell buttons (.pk-kbtn: 38 px, 13 px/600).
+  // DRMS 15/10 #5: every button of the row (Payload's own + the expense-request action bar) = the same box.
   .doc-controls__controls {
     gap: 8px;
     align-items: center;
 
     .btn {
-      min-height: 38px;
-      margin: 0;
-      padding-block: 0;
-      padding-inline: 16px;
-      font-size: 13px;
+      @include pk-btn-box;
+
+      padding-inline: 14px;
     }
   }
 
@@ -2266,15 +2285,23 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     font-size: 13px;
   }
 
+  // "Cetak" = a <details>: flex so the summary is a flex item (no line box / strut around it → the same 38 px as
+  // the buttons next to it), the chevron rotates while open (.pk-caret).
   .pk-er-print {
     position: relative;
+    display: flex;
 
     > summary {
       list-style: none;
       cursor: pointer;
+      user-select: none;
 
       &::-webkit-details-marker {
         display: none;
+      }
+
+      &::marker {
+        content: '';
       }
     }
   }
@@ -2740,10 +2767,10 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     font-size: 12px;
     font-weight: 600;
 
-    input,
+    input:not([type='checkbox'], [type='radio']),
     select {
       min-width: 140px;
-      min-height: 36px;
+      min-height: 38px;
       padding: 4px 8px;
       border: 1px solid var(--pk-input);
       border-radius: var(--style-radius-s);
@@ -2779,17 +2806,20 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 
   .pk-ltb__btn {
     display: inline-flex;
+    gap: 6px;
     align-items: center;
     justify-content: center;
-    min-height: 36px;
+    box-sizing: border-box;
+    min-height: 38px;
     padding: 0 14px;
-    border: 1px solid color-mix(in oklab, var(--pk-muted-fg) 60%, var(--pk-input));
+    border: 1px solid var(--pk-btn-border);
     border-radius: var(--style-radius-m);
     background: var(--pk-card);
     color: var(--pk-fg);
     font: inherit;
     font-size: 13px;
     font-weight: 600;
+    line-height: 1.2;
     white-space: nowrap;
     text-decoration: none;
     cursor: pointer;
@@ -2842,7 +2872,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     .pk-ltb__field {
       flex: 1 1 calc(50% - 6px);
 
-      input,
+      input:not([type='checkbox'], [type='radio']),
       select {
         width: 100%;
         min-width: 0;
@@ -2859,7 +2889,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   }
 
   @media (pointer: coarse) {
-    .pk-ltb__field :is(input, select),
+    .pk-ltb__field :is(input:not([type='checkbox'], [type='radio']), select),
     .pk-ltb__btn {
       min-height: 44px;
     }
@@ -2896,7 +2926,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     justify-content: space-between;
     min-width: 140px;
     max-width: 240px;
-    min-height: 36px;
+    min-height: 38px;
     padding: 4px 8px;
     border: 1px solid var(--pk-input);
     border-radius: var(--style-radius-s);
@@ -2997,13 +3027,6 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     &:hover {
       background: color-mix(in oklab, var(--pk-primary) 8%, transparent);
     }
-
-    input {
-      width: 16px;
-      height: 16px;
-      margin: 0;
-      accent-color: var(--pk-primary);
-    }
   }
 
   .pk-ms__none,
@@ -3096,6 +3119,11 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
   }
 
+  // DRMS 15/10 #6 (owner: "jarak antar kolom terlalu lebar"): the data columns hug their content (width 1 % + no
+  // wrapping; Payload's 150 px cell minimum off) and the empty filler column before "Aksi" takes the rest of the row,
+  // so 3–4 columns no longer spread over the whole width. Long texts end in an ellipsis at 360 px (.pk-plist__cell);
+  // textareas wrap inside 360 px. No `min-width: max-content` on the table: with percentage columns the table's
+  // max-content would be scaled up — its min-content (nowrap cells) already keeps it from squeezing.
   .pk-plist__table {
     border: 1px solid var(--pk-border);
     border-radius: var(--style-radius-l);
@@ -3104,29 +3132,40 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 
     table {
       width: 100%;
-      min-width: max-content;
       border-collapse: collapse;
     }
 
     th,
     td {
-      padding: 10px 12px;
+      width: 1%;
+      min-width: 0;
+      padding: 8px 12px;
       text-align: left;
       vertical-align: middle;
-    }
-
-    th {
       white-space: nowrap;
     }
 
-    td {
-      max-width: 360px;
+    .pk-plist__fill {
+      width: auto;
+      padding: 0;
     }
 
     tbody tr:focus-visible {
       outline: 2px solid var(--pk-ring);
       outline-offset: -2px;
     }
+  }
+
+  .pk-plist__cell {
+    overflow: hidden;
+    max-width: 360px;
+    text-overflow: ellipsis;
+  }
+
+  .pk-plist__cell--wrap {
+    width: max-content;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .pk-plist__sort {
@@ -3444,5 +3483,170 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 @layer payload {
   .pk-ms__btn[data-invalid] {
     border-color: var(--pk-tone-bad);
+  }
+}
+
+// =================================================================================================
+// DRMS 15/10 owner UI feedback: native checkboxes/radios (#2), one button system (#5), frozen table headers (#7).
+// =================================================================================================
+@layer payload {
+  // ---- #2 "Checkbox terlalu besar dan tidak align kiri" --------------------------------------------------------
+  // Every native checkbox / radio = a 16 px box in the brand colour, never stretched by a generic `input` rule.
+  // !important: several views inject unlayered <style> strings (KAS_STYLE, F3_STYLE, FIELD_STYLE, Absensi) whose
+  // field rules (width 100 %, min-height 40 px, padding, border) beat this layer; those now skip checkboxes/radios at
+  // the source too. Payload's own checkbox / radio fields draw their own box over a hidden native input → excluded.
+  input:is([type='checkbox'], [type='radio']):not(.checkbox-input input, .radio-input input) {
+    flex: none;
+    box-sizing: border-box;
+    width: 16px !important;
+    min-width: 0 !important;
+    height: 16px !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    accent-color: var(--pk-primary);
+    vertical-align: middle;
+    cursor: pointer;
+  }
+
+  input:is([type='checkbox'], [type='radio']):disabled {
+    cursor: not-allowed;
+  }
+
+  // Its label: box first, text right next to it, left-aligned. Zero specificity (:where) = a default that every
+  // component layout (.pk-ms__opt, .pk-pt__opt grid, .pk-sc-loc card, .pk-seg pill …) still overrides.
+  // Touch: the 44 px target is the label row, not the box (WCAG 2.5.8).
+  :where(label:has(> input:is([type='checkbox'], [type='radio']))),
+  .pk-check {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  // `.pk-check` = the explicit checkbox/radio row of the custom forms (dialogs, loan forms): one option per line
+  .pk-check {
+    display: flex;
+    min-height: 32px;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+
+  @media (pointer: coarse) {
+    :where(label:has(> input:is([type='checkbox'], [type='radio']))),
+    .pk-check {
+      min-height: 44px;
+    }
+  }
+
+  // ---- #5 "Tombol … perbaiki seluruh tombol" -----------------------------------------------------------------------
+  // Payload-styled buttons of our own components (class strings, no Payload Button markup — ActionButton,
+  // ActionDialog, the expense-request action bar incl. the "Cetak" <summary>, RequesterActions, ChangeLog …) carry
+  // `.pk-pbtn`: the same box as .pk-kbtn. Inside a table row they are the small size (as .pk-row-act).
+  .btn.pk-pbtn {
+    @include pk-btn-box;
+
+    padding-inline: 14px;
+    text-decoration: none;
+  }
+
+  :is(td, .pk-row-actions) .btn.pk-pbtn {
+    min-height: 32px;
+    padding-inline: 10px;
+  }
+
+  @media (pointer: coarse) {
+    .btn.pk-pbtn,
+    :is(td, .pk-row-actions) .btn.pk-pbtn,
+    .doc-controls__controls .btn,
+    .pk-pt__btn {
+      min-height: 44px;
+    }
+  }
+
+  // Dropdown chevron of a button ("Cetak", "Kolom", checklist filters): drawn with two borders so it sits on the text's
+  // centre line in every font (the ▾ glyph did not); points up while the menu is open.
+  .pk-caret {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: translateY(-2px) rotate(45deg);
+  }
+
+  [open] > summary > .pk-caret,
+  [aria-expanded='true'] > .pk-caret {
+    transform: translateY(2px) rotate(-135deg);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .pk-caret {
+      transition: transform 0.15s ease;
+    }
+  }
+
+  // ---- #7 "Saat scroll table, header harus freeze" -------------------------------------------------------------
+  // A tall table scrolls inside its own box (the box already scrolls sideways) so its header row can stick: the box
+  // ends at the bottom of the viewport once its top reaches the sticky module bar, never shorter than 320 px — short
+  // tables (dashboard cards) are unaffected. Header cells are opaque and above the body cells (1) and the pinned
+  // "Aksi" cells (2); the top-right "Aksi" header sits above both. Collapsed borders do not travel with a sticky
+  // cell → the header's bottom line is an inset shadow.
+  :root {
+    --pk-table-max-h: max(320px, calc(100dvh - var(--pk-bar-h) - 24px));
+  }
+
+  .pk-tscroll,
+  .pk-plist__table,
+  .pk-f3 .pk-tw,
+  .pk-f3 .pk-scroll {
+    max-height: var(--pk-table-max-h);
+    overflow-y: auto;
+  }
+
+  :is(.pk-tscroll, .pk-plist__table, .pk-f3 .pk-tw, .pk-f3 .pk-scroll) > table > thead > tr > :is(th, td) {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--pk-card);
+    background-clip: padding-box;
+    box-shadow: inset 0 -1px 0 var(--pk-border);
+  }
+
+  .pk-plist__table > table > thead > tr > th.cell-rowActions {
+    right: 0;
+    z-index: 4;
+    box-shadow:
+      inset 1px 0 0 var(--pk-border),
+      inset 0 -1px 0 var(--pk-border);
+  }
+
+  // PkListView: the inner Payload .table box is the scroller (overflow auto); the TableScroll around it stays a plain
+  // wrapper (no second scrollbar from Payload's bottom margin)
+  .pk-tscroll:has(> .pk-plist__table) {
+    max-height: none;
+  }
+
+  .pk-plist__table {
+    margin-bottom: 0;
+  }
+
+  // ≤ 640 px the transfer queue is a list of cards (.pk-rtable): no inner scroll box around cards.
+  @media (max-width: 640px) {
+    .pk-tscroll:has(> .pk-rtable) {
+      max-height: none;
+    }
+  }
+
+  @media print {
+    .pk-tscroll,
+    .pk-plist__table,
+    .pk-f3 .pk-tw,
+    .pk-f3 .pk-scroll {
+      max-height: none;
+      overflow: visible;
+    }
   }
 }

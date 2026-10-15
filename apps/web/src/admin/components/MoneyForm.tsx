@@ -38,7 +38,7 @@ const MFORM_STYLE = `
 .pk-mform { display: grid; gap: 12px; padding: 12px; border: 1px solid var(--pk-border); border-radius: var(--style-radius-m); background: var(--pk-muted-bg); }
 .pk-mform__amount { font-size: 15px; font-variant-numeric: tabular-nums; }
 .pk-mform__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 16px; align-items: start; }
-.pk-mform .pk-fld :is(input, select) { background: var(--theme-input-bg, var(--pk-card)); }
+.pk-mform .pk-fld :is(input:not([type='checkbox'], [type='radio']), select) { background: var(--theme-input-bg, var(--pk-card)); }
 `
 
 async function uploadProof(kind: string, file: File): Promise<number> {

@@ -78,7 +78,7 @@ export function ActionButton({ url, label, body, prompt, confirm, variant = 'sec
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const key = useRef<string | undefined>(undefined)
-  const btnClass = `btn btn--style-${variant} btn--size-small`
+  const btnClass = `btn btn--style-${variant} btn--size-small pk-pbtn`
 
   const send = async (extra: Record<string, unknown>, idempotencyKey: string | undefined): Promise<string | null> => {
     const r = await postJson(url, { ...(body ?? {}), ...extra }, { idempotencyKey })
