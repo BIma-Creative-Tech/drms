@@ -23,6 +23,7 @@ import '../support/widget_harness.dart';
 /// `statusLabel`. Fictional PTs and numbers.
 
 const _mandiri = 'Mandiri · ••••0123 · PT Contoh Dirgantara';
+const _none = 'PT peminjam belum menetapkan rekening penerimaan antar-PT — pencairan akan ditolak.';
 
 AuthSignedIn _finance() {
   final p = profile(const {Role.finance});
@@ -32,66 +33,47 @@ AuthSignedIn _finance() {
   );
 }
 
+AuthSignedIn _owner() => AuthSignedIn(profile: profile(Role.effective({Role.principal})), sub: 's');
+
 String? _text(WidgetTester tester, String key) => tester.widget<Text>(find.byKey(Key(key))).data;
+
+Override _detail(Map<String, dynamic> j) => icLoanDetailProvider(77).overrideWith((ref) async => IcLoan.fromJson(j));
 
 /// The disbursement queue, counting its reads (the detail must not need it).
 class _Queue {
   var reads = 0;
+
   Future<IcLoanQueue> load() async {
     reads++;
     return IcLoanQueue.fromJson(icLoanQueueJson());
   }
+
+  Override get asOverride => icLoanQueueProvider.overrideWith((ref) => load());
 }
 
 void main() {
   group('loan detail', () {
     testWidgets('Finance of the lender: the receiving account from the detail, no queue read', (tester) async {
       final queue = _Queue();
-      await pumpScreen(
-        tester,
-        const IcLoanDetailScreen(id: 77),
-        auth: _finance(),
-        overrides: [
-          icLoanDetailProvider(77).overrideWith(
-            (ref) async => IcLoan.fromJson(icLoanDetailJson(destination: icDestinationJson)),
-          ),
-          icLoanQueueProvider.overrideWith((ref) => queue.load()),
-        ],
-      );
+      final overrides = <Override>[_detail(icLoanDetailJson(destination: icDestinationJson)), queue.asOverride];
+      await pumpScreen(tester, const IcLoanDetailScreen(id: 77), auth: _finance(), overrides: overrides);
       expect(_text(tester, 'icloan-destination-value'), _mandiri);
       expect(find.byKey(const Key('icloan-destination-none')), findsNothing);
       expect(queue.reads, 0);
     });
 
     testWidgets('none designated (null for a reader): the warning', (tester) async {
-      await pumpScreen(
-        tester,
-        const IcLoanDetailScreen(id: 77),
-        auth: _finance(),
-        overrides: [
-          icLoanDetailProvider(77).overrideWith((ref) async => IcLoan.fromJson(icLoanDetailJson(destination: null))),
-        ],
-      );
+      final overrides = <Override>[_detail(icLoanDetailJson(destination: null))];
+      await pumpScreen(tester, const IcLoanDetailScreen(id: 77), auth: _finance(), overrides: overrides);
       expect(find.byKey(const Key('icloan-destination-value')), findsNothing);
-      expect(
-        _text(tester, 'icloan-destination-none'),
-        'PT peminjam belum menetapkan rekening penerimaan antar-PT — pencairan akan ditolak.',
-      );
+      expect(_text(tester, 'icloan-destination-none'), _none);
     });
 
     testWidgets('not a reader (the Owner without Finance in the lender): nothing, no warning', (tester) async {
       final queue = _Queue();
-      await pumpScreen(
-        tester,
-        const IcLoanDetailScreen(id: 77),
-        auth: AuthSignedIn(profile: profile(Role.effective({Role.principal})), sub: 's'),
-        overrides: [
-          icLoanDetailProvider(77).overrideWith(
-            (ref) async => IcLoan.fromJson(icLoanDetailJson(allowed: const ['cancel'], destination: null)),
-          ),
-          icLoanQueueProvider.overrideWith((ref) => queue.load()),
-        ],
-      );
+      final json = icLoanDetailJson(allowed: const ['cancel'], destination: null);
+      final overrides = <Override>[_detail(json), queue.asOverride];
+      await pumpScreen(tester, const IcLoanDetailScreen(id: 77), auth: _owner(), overrides: overrides);
       expect(find.byKey(const Key('icloan-destination-value')), findsNothing);
       expect(find.byKey(const Key('icloan-destination-none')), findsNothing);
       expect(queue.reads, 0);
@@ -99,35 +81,21 @@ void main() {
 
     testWidgets('an older server (no field): the queue item as the fallback', (tester) async {
       final queue = _Queue();
-      await pumpScreen(
-        tester,
-        const IcLoanDetailScreen(id: 77),
-        auth: _finance(),
-        overrides: [
-          icLoanDetailProvider(77).overrideWith((ref) async => IcLoan.fromJson(icLoanDetailJson())),
-          icLoanQueueProvider.overrideWith((ref) => queue.load()),
-        ],
-      );
+      final overrides = <Override>[_detail(icLoanDetailJson()), queue.asOverride];
+      await pumpScreen(tester, const IcLoanDetailScreen(id: 77), auth: _finance(), overrides: overrides);
       expect(_text(tester, 'icloan-destination-value'), _mandiri);
       expect(queue.reads, 1);
     });
   });
 
   group('disbursement form opened from a notification', () {
-    List<Override> form(Map<String, dynamic> detail, _Queue queue) => [
-      icLoanDetailProvider(77).overrideWith((ref) async => IcLoan.fromJson(detail)),
-      icLoanQueueProvider.overrideWith((ref) => queue.load()),
-      financeApiProvider.overrideWithValue(FakeFinanceApi()),
-    ];
+    Override finance() => financeApiProvider.overrideWithValue(FakeFinanceApi());
 
     testWidgets('the destination comes with the detail — shown at once, the queue is not read', (tester) async {
       final queue = _Queue();
-      await pumpScreen(
-        tester,
-        const IcLoanDisburseRoute(id: 77),
-        auth: _finance(),
-        overrides: form(icLoanDetailJson(destination: icDestinationJson), queue),
-      );
+      final json = icLoanDetailJson(destination: icDestinationJson);
+      final overrides = <Override>[_detail(json), queue.asOverride, finance()];
+      await pumpScreen(tester, const IcLoanDisburseRoute(id: 77), auth: _finance(), overrides: overrides);
       expect(find.byType(IcLoanDisburseScreen), findsOneWidget);
       expect(_text(tester, 'icloan-destination'), 'Rekening tujuan: $_mandiri');
       expect(queue.reads, 0);
@@ -135,12 +103,8 @@ void main() {
 
     testWidgets('null on the detail: "none designated" without waiting for the queue', (tester) async {
       final queue = _Queue();
-      await pumpScreen(
-        tester,
-        const IcLoanDisburseRoute(id: 77),
-        auth: _finance(),
-        overrides: form(icLoanDetailJson(destination: null), queue),
-      );
+      final overrides = <Override>[_detail(icLoanDetailJson(destination: null)), queue.asOverride, finance()];
+      await pumpScreen(tester, const IcLoanDisburseRoute(id: 77), auth: _finance(), overrides: overrides);
       expect(find.byKey(const Key('icloan-destination')), findsNothing);
       expect(find.byKey(const Key('icloan-destination-none')), findsOneWidget);
       expect(queue.reads, 0);
@@ -148,12 +112,8 @@ void main() {
 
     testWidgets('an older server (no field): the queue item once the queue has loaded', (tester) async {
       final queue = _Queue();
-      await pumpScreen(
-        tester,
-        const IcLoanDisburseRoute(id: 77),
-        auth: _finance(),
-        overrides: form(icLoanDetailJson(), queue),
-      );
+      final overrides = <Override>[_detail(icLoanDetailJson()), queue.asOverride, finance()];
+      await pumpScreen(tester, const IcLoanDisburseRoute(id: 77), auth: _finance(), overrides: overrides);
       expect(_text(tester, 'icloan-destination'), 'Rekening tujuan: $_mandiri');
       expect(queue.reads, 1);
     });
@@ -165,15 +125,10 @@ void main() {
     loan['status'] = 'on_hold';
     loan['statusLabel'] = 'Ditahan';
     fund['loans'] = [loan];
-    await pumpScreen(
-      tester,
-      const RequestDetailScreen(id: 42),
-      auth: AuthSignedIn(profile: profile(Role.effective({Role.principal})), sub: 's'),
-      overrides: [
-        requestDetailProvider(42).overrideWith((ref) async => detailFromJson(fundDetailJson(fundCheck: fund))),
-        receiptThumbProvider(901).overrideWith((ref) => Future.error(const NetworkException())),
-      ],
-    );
+    final detail = detailFromJson(fundDetailJson(fundCheck: fund));
+    final thumb = receiptThumbProvider(901).overrideWith((ref) => Future.error(const NetworkException()));
+    final overrides = <Override>[requestDetailProvider(42).overrideWith((ref) async => detail), thumb];
+    await pumpScreen(tester, const RequestDetailScreen(id: 42), auth: _owner(), overrides: overrides);
     expect(_text(tester, 'fund-loan-77'), 'PJA/LAS/2610/0002 · LAS · Rp 500.000 · Ditahan');
   });
 }
