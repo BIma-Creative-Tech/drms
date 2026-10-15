@@ -84,7 +84,8 @@ export async function TransferQueue(props: AdminViewServerProps) {
       ) : (
         // Wide (6 columns + the transfer form): stacked cards ≤ 640px (custom.scss .pk-rtable), one
         // <tbody> per item so the item row and its form stay one card; a plain table on wider screens.
-        <table style={table} className="pk-rtable" data-pk-table="transfer-queue">
+        // Full width (unlike the other custom tables): the transfer form row below each item needs the room.
+        <table style={{ ...table, width: '100%' }} className="pk-rtable" data-pk-table="transfer-queue">
           <thead>
             <tr>
               {pt.multi ? <th style={th}>PT</th> : null}

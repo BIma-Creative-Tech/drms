@@ -51,7 +51,7 @@ export const ABSENSI_STYLE = `
 .pk-sc-locs legend { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
 .pk-sc-loc { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center; min-height: 56px; padding: 12px 14px; border: 1px solid var(--pk-border); border-radius: var(--style-radius-m); background: var(--pk-card); cursor: pointer; }
 .pk-sc-loc:has(input:checked) { border-color: var(--pk-primary); box-shadow: 0 0 0 1px var(--pk-primary); }
-.pk-sc-loc input { width: 20px; height: 20px; margin: 0; grid-row: span 2; accent-color: var(--pk-primary); }
+.pk-sc-loc input { grid-row: span 2; } /* the radio box: native normalisation (custom.scss, DRMS 15/10 #2) */
 .pk-sc-loc .name { font-weight: 600; font-size: 15px; display: flex; flex-direction: column; }
 .pk-sc-loc .name .sub { font-weight: 400; font-size: 12px; color: var(--pk-muted-fg); }
 .pk-sc-loc .st { font-size: 12px; font-weight: 600; color: var(--pk-muted-fg); }
@@ -146,15 +146,15 @@ export const ABSENSI_STYLE = `
 .pk-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .pk-inline.wrap { align-items: flex-end; }
 .pk-inline .pk-fld.grow { flex: 1 1 220px; }
-.pk-inline select, .pk-geo input { min-height: 36px; padding: 6px 8px; font: inherit; font-size: 13px; color: var(--theme-text); background: var(--theme-input-bg, var(--theme-elevation-0)); border: 1px solid var(--pk-input); border-radius: var(--style-radius-s); max-width: 100%; }
-.pk-inline select:focus-visible, .pk-geo input:focus-visible { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
+.pk-inline select, .pk-geo input:not([type='checkbox'], [type='radio']) { min-height: 36px; padding: 6px 8px; font: inherit; font-size: 13px; color: var(--theme-text); background: var(--theme-input-bg, var(--theme-elevation-0)); border: 1px solid var(--pk-input); border-radius: var(--style-radius-s); max-width: 100%; }
+.pk-inline select:focus-visible, .pk-geo input:not([type='checkbox'], [type='radio']):focus-visible { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
 .pk-inline > label { font-size: 13px; font-weight: 600; }
 .pk-geo { display: grid; grid-template-columns: repeat(3, minmax(90px, 1fr)) auto; gap: 8px; align-items: end; }
 .pk-geo .pk-fld label { font-size: 11px; font-weight: 600; color: var(--pk-muted-fg); }
 .pk-geo .pk-geo-act { display: flex; gap: 6px; }
 .pk-geo > p { grid-column: 1 / -1; }
 @container (max-width: 640px) { .pk-geo { grid-template-columns: repeat(3, minmax(0, 1fr)); } .pk-geo .pk-geo-act { grid-column: 1 / -1; } }
-@media (pointer: coarse) { .pk-inline select, .pk-geo input { min-height: 44px; } }
+@media (pointer: coarse) { .pk-inline select, .pk-geo input:not([type='checkbox'], [type='radio']) { min-height: 44px; } }
 .pk-f3 .pk-days { display: inline-flex; gap: 3px; }
 .pk-f3 .pk-days span { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; font-size: 10px; font-weight: 700; border: 1px solid var(--pk-border); color: var(--pk-muted-fg); }
 .pk-f3 .pk-days span.on { background: color-mix(in oklab, var(--pk-primary) 14%, var(--pk-card)); color: var(--pk-primary); border-color: color-mix(in oklab, var(--pk-primary) 40%, var(--pk-border)); }

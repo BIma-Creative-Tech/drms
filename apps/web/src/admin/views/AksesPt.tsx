@@ -23,8 +23,8 @@ const PAGE_SIZE = 40
 const STYLE = `
 .pk-rm h1 { font-family: var(--pk-font-heading); margin: 24px 0 4px; }
 .pk-rm .pk-rm__lead { color: var(--pk-muted-fg); margin: 0 0 16px; max-width: 880px; }
-.pk-f3 form.pk-filter label.pk-rm__check { flex-direction: row; align-items: center; gap: 6px; min-height: 30px; }
-.pk-f3 form.pk-filter label.pk-rm__check input { min-width: 0; width: 16px; height: 16px; margin: 0; }
+/* the checkbox row itself = the shared filter rule (F3_STYLE) + the native checkbox normalisation (custom.scss) */
+.pk-f3 form.pk-filter label.pk-rm__check { min-height: 34px; }
 .pk-f3 .pk-rm .pk-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 `
 

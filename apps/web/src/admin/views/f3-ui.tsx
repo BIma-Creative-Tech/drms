@@ -16,8 +16,10 @@ export const F3_STYLE = `
 .pk-f3 section.pk-block { margin: 0 0 24px; }
 .pk-f3 section.pk-block > h2 { font-family: var(--pk-font-heading); font-size: 17px; line-height: 1.3; margin: 0 0 10px; }
 .pk-f3 .pk-scroll { overflow-x: auto; margin: 0 0 12px; background: var(--pk-card); border: 1px solid var(--pk-border); border-radius: var(--style-radius-l); box-shadow: var(--pk-shadow); }
+/* DRMS 15/10 #6: a report with few columns does not spread them over the page — the card hugs its table */
+.pk-f3 .pk-scroll:has(> table.pk-table) { width: fit-content; max-width: 100%; }
 .pk-f3 table.pk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.pk-f3 .pk-table th { text-align: left; border-bottom: 2px solid var(--pk-border); padding: 10px 12px; white-space: nowrap; color: var(--pk-muted-fg); font-weight: 600; }
+.pk-f3 .pk-table th { text-align: left; border-bottom: 2px solid var(--pk-border); padding: 8px 12px; white-space: nowrap; color: var(--pk-muted-fg); font-weight: 600; }
 .pk-f3 .pk-table td { border-bottom: 1px solid var(--pk-border); padding: 8px 12px; vertical-align: top; }
 .pk-f3 .pk-table tbody tr:last-child td { border-bottom: 0; }
 .pk-f3 .pk-table .n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -28,19 +30,19 @@ export const F3_STYLE = `
 .pk-f3 .pk-note { color: var(--pk-muted); font-size: 12px; margin: 4px 0; }
 .pk-f3 form.pk-filter { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; margin: 0 0 12px; padding: 12px; border: 1px solid var(--pk-border); border-radius: var(--style-radius-l); background: var(--pk-card); }
 .pk-f3 form.pk-filter label { display: flex; flex-direction: column; font-size: 12px; gap: 2px; }
-.pk-f3 form.pk-filter input, .pk-f3 form.pk-filter select { font-size: 13px; padding: 4px 6px; min-width: 140px; background: var(--theme-input-bg, var(--theme-elevation-0)); color: var(--theme-text); border: 1px solid var(--pk-input); border-radius: var(--style-radius-s); }
+/* DRMS 15/10 #2: a checkbox / radio label is a row (box left of its text); the field rules below skip the box itself */
+.pk-f3 form.pk-filter label:has(> input:is([type='checkbox'], [type='radio'])) { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; font-size: 13px; }
+.pk-f3 form.pk-filter input:not([type='checkbox'], [type='radio']), .pk-f3 form.pk-filter select { font-size: 13px; padding: 4px 6px; min-width: 140px; background: var(--theme-input-bg, var(--theme-elevation-0)); color: var(--theme-text); border: 1px solid var(--pk-input); border-radius: var(--style-radius-s); }
 .pk-f3 form.pk-filter select[multiple] { min-height: 90px; }
 /* DRMS 13/10 Umum #4: checklist dropdowns (MultiSelect) inside .pk-filter — undo the column label / 140px input rules */
 .pk-f3 form.pk-filter .pk-filter__multi { display: flex; flex-direction: column; font-size: 12px; gap: 2px; }
-.pk-f3 form.pk-filter label.pk-ms__opt { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; }
-.pk-f3 form.pk-filter .pk-ms__opt input { min-width: 0; width: 16px; height: 16px; padding: 0; }
 .pk-f3 form.pk-filter .pk-ms__search { min-width: 0; width: 100%; }
 .pk-f3 .pk-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 12px; font-size: 13px; }
 /* one button system: same box as .pk-kbtn (components/kas/style.ts) — 38 px, 32 px .sm, 44 px on touch */
-.pk-f3 .pk-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: var(--style-radius-m); border: 1px solid color-mix(in oklab, var(--pk-muted-fg) 60%, var(--pk-input)); text-decoration: none; background: var(--pk-card); color: var(--theme-text); font: inherit; font-size: 13px; font-weight: 600; line-height: 1.2; white-space: nowrap; cursor: pointer; }
+.pk-f3 .pk-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; min-height: 38px; padding: 0 14px; border-radius: var(--style-radius-m); border: 1px solid var(--pk-btn-border); text-decoration: none; background: var(--pk-card); color: var(--theme-text); font: inherit; font-size: 13px; font-weight: 600; line-height: 1.2; white-space: nowrap; cursor: pointer; }
 .pk-f3 .pk-btn:hover { border-color: var(--pk-primary); color: var(--pk-primary); }
 .pk-f3 .pk-btn:focus-visible { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
-.pk-f3 .pk-btn.sm { min-height: 32px; padding: 0 10px; font-size: 12px; }
+.pk-f3 .pk-btn.sm { min-height: 32px; padding: 0 10px; }
 @media (pointer: coarse) { .pk-f3 .pk-btn, .pk-f3 .pk-btn.sm { min-height: 44px; } }
 .pk-f3 .pk-btn.primary { background: var(--pk-primary); border-color: var(--pk-primary); color: var(--pk-on-primary); }
 .pk-f3 .pk-btn.primary:hover { background: var(--pk-primary-hover); color: var(--pk-on-primary); }

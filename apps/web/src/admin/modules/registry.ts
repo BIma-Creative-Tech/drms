@@ -57,6 +57,12 @@ export type ModuleItem =
       feature?: FeatureKey
       /** Path prefix that belongs to the module when wider than `view` (e.g. `/pengguna` for /pengguna/<id>). */
       prefix?: string
+      /**
+       * DRMS 15/10 #3: a second placement of a view whose home is another module (same view, also offered here as a
+       * menu item / landing tile). The route itself — active module, breadcrumbs — belongs to the module of the one
+       * placement without `alias` (unit test: exactly one per view path).
+       */
+      alias?: true
     }
 
 export type ModuleSection = { label?: string; items: readonly ModuleItem[] }
@@ -109,8 +115,9 @@ export const MODULES: readonly ModuleDef[] = [
         items: [
           // ADR 0021: the PM project approves its requests first ("Persetujuan PM")
           { view: '/persetujuan', label: 'Persetujuan', roles: OFFICE_PM, navKey: 'persetujuan' },
-          { view: '/antrian-transfer', label: 'Antrian Transfer', roles: OFFICE, badge: 'transfers', navKey: 'antrian-transfer' },
-          { view: '/verifikasi-lpj', label: 'Verifikasi LPJ', roles: OFFICE, badge: 'lpj', navKey: 'verifikasi-lpj' },
+          // DRMS 15/10 #3: the queues' home is Keuangan › Transfer & LPJ (Finance's work); kept here as shortcuts
+          { view: '/antrian-transfer', label: 'Antrian Transfer', roles: OFFICE, badge: 'transfers', navKey: 'antrian-transfer', alias: true },
+          { view: '/verifikasi-lpj', label: 'Verifikasi LPJ', roles: OFFICE, badge: 'lpj', navKey: 'verifikasi-lpj', alias: true },
           { collection: 'approvals' },
         ],
       },
@@ -192,7 +199,16 @@ export const MODULES: readonly ModuleDef[] = [
           { collection: 'cash-in-sources' },
         ],
       },
-      { label: 'Transfer & LPJ', items: [{ collection: 'transfers' }, { collection: 'settlements' }] },
+      // DRMS 15/10 #3 (owner): Finance monitors what must be transferred here — the queue first, with its badge
+      {
+        label: 'Transfer & LPJ',
+        items: [
+          { view: '/antrian-transfer', label: 'Antrian Transfer', roles: OFFICE, badge: 'transfers', navKey: 'antrian-transfer' },
+          { view: '/verifikasi-lpj', label: 'Verifikasi LPJ', roles: OFFICE, badge: 'lpj', navKey: 'verifikasi-lpj' },
+          { collection: 'transfers' },
+          { collection: 'settlements' },
+        ],
+      },
       // ADR 0022: inter-project loans (PM submits, Direktur approves; Direktur / Admin / Finance / PM only)
       {
         label: 'Pinjaman',
@@ -361,13 +377,24 @@ export function entityModuleMap(modules: readonly ModuleDef[] = MODULES): { coll
   return { collections, globals }
 }
 
-/** Custom-view path prefixes (relative to /admin) → module, longest first. */
+/** Custom-view path prefixes (relative to /admin) → module, longest first. `alias` placements do not claim the route. */
 function viewPrefixes(modules: readonly ModuleDef[]): Array<[string, ModuleId]> {
   const out: Array<[string, ModuleId]> = []
   for (const m of modules) {
-    for (const it of allItems(m)) if ('view' in it && !it.view.startsWith('/collections/') && !it.view.startsWith('/globals/')) out.push([it.prefix ?? it.view, m.id])
+    for (const it of allItems(m)) if ('view' in it && !it.alias && !it.view.startsWith('/collections/') && !it.view.startsWith('/globals/')) out.push([it.prefix ?? it.view, m.id])
   }
   return out.sort((a, b) => b[0].length - a[0].length)
+}
+
+/**
+ * View path → the module(s) of its placements without `alias` (DRMS 15/10 #3). Exactly one each, unit-tested: a view in
+ * two modules must mark all but its home placement as `alias`, so the active module of the route stays deterministic.
+ */
+export function viewHomes(modules: readonly ModuleDef[] = MODULES): Map<string, ModuleId[]> {
+  const out = new Map<string, ModuleId[]>()
+  for (const m of modules) for (const it of allItems(m)) if ('view' in it && !it.alias) out.set(it.view, [...(out.get(it.view) ?? []), m.id])
+  for (const m of modules) for (const it of allItems(m)) if ('view' in it && it.alias && !out.has(it.view)) out.set(it.view, [])
+  return out
 }
 
 const MAPS = entityModuleMap()

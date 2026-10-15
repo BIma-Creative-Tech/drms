@@ -4,7 +4,7 @@ import { renderToString } from 'react-dom/server'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { withCompanyContext, type Role } from '@/access/roles'
-import { activeHref, entityModuleMap, landingSections, MODULES, moduleForPath, resolveModules, type ModuleId, type ResolvedModule } from '@/admin/modules/registry'
+import { activeHref, entityModuleMap, landingSections, MODULES, moduleForPath, resolveModules, viewHomes, type ModuleId, type ResolvedModule } from '@/admin/modules/registry'
 import { deriveCrumbs, routeOf, type StepLike } from '@/admin/shell/crumbs'
 import { loadBadges, loadModules, navUser } from '@/admin/shell/modules-server'
 
@@ -95,6 +95,19 @@ describe('registry guard: every entity maps to exactly one module', () => {
     const map = entityModuleMap()
     expect(config.globals.map((g) => g.slug as string).filter((s) => !INTERNAL(s) && !map.globals.has(s))).toEqual([])
     expect([...map.globals.keys()].filter((s) => !config.globals.some((g) => g.slug === s))).toEqual([])
+  })
+
+  it('DRMS 15/10 #3: every custom view has exactly one home module; other placements are marked `alias`', () => {
+    for (const [view, homes] of viewHomes()) expect(homes, view).toHaveLength(1)
+    // the transfer queue / LPJ verification live in Keuangan › Transfer & LPJ, Persetujuan keeps them as shortcuts
+    expect(viewHomes().get('/antrian-transfer')).toEqual(['keuangan'])
+    expect(viewHomes().get('/verifikasi-lpj')).toEqual(['keuangan'])
+    const dup = [
+      { ...MODULES[0]!, sections: [{ items: [{ view: '/x', label: 'X' }] }] },
+      { ...MODULES[1]!, sections: [{ items: [{ view: '/x', label: 'X' }] }] },
+    ]
+    expect(viewHomes(dup).get('/x')).toHaveLength(2)
+    expect(viewHomes([{ ...MODULES[0]!, sections: [{ items: [{ view: '/y', label: 'Y', alias: true }] }] }]).get('/y')).toEqual([])
   })
 
   it('a slug in two modules is rejected', () => {
@@ -224,6 +237,12 @@ describe('tile visibility per role (real config: admin.hidden + access.read + ro
     const p = m.find((x) => x.id === 'persetujuan')!
     expect(p.badge).toBe(6)
     expect(p.sections[0]!.items.find((i) => i.navKey === 'antrian-transfer')!.badge).toBe(3)
+    // DRMS 15/10 #3: Keuangan › Transfer & LPJ opens with the transfer queue (badge), then LPJ verification
+    const keu = m.find((x) => x.id === 'keuangan')!
+    const tl = keu.sections.find((s) => s.label === 'Transfer & LPJ')!
+    expect(tl.items.map((i) => i.navKey ?? i.href)).toEqual(['antrian-transfer', 'verifikasi-lpj', '/admin/collections/transfers', '/admin/collections/settlements'])
+    expect(tl.items[0]).toMatchObject({ href: '/admin/antrian-transfer', label: 'Antrian Transfer', badge: 3 })
+    expect(keu.badge).toBe(6)
     expect((await modulesFor(['pk-pm'], 3)).every((x) => x.badge === 0)).toBe(true)
   })
 
@@ -261,7 +280,10 @@ describe('active module resolution', () => {
     ['/admin/progress/project/9', 'proyek'],
     ['/admin/addendum/detail/2', 'proyek'],
     ['/admin/absensi/jadwal', 'absensi'],
-    ['/admin/antrian-transfer', 'persetujuan'],
+    // DRMS 15/10 #3: home = Keuangan (Persetujuan only links to them)
+    ['/admin/antrian-transfer', 'keuangan'],
+    ['/admin/verifikasi-lpj', 'keuangan'],
+    ['/admin/persetujuan', 'persetujuan'],
     ['/admin/audit-log', 'sistem'],
     ['/admin/notifikasi', 'sistem'],
     ['/admin/modul/master', 'master'],
@@ -315,7 +337,7 @@ describe('ModuleBar (SSR with mocked pathname/theme)', () => {
   })
 
   it('DRMS 13/10 #9: Persetujuan module — no module menu in the bar; module name → landing page, module badge kept', async () => {
-    const html = await bar('/admin/antrian-transfer', ['pk-owner'])
+    const html = await bar('/admin/persetujuan', ['pk-owner'])
     expect(html).toContain('data-module="persetujuan"')
     expect(html).not.toContain('pk-bar__nav')
     expect(html).not.toContain('pk-bar__link')
@@ -429,8 +451,8 @@ describe('breadcrumbs (deriveCrumbs)', () => {
       ['Keuangan', '/admin/modul/keuangan', ''],
       ['Buku kas', '/admin/kas', ''],
     ])
-    expect(crumbs('/admin/antrian-transfer', persetujuan, null)).toEqual([
-      ['Persetujuan', '/admin/modul/persetujuan', ''],
+    expect(crumbs('/admin/antrian-transfer', keu, null)).toEqual([
+      ['Keuangan', '/admin/modul/keuangan', ''],
       ['Antrian Transfer', null, 'current'],
     ])
   })

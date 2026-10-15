@@ -58,9 +58,14 @@ export function allowed(req: PayloadRequest, roles: Role[]): boolean {
   return hasRoleAny(req, ...roles)
 }
 
-export const table: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: 13 }
-export const th: React.CSSProperties = { textAlign: 'left', borderBottom: '2px solid var(--theme-elevation-150)', padding: '6px 8px', whiteSpace: 'nowrap' }
-export const td: React.CSSProperties = { borderBottom: '1px solid var(--theme-elevation-100)', padding: '6px 8px', verticalAlign: 'top' }
+/**
+ * DRMS 15/10 #6 (owner: "jarak antar kolom terlalu lebar"): the custom-view tables hug their columns (width auto)
+ * instead of spreading a few columns over the whole page; wide ones still scroll inside TableScroll, whose header row
+ * stays frozen (custom.scss .pk-tscroll). Cell padding = the generic list (8 × 12 px).
+ */
+export const table: React.CSSProperties = { width: 'auto', borderCollapse: 'collapse', fontSize: 13 }
+export const th: React.CSSProperties = { textAlign: 'left', borderBottom: '2px solid var(--theme-elevation-150)', padding: '8px 12px', whiteSpace: 'nowrap' }
+export const td: React.CSSProperties = { borderBottom: '1px solid var(--theme-elevation-100)', padding: '8px 12px', verticalAlign: 'top' }
 export const num: React.CSSProperties = { ...td, textAlign: 'right', whiteSpace: 'nowrap' }
 export const badge = (tone: 'ok' | 'warn' | 'bad' | 'muted'): React.CSSProperties => ({
   display: 'inline-block',

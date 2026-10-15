@@ -4,7 +4,7 @@ import React from 'react'
 export function LogoutButton() {
   return (
     <form action="/auth/logout" method="post" className="pk-logout">
-      <button type="submit" id="pk-logout" className="btn btn--style-secondary btn--size-small">
+      <button type="submit" id="pk-logout" className="btn btn--style-secondary btn--size-small pk-pbtn">
         Keluar
       </button>
     </form>
