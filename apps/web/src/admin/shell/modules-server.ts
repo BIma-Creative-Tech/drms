@@ -7,6 +7,7 @@ import { TRANSFER_QUEUE_WHERE } from '@/domain/expense/types'
 import { pickDisplayName, resolveDisplayName } from '@/domain/user-display-name'
 
 import { normalizeSelection, type SwitcherState } from './company-switcher'
+import { canCreateFrom, quickCreateGroups, type QuickCreateGroup } from './quick-create'
 
 /**
  * Server-side data of the Odoo-style navigation (ModuleNav bar + Launcher at /admin): visible
@@ -109,10 +110,12 @@ export type ModuleNavInput = {
   permissions?: SanitizedPermissions | null
   visibleEntities?: VisibleEntities | null
   i18n?: I18nLike
+  /** Already loaded by the caller (ModuleNav shares them with the "+ Buat" menu) — omitted → loadFeatures. */
+  features?: Partial<Record<FeatureKey, boolean>>
 }
 
 /** Visible modules for the caller: Payload read permission ∧ visibleEntities ∧ role rules. */
-export async function loadModules({ payload, user, permissions, visibleEntities, i18n }: ModuleNavInput): Promise<ResolvedModule[]> {
+export async function loadModules({ payload, user, permissions, visibleEntities, i18n, features: known }: ModuleNavInput): Promise<ResolvedModule[]> {
   const cfg = payload.config
   const labelOf = (kind: 'collection' | 'global', slug: string): string => {
     const raw =
@@ -135,8 +138,16 @@ export async function loadModules({ payload, user, permissions, visibleEntities,
     const perms = (kind === 'collection' ? permissions?.collections : permissions?.globals) as Record<string, { create?: unknown; update?: unknown } | undefined> | undefined
     return Boolean(perms?.[slug]?.create || perms?.[slug]?.update)
   }
-  const [badges, features] = await Promise.all([loadBadges(payload, user), loadFeatures(payload, user)])
+  const [badges, features] = await Promise.all([loadBadges(payload, user), known ?? loadFeatures(payload, user)])
   return resolveModules({ roles: rolesOf(user), staffOnly: isStaffOnly(user), operatorOnly: isOperatorOnly(user), canSee, canManage, labelOf, badges, features })
+}
+
+/**
+ * DRMS 16/10: items of the "+ Buat" menu (./quick-create.ts) from the Nav server props — effective roles of the
+ * selected PTs, Payload create permission ∧ visibleEntities, PT features. Empty → no button.
+ */
+export function quickCreateFor({ user, permissions, visibleEntities, features }: Pick<ModuleNavInput, 'user' | 'permissions' | 'visibleEntities' | 'features'>): QuickCreateGroup[] {
+  return quickCreateGroups({ roles: rolesOf(user), canCreate: canCreateFrom(permissions as never, visibleEntities as never), features })
 }
 
 /**

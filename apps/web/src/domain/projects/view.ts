@@ -110,7 +110,7 @@ async function items(req: PayloadRequest, docs: ProjectDoc[]) {
 export async function listProjects(req: PayloadRequest, q: ProjectListQuery) {
   const and: Where[] = []
   const statuses = (q.status ?? '').split(',').filter(Boolean)
-  and.push(statuses.length ? { status: { in: statuses } } : { status: { not_equals: 'arsip' } })
+  and.push(statuses.length ? { status: { in: statuses } } : { status: { not_in: ['arsip', 'dibatalkan'] } })
   const text = searchWhere(['code', 'name'], q.q)
   if (text) and.push(text)
   if (q.companies?.length) and.push({ company: { in: q.companies } })

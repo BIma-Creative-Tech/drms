@@ -76,6 +76,9 @@ export const AUDIT_ACTIONS = [
   // ADR 0029: an approval / Owner submit / loan step refused because the PT's available funds are short (written in its
   // own transaction like `access_denied`: the refused attempt stays recorded).
   'fund_insufficient',
+  // D1610 (ADR 0030): the row action "Hapus" (soft delete: isDeleted = true, reason) and the Admin's "Pulihkan".
+  'soft_delete',
+  'restore',
 ] as const
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 

@@ -263,3 +263,12 @@ Branch `feat/approval-pm-direktur`. Migration `20261010_130000_approval_pm_direk
 |---|---|---|---|---|---|---|---|
 | US-69 | M04 | PM project (snapshot acknowledger), Direktur, Finance (transfer only) | `approval-rules`, `expense-requests`, `approvals`, `notifications`, `settlements` | `POST /api/v1/expense-requests/{id}/acknowledge` (PM), `/approve` (Direktur), `/reject`; `GET /api/v1/approvals/inbox`; `GET /api/v1/me` (`capabilities.approvalInbox` for PM); LPJ shortfall `…/lpj/shortfall-approval/*` | web Persetujuan, PM dashboard, APK 0.4.1 | approval-pm | integration `approval-pm-direktur.int.test.ts` (scenarios 1–9), updated ADR 0013 suites (old snapshot still finishes) |
 | US-70 | M04, M15 | PM (creator), Direktur (requester) | `expense-requests.g1_exception`, `approvals`, `audit-logs` | submit / acknowledge / approve (unchanged paths) | web panel + PDF note | approval-pm | integration (exception recorded in audit/PDF; Direktur alone → 409; DB trigger refuses actor = creator without the exception) |
+
+## D1610 — Hapus per baris (soft delete) / Batalkan proyek (ADR 0030, owner 2026-10-16)
+
+| Requirement | Collections | API | Screen | Test |
+|---|---|---|---|---|
+| Hapus (soft delete) of an unused row: `isDeleted` + who / when / reason, audit `soft_delete`; hard delete stays denied | 18 masters, `projects`, `expense-requests` (registry `domain/soft-delete/registry.ts`) | `GET /api/v1/records/{collection}/{id}/delete-check`, `POST …/delete` | list "Aksi" → Hapus (RowRecordAction) | unit `d1610-soft-delete.test.ts`; int `d1610-soft-delete.int.test.ts` (usage check, permissions, audit) |
+| Deleted rows hidden from lists, pickers, API, masters, reports; labels of old documents kept | same | central `hideDeleted` read rule; `GET /api/v1/masters` (tombstones on `since`) | every list / picker; Admin filter "Data dihapus" | int (REST list, v1 list, masters, PkListView, reports scope) |
+| Pulihkan (Admin), audit `restore` | same | `POST /api/v1/records/{collection}/{id}/restore` | list "Aksi" → Pulihkan | int (restore, permissions) |
+| Used row: master → Nonaktifkan, request → Batalkan, project → Batalkan proyek (status `dibatalkan`, cascade, refused while money moved) | `projects`, `expense-requests`, `budget-addenda`, `project-loans` | `GET /api/v1/projects/{id}/cancel-plan`, `POST /api/v1/projects/{id}/cancel` | list "Aksi" → Batalkan (dry-run dialog) | int (cascade, refusal with `blocking`, permissions, closed project) |

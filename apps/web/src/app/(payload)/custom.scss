@@ -763,6 +763,96 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
   }
 
+  // DRMS 16/10: "+ Buat" menu (ModuleBar QuickCreateMenu, src/admin/shell/quick-create.ts) — primary pill left of the
+  // PT switcher; items = create pages grouped by module, ≥ 44px rows; icon-only "+" and a full-width panel under 640px.
+  .pk-quick__btn {
+    display: inline-flex;
+    flex-shrink: 0;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    height: 44px;
+    padding: 0 14px 0 10px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--pk-primary);
+    color: var(--pk-on-primary);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--pk-primary-hover);
+    }
+
+    &[aria-expanded='true'] {
+      box-shadow: 0 0 0 3px color-mix(in oklab, var(--pk-primary) 28%, transparent);
+    }
+  }
+
+  .pk-quick__menu {
+    min-width: 260px;
+    max-height: calc(100dvh - var(--pk-bar-h) - 16px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .pk-quick__group + .pk-quick__group {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid var(--pk-border);
+  }
+
+  .pk-quick__head {
+    padding: 6px 10px 2px;
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .pk-bar__menu-link.pk-quick__link {
+    min-height: 44px;
+
+    .pk-quick__chip svg {
+      color: #FFFFFF;
+    }
+  }
+
+  .pk-quick__chip {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
+  }
+
+  @media (max-width: 639px) {
+    .pk-quick__btn {
+      width: 44px;
+      padding: 0;
+    }
+
+    .pk-quick__text {
+      display: none;
+    }
+
+    // the button is not at the right edge (PT switcher, bell, avatar follow) → a panel under the bar, full width
+    .pk-quick .pk-quick__menu {
+      position: fixed;
+      top: calc(var(--pk-bar-h) + 4px);
+      right: 8px;
+      left: 8px;
+      min-width: 0;
+      transform-origin: top center;
+    }
+  }
+
   // ---- launcher ----------------------------------------------------------------------------------
   .pk-launcher {
     max-width: 1120px;
@@ -2125,6 +2215,43 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
         color: var(--pk-on-primary);
       }
     }
+  }
+
+  // D1610 (ADR 0030): "Hapus" / "Batalkan" read as destructive (outline in the bad tone); "Pulihkan" / "Nonaktifkan" neutral.
+  button.pk-row-act {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .pk-row-act:is([data-kind='hapus'], [data-kind='batalkan']) {
+    border-color: color-mix(in oklab, var(--pk-tone-bad-text) 45%, var(--pk-input));
+    color: var(--pk-tone-bad-text);
+
+    &:hover {
+      border-color: var(--pk-tone-bad-text);
+      background: color-mix(in oklab, var(--pk-tone-bad-text) 10%, var(--pk-card));
+      color: var(--pk-tone-bad-text);
+    }
+  }
+
+  .pk-row-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--pk-tone-bad-text) 12%, var(--pk-card));
+    color: var(--pk-tone-bad-text);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  // a soft-deleted row (Admin filter "Tampilkan yang dihapus"): muted and struck through, the actions stay readable
+  tr.pk-plist__row--deleted td:not(.cell-rowActions) {
+    color: var(--pk-muted-fg);
+    text-decoration: line-through;
   }
 
   @media (pointer: coarse) {

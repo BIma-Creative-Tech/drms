@@ -15,6 +15,7 @@ import {
   ids,
   loadRaw,
   loadVisible,
+  lockRequest,
   openFlagCount,
   projectCommitted,
   requireAction,
@@ -27,7 +28,8 @@ import {
   type Signature,
 } from './common'
 import { fromDocLines, validateContent, vendorOfDoc } from './drafts'
-import { payeeOf } from './types'
+import { targets } from './state'
+import { payeeOf, STATUS_LABELS } from './types'
 import { designatedAccount } from '@/domain/intercompany/service'
 import { checkFundsForApproval } from '@/domain/fundcheck/service'
 import type { FundFigures } from '@/domain/fundcheck/rules'
@@ -293,6 +295,22 @@ export async function withdraw(req: PayloadRequest, id: number, reason: string):
 export async function cancel(req: PayloadRequest, id: number, reason: string): Promise<RequestDoc> {
   const doc = await loadVisible(req, id, { lock: true })
   requireAction(await actorContext(req, doc), 'cancel')
+  return updateRequest(req, id, { status: 'cancelled', cancelReason: reason }, reason)
+}
+
+/**
+ * D1610 (ADR 0030) "Batalkan proyek" cascade: cancel ONE request of the cancelled project as the system — the actor
+ * guard is the project-cancel permission (Direktur / Admin of the PT, checked by domain/projects/cancel.ts), the
+ * STATE MACHINE still decides (a `cancel` transition must exist: draft / pending_ack / pending_approval, advance
+ * approved, reimburse approved / receipts_verified / receipt_revision). Same write as `cancel` (status + reason,
+ * notifications and audit through the collection hooks), in the caller's transaction.
+ */
+export async function cancelForProject(req: PayloadRequest, id: number, reason: string): Promise<RequestDoc> {
+  await lockRequest(req, id)
+  const doc = await loadRaw(req, id)
+  if (targets(doc.type, doc.status, 'cancel', payeeOf(doc.payeeType)).length === 0) {
+    fail(409, `Pengajuan ${doc.docNo ?? `#${id}`} berstatus "${STATUS_LABELS[doc.status]}" tidak dapat dibatalkan.`)
+  }
   return updateRequest(req, id, { status: 'cancelled', cancelReason: reason }, reason)
 }
 

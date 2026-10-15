@@ -5,6 +5,7 @@ ADR 0026, sesudah Anda masih ada **Persetujuan Owner** — lihat [Panduan Owner]
 menyetujui **addendum RAB**, mengelola **project dan tahapan**, **membuka kembali tutup buku**, dan memantau
 **dashboard** serta **laporan progress**. Direktur tidak membuat pengajuan dan tidak mencatat kas. Baca juga
 [Hal umum](README.md#hal-umum-untuk-semua-peran).
+Tombol **+ Buat** di bar atas (pintasan **Alt+N**) langsung membuka: Pengajuan baru (pengajuan Anda sendiri, ADR 0024), Proyek baru, Klien baru dan — di PT dengan laporan lapangan — Laporan harian.
 
 ## 1. Menyetujui pengajuan (Persetujuan Direktur)
 

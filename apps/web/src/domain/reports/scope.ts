@@ -193,13 +193,13 @@ export function companyScopeSql(col: SQL, companyIds: readonly number[]): SQL {
  * OR over the parts of `(companyCol = c AND pred(part) [AND site(onlySites)])`; FALSE when there is none. `site` =
  * the ADR 0023 site predicate of the row (required when a part carries `onlySites`; missing → FALSE, fail closed).
  */
-function orCompanies(s: ReportScope, companyCol: SQL, pred: (p: Part) => SQL | null, site?: (sites: number[]) => SQL): SQL {
+function orCompanies(s: ReportScope, companyCol: SQL, pred: (p: Part) => SQL | null, site?: (sites: number[]) => SQL, extra?: SQL): SQL {
   const out: SQL[] = []
   for (const p of parts(s)) {
     const x = pred(p)
     if (!x) continue
     const narrowed = p.onlySites ? sql` AND ${site ? site(p.onlySites) : sql`FALSE`}` : sql``
-    out.push(sql`(${companyCol} = ${p.company} AND ${x}${narrowed})`)
+    out.push(sql`(${companyCol} = ${p.company} AND ${x}${narrowed}${extra ? sql` AND ${extra}` : sql``})`)
   }
   return out.length ? sql`(${sql.join(out, sql` OR `)})` : sql`FALSE`
 }
@@ -214,7 +214,7 @@ export function accountOfSitesSql(col: SQL, sites: readonly number[]): SQL {
   return sites.length ? sql`${col} IN (SELECT sa.id FROM cash_accounts sa WHERE ${inList(sql`sa.site_id`, sites)})` : sql`FALSE`
 }
 
-/** Row filter on `expense_requests er` for the scope. */
+/** Row filter on `expense_requests er` for the scope. D1610 (ADR 0030): a soft-deleted draft is never counted. */
 export function requestScopeSql(s: ReportScope): SQL {
   return orCompanies(
     s,
@@ -227,6 +227,7 @@ export function requestScopeSql(s: ReportScope): SQL {
         : sql`(er.created_by_id = ${p.userId} OR EXISTS (SELECT 1 FROM expense_requests_rels rr WHERE rr.parent_id = er.id AND rr.path = 'requesters' AND rr.employees_id = ${p.employeeId}))`
     },
     (sites) => projectOfSitesSql(sql`er.project_id`, sites),
+    sql`er.is_deleted IS NOT TRUE`,
   )
 }
 
@@ -265,6 +266,9 @@ export function ledgerScopeSql(s: ReportScope, alias = 'ce', table: 'entry' | 'a
   )
 }
 
+/** D1610 (ADR 0030): soft-deleted projects / masters never appear in report filters, lists and counts (NULL-safe on outer joins). */
+const notDeleted = (alias: string): SQL => sql`${aliasCol(alias, 'is_deleted')} IS NOT TRUE`
+
 /** Projects visible in the scope (`projects p`). */
 export function projectScopeSql(s: ReportScope, alias = 'p'): SQL {
   return orCompanies(
@@ -272,6 +276,7 @@ export function projectScopeSql(s: ReportScope, alias = 'p'): SQL {
     aliasCol(alias, 'company_id'),
     (p) => (p.kind === 'all' ? sql`TRUE` : p.kind === 'team' ? inList(aliasCol(alias, 'id'), p.projects) : null),
     (sites) => inList(aliasCol(alias, 'site_id'), sites),
+    notDeleted(alias),
   )
 }
 
@@ -282,17 +287,18 @@ export function costCenterScopeSql(s: ReportScope, alias = 'cc'): SQL {
     aliasCol(alias, 'company_id'),
     (p) => (p.kind === 'all' ? sql`TRUE` : p.kind === 'team' ? inList(aliasCol(alias, 'id'), p.costCenters) : null),
     (sites) => sql`${aliasCol(alias, 'id')} IN (SELECT sc.cost_center_id FROM sites sc WHERE ${inList(sql`sc.id`, sites)})`,
+    notDeleted(alias),
   )
 }
 
 /** Sites of the scope's PTs (`sites s`, filter option lists): every site of a PT in the scope. */
 export function siteScopeSql(s: ReportScope, alias = 's'): SQL {
-  return companyScopeSql(aliasCol(alias, 'company_id'), scopeCompanies(s))
+  return sql`(${companyScopeSql(aliasCol(alias, 'company_id'), scopeCompanies(s))} AND ${notDeleted(alias)})`
 }
 
 /** Per-PT masters of the scope's PTs (categories, accounts, vehicles, sources): `alias.company_id IN …`. */
 export function masterScopeSql(s: ReportScope, alias: string): SQL {
-  return companyScopeSql(aliasCol(alias, 'company_id'), scopeCompanies(s))
+  return sql`(${companyScopeSql(aliasCol(alias, 'company_id'), scopeCompanies(s))} AND ${notDeleted(alias)})`
 }
 
 /** Manual cash entries are part of office reports only (PM: "tanpa kas manual"): any `all` PT. */

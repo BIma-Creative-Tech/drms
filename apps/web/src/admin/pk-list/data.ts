@@ -3,6 +3,10 @@ import type { Payload, SanitizedCollectionConfig, SanitizedFieldsPermissions, Ty
 import { companyContextOf } from '@/access/roles'
 import { pageOfFind, type PageOf } from '@/admin/list-query'
 import { companyLabels } from '@/admin/components/companies/labels'
+import { spValue } from '@/admin/list-query'
+import { mayShowDeleted } from '@/domain/soft-delete/collection'
+import { softDeleteEntry } from '@/domain/soft-delete/registry'
+import { ONLY_DELETED, WITH_DELETED } from '@/domain/soft-delete/where'
 
 import { buildPkListConfig, topLevelFields, type PkListConfig } from './config'
 import { activeColumns, companyScope, parsePkQuery, pkWhere, type PkQuery } from './query'
@@ -36,6 +40,19 @@ export type PkListData = {
   companies: FilterOption[] | null
   /** The where of an old deep link / a filter Payload refused (QueryError) → message. */
   error: string | null
+  /** D1610 (ADR 0030): Admin filter "Tampilkan yang dihapus" — offered (`allowed`) and its value. */
+  deleted: { allowed: boolean; mode: DeletedMode }
+}
+
+/** D1610: URL param of the deleted-rows filter: '' = hidden (default), `tampil` = with deleted, `hanya` = deleted only. */
+export const DELETED_PARAM = 'dihapus'
+export type DeletedMode = '' | 'tampil' | 'hanya'
+
+/** The deleted-rows mode of one request — only for a soft-delete collection and an Admin (mayShowDeleted). */
+export function deletedModeOf(slug: string, user: TypedUser | null | undefined, sp: Record<string, string | string[] | undefined> | undefined): { allowed: boolean; mode: DeletedMode } {
+  const allowed = !!softDeleteEntry(slug) && !!user && mayShowDeleted({ user } as never)
+  const raw = spValue(sp, DELETED_PARAM)
+  return { allowed, mode: allowed && (raw === 'tampil' || raw === 'hanya') ? raw : '' }
 }
 
 const configs = new WeakMap<object, PkListConfig>()
@@ -105,7 +122,11 @@ export async function loadPkList({ payload, user, collection, searchParams, colu
   const readable = readableFields(collection, fieldPermissions)
   const query = parsePkQuery(searchParams, cfg)
   const selected = companyContextOf(user)?.selected ?? null
-  const where = pkWhere(query, cfg, { selected, readable })
+  const deleted = deletedModeOf(collection.slug, user, searchParams)
+  const base = pkWhere(query, cfg, { selected, readable })
+  // D1610: an explicit isDeleted condition — kept by the central read rule for Admins only (else ignored)
+  const deletedWhere = deleted.mode === 'tampil' ? WITH_DELETED : deleted.mode === 'hanya' ? ONLY_DELETED : null
+  const where: Where = deletedWhere ? (Object.keys(base).length ? { and: [base, deletedWhere] } : deletedWhere) : base
   const available = cfg.columns.map((c) => c.name).filter(readable)
   const columns = activeColumns(columnsPref, cfg, readable)
 
@@ -150,5 +171,5 @@ export async function loadPkList({ payload, user, collection, searchParams, colu
   // URL PT ids outside the selection never reach the where (companyScope) — and are not shown as ticked
   query.companies = companyScope(query.companies, selected)
 
-  return { cfg, query, where, docs: page.items as Array<Record<string, unknown>>, page, columns, available, relOptions, companies, error }
+  return { cfg, query, where, docs: page.items as Array<Record<string, unknown>>, page, columns, available, relOptions, companies, error, deleted }
 }

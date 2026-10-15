@@ -16,6 +16,9 @@ import { copyReceiptsForResubmit } from './receipts'
 import { INACTIVE_FOR_DUPLICATES, isBusinessDate, isDirectPayment, normalizeInvoiceNo, payeeOf, STATUS_LABELS, type PayeeType, type RequestStatus, type RequestType } from './types'
 import { assertDocumentUnused, INTERCOMPANY_NO_ACCOUNT, payeeCompanyErrors } from '@/domain/intercompany/service'
 import { failCoded } from '@/domain/coded-error'
+import { isClosedProjectStatus } from '@/domain/projects/status'
+import { NOT_DELETED } from '@/domain/soft-delete/where'
+import { softDeleteEntry } from '@/domain/soft-delete/registry'
 
 export type LineInputApi = {
   id?: string
@@ -131,7 +134,8 @@ async function activeIds(req: PayloadRequest, collection: CollectionSlug, wanted
   const mapped = perPt ? mappedCompanies(req) : null
   const res = await req.payload.find({
     collection,
-    where: { and: [{ id: { in: wanted } }, { active: { not_equals: false } }, ...(mapped !== null ? [{ company: { in: mapped } }] : [])] },
+    // D1610: a soft-deleted master is refused like an inactive one (an explicit id list skips the central read rule)
+    where: { and: [{ id: { in: wanted } }, { active: { not_equals: false } }, ...(softDeleteEntry(collection) ? [NOT_DELETED] : []), ...(mapped !== null ? [{ company: { in: mapped } }] : [])] },
     depth: 0,
     pagination: false,
     overrideAccess: true, // SYSTEM-READ: master validation
@@ -149,7 +153,7 @@ async function activeEmployees(req: PayloadRequest, wanted: number[]): Promise<M
   const mapped = mappedCompanies(req)
   const res = await req.payload.find({
     collection: 'employees',
-    where: { and: [{ id: { in: wanted } }, { active: { not_equals: false } }, ...(mapped !== null ? [{ company: { in: mapped } }] : [])] },
+    where: { and: [{ id: { in: wanted } }, { active: { not_equals: false } }, NOT_DELETED, ...(mapped !== null ? [{ company: { in: mapped } }] : [])] },
     depth: 0,
     pagination: false,
     select: { company: true },
@@ -226,13 +230,14 @@ export async function validateContent(
   // G10: project / cost center in the caller's scope (office roles: any active one).
   if (c.projectId) {
     const p = await req.payload.findByID({ collection: 'projects', id: c.projectId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
-    if (!p || isForeign(req, relId(p.company) ?? -1)) errors.push({ path: 'projectId', message: 'Project tidak ditemukan.' })
-    else if (p.status === 'arsip' || p.status === 'selesai') errors.push({ path: 'projectId', message: 'Project sudah selesai/diarsipkan.' })
+    // D1610: a soft-deleted project is reported like a missing one (findByID still returns it — labels of old documents)
+    if (!p || p.isDeleted === true || isForeign(req, relId(p.company) ?? -1)) errors.push({ path: 'projectId', message: 'Project tidak ditemukan.' })
+    else if (isClosedProjectStatus(p.status) || p.status === 'selesai') errors.push({ path: 'projectId', message: p.status === 'dibatalkan' ? 'Project sudah dibatalkan.' : 'Project sudah selesai/diarsipkan.' })
     else if (!office && !(await scope()).assignedProjects.includes(c.projectId)) fail(403, 'Project di luar penugasan Anda.')
   }
   if (c.costCenterId) {
     const cc = await req.payload.findByID({ collection: 'cost-centers', id: c.costCenterId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
-    if (!cc || cc.active === false || isForeign(req, relId(cc.company) ?? -1)) errors.push({ path: 'costCenterId', message: 'Pusat biaya tidak ditemukan atau nonaktif.' })
+    if (!cc || cc.active === false || cc.isDeleted === true || isForeign(req, relId(cc.company) ?? -1)) errors.push({ path: 'costCenterId', message: 'Pusat biaya tidak ditemukan atau nonaktif.' })
     else if (!office && !(await scope()).assignedCostCenters.includes(c.costCenterId)) fail(403, 'Pusat biaya di luar penugasan Anda.')
   }
 
