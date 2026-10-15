@@ -103,6 +103,19 @@ async function mayUpdate(req: PayloadRequest, slug: string, id: number): Promise
   return r.totalDocs > 0
 }
 
+/**
+ * Hapus of a request: its creator or one of its requesters (the people who may edit the draft) — decided BEFORE the
+ * status, so the owner of a submitted request learns it must be cancelled (409) instead of a 403.
+ */
+async function ownsRequest(req: PayloadRequest, row: RecordRow): Promise<boolean> {
+  const uid = userId(req)
+  if (uid !== undefined && relId(row.created_by_id) === uid) return true
+  const emp = employeeIn(req, relId(row.company_id))
+  if (emp === undefined) return false
+  const r = await rows<{ n: number }>(req, sql`SELECT count(*)::int AS n FROM expense_requests_rels WHERE parent_id = ${row.id} AND path = 'requesters' AND employees_id = ${emp}`)
+  return Number(r[0]?.n ?? 0) > 0
+}
+
 /** Pulihkan / "Tampilkan yang dihapus": Admin of the row's PT (shared master: of any selected PT), group admin. */
 export function mayRestore(req: PayloadRequest, entry: SoftDeleteEntry, companyId: number | null | undefined): boolean {
   if (isGroupAdmin(req)) return true
@@ -168,7 +181,7 @@ export async function deleteCheck(req: PayloadRequest, slug: string, id: number)
   const canRestore = deleted && mayRestore(req, entry, company)
   const base = { collection: slug, id, title: titleOf(entry, row), deleted, canRestore, deletedAt: (row.deleted_at as string | null) ?? null, deleteReason: (row.delete_reason as string | null) ?? null }
   if (deleted) return { ...base, action: canRestore ? 'pulihkan' : null, canDelete: false, blockedReason: 'Data ini sudah dihapus.', usage: [] }
-  const canUpdate = await mayUpdate(req, slug, id)
+  const canUpdate = entry.kind === 'expense' ? await ownsRequest(req, row) : await mayUpdate(req, slug, id)
   if (entry.kind === 'expense') {
     const draft = isNeverSubmittedDraft(row)
     const action = draft && canUpdate ? 'hapus' : !draft && requestCancellable(row) ? 'batalkan' : null
@@ -237,7 +250,7 @@ export async function softDelete(req: PayloadRequest, slug: string, id: number, 
   const row = await loadRow(req, entry, id, true)
   if (!row || !(await mayRead(req, slug, id))) return fail(404, 'NOT_FOUND', 'Data tidak ditemukan.')
   if (row.is_deleted === true) fail(409, 'ALREADY_DELETED', 'Data ini sudah dihapus.')
-  if (!(await mayUpdate(req, slug, id))) fail(403, 'FORBIDDEN', entry.kind === 'expense' ? 'Hanya pembuat / pemohon yang dapat menghapus draft pengajuan ini.' : 'Anda tidak berhak menghapus data ini.')
+  if (!(entry.kind === 'expense' ? await ownsRequest(req, row) : await mayUpdate(req, slug, id))) fail(403, 'FORBIDDEN', entry.kind === 'expense' ? 'Hanya pembuat / pemohon yang dapat menghapus draft pengajuan ini.' : 'Anda tidak berhak menghapus data ini.')
   if (entry.kind === 'expense') {
     if (!isNeverSubmittedDraft(row)) fail(409, 'NOT_A_DRAFT', 'Hanya draft yang belum pernah diajukan yang dapat dihapus. Pengajuan yang sudah diajukan dibatalkan lewat "Batalkan".')
   } else {
