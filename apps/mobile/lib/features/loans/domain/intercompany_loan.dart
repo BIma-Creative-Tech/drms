@@ -77,7 +77,8 @@ class IcCompanyRef {
   int get hashCode => Object.hash(id, shortCode, name);
 }
 
-/// The borrower's designated receiving account (masked; queue item `destination`).
+/// The borrower's designated receiving account (masked; `destination` of the queue item and — since 2026-10-15 — of the
+/// loan detail, for the same readers: Finance of the lender while the loan is instructed).
 class IcLoanDestination {
   const IcLoanDestination({this.bankName, this.accountNoMasked, this.accountHolder = ''});
   final String? bankName;
@@ -184,7 +185,8 @@ class IcLoanMovement {
 }
 
 /// A loan: the summary fields (list / queue) plus the detail fields when read from `GET /intercompany-loans/{id}`, and
-/// the queue fields (`canDisburse`, `g1Note`, `destination`) when read from `GET /intercompany-loans/queue`.
+/// the queue fields (`canDisburse`, `g1Note`) when read from `GET /intercompany-loans/queue`. `destination` comes with
+/// both (the detail since 2026-10-15; [destinationKnown] tells an older server's detail without it).
 class IcLoan {
   const IcLoan({
     required this.id,
@@ -217,6 +219,7 @@ class IcLoan {
     this.canDisburse,
     this.g1Note,
     this.destination,
+    this.destinationKnown = false,
   });
 
   final int id;
@@ -259,8 +262,18 @@ class IcLoan {
   final bool? canDisburse;
   final String? g1Note;
 
-  /// Queue only: the borrower's designated receiving account (null = none designated → the disbursement is refused).
+  /// The borrower's designated receiving account (masked). Queue item: null = none designated (the disbursement is
+  /// refused). Detail: the same for its readers (Finance of the lender while instructed), null for everyone else.
   final IcLoanDestination? destination;
+
+  /// The payload carried `destination` (queue items; the detail of a server since 2026-10-15). false = an older
+  /// server's detail: the APK falls back to the queue item.
+  final bool destinationKnown;
+
+  /// The caller reads `destination` (the queue item's readers): Finance of the lender while the loan waits — the server
+  /// offers `disburse`, or refuses it to the instruction's creator (G1).
+  bool get readsDestination =>
+      status == IcLoanStatus.instructed && (allowedActions.contains(IcLoanAction.disburse) || disburseBlockedByG1);
 
   String get lenderCode => lender?.shortCode ?? '-';
   String get borrowerCode => borrower?.shortCode ?? '-';
@@ -302,8 +315,18 @@ class IcLoan {
       canDisburse: j['canDisburse'] is bool ? j['canDisburse'] as bool : null,
       g1Note: _strN(j['g1Note']),
       destination: IcLoanDestination.fromJson(j['destination']),
+      destinationKnown: j.containsKey('destination'),
     );
   }
+}
+
+/// The borrower's receiving account of [loan] (a detail) for the disbursement form and the loan detail: the detail's
+/// own `destination`; only when an older server sent none, the [queued] item's (once the queue has loaded). `known`
+/// false = not known yet (no "none designated" warning).
+({IcLoanDestination? destination, bool known}) icLoanDestinationOf(IcLoan loan, {IcLoan? queued}) {
+  if (loan.destinationKnown) return (destination: loan.destination, known: true);
+  if (queued != null) return (destination: queued.destination, known: true);
+  return (destination: null, known: false);
 }
 
 /// `GET /intercompany-loans/queue`: instructed loans waiting for the caller's (lender) Finance PTs.
