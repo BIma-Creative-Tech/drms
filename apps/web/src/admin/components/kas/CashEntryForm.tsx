@@ -78,7 +78,7 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
   const id = (n: string) => `${uid}-${n}`
   const err = (name: string) => errors[name]
   const described = (name: string, help?: boolean) => [err(name) ? id(`${name}-e`) : null, help ? id(`${name}-h`) : null].filter(Boolean).join(' ') || undefined
-  const Err = ({ name }: { name: string }) =>
+  const errText = (name: string) =>
     err(name) ? (
       <p id={id(`${name}-e`)} className="err">
         {err(name)}
@@ -236,7 +236,7 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
           {o.help}
         </p>
       ) : null}
-      <Err name={name} />
+      {errText(name)}
     </div>
   )
 
@@ -301,7 +301,7 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
                 {lockDate ? `Tutup buku s/d ${lockDate}: tanggal sebelumnya ditolak.` : 'Belum ada periode yang ditutup.'}
                 {opening ? ` Saldo awal akun per ${dmy(opening)}: tanggal sebelumnya ditolak.` : ''} Tidak boleh di masa depan.
               </p>
-              <Err name="entryDate" />
+              {errText('entryDate')}
             </div>
             {select('cashAccountId', 'Akun kas', options.accounts, options.accounts.length === 1 ? options.accounts[0]!.id : null, { required: true, onPick: setAccountId })}
             <div className="pk-fld">
@@ -378,7 +378,7 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
             Keterangan<span className="req" aria-hidden>*</span>
           </label>
           <textarea id={id('description')} name="description" defaultValue={entry?.description ?? ''} maxLength={1000} required aria-invalid={err('description') ? true : undefined} aria-describedby={described('description')} />
-          <Err name="description" />
+          {errText('description')}
         </div>
 
         <div className="pk-fld full">
@@ -405,7 +405,7 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
             <p id={id('reason-h')} className="help">
               Tercatat di audit log bersama nilai lama dan baru.
             </p>
-            <Err name="reason" />
+            {errText('reason')}
           </div>
         ) : null}
       </div>
