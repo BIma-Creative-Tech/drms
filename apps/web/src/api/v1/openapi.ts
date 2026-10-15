@@ -9,6 +9,7 @@ import { registerFieldPaths } from './openapi-field'
 import { registerIcLoanPaths } from './openapi-icloans'
 import { registerLoanPaths } from './openapi-loans'
 import { registerProjectPaths } from './openapi-projects'
+import { registerRecordPaths } from './openapi-records'
 import { registerShortfallPaths } from './openapi-shortfall'
 import { registerUserOnboardingPaths } from './openapi-users'
 import { Device, DeviceRegister, DeviceRevoke, Health, Masters, MastersQuery, Me, Problem, Ready, TestEmailQueued } from './schemas'
@@ -662,6 +663,8 @@ export function buildOpenApiDocument(version: string) {
   registerIcLoanPaths(registry, { security, deviceHeader, idem, res })
   // ---- DRMS 13/10 W3: "Pengguna" tabbed onboarding (ADR 0003 revision 2026-10-13) ----------------
   registerUserOnboardingPaths(registry, { security, res })
+  // ---- D1610 (ADR 0030): row actions Hapus (soft delete) / Pulihkan / Batalkan proyek ------------
+  registerRecordPaths(registry, { security, deviceHeader, idem, res })
 
   return new OpenApiGeneratorV31(registry.definitions).generateDocument({
     openapi: '3.1.0',

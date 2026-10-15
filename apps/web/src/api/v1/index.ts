@@ -22,6 +22,7 @@ import { openapiEndpoint } from './endpoints/openapi'
 import { privacyAckEndpoint, privacyNoticeEndpoint } from './endpoints/privacy'
 import { PROGRESS_ENDPOINTS } from './endpoints/progress'
 import { PROJECT_ENDPOINTS } from './endpoints/projects'
+import { RECORD_ENDPOINTS } from './endpoints/records'
 import { REPORT_ENDPOINTS } from './endpoints/reports'
 import { SHORTFALL_ENDPOINTS } from './endpoints/shortfall'
 import { appConfigEndpoint } from './endpoints/app'
@@ -82,4 +83,6 @@ export const v1Endpoints: Endpoint[] = [
   ...LOAN_ENDPOINTS,
   // DRMS 13/10 W3: "Pengguna" tabbed onboarding — account + access per PT + employee + bank accounts in ONE save
   ...USER_ONBOARDING_ENDPOINTS,
+  // D1610 (ADR 0030): row actions Hapus (soft delete) / Pulihkan / Batalkan proyek (dry run + cascade)
+  ...RECORD_ENDPOINTS,
 ]
