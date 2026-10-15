@@ -28,6 +28,8 @@ bar ada **tombol PT**, **lonceng Notifikasi** dan **menu akun** (inisial nama: P
 Tema terang/gelap, Keluar). Di HP (layar sempit) menu modul dibuka dengan tombol **☰**. Modul hanya tampil bila Anda
 punya akses ke minimal satu isinya; angka merah = jumlah yang menunggu tindakan.
 
+**+ Buat** (bar atas, kiri tombol PT; pintasan **Alt+N**) membuka langsung formulir baru: Pengajuan baru (atas nama karyawan), Proyek baru, Klien baru, Vendor baru, **Pengguna baru** (formulir bertab Pengguna) dan Karyawan baru.
+
 Di halaman daftar dan formulir data, baris kecil di bawah bar menunjukkan **lokasi halaman**, mis.
 **Keuangan › Pengajuan biaya › PB-2026-0001**: klik nama modul untuk ke menu pertamanya, klik nama daftar untuk
 kembali ke daftar. Halaman khusus (Kas, Antrian Transfer, Laporan, dst.) tidak punya baris ini — judul halaman sudah
