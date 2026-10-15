@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import { partnerFormHref, projectForClientHref } from '@/admin/partner-routes'
 import type { ClientFormDetail, VendorFormDetail } from '@/domain/partners/service'
@@ -65,6 +65,47 @@ export function ClientForm(props: ClientFormProps) {
 
 export function VendorForm(props: VendorFormProps) {
   return <PartnerForm kind="vendor" {...props} />
+}
+
+/**
+ * Drawer / quick-create entry (no server page around it): loads the form data from `GET /api/v1/{client,vendor}-form`
+ * (`id` null = a new record: the PTs the caller may create in) and renders the same form — `onSaved(id, detail)`
+ * instead of any navigation, `onCancel` for the close button, `initialCompany` = the PT of the form that opened it
+ * (used when the caller may create there). The FORM state is built once from the loaded data (its initial state);
+ * nothing is prefilled into a mounted form.
+ */
+export function PartnerFormLoader({ kind, id, ...common }: Omit<Common, 'mode'> & { kind: PartnerKind; id: number | null }) {
+  const [state, setState] = useState<{ detail: ClientFormDetail | VendorFormDetail } | { error: string } | null>(null)
+  useEffect(() => {
+    let live = true
+    fetch(formUrl(kind, id), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(async (res) => {
+        const data = (await res.json().catch(() => null)) as ClientFormDetail | VendorFormDetail | null
+        if (live) setState(res.ok && data ? { detail: data } : { error: problemText(data, res.status) })
+      })
+      .catch(() => live && setState({ error: 'Gagal menghubungi server. Periksa koneksi lalu coba lagi.' }))
+    return () => {
+      live = false
+    }
+  }, [kind, id])
+  if (state === null) return <p className="pk-uo__hint" role="status">Memuat…</p>
+  if ('error' in state) {
+    return (
+      <div className="pk-uo">
+        <p className="pk-alert bad" role="alert">
+          {state.error}
+        </p>
+        {common.onCancel ? (
+          <div className="pk-kact">
+            <button type="button" className="pk-kbtn" onClick={common.onCancel}>
+              Tutup
+            </button>
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+  return <PartnerForm kind={kind} mode={id === null ? 'create' : 'update'} detail={state.detail} {...common} />
 }
 
 const REASON_MESSAGE = 'Alasan wajib diisi saat menonaktifkan data atau mengubah / menonaktifkan rekening.'

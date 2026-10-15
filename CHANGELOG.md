@@ -33,8 +33,9 @@ first, primary contact row. The previous image keeps working (it never reads the
   caller may create in), `GET …/{id}` (record + contacts + projects / bank accounts + whether the caller may save).
   OpenAPI regenerated.
 - The form component (`admin/components/partners/PartnerForm.tsx`: `ClientForm` / `VendorForm`) also renders inside a
-  drawer: `mode`, `onSaved(id, detail)` instead of navigation, `onCancel`, `initialCompany` (for the coming quick-create
-  "+" beside relationship pickers).
+  drawer: `mode`, `onSaved(id, detail)` instead of navigation, `onCancel`, `initialCompany`; `PartnerFormLoader`
+  (`kind`, `id` or null) loads its data from the GET endpoints itself — the entry for the coming quick-create "+" beside
+  relationship pickers (Payload's own relationship drawer keeps the plain collection form).
 
 ### Changed
 
@@ -42,8 +43,8 @@ first, primary contact row. The previous image keeps working (it never reads the
   (read-only for readers without the update right, e.g. PM, Finance on clients). Menu items **+ Klien baru** (Proyek ›
   Data pendukung; Admin / Direktur) and **+ Vendor baru** (Master Data; Admin / Finance).
 - The single **Kontak** / **No. HP** columns stay (list columns, APK masters, Odoo mirror) and are now derived from the
-  primary contact (read-only in Payload's form); a create that sends only them (seed, import) becomes the primary
-  contact.
+  primary contact (read-only in Payload's form); a write that sends only them (seed, import, old REST clients) updates
+  or creates the primary contact instead.
 - Vendors: the Payload tabs + `join` list of the bank accounts are removed (the tabbed page replaces them; no column).
 
 ## [0.12.0] - 2026-10-15
