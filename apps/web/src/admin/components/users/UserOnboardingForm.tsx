@@ -10,12 +10,31 @@ import type { OnboardingDetail } from '@/domain/user-onboarding/service'
 import { problemText } from '../ActionButton'
 import { lockOwner, roleOptionsFor } from '../access/role-matrix'
 import { MultiSelect } from '../list/MultiSelect'
-import { activeCompanies, buildBody, draftFromDetail, mapErrors, newBank, TABS, type BodyOrder, type CompanyDraft, type Draft, type EmpDraft, type TabId } from './user-onboarding-form'
+import {
+  activeCompanies,
+  ASG_ROLES,
+  buildBody,
+  draftFromDetail,
+  hasEmployee,
+  LOCATION_KINDS,
+  mapErrors,
+  newAssignment,
+  newBank,
+  showsSavedAssignments,
+  TABS,
+  type AsgDraft,
+  type BodyOrder,
+  type CompanyDraft,
+  type Draft,
+  type EmpDraft,
+  type TabId,
+} from './user-onboarding-form'
 
 /**
  * DRMS 13/10 Wave 3 — ONE tabbed form for an account (client brief: "Satu UI ber-tab: Detail Pengguna, Permissions,
  * Detail Karyawan, Rekening Karyawan"; "multiple dropdown, bukan checkbox"). Tabs: Detail Pengguna · Akses & Peran
- * (per PT one checklist dropdown of roles) · Data Karyawan (per PT) · Rekening Karyawan · Penugasan Proyek (read).
+ * (per PT one checklist dropdown of roles) · Data Karyawan (per PT) · Rekening Karyawan · Penugasan Proyek (DRMS 15/10:
+ * add assignments of the PT's employee — also a new one — and change the role / end of saved ones, same save).
  * One "Simpan" → `POST /api/v1/user-onboarding` / `PATCH /api/v1/user-onboarding/{id}`: everything in ONE
  * transaction on the server (all-or-nothing); a refused save marks the fields and opens the first tab with an error.
  * D4 layout: label left of the input (`.pk-fgrid`), stacked on phones.
@@ -37,7 +56,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
   const [created, setCreated] = useState<{ id: number; password: string | null; linked: boolean } | null>(null)
   const seq = useRef(0)
 
-  const { body, order, changed } = useMemo(() => buildBody(detail, draft, mode), [detail, draft, mode])
+  const { body, order, changed, needsReason } = useMemo(() => buildBody(detail, draft, mode), [detail, draft, mode])
   const shownCompanies = activeCompanies(detail, draft)
   const identityLocked = mode === 'update' && detail.user?.identityEditable === false
   const err = (key: string) => errors.get(key)
@@ -51,6 +70,12 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
 
   const save = async () => {
     if (busy || !changed) return
+    if (needsReason && draft.reason.trim().length < 3) {
+      // same rule as the server (TeamAssignments reasonOnChange) — answered here without a round trip
+      setErrors(new Map([['reason', 'Alasan wajib diisi saat mengubah peran atau mengakhiri penugasan.']]))
+      setMsg({ tone: 'bad', text: 'Tidak ada yang disimpan — isi alasan perubahan.' })
+      return
+    }
     setBusy(true)
     setMsg(null)
     setErrors(new Map())
@@ -150,6 +175,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
       if (t === 'akses' && (/^c\.\d+\.roles/.test(k) || k === 'companies')) return true
       if (t === 'karyawan' && /^c\.\d+\.employee/.test(k)) return true
       if (t === 'rekening' && /^c\.\d+\.bank/.test(k)) return true
+      if (t === 'penugasan' && /^c\.\d+\.asg/.test(k)) return true
     }
     return false
   }
@@ -456,47 +482,160 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
         })}
       </section>
 
-      {/* ---- Penugasan Proyek (read-only) ---- */}
+      {/* ---- Penugasan Proyek (DRMS 15/10: editable, same save) ---- */}
       <section id="uo-panel-penugasan" role="tabpanel" aria-labelledby="uo-tab-penugasan" hidden={tab !== 'penugasan'} className="pk-uo__panel">
-        <p className="pk-uo__lead">Penugasan tim dari data karyawan per PT (dibuat dan diubah di Proyek → Penugasan tim).</p>
-        {shownCompanies.every((c) => c.assignments.length === 0) ? <p className="pk-empty">{mode === 'create' ? 'Simpan pengguna dulu, lalu tambah penugasan di Proyek → Penugasan tim.' : 'Belum ada penugasan.'}</p> : null}
-        {shownCompanies
-          .filter((c) => c.assignments.length > 0)
-          .map((c) => (
-            <div key={c.id} className="pk-uo__group">
-              <p className="pk-uo__bank-title">
-                <span className="pk-pt-chip">{c.shortCode}</span> {c.name}
-              </p>
-              <ul className="pk-uo__list">
-                {c.assignments.map((a) => (
-                  <li key={a.id}>
-                    <Link prefetch={false} href={`/admin/collections/team-assignments/${a.id}`}>{a.label}</Link> · {a.roleInProject === 'pm' ? 'PM' : a.roleInProject === 'mandor' ? 'Mandor' : 'Staff'}
-                    {a.startDate ? ` · mulai ${a.startDate.slice(0, 10)}` : ''}
-                    {a.endDate ? ` · selesai ${a.endDate.slice(0, 10)}` : ''}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        <p>
-          <Link className="pk-kbtn sm" prefetch={false} href="/admin/collections/team-assignments/create">
-            + Penugasan tim
-          </Link>
+        <p className="pk-uo__lead">
+          Penugasan tim data karyawan per PT: project, pusat biaya, atau site. Penugasan yang tersimpan tidak dihapus — ubah peran atau isi tanggal selesai
+          untuk mengakhirinya (wajib dengan alasan).
         </p>
+        {shownCompanies.length === 0 ? <p className="pk-empty">Pilih dulu peran di tab Akses &amp; Peran.</p> : null}
+        {shownCompanies.map((c) => {
+          const d = draft.companies[String(c.id)]!
+          const withEmp = hasEmployee(d.emp)
+          const saved = showsSavedAssignments(c, d.emp)
+          const rows = d.asg.filter((a) => a.id === undefined || saved)
+          const locked = !c.canManageAssignments || busy
+          const ak = `c.${c.id}.asg`
+          const noEmpHelp = `uo-asg-noemp-${c.id}`
+          const setRow = (key: string, fn: (x: AsgDraft) => AsgDraft) => patchCompany(c.id, (x) => ({ ...x, asg: x.asg.map((y) => (y.key === key ? fn(y) : y)) }))
+          return (
+            <fieldset key={c.id} className="pk-uo__group" data-pk-asg-company={c.shortCode}>
+              <legend>
+                <span className="pk-pt-chip">{c.shortCode}</span> {c.name}
+              </legend>
+              {!c.canManageAssignments ? <p className="pk-alert info">Penugasan PT ini hanya dapat diubah oleh Admin atau PM PT ini.</p> : null}
+              {rows.length === 0 ? <p className="pk-empty">Belum ada penugasan.</p> : null}
+              {rows.map((a) => {
+                const p = `${ak}.${a.key}`
+                const stored = a.id !== undefined ? c.assignments.find((x) => x.id === a.id) : undefined
+                const kind = LOCATION_KINDS.find((k) => k.value === a.kind) ?? LOCATION_KINDS[0]!
+                const dirty = stored !== undefined && (a.roleInProject !== stored.roleInProject || a.endDate !== (stored.endDate ?? '').slice(0, 10))
+                return (
+                  <div className="pk-uo__bank" key={a.key} data-pk-asg={a.id ?? 'baru'}>
+                    <p className="pk-uo__bank-title">
+                      {a.id !== undefined ? (
+                        <>
+                          {kind.label}: {a.label}
+                          {a.startDate ? <span className="pk-uo__hint">mulai {a.startDate}</span> : null}
+                          <Link prefetch={false} href={`/admin/collections/team-assignments/${a.id}`} className="pk-uo__hint">
+                            Buka ↗
+                          </Link>
+                        </>
+                      ) : (
+                        'Penugasan baru'
+                      )}
+                    </p>
+                    <div className="pk-fgrid">
+                      {a.id === undefined ? (
+                        <>
+                          {field(
+                            `${p}.kind`,
+                            'Jenis lokasi',
+                            <select value={a.kind} disabled={locked} onChange={(ev) => setRow(a.key, (x) => ({ ...x, kind: LOCATION_KINDS.find((k) => k.value === ev.target.value)?.value ?? 'project', location: null }))}>
+                              {LOCATION_KINDS.map((k) => (
+                                <option key={k.value} value={k.value}>
+                                  {k.label}
+                                </option>
+                              ))}
+                            </select>,
+                            { required: true },
+                          )}
+                          {field(
+                            `${p}.location`,
+                            kind.label,
+                            <select value={a.location ?? ''} disabled={locked} onChange={(ev) => setRow(a.key, (x) => ({ ...x, location: ev.target.value ? Number(ev.target.value) : null }))}>
+                              <option value="">– pilih {kind.label.toLowerCase()} –</option>
+                              {c.assignmentChoices[kind.choices].map((x) => (
+                                <option key={x.id} value={x.id}>
+                                  {x.code} {x.name}
+                                </option>
+                              ))}
+                            </select>,
+                            { required: true, help: c.assignmentChoices[kind.choices].length === 0 ? `Tidak ada ${kind.label.toLowerCase()} aktif di PT ini yang dapat Anda pilih.` : `Hanya ${kind.label.toLowerCase()} aktif PT ini.` },
+                          )}
+                        </>
+                      ) : null}
+                      {field(
+                        `${p}.roleInProject`,
+                        'Peran',
+                        <select value={a.roleInProject} disabled={locked} onChange={(ev) => setRow(a.key, (x) => ({ ...x, roleInProject: ASG_ROLES.find((r) => r.value === ev.target.value)?.value ?? 'staff' }))}>
+                          {ASG_ROLES.map((r) => (
+                            <option key={r.value} value={r.value}>
+                              {r.label}
+                            </option>
+                          ))}
+                        </select>,
+                        { required: true },
+                      )}
+                      {a.id === undefined
+                        ? field(`${p}.startDate`, 'Mulai', <input type="date" value={a.startDate} disabled={locked} onChange={(ev) => setRow(a.key, (x) => ({ ...x, startDate: ev.target.value }))} />)
+                        : null}
+                      {field(
+                        `${p}.endDate`,
+                        'Selesai',
+                        <input type="date" value={a.endDate} min={a.startDate || undefined} disabled={locked} onChange={(ev) => setRow(a.key, (x) => ({ ...x, endDate: ev.target.value }))} />,
+                        { help: a.id === undefined ? 'Kosong = masih berjalan. Tidak boleh sebelum tanggal mulai.' : 'Isi untuk mengakhiri penugasan (wajib dengan alasan).' },
+                      )}
+                    </div>
+                    {dirty ? <p className="pk-alert info">Perubahan peran / tanggal selesai wajib dengan alasan — isi Alasan perubahan di bawah.</p> : null}
+                    {err(p) ? (
+                      <p className="pk-alert bad" role="alert" data-pk-error={p}>
+                        {err(p)}
+                      </p>
+                    ) : null}
+                    {a.id === undefined ? (
+                      <button type="button" className="pk-kbtn sm" disabled={busy} onClick={() => patchCompany(c.id, (x) => ({ ...x, asg: x.asg.filter((y) => y.key !== a.key) }))}>
+                        Hapus baris baru
+                      </button>
+                    ) : null}
+                  </div>
+                )
+              })}
+              {err(ak) ? (
+                <p className="pk-alert bad" role="alert">
+                  {err(ak)}
+                </p>
+              ) : null}
+              {c.canManageAssignments ? (
+                <p className="pk-uo__more">
+                  <button
+                    type="button"
+                    className="pk-kbtn"
+                    disabled={busy || !withEmp}
+                    aria-describedby={withEmp ? undefined : noEmpHelp}
+                    data-pk-add-asg={c.shortCode}
+                    onClick={() => patchCompany(c.id, (x) => ({ ...x, asg: [...x.asg, newAssignment(`n${++seq.current}`, localToday())] }))}
+                  >
+                    + Tambah penugasan
+                  </button>
+                  {!withEmp ? (
+                    <span id={noEmpHelp} className="help">
+                      {' '}
+                      Pilih atau buat data karyawan PT ini dulu di tab Data Karyawan.
+                    </span>
+                  ) : null}
+                </p>
+              ) : null}
+            </fieldset>
+          )
+        })}
       </section>
 
       {/* ---- one save bar ---- */}
       <div className="pk-uo__bar" aria-live="polite">
         {mode === 'update' ? (
           <label className="pk-uo__reason pk-fld">
-            <span className="lbl">Alasan perubahan</span>
-            <input type="text" value={draft.reason} maxLength={300} placeholder="mis. mutasi ke CS1 / rekening baru" disabled={busy} aria-invalid={err('reason') ? true : undefined} onChange={(e) => patch((d) => ({ ...d, reason: e.target.value }))} data-pk-reason />
+            <span className="lbl">
+              Alasan perubahan
+              {needsReason ? <span className="pk-uo__req" aria-hidden="true"> *</span> : null}
+            </span>
+            <input type="text" value={draft.reason} maxLength={300} placeholder="mis. mutasi ke CS1 / rekening baru" disabled={busy} required={needsReason} aria-required={needsReason || undefined} aria-invalid={err('reason') ? true : undefined} onChange={(e) => patch((d) => ({ ...d, reason: e.target.value }))} data-pk-reason />
             {err('reason') ? (
               <span className="err" role="alert" data-pk-error="reason">
                 {err('reason')}
               </span>
             ) : (
-              <span className="help">Wajib saat menonaktifkan atau mengubah data rekening.</span>
+              <span className="help">{needsReason ? 'Wajib diisi: ada perubahan peran atau tanggal selesai penugasan.' : 'Wajib saat menonaktifkan, mengubah data rekening, atau mengubah / mengakhiri penugasan.'}</span>
             )}
           </label>
         ) : null}
@@ -517,6 +656,12 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
       </div>
     </div>
   )
+}
+
+/** Today in the browser's zone as `YYYY-MM-DD` (default "Mulai" of a new assignment). */
+function localToday(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 export default UserOnboardingForm

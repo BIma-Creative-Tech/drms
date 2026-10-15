@@ -29,6 +29,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   the viewport below the module bar, at least 320 px) with a sticky, opaque header row; the "Aksi" header stays pinned in
   the top-right corner. Short tables, the ≤ 640 px transfer-queue cards and printing are unaffected.
 
+### Added
+
+- **Pengguna → tab "Penugasan Proyek" editable** (owner 15/10: "mendaftarkan data karyawan, rekening dan penugasan
+  secara langsung tanpa harus keluar menu"): per PT with an employee in the form (linked, picked or new) the Admin adds
+  assignments — **Jenis lokasi** (Project / Pusat biaya / Site) + one picker of that PT's **active** records (projects
+  not selesai / arsip), **Peran** (PM / Staff / Mandor, default Staff), **Mulai** (default today), **Selesai** — and
+  changes the role or ends a saved assignment ("Alasan perubahan" required then; no delete, new unsaved rows can be
+  removed). Saved together with the account, access, employee and bank accounts in the **same transaction** (a new
+  employee gets its assignments; any refusal saves nothing). The "Simpan pengguna dulu…" detour is gone; errors open the
+  Penugasan tab on the field.
+- API (additive, older callers unchanged): `POST` / `PATCH /user-onboarding` `companies[].assignments[]`
+  (`id?`, exactly one of `project` / `costCenter` / `site`, `roleInProject`, `startDate?`, `endDate?`; saved rows: role +
+  end date only, reason required). Written through `team-assignments` with the caller's access — the collection rules
+  stay the guard (PT from the employee, one location, end ≥ start, PM only for its team and never role PM, audit).
+  Unknown / unreadable / other-PT locations → 400 "… tidak ditemukan di PT ini", unknown saved rows → 404. Detail per PT:
+  `canManageAssignments`, `assignments[].kind`, `assignmentChoices` (projects / costCenters / sites, read with the
+  caller's access).
+
 ## [0.11.0] - 2026-10-15
 
 **DRMS 13/10 Phase C (cek dana + Pinjaman antar-PT) + the loan API follow-ups + the single-PT form fix** — PRs #70–#74.

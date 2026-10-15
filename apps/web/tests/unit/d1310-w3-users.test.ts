@@ -210,9 +210,11 @@ const detail: OnboardingDetail = {
       employee: { id: 21, code: 'K-01', name: 'Rina', nickname: null, position: 'Staf', phone: null, attendanceType: 'onsite', active: true },
       bankAccounts: [{ id: 31, bank: 1, bankName: 'Bank Satu', accountNo: '1234567', accountHolder: 'Rina', isDefault: true, verificationStatus: 'unverified', active: true }],
       employeeChoices: [{ id: 21, code: 'K-01', name: 'Rina', active: true }],
+      canManageAssignments: true,
       assignments: [],
+      assignmentChoices: { projects: [], costCenters: [], sites: [] },
     },
-    { id: 2, shortCode: 'CS1', name: 'PT Dua', canManageEmployees: true, membership: null, employee: null, bankAccounts: [], employeeChoices: [{ id: 22, code: 'K-02', name: 'Budi', active: true }], assignments: [] },
+    { id: 2, shortCode: 'CS1', name: 'PT Dua', canManageEmployees: true, membership: null, employee: null, bankAccounts: [], employeeChoices: [{ id: 22, code: 'K-02', name: 'Budi', active: true }], canManageAssignments: true, assignments: [], assignmentChoices: { projects: [], costCenters: [], sites: [] } },
   ],
 }
 
@@ -246,7 +248,7 @@ describe('form: draft → body', () => {
       ],
       reason: 'rekening baru',
     })
-    expect(r.order).toEqual({ companies: [1, 2], banks: { 0: ['b31'], 1: [] } })
+    expect(r.order).toEqual({ companies: [1, 2], banks: { 0: ['b31'], 1: [] }, asg: { 0: [], 1: [] } })
     expect(activeCompanies(detail, d).map((c) => c.id)).toEqual([1, 2])
   })
 

@@ -94,15 +94,18 @@ Pengguna → Akses PT satu per satu.
      lengkap ↗**.
    - **Rekening Karyawan:** per PT yang punya data karyawan → **+ Tambah rekening** (Bank, Nomor rekening — hanya
      angka, Atas nama, Status verifikasi, Rekening default, Status). Rekening tidak pernah dihapus — nonaktifkan.
-   - **Penugasan Proyek:** daftar penugasan tim karyawan itu (hanya-baca); tambah/ubah di **Proyek → Penugasan tim**.
+   - **Penugasan Proyek:** per PT yang punya data karyawan (juga karyawan baru di simpan yang sama) → **+ Tambah
+     penugasan**: **Jenis lokasi** (Project / Pusat biaya / Site) lalu pilih satu lokasi aktif PT itu, **Peran** (PM /
+     Staff / Mandor), **Mulai**, **Selesai** (boleh kosong). Penugasan yang tersimpan: ubah **Peran** atau isi
+     **Selesai** untuk mengakhirinya (wajib alasan); tidak dapat dihapus. Detail lain: tautan **Buka ↗**.
 3. **Simpan** (satu tombol, di bawah). Semua tab disimpan **bersama atau tidak sama sekali**. Bila ada yang salah,
    tidak ada yang tersimpan: tab yang bermasalah diberi titik merah, isian yang salah ditandai beserta pesannya.
 4. **Akun baru:** setelah Simpan tampil **kata sandi sementara** (hanya sekali — salin dan berikan langsung ke
    pengguna, jangan lewat grup chat). Saat login pertama pengguna **wajib mengganti** kata sandinya. Bila email itu
    sudah punya akun di sistem login, akun itu ditautkan dan kata sandinya **tidak** diubah (pesan "sudah ada …
    ditautkan").
-5. **Mengubah pengguna:** isi **Alasan perubahan** (bawah) bila menonaktifkan akun/karyawan/rekening atau mengubah
-   nomor rekening, nama pemilik atau bank — tanpa alasan, simpan ditolak dengan pesan di isian Alasan. Semua perubahan
+5. **Mengubah pengguna:** isi **Alasan perubahan** (bawah) bila menonaktifkan akun/karyawan/rekening, mengubah
+   nomor rekening, nama pemilik atau bank, atau mengubah peran / mengakhiri penugasan — tanpa alasan, simpan ditolak dengan pesan di isian Alasan. Semua perubahan
    tercatat di **Audit Log** seperti dari halaman masing-masing.
 
 Aturan yang tetap berlaku (sama seperti halaman lama):
