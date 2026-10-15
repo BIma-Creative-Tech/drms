@@ -3850,3 +3850,53 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
   }
 }
+
+// DRMS 16/10 (b): "+ <Klien|Vendor|Karyawan> baru" under a relationship picker
+// (admin/components/relationship/CreatableRelationshipField.tsx) + the partner form inside Payload's side drawer.
+@layer payload {
+  .pk-relcreate > .field-type {
+    margin-bottom: 4px;
+  }
+
+  .pk-relcreate__bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    align-items: center;
+    margin-bottom: var(--base);
+  }
+
+  .pk-relcreate__btn {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 12px 0 8px;
+    border: 1px dashed color-mix(in oklab, var(--pk-primary) 45%, transparent);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--pk-primary);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: color-mix(in oklab, var(--pk-primary) 10%, transparent);
+    }
+
+    &:disabled {
+      border-color: var(--pk-border);
+      color: var(--pk-muted-fg);
+      cursor: not-allowed;
+    }
+  }
+
+  .pk-relcreate__hint {
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+  }
+
+  .pk-relcreate__drawer .pk-uo {
+    max-width: none;
+  }
+}

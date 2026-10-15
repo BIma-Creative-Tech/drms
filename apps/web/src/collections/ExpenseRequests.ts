@@ -14,6 +14,7 @@ import { diffLines, type AuditLine } from '@/domain/expense/line-audit'
 import { recomputeFlags } from '@/domain/expense/receipts'
 import { INTERCOMPANY_PAYMENT_LABEL, isContentEditable, isDirectPayment, PAYEE_TYPE_LABELS, payeeOf, REQUEST_STATUSES, REQUEST_TYPE_LABELS, STATUS_LABELS, VENDOR_PAYMENT_LABEL, type RequestStatus, type RequestType } from '@/domain/expense/types'
 import { mayFileIntercompany, VENDOR_PAYMENT_ROLES } from '@/domain/expense/drafts'
+import { creatableRelationship } from '@/admin/relationship-create'
 import { changeReasonField, rupiahField, uuidField } from '@/fields/common'
 import { requestMeta } from '@/lib/request-meta'
 import { forceDeferredChecks } from '@/lib/system-tx'
@@ -482,7 +483,8 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       // QA-15: Staff-only users pick only themselves (requesterOptions); the server re-checks (validateContent).
       // WA-09: "Pemohon" as in the APK (the PDF signature box keeps "Diajukan Oleh").
       // ADR 0027: a vendor payment's Pemohon is its filer (server default) — no picker
-      { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Pemohon', admin: { isSortable: true, placeholder: PLACEHOLDERS.requesters, condition: employeePayee(editableInput()), components: { Field: COMPANY_SCOPED_FIELD } }, ...pickerSameCompany(), filterOptions: requesterOptions },
+      // DRMS 16/10 (b): "+ Karyawan baru" (plain employee form in a drawer, the request's PT) — the picker stays locked until the PT is known
+      creatableRelationship({ name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Pemohon', admin: { isSortable: true, placeholder: PLACEHOLDERS.requesters, condition: employeePayee(editableInput()) }, ...pickerSameCompany(), filterOptions: requesterOptions }, { company: 'form', lock: true }),
       {
         name: 'bankAccount',
         type: 'relationship',
@@ -499,7 +501,8 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         admin: { description: 'Hanya rekening milik pemohon. Kosongkan untuk memakai rekening default pemohon pertama.', placeholder: PLACEHOLDERS.bankAccount, condition: employeePayee(draftOnly), components: { Field: COMPANY_SCOPED_FIELD } },
       },
       // ADR 0027 "Pembayaran vendor": vendor + its account (Draft only, then the snapshot) + invoice (the proof)
-      { name: 'vendor', type: 'relationship', relationTo: 'vendors', label: 'Vendor', index: true, ...pickerSameCompany(), filterOptions: vendorOptions, admin: { placeholder: PLACEHOLDERS.vendor, condition: vendorPayee(editableInput('vendor')), components: { Field: COMPANY_SCOPED_FIELD } } },
+      // DRMS 16/10 (b): "+ Vendor baru" opens the tabbed Vendor form (detail + rekening + kontak) in a drawer, in the request's PT
+      creatableRelationship({ name: 'vendor', type: 'relationship', relationTo: 'vendors', label: 'Vendor', index: true, ...pickerSameCompany(), filterOptions: vendorOptions, admin: { placeholder: PLACEHOLDERS.vendor, condition: vendorPayee(editableInput('vendor')) } }, { company: 'form', lock: true }),
       {
         name: 'vendorBankAccount',
         type: 'relationship',

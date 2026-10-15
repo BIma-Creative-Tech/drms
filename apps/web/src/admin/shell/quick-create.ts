@@ -1,6 +1,7 @@
 import type { Role } from '@/access/roles'
 import type { IconName } from '@/admin/modules/icons'
 import type { FeatureKey, ModuleId } from '@/admin/modules/registry'
+import { partnerFormHref } from '@/admin/partner-routes'
 
 /**
  * DRMS 16/10 (owner 2026-10-16, "konsep no. 1"): the global "+ Buat" menu of the top bar (ModuleBar) — one click from
@@ -72,8 +73,9 @@ export const QUICK_CREATE_DEFS: readonly QuickCreateDef[] = [
   { key: 'proyek', label: 'Proyek baru', href: '/admin/collections/projects/create', icon: 'project', group: 'proyek', collection: 'projects' },
   { key: 'laporan-harian', label: 'Laporan harian', href: '/admin/laporan-harian/baru', icon: 'tCalendarEdit', group: 'proyek', roles: QUICK_ROLE_RULES.dailyReport, feature: 'fieldReports' },
   { key: 'addendum', label: 'Addendum RAB', href: '/admin/addendum/baru', icon: 'tNoteAdd', group: 'proyek', roles: QUICK_ROLE_RULES.addendum },
-  { key: 'klien', label: 'Klien baru', href: '/admin/collections/clients/create', icon: 'users', group: 'mitra', collection: 'clients' },
-  { key: 'vendor', label: 'Vendor baru', href: '/admin/collections/vendors/create', icon: 'tShop', group: 'mitra', collection: 'vendors' },
+  // the tabbed Klien / Vendor pages (detail + Kontak PIC + Proyek / Rekening, one save — admin/partner-routes.ts)
+  { key: 'klien', label: 'Klien baru', href: partnerFormHref('clients', 'baru')!, icon: 'users', group: 'mitra', collection: 'clients' },
+  { key: 'vendor', label: 'Vendor baru', href: partnerFormHref('vendors', 'baru')!, icon: 'tShop', group: 'mitra', collection: 'vendors' },
   { key: 'pengguna', label: 'Pengguna baru', href: '/admin/pengguna/baru', icon: 'tUser', group: 'pengguna', collection: 'users', roles: QUICK_ROLE_RULES.userOnboarding },
   { key: 'karyawan', label: 'Karyawan baru', href: '/admin/collections/employees/create', icon: 'tPersonalcard', group: 'pengguna', collection: 'employees' },
 ]

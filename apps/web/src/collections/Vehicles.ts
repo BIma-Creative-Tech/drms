@@ -1,4 +1,5 @@
 import type { CollectionBeforeChangeHook, CollectionConfig, PayloadRequest, Where } from 'payload'
+import { creatableRelationship } from '@/admin/relationship-create'
 
 import { denyAll, relId } from '@/access/roles'
 import { byRole, rolesAllowed, anyMember } from '@/access/policies'
@@ -138,7 +139,8 @@ export const Vehicles: CollectionConfig = withAudit(
               { label: 'Milik pelanggan', value: 'pelanggan' },
             ],
           },
-          { name: 'client', type: 'relationship', relationTo: 'clients', label: 'Pelanggan', index: true, admin: { condition: (data) => data?.owner === 'pelanggan', description: 'Wajib bila milik pelanggan.' } },
+          // DRMS 16/10 (b): "+ Klien baru" (tabbed Klien form in a drawer, the vehicle's PT)
+          creatableRelationship({ name: 'client', type: 'relationship', relationTo: 'clients', label: 'Pelanggan', index: true, admin: { condition: (data) => data?.owner === 'pelanggan', description: 'Wajib bila milik pelanggan.' } }, { company: 'form' }),
         ],
       },
       { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya default' },

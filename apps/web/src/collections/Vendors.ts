@@ -5,6 +5,7 @@ import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, odooRefField, uuidField } from '@/fields/common'
 import { companyField, companyHook } from '@/fields/company'
+import { PARTNER_REDIRECT_VIEWS } from '@/admin/partner-routes'
 import { contactsField, contactsHook, legacyContactColumn } from '@/fields/contacts'
 
 /**
@@ -19,7 +20,8 @@ export const Vendors: CollectionConfig = withAudit(
   {
     slug: 'vendors',
     labels: { singular: 'Vendor', plural: 'Vendor' },
-    admin: { useAsTitle: 'name', group: 'Master Data', defaultColumns: ['name', 'contact', 'npwp', 'active'] },
+    // DRMS 16/10 (b): the document pages /collections/vendors/<create|id> → /admin/vendor/<baru|id> (the drawer keeps this form)
+    admin: { useAsTitle: 'name', group: 'Master Data', defaultColumns: ['name', 'contact', 'npwp', 'active'], components: { views: PARTNER_REDIRECT_VIEWS } },
     access: {
       read: byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-finance': true, 'pk-pm': true }),
       create: rolesAllowed('pk-admin', 'pk-finance'),

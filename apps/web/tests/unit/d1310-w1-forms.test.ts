@@ -94,7 +94,9 @@ describe('Pengajuan #3/#5: dependent pickers are empty until the PT is known', (
     const fields = config.collections.find((c) => c.slug === 'expense-requests')!.flattenedFields
     for (const name of ['project', 'urgencyLevel', 'requesters', 'bankAccount']) {
       const f = fields.find((x) => x.name === name) as { filterOptions: (a: unknown) => unknown; admin?: { components?: { Field?: unknown } } }
-      expect(f.admin?.components?.Field, name).toBe('@/admin/components/companies/CompanyScopedField#CompanyScopedField')
+      // DRMS 16/10 (b): Pemohon = the "+ Karyawan baru" wrapper, which renders CompanyScopedField (`lock`)
+      if (name === 'requesters') expect(f.admin?.components?.Field, name).toEqual({ path: '@/admin/components/relationship/CreatableRelationshipField#CreatableRelationshipField', clientProps: { pkCreate: { company: 'form', lock: true } } })
+      else expect(f.admin?.components?.Field, name).toBe('@/admin/components/companies/CompanyScopedField#CompanyScopedField')
       expect(f.filterOptions({ data: FORM, user: user(null) }), name).toBe(false)
     }
     const urgency = fields.find((x) => x.name === 'urgencyLevel') as { filterOptions: (a: unknown) => unknown }
