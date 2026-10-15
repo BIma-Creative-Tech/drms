@@ -45,6 +45,14 @@ first, primary contact row. The previous image keeps working (it never reads the
   role rules of the custom views (`src/admin/shell/quick-create.ts`). Keyboard: **Alt+N** opens it (not while typing),
   ↑/↓/Home/End inside, Esc closes and returns focus; rows ≥ 44 px; icon-only **+** ("Buat baru") under 640 px with a
   full-width panel. Staff and Operator panels are unchanged. Web only, no API or schema change.
+- **"+ Klien / Vendor / Karyawan baru" beside relationship pickers (DRMS 16/10 part b, "konsep no. 1").** Under the
+  pickers Proyek › Klien, Pengajuan › Vendor and Pemohon, Rekening vendor › Vendor, Penugasan tim › Karyawan, Rekening
+  karyawan › Karyawan and Kendaraan › Pelanggan a **+ … baru** button creates the missing record in a side drawer and
+  puts it into the picker: Klien / Vendor in the tabbed form (PartnerFormLoader) with the form's PT preselected,
+  Karyawan in Payload's document drawer of the plain employee form (`initialData: { company }`, no user account).
+  Shown only with the collection's create permission; disabled with **Pilih PT terlebih dahulu** until the form has a
+  PT (where the PT is chosen in the form). Payload's own "+" (`allowCreate`, no PT carried over) is off on these
+  fields. `src/admin/relationship-create.ts` + `admin/components/relationship/CreatableRelationshipField.tsx`.
 
 ### Changed
 
@@ -55,6 +63,10 @@ first, primary contact row. The previous image keeps working (it never reads the
   primary contact (read-only in Payload's form); a write that sends only them (seed, import, old REST clients) updates
   or creates the primary contact instead.
 - Vendors: the Payload tabs + `join` list of the bank accounts are removed (the tabbed page replaces them; no column).
+- "+ Buat" › **Klien baru** / **Vendor baru** open the tabbed pages (`/admin/klien/baru`, `/admin/vendor/baru`).
+  Payload's document pages `/admin/collections/{clients,vendors}/<create|id>` (bookmarks, old links) redirect to
+  `/admin/klien/…` / `/admin/vendor/…` — a collection-level custom view (`partnerPage`, path `/:id`) that only the page
+  router reaches; Payload's document drawer (relationship "edit" pencil) keeps the collection form.
 
 ## [0.12.0] - 2026-10-15
 

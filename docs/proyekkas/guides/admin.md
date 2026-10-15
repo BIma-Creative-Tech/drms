@@ -214,6 +214,12 @@ sekaligus; bila satu baris ditolak, **tidak ada yang tersimpan** dan tab yang sa
   dari kontak utama). Kontak yang sudah ada sebelum 16/10 dipindahkan otomatis menjadi kontak utama.
 - Menonaktifkan klien / vendor wajib dengan **Alasan perubahan** (bar Simpan). Yang tidak berhak mengubah melihat
   halaman yang sama dalam mode **hanya baca**.
+- **Dari formulir lain tanpa pindah halaman:** di bawah pilihan **Klien** (Project, Kendaraan), **Vendor** (Pengajuan,
+  Rekening vendor) dan **Karyawan / Pemohon** (Pengajuan, Penugasan tim, Rekening karyawan) ada tombol **+ Klien
+  baru** / **+ Vendor baru** / **+ Karyawan baru**: formulir terbuka di panel samping (Klien / Vendor = halaman ber-tab
+  di atas, Karyawan = formulir karyawan biasa, tanpa akun pengguna), PT-nya mengikuti formulir, dan setelah **Simpan**
+  data baru langsung terpilih. Tombol hanya tampil bila Anda boleh membuat data itu; selama PT formulir belum dipilih
+  tombolnya mati dengan keterangan **Pilih PT terlebih dahulu**.
 
 ## 4. Aturan approval
 
