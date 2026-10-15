@@ -3,6 +3,7 @@ import type { PayloadRequest, Where } from 'payload'
 import { DEFAULT_TZ, startOfLocalDay } from '@/lib/time'
 
 import { membershipsOf, relId, userId } from './roles'
+import { NOT_DELETED } from '@/domain/soft-delete/where'
 
 /**
  * Scope data of the current user (architecture §7.1) PER PT (ADR 0016 §5), resolved once per
@@ -145,7 +146,7 @@ export async function resolveScope(req: PayloadRequest, companyId: number | null
   if (team.size > 0) {
     const ofTeam = await req.payload.find({
       collection: 'projects',
-      where: { and: [{ id: { in: [...team] } }, { site: { exists: true } }] },
+      where: { and: [{ id: { in: [...team] } }, { site: { exists: true } }, NOT_DELETED] },
       depth: 0,
       pagination: false,
       select: { site: true },

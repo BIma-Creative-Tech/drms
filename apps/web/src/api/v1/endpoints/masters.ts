@@ -9,6 +9,8 @@ import { today } from '@/domain/expense/common'
 import { siteFlagsFor, type SiteFlags } from '@/domain/sites'
 import { mayFileIntercompany } from '@/domain/expense/drafts'
 import { payeeDirectory } from '@/domain/intercompany/service'
+import { INCLUDE_DELETED, softDeleteEntry } from '@/domain/soft-delete/registry'
+import { ONLY_DELETED } from '@/domain/soft-delete/where'
 
 import { companyQuery } from '../company-query'
 import { MASTER_TYPES, MastersQuery, SHARED_MASTER_TYPES, type MasterType } from '../schemas'
@@ -90,6 +92,13 @@ async function loadType(req: PayloadRequest, type: MasterType, companies: number
       req,
     })
     let items = res.docs.map((d) => pick(d as unknown as Record<string, unknown>, fields, shared))
+    // D1610 (ADR 0030): soft-deleted rows are not in the list (central read rule). A delta read (`since`) gets them as
+    // tombstones (`deleted: true`, `active: false`) so a delta cache can drop them; the full read simply omits them.
+    if (since && softDeleteEntry(collection)) items = [...items, ...(await tombstones(req, collection, and, fields, shared))]
+    // a cancelled project ("Batalkan proyek") is closed: inactive for the APK pickers (attendance, progress, reports)
+    if (type === 'projects') items = items.map((i) => (i.status === 'dibatalkan' ? { ...i, active: false } : i))
+    // assignments to a soft-deleted project are left out (the project itself is not in `projects`)
+    if (type === 'team-assignments') items = await withoutDeletedProjects(req, items)
     if (type === 'sites') {
       // ADR 0023 §6: the caller's own check-in sites (home site / active site assignment) and on-behalf sites (team)
       const flags = new Map<number, SiteFlags>()
@@ -121,6 +130,28 @@ async function loadType(req: PayloadRequest, type: MasterType, companies: number
     if ((err as { status?: number }).status === 403) return { items: [], hasMore: false }
     throw err
   }
+}
+
+/** D1610: rows soft-deleted since the delta point, within the caller's read access (`isDeleted` kept: INCLUDE_DELETED). */
+async function tombstones(req: PayloadRequest, collection: CollectionSlug, and: Where[], fields: string[], shared: boolean): Promise<Item[]> {
+  const before = req.context[INCLUDE_DELETED]
+  req.context[INCLUDE_DELETED] = true
+  try {
+    const res = await req.payload.find({ collection, where: { and: [...and, ONLY_DELETED] }, sort: 'updatedAt', limit: LIMIT, depth: 0, overrideAccess: false /* caller's read scope */, req })
+    return res.docs.map((d) => ({ ...pick(d as unknown as Record<string, unknown>, fields, shared), active: false, deleted: true }))
+  } finally {
+    if (before === undefined) delete req.context[INCLUDE_DELETED]
+    else req.context[INCLUDE_DELETED] = before
+  }
+}
+
+/** D1610: team assignments whose project is soft-deleted are dropped from the masters answer. */
+async function withoutDeletedProjects(req: PayloadRequest, items: Item[]): Promise<Item[]> {
+  const ids = [...new Set(items.map((i) => relId(i.project)).filter((x): x is number => x !== undefined))]
+  if (ids.length === 0) return items
+  const res = await req.payload.find({ collection: 'projects', where: { and: [{ id: { in: ids } }, ONLY_DELETED] }, depth: 0, pagination: false, select: { id: true } as never, overrideAccess: true /* SYSTEM-READ: which assigned projects are soft-deleted (ids only) */, req })
+  const gone = new Set(res.docs.map((d) => d.id as number))
+  return gone.size === 0 ? items : items.filter((i) => !gone.has(relId(i.project) ?? -1))
 }
 
 /** Employees whose active account holds Direktur (pk-owner) or Owner (pk-principal, ADR 0026) through an active membership (ADR 0024). */
@@ -163,7 +194,8 @@ function etagMatches(header: string | null, etag: string): boolean {
  *   default radius; `sharedVersion` for the shared types — the APK caches per PT and refetches a PT
  *   only when its version changed. The whole answer has an `ETag`; `If-None-Match` → 304.
  * Deactivated rows are included (`active`) so the APK can hide them; delta via `since` (ordered by
- * updatedAt, ≤ 500 per type).
+ * updatedAt, ≤ 500 per type). D1610 (ADR 0030): soft-deleted rows never appear in a full read; a delta read lists
+ * the rows deleted since then as tombstones (`deleted: true, active: false`); a cancelled project has `active: false`.
  */
 export const mastersEndpoint = v1({
   path: '/masters',
