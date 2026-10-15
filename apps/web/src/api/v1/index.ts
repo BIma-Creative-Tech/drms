@@ -27,6 +27,7 @@ import { SHORTFALL_ENDPOINTS } from './endpoints/shortfall'
 import { appConfigEndpoint } from './endpoints/app'
 import { syncBatchEndpoint } from './endpoints/sync'
 import { USER_ONBOARDING_ENDPOINTS } from './endpoints/user-onboarding'
+import { PARTNER_FORM_ENDPOINTS } from './endpoints/partner-forms'
 
 /** Root custom endpoints served at /api/v1/* (architecture §6.1/§6.3). */
 export const v1Endpoints: Endpoint[] = [
@@ -82,4 +83,6 @@ export const v1Endpoints: Endpoint[] = [
   ...LOAN_ENDPOINTS,
   // DRMS 13/10 W3: "Pengguna" tabbed onboarding — account + access per PT + employee + bank accounts in ONE save
   ...USER_ONBOARDING_ENDPOINTS,
+  // DRMS 16/10: "Klien" / "Vendor" tabbed pages — detail + Kontak PIC (+ vendor bank accounts) in ONE save
+  ...PARTNER_FORM_ENDPOINTS,
 ]

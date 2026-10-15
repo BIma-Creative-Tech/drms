@@ -10,6 +10,7 @@ import { registerIcLoanPaths } from './openapi-icloans'
 import { registerLoanPaths } from './openapi-loans'
 import { registerProjectPaths } from './openapi-projects'
 import { registerShortfallPaths } from './openapi-shortfall'
+import { registerPartnerFormPaths } from './openapi-partners'
 import { registerUserOnboardingPaths } from './openapi-users'
 import { Device, DeviceRegister, DeviceRevoke, Health, Masters, MastersQuery, Me, Problem, Ready, TestEmailQueued } from './schemas'
 import * as F from './schemas-flow'
@@ -662,6 +663,8 @@ export function buildOpenApiDocument(version: string) {
   registerIcLoanPaths(registry, { security, deviceHeader, idem, res })
   // ---- DRMS 13/10 W3: "Pengguna" tabbed onboarding (ADR 0003 revision 2026-10-13) ----------------
   registerUserOnboardingPaths(registry, { security, res })
+  // ---- DRMS 16/10: "Klien" / "Vendor" tabbed pages (detail + Kontak PIC + Rekening vendor, one save) ----------
+  registerPartnerFormPaths(registry, { security, res })
 
   return new OpenApiGeneratorV31(registry.definitions).generateDocument({
     openapi: '3.1.0',
