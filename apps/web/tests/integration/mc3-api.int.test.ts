@@ -456,6 +456,12 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /project-loans/:id/repayments': 'document',
   'POST /project-loans/:id/repayments/:rid/void': 'document',
   'POST /project-loans': 'named-pt',
+  // D1610 (ADR 0030): row actions — one document, read within the selection, role checked IN its PT
+  'GET /records/:collection/:id/delete-check': 'document',
+  'POST /records/:collection/:id/delete': 'document',
+  'POST /records/:collection/:id/restore': 'document',
+  'GET /projects/:id/cancel-plan': 'document',
+  'POST /projects/:id/cancel': 'document',
   // ADR 0029: inter-PT loans (two PTs: read by Owner / Direktur / Finance / Admin of either; roles checked IN the loan's
   // PTs) + the fund availability of a named PT
   'GET /intercompany-loans': 'selection',

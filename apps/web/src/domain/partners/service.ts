@@ -21,6 +21,7 @@ import {
   type StoredVendorBank,
   type VendorBankInput,
 } from './rules'
+import { NOT_DELETED } from '@/domain/soft-delete/where'
 
 /**
  * DRMS 16/10 — "Klien" / "Vendor" tabbed pages (owner 2026-10-16): load and save a client (Detail Klien · Kontak PIC ·
@@ -98,6 +99,10 @@ async function readAsCaller(req: PayloadRequest, collection: CollectionSlug, id:
   }
 }
 
+/** D1610 (ADR 0030): a soft-deleted client / vendor opens read-only (found by id) and is never saved until an Admin restores it. */
+const isDeletedRow = (doc: Row | null): boolean => doc?.isDeleted === true
+const DELETED_MESSAGE = 'Data ini sudah dihapus. Admin perlu memulihkannya ("Pulihkan" di daftar) sebelum data dapat diubah.'
+
 /** The collection's own `update` rule evaluated for ONE record (true / false / a per-PT where). */
 export async function canUpdateDoc(req: PayloadRequest, collection: 'clients' | 'vendors', id: number): Promise<boolean> {
   const access = req.payload.collections[collection].config.access.update
@@ -141,7 +146,7 @@ export async function loadClientForm(req: PayloadRequest, id: number | null): Pr
   const client = partnerView(id, doc)
   const [companies, canEdit, projects] = await Promise.all([
     companyInfo(req, client.company !== null ? [client.company] : []),
-    canUpdateDoc(req, 'clients', id),
+    isDeletedRow(doc) ? false : canUpdateDoc(req, 'clients', id),
     req.payload.find({ collection: 'projects', where: { client: { equals: id } }, sort: 'code', pagination: false, select: { code: true, name: true, status: true }, user: req.user, req, depth: 0, overrideAccess: false }),
   ])
   return {
@@ -185,7 +190,7 @@ export async function loadVendorForm(req: PayloadRequest, id: number | null): Pr
   const vendor = { ...partnerView(id, doc), npwp: strOrNull(doc.npwp) }
   const [companies, canEdit, banks, accounts] = await Promise.all([
     companyInfo(req, vendor.company !== null ? [vendor.company] : []),
-    canUpdateDoc(req, 'vendors', id),
+    isDeletedRow(doc) ? false : canUpdateDoc(req, 'vendors', id),
     activeBanks(req),
     req.payload.find({ collection: 'vendor-bank-accounts', where: { vendor: { equals: id } }, sort: 'id', pagination: false, select: { vendor: true, bank: true, accountNo: true, accountHolder: true, isDefault: true, verificationStatus: true, active: true }, user: req.user, req, depth: 0, overrideAccess: false }),
   ])
@@ -281,6 +286,7 @@ export async function saveClientForm(req: PayloadRequest, input: ClientFormInput
   if (id !== null) {
     current = await readAsCaller(req, 'clients', id)
     if (!current) throw new PartnerFormError(404, 'Klien tidak ditemukan atau bukan klien PT Anda.')
+    if (isDeletedRow(current)) throw new PartnerFormError(409, DELETED_MESSAGE)
     if (!(await canUpdateDoc(req, 'clients', id))) fail(403, [{ path: 'client', message: 'Anda tidak berhak mengubah klien ini (Admin / Direktur PT).' }])
   }
   const company = id === null ? companyForCreate(req, input.client?.company, CLIENT_CREATE_ROLES, 'client') : null
@@ -308,7 +314,8 @@ export async function saveClientForm(req: PayloadRequest, input: ClientFormInput
 async function storedBanks(req: PayloadRequest, rows: readonly VendorBankInput[]): Promise<Map<number, StoredVendorBank>> {
   const ids = [...new Set(rows.flatMap((b) => (b.id !== undefined ? [b.id] : [])))]
   if (!ids.length) return new Map()
-  const res = await req.payload.find({ collection: 'vendor-bank-accounts', where: { id: { in: ids } }, depth: 0, pagination: false, select: { vendor: true, bank: true, accountNo: true, accountHolder: true, isDefault: true, verificationStatus: true, active: true }, user: req.user, req, overrideAccess: false })
+  // D1610: an explicit id list skips the central read rule → a soft-deleted account is reported like a missing one
+  const res = await req.payload.find({ collection: 'vendor-bank-accounts', where: { and: [{ id: { in: ids } }, NOT_DELETED] }, depth: 0, pagination: false, select: { vendor: true, bank: true, accountNo: true, accountHolder: true, isDefault: true, verificationStatus: true, active: true }, user: req.user, req, overrideAccess: false })
   return new Map(
     (res.docs as unknown as Row[]).map((a) => {
       const v = bankView(a, new Map())
@@ -325,6 +332,7 @@ export async function saveVendorForm(req: PayloadRequest, input: VendorFormInput
   if (id !== null) {
     current = await readAsCaller(req, 'vendors', id)
     if (!current) throw new PartnerFormError(404, 'Vendor tidak ditemukan atau bukan vendor PT Anda.')
+    if (isDeletedRow(current)) throw new PartnerFormError(409, DELETED_MESSAGE)
   }
   const company = id === null ? companyForCreate(req, input.vendor?.company, VENDOR_CREATE_ROLES, 'vendor') : (relId(current!.company) ?? null)
   const rows = input.bankAccounts ?? []

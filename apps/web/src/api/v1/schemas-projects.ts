@@ -14,9 +14,9 @@ export const ProjectListQuery = z
     q: z.string().trim().max(100).optional().meta({ description: 'Search in kode / nama (every word must match).' }),
     status: z
       .string()
-      .regex(/^(perencanaan|berjalan|ditunda|selesai|arsip)(,(perencanaan|berjalan|ditunda|selesai|arsip))*$/)
+      .regex(/^(perencanaan|berjalan|ditunda|selesai|arsip|dibatalkan)(,(perencanaan|berjalan|ditunda|selesai|arsip|dibatalkan))*$/)
       .optional()
-      .meta({ description: 'Comma separated statuses. Default: every status except arsip.' }),
+      .meta({ description: 'Comma separated statuses. Default: every status except arsip and dibatalkan (D1610: "Batalkan proyek"). Soft-deleted projects are never listed.' }),
     page: z.coerce.number().int().min(1).max(100_000).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     company: companyFilterParam,

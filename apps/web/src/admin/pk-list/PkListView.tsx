@@ -11,9 +11,12 @@ import { ListToolbar, Pager, type ToolbarFilter } from '@/admin/components/list/
 import { TableScroll } from '@/admin/components/TableScroll'
 import { listHref } from '@/admin/list-query'
 import { ROW_ACTIONS_FIELD } from '@/admin/row-actions'
+import { ROW_STATE_KEY, softDeleteEntry, type RowState } from '@/domain/soft-delete/registry'
+import { rowStates } from '@/domain/soft-delete/service'
+import { withSystemTransaction } from '@/lib/system-tx'
 
 import { ColumnPicker } from './ColumnPicker'
-import { loadPkList } from './data'
+import { DELETED_PARAM, loadPkList } from './data'
 import { customEditOf } from './edit-view'
 import { COMPANY_PARAM, dateParams, filterParam, nextSort, pkFiltered, SORT_PARAM, toolbarQuery } from './query'
 
@@ -56,7 +59,19 @@ export async function PkListView(props: ListViewServerProps) {
   const base = `${adminRoute}/collections/${slug}`
   const fieldPermissions = permissions?.collections?.[slug]?.fields
   const data = await loadPkList({ payload, user, collection: collectionConfig, searchParams, columnsPref: listPreferences?.columns, fieldPermissions })
-  const { cfg, query, page, docs } = data
+  const { cfg, query, page } = data
+  // D1610 (ADR 0030): the row action of each row (Hapus / Batalkan / Nonaktifkan / Pulihkan) — one usage query per
+  // page; read by RowActionsCell from `rowData._pkRow`. A hint only: the /api/v1/records endpoints re-check.
+  let states: Map<number, RowState> | null = null
+  if (softDeleteEntry(slug) && data.docs.length > 0) {
+    try {
+      states = await withSystemTransaction(payload, (user ?? null) as never, (req) => rowStates(req, slug, data.docs))
+    } catch (err) {
+      payload.logger.warn({ msg: 'row states failed', slug, err: (err as Error).message })
+    }
+  }
+  const st = states
+  const docs: Array<Record<string, unknown>> = st ? data.docs.map((d) => ({ ...d, [ROW_STATE_KEY]: st.get(d.id as number) ?? null })) : data.docs
   const plural = label(collectionConfig.labels?.plural, i18n, slug)
   // DRMS 13/10 W3: users → the tabbed "Pengguna" view for Admins (create + row); DRMS 16/10: clients / vendors → the
   // tabbed "Klien" / "Vendor" pages (create + row + the "Aksi" link), see edit-view.ts
@@ -101,6 +116,8 @@ export async function PkListView(props: ListViewServerProps) {
     else if (f.kind === 'boolean') filters.push({ key: filterParam(f.name), label: name, multi: true, options: f.name === 'active' ? [{ value: 'true', label: 'Aktif' }, { value: 'false', label: 'Nonaktif' }] : [{ value: 'true', label: 'Ya' }, { value: 'false', label: 'Tidak' }] })
     else if (data.relOptions[f.name]) filters.push({ key: filterParam(f.name), label: name, multi: true, options: data.relOptions[f.name]! })
   }
+  // D1610: Admin only — soft-deleted rows are hidden everywhere else
+  if (data.deleted.allowed) filters.push({ key: DELETED_PARAM, label: 'Data dihapus', all: 'Sembunyikan yang dihapus', options: [{ value: 'tampil', label: 'Tampilkan yang dihapus' }, { value: 'hanya', label: 'Hanya yang dihapus' }] })
   const dates = cfg.dates.map((d) => {
     const k = dateParams(d.name)
     const name = label(d.label, i18n, d.name)
@@ -109,7 +126,9 @@ export async function PkListView(props: ListViewServerProps) {
   // params the bar does not own survive a search / filter change: the sort and an old where[…] deep link
   const keep: Record<string, string | undefined> = { [SORT_PARAM]: query.sort }
   for (const [k, v] of Object.entries(searchParams ?? {})) if (k.startsWith('where[') && typeof v === 'string') keep[k] = v
-  const filtered = pkFiltered(query)
+  const filtered = pkFiltered(query) || data.deleted.mode !== ''
+  const tbQuery = toolbarQuery(query, cfg)
+  if (data.deleted.allowed) tbQuery.filters[DELETED_PARAM] = data.deleted.mode
 
   const pickerColumns = data.available.filter((n) => n !== ROW_ACTIONS_FIELD).map((name) => ({ name, label: colLabel(name, byAccessor.get(name)?.field) }))
 
@@ -131,7 +150,7 @@ export async function PkListView(props: ListViewServerProps) {
         <ListToolbar
           id={`list-${slug}`}
           action={base}
-          query={toolbarQuery(query, cfg)}
+          query={tbQuery}
           label={`Cari dan saring ${plural.toLocaleLowerCase('id')}`}
           search={cfg.searchFields.length ? { placeholder: `${cfg.searchFields.map((n) => colLabel(n)).join(', ')}…` } : undefined}
           filters={filters}
@@ -195,7 +214,7 @@ export async function PkListView(props: ListViewServerProps) {
                   </thead>
                   <tbody>
                     {docs.map((doc, i) => (
-                      <ClickableRow key={String(doc.id)} href={rowHref(doc.id)} data-id={String(doc.id)} className={`row-${i + 1}`}>
+                      <ClickableRow key={String(doc.id)} href={rowHref(doc.id)} data-id={String(doc.id)} className={`row-${i + 1}${doc.isDeleted === true ? ' pk-plist__row--deleted' : ''}`} data-pk-deleted={doc.isDeleted === true ? 'true' : undefined}>
                         {shown.flatMap((c, ci) => [
                           ...(ci === fillAt ? [fill()] : []),
                           <td key={c.accessor} className={`cell-${c.accessor}`}>

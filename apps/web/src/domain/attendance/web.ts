@@ -47,7 +47,7 @@ export async function scopeLocations(req: PayloadRequest, scope: AttScope): Prom
   const full = fullCompanies(scope)
   const teamP = (scope.parts ?? []).filter((p) => !p.all).flatMap((p) => p.projects) // legacy literal: nothing (MC4)
   const teamC = (scope.parts ?? []).filter((p) => !p.all).flatMap((p) => p.costCenters)
-  const pw = sql`((${companyScopeSql(sql`p.company_id`, full)} AND p.status::text <> 'arsip') OR ${inList(sql`p.id`, teamP)})`
+  const pw = sql`(((${companyScopeSql(sql`p.company_id`, full)} AND p.status::text NOT IN ('arsip', 'dibatalkan')) OR ${inList(sql`p.id`, teamP)}) AND p.is_deleted IS NOT TRUE)`
   const cw = sql`((${companyScopeSql(sql`cc.company_id`, full)} AND coalesce(cc.active, true)) OR ${inList(sql`cc.id`, teamC)})`
   const p = await rows<{ id: number; code: string; name: string; company_id: number }>(req, sql`SELECT p.id, p.code, p.name, p.company_id FROM projects p WHERE ${pw} ORDER BY p.code`)
   const c = await rows<{ id: number; code: string; name: string; company_id: number }>(req, sql`SELECT cc.id, cc.code, cc.name, cc.company_id FROM cost_centers cc WHERE ${cw} ORDER BY cc.code`)

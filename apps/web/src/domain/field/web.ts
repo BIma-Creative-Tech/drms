@@ -11,6 +11,7 @@ import { namesOf, num, str, unitRef } from './refs'
 import { kindOf, round2, unitLabel, type FieldReportType, type ProjectKind, type RateBasis } from './rules'
 import type { TimesheetDoc } from './timesheet'
 import type { ContractTermsView, MatrixContract, MatrixTimesheet } from './views'
+import { NOT_DELETED } from '@/domain/soft-delete/where'
 
 /**
  * FR1 web views (admin custom views, ADR 0020): read models that are not part of the /api/v1
@@ -40,7 +41,7 @@ export async function todayOf(req: PayloadRequest, companyId?: number | null): P
 export async function fieldProjects(req: PayloadRequest, kinds: readonly ProjectKind[], companies: readonly number[], opts: { includeArchived?: boolean } = {}): Promise<ProjectOpt[]> {
   if (companies.length === 0) return []
   const and: Where[] = [{ kind: { in: [...kinds] } }, { company: { in: [...companies] } }]
-  if (!opts.includeArchived) and.push({ status: { not_equals: 'arsip' } })
+  if (!opts.includeArchived) and.push({ status: { not_in: ['arsip', 'dibatalkan'] } })
   const r = await req.payload
     .find({ collection: 'projects', where: { and }, sort: 'code', depth: 0, pagination: false, select: { code: true, name: true, kind: true, company: true, client: true, status: true }, user: req.user, overrideAccess: false /* caller's project scope */, req })
     .catch(() => ({ docs: [] as unknown[] }))
@@ -181,7 +182,8 @@ function unitView(d: Record<string, unknown> & { id: number }, clientName: (id: 
 export async function unitsOf(req: PayloadRequest, companies: readonly number[], opts: { ids?: readonly number[]; activeOnly?: boolean } = {}): Promise<UnitView[]> {
   if (companies.length === 0) return []
   const and: Where[] = [{ company: { in: [...companies] } }]
-  if (opts.ids) and.push({ id: { in: [...opts.ids, 0] } })
+  // D1610: an explicit id list skips the central read rule → soft-deleted units are excluded here
+  if (opts.ids) and.push({ id: { in: [...opts.ids, 0] } }, NOT_DELETED)
   if (opts.activeOnly) and.push({ active: { equals: true } })
   const r = await req.payload.find({ collection: 'vehicles', where: { and }, sort: 'displayName', depth: 0, pagination: false, user: req.user, overrideAccess: false /* members read the units of their PTs */, req }).catch(() => ({ docs: [] as unknown[] }))
   const docs = r.docs as Array<Record<string, unknown> & { id: number }>

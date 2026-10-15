@@ -22,6 +22,7 @@ import { openapiEndpoint } from './endpoints/openapi'
 import { privacyAckEndpoint, privacyNoticeEndpoint } from './endpoints/privacy'
 import { PROGRESS_ENDPOINTS } from './endpoints/progress'
 import { PROJECT_ENDPOINTS } from './endpoints/projects'
+import { RECORD_ENDPOINTS } from './endpoints/records'
 import { REPORT_ENDPOINTS } from './endpoints/reports'
 import { SHORTFALL_ENDPOINTS } from './endpoints/shortfall'
 import { appConfigEndpoint } from './endpoints/app'
@@ -85,4 +86,6 @@ export const v1Endpoints: Endpoint[] = [
   ...USER_ONBOARDING_ENDPOINTS,
   // DRMS 16/10: "Klien" / "Vendor" tabbed pages — detail + Kontak PIC (+ vendor bank accounts) in ONE save
   ...PARTNER_FORM_ENDPOINTS,
+  // D1610 (ADR 0030): row actions Hapus (soft delete) / Pulihkan / Batalkan proyek (dry run + cascade)
+  ...RECORD_ENDPOINTS,
 ]

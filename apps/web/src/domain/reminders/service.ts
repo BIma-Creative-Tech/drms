@@ -203,7 +203,7 @@ async function lpjOverdue(run: Run) {
                (SELECT min(t.transfer_date) FROM transfers t WHERE t.request_id = er.id AND t.status = 'posted' AND t.kind = 'advance') AS since
           FROM expense_requests er LEFT JOIN projects p ON p.id = er.project_id
          WHERE er.type = 'advance' AND er.status::text IN ('transferred', 'receipts_complete') AND er.company_id = ${s.companyId}
-           AND (p.id IS NULL OR p.status::text <> 'arsip')
+           AND (p.id IS NULL OR p.status::text NOT IN ('arsip', 'dibatalkan'))
          ORDER BY er.id`,
   )
   const t = await notificationTemplate(req, REMINDER_EVENTS.lpj_overdue, DEFAULT_TEXTS.lpj_overdue)
@@ -232,7 +232,7 @@ async function revisionPending(run: Run) {
                  er.updated_at) AT TIME ZONE ${s.timeZone}, 'YYYY-MM-DD') AS since
           FROM expense_requests er LEFT JOIN projects p ON p.id = er.project_id
          WHERE er.status::text IN ('receipt_revision', 'lpj_revision') AND er.company_id = ${s.companyId}
-           AND (p.id IS NULL OR p.status::text <> 'arsip')
+           AND (p.id IS NULL OR p.status::text NOT IN ('arsip', 'dibatalkan'))
          ORDER BY er.id`,
   )
   const t = await notificationTemplate(req, REMINDER_EVENTS.revision_pending, DEFAULT_TEXTS.revision_pending)
@@ -261,7 +261,7 @@ async function aftersalesFollowup(run: Run) {
           FROM aftersales_activities a JOIN clients c ON c.id = a.client_id JOIN projects p ON p.id = a.project_id
          WHERE a.company_id = ${s.companyId} AND a.kind = 'penawaran' AND a.follow_up_date IS NOT NULL
            AND a.follow_up_date <= ${date} AND a.follow_up_date >= to_char(${date}::date - 30, 'YYYY-MM-DD')
-           AND p.status::text <> 'arsip'
+           AND p.status::text NOT IN ('arsip', 'dibatalkan')
          ORDER BY a.follow_up_date, a.id`,
   )
   const t = await notificationTemplate(req, REMINDER_EVENTS.aftersales_followup, DEFAULT_TEXTS.aftersales_followup)
@@ -289,7 +289,7 @@ async function loanOverdue(run: Run) {
     sql`SELECT l.id, l.doc_no, l.amount, l.repaid_total, l.due_date, l.status::text AS status, pb.pm_id, pl.code AS lcode, pl.name AS lname, pb.code AS bcode, pb.name AS bname
           FROM project_loans l JOIN projects pb ON pb.id = l.borrower_project_id JOIN projects pl ON pl.id = l.lender_project_id
          WHERE l.company_id = ${s.companyId} AND l.status::text IN ('approved', 'partially_repaid') AND l.due_date < ${date}
-           AND l.amount > l.repaid_total AND pb.status::text <> 'arsip'
+           AND l.amount > l.repaid_total AND pb.status::text NOT IN ('arsip', 'dibatalkan')
          ORDER BY l.due_date, l.id`,
   )
   const t = await notificationTemplate(req, REMINDER_EVENTS.loan_overdue, LOAN_NOTIFICATION_DEFAULTS['project_loan.overdue'])

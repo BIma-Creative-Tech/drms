@@ -74,7 +74,7 @@ export async function RapIndex(props: AdminViewServerProps) {
   const totals = overviewTotals(rows)
   // money columns only when the caller sees money of at least one project (Staff: never)
   const money = all.some((x) => x.prices || x.budget !== null)
-  const missing = all.filter((x) => x.state === 'wajib' && x.status !== 'arsip' && x.status !== 'selesai').length
+  const missing = all.filter((x) => x.state === 'wajib' && x.status !== 'arsip' && x.status !== 'selesai' && x.status !== 'dibatalkan').length
   const cols = 4 + (pt.multi ? 1 : 0) // PT?, Project, Jenis, Status, RAP
   return (
     <Frame props={props} name="rap">
@@ -262,7 +262,7 @@ export async function RapProject(props: AdminViewServerProps) {
   }
   const { p, rap, roles, templates } = data
   const pt = await ptView(r)
-  const mode = rapEditMode(roles, rap.locked, p.status === 'arsip')
+  const mode = rapEditMode(roles, rap.locked, p.status === 'arsip' || p.status === 'dibatalkan')
   const prices = rap.totals !== null
   const path = rapHref(id)
   const q = sp(props)

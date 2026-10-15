@@ -18,9 +18,10 @@ import { requestMeta } from '@/lib/request-meta'
 import { getRequestTx } from '@/lib/tx'
 
 import { isTeamPm, mayReadAddenda } from './access'
-import { addendumAllowedActions, addendumInputErrors, ADDENDUM_STATUS_LABELS, newBudget, pctOf, type AddendumAction, type AddendumActorContext, type AddendumStatus } from './rules'
+import { ADDENDUM_TRANSITIONS, addendumAllowedActions, addendumInputErrors, ADDENDUM_STATUS_LABELS, newBudget, pctOf, type AddendumAction, type AddendumActorContext, type AddendumStatus } from './rules'
 import { contextCompanyId, membersWithRole } from '@/domain/companies'
 import { searchWhere } from '@/lib/text-search'
+import { closedProjectMessage, isClosedProjectStatus } from '@/domain/projects/status'
 
 /**
  * E5 Addendum RAB (T12, US-18/US-30) — the single write path behind /api/v1/budget-addenda.
@@ -309,7 +310,7 @@ function checkInput(input: { addition?: unknown; reason?: unknown }): void {
 }
 
 function checkProjectOpen(p: ProjectRow): void {
-  if (p.status === 'arsip') fail(409, 'STATE_CONFLICT', 'Project sudah diarsipkan.', 'projectId')
+  if (isClosedProjectStatus(p.status)) fail(409, 'STATE_CONFLICT', closedProjectMessage(p.status), 'projectId')
   if (!p.budget || p.budget <= 0) fail(409, 'NO_BUDGET', 'Project belum memiliki RAB. RAB awal ditetapkan Direktur di data project; addendum menambah RAB yang ada.', 'projectId')
 }
 
@@ -409,6 +410,17 @@ export async function cancelAddendum(req: PayloadRequest, id: number, reason: st
   return updateAddendum(req, id, { status: 'cancelled', cancelReason: reason.trim(), currentLevel: null }, reason.trim())
 }
 
+/**
+ * D1610 (ADR 0030) "Batalkan proyek" cascade: cancel a pending addendum of the cancelled project as the system (the
+ * caller holds the project-cancel permission); the status table still decides (Draft / Menunggu → Dibatalkan).
+ */
+export async function cancelAddendumForProject(req: PayloadRequest, id: number, reason: string): Promise<AddendumDoc> {
+  await lockAddendum(req, id)
+  const doc = await loadRawAddendum(req, id)
+  if (!ADDENDUM_TRANSITIONS[doc.status].includes('cancelled')) fail(409, 'STATE_CONFLICT', `Addendum ${doc.docNo ?? `#${id}`} berstatus "${ADDENDUM_STATUS_LABELS[doc.status]}" tidak dapat dibatalkan.`)
+  return updateAddendum(req, id, { status: 'cancelled', cancelReason: reason.trim(), currentLevel: null }, reason.trim())
+}
+
 // ---------------------------------------------------------------- decisions
 
 type SignOpts = { signatureMediaId?: number | null }
@@ -476,7 +488,7 @@ async function finalize(req: PayloadRequest, doc: AddendumDoc, project: ProjectR
   const projectId = project.id
   await lockProject(req, projectId)
   const fresh = await loadProject(req, projectId)
-  if (fresh.status === 'arsip') fail(409, 'STATE_CONFLICT', 'Project sudah diarsipkan; addendum tidak dapat disetujui.')
+  if (isClosedProjectStatus(fresh.status)) fail(409, 'STATE_CONFLICT', `${closedProjectMessage(fresh.status).replace(/\.$/, '')}; addendum tidak dapat disetujui.`)
   const oldBudget = Math.round(Number(fresh.budget ?? 0))
   const nextBudget = newBudget(oldBudget, doc.addition)
   const approved = await updateAddendum(req, doc.id, { status: 'approved', oldBudget, newBudget: nextBudget, decidedAt: new Date().toISOString(), currentLevel: null })
@@ -690,7 +702,7 @@ export async function addendumProjectOptions(req: PayloadRequest): Promise<Array
   if (!hasRoleAny(req, 'pk-pm')) return []
   const res = await req.payload.find({
     collection: 'projects',
-    where: { status: { not_equals: 'arsip' } },
+    where: { status: { not_in: ['arsip', 'dibatalkan'] } },
     sort: 'code',
     depth: 0,
     pagination: false,

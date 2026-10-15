@@ -14,6 +14,7 @@ import { getRequestTx } from '@/lib/tx'
 import { rapItemMoney, rapUsage, sumRapMoney, type RapMoney } from './budget'
 import { isQty, itemPct, normUom, RAP_REASON_MIN, RAP_USED_REASON_MESSAGE, rapDrivesProgress, rapItemUsed, rapRequiredFor, round2, stagePct, stockOf, type RapKind } from './rules'
 import { parseRapWorkbook, type RapIssue, type RapRow } from './workbook'
+import { closedProjectMessage, isClosedProjectStatus } from '@/domain/projects/status'
 
 /**
  * P3 RAP of a project (owner decisions 2026-10-10; every project kind since DRMS 10/10 D4, owner 2026-10-11 "RAP wajib
@@ -51,7 +52,7 @@ export async function isRapLocked(req: PayloadRequest, p: Pick<Project, 'id' | '
 }
 
 async function requireEditor(req: PayloadRequest, p: Project, reason: string | null | undefined): Promise<{ locked: boolean; roles: RapRoles; reason: string }> {
-  if (p.status === 'arsip') fail(409, 'STATE_CONFLICT', 'Project sudah diarsipkan.')
+  if (isClosedProjectStatus(p.status)) fail(409, 'STATE_CONFLICT', closedProjectMessage(p.status))
   const roles = await rapRoles(req, p)
   if (!roles.director && !roles.pm) fail(403, 'FORBIDDEN', 'RAP hanya dapat diubah oleh Direktur/Admin atau PM project ini.')
   const locked = await isRapLocked(req, p)

@@ -12,6 +12,7 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { canReportOn } from './access'
 import { lockProject, projectStages, recalcProjectProgress, setStageProgress } from './recalc'
 import { EDIT_WINDOW_HOURS, isComplete, isPct, localDate, MAX_PHOTOS, projectProgress, round2, weightSum } from './rules'
+import { closedProjectMessage, isClosedProjectStatus } from '@/domain/projects/status'
 
 /**
  * T11 progress reports (US-10/US-31, plan fase1-golive §E4) — the single write path used by
@@ -186,7 +187,7 @@ async function companyTz(req: PayloadRequest): Promise<string> {
 async function loadProject(req: PayloadRequest, projectId: number): Promise<ProjectRow> {
   const p = (await req.payload.findByID({ collection: 'projects', id: projectId, depth: 0, overrideAccess: true /* SYSTEM-READ: status (caller checked) */, req, disableErrors: true })) as ProjectRow | null
   if (!p) fail(404, 'NOT_FOUND', 'Project tidak ditemukan.', 'projectId')
-  if (p!.status === 'arsip') fail(409, 'STATE_CONFLICT', 'Project sudah diarsipkan.', 'projectId')
+  if (isClosedProjectStatus(p!.status)) fail(409, 'STATE_CONFLICT', closedProjectMessage(p!.status), 'projectId')
   return p!
 }
 
