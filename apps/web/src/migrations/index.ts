@@ -82,6 +82,7 @@ import * as migration_20261015_100000_d1310_fundcheck_enums from './20261015_100
 import * as migration_20261015_100100_d1310_fundcheck_loans from './20261015_100100_d1310_fundcheck_loans';
 import * as migration_20261015_100200_d1310_fundcheck_guard from './20261015_100200_d1310_fundcheck_guard';
 import * as migration_20261015_100300_d1310_fundcheck_data from './20261015_100300_d1310_fundcheck_data';
+import * as migration_20261015_200000_d1510_approval_reroute from './20261015_200000_d1510_approval_reroute';
 
 export const migrations = [
   {
@@ -503,5 +504,10 @@ export const migrations = [
     up: migration_20261015_100300_d1310_fundcheck_data.up,
     down: migration_20261015_100300_d1310_fundcheck_data.down,
     name: '20261015_100300_d1310_fundcheck_data',
+  },
+  {
+    up: migration_20261015_200000_d1510_approval_reroute.up,
+    down: migration_20261015_200000_d1510_approval_reroute.down,
+    name: '20261015_200000_d1510_approval_reroute',
   },
 ];

@@ -177,3 +177,11 @@ receipts, not an approval) and most notification routing already support it.
   their PM → Direktur snapshot and need the code to finish.
 - Code: `git revert`; migration `down()` restores the previous `pk_approvals_before_insert` body and drops the guard
   trigger, the CHECK and the column (the audit enum value stays, enum values cannot be dropped).
+
+## Amendment 2026-10-15 owner decision
+
+"Snapshots and in-flight requests" no longer holds for requests still waiting for the Direktur's "Diketahui" under the
+old default rule: migration `20261015_200000_d1510_approval_reroute` aligns the remaining ADR 0013-shaped default
+rules of every PT to PM project → Direktur (→ Owner, ADR 0026) and re-routes those requests to the snapshot a submit
+today produces (PM step skipped when the PM is requester / creator). Requests past the Direktur keep their flow.
+Details: [ADR 0026 § Amendment 2026-10-15](0026-owner-approval-level-above-direktur.md).

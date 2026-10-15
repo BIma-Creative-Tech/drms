@@ -142,3 +142,32 @@ expense request "Disetujui" (normally the Owner's; under a rule without an Owner
 of the Owner's own request (no approval) are refused (409 `FUND_INSUFFICIENT`) when the paying PT's available funds —
 balance of its active accounts without a site minus its commitments — are short. Who decides is unchanged (G1 rules
 stand). The Owner may instruct a "Pinjaman antar-PT" and then approves again.
+
+## Amendment 2026-10-15 owner decision — default rules aligned, in-flight requests re-routed (d1510)
+
+Owner decision 2026-10-15: every PT runs **Staff → PM project → Direktur → Owner → Finance (transfer only)** — also the
+PTs whose default rule still had the ADR 0013 shape after §5 ("Default — Direktur lalu Finance": "Diketahui" Direktur →
+L1 Owner → L2 Finance), and also the requests already waiting for the Direktur. This amends §3 "In-flight requests"
+and §5 ("rule names unchanged", "request rows are not touched") for that case only:
+
+- **Rules** (migration `20261015_200000_d1510_approval_reroute`, idempotent): a rule NAMED "Default — Direktur lalu
+  Finance (semua nominal)" / "Contoh — di atas Rp 10 juta: Direktur lalu Finance (Q-31, nonaktif)" in **exactly** the
+  ADR 0013 shape or the ADR 0013 + Owner shape (no named user, no "Peran pemohon" / payee condition) gets the seed shape
+  and name ("Default — PM project lalu Direktur (semua nominal)" / "Contoh — … PM project lalu Direktur …": "Diketahui"
+  = PM project, L1 Direktur, L2 Owner), **id kept** (requests reference it), active flag, priority and conditions kept;
+  audited (`source: system`, reason "keputusan owner 2026-10-15"). A rule an Admin changed to another shape, and an
+  Admin's own rule in the old shape under another name, are left alone (listed by the dry-run / migrate log).
+- **Requests**: a request under such a rule that is `pending_ack` with **no decision** in its current cycle, a "Diketahui
+  Direktur" snapshot and no G1 exception gets the rule + snapshot a **submit today** produces — the same code
+  (`domain/expense/snapshot-plan.ts`, shared with `selectAndSnapshot`): PM project first; the PM step skipped exactly as
+  at submit when the requester / creator is the PM (→ `pending_approval`, Direktur level 1, `approval_skipped` audited);
+  a Direktur's own request takes "Pengajuan Direktur" (→ Owner). Doc no, lines, amounts, attachments, signatures and the
+  approval cycle are unchanged. Kept on the old flow (listed): a submit that would be refused (409, e.g. project without
+  PM) and the Owner's own request (no approval — a person decides, not a migration). Requests past the Direktur keep
+  their flow. Per request: audit row "Alur persetujuan" (old rule / snapshot / status → new; the stepper shows "Alur
+  persetujuan diperbarui ke aturan terbaru (keputusan owner 2026-10-15)") and the notification + approval e-mail a submit
+  sends to the new first approver.
+- **Down** restores the old snapshots and rule shapes from the audit rows; it is **refused** once a re-routed request
+  moved (a decision taken in the new flow is not undone — rollback = restore the pre-migration dump).
+- Preview: `payload run src/reroute/cli.ts -- --dry-run` (exact, read-only) and `src/reroute/preview.sql` (psql);
+  runbook `docs/proyekkas/runbooks/alur-persetujuan-2026-10-15.md`.
