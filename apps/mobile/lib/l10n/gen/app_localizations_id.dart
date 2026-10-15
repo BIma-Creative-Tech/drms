@@ -3971,4 +3971,259 @@ class AppLocalizationsId extends AppLocalizations {
   String kpiCashFlowAntarPtExcluded(String masuk, String keluar) {
     return 'Tanpa antar-PT: masuk $masuk · keluar $keluar tidak dihitung';
   }
+
+  @override
+  String fundPanelTitle(String pt) {
+    return 'Ketersediaan dana PT $pt';
+  }
+
+  @override
+  String get fundNotEnabled => 'Cek dana PT ini belum aktif (informasi saja).';
+
+  @override
+  String get fundNotFinal => 'Cek akhir di persetujuan Owner.';
+
+  @override
+  String get fundBalance => 'Saldo dana';
+
+  @override
+  String fundAccounts(int count) {
+    return '$count akun, tanpa akun site';
+  }
+
+  @override
+  String fundSiteExcluded(int count, String amount) {
+    return '$count akun site $amount tidak dihitung';
+  }
+
+  @override
+  String get fundCommitments => 'Komitmen';
+
+  @override
+  String fundCommitmentDetails(int count) {
+    return 'Rincian komitmen ($count)';
+  }
+
+  @override
+  String get fundAvailable => 'Dana tersedia';
+
+  @override
+  String get fundNeeded => 'Dibutuhkan';
+
+  @override
+  String get fundShortLabel => 'Kurang';
+
+  @override
+  String get fundStatusLabel => 'Status';
+
+  @override
+  String fundGap(String amount) {
+    return 'Kurang $amount';
+  }
+
+  @override
+  String get fundEnough => 'Cukup';
+
+  @override
+  String fundWaiting(int count, String amount) {
+    return 'Pengajuan lain menunggu persetujuan akhir di PT ini: $count, total $amount (belum dicadangkan — yang disetujui lebih dulu memakai dana lebih dulu).';
+  }
+
+  @override
+  String get fundLoansTitle => 'Pinjaman antar-PT untuk pengajuan ini';
+
+  @override
+  String get fundInstructLoan => 'Perintahkan pinjaman antar-PT';
+
+  @override
+  String fundShortBadge(String amount) {
+    return 'Dana kurang $amount';
+  }
+
+  @override
+  String get icLoanTitle => 'Pinjaman antar-PT';
+
+  @override
+  String get icLoanInstructTitle => 'Perintahkan pinjaman antar-PT';
+
+  @override
+  String get icLoanInstructNote =>
+      'Nomor PJA dari PT pemberi. Finance PT pemberi mencairkan dari Antrian Transfer; Owner menyetujui ulang pengajuan setelah dana masuk.';
+
+  @override
+  String get icLoanBorrower => 'PT peminjam';
+
+  @override
+  String get icLoanLender => 'PT pemberi';
+
+  @override
+  String icLoanAvailable(String amount) {
+    return 'Dana tersedia $amount';
+  }
+
+  @override
+  String get icLoanBorrowerNoAccount =>
+      'PT peminjam belum menetapkan rekening penerimaan antar-PT — pinjaman tidak dapat diterima.';
+
+  @override
+  String get icLoanNoLenders => 'Tidak ada PT lain di mana Anda Owner.';
+
+  @override
+  String get icLoanLenderShort => 'Dana tersedia tidak cukup untuk nilai ini';
+
+  @override
+  String get icLoanLenderNoAccount =>
+      'Pengembalian belum dapat dicatat sampai PT ini menetapkan rekening penerimaan antar-PT.';
+
+  @override
+  String get icLoanAmount => 'Nilai pinjaman';
+
+  @override
+  String icLoanAmountGap(String amount) {
+    return 'Default = kekurangan dana $amount';
+  }
+
+  @override
+  String get icLoanAmountAbove => 'Di atas kekurangan dana — sisanya menambah dana tersedia PT peminjam.';
+
+  @override
+  String icLoanAmountBelow(String amount) {
+    return 'Di bawah kekurangan dana — masih kurang $amount; pinjaman dari PT lain dapat menutupnya.';
+  }
+
+  @override
+  String get icLoanDueDate => 'Jatuh tempo';
+
+  @override
+  String get icLoanDueHelp => 'Default 30 hari · tanpa bunga';
+
+  @override
+  String get icLoanReason => 'Alasan';
+
+  @override
+  String get icLoanRequests => 'Pengajuan terkait';
+
+  @override
+  String get icLoanRequestsNone => 'Tidak ada pengajuan yang menunggu persetujuan akhir di PT ini.';
+
+  @override
+  String icLoanCalcAll(String amount) {
+    return 'Hitung untuk semua ($amount)';
+  }
+
+  @override
+  String get icLoanSubmit => 'Perintahkan pinjaman';
+
+  @override
+  String get icLoanConfirmTitle => 'Perintahkan pinjaman antar-PT?';
+
+  @override
+  String icLoanConfirmBody(String lender, String amount, String borrower) {
+    return 'PT $lender meminjamkan $amount ke PT $borrower. Nilai dicadangkan di PT pemberi sampai Finance-nya mencairkan.';
+  }
+
+  @override
+  String icLoanInstructed(String docNo) {
+    return 'Perintah pinjaman $docNo dikirim ke Finance PT pemberi.';
+  }
+
+  @override
+  String icLoanFlow(String lender, String borrower) {
+    return 'PT $lender → PT $borrower';
+  }
+
+  @override
+  String get icLoanSideLender => 'Piutang antar-PT';
+
+  @override
+  String get icLoanSideBorrower => 'Hutang antar-PT';
+
+  @override
+  String get icLoanRepaid => 'Sudah kembali';
+
+  @override
+  String get icLoanOutstanding => 'Sisa pinjaman';
+
+  @override
+  String get icLoanInstructionDate => 'Tanggal perintah';
+
+  @override
+  String get icLoanNoInterest => 'tanpa bunga';
+
+  @override
+  String get icLoanCreatedBy => 'Diperintahkan oleh';
+
+  @override
+  String get icLoanG1Blocked => 'Anda yang memerintahkan pinjaman ini — pencairan harus dicatat Finance lain (G1).';
+
+  @override
+  String icLoanNoLenderAccount(String pt) {
+    return 'PT $pt belum menetapkan rekening penerimaan antar-PT — pengembalian belum dapat dicatat.';
+  }
+
+  @override
+  String icLoanCancelledBecause(String reason) {
+    return 'Perintah dibatalkan: $reason';
+  }
+
+  @override
+  String get icLoanMovements => 'Pencairan & pengembalian';
+
+  @override
+  String get icLoanMovementsEmpty => 'Belum dicairkan.';
+
+  @override
+  String get icLoanMovementVoid => 'Dibatalkan (void)';
+
+  @override
+  String icLoanMovementVoidReason(String reason) {
+    return 'Dibatalkan (void): $reason';
+  }
+
+  @override
+  String get icLoanWebOnlyHint =>
+      'Pembatalan perintah, pengembalian dan void dicatat di web (Keuangan → Pinjaman antar-PT).';
+
+  @override
+  String get icLoanDisburse => 'Catat pencairan';
+
+  @override
+  String get icLoanDisburseTitle => 'Pencairan pinjaman antar-PT';
+
+  @override
+  String icLoanDisburseAmount(String amount, String lender, String borrower) {
+    return 'Transfer $amount dari PT $lender ke rekening penerimaan antar-PT PT $borrower';
+  }
+
+  @override
+  String get icLoanDisburseHelp =>
+      'Nilai = nilai pinjaman (satu kali pencairan). KK di PT pemberi; kas masuk \"Antar PT\" di PT peminjam tercatat otomatis.';
+
+  @override
+  String get icLoanDestinationNone =>
+      'PT peminjam belum menetapkan rekening penerimaan antar-PT — pencairan akan ditolak.';
+
+  @override
+  String get icLoanAccountHelp => 'Hanya akun kantor pusat (tanpa site).';
+
+  @override
+  String get icLoanNoAccounts => 'Tidak ada akun kas aktif tanpa site di PT pemberi.';
+
+  @override
+  String get icLoanNotInQueue => 'Pinjaman ini tidak (lagi) menunggu pencairan oleh Anda.';
+
+  @override
+  String icLoanDisbursed(String docNo, String kk, String km) {
+    return 'Pencairan $docNo tercatat: $kk di PT pemberi, $km di PT peminjam.';
+  }
+
+  @override
+  String icLoanDisbursedShort(String docNo) {
+    return 'Pencairan $docNo tercatat.';
+  }
+
+  @override
+  String icLoanQueueTitle(int count) {
+    return 'Pencairan pinjaman antar-PT ($count)';
+  }
 }

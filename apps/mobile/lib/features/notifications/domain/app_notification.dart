@@ -46,6 +46,7 @@ class AppNotification {
   /// - `project`: `progress.late_report` → reports of that project; other project events
   ///   (reminder.budget_threshold) → "Progress fisik vs anggaran" tab
   /// - `attendance` → attendance screen (no id needed; team tab for users without own attendance)
+  /// - `intercompany_loan` (icloan.*, ADR 0029) → inter-PT loan detail
   /// [canReadProgress] = the caller may open the progress screens (PM / Direktur / Finance).
   String? route({bool canReadProgress = true, bool ownAttendance = true}) {
     final id = _numericId;
@@ -61,6 +62,8 @@ class AppNotification {
         return event == 'progress.late_report' ? '/progress?project=$id' : '/progress?tab=projects';
       case 'attendance':
         return ownAttendance ? '/attendance' : '/attendance?tab=team';
+      case 'intercompany_loan':
+        return id == null ? null : '/intercompany-loans/$id';
       default:
         return null;
     }

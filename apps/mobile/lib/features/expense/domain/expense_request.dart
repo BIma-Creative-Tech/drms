@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'fund_check.dart';
 import 'request_status.dart';
 
 part 'expense_request.freezed.dart';
@@ -363,6 +364,10 @@ abstract class ExpenseDetail with _$ExpenseDetail {
 
     /// ADR 0025: the caller's next decision is signed as the PT's definitive Direktur (`direkturSignature`).
     DirekturSignature? direkturSignature,
+
+    /// ADR 0029 "Ketersediaan dana PT" (`fundCheck`): Finance / Direktur / Owner of the PT while the request waits for a
+    /// decision (or the Owner's own Draft); null otherwise and from a server before ADR 0029.
+    FundCheck? fundCheck,
   }) = _ExpenseDetail;
 }
 
@@ -450,6 +455,10 @@ abstract class InboxItem with _$InboxItem {
 
     /// MC3: PT of the request (`company.id`) — chip + role check of that PT.
     int? companyId,
+
+    /// ADR 0029: "Dana kurang Rp X" — the gap of a final-step row of a PT with the fund check on (Kas roles of the PT);
+    /// null when enough / not applicable / a server before ADR 0029.
+    int? fundShort,
   }) = _InboxItem;
 }
 

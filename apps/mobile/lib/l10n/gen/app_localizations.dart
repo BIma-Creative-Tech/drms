@@ -7068,6 +7068,420 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Tanpa antar-PT: masuk {masuk} · keluar {keluar} tidak dihitung'**
   String kpiCashFlowAntarPtExcluded(String masuk, String keluar);
+
+  /// ADR 0029: title of the fund panel on the request detail / decision sheet.
+  ///
+  /// In id, this message translates to:
+  /// **'Ketersediaan dana PT {pt}'**
+  String fundPanelTitle(String pt);
+
+  /// No description provided for @fundNotEnabled.
+  ///
+  /// In id, this message translates to:
+  /// **'Cek dana PT ini belum aktif (informasi saja).'**
+  String get fundNotEnabled;
+
+  /// No description provided for @fundNotFinal.
+  ///
+  /// In id, this message translates to:
+  /// **'Cek akhir di persetujuan Owner.'**
+  String get fundNotFinal;
+
+  /// No description provided for @fundBalance.
+  ///
+  /// In id, this message translates to:
+  /// **'Saldo dana'**
+  String get fundBalance;
+
+  /// No description provided for @fundAccounts.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} akun, tanpa akun site'**
+  String fundAccounts(int count);
+
+  /// No description provided for @fundSiteExcluded.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} akun site {amount} tidak dihitung'**
+  String fundSiteExcluded(int count, String amount);
+
+  /// No description provided for @fundCommitments.
+  ///
+  /// In id, this message translates to:
+  /// **'Komitmen'**
+  String get fundCommitments;
+
+  /// No description provided for @fundCommitmentDetails.
+  ///
+  /// In id, this message translates to:
+  /// **'Rincian komitmen ({count})'**
+  String fundCommitmentDetails(int count);
+
+  /// No description provided for @fundAvailable.
+  ///
+  /// In id, this message translates to:
+  /// **'Dana tersedia'**
+  String get fundAvailable;
+
+  /// No description provided for @fundNeeded.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibutuhkan'**
+  String get fundNeeded;
+
+  /// No description provided for @fundShortLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Kurang'**
+  String get fundShortLabel;
+
+  /// No description provided for @fundStatusLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Status'**
+  String get fundStatusLabel;
+
+  /// No description provided for @fundGap.
+  ///
+  /// In id, this message translates to:
+  /// **'Kurang {amount}'**
+  String fundGap(String amount);
+
+  /// No description provided for @fundEnough.
+  ///
+  /// In id, this message translates to:
+  /// **'Cukup'**
+  String get fundEnough;
+
+  /// No description provided for @fundWaiting.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan lain menunggu persetujuan akhir di PT ini: {count}, total {amount} (belum dicadangkan — yang disetujui lebih dulu memakai dana lebih dulu).'**
+  String fundWaiting(int count, String amount);
+
+  /// No description provided for @fundLoansTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman antar-PT untuk pengajuan ini'**
+  String get fundLoansTitle;
+
+  /// No description provided for @fundInstructLoan.
+  ///
+  /// In id, this message translates to:
+  /// **'Perintahkan pinjaman antar-PT'**
+  String get fundInstructLoan;
+
+  /// ADR 0029: approval inbox badge (fundShort).
+  ///
+  /// In id, this message translates to:
+  /// **'Dana kurang {amount}'**
+  String fundShortBadge(String amount);
+
+  /// No description provided for @icLoanTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman antar-PT'**
+  String get icLoanTitle;
+
+  /// No description provided for @icLoanInstructTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Perintahkan pinjaman antar-PT'**
+  String get icLoanInstructTitle;
+
+  /// No description provided for @icLoanInstructNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Nomor PJA dari PT pemberi. Finance PT pemberi mencairkan dari Antrian Transfer; Owner menyetujui ulang pengajuan setelah dana masuk.'**
+  String get icLoanInstructNote;
+
+  /// No description provided for @icLoanBorrower.
+  ///
+  /// In id, this message translates to:
+  /// **'PT peminjam'**
+  String get icLoanBorrower;
+
+  /// No description provided for @icLoanLender.
+  ///
+  /// In id, this message translates to:
+  /// **'PT pemberi'**
+  String get icLoanLender;
+
+  /// No description provided for @icLoanAvailable.
+  ///
+  /// In id, this message translates to:
+  /// **'Dana tersedia {amount}'**
+  String icLoanAvailable(String amount);
+
+  /// No description provided for @icLoanBorrowerNoAccount.
+  ///
+  /// In id, this message translates to:
+  /// **'PT peminjam belum menetapkan rekening penerimaan antar-PT — pinjaman tidak dapat diterima.'**
+  String get icLoanBorrowerNoAccount;
+
+  /// No description provided for @icLoanNoLenders.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada PT lain di mana Anda Owner.'**
+  String get icLoanNoLenders;
+
+  /// No description provided for @icLoanLenderShort.
+  ///
+  /// In id, this message translates to:
+  /// **'Dana tersedia tidak cukup untuk nilai ini'**
+  String get icLoanLenderShort;
+
+  /// No description provided for @icLoanLenderNoAccount.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengembalian belum dapat dicatat sampai PT ini menetapkan rekening penerimaan antar-PT.'**
+  String get icLoanLenderNoAccount;
+
+  /// No description provided for @icLoanAmount.
+  ///
+  /// In id, this message translates to:
+  /// **'Nilai pinjaman'**
+  String get icLoanAmount;
+
+  /// No description provided for @icLoanAmountGap.
+  ///
+  /// In id, this message translates to:
+  /// **'Default = kekurangan dana {amount}'**
+  String icLoanAmountGap(String amount);
+
+  /// No description provided for @icLoanAmountAbove.
+  ///
+  /// In id, this message translates to:
+  /// **'Di atas kekurangan dana — sisanya menambah dana tersedia PT peminjam.'**
+  String get icLoanAmountAbove;
+
+  /// No description provided for @icLoanAmountBelow.
+  ///
+  /// In id, this message translates to:
+  /// **'Di bawah kekurangan dana — masih kurang {amount}; pinjaman dari PT lain dapat menutupnya.'**
+  String icLoanAmountBelow(String amount);
+
+  /// No description provided for @icLoanDueDate.
+  ///
+  /// In id, this message translates to:
+  /// **'Jatuh tempo'**
+  String get icLoanDueDate;
+
+  /// No description provided for @icLoanDueHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Default 30 hari · tanpa bunga'**
+  String get icLoanDueHelp;
+
+  /// No description provided for @icLoanReason.
+  ///
+  /// In id, this message translates to:
+  /// **'Alasan'**
+  String get icLoanReason;
+
+  /// No description provided for @icLoanRequests.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan terkait'**
+  String get icLoanRequests;
+
+  /// No description provided for @icLoanRequestsNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada pengajuan yang menunggu persetujuan akhir di PT ini.'**
+  String get icLoanRequestsNone;
+
+  /// ADR 0029: sets the amount to Σ needed − available of every waiting request and ticks them.
+  ///
+  /// In id, this message translates to:
+  /// **'Hitung untuk semua ({amount})'**
+  String icLoanCalcAll(String amount);
+
+  /// No description provided for @icLoanSubmit.
+  ///
+  /// In id, this message translates to:
+  /// **'Perintahkan pinjaman'**
+  String get icLoanSubmit;
+
+  /// No description provided for @icLoanConfirmTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Perintahkan pinjaman antar-PT?'**
+  String get icLoanConfirmTitle;
+
+  /// No description provided for @icLoanConfirmBody.
+  ///
+  /// In id, this message translates to:
+  /// **'PT {lender} meminjamkan {amount} ke PT {borrower}. Nilai dicadangkan di PT pemberi sampai Finance-nya mencairkan.'**
+  String icLoanConfirmBody(String lender, String amount, String borrower);
+
+  /// No description provided for @icLoanInstructed.
+  ///
+  /// In id, this message translates to:
+  /// **'Perintah pinjaman {docNo} dikirim ke Finance PT pemberi.'**
+  String icLoanInstructed(String docNo);
+
+  /// No description provided for @icLoanFlow.
+  ///
+  /// In id, this message translates to:
+  /// **'PT {lender} → PT {borrower}'**
+  String icLoanFlow(String lender, String borrower);
+
+  /// No description provided for @icLoanSideLender.
+  ///
+  /// In id, this message translates to:
+  /// **'Piutang antar-PT'**
+  String get icLoanSideLender;
+
+  /// No description provided for @icLoanSideBorrower.
+  ///
+  /// In id, this message translates to:
+  /// **'Hutang antar-PT'**
+  String get icLoanSideBorrower;
+
+  /// No description provided for @icLoanRepaid.
+  ///
+  /// In id, this message translates to:
+  /// **'Sudah kembali'**
+  String get icLoanRepaid;
+
+  /// No description provided for @icLoanOutstanding.
+  ///
+  /// In id, this message translates to:
+  /// **'Sisa pinjaman'**
+  String get icLoanOutstanding;
+
+  /// No description provided for @icLoanInstructionDate.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanggal perintah'**
+  String get icLoanInstructionDate;
+
+  /// No description provided for @icLoanNoInterest.
+  ///
+  /// In id, this message translates to:
+  /// **'tanpa bunga'**
+  String get icLoanNoInterest;
+
+  /// No description provided for @icLoanCreatedBy.
+  ///
+  /// In id, this message translates to:
+  /// **'Diperintahkan oleh'**
+  String get icLoanCreatedBy;
+
+  /// No description provided for @icLoanG1Blocked.
+  ///
+  /// In id, this message translates to:
+  /// **'Anda yang memerintahkan pinjaman ini — pencairan harus dicatat Finance lain (G1).'**
+  String get icLoanG1Blocked;
+
+  /// No description provided for @icLoanNoLenderAccount.
+  ///
+  /// In id, this message translates to:
+  /// **'PT {pt} belum menetapkan rekening penerimaan antar-PT — pengembalian belum dapat dicatat.'**
+  String icLoanNoLenderAccount(String pt);
+
+  /// No description provided for @icLoanCancelledBecause.
+  ///
+  /// In id, this message translates to:
+  /// **'Perintah dibatalkan: {reason}'**
+  String icLoanCancelledBecause(String reason);
+
+  /// No description provided for @icLoanMovements.
+  ///
+  /// In id, this message translates to:
+  /// **'Pencairan & pengembalian'**
+  String get icLoanMovements;
+
+  /// No description provided for @icLoanMovementsEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum dicairkan.'**
+  String get icLoanMovementsEmpty;
+
+  /// No description provided for @icLoanMovementVoid.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibatalkan (void)'**
+  String get icLoanMovementVoid;
+
+  /// No description provided for @icLoanMovementVoidReason.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibatalkan (void): {reason}'**
+  String icLoanMovementVoidReason(String reason);
+
+  /// No description provided for @icLoanWebOnlyHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Pembatalan perintah, pengembalian dan void dicatat di web (Keuangan → Pinjaman antar-PT).'**
+  String get icLoanWebOnlyHint;
+
+  /// No description provided for @icLoanDisburse.
+  ///
+  /// In id, this message translates to:
+  /// **'Catat pencairan'**
+  String get icLoanDisburse;
+
+  /// No description provided for @icLoanDisburseTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pencairan pinjaman antar-PT'**
+  String get icLoanDisburseTitle;
+
+  /// No description provided for @icLoanDisburseAmount.
+  ///
+  /// In id, this message translates to:
+  /// **'Transfer {amount} dari PT {lender} ke rekening penerimaan antar-PT PT {borrower}'**
+  String icLoanDisburseAmount(String amount, String lender, String borrower);
+
+  /// No description provided for @icLoanDisburseHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Nilai = nilai pinjaman (satu kali pencairan). KK di PT pemberi; kas masuk \"Antar PT\" di PT peminjam tercatat otomatis.'**
+  String get icLoanDisburseHelp;
+
+  /// No description provided for @icLoanDestinationNone.
+  ///
+  /// In id, this message translates to:
+  /// **'PT peminjam belum menetapkan rekening penerimaan antar-PT — pencairan akan ditolak.'**
+  String get icLoanDestinationNone;
+
+  /// No description provided for @icLoanAccountHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Hanya akun kantor pusat (tanpa site).'**
+  String get icLoanAccountHelp;
+
+  /// No description provided for @icLoanNoAccounts.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada akun kas aktif tanpa site di PT pemberi.'**
+  String get icLoanNoAccounts;
+
+  /// No description provided for @icLoanNotInQueue.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman ini tidak (lagi) menunggu pencairan oleh Anda.'**
+  String get icLoanNotInQueue;
+
+  /// No description provided for @icLoanDisbursed.
+  ///
+  /// In id, this message translates to:
+  /// **'Pencairan {docNo} tercatat: {kk} di PT pemberi, {km} di PT peminjam.'**
+  String icLoanDisbursed(String docNo, String kk, String km);
+
+  /// No description provided for @icLoanDisbursedShort.
+  ///
+  /// In id, this message translates to:
+  /// **'Pencairan {docNo} tercatat.'**
+  String icLoanDisbursedShort(String docNo);
+
+  /// No description provided for @icLoanQueueTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pencairan pinjaman antar-PT ({count})'**
+  String icLoanQueueTitle(int count);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -86,6 +86,17 @@ abstract class Capabilities with _$Capabilities {
     /// null = a server before this field (the APK then falls back to the payee directory, see
     /// `mayFileIntercompanyPayment`).
     bool? intercompanyPayment,
+
+    /// ADR 0029: Owner (`pk-principal` as stored) — may instruct a "Pinjaman antar-PT" (lender list + instruction). The
+    /// server re-checks the Owner role in BOTH PTs. False on a server before the field.
+    @Default(false) bool instructIntercompanyLoan,
+
+    /// ADR 0029: Finance (stored) — the "Pencairan pinjaman antar-PT" queue and the disbursement of loans whose LENDER is
+    /// this PT (never one the caller instructed, G1). False on a server before the field.
+    @Default(false) bool disburseIntercompanyLoan,
+
+    /// ADR 0029: `companies.fundCheckEnabled` of the PT — the final approval is refused while the PT is short.
+    @Default(false) bool fundCheckEnabled,
   }) = _Capabilities;
 
   /// FR1: any field-report create right.
@@ -249,6 +260,9 @@ abstract class UserProfile with _$UserProfile {
         aftersalesActivityCreate: scope.any((c) => c.capabilities.aftersalesActivityCreate),
         dailyReportCreate: scope.any((c) => c.capabilities.dailyReportCreate),
         intercompanyPayment: _anyFlag([for (final c in scope) c.capabilities.intercompanyPayment]),
+        instructIntercompanyLoan: scope.any((c) => c.capabilities.instructIntercompanyLoan),
+        disburseIntercompanyLoan: scope.any((c) => c.capabilities.disburseIntercompanyLoan),
+        fundCheckEnabled: scope.any((c) => c.capabilities.fundCheckEnabled),
       ),
       employee: primary.employee,
       timezone: primary.timezone,

@@ -9,6 +9,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../expense/domain/expense_request.dart';
 import '../../expense/presentation/request_detail_screen.dart' show pct;
+import '../../expense/presentation/widgets/fund_check_panel.dart';
 import '../../expense/presentation/widgets/receipt_mismatch_chip.dart';
 import '../../addendum/presentation/addendum_providers.dart';
 import '../../addendum/presentation/addendum_screens.dart';
@@ -178,6 +179,11 @@ class InboxCard extends StatelessWidget {
                   if (it.receiptMismatchFlags > 0) ...[
                     const SizedBox(width: 8),
                     ReceiptMismatchChip(key: Key('inbox-mismatch-${it.id}'), count: it.receiptMismatchFlags),
+                  ],
+                  // ADR 0029: the PT is short for this request at its final step ("Setujui" is refused)
+                  if (it.fundShort case final gap?) ...[
+                    const SizedBox(width: 8),
+                    FundShortBadge(key: Key('inbox-fund-short-${it.id}'), gap: gap),
                   ],
                 ],
               ),

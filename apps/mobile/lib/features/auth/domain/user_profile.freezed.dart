@@ -27,7 +27,12 @@ mixin _$Capabilities {
 /// Unlike the effective [UserProfile.roles] it is false for an Owner (`pk-principal`) without one of those roles.
 /// null = a server before this field (the APK then falls back to the payee directory, see
 /// `mayFileIntercompanyPayment`).
- bool? get intercompanyPayment;
+ bool? get intercompanyPayment;/// ADR 0029: Owner (`pk-principal` as stored) — may instruct a "Pinjaman antar-PT" (lender list + instruction). The
+/// server re-checks the Owner role in BOTH PTs. False on a server before the field.
+ bool get instructIntercompanyLoan;/// ADR 0029: Finance (stored) — the "Pencairan pinjaman antar-PT" queue and the disbursement of loans whose LENDER is
+/// this PT (never one the caller instructed, G1). False on a server before the field.
+ bool get disburseIntercompanyLoan;/// ADR 0029: `companies.fundCheckEnabled` of the PT — the final approval is refused while the PT is short.
+ bool get fundCheckEnabled;
 /// Create a copy of Capabilities
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -39,20 +44,20 @@ $CapabilitiesCopyWith<Capabilities> get copyWith => _$CapabilitiesCopyWithImpl<C
 @override
 bool operator ==(Object other) {
   final _this = this as Capabilities;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Capabilities&&(identical(other.approvalInbox, _this.approvalInbox) || other.approvalInbox == _this.approvalInbox)&&(identical(other.teamMonitor, _this.teamMonitor) || other.teamMonitor == _this.teamMonitor)&&(identical(other.progressReportCreate, _this.progressReportCreate) || other.progressReportCreate == _this.progressReportCreate)&&(identical(other.serviceReportCreate, _this.serviceReportCreate) || other.serviceReportCreate == _this.serviceReportCreate)&&(identical(other.unitTimesheetCreate, _this.unitTimesheetCreate) || other.unitTimesheetCreate == _this.unitTimesheetCreate)&&(identical(other.aftersalesActivityCreate, _this.aftersalesActivityCreate) || other.aftersalesActivityCreate == _this.aftersalesActivityCreate)&&(identical(other.dailyReportCreate, _this.dailyReportCreate) || other.dailyReportCreate == _this.dailyReportCreate)&&(identical(other.intercompanyPayment, _this.intercompanyPayment) || other.intercompanyPayment == _this.intercompanyPayment));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Capabilities&&(identical(other.approvalInbox, _this.approvalInbox) || other.approvalInbox == _this.approvalInbox)&&(identical(other.teamMonitor, _this.teamMonitor) || other.teamMonitor == _this.teamMonitor)&&(identical(other.progressReportCreate, _this.progressReportCreate) || other.progressReportCreate == _this.progressReportCreate)&&(identical(other.serviceReportCreate, _this.serviceReportCreate) || other.serviceReportCreate == _this.serviceReportCreate)&&(identical(other.unitTimesheetCreate, _this.unitTimesheetCreate) || other.unitTimesheetCreate == _this.unitTimesheetCreate)&&(identical(other.aftersalesActivityCreate, _this.aftersalesActivityCreate) || other.aftersalesActivityCreate == _this.aftersalesActivityCreate)&&(identical(other.dailyReportCreate, _this.dailyReportCreate) || other.dailyReportCreate == _this.dailyReportCreate)&&(identical(other.intercompanyPayment, _this.intercompanyPayment) || other.intercompanyPayment == _this.intercompanyPayment)&&(identical(other.instructIntercompanyLoan, _this.instructIntercompanyLoan) || other.instructIntercompanyLoan == _this.instructIntercompanyLoan)&&(identical(other.disburseIntercompanyLoan, _this.disburseIntercompanyLoan) || other.disburseIntercompanyLoan == _this.disburseIntercompanyLoan)&&(identical(other.fundCheckEnabled, _this.fundCheckEnabled) || other.fundCheckEnabled == _this.fundCheckEnabled));
 }
 
 
 @override
 int get hashCode {
   final _this = this as Capabilities;
-  return Object.hash(runtimeType,_this.approvalInbox,_this.teamMonitor,_this.progressReportCreate,_this.serviceReportCreate,_this.unitTimesheetCreate,_this.aftersalesActivityCreate,_this.dailyReportCreate,_this.intercompanyPayment);
+  return Object.hash(runtimeType,_this.approvalInbox,_this.teamMonitor,_this.progressReportCreate,_this.serviceReportCreate,_this.unitTimesheetCreate,_this.aftersalesActivityCreate,_this.dailyReportCreate,_this.intercompanyPayment,_this.instructIntercompanyLoan,_this.disburseIntercompanyLoan,_this.fundCheckEnabled);
 }
 
 @override
 String toString() {
   final _this = this as Capabilities;
-  return 'Capabilities(approvalInbox: ${_this.approvalInbox}, teamMonitor: ${_this.teamMonitor}, progressReportCreate: ${_this.progressReportCreate}, serviceReportCreate: ${_this.serviceReportCreate}, unitTimesheetCreate: ${_this.unitTimesheetCreate}, aftersalesActivityCreate: ${_this.aftersalesActivityCreate}, dailyReportCreate: ${_this.dailyReportCreate}, intercompanyPayment: ${_this.intercompanyPayment})';
+  return 'Capabilities(approvalInbox: ${_this.approvalInbox}, teamMonitor: ${_this.teamMonitor}, progressReportCreate: ${_this.progressReportCreate}, serviceReportCreate: ${_this.serviceReportCreate}, unitTimesheetCreate: ${_this.unitTimesheetCreate}, aftersalesActivityCreate: ${_this.aftersalesActivityCreate}, dailyReportCreate: ${_this.dailyReportCreate}, intercompanyPayment: ${_this.intercompanyPayment}, instructIntercompanyLoan: ${_this.instructIntercompanyLoan}, disburseIntercompanyLoan: ${_this.disburseIntercompanyLoan}, fundCheckEnabled: ${_this.fundCheckEnabled})';
 }
 
 
@@ -63,7 +68,7 @@ abstract mixin class $CapabilitiesCopyWith<$Res>  {
   factory $CapabilitiesCopyWith(Capabilities value, $Res Function(Capabilities) _then) = _$CapabilitiesCopyWithImpl;
 @useResult
 $Res call({
- bool approvalInbox, bool teamMonitor, bool progressReportCreate, bool serviceReportCreate, bool unitTimesheetCreate, bool aftersalesActivityCreate, bool dailyReportCreate, bool? intercompanyPayment
+ bool approvalInbox, bool teamMonitor, bool progressReportCreate, bool serviceReportCreate, bool unitTimesheetCreate, bool aftersalesActivityCreate, bool dailyReportCreate, bool? intercompanyPayment, bool instructIntercompanyLoan, bool disburseIntercompanyLoan, bool fundCheckEnabled
 });
 
 
@@ -80,7 +85,7 @@ class _$CapabilitiesCopyWithImpl<$Res>
 
 /// Create a copy of Capabilities
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? approvalInbox = null,Object? teamMonitor = null,Object? progressReportCreate = null,Object? serviceReportCreate = null,Object? unitTimesheetCreate = null,Object? aftersalesActivityCreate = null,Object? dailyReportCreate = null,Object? intercompanyPayment = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? approvalInbox = null,Object? teamMonitor = null,Object? progressReportCreate = null,Object? serviceReportCreate = null,Object? unitTimesheetCreate = null,Object? aftersalesActivityCreate = null,Object? dailyReportCreate = null,Object? intercompanyPayment = freezed,Object? instructIntercompanyLoan = null,Object? disburseIntercompanyLoan = null,Object? fundCheckEnabled = null,}) {
   return _then(Capabilities(
 approvalInbox: null == approvalInbox ? _self.approvalInbox : approvalInbox // ignore: cast_nullable_to_non_nullable
 as bool,teamMonitor: null == teamMonitor ? _self.teamMonitor : teamMonitor // ignore: cast_nullable_to_non_nullable
@@ -90,7 +95,10 @@ as bool,unitTimesheetCreate: null == unitTimesheetCreate ? _self.unitTimesheetCr
 as bool,aftersalesActivityCreate: null == aftersalesActivityCreate ? _self.aftersalesActivityCreate : aftersalesActivityCreate // ignore: cast_nullable_to_non_nullable
 as bool,dailyReportCreate: null == dailyReportCreate ? _self.dailyReportCreate : dailyReportCreate // ignore: cast_nullable_to_non_nullable
 as bool,intercompanyPayment: freezed == intercompanyPayment ? _self.intercompanyPayment : intercompanyPayment // ignore: cast_nullable_to_non_nullable
-as bool?,
+as bool?,instructIntercompanyLoan: null == instructIntercompanyLoan ? _self.instructIntercompanyLoan : instructIntercompanyLoan // ignore: cast_nullable_to_non_nullable
+as bool,disburseIntercompanyLoan: null == disburseIntercompanyLoan ? _self.disburseIntercompanyLoan : disburseIntercompanyLoan // ignore: cast_nullable_to_non_nullable
+as bool,fundCheckEnabled: null == fundCheckEnabled ? _self.fundCheckEnabled : fundCheckEnabled // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 
@@ -175,10 +183,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate,  bool serviceReportCreate,  bool unitTimesheetCreate,  bool aftersalesActivityCreate,  bool dailyReportCreate,  bool? intercompanyPayment)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate,  bool serviceReportCreate,  bool unitTimesheetCreate,  bool aftersalesActivityCreate,  bool dailyReportCreate,  bool? intercompanyPayment,  bool instructIntercompanyLoan,  bool disburseIntercompanyLoan,  bool fundCheckEnabled)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Capabilities() when $default != null:
-return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate,_that.serviceReportCreate,_that.unitTimesheetCreate,_that.aftersalesActivityCreate,_that.dailyReportCreate,_that.intercompanyPayment);case _:
+return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate,_that.serviceReportCreate,_that.unitTimesheetCreate,_that.aftersalesActivityCreate,_that.dailyReportCreate,_that.intercompanyPayment,_that.instructIntercompanyLoan,_that.disburseIntercompanyLoan,_that.fundCheckEnabled);case _:
   return orElse();
 
 }
@@ -196,10 +204,10 @@ return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate,  bool serviceReportCreate,  bool unitTimesheetCreate,  bool aftersalesActivityCreate,  bool dailyReportCreate,  bool? intercompanyPayment)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate,  bool serviceReportCreate,  bool unitTimesheetCreate,  bool aftersalesActivityCreate,  bool dailyReportCreate,  bool? intercompanyPayment,  bool instructIntercompanyLoan,  bool disburseIntercompanyLoan,  bool fundCheckEnabled)  $default,) {final _that = this;
 switch (_that) {
 case _Capabilities():
-return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate,_that.serviceReportCreate,_that.unitTimesheetCreate,_that.aftersalesActivityCreate,_that.dailyReportCreate,_that.intercompanyPayment);case _:
+return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate,_that.serviceReportCreate,_that.unitTimesheetCreate,_that.aftersalesActivityCreate,_that.dailyReportCreate,_that.intercompanyPayment,_that.instructIntercompanyLoan,_that.disburseIntercompanyLoan,_that.fundCheckEnabled);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -216,10 +224,10 @@ return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate,  bool serviceReportCreate,  bool unitTimesheetCreate,  bool aftersalesActivityCreate,  bool dailyReportCreate,  bool? intercompanyPayment)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate,  bool serviceReportCreate,  bool unitTimesheetCreate,  bool aftersalesActivityCreate,  bool dailyReportCreate,  bool? intercompanyPayment,  bool instructIntercompanyLoan,  bool disburseIntercompanyLoan,  bool fundCheckEnabled)?  $default,) {final _that = this;
 switch (_that) {
 case _Capabilities() when $default != null:
-return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate,_that.serviceReportCreate,_that.unitTimesheetCreate,_that.aftersalesActivityCreate,_that.dailyReportCreate,_that.intercompanyPayment);case _:
+return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate,_that.serviceReportCreate,_that.unitTimesheetCreate,_that.aftersalesActivityCreate,_that.dailyReportCreate,_that.intercompanyPayment,_that.instructIntercompanyLoan,_that.disburseIntercompanyLoan,_that.fundCheckEnabled);case _:
   return null;
 
 }
@@ -231,7 +239,7 @@ return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate
 
 
 class _Capabilities extends Capabilities {
-  const _Capabilities({this.approvalInbox = false, this.teamMonitor = false, this.progressReportCreate = false, this.serviceReportCreate = false, this.unitTimesheetCreate = false, this.aftersalesActivityCreate = false, this.dailyReportCreate = false, this.intercompanyPayment}): super._();
+  const _Capabilities({this.approvalInbox = false, this.teamMonitor = false, this.progressReportCreate = false, this.serviceReportCreate = false, this.unitTimesheetCreate = false, this.aftersalesActivityCreate = false, this.dailyReportCreate = false, this.intercompanyPayment, this.instructIntercompanyLoan = false, this.disburseIntercompanyLoan = false, this.fundCheckEnabled = false}): super._();
   
 
 /// Direktur (`pk-owner`) or Finance (`pk-finance`): "Persetujuan" inbox.
@@ -254,6 +262,14 @@ class _Capabilities extends Capabilities {
 /// null = a server before this field (the APK then falls back to the payee directory, see
 /// `mayFileIntercompanyPayment`).
 @override final  bool? intercompanyPayment;
+/// ADR 0029: Owner (`pk-principal` as stored) — may instruct a "Pinjaman antar-PT" (lender list + instruction). The
+/// server re-checks the Owner role in BOTH PTs. False on a server before the field.
+@override@JsonKey() final  bool instructIntercompanyLoan;
+/// ADR 0029: Finance (stored) — the "Pencairan pinjaman antar-PT" queue and the disbursement of loans whose LENDER is
+/// this PT (never one the caller instructed, G1). False on a server before the field.
+@override@JsonKey() final  bool disburseIntercompanyLoan;
+/// ADR 0029: `companies.fundCheckEnabled` of the PT — the final approval is refused while the PT is short.
+@override@JsonKey() final  bool fundCheckEnabled;
 
 /// Create a copy of Capabilities
 /// with the given fields replaced by the non-null parameter values.
@@ -265,18 +281,18 @@ _$CapabilitiesCopyWith<_Capabilities> get copyWith => __$CapabilitiesCopyWithImp
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Capabilities&&(identical(other.approvalInbox, approvalInbox) || other.approvalInbox == approvalInbox)&&(identical(other.teamMonitor, teamMonitor) || other.teamMonitor == teamMonitor)&&(identical(other.progressReportCreate, progressReportCreate) || other.progressReportCreate == progressReportCreate)&&(identical(other.serviceReportCreate, serviceReportCreate) || other.serviceReportCreate == serviceReportCreate)&&(identical(other.unitTimesheetCreate, unitTimesheetCreate) || other.unitTimesheetCreate == unitTimesheetCreate)&&(identical(other.aftersalesActivityCreate, aftersalesActivityCreate) || other.aftersalesActivityCreate == aftersalesActivityCreate)&&(identical(other.dailyReportCreate, dailyReportCreate) || other.dailyReportCreate == dailyReportCreate)&&(identical(other.intercompanyPayment, intercompanyPayment) || other.intercompanyPayment == intercompanyPayment));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Capabilities&&(identical(other.approvalInbox, approvalInbox) || other.approvalInbox == approvalInbox)&&(identical(other.teamMonitor, teamMonitor) || other.teamMonitor == teamMonitor)&&(identical(other.progressReportCreate, progressReportCreate) || other.progressReportCreate == progressReportCreate)&&(identical(other.serviceReportCreate, serviceReportCreate) || other.serviceReportCreate == serviceReportCreate)&&(identical(other.unitTimesheetCreate, unitTimesheetCreate) || other.unitTimesheetCreate == unitTimesheetCreate)&&(identical(other.aftersalesActivityCreate, aftersalesActivityCreate) || other.aftersalesActivityCreate == aftersalesActivityCreate)&&(identical(other.dailyReportCreate, dailyReportCreate) || other.dailyReportCreate == dailyReportCreate)&&(identical(other.intercompanyPayment, intercompanyPayment) || other.intercompanyPayment == intercompanyPayment)&&(identical(other.instructIntercompanyLoan, instructIntercompanyLoan) || other.instructIntercompanyLoan == instructIntercompanyLoan)&&(identical(other.disburseIntercompanyLoan, disburseIntercompanyLoan) || other.disburseIntercompanyLoan == disburseIntercompanyLoan)&&(identical(other.fundCheckEnabled, fundCheckEnabled) || other.fundCheckEnabled == fundCheckEnabled));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,approvalInbox,teamMonitor,progressReportCreate,serviceReportCreate,unitTimesheetCreate,aftersalesActivityCreate,dailyReportCreate,intercompanyPayment);
+    return Object.hash(runtimeType,approvalInbox,teamMonitor,progressReportCreate,serviceReportCreate,unitTimesheetCreate,aftersalesActivityCreate,dailyReportCreate,intercompanyPayment,instructIntercompanyLoan,disburseIntercompanyLoan,fundCheckEnabled);
 }
 
 @override
 String toString() {
-    return 'Capabilities(approvalInbox: $approvalInbox, teamMonitor: $teamMonitor, progressReportCreate: $progressReportCreate, serviceReportCreate: $serviceReportCreate, unitTimesheetCreate: $unitTimesheetCreate, aftersalesActivityCreate: $aftersalesActivityCreate, dailyReportCreate: $dailyReportCreate, intercompanyPayment: $intercompanyPayment)';
+    return 'Capabilities(approvalInbox: $approvalInbox, teamMonitor: $teamMonitor, progressReportCreate: $progressReportCreate, serviceReportCreate: $serviceReportCreate, unitTimesheetCreate: $unitTimesheetCreate, aftersalesActivityCreate: $aftersalesActivityCreate, dailyReportCreate: $dailyReportCreate, intercompanyPayment: $intercompanyPayment, instructIntercompanyLoan: $instructIntercompanyLoan, disburseIntercompanyLoan: $disburseIntercompanyLoan, fundCheckEnabled: $fundCheckEnabled)';
 }
 
 
@@ -287,7 +303,7 @@ abstract mixin class _$CapabilitiesCopyWith<$Res> implements $CapabilitiesCopyWi
   factory _$CapabilitiesCopyWith(_Capabilities value, $Res Function(_Capabilities) _then) = __$CapabilitiesCopyWithImpl;
 @override @useResult
 $Res call({
- bool approvalInbox, bool teamMonitor, bool progressReportCreate, bool serviceReportCreate, bool unitTimesheetCreate, bool aftersalesActivityCreate, bool dailyReportCreate, bool? intercompanyPayment
+ bool approvalInbox, bool teamMonitor, bool progressReportCreate, bool serviceReportCreate, bool unitTimesheetCreate, bool aftersalesActivityCreate, bool dailyReportCreate, bool? intercompanyPayment, bool instructIntercompanyLoan, bool disburseIntercompanyLoan, bool fundCheckEnabled
 });
 
 
@@ -304,7 +320,7 @@ class __$CapabilitiesCopyWithImpl<$Res>
 
 /// Create a copy of Capabilities
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? approvalInbox = null,Object? teamMonitor = null,Object? progressReportCreate = null,Object? serviceReportCreate = null,Object? unitTimesheetCreate = null,Object? aftersalesActivityCreate = null,Object? dailyReportCreate = null,Object? intercompanyPayment = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? approvalInbox = null,Object? teamMonitor = null,Object? progressReportCreate = null,Object? serviceReportCreate = null,Object? unitTimesheetCreate = null,Object? aftersalesActivityCreate = null,Object? dailyReportCreate = null,Object? intercompanyPayment = freezed,Object? instructIntercompanyLoan = null,Object? disburseIntercompanyLoan = null,Object? fundCheckEnabled = null,}) {
   return _then(_Capabilities(
 approvalInbox: null == approvalInbox ? _self.approvalInbox : approvalInbox // ignore: cast_nullable_to_non_nullable
 as bool,teamMonitor: null == teamMonitor ? _self.teamMonitor : teamMonitor // ignore: cast_nullable_to_non_nullable
@@ -314,7 +330,10 @@ as bool,unitTimesheetCreate: null == unitTimesheetCreate ? _self.unitTimesheetCr
 as bool,aftersalesActivityCreate: null == aftersalesActivityCreate ? _self.aftersalesActivityCreate : aftersalesActivityCreate // ignore: cast_nullable_to_non_nullable
 as bool,dailyReportCreate: null == dailyReportCreate ? _self.dailyReportCreate : dailyReportCreate // ignore: cast_nullable_to_non_nullable
 as bool,intercompanyPayment: freezed == intercompanyPayment ? _self.intercompanyPayment : intercompanyPayment // ignore: cast_nullable_to_non_nullable
-as bool?,
+as bool?,instructIntercompanyLoan: null == instructIntercompanyLoan ? _self.instructIntercompanyLoan : instructIntercompanyLoan // ignore: cast_nullable_to_non_nullable
+as bool,disburseIntercompanyLoan: null == disburseIntercompanyLoan ? _self.disburseIntercompanyLoan : disburseIntercompanyLoan // ignore: cast_nullable_to_non_nullable
+as bool,fundCheckEnabled: null == fundCheckEnabled ? _self.fundCheckEnabled : fundCheckEnabled // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 
