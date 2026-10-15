@@ -6,6 +6,7 @@ import { postJson, problemText } from './ActionButton'
 import { OverrideDialog, overridePromptOf, type OverridePrompt } from './kas/OverrideDialog'
 import { DateInput } from './DateInput'
 import { KAS_STYLE } from './kas/style'
+import { WrapSelect } from './WrapSelect'
 
 /**
  * Finance forms of the transfer queue (T3, US-20) and the LPJ settlement (T5, US-22): cash account,
@@ -139,13 +140,13 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
           <label htmlFor={`${uid}-acc`}>
             Akun kas<span className="req" aria-hidden>*</span>
           </label>
-          <select id={`${uid}-acc`} name="cashAccountId" required defaultValue={cashAccounts[0]?.id}>
+          <WrapSelect id={`${uid}-acc`} name="cashAccountId" required defaultValue={cashAccounts[0]?.id}>
             {cashAccounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
               </option>
             ))}
-          </select>
+          </WrapSelect>
         </div>
         {isTransfer ? (
           <div className="pk-fld">
@@ -167,14 +168,14 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
             <label htmlFor={`${uid}-cc`}>
               Pusat biaya<span className="req" aria-hidden>*</span>
             </label>
-            <select id={`${uid}-cc`} name="costCenterId" required defaultValue={costCenter.defaultId ?? ''} data-pk-field="transfer-cost-center">
+            <WrapSelect id={`${uid}-cc`} name="costCenterId" required defaultValue={costCenter.defaultId ?? ''} data-pk-field="transfer-cost-center">
               <option value="">Pilih pusat biaya…</option>
               {costCenter.options.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
                 </option>
               ))}
-            </select>
+            </WrapSelect>
             <p className="help">{costCenter.defaultId ? 'Usulan: pusat biaya default project. Ubah bila perlu.' : 'Project belum punya pusat biaya default — pilih.'}</p>
           </div>
         ) : null}

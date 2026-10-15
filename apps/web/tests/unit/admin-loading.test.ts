@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { exclusionFor, installMutationTracker, isTrackedMutation, MUTATION_EXCLUSIONS, requestMethod } from '@/admin/loading/mutation-tracker'
-import { createVisibilityController, DEFAULT_TIMING, isAdminNavigation, isAdminUrlChange } from '@/admin/loading/visibility'
+import { blocksKey, createVisibilityController, DEFAULT_TIMING, isAdminNavigation, isAdminUrlChange } from '@/admin/loading/visibility'
 
 /**
  * Admin loader (src/admin/loading): the global mutation tracker (window.fetch wrapper), its
@@ -259,6 +259,60 @@ describe('createVisibilityController (anti-flash timing)', () => {
     c.update(true)
     vi.advanceTimersByTime(180)
     expect(seen).toEqual([true, false, true])
+  })
+
+  describe('input blocking (DRMS 16/10)', () => {
+    const blockSetup = () => {
+      const blocked: boolean[] = []
+      const c = createVisibilityController(() => {}, DEFAULT_TIMING, (b) => blocked.push(b))
+      return { c, blocked }
+    }
+
+    it('blocks from the first moment of busy, before the dots appear', () => {
+      const { c, blocked } = blockSetup()
+      c.update(true)
+      expect(blocked).toEqual([true])
+      expect(c.isBlocked()).toBe(true)
+      expect(c.isVisible()).toBe(false)
+    })
+
+    it('fast work: released as soon as busy drops', () => {
+      const { c, blocked } = blockSetup()
+      c.update(true)
+      vi.advanceTimersByTime(100)
+      c.update(false)
+      expect(blocked).toEqual([true, false])
+    })
+
+    it('stays blocked while the loader is visible (minimum window), released with it', () => {
+      const { c, blocked } = blockSetup()
+      c.update(true)
+      vi.advanceTimersByTime(200)
+      c.update(false)
+      expect(c.isBlocked()).toBe(true)
+      vi.advanceTimersByTime(280)
+      expect(blocked).toEqual([true, false])
+    })
+
+    it('the safety timeout releases the page even while still busy, until busy rises again', () => {
+      const { c, blocked } = blockSetup()
+      c.update(true)
+      vi.advanceTimersByTime(180 + 15_000)
+      expect(blocked).toEqual([true, false])
+      c.update(true)
+      expect(c.isBlocked()).toBe(false)
+      c.update(false)
+      c.update(true)
+      expect(blocked).toEqual([true, false, true])
+    })
+  })
+
+  it('blocksKey: Enter always, Space outside text fields, nothing else', () => {
+    expect(blocksKey('Enter', false)).toBe(true)
+    expect(blocksKey('Enter', true)).toBe(true)
+    expect(blocksKey(' ', false)).toBe(true)
+    expect(blocksKey(' ', true)).toBe(false)
+    for (const k of ['a', 'Tab', 'Escape', 'Backspace', 'ArrowDown']) expect(blocksKey(k, false)).toBe(false)
   })
 
   it('dispose cancels pending timers', () => {

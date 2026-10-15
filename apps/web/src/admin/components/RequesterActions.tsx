@@ -10,6 +10,8 @@ import { TableScroll } from './TableScroll'
 import { DateInput } from './DateInput'
 import { LpjPhotoGrid } from './lpj/LpjPhotoGrid'
 import { LpjPhotosEditor } from './lpj/LpjPhotosEditor'
+import { WrapSelect } from './WrapSelect'
+import { isMultilineText, WrapText } from './WrapText'
 
 /**
  * Requester actions of the expense-request edit view (F2c, US-03…US-08): submit, withdraw/cancel
@@ -190,7 +192,7 @@ function useFields() {
 }
 
 const noEnter = (e: React.KeyboardEvent) => {
-  if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) e.preventDefault()
+  if (e.key === 'Enter' && !isMultilineText(e.target)) e.preventDefault()
 }
 
 function ReceiptForm({ requestId, lines, today }: { requestId: number; lines: RequesterActionsProps['lines']; today?: string }) {
@@ -219,13 +221,13 @@ function ReceiptForm({ requestId, lines, today }: { requestId: number; lines: Re
     <div ref={ref} onKeyDown={noEnter} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end', marginTop: 8 }} data-pk-form="receipt">
       <label style={field}>
         Baris item
-        <select data-f="lineId">
+        <WrapSelect data-f="lineId">
           {lines.map((l) => (
             <option key={l.id} value={l.id}>
               {l.no}. {l.description || '(tanpa uraian)'} — {rp(l.total)}
             </option>
           ))}
-        </select>
+        </WrapSelect>
       </label>
       <label style={field}>
         Foto nota (JPG/PNG/WebP)
@@ -237,7 +239,7 @@ function ReceiptForm({ requestId, lines, today }: { requestId: number; lines: Re
       </label>
       <label style={field}>
         Vendor / toko
-        <input type="text" data-f="vendorName" maxLength={160} />
+        <WrapText data-f="vendorName" maxLength={160} />
       </label>
       <label style={field}>
         Tanggal nota

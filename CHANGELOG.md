@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **"+ Buat" in the top bar (DRMS 16/10, owner request 2026-10-16, "konsep no. 1").** Admin, Direktur (and Owner),
+  PM and Finance of the selected PT get a **+ Buat** button left of the PT switcher. It opens a menu of the create
+  pages the user may actually use, grouped Keuangan · Proyek · Klien & vendor · Pengguna & karyawan: Pengajuan baru,
+  Pembayaran vendor (request form with Jenis penerima = Vendor preset, Finance / PM), Kas masuk / Kas keluar (Finance),
+  Proyek baru, Laporan harian (PTs with field reports), Addendum RAB (PM), Klien baru, Vendor baru, Pengguna baru (the
+  tabbed Pengguna form, Admin) and Karyawan baru. Items follow Payload's create permission + hidden collections and the
+  role rules of the custom views (`src/admin/shell/quick-create.ts`). Keyboard: **Alt+N** opens it (not while typing),
+  ↑/↓/Home/End inside, Esc closes and returns focus; rows ≥ 44 px; icon-only **+** ("Buat baru") under 640 px with a
+  full-width panel. Staff and Operator panels are unchanged. Web only, no API or schema change.
+- **"+ Klien / Vendor / Karyawan baru" beside relationship pickers (DRMS 16/10 part b, "konsep no. 1").** Under the
+  pickers Proyek › Klien, Pengajuan › Vendor and Pemohon, Rekening vendor › Vendor, Penugasan tim › Karyawan, Rekening
+  karyawan › Karyawan and Kendaraan › Pelanggan a **+ … baru** button creates the missing record in a side drawer and
+  puts it into the picker: Klien / Vendor in the tabbed form (PartnerFormLoader) with the form's PT preselected,
+  Karyawan in Payload's document drawer of the plain employee form (`initialData: { company }`, no user account).
+  Shown only with the collection's create permission; disabled with **Pilih PT terlebih dahulu** until the form has a
+  PT (where the PT is chosen in the form). Payload's own "+" (`allowCreate`, no PT carried over) is off on these
+  fields. `src/admin/relationship-create.ts` + `admin/components/relationship/CreatableRelationshipField.tsx`.
+- "+ Buat" › **Klien baru** / **Vendor baru** open the tabbed pages (`/admin/klien/baru`, `/admin/vendor/baru`).
+  Payload's document pages `/admin/collections/{clients,vendors}/<create|id>` (bookmarks, old links) redirect to
+  `/admin/klien/…` / `/admin/vendor/…` — a collection-level custom view (`partnerPage`, path `/:id`) that only the page
+  router reaches; Payload's document drawer (relationship "edit" pencil) keeps the collection form.
+
 **DRMS 16/10 owner request — Klien and Vendor as one tabbed page with one save** (owner 2026-10-16: "Dalam pembuatan
 client dan vendor, tanpa harus masuk ke sub menu lain, tab dapat mengakomodir penambahan record yang disesuaikan
 tabnya"). Branch `feat/d1610-partner-forms`. Guide: [admin.md §3b](docs/proyekkas/guides/admin.md).
@@ -36,23 +60,6 @@ first, primary contact row. The previous image keeps working (it never reads the
   drawer: `mode`, `onSaved(id, detail)` instead of navigation, `onCancel`, `initialCompany`; `PartnerFormLoader`
   (`kind`, `id` or null) loads its data from the GET endpoints itself — the entry for the coming quick-create "+" beside
   relationship pickers (Payload's own relationship drawer keeps the plain collection form).
-- **"+ Buat" in the top bar (DRMS 16/10, owner request 2026-10-16, "konsep no. 1").** Admin, Direktur (and Owner),
-  PM and Finance of the selected PT get a **+ Buat** button left of the PT switcher. It opens a menu of the create
-  pages the user may actually use, grouped Keuangan · Proyek · Klien & vendor · Pengguna & karyawan: Pengajuan baru,
-  Pembayaran vendor (request form with Jenis penerima = Vendor preset, Finance / PM), Kas masuk / Kas keluar (Finance),
-  Proyek baru, Laporan harian (PTs with field reports), Addendum RAB (PM), Klien baru, Vendor baru, Pengguna baru (the
-  tabbed Pengguna form, Admin) and Karyawan baru. Items follow Payload's create permission + hidden collections and the
-  role rules of the custom views (`src/admin/shell/quick-create.ts`). Keyboard: **Alt+N** opens it (not while typing),
-  ↑/↓/Home/End inside, Esc closes and returns focus; rows ≥ 44 px; icon-only **+** ("Buat baru") under 640 px with a
-  full-width panel. Staff and Operator panels are unchanged. Web only, no API or schema change.
-- **"+ Klien / Vendor / Karyawan baru" beside relationship pickers (DRMS 16/10 part b, "konsep no. 1").** Under the
-  pickers Proyek › Klien, Pengajuan › Vendor and Pemohon, Rekening vendor › Vendor, Penugasan tim › Karyawan, Rekening
-  karyawan › Karyawan and Kendaraan › Pelanggan a **+ … baru** button creates the missing record in a side drawer and
-  puts it into the picker: Klien / Vendor in the tabbed form (PartnerFormLoader) with the form's PT preselected,
-  Karyawan in Payload's document drawer of the plain employee form (`initialData: { company }`, no user account).
-  Shown only with the collection's create permission; disabled with **Pilih PT terlebih dahulu** until the form has a
-  PT (where the PT is chosen in the form). Payload's own "+" (`allowCreate`, no PT carried over) is off on these
-  fields. `src/admin/relationship-create.ts` + `admin/components/relationship/CreatableRelationshipField.tsx`.
 
 ### Changed
 
@@ -63,10 +70,12 @@ first, primary contact row. The previous image keeps working (it never reads the
   primary contact (read-only in Payload's form); a write that sends only them (seed, import, old REST clients) updates
   or creates the primary contact instead.
 - Vendors: the Payload tabs + `join` list of the bank accounts are removed (the tabbed page replaces them; no column).
-- "+ Buat" › **Klien baru** / **Vendor baru** open the tabbed pages (`/admin/klien/baru`, `/admin/vendor/baru`).
-  Payload's document pages `/admin/collections/{clients,vendors}/<create|id>` (bookmarks, old links) redirect to
-  `/admin/klien/…` / `/admin/vendor/…` — a collection-level custom view (`partnerPage`, path `/:id`) that only the page
-  router reaches; Payload's document drawer (relationship "edit" pencil) keeps the collection form.
+
+### Changed
+- **Admin loader blocks input (DRMS 16/10 #2).** From the first moment of a navigation or a save, a transparent shield
+  over the whole page absorbs clicks and Enter / Space until the loader hides (dots still after 180 ms; released by the
+  15 s safety timeout at the latest). Navigations stopped by Payload's "leave without saving?" guard no longer count.
+  ADR 0014 § Amendment 2026-10-16.
 
 ## [0.12.0] - 2026-10-15
 

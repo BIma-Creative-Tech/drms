@@ -1706,12 +1706,11 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 
   .pk-rmx__email {
     display: block;
-    overflow: hidden;
     max-width: 220px;
     color: var(--pk-muted-fg);
     font-size: 12px;
     font-weight: 400;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
   }
 
   .pk-rmx__table td[data-changed] {
@@ -1854,7 +1853,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     gap: 2px;
     font-size: 12px;
 
-    input {
+    :is(input, textarea) {
       min-height: 34px;
       padding: 4px 8px;
       border: 1px solid var(--pk-input);
@@ -1862,6 +1861,11 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
       background: var(--theme-input-bg, var(--theme-elevation-0));
       color: var(--theme-text);
       font-size: 13px;
+    }
+
+    // WrapText (DRMS 16/10): one text line = 34 px like the input it replaced
+    textarea {
+      line-height: 24px;
     }
   }
 
@@ -3211,9 +3215,11 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 
   // DRMS 15/10 #6 (owner: "jarak antar kolom terlalu lebar"): the data columns hug their content (width 1 % + no
   // wrapping; Payload's 150 px cell minimum off) and the empty filler column before "Aksi" takes the rest of the row,
-  // so 3–4 columns no longer spread over the whole width. Long texts end in an ellipsis at 360 px (.pk-plist__cell);
-  // textareas wrap inside 360 px. No `min-width: max-content` on the table: with percentage columns the table's
-  // max-content would be scaled up — its min-content (nowrap cells) already keeps it from squeezing.
+  // so 3–4 columns no longer spread over the whole width. DRMS 16/10 (owner: "text wrap agar kalimat tidak
+  // terpotong"): a long text WRAPS inside the same 360 px (.pk-plist__cell) instead of ending in an ellipsis — the
+  // column keeps its width, only that row grows. No `min-width: max-content` on the table: with percentage columns
+  // the table's max-content would be scaled up — its min-content (cells of a fixed max-content width) already keeps it
+  // from squeezing.
   .pk-plist__table {
     border: 1px solid var(--pk-border);
     border-radius: var(--style-radius-l);
@@ -3247,15 +3253,18 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   }
 
   .pk-plist__cell {
-    overflow: hidden;
-    max-width: 360px;
-    text-overflow: ellipsis;
-  }
-
-  .pk-plist__cell--wrap {
     width: max-content;
+    max-width: 360px;
     white-space: normal;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+
+    // Payload's select / relationship pills end in an ellipsis of their own
+    :is(.pill, .pill__label) {
+      max-width: 100%;
+      overflow: visible;
+      text-overflow: clip;
+      white-space: normal;
+    }
   }
 
   .pk-plist__sort {
@@ -3746,6 +3755,55 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     .pk-f3 .pk-scroll {
       max-height: none;
       overflow: visible;
+    }
+  }
+}
+
+// ---- DRMS 16/10 (owner): "kalimat pada kolom grid tidak terpotong" — text wraps, column widths unchanged ----------
+// Every grid (transactions and master data) keeps its columns; a long free text or master-data name wraps inside its
+// cell and only that row grows. List views: .pk-plist__cell above; custom tables: a long unbroken word breaks at the
+// cell edge instead of running over the next column (`break-word` does not change a column's minimum width). The
+// one-line inputs and native dropdowns of the custom forms wrap through WrapText / WrapSelect.
+@layer payload {
+  :is(.pk-tscroll, .pk-plist__table, .pk-tw, .pk-lwide, .pk-scroll, .pk-grid-w) td,
+  .table td {
+    overflow-wrap: break-word;
+  }
+
+  .table td :is(.pill, .pill__label) {
+    max-width: 100%;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  // Payload's dropdowns (relationship / select fields of every transaction and master-data form): the chosen value
+  // and the chips wrap instead of ending in "…". react-select's own (emotion) styles are unlayered → !important,
+  // which a layer wins over unlayered normal declarations.
+  .react-select {
+    .rs__single-value {
+      overflow: visible !important;
+      text-overflow: clip !important;
+      white-space: normal !important;
+      overflow-wrap: anywhere;
+    }
+
+    .relationship--single-value__text {
+      overflow: visible;
+      text-overflow: clip;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    :is(.multi-value-label__text, .relationship--multi-value-label__text, .rs__multi-value__label) {
+      overflow: visible !important;
+      text-overflow: clip !important;
+      white-space: normal !important;
+      overflow-wrap: anywhere;
+    }
+
+    .rs__option {
+      overflow-wrap: anywhere;
     }
   }
 }

@@ -7,6 +7,7 @@ import { fmtNum } from '@/domain/field/views'
 
 import { newIdemKey, sendJson, fieldErrors } from '../kas/client'
 import { decOut, LinesEditor, linesFrom, linesOut, type LineDraft } from './parts'
+import { WrapSelect } from '../WrapSelect'
 
 /**
  * FR1 correction (PM of the project team / Direktur, any time, REASON REQUIRED → POST …/corrections,
@@ -175,13 +176,13 @@ export function CorrectionDialog({ url, mode, buttonLabel, title, description, f
                   {f.kind === 'textarea' ? (
                     <textarea {...common} rows={3} maxLength={f.max ?? 4000} onChange={(e) => set(e.target.value)} />
                   ) : f.kind === 'select' ? (
-                    <select {...common} onChange={(e) => set(e.target.value)}>
+                    <WrapSelect {...common} onChange={(e) => set(e.target.value)}>
                       {f.options.map((o) => (
                         <option key={o.value} value={o.value}>
                           {o.label}
                         </option>
                       ))}
-                    </select>
+                    </WrapSelect>
                   ) : f.kind === 'rupiah' ? (
                     <div className="pk-money">
                       <span aria-hidden>Rp</span>

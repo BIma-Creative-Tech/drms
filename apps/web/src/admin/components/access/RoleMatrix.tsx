@@ -35,6 +35,8 @@ import {
   type MatrixUser,
   type Viewer,
 } from './role-matrix'
+import { WrapSelect } from '../WrapSelect'
+import { WrapText } from '../WrapText'
 
 /**
  * Client part of the role matrix (/admin/akses-pt, wireframe §2). Edits are local drafts until
@@ -230,7 +232,7 @@ export function RoleMatrix({ companies, users, cells, employees, activeUserIds, 
         </span>
         <label className="pk-rmx__reason">
           <span>Alasan (wajib)</span>
-          <input type="text" value={reason} onChange={(e) => editReason(e.target.value)} maxLength={300} placeholder="mis. mutasi tugas ke CS1" disabled={ops.length === 0 || busy} aria-invalid={ops.length > 0 && !reasonOk(reason)} data-pk-reason />
+          <WrapText value={reason} onChange={(e) => editReason(e.target.value)} maxLength={300} placeholder="mis. mutasi tugas ke CS1" disabled={ops.length === 0 || busy} aria-invalid={ops.length > 0 && !reasonOk(reason)} data-pk-reason />
         </label>
         <button type="button" className="pk-btn primary" onClick={() => void save()} disabled={busy || ops.length === 0 || !reasonOk(reason) || dups.length > 0} data-pk-save>
           {busy ? 'Menyimpan…' : 'Simpan'}
@@ -292,7 +294,7 @@ function Cell({
       <div className="pk-rmx__emp">
         <label>
           <span className="pk-rmx__emp-label">Karyawan</span>
-          <select value={cell.employee ?? ''} disabled={!editable} onChange={(e) => onChange(setEmployee(cell, e.target.value ? Number(e.target.value) : null))} aria-invalid={duplicate || undefined} data-pk-employee>
+          <WrapSelect value={cell.employee ?? ''} disabled={!editable} onChange={(e) => onChange(setEmployee(cell, e.target.value ? Number(e.target.value) : null))} aria-invalid={duplicate || undefined} data-pk-employee>
             <option value="">– (tanpa)</option>
             {choices.map((e) => (
               <option key={e.id} value={e.id}>
@@ -300,7 +302,7 @@ function Cell({
                 {e.active ? '' : ' (nonaktif)'}
               </option>
             ))}
-          </select>
+          </WrapSelect>
         </label>
         {emp ? (
           <a href={`/admin/collections/employees/${emp.id}`} className="pk-rmx__emp-link" aria-label={`Buka data karyawan ${emp.name}`} title="Buka data karyawan">

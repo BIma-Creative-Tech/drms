@@ -4,6 +4,7 @@ import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { fmtNum, parseDecimalId } from '@/domain/field/views'
 
 import { uploadFieldPhoto } from './client'
+import { WrapText } from '../WrapText'
 
 /**
  * FR1 web forms — shared client parts: photo picker (preview, remove, upload on submit with the id
@@ -174,14 +175,14 @@ export function LinesEditor({ rows, setRows, label, nameLabel, addLabel, help, w
       ) : null}
       {rows.map((r, i) => (
         <div key={r.key} className="pk-line" data-pk-line={i + 1}>
-          <input aria-label={`${nameLabel} ${i + 1}`} value={r.name} maxLength={160} onChange={(e) => set(i, 'name', e.target.value)} aria-invalid={errs[i] ? true : undefined} aria-describedby={errs[i] ? `${uid}-e${i}` : undefined} />
+          <WrapText aria-label={`${nameLabel} ${i + 1}`} value={r.name} maxLength={160} onChange={(e) => set(i, 'name', e.target.value)} aria-invalid={errs[i] ? true : undefined} aria-describedby={errs[i] ? `${uid}-e${i}` : undefined} />
           <input aria-label={`No. part ${i + 1}`} value={r.partNo} maxLength={64} onChange={(e) => set(i, 'partNo', e.target.value)} />
           <input aria-label={`Jumlah ${i + 1}`} value={r.qty} inputMode="decimal" maxLength={12} onChange={(e) => set(i, 'qty', e.target.value)} aria-invalid={errs[i] ? true : undefined} />
           <input aria-label={`Satuan ${i + 1}`} value={r.uom} maxLength={16} placeholder="PCS" onChange={(e) => set(i, 'uom', e.target.value)} />
           <button type="button" className="pk-kbtn sm" onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label={`Hapus baris ${i + 1}`}>
             Hapus
           </button>
-          {withNote ? <input className="note" aria-label={`Keterangan ${i + 1}`} placeholder="Keterangan (opsional)" value={r.note} maxLength={300} onChange={(e) => set(i, 'note', e.target.value)} /> : null}
+          {withNote ? <WrapText className="note" aria-label={`Keterangan ${i + 1}`} placeholder="Keterangan (opsional)" value={r.note} maxLength={300} onChange={(e) => set(i, 'note', e.target.value)} /> : null}
           {errs[i] ? (
             <p className="err" id={`${uid}-e${i}`} role="alert">
               Baris {i + 1}: {errs[i]}
