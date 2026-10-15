@@ -10,6 +10,7 @@ import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson, uploadAttachment } from './client'
 import { OverrideDialog, overridePromptOf, type OverridePrompt } from './OverrideDialog'
 import { DateInput } from '../DateInput'
+import { WrapSelect } from '../WrapSelect'
 
 /**
  * E2 form "Kas masuk / Kas keluar" (US-23) and its edit mode (ADR 0005 §5: descriptive fields
@@ -213,7 +214,7 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
           </span>
         ) : null}
       </label>
-      <select
+      <WrapSelect
         id={id(name)}
         name={name}
         defaultValue={value ? String(value) : ''}
@@ -229,7 +230,7 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
             {x.label}
           </option>
         ))}
-      </select>
+      </WrapSelect>
       {o.help ? (
         <p id={id(`${name}-h`)} className="help">
           {o.help}

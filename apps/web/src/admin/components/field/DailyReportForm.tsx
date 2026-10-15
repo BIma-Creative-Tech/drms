@@ -8,6 +8,7 @@ import { fmtNum } from '@/domain/field/views'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 import { Choice, decOut, DecimalField, PhotoPicker, usePhotos } from './parts'
 import { DateInput } from '../DateInput'
+import { WrapSelect } from '../WrapSelect'
 
 /**
  * P3 web input "Laporan harian" (konstruksi; same fields as the APK): project → date, weather
@@ -216,14 +217,14 @@ export function DailyReportForm({ mode, projects, itemsByProject, resourcesByCom
             <label htmlFor={id('project')}>
               Project konstruksi<span className="req" aria-hidden>*</span>
             </label>
-            <select id={id('project')} value={projectId} disabled={mode !== 'create'} onChange={(e) => setProjectId(e.target.value)} aria-invalid={err('projectId') ? true : undefined}>
+            <WrapSelect id={id('project')} value={projectId} disabled={mode !== 'create'} onChange={(e) => setProjectId(e.target.value)} aria-invalid={err('projectId') ? true : undefined}>
               <option value="">— Pilih project —</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.label}
                 </option>
               ))}
-            </select>
+            </WrapSelect>
             {errEl('projectId')}
           </div>
           <div className="pk-fld">
