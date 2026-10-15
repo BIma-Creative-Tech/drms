@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-16
+
+**DRMS 16/10 owner feedback: one-page tabbed forms (Pengguna, Klien, Vendor), "+ Buat" and "+ … baru" shortcuts,
+blocking loader, and row "Hapus" as a soft delete with "Batalkan proyek".** PRs #83–#89. Production goes 0.12.0 →
+0.13.0. Web / server only: **no APK release** (APK stays 0.7.0; deleted masters simply drop out of its sync), and every
+API change is additive.
+
+**Database migrations** (one batch, in this order; additive, the 0.12.0 image keeps working on the new schema):
+`20261016_100000_d1610_partner_contacts` (#87: tables `clients_contacts` / `vendors_contacts` + backfill of the single
+contact as the primary PIC) → `20261016_200000_d1610_soft_delete_enums` (#88: project status `dibatalkan`, audit
+`soft_delete` / `restore`) → `20261016_200100_d1610_soft_delete` (#88: `is_deleted` / `deleted_at` / `deleted_by_id` /
+`delete_reason` on 20 tables, project cancel columns, CHECKs; every existing row stays not deleted).
+
+**Deploy checklist:** staging first, then prod.
+1. Take a dump (+ `.env.pre-0.13.0`) right before the migration.
+2. Deploy (migrate → web + worker), then check: the migrate log; `/api/health`; login; **Pengguna baru** (Data Karyawan
+   tab lists every PT, "+ Tambah data karyawan" ticks Staff); **Klien / Vendor** pages (existing contact shown as the
+   primary Kontak PIC, a vendor's Rekening tab); **+ Buat** menu; "+ Klien baru" under Proyek › Klien opens the drawer;
+   the **Aksi** column shows Hapus / Nonaktifkan; the loader blocks clicks.
+3. Rollback: `payload migrate:down` (newest first) + the 0.12.0 image — refused once a project is `dibatalkan`, and
+   contacts added after the deploy are lost (the single contact column keeps the primary one); otherwise restore the
+   dump + the 0.12.0 image.
+
 ### Changed
 - **Pengguna: add employee data, bank accounts and assignments right on their tab (DRMS 16/10 #1).** Data Karyawan /
   Rekening Karyawan / Penugasan Proyek list every PT the admin manages instead of "Pilih dulu peran di tab Akses &
