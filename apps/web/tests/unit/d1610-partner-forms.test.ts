@@ -147,23 +147,39 @@ describe('rules: detail, vendor bank rows, reason, error paths', () => {
 })
 
 describe('collection hook: Kontak PIC ↔ single Kontak / No. HP columns', () => {
-  const run = (data: Record<string, unknown>, operation: 'create' | 'update', phone = true) => contactsHook({ phone })({ data, operation } as never) as Record<string, unknown>
+  const run = (data: Record<string, unknown>, operation: 'create' | 'update', originalDoc?: Record<string, unknown>, phone = true) => contactsHook({ phone })({ data, operation, originalDoc } as never) as Record<string, unknown>
 
-  it('a write with contacts derives the single columns from the primary row', () => {
-    const d = run({ contacts: [{ name: 'A', phone: '0811' }, { name: ' B ', phone: '0822', isPrimary: true }] }, 'update')
+  it('changed contact rows derive the single columns from the primary row', () => {
+    const d = run({ contacts: [{ name: 'A', phone: '0811' }, { name: ' B ', phone: '0822', isPrimary: true }] }, 'update', { contacts: [], contact: null, phone: null })
     expect(d.contact).toBe('B')
     expect(d.phone).toBe('0822')
     expect((d.contacts as Array<{ isPrimary: boolean }>).map((r) => r.isPrimary)).toEqual([false, true])
-    const cleared = run({ contacts: [] }, 'update')
+    const cleared = run({ contacts: [], contact: 'A', phone: '0811' }, 'update', { contacts: [{ id: 'r', name: 'A', phone: '0811', isPrimary: true }], contact: 'A', phone: '0811' })
     expect([cleared.contact, cleared.phone]).toEqual([null, null])
     // vendors: no phone column
-    expect(run({ contacts: [{ name: 'C', phone: '1' }] }, 'update', false)).not.toHaveProperty('phone')
+    expect(run({ contacts: [{ name: 'C', phone: '1' }] }, 'create', undefined, false)).not.toHaveProperty('phone')
   })
 
-  it('a create with only the single columns (seed, import) becomes the primary row; an update without contacts is left alone', () => {
+  it('unchanged rows (Payload merges the stored values into an update) leave everything as is', () => {
+    const stored = { contacts: [{ id: 'r', name: 'A', phone: '0811', isPrimary: true }], contact: 'A', phone: '0811' }
+    const d = run({ ...stored, name: 'Baru' }, 'update', stored)
+    expect([d.contact, d.phone]).toEqual(['A', '0811'])
+    expect((d.contacts as Array<{ id?: string }>)[0]!.id).toBe('r')
+  })
+
+  it('a write of the single columns only (seed, import, old REST clients) keeps the primary row in step', () => {
     expect(run({ contact: 'Pak Andi', phone: '0812' }, 'create').contacts).toEqual([{ name: 'Pak Andi', position: null, phone: '0812', email: null, notes: null, isPrimary: true }])
-    expect(run({ contact: 'Pak Andi' }, 'update')).not.toHaveProperty('contacts')
     expect(run({ name: 'X' }, 'create')).not.toHaveProperty('contacts')
+    // update without rows: becomes the first (primary) row
+    expect((run({ contact: 'Bu Audit' }, 'update', { contacts: [], contact: null }).contacts as Array<{ name: string }>).map((r) => r.name)).toEqual(['Bu Audit'])
+    // update with rows: the primary row is renamed, the others stay
+    const stored = { contacts: [{ id: 'a', name: 'A', isPrimary: false }, { id: 'b', name: 'B', phone: '1', isPrimary: true }], contact: 'B', phone: '1' }
+    const d = run({ ...stored, contact: 'Bu B', phone: '2' }, 'update', stored)
+    expect((d.contacts as Array<{ id?: string; name: string; phone: string | null }>).map((r) => [r.id, r.name, r.phone])).toEqual([
+      ['a', 'A', null],
+      ['b', 'Bu B', '2'],
+    ])
+    expect(d.contact).toBe('Bu B')
   })
 })
 
