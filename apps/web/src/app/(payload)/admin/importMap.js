@@ -99,6 +99,8 @@ import { IcLoanList as IcLoanList_b223b638967a0af97c0e72d82469d43e } from '@/adm
 import { IcLoanNew as IcLoanNew_b223b638967a0af97c0e72d82469d43e } from '@/admin/views/IntercompanyLoans'
 import { IcLoanDetail as IcLoanDetail_b223b638967a0af97c0e72d82469d43e } from '@/admin/views/IntercompanyLoans'
 import { PenggunaView as PenggunaView_fad9889f096e54cb6a767f508ef49231 } from '@/admin/views/Pengguna'
+import { KlienView as KlienView_ae9d2da906c22c59a95548bda5b58b58 } from '@/admin/views/Partners'
+import { VendorView as VendorView_ae9d2da906c22c59a95548bda5b58b58 } from '@/admin/views/Partners'
 import { RapIndex as RapIndex_773cef30cdd6663e7e587999e07fc5eb } from '@/admin/views/Rap'
 import { RapProject as RapProject_773cef30cdd6663e7e587999e07fc5eb } from '@/admin/views/Rap'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
@@ -206,6 +208,8 @@ export const importMap = {
   "@/admin/views/IntercompanyLoans#IcLoanNew": IcLoanNew_b223b638967a0af97c0e72d82469d43e,
   "@/admin/views/IntercompanyLoans#IcLoanDetail": IcLoanDetail_b223b638967a0af97c0e72d82469d43e,
   "@/admin/views/Pengguna#PenggunaView": PenggunaView_fad9889f096e54cb6a767f508ef49231,
+  "@/admin/views/Partners#KlienView": KlienView_ae9d2da906c22c59a95548bda5b58b58,
+  "@/admin/views/Partners#VendorView": VendorView_ae9d2da906c22c59a95548bda5b58b58,
   "@/admin/views/Rap#RapIndex": RapIndex_773cef30cdd6663e7e587999e07fc5eb,
   "@/admin/views/Rap#RapProject": RapProject_773cef30cdd6663e7e587999e07fc5eb,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1

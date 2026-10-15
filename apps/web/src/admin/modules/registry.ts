@@ -142,7 +142,16 @@ export const MODULES: readonly ModuleDef[] = [
         ],
       },
       { label: 'Tahapan', items: [{ collection: 'project-stages' }, { collection: 'stage-templates' }] },
-      { label: 'Data pendukung', items: [{ collection: 'clients' }, { collection: 'cost-centers' }, { collection: 'team-assignments' }] },
+      // DRMS 16/10: "+ Klien baru" = the tabbed Klien page (/klien/<id> = edit; the list rows open it too)
+      {
+        label: 'Data pendukung',
+        items: [
+          { collection: 'clients' },
+          { view: '/klien/baru', label: '+ Klien baru', roles: ['pk-admin', 'pk-owner'], navKey: 'klien-baru', prefix: '/klien' },
+          { collection: 'cost-centers' },
+          { collection: 'team-assignments' },
+        ],
+      },
       {
         label: 'Progress',
         items: [
@@ -279,7 +288,22 @@ export const MODULES: readonly ModuleDef[] = [
     icon: 'master',
     hint: 'Bank, satuan, vendor',
     manage: true,
-    sections: [{ items: [{ collection: 'banks' }, { collection: 'uoms' }, { collection: 'expense-categories' }, { collection: 'urgency-levels' }, { collection: 'vehicles' }, { collection: 'vendors' }, { collection: 'vendor-bank-accounts' }, { collection: 'sites' }] }],
+    sections: [
+      {
+        items: [
+          { collection: 'banks' },
+          { collection: 'uoms' },
+          { collection: 'expense-categories' },
+          { collection: 'urgency-levels' },
+          { collection: 'vehicles' },
+          { collection: 'vendors' },
+          // DRMS 16/10: "+ Vendor baru" = the tabbed Vendor page (detail + rekening + kontak PIC; /vendor/<id> = edit)
+          { view: '/vendor/baru', label: '+ Vendor baru', roles: ['pk-admin', 'pk-finance'], navKey: 'vendor-baru', prefix: '/vendor' },
+          { collection: 'vendor-bank-accounts' },
+          { collection: 'sites' },
+        ],
+      },
+    ],
   },
   {
     id: 'media',

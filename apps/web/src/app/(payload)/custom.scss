@@ -3467,6 +3467,15 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     min-height: 40px;
   }
 
+  // DRMS 16/10 Klien / Vendor pages (same form): a read-only value in the label-left grid (PT, Ref. Odoo)
+  .pk-fgrid__value {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    min-height: 40px;
+  }
+
   @media (max-width: 640px) {
     .pk-uo__tab {
       flex: 1 1 auto;
