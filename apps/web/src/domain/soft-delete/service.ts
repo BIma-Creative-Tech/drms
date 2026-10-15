@@ -117,13 +117,13 @@ export function mayCancelProject(req: PayloadRequest, companyId: number | null |
 export const PROJECT_CANCELLABLE: readonly string[] = ['perencanaan', 'berjalan', 'ditunda']
 
 /** A request that may be soft-deleted: a Draft never submitted (the number is allocated at the first submit). */
-export function isNeverSubmittedDraft(row: { status?: unknown; doc_no?: unknown; docNo?: unknown }): boolean {
+export function isNeverSubmittedDraft(row: Readonly<Record<string, unknown>>): boolean {
   const no = row.doc_no ?? row.docNo
   return row.status === 'draft' && (no === null || no === undefined || no === '')
 }
 
 /** The state machine has a `cancel` transition from the request's status. */
-export function requestCancellable(row: { type?: unknown; status?: unknown; payee_type?: unknown; payeeType?: unknown }): boolean {
+export function requestCancellable(row: Readonly<Record<string, unknown>>): boolean {
   return targets((row.type ?? 'advance') as RequestType, row.status as RequestStatus, 'cancel', payeeOf(row.payee_type ?? row.payeeType)).length > 0
 }
 

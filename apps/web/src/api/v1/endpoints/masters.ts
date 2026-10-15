@@ -150,7 +150,7 @@ async function withoutDeletedProjects(req: PayloadRequest, items: Item[]): Promi
   const ids = [...new Set(items.map((i) => relId(i.project)).filter((x): x is number => x !== undefined))]
   if (ids.length === 0) return items
   const res = await req.payload.find({ collection: 'projects', where: { and: [{ id: { in: ids } }, ONLY_DELETED] }, depth: 0, pagination: false, select: { id: true } as never, overrideAccess: true /* SYSTEM-READ: which assigned projects are soft-deleted (ids only) */, req })
-  const gone = new Set(res.docs.map((d) => d.id as number))
+  const gone = new Set((res.docs as unknown as Array<{ id: number }>).map((d) => d.id))
   return gone.size === 0 ? items : items.filter((i) => !gone.has(relId(i.project) ?? -1))
 }
 

@@ -71,7 +71,7 @@ export async function PkListView(props: ListViewServerProps) {
     }
   }
   const st = states
-  const docs = st ? data.docs.map((d) => ({ ...d, [ROW_STATE_KEY]: st.get(d.id as number) ?? null })) : data.docs
+  const docs: Array<Record<string, unknown>> = st ? data.docs.map((d) => ({ ...d, [ROW_STATE_KEY]: st.get(d.id as number) ?? null })) : data.docs
   const plural = label(collectionConfig.labels?.plural, i18n, slug)
   // DRMS 13/10 W3: users → the tabbed "Pengguna" view for Admins (create + row), see edit-view.ts
   const custom = customEditOf(slug, user, adminRoute)

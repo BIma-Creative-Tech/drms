@@ -2830,7 +2830,9 @@ export interface AuditLog {
     | 'overdraft_confirmed'
     | 'bank_unverified_confirmed'
     | 'renumbered'
-    | 'fund_insufficient';
+    | 'fund_insufficient'
+    | 'soft_delete'
+    | 'restore';
   field?: string | null;
   lineNo?: number | null;
   oldValue?:
