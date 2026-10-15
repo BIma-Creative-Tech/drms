@@ -66,7 +66,8 @@ void main() {
       final overrides = <Override>[_detail(icLoanDetailJson(destination: null))];
       await pumpScreen(tester, const IcLoanDetailScreen(id: 77), auth: _finance(), overrides: overrides);
       expect(find.byKey(const Key('icloan-destination-value')), findsNothing);
-      expect(_text(tester, 'icloan-destination-none'), _none);
+      expect(find.byKey(const Key('icloan-destination-none')), findsOneWidget);
+      expect(find.text(_none), findsOneWidget);
     });
 
     testWidgets('not a reader (the Owner without Finance in the lender): nothing, no warning', (tester) async {
