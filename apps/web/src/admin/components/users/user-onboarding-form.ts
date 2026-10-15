@@ -28,7 +28,8 @@ export type BankDraft = { key: string; id?: number; bank: number | null; account
  */
 export type AsgRole = 'pm' | 'staff' | 'mandor'
 export type AsgDraft = { key: string; id?: number; kind: LocationKind; location: number | null; label: string; roleInProject: AsgRole; startDate: string; endDate: string }
-export type CompanyDraft = { roles: string[]; emp: EmpDraft; banks: BankDraft[]; asg: AsgDraft[] }
+/** `autoStaff`: Staff was ticked by the form itself (DRMS 16/10, see `withAutoStaff`), not by the admin. */
+export type CompanyDraft = { roles: string[]; emp: EmpDraft; banks: BankDraft[]; asg: AsgDraft[]; autoStaff?: boolean }
 export type Draft = {
   user: { email: string; name: string; phone: string; active: boolean }
   companies: Record<string, CompanyDraft>
@@ -87,9 +88,47 @@ export function showsSavedAssignments(c: OnboardingDetail['companies'][number], 
   return e.mode === 'linked' && c.employee !== null && e.id === c.employee.id
 }
 
-/** PTs shown on the employee / bank-account tabs: with a role in the draft or an existing membership. */
+/**
+ * PTs whose employee / bank-account / assignment sections are open: with a role in the draft, an existing membership
+ * or an employee in the draft. The other PTs the editor manages are listed compact with "+ Tambah …" (DRMS 16/10).
+ */
 export function activeCompanies(detail: OnboardingDetail, draft: Draft): OnboardingDetail['companies'] {
-  return detail.companies.filter((c) => (draft.companies[String(c.id)]?.roles.length ?? 0) > 0 || c.membership !== null)
+  return detail.companies.filter((c) => {
+    const d = draft.companies[String(c.id)]
+    return (d?.roles.length ?? 0) > 0 || c.membership !== null || (d !== undefined && hasEmployee(d.emp))
+  })
+}
+
+/** Role ticked automatically when employee data is added in a PT where the account has no role (DRMS 16/10). */
+export const AUTO_ROLE = 'pk-staff'
+
+type DetailCompany = OnboardingDetail['companies'][number]
+
+/**
+ * DRMS 16/10 (owner: "auto-centang Staff"): employee data — and a bank account or assignment, which need one — may be
+ * added on its own tab without picking a role first. The server still needs a role in a PT the account is not a member
+ * of (NO_ROLE_MESSAGE), so Staff is ticked there, visibly and changeable on Akses & Peran. An existing membership
+ * (also an inactive one) is never touched.
+ */
+export function withAutoStaff(c: DetailCompany, d: CompanyDraft): CompanyDraft {
+  if (c.membership !== null || d.roles.length > 0) return d
+  return { ...d, roles: [AUTO_ROLE], autoStaff: true }
+}
+
+/** Undo `withAutoStaff` when the employee is taken away again — only while Staff is still the sole, automatic role. */
+export function withoutAutoStaff(d: CompanyDraft): CompanyDraft {
+  if (!d.autoStaff) return d
+  return { ...d, autoStaff: false, roles: d.roles.length === 1 && d.roles[0] === AUTO_ROLE ? [] : d.roles }
+}
+
+/** A new employee of the PT, prefilled from the account (code still to fill — required by the server). */
+export function newEmployee(user: Draft['user']): EmpDraft {
+  return { mode: 'new', id: null, code: '', name: user.name.trim(), nickname: '', position: '', phone: user.phone.trim(), attendanceType: 'onsite', active: true }
+}
+
+/** The PT's draft with an employee (kept when there is one, else a new one) and, when needed, the automatic Staff role. */
+export function ensureEmployee(c: DetailCompany, d: CompanyDraft, user: Draft['user']): CompanyDraft {
+  return withAutoStaff(c, hasEmployee(d.emp) ? d : { ...d, emp: newEmployee(user) })
 }
 
 const sameSet = (a: readonly string[], b: readonly string[]) => [...a].sort().join() === [...b].sort().join()

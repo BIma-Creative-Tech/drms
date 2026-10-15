@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+- **Pengguna: add employee data, bank accounts and assignments right on their tab (DRMS 16/10 #1).** Data Karyawan /
+  Rekening Karyawan / Penugasan Proyek list every PT the admin manages instead of "Pilih dulu peran di tab Akses &
+  Peran"; "+ Tambah …" creates the PT's employee when missing and ticks **Staff lapangan** where the account has no role
+  in that PT yet (shown, changeable; undone by "Tanpa data karyawan"). Client-only — the server rules are unchanged.
+
 ## [0.12.0] - 2026-10-15
 
 **DRMS 15/10 owner feedback: UI fixes, Pengguna with Penugasan in one form, and approval flow PM project → Direktur →
