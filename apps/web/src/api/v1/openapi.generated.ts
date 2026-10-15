@@ -818,7 +818,7 @@ export const openapiDocument = {
       "MasterItem": {
         "type": "object",
         "additionalProperties": {},
-        "description": "Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur — or, ADR 0026, Owner — in that PT; not offered as requester to others). ADR 0028: `intercompany-payees` items = the receiving PTs a request of PT `company` may pay (id = the RECEIVING PT id — unique per (company, id) —, payeeCompanyId, shortCode, name, bankName, accountNoMasked, accountHolder, active); only for Finance / PM / Direktur of `company`. D1610 (ADR 0030): soft-deleted rows are never in a full read; a delta read (`since`) lists rows soft-deleted since then with `deleted: true, active: false` (drop them); a cancelled project (`status: dibatalkan`) has `active: false`."
+        "description": "Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur — or, ADR 0026, Owner — in that PT; not offered as requester to others). ADR 0028: `intercompany-payees` items = the receiving PTs a request of PT `company` may pay (id = the RECEIVING PT id — unique per (company, id) —, payeeCompanyId, shortCode, name, bankName, accountNoMasked, accountHolder, active); only for Finance / PM / Direktur of `company`."
       },
       "Device": {
         "type": "object",
@@ -19601,309 +19601,741 @@ export const openapiDocument = {
         },
         "additionalProperties": false
       },
-      "RecordDeleteCheck": {
+      "ClientFormDetail": {
         "type": "object",
         "properties": {
-          "collection": {
-            "type": "string"
+          "client": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "company": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": "string"
+              },
+              "address": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "odooPartnerRef": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Filled by the Odoo sync (read-only here)."
+              },
+              "active": {
+                "type": "boolean"
+              },
+              "contacts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "position": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "phone": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "email": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "notes": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "isPrimary": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "position",
+                    "phone",
+                    "email",
+                    "notes",
+                    "isPrimary"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "id",
+              "company",
+              "name",
+              "address",
+              "odooPartnerRef",
+              "active",
+              "contacts"
+            ]
           },
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "shortCode": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "canManageBankAccounts": {
+                  "type": "boolean",
+                  "description": "Admin / Finance role in this PT (vendor bank accounts + their verification)."
+                }
+              },
+              "required": [
+                "id",
+                "shortCode",
+                "name",
+                "canManageBankAccounts"
+              ]
+            },
+            "description": "Create: the PTs the caller may create in (PT switcher selection). Edit: the record's PT."
+          },
+          "canEdit": {
+            "type": "boolean",
+            "description": "May the caller save the form (create: always true — the PTs listed allow it; edit: the collection update rule for this record)."
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "name",
+                "status"
+              ]
+            },
+            "description": "Projects of this client the caller can read."
+          },
+          "canCreateProject": {
+            "type": "boolean",
+            "description": "Project create rule in the client's PT (Direktur / Admin / PM) — \"+ Proyek baru\" opens /admin/collections/projects/create?client=<id>."
+          }
+        },
+        "required": [
+          "client",
+          "companies",
+          "canEdit",
+          "projects",
+          "canCreateProject"
+        ]
+      },
+      "ClientFormResult": {
+        "type": "object",
+        "properties": {
           "id": {
             "type": "integer",
             "exclusiveMinimum": 0
           },
-          "title": {
-            "type": "string"
-          },
-          "deleted": {
+          "created": {
             "type": "boolean"
           },
-          "action": {
-            "$ref": "#/components/schemas/RecordRowAction"
+          "detail": {
+            "$ref": "#/components/schemas/ClientFormDetail"
+          }
+        },
+        "required": [
+          "id",
+          "created",
+          "detail"
+        ]
+      },
+      "ClientFormCreate": {
+        "type": "object",
+        "properties": {
+          "client": {
+            "type": "object",
+            "properties": {
+              "company": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "description": "Create only: the PT (must be selected in the PT switcher and allow the create). Omitted = the caller's only such PT."
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "address": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 500
+              },
+              "active": {
+                "type": "boolean",
+                "description": "false = deactivate (reason required)."
+              }
+            },
+            "additionalProperties": false
           },
-          "canDelete": {
-            "type": "boolean"
-          },
-          "canRestore": {
-            "type": "boolean"
-          },
-          "blockedReason": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "usage": {
+          "contacts": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RecordUsageLine"
+              "$ref": "#/components/schemas/PartnerContactInput"
             },
-            "description": "Rows of other tables that reference this one (non-empty = used; Hapus refused)."
+            "maxItems": 20,
+            "description": "The WHOLE list of contact persons (replaces the stored rows; an empty list removes them). Omitted = unchanged."
           },
-          "deletedAt": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "deleteReason": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "collection",
-          "id",
-          "title",
-          "deleted",
-          "action",
-          "canDelete",
-          "canRestore",
-          "blockedReason",
-          "usage",
-          "deletedAt",
-          "deleteReason"
-        ]
-      },
-      "RecordRowAction": {
-        "type": [
-          "string",
-          "null"
-        ],
-        "enum": [
-          "hapus",
-          "batalkan",
-          "nonaktifkan",
-          "pulihkan",
-          null
-        ],
-        "description": "hapus = soft delete allowed; batalkan = cancel instead (project / submitted request); nonaktifkan = used master (deactivate); pulihkan = deleted, the caller (Admin) may restore; null = nothing for this caller."
-      },
-      "RecordUsageLine": {
-        "type": "object",
-        "properties": {
-          "table": {
-            "type": "string"
-          },
-          "label": {
-            "type": "string",
-            "description": "e.g. \"Pengajuan\", \"Kas\"."
-          },
-          "count": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "table",
-          "label",
-          "count"
-        ]
-      },
-      "RecordCollection": {
-        "type": "string",
-        "enum": [
-          "banks",
-          "uoms",
-          "clients",
-          "vendors",
-          "vendor-bank-accounts",
-          "employees",
-          "employee-bank-accounts",
-          "sites",
-          "cost-centers",
-          "expense-categories",
-          "urgency-levels",
-          "resource-types",
-          "vehicles",
-          "cash-in-sources",
-          "cash-accounts",
-          "work-schedules",
-          "stage-templates",
-          "rap-templates",
-          "projects",
-          "expense-requests"
-        ],
-        "description": "Collection with a soft delete (ADR 0030)."
-      },
-      "RecordReason": {
-        "type": "object",
-        "properties": {
           "reason": {
             "type": "string",
-            "minLength": 3,
             "maxLength": 1000,
-            "description": "Alasan (wajib) — tercatat di audit log."
+            "description": "Change reason for the audit rows. Required (≥ 3 characters) when a collection rule asks for it: deactivating the record or a bank account, changing a bank account's number, holder or bank."
           }
         },
         "required": [
-          "reason"
+          "client"
         ],
         "additionalProperties": false
       },
-      "ProjectCancelPlan": {
+      "PartnerContactInput": {
         "type": "object",
         "properties": {
-          "project": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              "code": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string"
-              },
-              "companyId": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "exclusiveMinimum": 0
-              }
-            },
-            "required": [
-              "id",
-              "code",
-              "name",
-              "status",
-              "companyId"
-            ]
-          },
-          "allowed": {
-            "type": "boolean",
-            "description": "The caller may cancel (Direktur / Admin of the PT; status Perencanaan / Berjalan / Ditunda)."
-          },
-          "notAllowedReason": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "cancel": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProjectCancelItem"
-            },
-            "description": "Cancelled together with the project (reason \"Proyek dibatalkan: <alasan>\")."
-          },
-          "blocking": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProjectCancelItem"
-            },
-            "description": "In flight and not cancellable (transferred / LPJ / loan with a repayment) — the cancellation is refused (409) until they are settled."
-          }
-        },
-        "required": [
-          "project",
-          "allowed",
-          "notAllowedReason",
-          "cancel",
-          "blocking"
-        ]
-      },
-      "ProjectCancelItem": {
-        "type": "object",
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "expense_request",
-              "budget_addendum",
-              "project_loan"
-            ]
-          },
           "id": {
-            "type": "integer",
-            "exclusiveMinimum": 0
+            "type": "string",
+            "maxLength": 64,
+            "description": "Stored row id (keeps the row). Omitted = a new row."
           },
-          "docNo": {
+          "name": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "Required."
+          },
+          "position": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "maxLength": 128
           },
-          "title": {
-            "type": "string"
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 32
           },
-          "status": {
-            "type": "string"
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 254
           },
-          "statusLabel": {
-            "type": "string"
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
           },
-          "href": {
-            "type": "string",
-            "description": "Admin page of the document."
+          "isPrimary": {
+            "type": "boolean",
+            "description": "Primary contact (\"Utama\"). Exactly one per record: the first flagged row, none flagged = the first row. Its name / phone fill the single Kontak / No. HP columns."
           }
         },
-        "required": [
-          "kind",
-          "id",
-          "docNo",
-          "title",
-          "status",
-          "statusLabel",
-          "href"
-        ]
+        "additionalProperties": false
       },
-      "ProjectCancelResult": {
+      "ClientFormUpdate": {
         "type": "object",
         "properties": {
-          "project": {
+          "client": {
             "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "address": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 500
+              },
+              "active": {
+                "type": "boolean",
+                "description": "false = deactivate (reason required)."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Only the fields to change."
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartnerContactInput"
+            },
+            "maxItems": 20,
+            "description": "The WHOLE list of contact persons (replaces the stored rows; an empty list removes them). Omitted = unchanged."
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Change reason for the audit rows. Required (≥ 3 characters) when a collection rule asks for it: deactivating the record or a bank account, changing a bank account's number, holder or bank."
+          }
+        },
+        "additionalProperties": false
+      },
+      "VendorFormDetail": {
+        "type": "object",
+        "properties": {
+          "vendor": {
+            "type": [
+              "object",
+              "null"
+            ],
             "properties": {
               "id": {
                 "type": "integer",
                 "exclusiveMinimum": 0
               },
-              "code": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string"
-              },
-              "companyId": {
+              "company": {
                 "type": [
                   "integer",
                   "null"
                 ],
                 "exclusiveMinimum": 0
               },
-              "cancelReason": {
+              "name": {
                 "type": "string"
+              },
+              "address": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "odooPartnerRef": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Filled by the Odoo sync (read-only here)."
+              },
+              "active": {
+                "type": "boolean"
+              },
+              "contacts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "position": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "phone": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "email": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "notes": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "isPrimary": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "position",
+                    "phone",
+                    "email",
+                    "notes",
+                    "isPrimary"
+                  ]
+                }
+              },
+              "npwp": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
               "id",
-              "code",
+              "company",
               "name",
-              "status",
-              "companyId",
-              "cancelReason"
+              "address",
+              "odooPartnerRef",
+              "active",
+              "contacts",
+              "npwp"
             ]
           },
-          "cancelled": {
+          "companies": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ProjectCancelItem"
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "shortCode": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "canManageBankAccounts": {
+                  "type": "boolean",
+                  "description": "Admin / Finance role in this PT (vendor bank accounts + their verification)."
+                }
+              },
+              "required": [
+                "id",
+                "shortCode",
+                "name",
+                "canManageBankAccounts"
+              ]
+            },
+            "description": "Create: the PTs the caller may create in (PT switcher selection). Edit: the record's PT."
+          },
+          "canEdit": {
+            "type": "boolean",
+            "description": "May the caller save the form (create: always true — the PTs listed allow it; edit: the collection update rule for this record)."
+          },
+          "bankAccounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "bank": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
+                },
+                "bankName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "accountNo": {
+                  "type": "string"
+                },
+                "accountHolder": {
+                  "type": "string"
+                },
+                "isDefault": {
+                  "type": "boolean"
+                },
+                "verificationStatus": {
+                  "type": "string",
+                  "enum": [
+                    "unverified",
+                    "verified"
+                  ]
+                },
+                "active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "bank",
+                "bankName",
+                "accountNo",
+                "accountHolder",
+                "isDefault",
+                "verificationStatus",
+                "active"
+              ]
+            }
+          },
+          "banks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ]
             }
           }
         },
         "required": [
-          "project",
-          "cancelled"
+          "vendor",
+          "companies",
+          "canEdit",
+          "bankAccounts",
+          "banks"
         ]
+      },
+      "VendorFormResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "created": {
+            "type": "boolean"
+          },
+          "detail": {
+            "$ref": "#/components/schemas/VendorFormDetail"
+          }
+        },
+        "required": [
+          "id",
+          "created",
+          "detail"
+        ]
+      },
+      "VendorFormCreate": {
+        "type": "object",
+        "properties": {
+          "vendor": {
+            "type": "object",
+            "properties": {
+              "company": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "description": "Create only: the PT (must be selected in the PT switcher and allow the create). Omitted = the caller's only such PT."
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "address": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 500
+              },
+              "active": {
+                "type": "boolean",
+                "description": "false = deactivate (reason required)."
+              },
+              "npwp": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 32
+              }
+            },
+            "additionalProperties": false
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartnerContactInput"
+            },
+            "maxItems": 20,
+            "description": "The WHOLE list of contact persons (replaces the stored rows; an empty list removes them). Omitted = unchanged."
+          },
+          "bankAccounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VendorBankAccountInput"
+            },
+            "maxItems": 20,
+            "description": "Bank accounts of THIS vendor, written after the vendor (a new vendor gets them). Rows omitted = unchanged; never deleted — deactivate instead. Admin / Finance of the vendor's PT."
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Change reason for the audit rows. Required (≥ 3 characters) when a collection rule asks for it: deactivating the record or a bank account, changing a bank account's number, holder or bank."
+          }
+        },
+        "required": [
+          "vendor"
+        ],
+        "additionalProperties": false
+      },
+      "VendorBankAccountInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Existing account of THIS vendor (update). Omitted = new account (bank, accountNo, accountHolder required)."
+          },
+          "bank": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "accountNo": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Digits only after removing spaces, dots and dashes (5–34)."
+          },
+          "accountHolder": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "verificationStatus": {
+            "type": "string",
+            "enum": [
+              "unverified",
+              "verified"
+            ],
+            "description": "Admin / Finance only (collection field access)."
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "VendorFormUpdate": {
+        "type": "object",
+        "properties": {
+          "vendor": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "address": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 500
+              },
+              "active": {
+                "type": "boolean",
+                "description": "false = deactivate (reason required)."
+              },
+              "npwp": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 32
+              }
+            },
+            "additionalProperties": false,
+            "description": "Only the fields to change."
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartnerContactInput"
+            },
+            "maxItems": 20,
+            "description": "The WHOLE list of contact persons (replaces the stored rows; an empty list removes them). Omitted = unchanged."
+          },
+          "bankAccounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VendorBankAccountInput"
+            },
+            "maxItems": 20,
+            "description": "Bank accounts of THIS vendor, written after the vendor (a new vendor gets them). Rows omitted = unchanged; never deleted — deactivate instead. Admin / Finance of the vendor's PT."
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Change reason for the audit rows. Required (≥ 3 characters) when a collection rule asks for it: deactivating the record or a bank account, changing a bank account's number, holder or bank."
+          }
+        },
+        "additionalProperties": false
       }
     },
     "parameters": {
@@ -42596,11 +43028,11 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "pattern": "^(perencanaan|berjalan|ditunda|selesai|arsip|dibatalkan)(,(perencanaan|berjalan|ditunda|selesai|arsip|dibatalkan))*$",
-              "description": "Comma separated statuses. Default: every status except arsip and dibatalkan (D1610: \"Batalkan proyek\"). Soft-deleted projects are never listed."
+              "pattern": "^(perencanaan|berjalan|ditunda|selesai|arsip)(,(perencanaan|berjalan|ditunda|selesai|arsip))*$",
+              "description": "Comma separated statuses. Default: every status except arsip."
             },
             "required": false,
-            "description": "Comma separated statuses. Default: every status except arsip and dibatalkan (D1610: \"Batalkan proyek\"). Soft-deleted projects are never listed.",
+            "description": "Comma separated statuses. Default: every status except arsip.",
             "name": "status",
             "in": "query"
           },
@@ -46501,9 +46933,9 @@ export const openapiDocument = {
         }
       }
     },
-    "/records/{collection}/{id}/delete-check": {
+    "/client-form": {
       "get": {
-        "summary": "What \"Hapus\" would do for the caller: the action (hapus / batalkan / nonaktifkan / pulihkan), the usage lines that block it (other rows referencing this one), the deleted state",
+        "summary": "Form data of a NEW client: the PTs the caller may create it in (PT switcher selection). 403 when there is none",
         "security": [
           {
             "bearer": []
@@ -46512,57 +46944,13 @@ export const openapiDocument = {
             "session": []
           }
         ],
-        "parameters": [
-          {
-            "schema": {
-              "$ref": "#/components/schemas/RecordCollection"
-            },
-            "required": true,
-            "description": "Collection with a soft delete (ADR 0030).",
-            "name": "collection",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d+$"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "description": "Registered install id (APK)."
-            },
-            "required": true,
-            "description": "Registered install id (APK).",
-            "name": "X-Device-Id",
-            "in": "header"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "description": "APK version; below company minimum → 426."
-            },
-            "required": false,
-            "description": "APK version; below company minimum → 426.",
-            "name": "X-App-Version",
-            "in": "header"
-          },
-          {
-            "$ref": "#/components/parameters/CompanyIds"
-          }
-        ],
         "responses": {
           "200": {
-            "description": "Check",
+            "description": "Detail",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RecordDeleteCheck"
+                  "$ref": "#/components/schemas/ClientFormDetail"
                 }
               }
             }
@@ -46577,17 +46965,7 @@ export const openapiDocument = {
               }
             }
           },
-          "404": {
-            "description": "Problem",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "426": {
+          "403": {
             "description": "Problem",
             "content": {
               "application/problem+json": {
@@ -46598,11 +46976,9 @@ export const openapiDocument = {
             }
           }
         }
-      }
-    },
-    "/records/{collection}/{id}/delete": {
+      },
       "post": {
-        "summary": "Soft delete (isDeleted = true, reason, audit `soft_delete`): masters / projects nobody references (409 IN_USE / PROJECT_IN_USE + usage), requests only as a never-submitted Draft (409 NOT_A_DRAFT). Whoever may update the row; hard delete stays denied",
+        "summary": "Create the client (Admin / Direktur of the PT) and its contact persons (Kontak PIC, the whole list) in ONE transaction (all-or-nothing). Collection rules apply unchanged (PT scoping ADR 0016, audit). Errors name the field: errors[].path = client.* / contacts.<i>.* / reason",
         "security": [
           {
             "bearer": []
@@ -46611,67 +46987,22 @@ export const openapiDocument = {
             "session": []
           }
         ],
-        "parameters": [
-          {
-            "schema": {
-              "$ref": "#/components/schemas/RecordCollection"
-            },
-            "required": true,
-            "description": "Collection with a soft delete (ADR 0030).",
-            "name": "collection",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d+$"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "$ref": "#/components/parameters/CompanyIds"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "description": "Registered install id (APK)."
-            },
-            "required": false,
-            "description": "Registered install id (APK).",
-            "name": "X-Device-Id",
-            "in": "header"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
-            },
-            "required": false,
-            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
-            "name": "Idempotency-Key",
-            "in": "header"
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RecordReason"
+                "$ref": "#/components/schemas/ClientFormCreate"
               }
             }
           }
         },
         "responses": {
-          "200": {
-            "description": "Check after the change",
+          "201": {
+            "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RecordDeleteCheck"
+                  "$ref": "#/components/schemas/ClientFormResult"
                 }
               }
             }
@@ -46726,17 +47057,7 @@ export const openapiDocument = {
               }
             }
           },
-          "422": {
-            "description": "Problem",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "426": {
+          "413": {
             "description": "Problem",
             "content": {
               "application/problem+json": {
@@ -46759,9 +47080,9 @@ export const openapiDocument = {
         }
       }
     },
-    "/records/{collection}/{id}/restore": {
-      "post": {
-        "summary": "Admin \"Pulihkan\": a soft-deleted row comes back (with the children deleted together with it), reason required, audit `restore`",
+    "/client-form/{clientId}": {
+      "get": {
+        "summary": "Form data of one client: the client, its contact persons, its PT, whether the caller may save, the client's projects the caller can read and whether the caller may create a project for it. Unknown / unreadable / other PT → 404",
         "security": [
           {
             "bearer": []
@@ -46773,64 +47094,84 @@ export const openapiDocument = {
         "parameters": [
           {
             "schema": {
-              "$ref": "#/components/schemas/RecordCollection"
+              "type": "string",
+              "pattern": "^\\d+$"
             },
             "required": true,
-            "description": "Collection with a soft delete (ADR 0030).",
-            "name": "collection",
+            "name": "clientId",
             "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientFormDetail"
+                }
+              }
+            }
           },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Edit the client (Admin / Direktur of the PT) and its contact persons (Kontak PIC, the whole list) in ONE transaction (only what is sent changes; contacts = the whole list). Deactivation needs a reason. Errors as for create",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
           {
             "schema": {
               "type": "string",
               "pattern": "^\\d+$"
             },
             "required": true,
-            "name": "id",
+            "name": "clientId",
             "in": "path"
-          },
-          {
-            "$ref": "#/components/parameters/CompanyIds"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "description": "Registered install id (APK)."
-            },
-            "required": false,
-            "description": "Registered install id (APK).",
-            "name": "X-Device-Id",
-            "in": "header"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
-            },
-            "required": false,
-            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
-            "name": "Idempotency-Key",
-            "in": "header"
           }
         ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RecordReason"
+                "$ref": "#/components/schemas/ClientFormUpdate"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Check after the change",
+            "description": "Saved",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RecordDeleteCheck"
+                  "$ref": "#/components/schemas/ClientFormResult"
                 }
               }
             }
@@ -46885,17 +47226,7 @@ export const openapiDocument = {
               }
             }
           },
-          "422": {
-            "description": "Problem",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "426": {
+          "413": {
             "description": "Problem",
             "content": {
               "application/problem+json": {
@@ -46918,9 +47249,9 @@ export const openapiDocument = {
         }
       }
     },
-    "/projects/{id}/cancel-plan": {
+    "/vendor-form": {
       "get": {
-        "summary": "Dry run of \"Batalkan proyek\": the in-flight requests / addenda / loans cancelled with it and the documents that block it (money transferred, LPJ, repayments)",
+        "summary": "Form data of a NEW vendor: the PTs the caller may create it in (PT switcher selection) and the active banks. 403 when there is none",
         "security": [
           {
             "bearer": []
@@ -46929,48 +47260,13 @@ export const openapiDocument = {
             "session": []
           }
         ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d+$"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "description": "Registered install id (APK)."
-            },
-            "required": true,
-            "description": "Registered install id (APK).",
-            "name": "X-Device-Id",
-            "in": "header"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "description": "APK version; below company minimum → 426."
-            },
-            "required": false,
-            "description": "APK version; below company minimum → 426.",
-            "name": "X-App-Version",
-            "in": "header"
-          },
-          {
-            "$ref": "#/components/parameters/CompanyIds"
-          }
-        ],
         "responses": {
           "200": {
-            "description": "Plan",
+            "description": "Detail",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectCancelPlan"
+                  "$ref": "#/components/schemas/VendorFormDetail"
                 }
               }
             }
@@ -46985,17 +47281,7 @@ export const openapiDocument = {
               }
             }
           },
-          "404": {
-            "description": "Problem",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "426": {
+          "403": {
             "description": "Problem",
             "content": {
               "application/problem+json": {
@@ -47006,11 +47292,9 @@ export const openapiDocument = {
             }
           }
         }
-      }
-    },
-    "/projects/{id}/cancel": {
+      },
       "post": {
-        "summary": "Batalkan proyek (Direktur / Admin of the PT): status Dibatalkan + cancels every cancellable in-flight document (\"Proyek dibatalkan: <alasan>\", normal notifications) in ONE transaction; 409 PROJECT_HAS_OPEN_DOCUMENTS with `blocking` when something cannot be cancelled",
+        "summary": "Create the vendor (create Admin / Finance; edit Admin / Finance / Direktur of the PT), its contact persons (Kontak PIC, the whole list) and its bank accounts (Admin / Finance of the PT: create / update, never deleted; verification Admin / Finance; reason on number / holder / bank change and on deactivation), the accounts written after the vendor in ONE transaction (all-or-nothing). Collection rules apply unchanged (PT scoping ADR 0016, audit). Errors name the field: errors[].path = vendor.* / contacts.<i>.* / bankAccounts.<j>.* / reason",
         "security": [
           {
             "bearer": []
@@ -47019,58 +47303,22 @@ export const openapiDocument = {
             "session": []
           }
         ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d+$"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "$ref": "#/components/parameters/CompanyIds"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "description": "Registered install id (APK)."
-            },
-            "required": false,
-            "description": "Registered install id (APK).",
-            "name": "X-Device-Id",
-            "in": "header"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
-            },
-            "required": false,
-            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
-            "name": "Idempotency-Key",
-            "in": "header"
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RecordReason"
+                "$ref": "#/components/schemas/VendorFormCreate"
               }
             }
           }
         },
         "responses": {
-          "200": {
-            "description": "Cancelled",
+          "201": {
+            "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectCancelResult"
+                  "$ref": "#/components/schemas/VendorFormResult"
                 }
               }
             }
@@ -47125,7 +47373,7 @@ export const openapiDocument = {
               }
             }
           },
-          "422": {
+          "413": {
             "description": "Problem",
             "content": {
               "application/problem+json": {
@@ -47135,7 +47383,166 @@ export const openapiDocument = {
               }
             }
           },
-          "426": {
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vendor-form/{vendorId}": {
+      "get": {
+        "summary": "Form data of one vendor: the vendor, its contact persons, its bank accounts, its PT (with the bank-account right), whether the caller may save and the active banks. Unknown / unreadable / other PT → 404",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "vendorId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorFormDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Edit the vendor (create Admin / Finance; edit Admin / Finance / Direktur of the PT), its contact persons (Kontak PIC, the whole list) and its bank accounts (Admin / Finance of the PT: create / update, never deleted; verification Admin / Finance; reason on number / holder / bank change and on deactivation), the accounts written after the vendor in ONE transaction (only what is sent changes; contacts = the whole list). Deactivation needs a reason. Errors as for create",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "vendorId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendorFormUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorFormResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

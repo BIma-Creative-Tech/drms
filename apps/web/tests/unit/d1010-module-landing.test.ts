@@ -29,7 +29,8 @@ describe('module href → landing page', () => {
 describe('landing tiles respect permissions / hidden entities / role rules', () => {
   it('only the visible entities of the caller', () => {
     const master = resolve(['pk-admin'], (_, s) => s === 'banks' || s === 'vendors', () => true).find((m) => m.id === 'master')
-    expect(tiles(master)).toEqual(['/admin/collections/banks', '/admin/collections/vendors'])
+    // DRMS 16/10: "+ Vendor baru" is a role-gated view (Admin / Finance), not an entity
+    expect(tiles(master)).toEqual(['/admin/collections/banks', '/admin/collections/vendors', '/admin/vendor/baru'])
   })
   it('role-gated views: Staff never gets Buku kas / Tutup buku tiles; Finance does', () => {
     const staffKeu = resolve(['pk-staff'], (_, s) => s === 'expense-requests' || s === 'receipts').find((m) => m.id === 'keuangan')

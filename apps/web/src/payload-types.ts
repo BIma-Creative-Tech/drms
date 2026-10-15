@@ -135,11 +135,7 @@ export interface Config {
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
   };
-  collectionsJoins: {
-    vendors: {
-      bankAccounts: 'vendor-bank-accounts';
-    };
-  };
+  collectionsJoins: {};
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     companies: CompaniesSelect<false> | CompaniesSelect<true>;
@@ -816,9 +812,29 @@ export interface Client {
    */
   company?: (number | null) | Company;
   name: string;
+  /**
+   * Otomatis dari Kontak PIC utama.
+   */
   contact?: string | null;
+  /**
+   * Otomatis dari Kontak PIC utama.
+   */
   phone?: string | null;
   address?: string | null;
+  /**
+   * Orang yang dapat dihubungi. Satu kontak ditandai Utama (tampil sebagai Kontak di daftar dan aplikasi).
+   */
+  contacts?:
+    | {
+        name: string;
+        position?: string | null;
+        phone?: string | null;
+        email?: string | null;
+        notes?: string | null;
+        isPrimary?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
   /**
    * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
@@ -850,20 +866,32 @@ export interface Vendor {
    */
   company?: (number | null) | Company;
   name: string;
+  /**
+   * Otomatis dari Kontak PIC utama.
+   */
   contact?: string | null;
   npwp?: string | null;
   address?: string | null;
+  /**
+   * Orang yang dapat dihubungi. Satu kontak ditandai Utama (tampil sebagai Kontak di daftar dan aplikasi).
+   */
+  contacts?:
+    | {
+        name: string;
+        position?: string | null;
+        phone?: string | null;
+        email?: string | null;
+        notes?: string | null;
+        isPrimary?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
   /**
    * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
   odooPartnerRef?: string | null;
   active?: boolean | null;
   uuid?: string | null;
-  bankAccounts?: {
-    docs?: (number | VendorBankAccount)[];
-    hasNextPage?: boolean;
-    totalDocs?: number;
-  };
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -3495,6 +3523,17 @@ export interface ClientsSelect<T extends boolean = true> {
   contact?: T;
   phone?: T;
   address?: T;
+  contacts?:
+    | T
+    | {
+        name?: T;
+        position?: T;
+        phone?: T;
+        email?: T;
+        notes?: T;
+        isPrimary?: T;
+        id?: T;
+      };
   odooPartnerRef?: T;
   active?: T;
   uuid?: T;
@@ -3516,10 +3555,20 @@ export interface VendorsSelect<T extends boolean = true> {
   contact?: T;
   npwp?: T;
   address?: T;
+  contacts?:
+    | T
+    | {
+        name?: T;
+        position?: T;
+        phone?: T;
+        email?: T;
+        notes?: T;
+        isPrimary?: T;
+        id?: T;
+      };
   odooPartnerRef?: T;
   active?: T;
   uuid?: T;
-  bankAccounts?: T;
   changeReason?: T;
   isDeleted?: T;
   deletedAt?: T;

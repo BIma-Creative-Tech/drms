@@ -104,7 +104,7 @@ export const ABSENSI_STYLE = `
 .pk-f3 .pk-grid th { font-weight: 600; color: var(--pk-muted-fg); text-align: center; padding: 2px 0; min-width: 22px; }
 .pk-f3 .pk-grid th.we { color: var(--pk-tone-bad-text); }
 .pk-f3 .pk-grid th.nm, .pk-f3 .pk-grid td.nm { position: sticky; left: 0; z-index: 1; background: var(--pk-card); text-align: left; min-width: 170px; max-width: 220px; padding: 2px 8px 2px 0; }
-.pk-f3 .pk-grid td.nm a { font-weight: 600; color: var(--pk-primary); text-decoration: none; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.pk-f3 .pk-grid td.nm a { font-weight: 600; color: var(--pk-primary); text-decoration: none; display: block; overflow-wrap: break-word; font-size: 12px; } /* DRMS 16/10: wraps, no ellipsis */
 .pk-f3 .pk-grid td.nm small { display: block; color: var(--pk-muted-fg); }
 .pk-f3 .pk-grid td.c { width: 22px; height: 24px; padding: 0; text-align: center; border-radius: 5px; font-size: 10px; line-height: 24px; }
 .pk-f3 .pk-grid td.t { padding: 0 6px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--pk-fg); white-space: nowrap; }

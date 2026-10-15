@@ -14,7 +14,7 @@ import { withoutApiTab, withoutGlobalApiTab } from './admin/edit-view'
 import { withListSearch } from './admin/list-search'
 import { withPkListView } from './admin/pk-list/wire'
 import { withSoftDelete } from './domain/soft-delete/collection'
-import { ACCOUNT_ADMIN_VIEWS, D1010_ADMIN_VIEWS, E2_ADMIN_VIEWS, E6_ADMIN_VIEWS, F2_ADMIN_VIEWS, F3_ADMIN_VIEWS, FR1_ADMIN_VIEWS, IC_LOAN_ADMIN_VIEWS, LOAN_ADMIN_VIEWS, MC2_ADMIN_VIEWS, RAP_ADMIN_VIEWS, S2A_ADMIN_VIEWS, S3E_ADMIN_VIEWS, USER_ONBOARDING_ADMIN_VIEWS } from './admin/config'
+import { ACCOUNT_ADMIN_VIEWS, D1010_ADMIN_VIEWS, E2_ADMIN_VIEWS, E6_ADMIN_VIEWS, F2_ADMIN_VIEWS, F3_ADMIN_VIEWS, FR1_ADMIN_VIEWS, IC_LOAN_ADMIN_VIEWS, LOAN_ADMIN_VIEWS, MC2_ADMIN_VIEWS, PARTNER_ADMIN_VIEWS, RAP_ADMIN_VIEWS, S2A_ADMIN_VIEWS, S3E_ADMIN_VIEWS, USER_ONBOARDING_ADMIN_VIEWS } from './admin/config'
 import { v1Endpoints } from './api/v1'
 import { Attendances } from './collections/Attendances'
 import { AttendanceCorrections } from './collections/AttendanceCorrections'
@@ -159,7 +159,7 @@ export default buildConfig({
       // DRMS 10/10 12c: one image lightbox for every thumbnail link `a[data-pk-lightbox]` (src/admin/components/lightbox).
       providers: ['@/admin/loading/LoadingProvider#LoadingProvider', '@/admin/components/lightbox/LightboxProvider#LightboxProvider'],
       // F3: module launcher at /admin, role dashboards at /admin/dashboard, reports, global audit log.
-      views: { ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS, ...ACCOUNT_ADMIN_VIEWS, ...MC2_ADMIN_VIEWS, ...FR1_ADMIN_VIEWS, ...D1010_ADMIN_VIEWS, ...LOAN_ADMIN_VIEWS, ...IC_LOAN_ADMIN_VIEWS, ...RAP_ADMIN_VIEWS, ...USER_ONBOARDING_ADMIN_VIEWS },
+      views: { ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS, ...ACCOUNT_ADMIN_VIEWS, ...MC2_ADMIN_VIEWS, ...FR1_ADMIN_VIEWS, ...D1010_ADMIN_VIEWS, ...LOAN_ADMIN_VIEWS, ...IC_LOAN_ADMIN_VIEWS, ...RAP_ADMIN_VIEWS, ...USER_ONBOARDING_ADMIN_VIEWS, ...PARTNER_ADMIN_VIEWS },
     },
     timezones: { defaultTimezone: 'Asia/Makassar' },
     // QA-29: "8 Okt 2026 14:30" instead of the default "Oktober ke-8 2026, 2:30 PM" (date-fns, id locale)

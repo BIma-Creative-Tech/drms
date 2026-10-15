@@ -4,6 +4,7 @@ import Link from 'next/link'
 import React from 'react'
 
 import { Icon } from '@/admin/modules/Icon'
+import { partnerFormHref } from '@/admin/partner-routes'
 import { canOnRow, rowActionOf } from '@/admin/row-actions'
 import { ROW_STATE_KEY, type RowState } from '@/domain/soft-delete/registry'
 
@@ -32,7 +33,9 @@ export function RowActionsCell({ collectionSlug, rowData, viewType }: Props) {
   const useAsTitle = getEntityConfig({ collectionSlug })?.admin?.useAsTitle
   const title = useAsTitle ? rowData?.[useAsTitle] : undefined
   const name = typeof title === 'string' || typeof title === 'number' ? String(title) : `#${id}`
-  const href = `${config.routes.admin}/collections/${collectionSlug}${viewType === 'trash' ? '/trash' : ''}/${encodeURIComponent(String(id))}`
+  // DRMS 16/10: clients / vendors open their tabbed page (admin/partner-routes.ts), read-only without the update right
+  const custom = viewType === 'trash' ? null : partnerFormHref(collectionSlug, id, config.routes.admin)
+  const href = custom ?? `${config.routes.admin}/collections/${collectionSlug}${viewType === 'trash' ? '/trash' : ''}/${encodeURIComponent(String(id))}`
   return (
     <span className="pk-row-actions">
       <Link href={href} prefetch={false} className="pk-row-act" data-kind={action.kind} aria-label={`${action.label} ${name}`} data-pk-row-action={action.kind}>

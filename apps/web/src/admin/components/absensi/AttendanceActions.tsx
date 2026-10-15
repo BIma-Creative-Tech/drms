@@ -10,6 +10,8 @@ import { errorLine } from '@/lib/field-labels'
 import { newIdemKey, sendJson, uploadSelfie } from '../kas/client'
 import { CAMERA_STYLE, CameraCapture } from './CameraCapture'
 import { DateInput } from '../DateInput'
+import { WrapSelect } from '../WrapSelect'
+import { WrapText } from '../WrapText'
 
 /**
  * E6 web (S2) client actions of the attendance views. Same pattern as the Kas dialogs (native modal
@@ -290,14 +292,14 @@ export function ScheduleAssign({ employeeId, employee, current, options, disable
       <label htmlFor={`${uid}-s`} className="pk-sr">
         Jadwal kerja {employee}
       </label>
-      <select id={`${uid}-s`} value={value} onChange={(e) => setValue(e.target.value)} disabled={disabled || busy} aria-describedby={msg ? `${uid}-m` : undefined}>
+      <WrapSelect id={`${uid}-s`} value={value} onChange={(e) => setValue(e.target.value)} disabled={disabled || busy} aria-describedby={msg ? `${uid}-m` : undefined}>
         <option value="">Default perusahaan</option>
         {options.map((o) => (
           <option key={o.id} value={o.id}>
             {o.label}
           </option>
         ))}
-      </select>
+      </WrapSelect>
       {!disabled ? (
         <button type="submit" className="pk-kbtn sm" disabled={busy || value === (current ? String(current) : '')}>
           {busy ? 'Menyimpan…' : 'Simpan'}
@@ -323,14 +325,14 @@ export function DefaultSchedule({ current, companyId, options, disabled }: { cur
       data-pk-form="default-schedule"
     >
       <label htmlFor={`${uid}-s`}>Jadwal default perusahaan</label>
-      <select id={`${uid}-s`} value={value} onChange={(e) => setValue(e.target.value)} disabled={disabled || busy}>
+      <WrapSelect id={`${uid}-s`} value={value} onChange={(e) => setValue(e.target.value)} disabled={disabled || busy}>
         <option value="">— tidak ada (keterlambatan tidak dihitung) —</option>
         {options.map((o) => (
           <option key={o.id} value={o.id}>
             {o.label}
           </option>
         ))}
-      </select>
+      </WrapSelect>
       {!disabled ? (
         <button type="submit" className="pk-kbtn sm primary" disabled={busy || value === (current ? String(current) : '')}>
           {busy ? 'Menyimpan…' : 'Simpan'}
@@ -370,7 +372,7 @@ export function HolidayAdd({ year }: { year: string }) {
       </div>
       <div className="pk-fld grow">
         <label htmlFor={`${uid}-n`}>Keterangan</label>
-        <input id={`${uid}-n`} type="text" value={name} maxLength={128} onChange={(e) => setName(e.target.value)} required placeholder="mis. Hari Kemerdekaan RI" />
+        <WrapText id={`${uid}-n`} value={name} maxLength={128} onChange={(e) => setName(e.target.value)} required placeholder="mis. Hari Kemerdekaan RI" />
       </div>
       <button type="submit" className="pk-kbtn primary" disabled={busy}>
         {busy ? 'Menyimpan…' : '+ Tambah hari libur'}

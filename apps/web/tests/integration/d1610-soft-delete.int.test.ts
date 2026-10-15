@@ -111,9 +111,14 @@ describe('master: Hapus of an unused row, hidden everywhere, Pulihkan', () => {
     // id lookups (relationship labels, population, the detail page) still find it
     expect((await api('GET', `/api/vendors/${vendor}?depth=0`, w.users.finance)).status).toBe(200)
     expect((await api('GET', `/api/vendors?depth=0&where[id][in]=${vendor}`, w.users.finance)).body.docs).toHaveLength(1)
-    // the join tab "Rekening" of the vendor no longer lists the deleted account
-    const v = await api('GET', `/api/vendors/${vendor}?depth=1`, w.users.admin)
-    expect((v.body.bankAccounts?.docs ?? []).length).toBe(0)
+    // the tabbed Vendor page (DRMS 16/10): opens read-only, its "Rekening" tab no longer lists the deleted account, a save is refused
+    const form = await api('GET', `/api/v1/vendor-form/${vendor}`, w.users.admin)
+    expect(form.status, JSON.stringify(form.body)).toBe(200)
+    expect(form.body.canEdit).toBe(false)
+    expect(form.body.bankAccounts).toEqual([])
+    const save = await api('PATCH', `/api/v1/vendor-form/${vendor}`, w.users.admin, { vendor: { name: `${name} ubah` } })
+    expect(save.status).toBe(409)
+    expect(JSON.stringify(save.body)).toContain('sudah dihapus')
     // APK masters: full read without it; a delta read lists it as a tombstone
     const full = await api('GET', '/api/v1/masters?types=vendors,vendor-bank-accounts', w.users.finance)
     expect(full.status).toBe(200)

@@ -10,6 +10,8 @@ import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 import { getJson } from './client'
 import { Choice, LinesEditor, linesFrom, linesOut, PhotoPicker, usePhotos, type LineDraft } from './parts'
 import { DateInput } from '../DateInput'
+import { WrapSelect } from '../WrapSelect'
+import { WrapText } from '../WrapText'
 
 /**
  * FR1 web quick input "Aktivitas aftersales" (plan A2; APK mockup Android-Aftersales): customer, kind
@@ -163,7 +165,7 @@ export function ActivityForm({ projects, clients, today, minDate, initial }: { p
             <label htmlFor={id('project')}>
               Project aftersales<span className="req" aria-hidden>*</span>
             </label>
-            <select
+            <WrapSelect
               id={id('project')}
               value={projectId}
               onChange={(e) => {
@@ -179,7 +181,7 @@ export function ActivityForm({ projects, clients, today, minDate, initial }: { p
                   {p.label}
                 </option>
               ))}
-            </select>
+            </WrapSelect>
             {errEl('projectId')}
           </div>
         ) : null}
@@ -187,7 +189,7 @@ export function ActivityForm({ projects, clients, today, minDate, initial }: { p
           <label htmlFor={id('client')}>
             Pelanggan<span className="req" aria-hidden>*</span>
           </label>
-          <select
+          <WrapSelect
             id={id('client')}
             value={clientId}
             onChange={(e) => {
@@ -203,7 +205,7 @@ export function ActivityForm({ projects, clients, today, minDate, initial }: { p
                 {c.name}
               </option>
             ))}
-          </select>
+          </WrapSelect>
           {errEl('clientId')}
         </div>
         <div className="pk-fld">
@@ -231,7 +233,7 @@ export function ActivityForm({ projects, clients, today, minDate, initial }: { p
           <label htmlFor={id('po')}>
             Untuk PO (PO terbuka pelanggan ini){kind === 'pengiriman' ? <span className="req" aria-hidden>*</span> : null}
           </label>
-          <select
+          <WrapSelect
             id={id('po')}
             value={relatesTo}
             disabled={!client || !project}
@@ -249,7 +251,7 @@ export function ActivityForm({ projects, clients, today, minDate, initial }: { p
                 {p.docNo ?? `PO #${p.id}`} · {itemsText(p.items, 2) || 'tanpa item'} ({p.ageDays} hari{p.poStatus === 'sebagian' ? ', sebagian' : ''})
               </option>
             ))}
-          </select>
+          </WrapSelect>
           <p className="help" id={id('po-h')}>
             {kind === 'pengiriman' ? 'Item PO disalin ke baris item (ubah bila hanya sebagian yang dikirim).' : 'Opsional untuk penagihan.'}
           </p>
@@ -273,7 +275,7 @@ export function ActivityForm({ projects, clients, today, minDate, initial }: { p
         {kind === 'pengiriman' ? (
           <div className="pk-fld">
             <label htmlFor={id('recv')}>Penerima</label>
-            <input id={id('recv')} value={receiver} maxLength={128} onChange={(e) => setReceiver(e.target.value)} />
+            <WrapText id={id('recv')} value={receiver} maxLength={128} onChange={(e) => setReceiver(e.target.value)} />
           </div>
         ) : null}
       </div>

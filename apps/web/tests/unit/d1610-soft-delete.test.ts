@@ -111,14 +111,15 @@ describe('deletedRowGuard + fields', () => {
     }
   })
   it('withSoftDelete: registry collections only, idempotent; join fields to a registry collection get isDeleted != true', () => {
-    const other: CollectionConfig = { slug: 'things', fields: [{ name: 'name', type: 'text' }] }
+    // a join (tab) pointing at a registry collection — the vendor's former "Rekening" tab shape
+    const other: CollectionConfig = { slug: 'things', fields: [{ name: 'name', type: 'text' }, { type: 'tabs', tabs: [{ label: 'Rekening', fields: [{ name: 'accounts', type: 'join', collection: 'vendor-bank-accounts', on: 'vendor' }] }] }] }
     const [vendors, things] = withSoftDelete([Vendors, other])
     expect(vendors!.fields.filter((f) => 'name' in f && f.name === IS_DELETED)).toHaveLength(1)
     expect(withSoftDelete([vendors!])[0]!.fields.filter((f) => 'name' in f && f.name === IS_DELETED)).toHaveLength(1)
     expect(vendors!.hooks?.beforeOperation).toContain(hideDeleted)
     expect(vendors!.hooks?.beforeChange?.[0]).toBe(deletedRowGuard)
     expect(things!.fields.some((f) => 'name' in f && f.name === IS_DELETED)).toBe(false)
-    const tabs = vendors!.fields.find((f) => f.type === 'tabs') as unknown as { tabs: Array<{ fields: Array<{ type: string; where?: Where }> }> }
+    const tabs = things!.fields.find((f) => f.type === 'tabs') as unknown as { tabs: Array<{ fields: Array<{ type: string; where?: Where }> }> }
     const join = tabs.tabs.flatMap((t) => t.fields).find((f) => f.type === 'join')!
     expect(join.where).toEqual(NOT_DELETED)
   })

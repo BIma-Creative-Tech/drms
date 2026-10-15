@@ -8,6 +8,7 @@ import { assignedProjects, byRole, fieldRoles, rolesAllowed } from '@/access/pol
 import { inIds } from '@/access/scope'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
 import { PROJECT_KIND_LABELS, PROJECT_KINDS } from '@/domain/field/rules'
+import { projectFromClientDefault } from '@/domain/partners/project-prefill'
 import { progressWriteGuard } from '@/domain/progress/guards'
 import { codeField, odooRefField, percentField, rupiahField, uuidField } from '@/fields/common'
 import { companyField, companyHook, pickerSameCompany, siteOptions } from '@/fields/company'
@@ -117,7 +118,8 @@ export const Projects: CollectionConfig = withAudit(
     fields: [
       // DRMS 10/10 #5: link to the custom project page (tahapan/progress); no DB column, no API value
       { name: 'detailLink', type: 'ui', admin: { position: 'sidebar', components: { Field: '@/admin/components/ProjectDetailLink#ProjectDetailLink' } } },
-      companyField(),
+      // DRMS 16/10: "+ Proyek baru" of the Klien page (?client=<id>) starts with the client's PT and the client
+      { ...companyField(), defaultValue: projectFromClientDefault('company') },
       { ...codeField('Kode', 32, { perCompany: true }), access: { update: projectEditors } },
       { name: 'name', type: 'text', label: 'Nama project', required: true, maxLength: 160 },
       {
@@ -134,7 +136,7 @@ export const Projects: CollectionConfig = withAudit(
           description: 'Menentukan laporan lapangan: kontrak unit → timesheet + servis; aftersales → servis + aktivitas. Umum/konstruksi/trading: belum ada laporan lapangan. Diubah oleh Direktur/Admin.',
         },
       },
-      { name: 'client', type: 'relationship', relationTo: 'clients', label: 'Klien', access: { update: projectEditors } },
+      { name: 'client', type: 'relationship', relationTo: 'clients', label: 'Klien', access: { update: projectEditors }, defaultValue: projectFromClientDefault('client') },
       // ADR 0023 (Q-S1): the branch office (site) that handles the project — at most one; same PT (companyHook + DB
       // trigger). Report / dashboard filter "Site"; the project keeps its own attendance point (no fallback to the site).
       {

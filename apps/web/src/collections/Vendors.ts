@@ -5,11 +5,15 @@ import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, odooRefField, uuidField } from '@/fields/common'
 import { companyField, companyHook } from '@/fields/company'
+import { contactsField, contactsHook, legacyContactColumn } from '@/fields/contacts'
 
 /**
  * Vendor (opsional; duplikat nota). Admin/Finance C/R/U, Owner R/U, PM R.
- * ADR 0027 (DRMS 13/10 Wave 4): tab "Rekening" lists the vendor's bank accounts (`vendor-bank-accounts`, join — no
- * column) — the destination of a vendor payment ("Pembayaran vendor"). Unnamed tabs: no schema change.
+ * ADR 0027 (DRMS 13/10 Wave 4): the vendor's bank accounts (`vendor-bank-accounts`) are the destination of a vendor
+ * payment ("Pembayaran vendor").
+ * DRMS 16/10: edited in the tabbed "Vendor" page (/admin/vendor/<id>: Detail Vendor · Rekening · Kontak PIC, one save —
+ * domain/partners/service.ts) — it replaces the Payload tabs + `join` list of the accounts (no column: no schema change
+ * for that part); many "Kontak PIC" (`contacts`), the single Kontak column = the primary one.
  */
 export const Vendors: CollectionConfig = withAudit(
   {
@@ -22,51 +26,27 @@ export const Vendors: CollectionConfig = withAudit(
       update: byRole({ 'pk-admin': true, 'pk-finance': true, 'pk-owner': true }),
       delete: denyAll,
     },
-    hooks: { beforeChange: [companyHook('vendors')] },
+    hooks: { beforeValidate: [contactsHook({ phone: false })], beforeChange: [companyHook('vendors')] },
     fields: [
       // PT stays a top-level field (PT column / chip / filter of the list wrappers, ADR 0016)
       companyField(),
+      { name: 'name', type: 'text', label: 'Nama', required: true, maxLength: 160 },
+      legacyContactColumn('contact', 'Kontak', 128),
       {
-        type: 'tabs',
-        tabs: [
-          {
-            label: 'Vendor',
-            fields: [
-              { name: 'name', type: 'text', label: 'Nama', required: true, maxLength: 160 },
-              { name: 'contact', type: 'text', label: 'Kontak', maxLength: 128 },
-              {
-                name: 'npwp',
-                type: 'text',
-                label: 'NPWP',
-                maxLength: 32,
-                validate: (v: unknown) =>
-                  v === null || v === undefined || v === '' || (typeof v === 'string' && /^[0-9.\-]{15,20}$/.test(v))
-                    ? true
-                    : 'NPWP hanya angka, titik dan minus (15–20 karakter).',
-              },
-              { name: 'address', type: 'textarea', label: 'Alamat', maxLength: 500 },
-              odooRefField('odooPartnerRef', 'Ref. partner Odoo'),
-              activeField(),
-              uuidField(),
-            ],
-          },
-          {
-            label: 'Rekening',
-            description: 'Rekening tujuan pembayaran vendor. Tambah / ubah rekening di sini atau di Master Data → Rekening vendor; verifikasi oleh Finance / Admin.',
-            fields: [
-              {
-                name: 'bankAccounts',
-                type: 'join',
-                collection: 'vendor-bank-accounts',
-                on: 'vendor',
-                label: 'Rekening vendor',
-                defaultSort: '-isDefault',
-                admin: { defaultColumns: ['bank', 'accountNo', 'accountHolder', 'isDefault', 'verificationStatus', 'active'] },
-              },
-            ],
-          },
-        ],
+        name: 'npwp',
+        type: 'text',
+        label: 'NPWP',
+        maxLength: 32,
+        validate: (v: unknown) =>
+          v === null || v === undefined || v === '' || (typeof v === 'string' && /^[0-9.\-]{15,20}$/.test(v))
+            ? true
+            : 'NPWP hanya angka, titik dan minus (15–20 karakter).',
       },
+      { name: 'address', type: 'textarea', label: 'Alamat', maxLength: 500 },
+      contactsField(),
+      odooRefField('odooPartnerRef', 'Ref. partner Odoo'),
+      activeField(),
+      uuidField(),
     ],
   },
   { docType: 'vendor', reasonRules: [reasonOnDeactivate] },

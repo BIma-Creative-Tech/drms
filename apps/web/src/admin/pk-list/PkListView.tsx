@@ -73,7 +73,8 @@ export async function PkListView(props: ListViewServerProps) {
   const st = states
   const docs: Array<Record<string, unknown>> = st ? data.docs.map((d) => ({ ...d, [ROW_STATE_KEY]: st.get(d.id as number) ?? null })) : data.docs
   const plural = label(collectionConfig.labels?.plural, i18n, slug)
-  // DRMS 13/10 W3: users → the tabbed "Pengguna" view for Admins (create + row), see edit-view.ts
+  // DRMS 13/10 W3: users → the tabbed "Pengguna" view for Admins (create + row); DRMS 16/10: clients / vendors → the
+  // tabbed "Klien" / "Vendor" pages (create + row + the "Aksi" link), see edit-view.ts
   const custom = customEditOf(slug, user, adminRoute)
   const createHref = custom ? (props.hasCreatePermission ? custom.createHref : undefined) : props.hasCreatePermission ? props.newDocumentURL : undefined
   const rowHref = (id: unknown) => (custom ? custom.rowHref(String(id)) : `${base}/${encodeURIComponent(String(id))}`)
@@ -96,14 +97,13 @@ export async function PkListView(props: ListViewServerProps) {
     viewType: 'list',
   })
   const byAccessor = new Map(columnState.map((c) => [c.accessor, c]))
-  const shown = data.columns.map((a) => byAccessor.get(a)).filter((c): c is NonNullable<typeof c> => !!c && c.active && !(custom && c.accessor === ROW_ACTIONS_FIELD))
+  const shown = data.columns.map((a) => byAccessor.get(a)).filter((c): c is NonNullable<typeof c> => !!c && c.active && !(custom?.hideRowActions && c.accessor === ROW_ACTIONS_FIELD))
   const sortable = new Set(cfg.columns.filter((c) => c.sortable).map((c) => c.name))
   // DRMS 15/10 #6: columns hug their content; the empty filler cell before "Aksi" (or last) takes the rest of the row
   const actionsAt = shown.findIndex((c) => c.accessor === ROW_ACTIONS_FIELD)
   const fillAt = actionsAt < 0 ? shown.length : actionsAt
   const fill = () => <td key="pk-fill" className="pk-plist__fill" aria-hidden="true" />
-  // long texts: one line with an ellipsis; textareas wrap (both within 360 px, custom.scss .pk-plist__cell)
-  const wraps = (field: unknown) => ['textarea', 'richText'].includes((field as { type?: string } | undefined)?.type ?? '')
+  // DRMS 16/10: long texts wrap inside 360 px instead of ending in an ellipsis (custom.scss .pk-plist__cell)
   const colLabel = (name: string, field?: unknown) =>
     name === 'id' ? 'ID' : name === ROW_ACTIONS_FIELD ? 'Aksi' : label((field as { label?: unknown } | undefined)?.label ?? cfg.columns.find((c) => c.name === name)?.label, i18n, name)
 
@@ -218,7 +218,7 @@ export async function PkListView(props: ListViewServerProps) {
                         {shown.flatMap((c, ci) => [
                           ...(ci === fillAt ? [fill()] : []),
                           <td key={c.accessor} className={`cell-${c.accessor}`}>
-                            {c.accessor === ROW_ACTIONS_FIELD ? c.renderedCells[i] : <div className={wraps(c.field) ? 'pk-plist__cell pk-plist__cell--wrap' : 'pk-plist__cell'}>{c.renderedCells[i]}</div>}
+                            {c.accessor === ROW_ACTIONS_FIELD ? c.renderedCells[i] : <div className="pk-plist__cell">{c.renderedCells[i]}</div>}
                           </td>,
                         ])}
                         {fillAt === shown.length ? fill() : null}

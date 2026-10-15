@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react'
 
 import { PICK_COMPANY_FIRST } from './companies/CompanyScopedField'
 import { intercompanyOptionLabel, payeesQuery, type PayeeOption } from './intercompany-payee'
+import { WrapSelect } from './WrapSelect'
 
 const relValue = (v: unknown): number | null => {
   if (typeof v === 'number') return v
@@ -53,14 +54,15 @@ export const IntercompanyPayeeField: RelationshipFieldClientComponent = ({ field
       <FieldLabel label={field.label} path={path} required />
       <div className="field-type__wrap">
         <FieldError path={path} showError={showError} />
-        <select
+        <WrapSelect
           id={id}
           name={path}
           value={selected === null ? '' : String(selected)}
           disabled={readOnly || company === null || !current}
           onChange={(e) => setValue(e.target.value === '' ? null : Number(e.target.value))}
           aria-invalid={showError ? true : undefined}
-          style={{ width: '100%', maxWidth: 520, minHeight: 40, padding: '6px 10px', border: '1px solid var(--theme-elevation-150)', borderRadius: 4, background: 'var(--theme-input-bg, var(--theme-elevation-0))', color: 'inherit' }}
+          wrapStyle={{ maxWidth: 520 }}
+          style={{ width: '100%', minHeight: 40, padding: '6px 10px', border: '1px solid var(--theme-elevation-150)', borderRadius: 4, background: 'var(--theme-input-bg, var(--theme-elevation-0))', color: 'inherit' }}
         >
           <option value="">{company === null ? `${PICK_COMPANY_FIRST}…` : !current ? 'memuat…' : items.length === 0 ? 'Belum ada PT lain dengan rekening penerimaan antar-PT' : (field.admin?.placeholder as string | undefined) || 'Pilih PT penerima…'}</option>
           {missing ? <option value={String(selected)}>{`PT #${selected} (tidak tersedia — pilih PT lain)`}</option> : null}
@@ -69,7 +71,7 @@ export const IntercompanyPayeeField: RelationshipFieldClientComponent = ({ field
               {intercompanyOptionLabel(i)}
             </option>
           ))}
-        </select>
+        </WrapSelect>
         {current?.status === 'error' ? <div style={{ color: 'var(--theme-error-500)', fontSize: 13, marginTop: 4 }}>Gagal memuat daftar PT penerima (hanya Finance, PM atau Direktur PT ini).</div> : null}
         <FieldDescription description={field.admin?.description} path={path} />
       </div>

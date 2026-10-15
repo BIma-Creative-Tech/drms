@@ -5,6 +5,7 @@ import { byRole, rolesAllowed, type Rule } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, odooRefField, uuidField } from '@/fields/common'
 import { companyField, companyHook } from '@/fields/company'
+import { contactsField, contactsHook, legacyContactColumn } from '@/fields/contacts'
 
 /**
  * FR1 (ADR 0020 §2): Staff assigned to an AFTERSALES project of the PT read the PT's clients (customer
@@ -27,7 +28,11 @@ const aftersalesStaff: Rule = async ({ req, scope, companyId }) => {
   return r.docs.length > 0
 }
 
-/** Klien (pemberi kerja). Admin C/R/U, Owner C/R/U, Finance + PM R (project/kas masuk pickers), Staff of aftersales projects R. */
+/**
+ * Klien (pemberi kerja). Admin C/R/U, Owner C/R/U, Finance + PM R (project/kas masuk pickers), Staff of aftersales projects R.
+ * DRMS 16/10: edited in the tabbed "Klien" page (/admin/klien/<id>: Detail Klien · Kontak PIC · Proyek, one save —
+ * domain/partners/service.ts); many "Kontak PIC" (`contacts`), the single Kontak / No. HP columns = the primary one.
+ */
 export const Clients: CollectionConfig = withAudit(
   {
     slug: 'clients',
@@ -39,13 +44,14 @@ export const Clients: CollectionConfig = withAudit(
       update: byRole({ 'pk-admin': true, 'pk-owner': true }),
       delete: denyAll,
     },
-    hooks: { beforeChange: [companyHook('clients')] },
+    hooks: { beforeValidate: [contactsHook({ phone: true })], beforeChange: [companyHook('clients')] },
     fields: [
       companyField(),
       { name: 'name', type: 'text', label: 'Nama', required: true, maxLength: 160 },
-      { name: 'contact', type: 'text', label: 'Kontak', maxLength: 128 },
-      { name: 'phone', type: 'text', label: 'No. HP/telepon', maxLength: 32 },
+      legacyContactColumn('contact', 'Kontak', 128),
+      legacyContactColumn('phone', 'No. HP/telepon', 32),
       { name: 'address', type: 'textarea', label: 'Alamat', maxLength: 500 },
+      contactsField(),
       odooRefField('odooPartnerRef', 'Ref. partner Odoo'),
       activeField(),
       uuidField(),

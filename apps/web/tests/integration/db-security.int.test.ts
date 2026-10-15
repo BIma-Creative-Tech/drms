@@ -58,6 +58,7 @@ describe('grants (least privilege)', () => {
     expect(r.rows.map((x) => x.table_name)).toEqual([
       'approval_rules_requester_roles', // ADR 0024: "Peran pemohon" (hasMany rewritten on update)
       'approval_rules_steps',
+      'clients_contacts', // DRMS 16/10: "Kontak PIC" (array rewritten on update)
       'companies_rels', // ADR 0025: representatives of the PT's definitive Direktur (hasMany rewritten on update)
       'company_memberships_roles', // MC1: per-PT roles (hasMany rewritten on update)
       'expense_categories_rels',
@@ -77,6 +78,7 @@ describe('grants (least privilege)', () => {
       'settlements_rels', // DRMS 10/10 point 13: LPJ photos (hasMany rewritten on update; frozen by settlements_photos_frozen)
       'stage_templates_items',
       'sync_receipts', // F4: purge of expired sync results (30 days, ADR 0010)
+      'vendors_contacts', // DRMS 16/10: "Kontak PIC" (array rewritten on update)
     ])
   })
 
