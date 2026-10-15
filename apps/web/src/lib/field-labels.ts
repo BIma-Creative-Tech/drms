@@ -32,7 +32,7 @@ const LABELS: Record<string, string> = {
   costCenterId: 'Pusat biaya',
   requesters: 'Diajukan oleh',
   // d1510 (owner decision 2026-10-15): "Log perubahan" row of a request re-routed to the current approval rule
-  approvalRule: 'Alur persetujuan',
+  approvalFlow: 'Alur persetujuan',
   requesterIds: 'Diajukan oleh',
   bankAccount: 'Rekening tujuan',
   bankAccountId: 'Rekening tujuan',

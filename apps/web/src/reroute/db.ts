@@ -13,7 +13,7 @@
  *    Direktur" snapshot: rule + snapshot + status / level replaced by what a submit today produces (doc no, lines,
  *    amounts, attachments, signatures and the approval cycle unchanged). The request guard
  *    (`expense_requests_guard`, content locked after submit) is disabled for these statements only (owner, same
- *    transaction — like 20261012_200100). Per request: one audit row `update` field `approvalRule` (old rule /
+ *    transaction — like 20261012_200100). Per request: one audit row `update` field `approvalFlow` (old rule /
  *    snapshot / status → new: what `down` restores), a `status_change` row when the status moves (PM step skipped →
  *    "Menunggu persetujuan Direktur"), the `approval_skipped` rows a submit writes, and the notification a submit
  *    sends to the new first approver (in-app row + the approval e-mail job when the PT has it switched on).
@@ -39,6 +39,7 @@ import {
   REASON_REQUEST,
   REASON_REVERT,
   REASON_RULE,
+  REROUTE_FIELD,
   REROUTE_NOTE,
   ruleAlignmentOf,
   shapeText,
@@ -380,7 +381,7 @@ export async function applyReroute(db: Exec, opts: { push?: boolean; appUrl?: st
         { flow: p.newFlow!, ruleId: p.newRuleId, ruleName: p.newRuleName, status: p.newStatus!, currentLevel: p.newLevel, cycle: p.cycle, snapshot: p.newSnapshot },
         { migration: MIGRATION, kind: 'reroute', menunggu: p.firstStep },
       )
-      await audit(db, { docId: p.id, docNo: p.docNo, companyId: p.companyId, action: 'update', field: 'approvalRule', old, neu, reason: REASON_REQUEST })
+      await audit(db, { docId: p.id, docNo: p.docNo, companyId: p.companyId, action: 'update', field: REROUTE_FIELD, old, neu, reason: REASON_REQUEST })
       if (p.newStatus !== p.status) {
         await audit(db, { docId: p.id, docNo: p.docNo, companyId: p.companyId, action: 'status_change', field: 'status', old: p.status, neu: p.newStatus, statusFrom: p.status, statusTo: p.newStatus, reason: REROUTE_NOTE })
       }
@@ -408,7 +409,7 @@ export async function revertReroute(db: Exec): Promise<RevertResult> {
   const reqRows = (
     await rows<{ doc_id: string; old_value: AuditJson; new_value: AuditJson }>(db, sql`
       SELECT DISTINCT ON (a.doc_id) a.doc_id, a.old_value, a.new_value FROM audit_logs a
-       WHERE a.doc_type = 'expense_request' AND a.action::text = 'update' AND a.field = 'approvalRule' AND a.new_value -> 'v' ->> 'migration' = ${MIGRATION}
+       WHERE a.doc_type = 'expense_request' AND a.action::text = 'update' AND a.field = ${REROUTE_FIELD} AND a.new_value -> 'v' ->> 'migration' = ${MIGRATION}
        ORDER BY a.doc_id, a.id DESC`)
   ).filter((r) => json<AuditJson>(r.new_value)?.v?.kind === 'reroute')
   type Val = { ruleId: number | null; ruleName: string | null; status: string; currentLevel: number | null; cycle: number; snapshot: ApprovalSnapshot | null; alur: string }
@@ -480,7 +481,7 @@ export async function revertReroute(db: Exec): Promise<RevertResult> {
       await db.execute(sql`UPDATE expense_requests SET approval_rule_id = ${t.old.ruleId}::int, approval_snapshot = ${JSON.stringify(t.old.snapshot)}::jsonb,
                              status = ${t.old.status}::enum_expense_requests_status, current_level = ${t.old.currentLevel}::numeric, updated_at = now()
                             WHERE id = ${t.id}::int`)
-      await audit(db, { docId: t.id, docNo: t.docNo, companyId: t.companyId, action: 'update', field: 'approvalRule', old: t.neu, neu: { ...t.old, migration: MIGRATION, kind: 'revert' }, reason: REASON_REVERT })
+      await audit(db, { docId: t.id, docNo: t.docNo, companyId: t.companyId, action: 'update', field: REROUTE_FIELD, old: t.neu, neu: { ...t.old, migration: MIGRATION, kind: 'revert' }, reason: REASON_REVERT })
       if (t.old.status !== t.neu.status) {
         await audit(db, { docId: t.id, docNo: t.docNo, companyId: t.companyId, action: 'status_change', field: 'status', old: t.neu.status, neu: t.old.status, statusFrom: t.neu.status, statusTo: t.old.status, reason: REASON_REVERT })
       }

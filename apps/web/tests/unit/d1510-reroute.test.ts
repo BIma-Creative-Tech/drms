@@ -301,7 +301,7 @@ describe('texts and helpers', () => {
   })
   it('stepper note while the request carries the re-routed snapshot; "Log perubahan" row label', () => {
     const snap = { ...OLD_SNAP, acknowledgeBy: 'scope_manager' as const }
-    const h = (newValue: unknown) => [{ action: 'update', field: 'approvalRule', newValue }]
+    const h = (newValue: unknown) => [{ action: 'update', field: 'approvalFlow', newValue }]
     expect(rerouteNoteOf(h({ migration: MIGRATION, kind: 'reroute', snapshot: snap }), { ...snap })).toBe(REROUTE_NOTE)
     expect(rerouteNoteOf(h({ migration: MIGRATION, kind: 'reroute', snapshot: snap }), OLD_SNAP)).toBeNull() // re-approved since
     expect(rerouteNoteOf(h({ migration: MIGRATION, kind: 'revert', snapshot: snap }), snap)).toBeNull()
@@ -315,7 +315,7 @@ describe('texts and helpers', () => {
         docId: '7',
         docNo: 'PB/UJI/2610/0007',
         action: 'update',
-        field: 'approvalRule',
+        field: 'approvalFlow',
         lineNo: null,
         oldValue: { alur: 'Direktur (Diketahui) → Owner → Finance' },
         newValue: { alur: 'PM project (PM Uji) → Direktur → Owner' },

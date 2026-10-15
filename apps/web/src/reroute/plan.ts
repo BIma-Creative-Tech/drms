@@ -12,6 +12,9 @@ import { resolveSelectAndSnapshot, SnapshotRefused, type SnapshotRequest, type S
 
 export const MIGRATION = '20261015_200000_d1510_approval_reroute'
 
+/** Audit field of the re-route rows of a request ("Log perubahan": "Alur persetujuan: lama → baru"). */
+export const REROUTE_FIELD = 'approvalFlow'
+
 /** Shown in "Log perubahan" of every re-routed request (audit reason) and next to the stepper. */
 export const REROUTE_NOTE = 'Alur persetujuan diperbarui ke aturan terbaru (keputusan owner 2026-10-15)'
 export const REASON_REQUEST = `${REROUTE_NOTE}: PM project → Direktur → Owner, Finance hanya transfer — pengajuan belum diputuskan Direktur (migrasi ${MIGRATION})`
@@ -175,7 +178,7 @@ export function firstStepText(s: ApprovalSnapshot, names: ReadonlyMap<number, st
  * snapshot it got there (history rows oldest first, values unwrapped — domain/history.ts). null otherwise.
  */
 export function rerouteNoteOf(history: ReadonlyArray<{ action: string; field: string | null; newValue: unknown }>, snapshot: unknown): string | null {
-  const last = [...history].reverse().find((h) => h.action === 'update' && h.field === 'approvalRule' && (h.newValue as { migration?: unknown } | null)?.migration === MIGRATION)
+  const last = [...history].reverse().find((h) => h.action === 'update' && h.field === REROUTE_FIELD && (h.newValue as { migration?: unknown } | null)?.migration === MIGRATION)
   const v = last?.newValue as { kind?: unknown; snapshot?: unknown } | undefined
   return v?.kind === 'reroute' && canonicalJson(v.snapshot) === canonicalJson(snapshot) ? REROUTE_NOTE : null
 }

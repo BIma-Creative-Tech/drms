@@ -204,7 +204,7 @@ describe('migration 20261015_200000_d1510_approval_reroute', () => {
     expect(detail.statusLabel).toBe('Menunggu persetujuan PM')
     expect(await inboxItem(w.users.pm, req.A)).toMatchObject({ step: 'acknowledge', stepLabel: 'Persetujuan PM' })
     expect(await inboxItem(w.users.owner, req.A)).toBeUndefined() // the Direktur is no longer asked first
-    const audit = (await sqlAs('app', "SELECT reason, old_value -> 'v' ->> 'alur' AS old, new_value -> 'v' ->> 'alur' AS neu FROM audit_logs WHERE doc_type = 'expense_request' AND doc_id = $1 AND field = 'approvalRule'", [String(req.A)])).rows
+    const audit = (await sqlAs('app', "SELECT reason, old_value -> 'v' ->> 'alur' AS old, new_value -> 'v' ->> 'alur' AS neu FROM audit_logs WHERE doc_type = 'expense_request' AND doc_id = $1 AND field = 'approvalFlow'", [String(req.A)])).rows
     expect(audit).toEqual([{ reason: expect.stringContaining(REROUTE_NOTE), old: 'Direktur (Diketahui) → Owner → Finance', neu: expect.stringMatching(/^PM project \(.+\) → Direktur → Owner$/) }])
     const panel = (await loadRequestPanel(await getTestPayload(), { ...w.users.staffA, collection: 'users' } as never, req.A))!
     expect(panel.stepperNote).toBe(REROUTE_NOTE)
