@@ -34,11 +34,12 @@ import { VENDOR_PAYMENT_ROLES } from '@/domain/expense/drafts'
  */
 let config: SanitizedConfig
 
-const nav = vi.hoisted(() => ({ path: '/admin' }))
+// stable step list: useOwnedSteps compares it by identity (a fresh [] per render would loop)
+const nav = vi.hoisted(() => ({ path: '/admin', steps: [] as unknown[] }))
 vi.mock('next/navigation', () => ({ usePathname: () => nav.path, useSearchParams: () => new URLSearchParams() }))
 vi.mock('@payloadcms/ui', () => ({
   useTheme: () => ({ theme: 'light', setTheme: () => undefined, autoMode: false }),
-  useStepNav: () => ({ stepNav: [], setStepNav: () => undefined }),
+  useStepNav: () => ({ stepNav: nav.steps, setStepNav: () => undefined }),
   useTranslation: () => ({ i18n: { language: 'id', fallbackLanguage: 'en' }, t: (k: string) => k }),
 }))
 
@@ -125,8 +126,9 @@ describe('"+ Buat" items per role (real Payload config)', () => {
 describe('items follow the permissions, not the role names', () => {
   const all = () => true
   it('a collection without create permission drops its items (vendor payment needs the request create too)', () => {
-    const g = quickCreateGroups({ roles: ['pk-finance'], canCreate: (s) => s !== 'expense-requests' })
+    const g = quickCreateGroups({ roles: ['pk-finance'], canCreate: (s) => s === 'vendors' })
     expect(labels(g)).toEqual(['Kas masuk', 'Kas keluar', 'Vendor baru'])
+    expect(labels(quickCreateGroups({ roles: ['pk-finance'], canCreate: (s) => s === 'expense-requests' }))).toEqual(['Pengajuan baru', 'Pembayaran vendor', 'Kas masuk', 'Kas keluar'])
   })
   it('a hidden collection (visibleEntities) counts as not creatable', () => {
     const can = canCreateFrom({ collections: { vendors: { create: true }, clients: { create: true } } }, { collections: ['clients'] })
