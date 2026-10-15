@@ -55,19 +55,19 @@ import {
 export type SqlQuery = ReturnType<typeof sql>
 export type Exec = { execute: (q: SqlQuery) => Promise<unknown> }
 
-async function rows<T>(db: Exec, q: SqlQuery): Promise<T[]> {
+export async function rows<T>(db: Exec, q: SqlQuery): Promise<T[]> {
   const r = (await db.execute(q)) as { rows?: T[] } | T[]
   return Array.isArray(r) ? r : (r.rows ?? [])
 }
 
 /** `{1,2,3}` for `= ANY(${…}::int[])` (drizzle expands a JS array into a parenthesised list). */
-function intArray(xs: readonly number[]): string {
+export function intArray(xs: readonly number[]): string {
   for (const x of xs) if (!Number.isSafeInteger(x)) throw new Error(`d1510: not an id: ${String(x)}`)
   return `{${xs.join(',')}}`
 }
 
-const num = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v))
-const json = <T>(v: unknown): T => (typeof v === 'string' ? (JSON.parse(v) as T) : (v as T))
+export const num = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v))
+export const json = <T>(v: unknown): T => (typeof v === 'string' ? (JSON.parse(v) as T) : (v as T))
 const roles = (v: unknown): Role[] => json<unknown[]>(v ?? []).filter(isRole)
 
 // ---------------------------------------------------------------- snapshot facts (≙ domain/companies + snapshot.ts)
@@ -289,7 +289,7 @@ function requestValue(p: { flow: string; ruleId: number | null; ruleName: string
   return { alur: p.flow, aturan: p.ruleName, ruleId: p.ruleId, status: p.status, currentLevel: p.currentLevel, cycle: p.cycle, snapshot: p.snapshot, ...extra }
 }
 
-async function audit(
+export async function audit(
   db: Exec,
   row: { docId: number; docNo: string | null; companyId: number; action: string; field: string; old: unknown; neu: unknown; reason: string; statusFrom?: string | null; statusTo?: string | null },
 ): Promise<void> {
@@ -299,39 +299,60 @@ async function audit(
             ${row.statusFrom ?? null}, ${row.statusTo ?? null}, ${row.reason}, 'system', ${row.companyId}::int)`)
 }
 
-/** Recipients + texts of the notification a submit sends to the first approver (`notifyTransition` → `deliver`). */
-async function notifyFirstApprover(db: Exec, p: RequestPlan, c: Candidate, opts: { push: boolean; appUrl: string | undefined }): Promise<number> {
-  const snap = p.newSnapshot!
-  const event: NotifyEvent = p.newStatus === 'pending_ack' ? 'expense.pending_ack' : 'expense.pending_approval'
+/** The request facts a waiting-position notification needs (SQL rows of a re-routed / trimmed request). */
+export type WaitingDoc = {
+  id: number
+  docNo: string | null
+  title: string
+  type: RequestType
+  grandTotal: number
+  companyId: number
+  projectId: number | null
+  creatorId: number | null
+  requesterEmployeeIds: number[]
+  status: 'pending_ack' | 'pending_approval'
+  currentLevel: number | null
+  snapshot: ApprovalSnapshot
+}
+
+/**
+ * The notification of the waiting position (`notifyTransition` → `deliver` of a submit / of the "next level"): in-app
+ * row for the PM project / named user / role holders of the position (minus requesters + creator, G1) and the approval
+ * e-mail job when the PT has it switched on. Shared by the re-route (new first approver) and the d1510 in-flight trim
+ * (a Finance level replaced by the Owner's). Returns the number of recipients.
+ */
+export async function notifyWaiting(db: Exec, w: WaitingDoc, opts: { push: boolean; appUrl: string | undefined }): Promise<number> {
+  const snap = w.snapshot
+  const event: NotifyEvent = w.status === 'pending_ack' ? 'expense.pending_ack' : 'expense.pending_approval'
   const src = sqlSnapshotSource(db)
   const doc: NotifyDoc = {
-    id: c.id,
-    docNo: c.docNo,
-    type: c.facts.type,
-    status: p.newStatus!,
-    title: c.title,
-    grandTotal: c.facts.grandTotal,
+    id: w.id,
+    docNo: w.docNo,
+    type: w.type,
+    status: w.status,
+    title: w.title,
+    grandTotal: w.grandTotal,
     approvedAmount: null,
-    requesters: c.facts.requesterEmployeeIds,
-    createdBy: c.facts.creatorId,
-    currentLevel: p.newLevel,
+    requesters: w.requesterEmployeeIds,
+    createdBy: w.creatorId,
+    currentLevel: w.currentLevel,
     approvalSnapshot: snap,
     g1Exception: null,
-    company: c.companyId,
-    project: c.facts.projectId,
+    company: w.companyId,
+    project: w.projectId,
   }
   // stepUsers(): the PM project / named user / role holders of the waiting position, minus requesters + creator (G1)
   let to: number[] = []
   if (event === 'expense.pending_ack') {
     if (snap.acknowledgerUserId !== null) to = [snap.acknowledgerUserId]
-    else if (snap.acknowledgeBy === 'role' && snap.acknowledgeRole) to = await src.membersWithRole(snap.acknowledgeRole, c.companyId)
+    else if (snap.acknowledgeBy === 'role' && snap.acknowledgeRole) to = await src.membersWithRole(snap.acknowledgeRole, w.companyId)
   } else {
-    const step = snap.steps.find((s) => s.level === (p.newLevel ?? 1))
+    const step = snap.steps.find((s) => s.level === (w.currentLevel ?? 1))
     if (step?.approverUserId) to = [step.approverUserId]
-    else if (step?.approverRole) to = await src.membersWithRole(step.approverRole, c.companyId)
+    else if (step?.approverRole) to = await src.membersWithRole(step.approverRole, w.companyId)
   }
-  const people = new Set<number>(c.facts.creatorId !== null ? [c.facts.creatorId] : [])
-  const requesterUsers = await src.usersOfEmployees(c.facts.requesterEmployeeIds)
+  const people = new Set<number>(w.creatorId !== null ? [w.creatorId] : [])
+  const requesterUsers = await src.usersOfEmployees(w.requesterEmployeeIds)
   if (requesterUsers.length) {
     for (const r of await rows<{ id: number }>(db, sql`SELECT id FROM users WHERE active = true AND id = ANY(${intArray(requesterUsers)}::int[])`)) people.add(Number(r.id))
   }
@@ -339,7 +360,7 @@ async function notifyFirstApprover(db: Exec, p: RequestPlan, c: Candidate, opts:
   if (to.length === 0) return 0
   const tpl = (await rows<{ title: string | null; body: string | null }>(db, sql`SELECT title, body FROM notification_templates WHERE event = ${event} AND active = true ORDER BY id LIMIT 1`))[0]
   const text = fixedText(event, doc) ?? (tpl?.title && tpl.body ? { title: tpl.title, body: tpl.body } : defaultText(event))
-  const email = APPROVAL_EMAIL_EVENTS.has(event) && (await rows<{ on: boolean }>(db, sql`SELECT approval_email_enabled IS TRUE AS on FROM companies WHERE id = ${c.companyId}::int`))[0]?.on === true
+  const email = APPROVAL_EMAIL_EVENTS.has(event) && (await rows<{ on: boolean }>(db, sql`SELECT approval_email_enabled IS TRUE AS on FROM companies WHERE id = ${w.companyId}::int`))[0]?.on === true
   for (const uid of to) {
     if (email) {
       const m = approvalEmail(doc, event, opts.appUrl)
@@ -347,10 +368,32 @@ async function notifyFirstApprover(db: Exec, p: RequestPlan, c: Candidate, opts:
         VALUES (${JSON.stringify({ userId: uid, subject: m.subject, text: m.text })}::jsonb, 'sendEmail', 'default', 0, false, false, now(), now())`)
     }
     await db.execute(sql`INSERT INTO notifications (user_id, event, title, body, doc_type, doc_id, doc_no, company_id, push_status, uuid, created_at, updated_at)
-      VALUES (${uid}::int, ${event}, ${renderTemplate(text.title, doc).slice(0, 160)}, ${renderTemplate(text.body, doc).slice(0, 1000)}, 'expense_request', ${String(c.id)}, ${c.docNo},
-              ${c.companyId}::int, ${opts.push ? 'pending' : 'skipped'}::enum_notifications_push_status, gen_random_uuid()::text, now(), now())`)
+      VALUES (${uid}::int, ${event}, ${renderTemplate(text.title, doc).slice(0, 160)}, ${renderTemplate(text.body, doc).slice(0, 1000)}, 'expense_request', ${String(w.id)}, ${w.docNo},
+              ${w.companyId}::int, ${opts.push ? 'pending' : 'skipped'}::enum_notifications_push_status, gen_random_uuid()::text, now(), now())`)
   }
   return to.length
+}
+
+/** The notification a submit sends to the first approver of a re-routed request. */
+async function notifyFirstApprover(db: Exec, p: RequestPlan, c: Candidate, opts: { push: boolean; appUrl: string | undefined }): Promise<number> {
+  return notifyWaiting(
+    db,
+    {
+      id: c.id,
+      docNo: c.docNo,
+      title: c.title,
+      type: c.facts.type,
+      grandTotal: c.facts.grandTotal,
+      companyId: c.companyId,
+      projectId: c.facts.projectId,
+      creatorId: c.facts.creatorId,
+      requesterEmployeeIds: c.facts.requesterEmployeeIds,
+      status: p.newStatus!,
+      currentLevel: p.newLevel,
+      snapshot: p.newSnapshot!,
+    },
+    opts,
+  )
 }
 
 export type ApplyResult = { plan: ReroutePlan; rulesAligned: number; requestsRerouted: number; notifications: number }

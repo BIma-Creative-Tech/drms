@@ -52,6 +52,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   submitted after the migration, PM / Direktur / Owner inbox + notifications, decided request untouched), idempotent
   re-run, down restores, PM → Direktur → Owner → transfer queue, down refused afterwards.
 
+### Changed (DRMS 15/10 — Finance no longer approves in-flight requests; data migration)
+
+- **In-flight requests past the Direktur** (owner decision 2026-10-15 follow-up, "jika masih berjalan lanjutkan
+  penyesuaian approval flow"): migration `20261015_210000_d1510_approval_inflight_trim` (data only, idempotent, after
+  200000) removes every UNDECIDED Finance approval level from requests waiting for a decision (any rule; G1 exceptions,
+  drafts, rejected / cancelled / approved and later untouched): (1) waiting before it → the level is dropped, status /
+  level / decisions kept (prod: PB/DRMS/2610/0004 → waits for the Owner, then straight to the transfer queue); (2) waiting
+  at a Finance level without an Owner level → it becomes the Owner's level, Owners notified (in-app + approval e-mail
+  job); (3) waiting at Finance after the Owner approved → "Disetujui" through the same finalisation as the last approval
+  (fund check ADR 0029 first; refused → kept, listed); (4) an old flow is never sent back to the PM project (noted).
+  Audit "Alur persetujuan" + stepper note "… Finance tidak lagi menyetujui — hanya transfer". Down restores (refused once
+  a request moved or was approved). Preview: `src/reroute/preview-trim.sql`; the dry-run CLI now prints both 200000 and
+  210000. ADR 0026 amendment 2026-10-15 (b); runbook updated.
+- Code: `finalizeApproved` (domain/expense/receipts.ts) is the one "→ Disetujui" finalisation of `approve`, a final
+  "Diketahui", `approveWithoutDecision` and the migration; `notifyWaiting` (src/reroute/db.ts) shared by both d1510
+  migrations.
+- **Deploy order (one batch):** `20261015_150000_d1510_finance_rule_data` → `20261015_200000_d1510_approval_reroute` →
+  `20261015_210000_d1510_approval_inflight_trim`.
+- Tests: unit `d1510-trim` (planner cases 1–4, G1, texts, stepper note); integration `d1510-trim` (dry-run writes
+  nothing, SQL preview = TS plan, fund check refuses case 3 → kept, migration as `payload migrate` — case 1 → Owner →
+  transfer queue without Finance, case 2 Owner notified, case 3 approved via the app's finalisation; idempotent; down
+  restores / refused after a decision).
+
 ### Changed (DRMS 15/10 — alur pengajuan Finance; data migration)
 
 - **Pengajuan Finance** (owner decision 2026-10-15): a request Finance files for himself (Jenis penerima Karyawan —

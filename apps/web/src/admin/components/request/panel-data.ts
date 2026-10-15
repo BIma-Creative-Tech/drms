@@ -17,6 +17,7 @@ import { requestHistory } from '@/domain/history'
 import { historyEntry, type HistoryEntry } from '@/domain/history-format'
 import { withSystemTransaction } from '@/lib/system-tx'
 import { rerouteNoteOf } from '@/reroute/plan'
+import { trimNoteOf } from '@/reroute/trim-plan'
 
 import type { DraftBank } from './RequestSummary'
 
@@ -131,8 +132,8 @@ async function load(payload: Payload, user: NonNullable<PayloadRequest['user']>,
       draftBank: d.status === 'draft' && (d.bankAccountId || d.vendorBankAccountId || d.payeeCompany) ? await bankPreview(r, { requestId: docId, reveal: false }).catch(() => null) : null,
       attachments,
       stepper,
-      // d1510: a request re-routed by the owner decision 2026-10-15 says so next to its stepper (while on that snapshot)
-      stepperNote: [g1ExceptionText(snap?.selfApproval), rerouteNoteOf(history, snap)].filter(Boolean).join(' · ') || null,
+      // d1510: a request re-routed / trimmed by the owner decision 2026-10-15 says so next to its stepper (while on that snapshot)
+      stepperNote: [g1ExceptionText(snap?.selfApproval), rerouteNoteOf(history, snap), trimNoteOf(history, snap)].filter(Boolean).join(' · ') || null,
       ruleName: snap?.ruleName && hasRole(r, RULE_READERS, company) ? String(snap.ruleName) : null,
       decision: decisionOf(d, snap),
       history: history.map((h) => historyEntry(h, tz)).reverse(),

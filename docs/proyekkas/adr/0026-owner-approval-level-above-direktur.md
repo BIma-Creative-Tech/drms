@@ -184,3 +184,27 @@ Unchanged: a requester who is also Direktur → "Pengajuan Direktur" (priority 1
 request with several requesters takes the rule only when every requester holds Finance. Submitted requests keep their
 snapshot (the 2026-10-15 re-route, migration `…_200000_d1510_approval_reroute`, runs after this one and therefore
 re-routes a pending Finance request to this rule). Test: `tests/unit/d1510-finance-rule.test.ts`.
+
+## Amendment 2026-10-15 (b) — in-flight requests past the Direktur: Finance no longer approves
+
+Owner decision 2026-10-15 (follow-up of the re-route above: "Pastikan ini berlaku dengan transaksi yg existing; jika
+masih berjalan lanjutkan penyesuaian approval flow"): Finance never approves — the flow ends at the Owner, then Finance
+only transfers — also for requests ALREADY past the Direktur's "Diketahui" (left alone by the re-route). Data migration
+`20261015_210000_d1510_approval_inflight_trim` (after 200000; code `src/reroute/trim-*.ts`), for every request waiting
+for a decision (`pending_ack` / `pending_approval`, any rule, no G1 exception) whose snapshot has an UNDECIDED Finance
+approval level:
+1. waiting before the Finance level → the undecided Finance level(s) are removed from `steps` (levels after them move
+   up) and `pk-finance` from `decisionRoles`; status, current level and decisions kept (prod: PB/DRMS/2610/0004);
+2. waiting at a Finance level, no Owner level in the snapshot (ADR 0013 shape) → that level becomes an Owner level (same
+   number, `pk-principal` added to `decisionRoles`), the Owners are notified like the "next level" notification; kept
+   when no Owner can decide it (none active, requester / creator, already decided another position — G1);
+3. waiting at a Finance level after the Owner approved → "Disetujui" through the app's finalisation of the last approval
+   (`finalizeApproved` in `domain/expense/receipts.ts`, shared with `approve`, the final "Diketahui" and
+   `approveWithoutDecision`), preceded by the ADR 0029 fund check (refused → kept and listed). It runs through the Payload
+   Local API inside the migration's transaction (`payload migrate` hands the migration the `req` of that transaction);
+4. an old-flow request (no PM project step) the Direktur decided is never sent back to the PM — noted "PM project: tidak
+   berlaku — alur lama — Direktur sudah memutuskan".
+Doc no, lines, amounts, signatures and cycle unchanged. Audit row "Alur persetujuan" per request (old → new), status row
+for case 3, stepper note "Alur persetujuan diperbarui (keputusan owner 2026-10-15): Finance tidak lagi menyetujui —
+hanya transfer". Down restores the old snapshots; refused once a trimmed request moved or was approved by case 3.
+Shortfall re-approvals (LPJ, `settlements`) are a different snapshot and are not touched.
