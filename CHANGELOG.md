@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-15
+
+**DRMS 13/10 Phase C (cek dana + Pinjaman antar-PT) + the loan API follow-ups + the single-PT form fix** — PRs #70–#74.
+Production goes 0.10.1 → 0.11.0; APK **0.7.0** (`mobile-v0.7.0`) ships with it. Deploy order: server first, then the
+APK (older APKs keep working: every new field is additive, **no `minAppVersion` bump**). Rollback = restore the
+pre-0.11.0 dump + the 0.10.1 image (the 0.10.1 image does not know the new enum values / tables).
+
 **DRMS 13/10 Phase C — cek dana di persetujuan Owner + Pinjaman antar-PT** ([ADR 0029](docs/proyekkas/adr/0029-fund-check-and-inter-pt-loans.md),
 accepted 2026-10-14: "setuju" on every recommended default). Web / server, and the APK part (Owner shortfall panel,
 loan instruction, Finance disbursement — below).
@@ -17,7 +24,8 @@ loan instruction, Finance disbursement — below).
 **Deploy checklist:** migrate; every PT keeps today's behaviour (switch OFF). Per PT, after Finance reconciled every
 non-site account with the bank statement (opening balances, all KM recorded), a **group admin** ticks **"Cek dana saat
 persetujuan"** on Perusahaan → Operasional (reason "saldo cocok dengan rekening koran per <tanggal>"). Every PT that may
-lend or borrow designates its **Rekening penerimaan antar-PT** (ADR 0028) first.
+lend or borrow designates its **Rekening penerimaan antar-PT** (ADR 0028) first. After the server: publish APK 0.7.0
+(`/unduh`, Pengaturan "Versi APK terbaru" 0.7.0); "Versi APK minimum" stays as it is.
 
 ### Added
 
@@ -81,6 +89,12 @@ lend or borrow designates its **Rekening penerimaan antar-PT** (ADR 0028) first.
   loan detail and in "Catat pencairan" straight from the detail (a form opened from a notification no longer waits for
   the queue; the queue item only for an older server) and prefers the server's loan `statusLabel` (its local labels as
   the fallback).
+
+### Fixed
+
+- **Pengajuan, user with one PT** (#71): the project / urgency / vendor / rekening pickers no longer stay locked on
+  "Pilih PT terlebih dahulu". The PT field now has a server-side default (the only PT the user may create in), so the
+  form's initial state already holds it; `CompanyPrefill` stays as a fallback.
 
 ## [0.10.1] - 2026-10-14
 
