@@ -241,9 +241,10 @@ describe('ADR 0027 web form, preview, list, menu', () => {
     expect(JSON.stringify(master ?? {})).toContain('vendor-bank-accounts')
   })
 
-  it('vendors form: tab "Rekening" with the join of the vendor accounts (no column)', () => {
+  it('DRMS 16/10: the vendor accounts are edited in the tabbed Vendor page (Payload tabs + join removed); Kontak PIC array', () => {
     const vendors = config.collections.find((c) => c.slug === 'vendors')!
-    expect(JSON.stringify(vendors.fields)).toContain('"collection":"vendor-bank-accounts"')
+    expect(JSON.stringify(vendors.fields)).not.toContain('"collection":"vendor-bank-accounts"')
+    expect(vendors.fields.some((f) => 'name' in f && f.name === 'contacts' && f.type === 'array')).toBe(true)
   })
 
   it('expense request: payeeType required with default karyawan; the vendor fields exist', () => {

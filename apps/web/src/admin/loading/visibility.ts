@@ -21,10 +21,15 @@ export const NAV_TIMEOUT_MS = 15_000
  * Debounces a boolean "busy" signal into a "visible" signal: shown only after `showDelayMs`,
  * visible for at least `minVisibleMs`, force-hidden after `maxVisibleMs`. Uses the global timers
  * (vitest fake timers in the test).
+ *
+ * `onBlocked` (DRMS 16/10: "loading belum memblokir klik"): input is blocked from the FIRST moment
+ * of busy — no anti-flash delay, a second click must never get through — for as long as the loader
+ * is visible, and released together with it by the safety timeout (the page can never stay locked).
  */
-export function createVisibilityController(onVisible: (visible: boolean) => void, timing: VisibilityTiming = DEFAULT_TIMING) {
+export function createVisibilityController(onVisible: (visible: boolean) => void, timing: VisibilityTiming = DEFAULT_TIMING, onBlocked?: (blocked: boolean) => void) {
   let busy = false
   let visible = false
+  let blocked = false
   let latched = false // safety timeout fired while still busy
   let shownAt = 0
   let showTimer: ReturnType<typeof setTimeout> | undefined
@@ -32,6 +37,12 @@ export function createVisibilityController(onVisible: (visible: boolean) => void
   let maxTimer: ReturnType<typeof setTimeout> | undefined
 
   const clear = (t: ReturnType<typeof setTimeout> | undefined) => t !== undefined && clearTimeout(t)
+  const syncBlocked = () => {
+    const b = visible || (busy && !latched)
+    if (b === blocked) return
+    blocked = b
+    onBlocked?.(b)
+  }
   const setVisible = (v: boolean) => {
     if (v === visible) return
     visible = v
@@ -40,6 +51,7 @@ export function createVisibilityController(onVisible: (visible: boolean) => void
       maxTimer = undefined
     }
     onVisible(v)
+    syncBlocked()
   }
   const show = () => {
     showTimer = undefined
@@ -57,6 +69,7 @@ export function createVisibilityController(onVisible: (visible: boolean) => void
     update(next: boolean) {
       busy = next
       if (busy) {
+        syncBlocked()
         if (latched) return
         clear(hideTimer)
         hideTimer = undefined
@@ -64,6 +77,7 @@ export function createVisibilityController(onVisible: (visible: boolean) => void
         return
       }
       latched = false
+      syncBlocked()
       clear(showTimer)
       showTimer = undefined
       if (visible && hideTimer === undefined) {
@@ -75,11 +89,20 @@ export function createVisibilityController(onVisible: (visible: boolean) => void
       }
     },
     isVisible: () => visible,
+    isBlocked: () => blocked,
     dispose() {
       ;[showTimer, hideTimer, maxTimer].forEach(clear)
       showTimer = hideTimer = maxTimer = undefined
     },
   }
+}
+
+/**
+ * Keys swallowed while input is blocked: Enter (submits a form, activates a link / button) and Space
+ * outside text fields (activates the focused button / checkbox). Typing, Tab and Esc still work.
+ */
+export function blocksKey(key: string, editableTarget: boolean): boolean {
+  return key === 'Enter' || (key === ' ' && !editableTarget)
 }
 
 export type ClickLike = {

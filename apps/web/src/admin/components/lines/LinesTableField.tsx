@@ -10,6 +10,8 @@ import { KAS_STYLE } from '../kas/style'
 import { LineCard } from './LineCard'
 import { RupiahInput, useRupiah } from '../RupiahInput'
 import { draftOf, draftTotal, formatQty, LINE_FIELD_NAMES, parseDraft, relValue, rowValues, type LineDraft, type LineDraftErrors, type LineValues } from './line-form'
+import { WrapSelect } from '../WrapSelect'
+import { isMultilineText, WrapText } from '../WrapText'
 
 /**
  * DRMS 10/10 8f–8h (D3, WA-05): the expense-request lines as a TABLE (No, Uraian, Kategori, Qty, Satuan, Harga
@@ -404,7 +406,7 @@ function LineDialog(props: { no: number; initial: LineValues | null; otherTotal:
   }
   const onKeyDown = (e: React.KeyboardEvent) => {
     // inside Payload's document <form>: Enter never submits the document
-    if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement) && !(e.target instanceof HTMLButtonElement)) {
+    if (e.key === 'Enter' && !isMultilineText(e.target) && !(e.target instanceof HTMLButtonElement)) {
       e.preventDefault()
       submit()
     }
@@ -436,7 +438,7 @@ function LineDialog(props: { no: number; initial: LineValues | null; otherTotal:
             <label htmlFor={`${uid}-desc`}>
               Uraian<span className="req" aria-hidden>*</span>
             </label>
-            <input id={`${uid}-desc`} type="text" value={d.description} onChange={set('description')} maxLength={500} autoFocus placeholder="mis. Semen 50 kg" data-pk-line-field="description" {...aria('description')} />
+            <WrapText id={`${uid}-desc`} value={d.description} onChange={set('description')} maxLength={500} autoFocus placeholder="mis. Semen 50 kg" data-pk-line-field="description" {...aria('description')} />
             {err('description')}
           </div>
           <div className="pk-fld full">
@@ -461,7 +463,7 @@ function LineDialog(props: { no: number; initial: LineValues | null; otherTotal:
               </p>
             ) : (
               <>
-                <select id={`${uid}-rap`} value={d.rapItem} onChange={set('rapItem')} data-pk-line-field="rapItem" {...aria('rapItem')}>
+                <WrapSelect id={`${uid}-rap`} value={d.rapItem} onChange={set('rapItem')} data-pk-line-field="rapItem" {...aria('rapItem')}>
                   <option value="">Pilih item RAP…</option>
                   {[...props.rap.items, ...props.rap.all.filter((o) => o.active === false && String(o.id) === d.rapItem)].map((o) => (
                     <option key={o.id} value={o.id}>
@@ -469,7 +471,7 @@ function LineDialog(props: { no: number; initial: LineValues | null; otherTotal:
                       {o.active === false ? ' (nonaktif)' : ''}
                     </option>
                   ))}
-                </select>
+                </WrapSelect>
                 {err('rapItem') ?? <p className="help">Biaya baris ini dibebankan ke item RAP ini (realisasi RAP).</p>}
               </>
             )}
@@ -478,14 +480,14 @@ function LineDialog(props: { no: number; initial: LineValues | null; otherTotal:
             <label htmlFor={`${uid}-cat`}>
               Kategori<span className="req" aria-hidden>*</span>
             </label>
-            <select id={`${uid}-cat`} value={d.category} onChange={set('category')} data-pk-line-field="category" {...aria('category')}>
+            <WrapSelect id={`${uid}-cat`} value={d.category} onChange={set('category')} data-pk-line-field="category" {...aria('category')}>
               <option value="">Pilih kategori…</option>
               {props.categories.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
                 </option>
               ))}
-            </select>
+            </WrapSelect>
             {err('category')}
           </div>
           {needsVehicle || d.vehicle ? (
@@ -493,14 +495,14 @@ function LineDialog(props: { no: number; initial: LineValues | null; otherTotal:
               <label htmlFor={`${uid}-veh`}>
                 Kendaraan{needsVehicle ? <span className="req" aria-hidden>*</span> : null}
               </label>
-              <select id={`${uid}-veh`} value={d.vehicle} onChange={set('vehicle')} data-pk-line-field="vehicle" {...aria('vehicle')}>
+              <WrapSelect id={`${uid}-veh`} value={d.vehicle} onChange={set('vehicle')} data-pk-line-field="vehicle" {...aria('vehicle')}>
                 <option value="">Pilih kendaraan…</option>
                 {props.vehicles.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.label}
                   </option>
                 ))}
-              </select>
+              </WrapSelect>
               {err('vehicle')}
             </div>
           ) : null}
@@ -515,14 +517,14 @@ function LineDialog(props: { no: number; initial: LineValues | null; otherTotal:
             <label htmlFor={`${uid}-uom`}>
               Satuan<span className="req" aria-hidden>*</span>
             </label>
-            <select id={`${uid}-uom`} value={d.uom} onChange={set('uom')} data-pk-line-field="uom" {...aria('uom')}>
+            <WrapSelect id={`${uid}-uom`} value={d.uom} onChange={set('uom')} data-pk-line-field="uom" {...aria('uom')}>
               <option value="">Pilih satuan…</option>
               {props.uoms.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
                 </option>
               ))}
-            </select>
+            </WrapSelect>
             {err('uom')}
           </div>
           <div className="pk-fld">
@@ -557,7 +559,7 @@ function LineDialog(props: { no: number; initial: LineValues | null; otherTotal:
           </div>
           <div className="pk-fld full">
             <label htmlFor={`${uid}-notes`}>Keterangan</label>
-            <input id={`${uid}-notes`} type="text" value={d.notes} onChange={set('notes')} maxLength={500} data-pk-line-field="notes" {...aria('notes')} />
+            <WrapText id={`${uid}-notes`} value={d.notes} onChange={set('notes')} maxLength={500} data-pk-line-field="notes" {...aria('notes')} />
             {err('notes')}
           </div>
         </div>

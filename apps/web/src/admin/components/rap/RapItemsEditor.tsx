@@ -24,6 +24,8 @@ import {
   type RapItemDraftErrors,
   type RapItemView,
 } from './rap-item-form'
+import { WrapSelect } from '../WrapSelect'
+import { WrapText } from '../WrapText'
 
 /**
  * DRMS 13/10 Wave 3 "Proyek › RAP" (client: "Form RAP"): the RAP items of one project as a table with a grand total
@@ -355,41 +357,41 @@ function RapItemDialog(props: { projectId: number; item: RapItemView | null; sta
           </div>
           <div className="pk-fld">
             <label htmlFor={`${uid}-desc`}>Uraian{req}</label>
-            <input id={`${uid}-desc`} type="text" value={d.description} onChange={set('description')} maxLength={300} data-pk-rap-field="description" {...aria('description')} />
+            <WrapText id={`${uid}-desc`} value={d.description} onChange={set('description')} maxLength={300} data-pk-rap-field="description" {...aria('description')} />
             {err('description')}
           </div>
           <div className="pk-fld">
             <label htmlFor={`${uid}-kind`}>Jenis{req}</label>
-            <select id={`${uid}-kind`} value={d.kind} onChange={set('kind')} disabled={item !== null} data-pk-rap-field="kind" {...aria('kind')}>
+            <WrapSelect id={`${uid}-kind`} value={d.kind} onChange={set('kind')} disabled={item !== null} data-pk-rap-field="kind" {...aria('kind')}>
               <option value="pekerjaan">Pekerjaan</option>
               <option value="material">Material</option>
-            </select>
+            </WrapSelect>
             {err('kind') ?? <p className="help">{item ? 'Jenis tidak dapat diubah (buat item baru).' : 'Pekerjaan menggerakkan progress tahapan (konstruksi); material: masuk / terpakai / stok.'}</p>}
           </div>
           <div className="pk-fld">
             <label htmlFor={`${uid}-stage`}>
               Tahapan{props.stageRequired ? req : null}
             </label>
-            <select id={`${uid}-stage`} value={d.stageId} onChange={set('stageId')} data-pk-rap-field="stageId" {...aria('stageId')}>
+            <WrapSelect id={`${uid}-stage`} value={d.stageId} onChange={set('stageId')} data-pk-rap-field="stageId" {...aria('stageId')}>
               <option value="">{props.stageRequired ? 'Pilih tahapan…' : '— Tanpa tahapan —'}</option>
               {props.stages.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.label}
                 </option>
               ))}
-            </select>
+            </WrapSelect>
             {err('stageId') ?? (props.stages.length === 0 ? <p className="help">Project ini belum punya tahapan aktif.</p> : null)}
           </div>
           <div className="pk-fld">
             <label htmlFor={`${uid}-uom`}>Satuan{req}</label>
-            <select id={`${uid}-uom`} value={d.uomId} onChange={set('uomId')} data-pk-rap-field="uomId" {...aria('uomId')}>
+            <WrapSelect id={`${uid}-uom`} value={d.uomId} onChange={set('uomId')} data-pk-rap-field="uomId" {...aria('uomId')}>
               <option value="">Pilih satuan…</option>
               {props.uoms.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.label}
                 </option>
               ))}
-            </select>
+            </WrapSelect>
             {err('uomId')}
           </div>
           <div className="pk-fld">
@@ -422,10 +424,10 @@ function RapItemDialog(props: { projectId: number; item: RapItemView | null; sta
           {item ? (
             <div className="pk-fld">
               <label htmlFor={`${uid}-act`}>Status</label>
-              <select id={`${uid}-act`} value={d.active} onChange={set('active')} data-pk-rap-field="active">
+              <WrapSelect id={`${uid}-act`} value={d.active} onChange={set('active')} data-pk-rap-field="active">
                 <option value="ya">Aktif</option>
                 <option value="tidak">Nonaktif</option>
-              </select>
+              </WrapSelect>
               <p className="help">Item RAP tidak pernah dihapus; item nonaktif tidak bisa dipilih di pengajuan baru.</p>
             </div>
           ) : null}

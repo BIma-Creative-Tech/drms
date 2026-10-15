@@ -74,6 +74,21 @@
     cursor: progress;
   }
 
+  // Input shield (DRMS 16/10): active from the first moment of busy (navigation or save), before the
+  // dots appear, over the whole page — module bar, drawers and modals (--z-modal 30, --z-status 40)
+  // included; Payload popups (60) and toasts stay above. Transparent: the dots overlay does the visuals.
+  .pk-loading-shield {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-status, 40) + 3);
+    display: none;
+  }
+
+  .pk-loading-shield[data-active] {
+    display: block;
+    cursor: progress;
+  }
+
   .pk-loading__status {
     position: absolute;
     width: 1px;

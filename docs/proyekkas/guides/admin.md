@@ -38,7 +38,7 @@ Transfer tampil sebagai kartu per pengajuan.
 |---|---|
 | **Dashboard** | Ringkasan per peran (tab peran bila punya lebih dari satu), `/admin/dashboard` |
 | **Persetujuan** | Persetujuan · Antrian Transfer · Verifikasi LPJ (Direktur/Finance) · Approval & tanda tangan |
-| **Proyek** | Project · RAB per kategori · Tahapan ▾ (Tahapan project, Template tahapan) · Data pendukung ▾ (Klien, Pusat biaya, Penugasan tim) · Progress ▾ · Addendum ▾ |
+| **Proyek** | Project · RAB per kategori · Tahapan ▾ (Tahapan project, Template tahapan) · Data pendukung ▾ (Klien, + Klien baru, Pusat biaya, Penugasan tim) · Progress ▾ · Addendum ▾ |
 | **Keuangan** | Pengajuan ▾ (Pengajuan biaya, + Buat pengajuan, Snapshot, Nota, Flag nota) · Kas ▾ · Transfer & LPJ ▾ · Tutup buku ▾ |
 | **Absensi** | Tim hari ini · Rekap bulanan · Jadwal & hari libur · Absensi · Koreksi absensi · Konfigurasi ▾ (Jadwal kerja, Hari libur) |
 | **Laporan** | Semua laporan (Admin: laporan absensi) |
@@ -187,9 +187,9 @@ memegang akses konsol Keycloak di prod: **belum diverifikasi** — hubungi tim t
 
 | Modul | Isi |
 |---|---|
-| **Master Data** | Bank, Satuan (dipakai bersama semua PT); Kategori pengeluaran (satuan wajar, perlu kendaraan), Kendaraan (nomor polisi unik di seluruh grup, contoh `DA 1234 XY`), Vendor (tab **Rekening**), **Rekening vendor** (tujuan pembayaran vendor; verifikasi oleh Admin / Finance) — per PT |
+| **Master Data** | Bank, Satuan (dipakai bersama semua PT); Kategori pengeluaran (satuan wajar, perlu kendaraan), Kendaraan (nomor polisi unik di seluruh grup, contoh `DA 1234 XY`), Vendor (halaman ber-tab: Detail · **Rekening** · Kontak PIC, lihat 3b), **Rekening vendor** (tujuan pembayaran vendor; verifikasi oleh Admin / Finance) — per PT |
 | **Absensi → Konfigurasi** | Jadwal kerja (per PT), Hari libur (bersama) |
-| **Proyek** | Project (dibuat Direktur), Pusat biaya, Klien, Template tahapan, Penugasan tim — per PT |
+| **Proyek** | Project (dibuat Direktur), Pusat biaya, Klien (halaman ber-tab: Detail · Kontak PIC · Proyek, lihat 3b), Template tahapan, Penugasan tim — per PT |
 | **Keuangan → Kas** | Akun kas/bank (saldo awal), Sumber kas masuk — per PT |
 | **Pengaturan** | Perusahaan (PT), Setting aplikasi, Aturan approval, Template notifikasi, Penomoran dokumen |
 | **Pengguna & Akses** | Akses PT (matriks), Pengguna, Karyawan, Rekening karyawan, Perangkat |
@@ -198,6 +198,25 @@ memegang akses konsol Keycloak di prod: **belum diverifikasi** — hubungi tim t
   setelah dibuat). Kode yang sama boleh dipakai di dua PT, tetapi tidak dua kali dalam satu PT.
 - Pilihan di formulir (project, pusat biaya, karyawan, rekening, jadwal) hanya berisi data **PT dokumen itu**.
 - Data yang sudah dipakai tetap tampil di dokumen lama walau dinonaktifkan.
+
+### 3b. Klien dan Vendor — satu halaman ber-tab (DRMS 16/10)
+
+Klien dan vendor dibuat / diubah di **satu halaman ber-tab dengan satu tombol Simpan** — baris kontak dan rekening
+ditambah langsung di tabnya, tanpa pindah sub-menu dan tanpa "simpan dulu, baru tambah". Semua isi tab tersimpan
+sekaligus; bila satu baris ditolak, **tidak ada yang tersimpan** dan tab yang salah diberi titik merah.
+
+- **Klien** (Proyek → Data pendukung → **Klien** → **+ Buat baru** / klik baris / **Ubah**, atau menu **+ Klien
+  baru**; dibuat Admin / Direktur PT): **Detail Klien** (PT, nama, alamat, status) · **Kontak PIC** (banyak orang:
+  nama wajib, jabatan, No. HP, email, catatan, *Kontak utama*) · **Proyek** (proyek klien ini yang boleh Anda lihat,
+  dengan tautan; **+ Proyek baru** membuka form proyek dengan klien ini dan PT-nya sudah terisi).
+- **Vendor** (Master Data → **Vendor**, atau menu **+ Vendor baru**; dibuat Admin / Finance, diubah juga oleh
+  Direktur): **Detail Vendor** (PT, nama, NPWP, alamat, status) · **Rekening** (bank, nomor, atas nama, default,
+  status verifikasi, aktif — hanya Admin / Finance PT itu; mengubah nomor / atas nama / bank atau menonaktifkan
+  rekening wajib dengan alasan) · **Kontak PIC**.
+- **Kontak utama** tampil sebagai kolom **Kontak** / **No. HP** di daftar dan di aplikasi (kolom lama diisi otomatis
+  dari kontak utama). Kontak yang sudah ada sebelum 16/10 dipindahkan otomatis menjadi kontak utama.
+- Menonaktifkan klien / vendor wajib dengan **Alasan perubahan** (bar Simpan). Yang tidak berhak mengubah melihat
+  halaman yang sama dalam mode **hanya baca**.
 
 ## 4. Aturan approval
 

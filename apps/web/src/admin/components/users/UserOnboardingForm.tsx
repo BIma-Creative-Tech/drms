@@ -32,6 +32,8 @@ import {
   withAutoStaff,
   withoutAutoStaff,
 } from './user-onboarding-form'
+import { WrapSelect } from '../WrapSelect'
+import { WrapText } from '../WrapText'
 
 /**
  * DRMS 13/10 Wave 3 — ONE tabbed form for an account (client brief: "Satu UI ber-tab: Detail Pengguna, Permissions,
@@ -240,15 +242,15 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
         ) : null}
         <div className="pk-fgrid">
           {field('user.email', 'Email', <input type="email" value={draft.user.email} maxLength={254} autoComplete="off" disabled={identityLocked || busy} onChange={(e) => patch((d) => ({ ...d, user: { ...d.user, email: e.target.value } }))} />, { required: true, help: 'Dipakai untuk login. Satu orang = satu akun, walau bekerja di beberapa PT.' })}
-          {field('user.name', 'Nama', <input type="text" value={draft.user.name} maxLength={128} disabled={identityLocked || busy} onChange={(e) => patch((d) => ({ ...d, user: { ...d.user, name: e.target.value } }))} />, { required: true })}
+          {field('user.name', 'Nama', <WrapText value={draft.user.name} maxLength={128} disabled={identityLocked || busy} onChange={(e) => patch((d) => ({ ...d, user: { ...d.user, name: e.target.value } }))} />, { required: true })}
           {field('user.phone', 'No. HP', <input type="tel" value={draft.user.phone} maxLength={32} disabled={identityLocked || busy} onChange={(e) => patch((d) => ({ ...d, user: { ...d.user, phone: e.target.value } }))} />)}
           {field(
             'user.active',
             'Status',
-            <select value={draft.user.active ? '1' : '0'} disabled={identityLocked || busy || (self && mode === 'update')} onChange={(e) => patch((d) => ({ ...d, user: { ...d.user, active: e.target.value === '1' } }))}>
+            <WrapSelect value={draft.user.active ? '1' : '0'} disabled={identityLocked || busy || (self && mode === 'update')} onChange={(e) => patch((d) => ({ ...d, user: { ...d.user, active: e.target.value === '1' } }))}>
               <option value="1">Aktif</option>
               <option value="0">Nonaktif</option>
-            </select>,
+            </WrapSelect>,
             { help: mode === 'create' ? 'Akun baru mendapat kata sandi sementara yang wajib diganti saat login pertama.' : 'Nonaktif = login, sesi web dan HP langsung dicabut di semua PT (alasan wajib).' },
           )}
         </div>
@@ -331,7 +333,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                 {field(
                   `${k}.mode`,
                   'Data karyawan',
-                  <select
+                  <WrapSelect
                     value={e.mode}
                     disabled={locked}
                     onChange={(ev) => {
@@ -355,13 +357,13 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                         {m.label}
                       </option>
                     ))}
-                  </select>,
+                  </WrapSelect>,
                 )}
                 {e.mode === 'pick'
                   ? field(
                       k,
                       'Karyawan',
-                      <select value={e.id ?? ''} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, id: ev.target.value ? Number(ev.target.value) : null }))}>
+                      <WrapSelect value={e.id ?? ''} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, id: ev.target.value ? Number(ev.target.value) : null }))}>
                         <option value="">– pilih karyawan –</option>
                         {c.employeeChoices
                           .filter((x) => x.id !== c.employee?.id)
@@ -371,33 +373,33 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                               {x.active ? '' : ' (nonaktif)'}
                             </option>
                           ))}
-                      </select>,
+                      </WrapSelect>,
                       { help: 'Hanya karyawan PT ini yang belum terhubung ke akun lain.' },
                     )
                   : null}
                 {e.mode === 'linked' || e.mode === 'new' ? (
                   <>
                     {field(`${k}.code`, 'Kode', <input type="text" value={e.code} maxLength={32} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, code: ev.target.value }))} />, { required: true })}
-                    {field(`${k}.name`, 'Nama lengkap', <input type="text" value={e.name} maxLength={128} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, name: ev.target.value }))} />, { required: true })}
+                    {field(`${k}.name`, 'Nama lengkap', <WrapText value={e.name} maxLength={128} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, name: ev.target.value }))} />, { required: true })}
                     {field(`${k}.nickname`, 'Nama panggilan', <input type="text" value={e.nickname} maxLength={64} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, nickname: ev.target.value }))} />)}
-                    {field(`${k}.position`, 'Jabatan', <input type="text" value={e.position} maxLength={128} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, position: ev.target.value }))} />)}
+                    {field(`${k}.position`, 'Jabatan', <WrapText value={e.position} maxLength={128} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, position: ev.target.value }))} />)}
                     {field(`${k}.phone`, 'No. HP', <input type="tel" value={e.phone} maxLength={32} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, phone: ev.target.value }))} />)}
                     {field(
                       `${k}.attendanceType`,
                       'Tipe absensi',
-                      <select value={e.attendanceType} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, attendanceType: ev.target.value === 'non_onsite' ? 'non_onsite' : 'onsite' }))}>
+                      <WrapSelect value={e.attendanceType} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, attendanceType: ev.target.value === 'non_onsite' ? 'non_onsite' : 'onsite' }))}>
                         <option value="onsite">Karyawan OnSite</option>
                         <option value="non_onsite">Karyawan Non-OnSite</option>
-                      </select>,
+                      </WrapSelect>,
                       { help: 'OnSite: absen di semua lokasi terdaftar PT (site, kantor pusat, project, pusat biaya) tanpa penugasan. Non-OnSite (staf kantor): hanya kantor pusat dan kantor cabang.' },
                     )}
                     {field(
                       `${k}.active`,
                       'Status karyawan',
-                      <select value={e.active ? '1' : '0'} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, active: ev.target.value === '1' }))}>
+                      <WrapSelect value={e.active ? '1' : '0'} disabled={locked} onChange={(ev) => patchEmp(c.id, (x) => ({ ...x, active: ev.target.value === '1' }))}>
                         <option value="1">Aktif</option>
                         <option value="0">Nonaktif</option>
-                      </select>,
+                      </WrapSelect>,
                     )}
                   </>
                 ) : null}
@@ -456,41 +458,41 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                           {field(
                             `${p}.bank`,
                             'Bank',
-                            <select value={b.bank ?? ''} disabled={locked} onChange={(ev) => set((x) => ({ ...x, bank: ev.target.value ? Number(ev.target.value) : null }))}>
+                            <WrapSelect value={b.bank ?? ''} disabled={locked} onChange={(ev) => set((x) => ({ ...x, bank: ev.target.value ? Number(ev.target.value) : null }))}>
                               <option value="">– pilih bank –</option>
                               {detail.banks.map((x) => (
                                 <option key={x.id} value={x.id}>
                                   {x.name}
                                 </option>
                               ))}
-                            </select>,
+                            </WrapSelect>,
                             { required: true },
                           )}
                           {field(`${p}.accountNo`, 'Nomor rekening', <input type="text" inputMode="numeric" value={b.accountNo} maxLength={40} disabled={locked} onChange={(ev) => set((x) => ({ ...x, accountNo: ev.target.value }))} />, { required: true, help: 'Hanya angka (5–34 digit).' })}
-                          {field(`${p}.accountHolder`, 'Atas nama', <input type="text" value={b.accountHolder} maxLength={128} disabled={locked} onChange={(ev) => set((x) => ({ ...x, accountHolder: ev.target.value }))} />, { required: true })}
+                          {field(`${p}.accountHolder`, 'Atas nama', <WrapText value={b.accountHolder} maxLength={128} disabled={locked} onChange={(ev) => set((x) => ({ ...x, accountHolder: ev.target.value }))} />, { required: true })}
                           {field(
                             `${p}.verificationStatus`,
                             'Status verifikasi',
-                            <select value={b.verificationStatus} disabled={locked} onChange={(ev) => set((x) => ({ ...x, verificationStatus: ev.target.value === 'verified' ? 'verified' : 'unverified' }))}>
+                            <WrapSelect value={b.verificationStatus} disabled={locked} onChange={(ev) => set((x) => ({ ...x, verificationStatus: ev.target.value === 'verified' ? 'verified' : 'unverified' }))}>
                               <option value="unverified">Belum diverifikasi</option>
                               <option value="verified">Terverifikasi</option>
-                            </select>,
+                            </WrapSelect>,
                           )}
                           {field(
                             `${p}.isDefault`,
                             'Rekening default',
-                            <select value={b.isDefault ? '1' : '0'} disabled={locked} onChange={(ev) => set((x) => ({ ...x, isDefault: ev.target.value === '1' }))}>
+                            <WrapSelect value={b.isDefault ? '1' : '0'} disabled={locked} onChange={(ev) => set((x) => ({ ...x, isDefault: ev.target.value === '1' }))}>
                               <option value="0">Tidak</option>
                               <option value="1">Ya</option>
-                            </select>,
+                            </WrapSelect>,
                           )}
                           {field(
                             `${p}.active`,
                             'Status',
-                            <select value={b.active ? '1' : '0'} disabled={locked} onChange={(ev) => set((x) => ({ ...x, active: ev.target.value === '1' }))}>
+                            <WrapSelect value={b.active ? '1' : '0'} disabled={locked} onChange={(ev) => set((x) => ({ ...x, active: ev.target.value === '1' }))}>
                               <option value="1">Aktif</option>
                               <option value="0">Nonaktif</option>
-                            </select>,
+                            </WrapSelect>,
                           )}
                         </div>
                         {err(p) ? (
@@ -573,26 +575,26 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                           {field(
                             `${p}.kind`,
                             'Jenis lokasi',
-                            <select value={a.kind} disabled={locked} onChange={(ev) => setRow(a.key, (x) => ({ ...x, kind: LOCATION_KINDS.find((k) => k.value === ev.target.value)?.value ?? 'project', location: null }))}>
+                            <WrapSelect value={a.kind} disabled={locked} onChange={(ev) => setRow(a.key, (x) => ({ ...x, kind: LOCATION_KINDS.find((k) => k.value === ev.target.value)?.value ?? 'project', location: null }))}>
                               {LOCATION_KINDS.map((k) => (
                                 <option key={k.value} value={k.value}>
                                   {k.label}
                                 </option>
                               ))}
-                            </select>,
+                            </WrapSelect>,
                             { required: true },
                           )}
                           {field(
                             `${p}.location`,
                             kind.label,
-                            <select value={a.location ?? ''} disabled={locked} onChange={(ev) => setRow(a.key, (x) => ({ ...x, location: ev.target.value ? Number(ev.target.value) : null }))}>
+                            <WrapSelect value={a.location ?? ''} disabled={locked} onChange={(ev) => setRow(a.key, (x) => ({ ...x, location: ev.target.value ? Number(ev.target.value) : null }))}>
                               <option value="">– pilih {kind.label.toLowerCase()} –</option>
                               {c.assignmentChoices[kind.choices].map((x) => (
                                 <option key={x.id} value={x.id}>
                                   {x.code} {x.name}
                                 </option>
                               ))}
-                            </select>,
+                            </WrapSelect>,
                             { required: true, help: c.assignmentChoices[kind.choices].length === 0 ? `Tidak ada ${kind.label.toLowerCase()} aktif di PT ini yang dapat Anda pilih.` : `Hanya ${kind.label.toLowerCase()} aktif PT ini.` },
                           )}
                         </>
@@ -600,13 +602,13 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                       {field(
                         `${p}.roleInProject`,
                         'Peran',
-                        <select value={a.roleInProject} disabled={locked} onChange={(ev) => setRow(a.key, (x) => ({ ...x, roleInProject: ASG_ROLES.find((r) => r.value === ev.target.value)?.value ?? 'staff' }))}>
+                        <WrapSelect value={a.roleInProject} disabled={locked} onChange={(ev) => setRow(a.key, (x) => ({ ...x, roleInProject: ASG_ROLES.find((r) => r.value === ev.target.value)?.value ?? 'staff' }))}>
                           {ASG_ROLES.map((r) => (
                             <option key={r.value} value={r.value}>
                               {r.label}
                             </option>
                           ))}
-                        </select>,
+                        </WrapSelect>,
                         { required: true },
                       )}
                       {a.id === undefined
@@ -671,7 +673,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
               Alasan perubahan
               {needsReason ? <span className="pk-uo__req" aria-hidden="true"> *</span> : null}
             </span>
-            <input type="text" value={draft.reason} maxLength={300} placeholder="mis. mutasi ke CS1 / rekening baru" disabled={busy} required={needsReason} aria-required={needsReason || undefined} aria-invalid={err('reason') ? true : undefined} onChange={(e) => patch((d) => ({ ...d, reason: e.target.value }))} data-pk-reason />
+            <WrapText value={draft.reason} maxLength={300} placeholder="mis. mutasi ke CS1 / rekening baru" disabled={busy} required={needsReason} aria-required={needsReason || undefined} aria-invalid={err('reason') ? true : undefined} onChange={(e) => patch((d) => ({ ...d, reason: e.target.value }))} data-pk-reason />
             {err('reason') ? (
               <span className="err" role="alert" data-pk-error="reason">
                 {err('reason')}
