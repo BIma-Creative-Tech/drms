@@ -460,6 +460,11 @@ class IcLoanDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     final value = ref.watch(icLoanDetailProvider(id));
+    final loaded = value.value;
+    // an older server sends no `destination` on the detail: the queue item's (its readers only)
+    final queued = loaded != null && !loaded.destinationKnown && loaded.readsDestination
+        ? ref.watch(icLoanQueueProvider).value?.items.where((i) => i.id == id).firstOrNull
+        : null;
     return Scaffold(
       appBar: AppBar(title: Text(value.value?.docNo ?? t.icLoanTitle, overflow: TextOverflow.ellipsis)),
       body: RefreshIndicator(
@@ -467,7 +472,7 @@ class IcLoanDetailScreen extends ConsumerWidget {
         child: AsyncBody<IcLoan>(
           value: value,
           onRetry: () => ref.invalidate(icLoanDetailProvider(id)),
-          data: (l) => _IcLoanBody(loan: l),
+          data: (l) => _IcLoanBody(loan: l, queued: queued),
         ),
       ),
       bottomNavigationBar: switch (value) {
@@ -492,8 +497,11 @@ class IcLoanDetailScreen extends ConsumerWidget {
 }
 
 class _IcLoanBody extends ConsumerWidget {
-  const _IcLoanBody({required this.loan});
+  const _IcLoanBody({required this.loan, this.queued});
   final IcLoan loan;
+
+  /// The queue item of this loan — only looked up for an older server's detail without `destination`.
+  final IcLoan? queued;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -535,6 +543,7 @@ class _IcLoanBody extends ConsumerWidget {
       fontWeight: FontWeight.w600,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
+    final destination = icLoanDestinationOf(l, queued: queued);
     final side = switch (l.side) {
       'lender' => t.icLoanSideLender,
       'borrower' => t.icLoanSideBorrower,
@@ -570,6 +579,8 @@ class _IcLoanBody extends ConsumerWidget {
         const SizedBox(height: 8),
         row(t.icLoanLender, l.lender?.label ?? '-', key: const Key('icloan-lender-value')),
         row(t.icLoanBorrower, l.borrower?.label ?? '-', key: const Key('icloan-borrower-value')),
+        if (destination.destination != null)
+          row(t.bankDestination, destination.destination!.text, key: const Key('icloan-destination-value')),
         row(t.icLoanAmount, formatRupiah(l.amount), key: const Key('icloan-amount-value'), style: money),
         if (l.status.active) ...[
           row(t.icLoanRepaid, formatRupiah(l.repaidTotal), key: const Key('icloan-repaid-value'), style: money),
@@ -593,6 +604,8 @@ class _IcLoanBody extends ConsumerWidget {
         if (l.droppedRequestNote != null)
           note(l.droppedRequestNote!, key: const Key('icloan-dropped-request'), color: context.pk.warnText),
         if (l.disburseBlockedByG1) note(t.icLoanG1Blocked, key: const Key('icloan-g1'), color: context.pk.warnText),
+        if (destination.destination == null && destination.known && l.readsDestination)
+          note(t.icLoanDestinationNone, key: const Key('icloan-destination-none'), color: theme.colorScheme.error),
         if (!l.lenderHasReceivingAccount && l.status.active)
           note(
             t.icLoanNoLenderAccount(l.lenderCode),
@@ -696,7 +709,8 @@ class _MovementTile extends StatelessWidget {
 // ---------------------------------------------------------------------------------------------------- disbursement
 
 /// `/intercompany-loans/:id/disburse`: the loan (detail) while the server offers `disburse` to the caller, with the
-/// borrower's receiving account from the disbursement queue when it is loaded.
+/// borrower's receiving account from the detail — from the disbursement queue only for an older server's detail
+/// without `destination` (once the queue has loaded).
 class IcLoanDisburseRoute extends ConsumerWidget {
   const IcLoanDisburseRoute({super.key, required this.id});
   final int id;
@@ -704,9 +718,12 @@ class IcLoanDisburseRoute extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
-    final queued = ref.watch(icLoanQueueProvider).value?.items.where((i) => i.id == id).firstOrNull;
+    final detail = ref.watch(icLoanDetailProvider(id));
+    final queued = detail.value?.destinationKnown == false
+        ? ref.watch(icLoanQueueProvider).value?.items.where((i) => i.id == id).firstOrNull
+        : null;
     return AsyncBody<IcLoan>(
-      value: ref.watch(icLoanDetailProvider(id)),
+      value: detail,
       onRetry: () => ref.invalidate(icLoanDetailProvider(id)),
       data: (loan) {
         if (!loan.allowedActions.contains(IcLoanAction.disburse)) {
@@ -721,7 +738,12 @@ class IcLoanDisburseRoute extends ConsumerWidget {
             ),
           );
         }
-        return IcLoanDisburseScreen(loan: loan, destination: queued?.destination, destinationKnown: queued != null);
+        final destination = icLoanDestinationOf(loan, queued: queued);
+        return IcLoanDisburseScreen(
+          loan: loan,
+          destination: destination.destination,
+          destinationKnown: destination.known,
+        );
       },
     );
   }
@@ -735,7 +757,8 @@ class IcLoanDisburseScreen extends ConsumerStatefulWidget {
   final IcLoan loan;
   final IcLoanDestination? destination;
 
-  /// The queue was loaded: a null [destination] then means "none designated" (the disbursement will be refused).
+  /// The detail carried `destination` (or, from an older server, the queue was loaded): a null [destination] then means
+  /// "none designated" (the disbursement will be refused).
   final bool destinationKnown;
 
   @override

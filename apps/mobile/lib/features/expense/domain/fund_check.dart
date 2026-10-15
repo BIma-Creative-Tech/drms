@@ -47,7 +47,8 @@ abstract class FundCommitmentItem with _$FundCommitmentItem {
   String get label => docNo ?? '#$id';
 }
 
-/// An inter-PT loan instructed for this request (`fundCheck.loans[]`).
+/// An inter-PT loan instructed for this request (`fundCheck.loans[]`). [serverStatusLabel] = the server's `statusLabel`
+/// (web `IC_LOAN_STATUS_LABELS`); absent on a server before 2026-10-15.
 @freezed
 abstract class FundLoanRef with _$FundLoanRef {
   const FundLoanRef._();
@@ -57,13 +58,18 @@ abstract class FundLoanRef with _$FundLoanRef {
     required String status,
     required int amount,
     String? lenderCode,
+    String? serverStatusLabel,
   }) = _FundLoanRef;
 
-  /// Status label of the loan (`loan-rules.ts` IC_LOAN_STATUS_LABELS; the panel sends the code only).
-  String get statusLabel => icLoanStatusLabel(status);
+  /// Status label of the loan: the server's `statusLabel`, else the local map (an older server sends the code only).
+  String get statusLabel {
+    final s = serverStatusLabel?.trim() ?? '';
+    return s.isNotEmpty ? s : icLoanStatusLabel(status);
+  }
 }
 
-/// Labels of the inter-PT loan statuses (web `IC_LOAN_STATUS_LABELS`).
+/// Labels of the inter-PT loan statuses (web `IC_LOAN_STATUS_LABELS`) — the fallback when the server sends no
+/// `statusLabel`.
 String icLoanStatusLabel(String code) => switch (code) {
   'instructed' => 'Menunggu pencairan',
   'disbursed' => 'Dicairkan',

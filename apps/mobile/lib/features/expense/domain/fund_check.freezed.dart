@@ -293,7 +293,7 @@ as String,
 /// @nodoc
 mixin _$FundLoanRef {
 
- int get id; String get docNo; String get status; int get amount; String? get lenderCode;
+ int get id; String get docNo; String get status; int get amount; String? get lenderCode; String? get serverStatusLabel;
 /// Create a copy of FundLoanRef
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -305,20 +305,20 @@ $FundLoanRefCopyWith<FundLoanRef> get copyWith => _$FundLoanRefCopyWithImpl<Fund
 @override
 bool operator ==(Object other) {
   final _this = this as FundLoanRef;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is FundLoanRef&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.docNo, _this.docNo) || other.docNo == _this.docNo)&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.amount, _this.amount) || other.amount == _this.amount)&&(identical(other.lenderCode, _this.lenderCode) || other.lenderCode == _this.lenderCode));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is FundLoanRef&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.docNo, _this.docNo) || other.docNo == _this.docNo)&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.amount, _this.amount) || other.amount == _this.amount)&&(identical(other.lenderCode, _this.lenderCode) || other.lenderCode == _this.lenderCode)&&(identical(other.serverStatusLabel, _this.serverStatusLabel) || other.serverStatusLabel == _this.serverStatusLabel));
 }
 
 
 @override
 int get hashCode {
   final _this = this as FundLoanRef;
-  return Object.hash(runtimeType,_this.id,_this.docNo,_this.status,_this.amount,_this.lenderCode);
+  return Object.hash(runtimeType,_this.id,_this.docNo,_this.status,_this.amount,_this.lenderCode,_this.serverStatusLabel);
 }
 
 @override
 String toString() {
   final _this = this as FundLoanRef;
-  return 'FundLoanRef(id: ${_this.id}, docNo: ${_this.docNo}, status: ${_this.status}, amount: ${_this.amount}, lenderCode: ${_this.lenderCode})';
+  return 'FundLoanRef(id: ${_this.id}, docNo: ${_this.docNo}, status: ${_this.status}, amount: ${_this.amount}, lenderCode: ${_this.lenderCode}, serverStatusLabel: ${_this.serverStatusLabel})';
 }
 
 
@@ -329,7 +329,7 @@ abstract mixin class $FundLoanRefCopyWith<$Res>  {
   factory $FundLoanRefCopyWith(FundLoanRef value, $Res Function(FundLoanRef) _then) = _$FundLoanRefCopyWithImpl;
 @useResult
 $Res call({
- int id, String docNo, String status, int amount, String? lenderCode
+ int id, String docNo, String status, int amount, String? lenderCode, String? serverStatusLabel
 });
 
 
@@ -346,13 +346,14 @@ class _$FundLoanRefCopyWithImpl<$Res>
 
 /// Create a copy of FundLoanRef
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? docNo = null,Object? status = null,Object? amount = null,Object? lenderCode = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? docNo = null,Object? status = null,Object? amount = null,Object? lenderCode = freezed,Object? serverStatusLabel = freezed,}) {
   return _then(FundLoanRef(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,docNo: null == docNo ? _self.docNo : docNo // ignore: cast_nullable_to_non_nullable
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String,amount: null == amount ? _self.amount : amount // ignore: cast_nullable_to_non_nullable
 as int,lenderCode: freezed == lenderCode ? _self.lenderCode : lenderCode // ignore: cast_nullable_to_non_nullable
+as String?,serverStatusLabel: freezed == serverStatusLabel ? _self.serverStatusLabel : serverStatusLabel // ignore: cast_nullable_to_non_nullable
 as String?,
   ));
 }
@@ -438,10 +439,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String docNo,  String status,  int amount,  String? lenderCode)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String docNo,  String status,  int amount,  String? lenderCode,  String? serverStatusLabel)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _FundLoanRef() when $default != null:
-return $default(_that.id,_that.docNo,_that.status,_that.amount,_that.lenderCode);case _:
+return $default(_that.id,_that.docNo,_that.status,_that.amount,_that.lenderCode,_that.serverStatusLabel);case _:
   return orElse();
 
 }
@@ -459,10 +460,10 @@ return $default(_that.id,_that.docNo,_that.status,_that.amount,_that.lenderCode)
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String docNo,  String status,  int amount,  String? lenderCode)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String docNo,  String status,  int amount,  String? lenderCode,  String? serverStatusLabel)  $default,) {final _that = this;
 switch (_that) {
 case _FundLoanRef():
-return $default(_that.id,_that.docNo,_that.status,_that.amount,_that.lenderCode);case _:
+return $default(_that.id,_that.docNo,_that.status,_that.amount,_that.lenderCode,_that.serverStatusLabel);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -479,10 +480,10 @@ return $default(_that.id,_that.docNo,_that.status,_that.amount,_that.lenderCode)
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String docNo,  String status,  int amount,  String? lenderCode)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String docNo,  String status,  int amount,  String? lenderCode,  String? serverStatusLabel)?  $default,) {final _that = this;
 switch (_that) {
 case _FundLoanRef() when $default != null:
-return $default(_that.id,_that.docNo,_that.status,_that.amount,_that.lenderCode);case _:
+return $default(_that.id,_that.docNo,_that.status,_that.amount,_that.lenderCode,_that.serverStatusLabel);case _:
   return null;
 
 }
@@ -494,7 +495,7 @@ return $default(_that.id,_that.docNo,_that.status,_that.amount,_that.lenderCode)
 
 
 class _FundLoanRef extends FundLoanRef {
-  const _FundLoanRef({required this.id, required this.docNo, required this.status, required this.amount, this.lenderCode}): super._();
+  const _FundLoanRef({required this.id, required this.docNo, required this.status, required this.amount, this.lenderCode, this.serverStatusLabel}): super._();
   
 
 @override final  int id;
@@ -502,6 +503,7 @@ class _FundLoanRef extends FundLoanRef {
 @override final  String status;
 @override final  int amount;
 @override final  String? lenderCode;
+@override final  String? serverStatusLabel;
 
 /// Create a copy of FundLoanRef
 /// with the given fields replaced by the non-null parameter values.
@@ -513,18 +515,18 @@ _$FundLoanRefCopyWith<_FundLoanRef> get copyWith => __$FundLoanRefCopyWithImpl<_
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _FundLoanRef&&(identical(other.id, id) || other.id == id)&&(identical(other.docNo, docNo) || other.docNo == docNo)&&(identical(other.status, status) || other.status == status)&&(identical(other.amount, amount) || other.amount == amount)&&(identical(other.lenderCode, lenderCode) || other.lenderCode == lenderCode));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _FundLoanRef&&(identical(other.id, id) || other.id == id)&&(identical(other.docNo, docNo) || other.docNo == docNo)&&(identical(other.status, status) || other.status == status)&&(identical(other.amount, amount) || other.amount == amount)&&(identical(other.lenderCode, lenderCode) || other.lenderCode == lenderCode)&&(identical(other.serverStatusLabel, serverStatusLabel) || other.serverStatusLabel == serverStatusLabel));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,docNo,status,amount,lenderCode);
+    return Object.hash(runtimeType,id,docNo,status,amount,lenderCode,serverStatusLabel);
 }
 
 @override
 String toString() {
-    return 'FundLoanRef(id: $id, docNo: $docNo, status: $status, amount: $amount, lenderCode: $lenderCode)';
+    return 'FundLoanRef(id: $id, docNo: $docNo, status: $status, amount: $amount, lenderCode: $lenderCode, serverStatusLabel: $serverStatusLabel)';
 }
 
 
@@ -535,7 +537,7 @@ abstract mixin class _$FundLoanRefCopyWith<$Res> implements $FundLoanRefCopyWith
   factory _$FundLoanRefCopyWith(_FundLoanRef value, $Res Function(_FundLoanRef) _then) = __$FundLoanRefCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String docNo, String status, int amount, String? lenderCode
+ int id, String docNo, String status, int amount, String? lenderCode, String? serverStatusLabel
 });
 
 
@@ -552,13 +554,14 @@ class __$FundLoanRefCopyWithImpl<$Res>
 
 /// Create a copy of FundLoanRef
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? docNo = null,Object? status = null,Object? amount = null,Object? lenderCode = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? docNo = null,Object? status = null,Object? amount = null,Object? lenderCode = freezed,Object? serverStatusLabel = freezed,}) {
   return _then(_FundLoanRef(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,docNo: null == docNo ? _self.docNo : docNo // ignore: cast_nullable_to_non_nullable
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String,amount: null == amount ? _self.amount : amount // ignore: cast_nullable_to_non_nullable
 as int,lenderCode: freezed == lenderCode ? _self.lenderCode : lenderCode // ignore: cast_nullable_to_non_nullable
+as String?,serverStatusLabel: freezed == serverStatusLabel ? _self.serverStatusLabel : serverStatusLabel // ignore: cast_nullable_to_non_nullable
 as String?,
   ));
 }

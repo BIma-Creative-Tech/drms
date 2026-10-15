@@ -220,6 +220,7 @@ FundCheck? fundCheckFromJson(Object? v) {
             status: '${x['status'] ?? ''}',
             amount: _int(x['amount']),
             lenderCode: _strN(_map(x['lender'])?['shortCode']),
+            serverStatusLabel: _strN(x['statusLabel']),
           ),
     ],
   );

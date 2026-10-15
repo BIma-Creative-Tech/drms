@@ -373,13 +373,19 @@ describe('7a. "Perintahkan pinjaman antar-PT" (Owner)', () => {
     expect((await api('GET', `${IC}/${loanId}`, outsider)).status).toBe(404)
     const fl = await ok(api('GET', `${IC}/${loanId}`, financeL))
     expect(fl.allowedActions).toEqual(['disburse'])
+    // the detail carries the queue item's `destination` for the queue item's readers (Finance of the lender, instructed)
+    expect(fl.destination).toMatchObject({ accountHolder: 'PT Contoh Peminjam Dana', accountNoMasked: expect.stringMatching(/^••••\d{4}$/) })
+    expect(r.destination).toEqual(fl.destination) // the Owner also holds Finance in L (the G1 creator sees the queue item too)
+    expect((await ok(api('GET', `${IC}/${loanId}`, financeM))).destination).toBeNull() // borrower side: not a queue reader
+    expect((await ok(api('GET', `${IC}/${loanId}`, direkturM))).destination).toBeNull()
     expect(fl.requests[0]).toMatchObject({ id: r1, title: null }) // lender side: the number only
     expect((await ok(api('GET', `${IC}/${loanId}`, financeM))).requests[0].title).toMatch(/Pembelian/)
     // linked on the request's panel
-    expect((await ok(api('GET', `${E}/${r1}`, owner))).fundCheck.loans).toEqual([expect.objectContaining({ id: loanId, docNo: loanNo, status: 'instructed' })])
+    expect((await ok(api('GET', `${E}/${r1}`, owner))).fundCheck.loans).toEqual([expect.objectContaining({ id: loanId, docNo: loanNo, status: 'instructed', statusLabel: 'Menunggu pencairan' })])
     const q = await ok(api('GET', `${IC}/queue`, financeL))
     expect(q.count).toBeGreaterThanOrEqual(1)
     expect(q.items.find((i: { id: number }) => i.id === loanId)).toMatchObject({ canDisburse: true, destination: { accountHolder: 'PT Contoh Peminjam Dana' } })
+    expect(q.items.find((i: { id: number }) => i.id === loanId).destination).toEqual(fl.destination) // same helper, same masking
     expect((await ok(api('GET', `${IC}/queue`, owner))).items.find((i: { id: number }) => i.id === loanId)).toMatchObject({ canDisburse: false })
   })
 })
@@ -413,6 +419,7 @@ describe('7b. disbursement (Finance of the lender)', () => {
   it('KK (intercompany, out) in L + automatic KM "Antar PT" in M on its receiving account, paired; status disbursed; Owner told', async () => {
     const r = await ok(api('POST', `${IC}/${loanId}/disburse`, financeL, await disburseBody(financeL), key()))
     expect(r).toMatchObject({ status: 'disbursed', outstanding: 120 * JT })
+    expect(r.destination).toBeNull() // paid: the movement's toAccount shows the account
     const mv = r.movements[0]
     expect(mv).toMatchObject({ kind: 'disbursement', label: 'Pencairan', amount: 120 * JT, status: 'posted', fromCompanyId: L, toCompanyId: M })
     expect(mv.kk.entryNo).toMatch(/^KK\//)
@@ -436,6 +443,7 @@ describe('7b. disbursement (Finance of the lender)', () => {
 
   it('no automatic approval: the request waits for the Owner, who approves AGAIN with a fresh check', async () => {
     expect(await statusOf(r1)).toEqual({ s: 'pending_approval', l: 2 })
+    expect((await ok(api('GET', `${E}/${r1}`, owner))).fundCheck.loans).toEqual([expect.objectContaining({ id: loanId, status: 'disbursed', statusLabel: 'Dicairkan' })])
     const a = await ok(api('POST', `${E}/${r1}/approve`, owner, {}, key()))
     expect(a.status).toBe('approved')
     const row = (await sqlAs('app', "SELECT fund_available::bigint AS a FROM approvals WHERE request_id = $1 AND position = 'approval' AND level = 2", [r1])).rows[0]
@@ -514,7 +522,7 @@ describe('7d. void of the disbursement (Finance of the lender) and cancel (Owner
     expect(v.status).toBe(409)
     expect(v.body).toMatchObject({ code: 'LOAN_VOID_BORROWER_SHORTFALL_CONFIRM_REQUIRED', borrowerCompanyId: M, after: -61 * JT })
     const ok2 = await ok(api('POST', `${IC}/${loanId}/disbursement/void`, financeL, { reason: 'salah rekening', confirmBorrowerShortfall: true }, key()))
-    expect(ok2).toMatchObject({ status: 'instructed', outstanding: 0 })
+    expect(ok2).toMatchObject({ status: 'instructed', outstanding: 0, destination: { accountHolder: 'PT Contoh Peminjam Dana' } }) // waiting again
     expect(ok2.movements[0]).toMatchObject({ kind: 'disbursement', status: 'void' })
     expect((await statusOf(r1)).s).toBe('approved') // approved requests stay approved
     expect((await notes('icloan.disbursement_voided', loanId)).map((x) => x.u)).toEqual(expect.arrayContaining([owner.id, financeM.id]))
@@ -524,7 +532,7 @@ describe('7d. void of the disbursement (Finance of the lender) and cancel (Owner
   it('cancel: Owner only, reason, while waiting; the reservation is released', async () => {
     expect((await api('POST', `${IC}/${loanId}/cancel`, financeL, { reason: 'tidak perlu' }, key())).status).toBe(403)
     const c = await ok(api('POST', `${IC}/${loanId}/cancel`, owner, { reason: 'pengajuan dibiayai dari setoran' }, key()))
-    expect(c).toMatchObject({ status: 'cancelled', cancelReason: 'pengajuan dibiayai dari setoran' })
+    expect(c).toMatchObject({ status: 'cancelled', cancelReason: 'pengajuan dibiayai dari setoran', destination: null })
     expect((await figures(L)).commitments).toBe(0)
     expect((await api('POST', `${IC}/${loanId}/cancel`, owner, { reason: 'lagi' }, key())).status).toBe(409)
   })

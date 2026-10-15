@@ -5,7 +5,13 @@ import 'fixtures.dart';
 /// PTs (DRMS = PT Contoh Dirgantara, LAS = PT Contoh Lestari, MKS = PT Contoh Makmur) and numbers.
 
 /// The request (42, Rp 1.447.500) waits at the Owner level of PT DRMS; DRMS has Rp 1.000.000 available → short Rp 447.500.
-Map<String, dynamic> fundCheckJson({bool blocked = true, bool enabled = true, bool applies = true}) => {
+/// [loanStatusLabel] = the linked loan's server `statusLabel` (null: an older server, the code only).
+Map<String, dynamic> fundCheckJson({
+  bool blocked = true,
+  bool enabled = true,
+  bool applies = true,
+  String? loanStatusLabel = 'Menunggu pencairan',
+}) => {
   'companyId': 1,
   'company': {'id': 1, 'shortCode': 'DRMS', 'name': 'PT Contoh Dirgantara'},
   'enabled': enabled,
@@ -30,6 +36,7 @@ Map<String, dynamic> fundCheckJson({bool blocked = true, bool enabled = true, bo
       'id': 77,
       'docNo': 'PJA/LAS/2610/0002',
       'status': 'instructed',
+      'statusLabel': ?loanStatusLabel,
       'amount': 500000,
       'lender': {'id': 2, 'shortCode': 'LAS'},
     },
@@ -76,8 +83,23 @@ Map<String, dynamic> fundInsufficientProblem() => {
 const _las = {'id': 2, 'shortCode': 'LAS', 'name': 'PT Contoh Lestari'};
 const _drms = {'id': 1, 'shortCode': 'DRMS', 'name': 'PT Contoh Dirgantara'};
 
-/// `IntercompanyLoanDetail` of loan 77 (LAS lends Rp 500.000 to DRMS for request 42).
-Map<String, dynamic> icLoanDetailJson({String status = 'instructed', List<String>? allowed, bool g1 = false}) {
+/// The borrower's (DRMS) designated receiving account as the server sends it (`destination`, masked).
+const icDestinationJson = {
+  'bankName': 'Mandiri',
+  'accountNoMasked': '••••0123',
+  'accountHolder': 'PT Contoh Dirgantara',
+};
+
+const _absent = Object();
+
+/// `IntercompanyLoanDetail` of loan 77 (LAS lends Rp 500.000 to DRMS for request 42). [destination]: omitted = an
+/// older server (no field); null or a map = the server's value.
+Map<String, dynamic> icLoanDetailJson({
+  String status = 'instructed',
+  List<String>? allowed,
+  bool g1 = false,
+  Object? destination = _absent,
+}) {
   final disbursed = status != 'instructed' && status != 'cancelled';
   return {
     'id': 77,
@@ -114,6 +136,7 @@ Map<String, dynamic> icLoanDetailJson({String status = 'instructed', List<String
         'Pinjaman untuk pengajuan Owner sendiri — pencairan oleh Finance PT pemberi (orang kedua yang independen).',
     'droppedRequestNote': null,
     'lenderHasReceivingAccount': true,
+    if (!identical(destination, _absent)) 'destination': destination,
     'requests': [
       {
         'id': 42,
@@ -186,9 +209,7 @@ Map<String, dynamic> icLoanQueueJson() {
       'docNo': 'PJA/LAS/2610/${id.toString().padLeft(4, '0')}',
       'canDisburse': can,
       'g1Note': can ? null : 'Anda yang memerintahkan pinjaman ini — pencairan oleh Finance lain (G1).',
-      'destination': can
-          ? {'bankName': 'Mandiri', 'accountNoMasked': '••••0123', 'accountHolder': 'PT Contoh Dirgantara'}
-          : null,
+      'destination': can ? icDestinationJson : null,
     };
   }
 

@@ -20,8 +20,34 @@ export const IC_LOAN_STATUS_LABELS: Record<IcLoanStatus, string> = {
   cancelled: 'Dibatalkan',
 }
 
+/** Label of a stored status (`IC_LOAN_STATUS_LABELS`, the single source); an unknown code is returned as is. */
+export function icLoanStatusLabel(status: string): string {
+  return (IC_LOAN_STATUS_LABELS as Record<string, string | undefined>)[status] ?? status
+}
+
 /** Derived "Terlambat" (ADR 0029 §3.3). */
 export const IC_OVERDUE_LABEL = 'Terlambat'
+
+/** '1234567890' → '••••7890'; none → null (ADR 0028 §2: the receiving account is shown masked). */
+export function maskIcAccountNo(no: string | null | undefined): string | null {
+  return no ? `••••${no.slice(-4)}` : null
+}
+
+/** `destination` of the queue item and of the loan detail: the borrower's designated receiving account, masked. */
+export type IcLoanDestination = { bankName: string | null; accountNoMasked: string | null; accountHolder: string }
+
+export function icLoanDestination(acc: { bankName: string | null; accountNo: string | null; accountHolder: string } | null): IcLoanDestination | null {
+  return acc ? { bankName: acc.bankName, accountNoMasked: maskIcAccountNo(acc.accountNo), accountHolder: acc.accountHolder } : null
+}
+
+/**
+ * Who reads `destination`: the readers of the disbursement queue item — Finance of the LENDER (the instruction's
+ * creator included: the queue shows it to him with `canDisburse` false) while the loan waits for its disbursement.
+ * Afterwards the movement's `toAccount` shows the account actually paid.
+ */
+export function seesIcLoanDestination(status: IcLoanStatus, financeOfLender: boolean): boolean {
+  return financeOfLender && status === 'instructed'
+}
 
 export const IC_MOVEMENT_KINDS = ['disbursement', 'repayment'] as const
 export type IcMovementKind = (typeof IC_MOVEMENT_KINDS)[number]

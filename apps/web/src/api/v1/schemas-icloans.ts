@@ -25,6 +25,8 @@ const transferAt = z
   .meta({ description: 'Date + time of the bank proof (ISO 8601 with offset, or wall clock in the PAYING PT zone). Not in the future; its date is the movement date (period lock of both PTs).' })
 const companyRef = z.object({ id, shortCode: z.string(), name: z.string() })
 const userRef = z.object({ id, name: z.string().nullable() })
+/** `icLoanDestination` (loan-rules.ts): one shape for the queue item and the loan detail. */
+const destination = z.object({ bankName: z.string().nullable(), accountNoMasked: z.string().nullable(), accountHolder: z.string() }).nullable()
 
 export const IcLoanCreate = z
   .object({
@@ -118,7 +120,7 @@ export const IcLoanQueue = z
       IcLoanSummary.extend({
         canDisburse: z.boolean().meta({ description: 'false for the instruction\'s creator (G1).' }),
         g1Note: z.string().nullable(),
-        destination: z.object({ bankName: z.string().nullable(), accountNoMasked: z.string().nullable(), accountHolder: z.string() }).nullable().meta({ description: 'The borrower\'s designated receiving account (masked); null = none designated (the disbursement answers 409 INTERCOMPANY_NO_ACCOUNT).' }),
+        destination: destination.meta({ description: 'The borrower\'s designated receiving account (masked); null = none designated (the disbursement answers 409 INTERCOMPANY_NO_ACCOUNT).' }),
       }),
     ),
   })
@@ -133,6 +135,10 @@ export const IcLoanDetail = IcLoanSummary.extend({
   ownRequestNote: z.string().nullable(),
   droppedRequestNote: z.string().nullable().meta({ description: 'A linked request was cancelled / rejected while the loan waits ("batalkan perintah bila tidak diperlukan").' }),
   lenderHasReceivingAccount: z.boolean().meta({ description: 'Repayments need the lender\'s designated receiving account.' }),
+  destination: destination.meta({
+    description:
+      'The borrower\'s designated receiving account (masked) — the queue item\'s `destination`, for its readers: Finance of the LENDER while the loan is instructed. null for everyone else, after the disbursement (the movement\'s toAccount shows the account paid) or when none is designated (the disbursement answers 409 INTERCOMPANY_NO_ACCOUNT). Absent on older servers (clients then fall back to the queue).',
+  }),
   requests: z.array(
     z.object({
       id,

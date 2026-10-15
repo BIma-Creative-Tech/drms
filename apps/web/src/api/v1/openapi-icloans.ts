@@ -52,7 +52,8 @@ export function registerIcLoanPaths(registry: OpenAPIRegistry, h: Helpers): void
   registry.registerPath({
     method: 'get',
     path: '/intercompany-loans/{id}',
-    summary: 'Loan detail: movements (Pencairan / Pengembalian ke-n with KK / KM numbers), linked requests, notes, allowed actions (404 for a user of neither PT)',
+    summary:
+      'Loan detail: movements (Pencairan / Pengembalian ke-n with KK / KM numbers), linked requests, notes, allowed actions and — for Finance of the lender while instructed, like the queue item — the borrower\'s receiving account `destination` (masked) (404 for a user of neither PT)',
     security: h.security,
     request: { headers: h.deviceHeader, params: idParam },
     responses: h.res(200, 'Loan', L.IcLoanDetail, [401, 404, 426]),
