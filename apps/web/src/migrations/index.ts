@@ -85,6 +85,7 @@ import * as migration_20261015_100300_d1310_fundcheck_data from './20261015_1003
 import * as migration_20261015_150000_d1510_finance_rule_data from './20261015_150000_d1510_finance_rule_data';
 import * as migration_20261015_200000_d1510_approval_reroute from './20261015_200000_d1510_approval_reroute';
 import * as migration_20261015_210000_d1510_approval_inflight_trim from './20261015_210000_d1510_approval_inflight_trim';
+import * as migration_20261016_100000_d1610_partner_contacts from './20261016_100000_d1610_partner_contacts';
 
 export const migrations = [
   {
@@ -521,5 +522,10 @@ export const migrations = [
     up: migration_20261015_210000_d1510_approval_inflight_trim.up,
     down: migration_20261015_210000_d1510_approval_inflight_trim.down,
     name: '20261015_210000_d1510_approval_inflight_trim',
+  },
+  {
+    up: migration_20261016_100000_d1610_partner_contacts.up,
+    down: migration_20261016_100000_d1610_partner_contacts.down,
+    name: '20261016_100000_d1610_partner_contacts',
   },
 ];

@@ -103,8 +103,9 @@ tanggalnya menentukan periode (tutup buku) — **No. referensi bank**, **Bukti**
 Membayar **invoice vendor** langsung ke **rekening vendor** — tanpa nota per baris, tanpa LPJ dan tanpa selisih;
 invoice adalah buktinya.
 
-1. **Rekening vendor dulu:** Master Data → **Vendor** → buka vendor → tab **Rekening** → tambah rekening (bank, nomor,
-   atas nama, *Rekening default*). Atau Master Data → **Rekening vendor**. Periksa nomor dan nama pemilik lalu ubah
+1. **Rekening vendor dulu:** Master Data → **Vendor** → buka vendor (atau **+ Vendor baru**) → tab **Rekening** →
+   **+ Tambah rekening** (bank, nomor, atas nama, *Rekening default*) → **Simpan** (vendor, rekening dan kontak PIC
+   tersimpan sekaligus, DRMS 16/10). Atau Master Data → **Rekening vendor**. Periksa nomor dan nama pemilik lalu ubah
    **Status verifikasi** menjadi *Terverifikasi* (hanya Finance / Admin). Mengubah nomor / nama / bank wajib dengan
    alasan (tercatat di audit).
 2. **Buat pengajuan:** Keuangan → Pengajuan biaya → Buat baru → **Jenis penerima: Vendor**. Pilih project — atau,

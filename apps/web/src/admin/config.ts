@@ -133,6 +133,19 @@ export const USER_ONBOARDING_ADMIN_VIEWS = {
 }
 
 /**
+ * DRMS 16/10: "Klien" / "Vendor" — ONE tabbed form each (detail + Kontak PIC + Proyek / Rekening) for create
+ * (`/klien/baru`, `/vendor/baru`) and edit / read (`/klien/<id>`, `/vendor/<id>`); entry of the lists and of the "Ubah"
+ * row action (admin/partner-routes.ts). Both routes of a kind render the same view (it reads the segment). Access
+ * checks inside the views + /api/v1/{client,vendor}-form.
+ */
+export const PARTNER_ADMIN_VIEWS = {
+  clientFormNew: { Component: '@/admin/views/Partners#KlienView', path: '/klien/baru' as const, exact: true, meta: { title: 'Klien baru' } },
+  clientForm: { Component: '@/admin/views/Partners#KlienView', path: '/klien/:id' as const, exact: true, meta: { title: 'Klien' } },
+  vendorFormNew: { Component: '@/admin/views/Partners#VendorView', path: '/vendor/baru' as const, exact: true, meta: { title: 'Vendor baru' } },
+  vendorForm: { Component: '@/admin/views/Partners#VendorView', path: '/vendor/:id' as const, exact: true, meta: { title: 'Vendor' } },
+}
+
+/**
  * FR1 (ADR 0020, plan "Web"): field reports per project kind — "Unit & kontrak" (contract list,
  * contract detail with tabs Timesheet/Rekap/Unit/Timeline, unit detail, timesheet input/detail),
  * "Laporan servis" (list/input/detail) and "Aftersales" (weekly recap, activity list/input/detail).

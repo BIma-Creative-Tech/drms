@@ -18,6 +18,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   ↑/↓/Home/End inside, Esc closes and returns focus; rows ≥ 44 px; icon-only **+** ("Buat baru") under 640 px with a
   full-width panel. Staff and Operator panels are unchanged. Web only, no API or schema change.
 
+**DRMS 16/10 owner request — Klien and Vendor as one tabbed page with one save** (owner 2026-10-16: "Dalam pembuatan
+client dan vendor, tanpa harus masuk ke sub menu lain, tab dapat mengakomodir penambahan record yang disesuaikan
+tabnya"). Branch `feat/d1610-partner-forms`. Guide: [admin.md §3b](docs/proyekkas/guides/admin.md).
+
+**Database migration** (schema + backfill, additive, one batch): `20261016_100000_d1610_partner_contacts` (Payload
+snapshot in the `.json`) — tables `clients_contacts` / `vendors_contacts` (array field `contacts`), DELETE granted to
+the app role (Payload rewrites array rows), and every existing single `contact` (+ clients' `phone`) copied into the
+first, primary contact row. The previous image keeps working (it never reads the new tables). Rollback:
+`payload migrate:down` drops the tables (contacts added since are lost; the single columns keep the primary one).
+
+### Added
+
+- **Klien page** `/admin/klien/baru` · `/admin/klien/<id>`: tabs **Detail Klien** · **Kontak PIC** (rows added inline)
+  · **Proyek** (the client's projects the caller can read, with links; **+ Proyek baru** opens the project create form
+  with this client and its PT preselected — field `defaultValue`s from `?client=<id>`, server side, no client-side
+  prefill on mount). ONE "Simpan" → `POST /api/v1/client-form` / `PATCH /api/v1/client-form/{id}` (one transaction).
+- **Vendor page** `/admin/vendor/baru` · `/admin/vendor/<id>`: tabs **Detail Vendor** · **Rekening** (vendor bank
+  accounts added / changed inline: bank, number, holder, default — exclusive —, verification, active; same rules as
+  Rekening vendor: Admin / Finance of the PT, verification Admin / Finance, reason on a changed number / holder / bank
+  and on deactivation) · **Kontak PIC**. ONE "Simpan" → `POST /api/v1/vendor-form` / `PATCH /api/v1/vendor-form/{id}`:
+  vendor, contacts and accounts in one transaction (a refused account rolls the vendor back too).
+- **Kontak PIC** (both): many contact persons — nama (required), jabatan, No. HP, email, catatan, utama (exactly one
+  primary). Array field `contacts` on Clients / Vendors.
+- API (additive, web): `GET /api/v1/client-form` and `GET /api/v1/vendor-form` (form data of a new record: the PTs the
+  caller may create in), `GET …/{id}` (record + contacts + projects / bank accounts + whether the caller may save).
+  OpenAPI regenerated.
+- The form component (`admin/components/partners/PartnerForm.tsx`: `ClientForm` / `VendorForm`) also renders inside a
+  drawer: `mode`, `onSaved(id, detail)` instead of navigation, `onCancel`, `initialCompany`; `PartnerFormLoader`
+  (`kind`, `id` or null) loads its data from the GET endpoints itself — the entry for the coming quick-create "+" beside
+  relationship pickers (Payload's own relationship drawer keeps the plain collection form).
+
+### Changed
+
+- Lists **Klien** / **Vendor**: "+ Buat baru", row click and the **Ubah** / **Lihat** row action open the tabbed page
+  (read-only for readers without the update right, e.g. PM, Finance on clients). Menu items **+ Klien baru** (Proyek ›
+  Data pendukung; Admin / Direktur) and **+ Vendor baru** (Master Data; Admin / Finance).
+- The single **Kontak** / **No. HP** columns stay (list columns, APK masters, Odoo mirror) and are now derived from the
+  primary contact (read-only in Payload's form); a write that sends only them (seed, import, old REST clients) updates
+  or creates the primary contact instead.
+- Vendors: the Payload tabs + `join` list of the bank accounts are removed (the tabbed page replaces them; no column).
+
 ### Changed
 - **Admin loader blocks input (DRMS 16/10 #2).** From the first moment of a navigation or a save, a transparent shield
   over the whole page absorbs clicks and Enter / Space until the loader hides (dots still after 180 ms; released by the
