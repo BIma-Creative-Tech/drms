@@ -311,7 +311,18 @@ export const FundCheck = z
     commitmentItems: z
       .array(z.object({ kind: z.enum(['request', 'shortfall', 'loan']), id, docNo: z.string().nullable(), amount: rupiah, status: z.string() }))
       .meta({ description: 'The commitments behind the figure, largest first (max 20). kind loan: id = the inter-PT loan.' }),
-    loans: z.array(z.object({ id, docNo: z.string(), status: z.string(), amount: rupiah, lender: z.object({ id, shortCode: z.string() }).nullable() })).meta({ description: 'Inter-PT loans instructed for this request (linked).' }),
+    loans: z
+      .array(
+        z.object({
+          id,
+          docNo: z.string(),
+          status: z.string(),
+          statusLabel: z.string().meta({ description: 'Indonesian label of `status` (instructed | disbursed | partially_repaid | repaid | cancelled), the labels of GET /intercompany-loans: Menunggu pencairan | Dicairkan | Sebagian dikembalikan | Lunas | Dibatalkan.' }),
+          amount: rupiah,
+          lender: z.object({ id, shortCode: z.string() }).nullable(),
+        }),
+      )
+      .meta({ description: 'Inter-PT loans instructed for this request (linked).' }),
   })
   .meta({ id: 'FundCheck' })
 

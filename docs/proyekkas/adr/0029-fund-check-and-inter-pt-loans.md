@@ -703,6 +703,13 @@ Ringkas, masing-masing dengan usulan default (dipakai bila owner setuju / tidak 
   is `GET /cash-accounts/balances?company=<lender>` filtered to active accounts **without a site** (`siteId`, now parsed),
   the server's rule for loan movements. The borrower's receiving account comes from the queue item (`destination`);
   the loan detail does not carry it, so a form opened from a notification shows it only once the queue has loaded.
+  *Closed in `fix/d1310-c-loan-api`, see the next item.*
+- **API gaps closed (`fix/d1310-c-loan-api`, 2026-10-15):** the loan detail carries `destination` (same shape, same
+  helper `icLoanDestination` and masking as the queue item, same readers — Finance of the lender while instructed,
+  `seesIcLoanDestination`; `null` otherwise), so the APK's disbursement form and loan detail take it from the detail and
+  read the queue only when the field is absent (an older server). `fundCheck.loans[]` carries `statusLabel`
+  (`icLoanStatusLabel` over `IC_LOAN_STATUS_LABELS`; list / detail / queue items already had it); the APK prefers it
+  and keeps its local map as the fallback.
 - **Not in the APK (this phase, as decided):** cancel of an instruction, repayments, both voids, the loans list and
   report, the fund-availability page and the company switch.
 

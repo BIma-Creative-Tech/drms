@@ -8,6 +8,7 @@ import { companyRefs, membersWithRole } from '@/domain/companies'
 import { isNoApproval, isNoApprovalRule } from '@/domain/expense/decision'
 import { lastLevel, type ApprovalSnapshot } from '@/domain/expense/rules'
 import { loadActiveRules } from '@/domain/expense/snapshot'
+import { icLoanStatusLabel } from '@/domain/intercompany/loan-rules'
 import { notificationTemplate, pushEnabled } from '@/domain/notifications'
 import { formatRupiah } from '@/lib/money'
 import { getRequestTx } from '@/lib/tx'
@@ -215,7 +216,8 @@ export type FundPanel = {
   excludedSiteAccounts: { count: number; balance: number }
   waitingAtOwner: { count: number; amount: number }
   commitmentItems: CommitmentItem[]
-  loans: Array<{ id: number; docNo: string; status: string; amount: number; lender: { id: number; shortCode: string } | null }>
+  /** `statusLabel` from `IC_LOAN_STATUS_LABELS` (the loan list / detail / queue use the same labels). */
+  loans: Array<{ id: number; docNo: string; status: string; statusLabel: string; amount: number; lender: { id: number; shortCode: string } | null }>
 }
 
 /** Is a Draft the Owner's own request that will go straight to Finance (checked at submit)? */
@@ -240,7 +242,7 @@ async function loansOfRequest(req: PayloadRequest, requestId: number): Promise<F
   const refs = new Map((await companyRefs(req, r.rows.map((x) => Number(x.lender_company_id)))).map((c) => [c.id, c]))
   return r.rows.map((x) => {
     const c = refs.get(Number(x.lender_company_id))
-    return { id: Number(x.id), docNo: x.doc_no, status: x.status, amount: n(x.amount), lender: c ? { id: c.id, shortCode: c.shortCode } : null }
+    return { id: Number(x.id), docNo: x.doc_no, status: x.status, statusLabel: icLoanStatusLabel(x.status), amount: n(x.amount), lender: c ? { id: c.id, shortCode: c.shortCode } : null }
   })
 }
 

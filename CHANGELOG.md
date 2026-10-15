@@ -73,6 +73,14 @@ lend or borrow designates its **Rekening penerimaan antar-PT** (ADR 0028) first.
     `LOAN_VOID_BORROWER_SHORTFALL_CONFIRM_REQUIRED`, `LOAN_REPAYMENT_EXCEEDS_OUTSTANDING`, `INTERCOMPANY_NO_ACCOUNT`,
     `INTERCOMPANY_PERIOD_CLOSED`) in Indonesian. `/me` capabilities `instructIntercompanyLoan`,
     `disburseIntercompanyLoan`, `fundCheckEnabled` parsed per PT.
+- **Loan API gaps closed** (additive; older APKs ignore the new fields): `GET /intercompany-loans/{id}` (and every loan
+  action's answer) carries **`destination`** — the borrower's designated receiving account, masked, with the queue
+  item's shape, helper and readers (Finance of the lender while the loan is instructed; `null` for everyone else, after
+  the disbursement, or when none is designated). `fundCheck.loans[]` carries **`statusLabel`** next to `status`
+  (`IC_LOAN_STATUS_LABELS`, the labels of the loan list / detail / queue). The APK shows the receiving account on the
+  loan detail and in "Catat pencairan" straight from the detail (a form opened from a notification no longer waits for
+  the queue; the queue item only for an older server) and prefers the server's loan `statusLabel` (its local labels as
+  the fallback).
 
 ## [0.10.1] - 2026-10-14
 

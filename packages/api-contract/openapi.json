@@ -2444,6 +2444,10 @@
                     "status": {
                       "type": "string"
                     },
+                    "statusLabel": {
+                      "type": "string",
+                      "description": "Indonesian label of `status` (instructed | disbursed | partially_repaid | repaid | cancelled), the labels of GET /intercompany-loans: Menunggu pencairan | Dicairkan | Sebagian dikembalikan | Lunas | Dibatalkan."
+                    },
                     "amount": {
                       "type": "integer",
                       "minimum": 0,
@@ -2473,6 +2477,7 @@
                     "id",
                     "docNo",
                     "status",
+                    "statusLabel",
                     "amount",
                     "lender"
                   ]
@@ -18145,6 +18150,35 @@
             "type": "boolean",
             "description": "Repayments need the lender's designated receiving account."
           },
+          "destination": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "bankName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "accountNoMasked": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "accountHolder": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "bankName",
+              "accountNoMasked",
+              "accountHolder"
+            ],
+            "description": "The borrower's designated receiving account (masked) — the queue item's `destination`, for its readers: Finance of the LENDER while the loan is instructed. null for everyone else, after the disbursement (the movement's toAccount shows the account paid) or when none is designated (the disbursement answers 409 INTERCOMPANY_NO_ACCOUNT). Absent on older servers (clients then fall back to the queue)."
+          },
           "requests": {
             "type": "array",
             "items": {
@@ -18489,6 +18523,7 @@
           "ownRequestNote",
           "droppedRequestNote",
           "lenderHasReceivingAccount",
+          "destination",
           "requests",
           "movements",
           "allowedActions",
@@ -44782,7 +44817,7 @@
     },
     "/intercompany-loans/{id}": {
       "get": {
-        "summary": "Loan detail: movements (Pencairan / Pengembalian ke-n with KK / KM numbers), linked requests, notes, allowed actions (404 for a user of neither PT)",
+        "summary": "Loan detail: movements (Pencairan / Pengembalian ke-n with KK / KM numbers), linked requests, notes, allowed actions and — for Finance of the lender while instructed, like the queue item — the borrower's receiving account `destination` (masked) (404 for a user of neither PT)",
         "security": [
           {
             "bearer": []

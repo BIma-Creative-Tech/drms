@@ -29,14 +29,17 @@ import {
   IC_LOAN_STATUS_LABELS,
   IC_OVERDUE_LABEL,
   icLoanAllowedActions,
+  icLoanDestination,
   isOverdue,
   LOAN_HAS_REPAYMENTS,
   LOAN_LENDER_INSUFFICIENT,
   LOAN_REPAYMENT_EXCEEDS_OUTSTANDING,
   LOAN_VOID_BORROWER_SHORTFALL_CONFIRM_REQUIRED,
+  maskIcAccountNo,
   outstandingOf,
   plusDays,
   renderLoanText,
+  seesIcLoanDestination,
   statusAfterRepayments,
   type IcLoanAction,
   type IcLoanEvent,
@@ -320,8 +323,6 @@ function actorOf(req: PayloadRequest, l: IcLoan) {
   }
 }
 
-const mask = (no: string | null | undefined) => (no ? `••••${no.slice(-4)}` : null)
-
 /** GET /intercompany-loans/{id} — the loan, its movements, the linked requests, notes and the caller's actions. */
 export async function icLoanDetail(req: PayloadRequest, l: IcLoan) {
   const refs = await refsOf(req, [l.lenderId, l.borrowerId])
@@ -359,7 +360,7 @@ export async function icLoanDetail(req: PayloadRequest, l: IcLoan) {
       toCompanyId: Number(m.to_company_id),
       // the paying PT's account by name for its own people; the receiving account masked (ADR 0028 §2)
       fromAccount: payerSide ? { id: Number(m.from_cash_account_id), name: m.from_name } : null,
-      toAccount: { name: receiverSide ? m.to_name : null, accountNoMasked: mask(m.to_no) },
+      toAccount: { name: receiverSide ? m.to_name : null, accountNoMasked: maskIcAccountNo(m.to_no) },
       // KK / KM numbers (counterpart numbers are shown, like ADR 0028); ids only for the Kas roles of that entry's PT
       kk: m.kk_id ? { id: hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], Number(m.from_company_id)) ? Number(m.kk_id) : null, entryNo: m.kk_no } : null,
       km: m.km_id ? { id: hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], Number(m.to_company_id)) ? Number(m.km_id) : null, entryNo: m.km_no } : null,
@@ -371,6 +372,9 @@ export async function icLoanDetail(req: PayloadRequest, l: IcLoan) {
     }
   })
   const lenderAccount = await designatedAccount(req, l.lenderId)
+  // the queue item's destination, for the queue item's readers (Finance of the lender while it waits) — a disbursement
+  // form opened from a notification needs no queue
+  const destination = seesIcLoanDestination(l.status, a.financeLender) ? icLoanDestination(await designatedAccount(req, l.borrowerId)) : null
   return {
     ...summaryOf(req, l, refs, names, todayStr),
     snapshot: l.snapshot,
@@ -382,6 +386,7 @@ export async function icLoanDetail(req: PayloadRequest, l: IcLoan) {
     droppedRequestNote:
       dropped.length > 0 && l.status === 'instructed' ? `Pengajuan terkait ${dropped.map((r) => r.doc_no ?? `#${r.id}`).join(', ')} dibatalkan / ditolak — batalkan perintah bila tidak diperlukan.` : null,
     lenderHasReceivingAccount: lenderAccount !== null,
+    destination,
     // linked requests of the borrower PT: number for everyone who reads the loan; title / status for the borrower's people
     requests: reqs.map((r) => ({
       id: Number(r.id),
@@ -448,13 +453,14 @@ export async function icLoanQueue(req: PayloadRequest, f: { companyIds?: readonl
   const uid = userId(req)
   const items = []
   for (const l of loans) {
+    // every item is instructed with a lender where the caller is Finance: seesIcLoanDestination holds by construction
     const acc = await designatedAccount(req, l.borrowerId)
     items.push({
       ...summaryOf(req, l, refs, names, todayStr),
       canDisburse: uid !== l.createdBy,
       g1Note: uid === l.createdBy ? 'Anda yang memerintahkan pinjaman ini — pencairan oleh Finance lain (G1).' : null,
       // the destination: the borrower's designated receiving account (masked, ADR 0028 §2)
-      destination: acc ? { bankName: acc.bankName, accountNoMasked: mask(acc.accountNo), accountHolder: acc.accountHolder } : null,
+      destination: icLoanDestination(acc),
     })
   }
   return { items, count: items.length }
