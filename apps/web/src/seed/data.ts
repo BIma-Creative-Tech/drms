@@ -132,6 +132,13 @@ export const VENDOR_FINANCE_RULE_NAME = 'Pembayaran vendor oleh Finance — Dire
  */
 export const INTERCOMPANY_FINANCE_RULE_NAME = 'Pembayaran antar-PT oleh Finance — Direktur lalu Owner'
 
+/**
+ * Owner decision 2026-10-15: Finance's OWN employee request (Jenis penerima = Karyawan; Reimburse and Pengajuan Baru)
+ * → Direktur → Owner → Finance transfer, without the PM project step (the vendor / PT grup rules already have that shape).
+ * Also inserted per PT by migration 20261015_150000_d1510_finance_rule_data.
+ */
+export const FINANCE_RULE_NAME = 'Pengajuan Finance — Direktur lalu Owner'
+
 export const DEFAULT_APPROVAL_RULES = [
   {
     // ADR 0021 (owner decision 2026-10-10): Staff → PM project ("Diketahui" = Persetujuan PM) → Direktur;
@@ -187,6 +194,27 @@ export const DEFAULT_APPROVAL_RULES = [
     signDiajukan: 'required',
     signDibuat: 'required',
     steps: [{ level: 1, approverRole: 'pk-principal' }],
+    active: true,
+  },
+  {
+    // Owner decision 2026-10-15: Finance's own employee request (Reimburse + Pengajuan Baru) → Direktur → Owner, no PM step.
+    name: FINANCE_RULE_NAME,
+    docType: 'expense_request',
+    requestType: 'any',
+    payeeType: 'karyawan',
+    minAmount: 0,
+    maxAmount: null,
+    priority: 20,
+    requesterRoles: ['pk-finance'],
+    acknowledge: 'none',
+    acknowledgeBy: 'role',
+    acknowledgeRole: null,
+    signDiajukan: 'required',
+    signDibuat: 'required',
+    steps: [
+      { level: 1, approverRole: 'pk-owner' },
+      { level: 2, approverRole: 'pk-principal' },
+    ],
     active: true,
   },
   {

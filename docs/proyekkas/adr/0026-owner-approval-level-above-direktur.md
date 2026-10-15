@@ -171,3 +171,16 @@ and §5 ("rule names unchanged", "request rows are not touched") for that case o
   moved (a decision taken in the new flow is not undone — rollback = restore the pre-migration dump).
 - Preview: `payload run src/reroute/cli.ts -- --dry-run` (exact, read-only) and `src/reroute/preview.sql` (psql);
   runbook `docs/proyekkas/runbooks/alur-persetujuan-2026-10-15.md`.
+
+## Amendment 2026-10-15 — Finance's own requests skip the PM project
+
+Owner decision 2026-10-15: a request **filed by Finance for himself** (Jenis penerima = Karyawan; Reimburse and Pengajuan
+Baru) follows **Finance → Direktur → Owner → Finance (transfer instruction only)**, like the Finance vendor / PT grup
+rules (ADR 0027 / 0028) — no PM project step. Seeded rule **"Pengajuan Finance — Direktur lalu Owner"** (Peran pemohon
+= Finance, Jenis penerima = Karyawan, any request type, no "Diketahui", L1 Direktur, L2 Owner, priority 20) in
+`seed/data.ts` (`FINANCE_RULE_NAME`, also copied to new PTs) and per existing PT by the data migration
+`20261015_150000_d1510_finance_rule_data` (skipped where an active Karyawan rule for Finance requesters already exists).
+Unchanged: a requester who is also Direktur → "Pengajuan Direktur" (priority 10), the Owner → "Pengajuan Owner" (5); a
+request with several requesters takes the rule only when every requester holds Finance. Submitted requests keep their
+snapshot (the 2026-10-15 re-route, migration `…_200000_d1510_approval_reroute`, runs after this one and therefore
+re-routes a pending Finance request to this rule). Test: `tests/unit/d1510-finance-rule.test.ts`.
