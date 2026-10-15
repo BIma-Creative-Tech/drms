@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **"+ Buat" in the top bar (DRMS 16/10, owner request 2026-10-16, "konsep no. 1").** Admin, Direktur (and Owner),
+  PM and Finance of the selected PT get a **+ Buat** button left of the PT switcher. It opens a menu of the create
+  pages the user may actually use, grouped Keuangan · Proyek · Klien & vendor · Pengguna & karyawan: Pengajuan baru,
+  Pembayaran vendor (request form with Jenis penerima = Vendor preset, Finance / PM), Kas masuk / Kas keluar (Finance),
+  Proyek baru, Laporan harian (PTs with field reports), Addendum RAB (PM), Klien baru, Vendor baru, Pengguna baru (the
+  tabbed Pengguna form, Admin) and Karyawan baru. Items follow Payload's create permission + hidden collections and the
+  role rules of the custom views (`src/admin/shell/quick-create.ts`). Keyboard: **Alt+N** opens it (not while typing),
+  ↑/↓/Home/End inside, Esc closes and returns focus; rows ≥ 44 px; icon-only **+** ("Buat baru") under 640 px with a
+  full-width panel. Staff and Operator panels are unchanged. Web only, no API or schema change.
+
 ## [0.12.0] - 2026-10-15
 
 **DRMS 15/10 owner feedback: UI fixes, Pengguna with Penugasan in one form, and approval flow PM project → Direktur →

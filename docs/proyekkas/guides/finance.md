@@ -8,6 +8,7 @@ Direktur untuk diverifikasi notanya (Reimburse) dan ditransfer. Sebagian besar d
 
 Modul web (layar modul `/admin`): **Persetujuan** (Persetujuan · Antrian Transfer · Verifikasi LPJ) · **Keuangan** (Pengajuan · Kas · Transfer & LPJ · Tutup buku) · **Laporan** · **Sistem** (Audit Log) · **Dashboard** · …
 Badge merah di menu = jumlah pekerjaan menunggu.
+Tombol **+ Buat** di bar atas (pintasan **Alt+N**) langsung membuka: Pengajuan baru, **Pembayaran vendor** (Jenis penerima sudah Vendor), **Kas masuk**, **Kas keluar** dan Vendor baru.
 
 ![TODO screenshot: Beranda web Finance](img/finance-beranda.png)
 

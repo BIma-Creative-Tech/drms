@@ -5,6 +5,7 @@ Peran **Owner** (sejak 13 Okt 2026, keputusan owner, ADR 0026) adalah satu tingk
 tutup buku) di setiap PT tempat Anda diberi peran Owner. Yang berbeda hanya **alur persetujuan pengajuan biaya**: Anda
 memberi **persetujuan terakhir** sebelum Finance mentransfer. Baca juga [Panduan Direktur](direktur.md) (semua menu
 Direktur berlaku untuk Anda) dan [Hal umum](README.md#hal-umum-untuk-semua-peran).
+Tombol **+ Buat** di bar atas sama dengan milik Direktur.
 
 ## 1. Persetujuan Owner
 
