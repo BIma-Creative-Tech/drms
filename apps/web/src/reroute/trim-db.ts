@@ -123,6 +123,9 @@ async function guardOff(db: Exec): Promise<void> {
 async function guardOn(db: Exec): Promise<void> {
   await db.execute(sql`SET CONSTRAINTS ALL IMMEDIATE`)
   await db.execute(sql`ALTER TABLE expense_requests ENABLE TRIGGER expense_requests_guard`)
+  // back to deferred (as `forceDeferredChecks`): a Payload update deletes + re-inserts the request's relationship rows,
+  // the frozen-content check must see the end state; the final IMMEDIATE of `applyInflightTrim` flushes them
+  await db.execute(sql`SET CONSTRAINTS ALL DEFERRED`)
 }
 
 async function writeTrim(db: Exec, p: TrimPlan, extra: Record<string, unknown> = {}): Promise<void> {
