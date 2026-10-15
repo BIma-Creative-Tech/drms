@@ -9,32 +9,39 @@ import { CTX_KC_NEW_USER, CTX_TEMP_PASSWORD } from '@/domain/users-sync'
 import { isDbGuardError, pgCode } from '@/lib/pg-error'
 
 import {
+  assignmentPatch,
   changedFields,
   errorPath,
   generateTemporaryPassword,
   membershipChange,
   normalizeAccountNo,
+  ownerAfterSave,
+  savedAssignmentErrors,
   selfGuardErrors,
   validateOnboarding,
+  type AssignmentInput,
   type BankAccountInput,
   type CompanyInput,
   type EmployeeInput,
   type FieldError,
   type OnboardingInput,
+  type StoredAssignment,
   type StoredCompany,
 } from './rules'
 
 /**
  * DRMS 13/10 Wave 3 — "Pengguna" tabbed onboarding (ADR 0003 revision 2026-10-13): load and save the account, its
- * access per PT, the employee of each PT and that employee's bank accounts in ONE transaction (the caller — the
- * endpoint — owns it and compensates Keycloak on failure).
+ * access per PT, the employee of each PT, that employee's bank accounts and (DRMS 15/10) its team assignments in ONE
+ * transaction (the caller — the endpoint — owns it and compensates Keycloak on failure).
  *
  * Every write goes through the existing collections with the CALLER's access (`overrideAccess: false`): Users
  * (create = Admin; identity update = accounts only in the caller's Admin PTs, Keycloak-first sync + deactivation
  * cascade in users-sync.ts), company-memberships (Admin of THAT PT or group admin; same-PT employee; audit
  * `role_change`), employees (Admin of the PT; per-PT code; `reasonOnDeactivate`), employee-bank-accounts (Admin /
- * Finance; verification status Admin / Finance; reason on number / holder / bank change). Nothing here bypasses
- * them; the checks below only answer earlier and name the field. Reads are SYSTEM-READs only where noted.
+ * Finance; verification status Admin / Finance; reason on number / holder / bank change), team-assignments (Admin /
+ * PM of the PT; PT from the employee; exactly one location; end ≥ start; a PM only for its team and never role pm;
+ * reason on role / end-date change; no delete). Nothing here bypasses them; the checks below only answer earlier and
+ * name the field. Reads are SYSTEM-READs only where noted.
  */
 
 export class OnboardingError extends Error {
@@ -56,14 +63,30 @@ export type OnboardingCompany = {
   employee: { id: number; code: string; name: string; nickname: string | null; position: string | null; phone: string | null; attendanceType: AttendanceType; active: boolean } | null
   bankAccounts: Array<{ id: number; bank: number | null; bankName: string | null; accountNo: string; accountHolder: string; isDefault: boolean; verificationStatus: 'unverified' | 'verified'; active: boolean }>
   employeeChoices: Array<{ id: number; code: string; name: string; active: boolean }>
-  assignments: Array<{ id: number; label: string; roleInProject: string; startDate: string | null; endDate: string | null }>
+  canManageAssignments: boolean
+  assignments: Array<{ id: number; kind: LocationKind | null; label: string; roleInProject: string; startDate: string | null; endDate: string | null }>
+  /** Locations of a NEW assignment: active records of this PT the caller can read. */
+  assignmentChoices: Record<'projects' | 'costCenters' | 'sites', LocationChoice[]>
 }
+
+export type LocationKind = 'project' | 'costCenter' | 'site'
+export type LocationChoice = { id: number; code: string; name: string }
 
 export type OnboardingDetail = {
   user: { id: number; email: string; name: string | null; phone: string | null; active: boolean; groupAdmin: boolean; identityEditable: boolean } | null
   companies: OnboardingCompany[]
   banks: Array<{ id: number; name: string }>
 }
+
+/** Project statuses that take no new assignment (the picker and the save agree). */
+const CLOSED_PROJECT = ['selesai', 'arsip'] as const
+
+/** The three locations of a team assignment (exactly one per row — TeamAssignments guard + DB CHECK). */
+const LOCATIONS = [
+  { key: 'project', collection: 'projects', label: 'Project' },
+  { key: 'costCenter', collection: 'cost-centers', label: 'Pusat biaya' },
+  { key: 'site', collection: 'sites', label: 'Site' },
+] as const satisfies ReadonlyArray<{ key: LocationKind; collection: CollectionSlug; label: string }>
 
 /** Who may use the form: the same as the Akses PT matrix (Admin of a PT or group admin). */
 export function onboardingViewer(req: Pick<PayloadRequest, 'user'>): Viewer {
@@ -156,10 +179,16 @@ export async function loadUserOnboarding(req: PayloadRequest, userId: number | n
 
   const mine = cells.filter((c) => userId !== null && c.user === userId)
   const linked = mine.map((c) => c.employee).filter((e): e is number => e !== null)
-  const [accountsRes, assignRes] = await Promise.all([
+  const [accountsRes, assignRes, projectsRes, costCentersRes, sitesRes] = await Promise.all([
     linked.length ? req.payload.find({ collection: 'employee-bank-accounts', where: { employee: { in: linked } }, sort: 'id', pagination: false, select: { employee: true, bank: true, accountNo: true, accountHolder: true, isDefault: true, verificationStatus: true, active: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
     linked.length ? req.payload.find({ collection: 'team-assignments', where: { employee: { in: linked } }, sort: '-startDate', pagination: false, ...asCaller, overrideAccess: false, depth: 1 }) : { docs: [] },
+    // DRMS 15/10: locations of a new assignment — the caller's own read access (a PM reads its team's only)
+    colIds.length ? req.payload.find({ collection: 'projects', where: { and: [{ company: { in: colIds } }, { status: { not_in: [...CLOSED_PROJECT] } }] }, sort: 'code', pagination: false, select: { code: true, name: true, company: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
+    colIds.length ? req.payload.find({ collection: 'cost-centers', where: { and: [{ company: { in: colIds } }, { active: { not_equals: false } }] }, sort: 'code', pagination: false, select: { code: true, name: true, company: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
+    colIds.length ? req.payload.find({ collection: 'sites', where: { and: [{ company: { in: colIds } }, { active: { not_equals: false } }] }, sort: 'code', pagination: false, select: { code: true, name: true, company: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
   ])
+  const choicesOf = (docs: unknown[], company: number): LocationChoice[] =>
+    (docs as Row[]).filter((d) => relId(d.company) === company).map((d) => ({ id: d.id as number, code: str(d.code), name: str(d.name) }))
 
   return {
     user,
@@ -167,6 +196,7 @@ export async function loadUserOnboarding(req: PayloadRequest, userId: number | n
     companies: companies.map((c) => {
       const m = mine.find((x) => x.company === c.id) ?? null
       const emp = m?.employee != null ? (employees.find((e) => e.id === m.employee) ?? null) : null
+      const canManageAssignments = hasRole(req, ['pk-admin', 'pk-pm'], c.id)
       return {
         id: c.id,
         shortCode: c.shortCode,
@@ -189,17 +219,22 @@ export async function loadUserOnboarding(req: PayloadRequest, userId: number | n
               }))
           : [],
         employeeChoices: employeeChoices(employees, cells, c.id, userId ?? -1, emp?.id ?? null).map((e) => ({ id: e.id, code: e.code, name: e.name, active: e.active })),
+        canManageAssignments,
         assignments: emp
           ? (assignRes.docs as unknown as Row[])
               .filter((a) => relId(a.employee) === emp.id)
               .map((a) => ({
                 id: a.id as number,
+                kind: LOCATIONS.find((l) => relId(a[l.key]) !== undefined)?.key ?? null,
                 label: [a.project, a.costCenter, a.site].map((x) => (x && typeof x === 'object' ? str((x as Row).name) : '')).find((x) => x !== '') ?? '—',
                 roleInProject: str(a.roleInProject),
                 startDate: strOrNull(a.startDate),
                 endDate: strOrNull(a.endDate),
               }))
           : [],
+        assignmentChoices: canManageAssignments
+          ? { projects: choicesOf(projectsRes.docs, c.id), costCenters: choicesOf(costCentersRes.docs, c.id), sites: choicesOf(sitesRes.docs, c.id) }
+          : { projects: [], costCenters: [], sites: [] },
       }
     }),
   }
@@ -283,8 +318,15 @@ export async function saveUserOnboarding(req: PayloadRequest, input: OnboardingI
     }
   }
 
+  // saved assignments named in the body, read with the caller's access (unreadable = not found, like other refs)
+  const storedAssignments = await loadStoredAssignments(req, companies)
+  const missing = companies.flatMap((c, i) => (c.assignments ?? []).flatMap((a, j) => (a.id !== undefined && !storedAssignments.has(a.id) ? [{ path: `companies.${i}.assignments.${j}`, message: 'Penugasan tidak ditemukan.' }] : [])))
+  if (missing.length) throw new OnboardingError(404, 'Penugasan tidak ditemukan.', missing)
+
   const errors = validateOnboarding(input, mode, stored)
   if (userId !== null && userId === callerId(req)) errors.push(...selfGuardErrors(input, stored))
+  const owners = new Map(companies.map((c) => [c.company, ownerAfterSave(c.employee, stored.get(c.company)?.employee ?? null)] as const))
+  if (!errors.length) errors.push(...savedAssignmentErrors(input, storedAssignments, owners))
   if (errors.length) throw new OnboardingError(400, errors.map((e) => e.message).filter((m, i, a) => a.indexOf(m) === i).slice(0, 3).join(' '), errors)
 
   if (input.reason && input.reason.trim()) req.context.auditReason = input.reason.trim()
@@ -323,12 +365,47 @@ export async function saveUserOnboarding(req: PayloadRequest, input: OnboardingI
   }
 
   // 2. per PT: employee (create / update / link), membership (roles + link), bank accounts
-  for (const [i, c] of companies.entries()) await savePt(req, uid, c, i, stored.get(c.company) ?? { membership: null, employee: null })
+  for (const [i, c] of companies.entries()) await savePt(req, uid, c, i, stored.get(c.company) ?? { membership: null, employee: null }, storedAssignments)
 
   return { userId: uid, created: userId === null, temporaryPassword, linkedExistingAccount }
 }
 
-async function savePt(req: PayloadRequest, uid: number, c: CompanyInput, i: number, stored: StoredCompany): Promise<void> {
+async function loadStoredAssignments(req: PayloadRequest, companies: readonly CompanyInput[]): Promise<Map<number, StoredAssignment>> {
+  const ids = [...new Set(companies.flatMap((c) => (c.assignments ?? []).flatMap((a) => (a.id !== undefined ? [a.id] : []))))]
+  if (!ids.length) return new Map()
+  const res = await req.payload.find({ collection: 'team-assignments', where: { id: { in: ids } }, depth: 0, pagination: false, select: { employee: true, roleInProject: true, startDate: true, endDate: true }, user: req.user, req, overrideAccess: false })
+  return new Map(
+    (res.docs as unknown as Row[]).map((a) => [a.id as number, { id: a.id as number, employee: relId(a.employee) ?? null, roleInProject: str(a.roleInProject), startDate: strOrNull(a.startDate), endDate: strOrNull(a.endDate) }]),
+  )
+}
+
+/**
+ * The location of a NEW assignment: readable by the caller (a PM reads its team's only), of THIS PT and active —
+ * otherwise "not found" (a foreign / unknown id answers the same). The collection guard still decides the rest.
+ */
+async function checkLocation(req: PayloadRequest, company: number, a: AssignmentInput, path: string): Promise<void> {
+  for (const l of LOCATIONS) {
+    const id = a[l.key]
+    if (id === undefined) continue
+    let doc: Row | null = null
+    try {
+      doc = (await req.payload.findByID({ collection: l.collection as CollectionSlug, id, depth: 0, select: { company: true, status: true, active: true } as never, user: req.user, req, overrideAccess: false, disableErrors: true })) as unknown as Row | null
+    } catch (err) {
+      if (!(err instanceof APIError && (err.status === 403 || err.status === 404))) throw err
+    }
+    if (!doc || relId(doc.company) !== company) {
+      const message = `${l.label} tidak ditemukan di PT ini.`
+      throw new OnboardingError(400, message, [{ path: `${path}.${l.key}`, message }])
+    }
+    const closed = l.key === 'project' ? (CLOSED_PROJECT as readonly string[]).includes(str(doc.status)) : doc.active === false
+    if (closed) {
+      const message = l.key === 'project' ? 'Project sudah selesai / diarsipkan — pilih project lain.' : `${l.label} tidak aktif — pilih yang lain.`
+      throw new OnboardingError(400, message, [{ path: `${path}.${l.key}`, message }])
+    }
+  }
+}
+
+async function savePt(req: PayloadRequest, uid: number, c: CompanyInput, i: number, stored: StoredCompany, storedAssignments: ReadonlyMap<number, StoredAssignment>): Promise<void> {
   const prefix = `companies.${i}`
   const asCaller = { depth: 0, user: req.user, req } as const
 
@@ -380,5 +457,21 @@ async function savePt(req: PayloadRequest, uid: number, c: CompanyInput, i: numb
     if (relId(current.employee) !== owner) throw new OnboardingError(400, 'Rekening ini bukan milik karyawan PT ini.', [{ path: bat, message: 'Rekening ini bukan milik karyawan PT ini.' }])
     const patch = changedFields({ ...current, bank: relId(current.bank) ?? null }, bankData(b), BANK_FIELDS)
     if (Object.keys(patch).length) await at(bat, () => req.payload.update({ collection: 'employee-bank-accounts', id, data: patch as never, ...asCaller, overrideAccess: false }))
+  }
+
+  // DRMS 15/10: team assignments of the PT's employee — after the employee, so a NEW employee's id is used
+  for (const [j, a] of (c.assignments ?? []).entries()) {
+    const aat = `${prefix}.assignments.${j}`
+    if (owner === null) throw new OnboardingError(400, 'Penugasan butuh data karyawan.', [{ path: aat, message: 'Penugasan butuh data karyawan.' }])
+    if (a.id === undefined) {
+      await checkLocation(req, c.company, a, aat)
+      const loc = LOCATIONS.find((l) => a[l.key] !== undefined)!
+      const data = { employee: owner, [loc.key]: a[loc.key], roleInProject: a.roleInProject, ...(a.startDate ? { startDate: a.startDate } : {}), ...(a.endDate ? { endDate: a.endDate } : {}) }
+      await at(aat, () => req.payload.create({ collection: 'team-assignments', data: data as never, ...asCaller, overrideAccess: false }))
+      continue
+    }
+    const id = a.id
+    const patch = assignmentPatch(storedAssignments.get(id)!, a)
+    if (Object.keys(patch).length) await at(aat, () => req.payload.update({ collection: 'team-assignments', id, data: patch as never, ...asCaller, overrideAccess: false }))
   }
 }

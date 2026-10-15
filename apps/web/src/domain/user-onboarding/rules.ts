@@ -2,9 +2,10 @@ import { randomInt } from 'node:crypto'
 
 /**
  * DRMS 13/10 Wave 3 — "Pengguna" tabbed onboarding: pure rules of ONE save (unit-tested). The collection hooks and
- * access rules stay the guards (Users / company-memberships / employees / employee-bank-accounts, run with the
- * caller's access by service.ts); these checks only give the form field-level answers BEFORE anything is written
- * (cross-field rules the collections cannot see: one entry per PT, a bank account needs an employee …).
+ * access rules stay the guards (Users / company-memberships / employees / employee-bank-accounts / team-assignments,
+ * run with the caller's access by service.ts); these checks only give the form field-level answers BEFORE anything is
+ * written (cross-field rules the collections cannot see: one entry per PT, a bank account or an assignment needs an
+ * employee …).
  * No Payload import.
  */
 
@@ -12,17 +13,28 @@ export type FieldError = { path: string; message: string }
 
 export type EmployeeInput = { id?: number; code?: string; name?: string; nickname?: string | null; position?: string | null; phone?: string | null; attendanceType?: 'onsite' | 'non_onsite'; active?: boolean }
 export type BankAccountInput = { id?: number; bank?: number; accountNo?: string; accountHolder?: string; isDefault?: boolean; verificationStatus?: 'unverified' | 'verified'; active?: boolean }
-export type CompanyInput = { company: number; roles: string[]; employee?: EmployeeInput | null; bankAccounts?: BankAccountInput[] }
+export type AssignmentRole = 'pm' | 'staff' | 'mandor'
+export type AssignmentInput = { id?: number; project?: number; costCenter?: number; site?: number; roleInProject: AssignmentRole; startDate?: string | null; endDate?: string | null }
+export type CompanyInput = { company: number; roles: string[]; employee?: EmployeeInput | null; bankAccounts?: BankAccountInput[]; assignments?: AssignmentInput[] }
 export type UserInput = { email?: string; name?: string; phone?: string | null; active?: boolean }
 export type OnboardingInput = { user?: UserInput; companies?: CompanyInput[]; reason?: string }
 
 /** Stored state of one PT of the account (edit), as the rules need it. */
 export type StoredCompany = { membership: { id: number; roles: string[]; active: boolean } | null; employee: number | null }
+/** A saved team assignment, as the rules need it (dates as stored: ISO, compared by day). */
+export type StoredAssignment = { id: number; employee: number | null; roleInProject: string; startDate: string | null; endDate: string | null }
 
 export const NO_ROLE_MESSAGE = 'Pilih minimal satu peran di PT ini.'
 export const NEED_EMPLOYEE_MESSAGE = 'Rekening butuh data karyawan di PT ini — pilih atau buat data karyawan dulu (tab Data Karyawan).'
 export const SELF_DEACTIVATE_MESSAGE = 'Anda tidak dapat menonaktifkan akun Anda sendiri.'
 export const SELF_ADMIN_MESSAGE = 'Anda tidak dapat mencabut peran Admin Anda sendiri di PT ini (minta Admin lain).'
+export const NEED_EMPLOYEE_ASSIGNMENT_MESSAGE = 'Penugasan butuh data karyawan di PT ini — pilih atau buat data karyawan dulu (tab Data Karyawan).'
+export const ONE_LOCATION_MESSAGE = 'Pilih tepat satu lokasi: project, pusat biaya, ATAU site.'
+export const END_BEFORE_START_MESSAGE = 'Tanggal selesai tidak boleh sebelum tanggal mulai.'
+export const ASSIGNMENT_FIXED_MESSAGE = 'Lokasi dan tanggal mulai penugasan yang tersimpan tidak dapat diubah — akhiri penugasan ini lalu tambah penugasan baru.'
+/** Same text as the collection rule (TeamAssignments reasonOnChange). */
+export const ASSIGNMENT_REASON_MESSAGE = 'Alasan wajib diisi saat mengubah peran atau mengakhiri penugasan.'
+export const ASSIGNMENT_OWNER_MESSAGE = 'Penugasan ini bukan milik karyawan PT ini.'
 
 /** Account number as the collection stores it (EmployeeBankAccounts beforeValidate): spaces, dots, dashes removed. */
 export function normalizeAccountNo(v: string): string {
@@ -46,7 +58,7 @@ export function validateOnboarding(input: OnboardingInput, mode: 'create' | 'upd
     seen.add(c.company)
     const s = stored.get(c.company)
     const member = s?.membership ?? null
-    if (!member && c.roles.length === 0 && (c.employee || (c.bankAccounts?.length ?? 0) > 0)) errors.push({ path: `${at}.roles`, message: NO_ROLE_MESSAGE })
+    if (!member && c.roles.length === 0 && (c.employee || (c.bankAccounts?.length ?? 0) > 0 || (c.assignments?.length ?? 0) > 0)) errors.push({ path: `${at}.roles`, message: NO_ROLE_MESSAGE })
     const emp = c.employee
     if (emp && emp.id === undefined) {
       if (!emp.code) errors.push({ path: `${at}.employee.code`, message: 'Kode karyawan wajib diisi.' })
@@ -66,7 +78,73 @@ export function validateOnboarding(input: OnboardingInput, mode: 'create' | 'upd
       }
       if (b.accountNo && !ACCOUNT_NO.test(normalizeAccountNo(b.accountNo))) errors.push({ path: `${bat}.accountNo`, message: 'Nomor rekening hanya angka (5–34 digit).' })
     })
+    ;(c.assignments ?? []).forEach((a, j) => {
+      const aat = `${at}.assignments.${j}`
+      if (!hasEmployee) {
+        errors.push({ path: aat, message: NEED_EMPLOYEE_ASSIGNMENT_MESSAGE })
+        return
+      }
+      const locations = [a.project, a.costCenter, a.site].filter((x) => x !== undefined).length
+      if (a.id !== undefined) {
+        // a saved row: only the role and the end date change here (TeamAssignments guard: a PM cannot move it either)
+        if (locations > 0 || a.startDate !== undefined) errors.push({ path: aat, message: ASSIGNMENT_FIXED_MESSAGE })
+        return
+      }
+      if (locations !== 1) errors.push({ path: `${aat}.location`, message: ONE_LOCATION_MESSAGE })
+      if (a.startDate && a.endDate && a.endDate < a.startDate) errors.push({ path: `${aat}.endDate`, message: END_BEFORE_START_MESSAGE })
+    })
   })
+  return errors
+}
+
+/** Day part (`YYYY-MM-DD`) of a stored date / a body date (the house convention: `slice(0, 10)`). */
+export function dayOf(v: string | null | undefined): string | null {
+  return typeof v === 'string' && v !== '' ? v.slice(0, 10) : null
+}
+
+/** Changes of a saved assignment (role / end date only; `undefined` in the body = unchanged). */
+export function assignmentPatch(stored: StoredAssignment, a: AssignmentInput): { roleInProject?: AssignmentRole; endDate?: string | null } {
+  const out: { roleInProject?: AssignmentRole; endDate?: string | null } = {}
+  if (a.roleInProject !== stored.roleInProject) out.roleInProject = a.roleInProject
+  if (a.endDate !== undefined && dayOf(a.endDate) !== dayOf(stored.endDate)) out.endDate = dayOf(a.endDate)
+  return out
+}
+
+/** Employee of one PT after the save, as far as known before writing (`'new'` = created by this save). */
+export function ownerAfterSave(e: EmployeeInput | null | undefined, storedEmployee: number | null): number | null | 'new' {
+  if (e === undefined) return storedEmployee
+  if (e === null) return null
+  return e.id ?? 'new'
+}
+
+/**
+ * Checks of the SAVED assignments named in the body (`stored` = those rows read with the caller's access; a row the
+ * caller cannot read is missing): same employee as the PT's after the save, end date not before the stored start,
+ * and the reason the collection asks for when the role or the end date changes (TeamAssignments reasonOnChange).
+ */
+export function savedAssignmentErrors(input: OnboardingInput, stored: ReadonlyMap<number, StoredAssignment>, owners: ReadonlyMap<number, number | null | 'new'>): FieldError[] {
+  const errors: FieldError[] = []
+  let changed = false
+  ;(input.companies ?? []).forEach((c, i) => {
+    ;(c.assignments ?? []).forEach((a, j) => {
+      if (a.id === undefined) return
+      const aat = `companies.${i}.assignments.${j}`
+      const s = stored.get(a.id)
+      if (!s) {
+        errors.push({ path: aat, message: 'Penugasan tidak ditemukan.' })
+        return
+      }
+      if (s.employee === null || s.employee !== owners.get(c.company)) {
+        errors.push({ path: aat, message: ASSIGNMENT_OWNER_MESSAGE })
+        return
+      }
+      const patch = assignmentPatch(s, a)
+      const start = dayOf(s.startDate)
+      if (patch.endDate && start && patch.endDate < start) errors.push({ path: `${aat}.endDate`, message: END_BEFORE_START_MESSAGE })
+      if (Object.keys(patch).length) changed = true
+    })
+  })
+  if (changed && (input.reason ?? '').trim().length < 3) errors.push({ path: 'reason', message: ASSIGNMENT_REASON_MESSAGE })
   return errors
 }
 

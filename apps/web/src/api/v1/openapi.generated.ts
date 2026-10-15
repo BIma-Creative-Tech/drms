@@ -18967,6 +18967,10 @@ export const openapiDocument = {
                   },
                   "description": "Employees of this PT not linked to another account (the linked one included)."
                 },
+                "canManageAssignments": {
+                  "type": "boolean",
+                  "description": "Admin or PM role IN this PT (team-assignments create rule; a PM only for its team and never role pm)."
+                },
                 "assignments": {
                   "type": "array",
                   "items": {
@@ -18975,6 +18979,18 @@ export const openapiDocument = {
                       "id": {
                         "type": "integer",
                         "exclusiveMinimum": 0
+                      },
+                      "kind": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "enum": [
+                          "project",
+                          "costCenter",
+                          "site",
+                          null
+                        ]
                       },
                       "label": {
                         "type": "string"
@@ -18997,13 +19013,94 @@ export const openapiDocument = {
                     },
                     "required": [
                       "id",
+                      "kind",
                       "label",
                       "roleInProject",
                       "startDate",
                       "endDate"
                     ]
                   },
-                  "description": "Team assignments of the linked employee (read-only here)."
+                  "description": "Team assignments of the linked employee."
+                },
+                "assignmentChoices": {
+                  "type": "object",
+                  "properties": {
+                    "projects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name"
+                        ]
+                      }
+                    },
+                    "costCenters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name"
+                        ]
+                      }
+                    },
+                    "sites": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "projects",
+                    "costCenters",
+                    "sites"
+                  ],
+                  "description": "Selectable locations of a NEW assignment: active projects (not selesai / arsip), cost centers and sites of this PT, read with the caller's access."
                 }
               },
               "required": [
@@ -19015,7 +19112,9 @@ export const openapiDocument = {
                 "employee",
                 "bankAccounts",
                 "employeeChoices",
-                "assignments"
+                "canManageAssignments",
+                "assignments",
+                "assignmentChoices"
               ]
             }
           },
@@ -19206,6 +19305,61 @@ export const openapiDocument = {
                   },
                   "maxItems": 20,
                   "description": "Bank accounts of THIS PT's employee (rows omitted = unchanged; never deleted — deactivate instead)."
+                },
+                "assignments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "description": "Existing assignment of this PT's employee: only roleInProject and endDate change (reason required). Omitted = a NEW assignment (exactly one of project / costCenter / site)."
+                      },
+                      "project": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "costCenter": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "site": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "roleInProject": {
+                        "type": "string",
+                        "enum": [
+                          "pm",
+                          "staff",
+                          "mandor"
+                        ],
+                        "description": "Role in the assignment (PM / Staff / Mandor). A PM caller cannot assign pm."
+                      },
+                      "startDate": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+                      },
+                      "endDate": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+                        "description": "Not before startDate. Set on an existing assignment = the assignment ends (reason required)."
+                      }
+                    },
+                    "required": [
+                      "roleInProject"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "maxItems": 50,
+                  "description": "Team assignments of THIS PT's employee, written after the employee (a new employee gets them). Rows omitted = unchanged; never deleted — set endDate instead. Locations: active records of this PT readable by the caller."
                 }
               },
               "required": [
@@ -19220,7 +19374,7 @@ export const openapiDocument = {
           "reason": {
             "type": "string",
             "maxLength": 1000,
-            "description": "Change reason for the audit rows. Required (≥ 3 characters) whenever a collection rule asks for it: deactivating the account / an employee / a bank account, changing a bank account's number, holder or bank."
+            "description": "Change reason for the audit rows. Required (≥ 3 characters) whenever a collection rule asks for it: deactivating the account / an employee / a bank account, changing a bank account's number, holder or bank, changing the role or end date of a team assignment."
           }
         },
         "required": [
@@ -19374,6 +19528,61 @@ export const openapiDocument = {
                   },
                   "maxItems": 20,
                   "description": "Bank accounts of THIS PT's employee (rows omitted = unchanged; never deleted — deactivate instead)."
+                },
+                "assignments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "description": "Existing assignment of this PT's employee: only roleInProject and endDate change (reason required). Omitted = a NEW assignment (exactly one of project / costCenter / site)."
+                      },
+                      "project": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "costCenter": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "site": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "roleInProject": {
+                        "type": "string",
+                        "enum": [
+                          "pm",
+                          "staff",
+                          "mandor"
+                        ],
+                        "description": "Role in the assignment (PM / Staff / Mandor). A PM caller cannot assign pm."
+                      },
+                      "startDate": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+                      },
+                      "endDate": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+                        "description": "Not before startDate. Set on an existing assignment = the assignment ends (reason required)."
+                      }
+                    },
+                    "required": [
+                      "roleInProject"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "maxItems": 50,
+                  "description": "Team assignments of THIS PT's employee, written after the employee (a new employee gets them). Rows omitted = unchanged; never deleted — set endDate instead. Locations: active records of this PT readable by the caller."
                 }
               },
               "required": [
@@ -19387,7 +19596,7 @@ export const openapiDocument = {
           "reason": {
             "type": "string",
             "maxLength": 1000,
-            "description": "Change reason for the audit rows. Required (≥ 3 characters) whenever a collection rule asks for it: deactivating the account / an employee / a bank account, changing a bank account's number, holder or bank."
+            "description": "Change reason for the audit rows. Required (≥ 3 characters) whenever a collection rule asks for it: deactivating the account / an employee / a bank account, changing a bank account's number, holder or bank, changing the role or end date of a team assignment."
           }
         },
         "additionalProperties": false
@@ -45667,7 +45876,7 @@ export const openapiDocument = {
     },
     "/user-onboarding": {
       "post": {
-        "summary": "Create an account with its access per PT, employee per PT and bank accounts in ONE transaction (Admin of every PT named / group admin). Keycloak first: a NEW Keycloak user gets a temporary password (UPDATE_PASSWORD at the first login), returned once; an existing Keycloak account with the email is linked. Any failure rolls the DB back and compensates Keycloak (new user deleted); Keycloak refusing / unreachable → 502 KEYCLOAK_FAILED, not configured → 503. Errors name the field: errors[].path = user.* / companies.<i>.* / reason",
+        "summary": "Create an account with its access per PT, employee per PT, bank accounts and team assignments (DRMS 15/10; written after the employee, so a new employee gets them) in ONE transaction (Admin of every PT named / group admin). Keycloak first: a NEW Keycloak user gets a temporary password (UPDATE_PASSWORD at the first login), returned once; an existing Keycloak account with the email is linked. Any failure rolls the DB back and compensates Keycloak (new user deleted); Keycloak refusing / unreachable → 502 KEYCLOAK_FAILED, not configured → 503. Errors name the field: errors[].path = user.* / companies.<i>.* / reason",
         "security": [
           {
             "bearer": []
@@ -45791,7 +46000,7 @@ export const openapiDocument = {
     },
     "/user-onboarding/{userId}": {
       "get": {
-        "summary": "Form data of one account: identity (+ whether the caller may change it), per PT of the caller (Admin PTs ∩ PT selection) the membership, linked employee, its bank accounts, selectable employees and team assignments; active banks",
+        "summary": "Form data of one account: identity (+ whether the caller may change it), per PT of the caller (Admin PTs ∩ PT selection) the membership, linked employee, its bank accounts, selectable employees, team assignments and the selectable locations of a new assignment (active projects / cost centers / sites of the PT, caller's read access); active banks",
         "security": [
           {
             "bearer": []
@@ -45855,7 +46064,7 @@ export const openapiDocument = {
         }
       },
       "patch": {
-        "summary": "Edit in ONE transaction: changed identity fields (Keycloak-first; accounts only in the caller's Admin PTs), roles per PT (empty = membership inactive), employee per PT (link / create / update / unlink), bank accounts (create / update, never deleted). Collection rules apply unchanged (reason on deactivation and bank-account changes, verification by Admin/Finance). Own account: no self-deactivation, no removal of the own Admin role",
+        "summary": "Edit in ONE transaction: changed identity fields (Keycloak-first; accounts only in the caller's Admin PTs), roles per PT (empty = membership inactive), employee per PT (link / create / update / unlink), bank accounts (create / update, never deleted), team assignments (create; role / end date of saved ones; never deleted). Collection rules apply unchanged (reason on deactivation, bank-account changes and assignment role / end-date changes, verification by Admin/Finance, one assignment location of the employee's PT, a PM caller only for its team and never role pm). Unknown / unreadable / foreign-PT assignment or location ids: 404 / 400 on the item. Own account: no self-deactivation, no removal of the own Admin role",
         "security": [
           {
             "bearer": []
