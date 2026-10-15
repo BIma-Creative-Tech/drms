@@ -57,6 +57,8 @@ export type ModuleItem =
       feature?: FeatureKey
       /** Path prefix that belongs to the module when wider than `view` (e.g. `/pengguna` for /pengguna/<id>). */
       prefix?: string
+      /** DRMS 16/10: shown only when the caller can see this collection (e.g. "+ Vendor baru" needs `vendors`). */
+      needsCollection?: string
       /**
        * DRMS 15/10 #3: a second placement of a view whose home is another module (same view, also offered here as a
        * menu item / landing tile). The route itself — active module, breadcrumbs — belongs to the module of the one
@@ -147,7 +149,7 @@ export const MODULES: readonly ModuleDef[] = [
         label: 'Data pendukung',
         items: [
           { collection: 'clients' },
-          { view: '/klien/baru', label: '+ Klien baru', roles: ['pk-admin', 'pk-owner'], navKey: 'klien-baru', prefix: '/klien' },
+          { view: '/klien/baru', label: '+ Klien baru', roles: ['pk-admin', 'pk-owner'], navKey: 'klien-baru', prefix: '/klien', needsCollection: 'clients' },
           { collection: 'cost-centers' },
           { collection: 'team-assignments' },
         ],
@@ -298,7 +300,7 @@ export const MODULES: readonly ModuleDef[] = [
           { collection: 'vehicles' },
           { collection: 'vendors' },
           // DRMS 16/10: "+ Vendor baru" = the tabbed Vendor page (detail + rekening + kontak PIC; /vendor/<id> = edit)
-          { view: '/vendor/baru', label: '+ Vendor baru', roles: ['pk-admin', 'pk-finance'], navKey: 'vendor-baru', prefix: '/vendor' },
+          { view: '/vendor/baru', label: '+ Vendor baru', roles: ['pk-admin', 'pk-finance'], navKey: 'vendor-baru', prefix: '/vendor', needsCollection: 'vendors' },
           { collection: 'vendor-bank-accounts' },
           { collection: 'sites' },
         ],
@@ -518,6 +520,7 @@ export function resolveModules(input: VisibilityInput, modules: readonly ModuleD
         const href = itemHref(it)
         if ('view' in it) {
           if (!viewAllowed(it, input.roles, input.features)) continue
+          if (it.needsCollection && !input.canSee('collection', it.needsCollection)) continue
           const badge = it.badge ? (input.badges?.[it.badge] ?? 0) : undefined
           const restricted = input.staffOnly || input.operatorOnly === true
           items.push({ key: href, label: restricted && it.staffLabel ? it.staffLabel : it.label, href, kind, navKey: it.navKey, ...(badge ? { badge } : {}) })
