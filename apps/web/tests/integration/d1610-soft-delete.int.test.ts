@@ -185,7 +185,7 @@ describe('master / project in use → no Hapus', () => {
 })
 
 describe('project: Hapus while unused (stages / team assignments are its own set-up)', () => {
-  it('deleted project disappears from the v1 list, REST, reports scope and the APK masters', async () => {
+  it('deleted project disappears from the v1 list, REST, reports scope, new requests and the APK masters', async () => {
     const pid = await sysCreate('projects', { code: `SD-DRAFT-${Date.now() % 1e6}`, name: 'SD Proyek Draft', pm: w.users.pm.id, status: 'perencanaan' })
     await sysCreate('team-assignments', { employee: w.emp.a, project: pid, roleInProject: 'staff' })
     expect((await check(w.users.owner, 'projects', pid)).body).toMatchObject({ action: 'hapus', canDelete: true })
@@ -198,6 +198,10 @@ describe('project: Hapus while unused (stages / team assignments are its own set
     const inScope = await asUser(w.users.owner, async (req) => (await rows(req, sql`SELECT p.id FROM projects p WHERE ${projectScopeSql(await officeScope(req))}`)).map((x) => Number(x.id)))
     expect(inScope).not.toContain(pid)
     expect(inScope).toContain(w.project)
+    // a new request naming it (stale APK cache) is refused like a missing project
+    const stale = await api('POST', E, w.users.staffA, draftBody(w, { projectId: pid }))
+    expect(stale.status).toBe(400)
+    expect(JSON.stringify(stale.body)).toContain('Project tidak ditemukan')
     // the masters' team assignments leave the deleted project out
     const m = await api('GET', '/api/v1/masters?types=team-assignments,projects', w.users.staffA)
     expect(m.body.types['team-assignments'].items.some((i: { project: number }) => i.project === pid)).toBe(false)

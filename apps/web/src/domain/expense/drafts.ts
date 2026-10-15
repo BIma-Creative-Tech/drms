@@ -230,13 +230,14 @@ export async function validateContent(
   // G10: project / cost center in the caller's scope (office roles: any active one).
   if (c.projectId) {
     const p = await req.payload.findByID({ collection: 'projects', id: c.projectId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
-    if (!p || isForeign(req, relId(p.company) ?? -1)) errors.push({ path: 'projectId', message: 'Project tidak ditemukan.' })
+    // D1610: a soft-deleted project is reported like a missing one (findByID still returns it — labels of old documents)
+    if (!p || p.isDeleted === true || isForeign(req, relId(p.company) ?? -1)) errors.push({ path: 'projectId', message: 'Project tidak ditemukan.' })
     else if (isClosedProjectStatus(p.status) || p.status === 'selesai') errors.push({ path: 'projectId', message: p.status === 'dibatalkan' ? 'Project sudah dibatalkan.' : 'Project sudah selesai/diarsipkan.' })
     else if (!office && !(await scope()).assignedProjects.includes(c.projectId)) fail(403, 'Project di luar penugasan Anda.')
   }
   if (c.costCenterId) {
     const cc = await req.payload.findByID({ collection: 'cost-centers', id: c.costCenterId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
-    if (!cc || cc.active === false || isForeign(req, relId(cc.company) ?? -1)) errors.push({ path: 'costCenterId', message: 'Pusat biaya tidak ditemukan atau nonaktif.' })
+    if (!cc || cc.active === false || cc.isDeleted === true || isForeign(req, relId(cc.company) ?? -1)) errors.push({ path: 'costCenterId', message: 'Pusat biaya tidak ditemukan atau nonaktif.' })
     else if (!office && !(await scope()).assignedCostCenters.includes(c.costCenterId)) fail(403, 'Pusat biaya di luar penugasan Anda.')
   }
 
