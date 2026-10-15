@@ -545,6 +545,13 @@ export interface WorkSchedule {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -608,6 +615,13 @@ export interface Employee {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -650,6 +664,13 @@ export interface Site {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -683,6 +704,13 @@ export interface CostCenter {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -743,6 +771,13 @@ export interface EmployeeBankAccount {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -760,6 +795,13 @@ export interface Bank {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -787,6 +829,13 @@ export interface Client {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -819,6 +868,13 @@ export interface Vendor {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -845,6 +901,13 @@ export interface VendorBankAccount {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -884,7 +947,10 @@ export interface Project {
   budget?: number | null;
   startDate?: string | null;
   targetDate?: string | null;
-  status: 'perencanaan' | 'berjalan' | 'ditunda' | 'selesai' | 'arsip';
+  status: 'perencanaan' | 'berjalan' | 'ditunda' | 'selesai' | 'arsip' | 'dibatalkan';
+  cancelReason?: string | null;
+  cancelledAt?: string | null;
+  cancelledBy?: (number | null) | User;
   /**
    * Dihitung dari bobot × progress tahapan (hanya lewat laporan progress).
    */
@@ -898,6 +964,13 @@ export interface Project {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -953,6 +1026,13 @@ export interface StageTemplate {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -998,6 +1078,13 @@ export interface ExpenseCategory {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1023,6 +1110,13 @@ export interface Uom {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1045,6 +1139,13 @@ export interface CashInSource {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1083,6 +1184,13 @@ export interface CashAccount {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1224,6 +1332,13 @@ export interface UrgencyLevel {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1283,6 +1398,13 @@ export interface Vehicle {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1447,6 +1569,13 @@ export interface ExpenseRequest {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -2271,6 +2400,13 @@ export interface RapTemplate {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -2293,6 +2429,13 @@ export interface ResourceType {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -3293,6 +3436,10 @@ export interface EmployeesSelect<T extends boolean = true> {
   active?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3312,6 +3459,10 @@ export interface EmployeeBankAccountsSelect<T extends boolean = true> {
   active?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3325,6 +3476,10 @@ export interface BanksSelect<T extends boolean = true> {
   active?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3342,6 +3497,10 @@ export interface ClientsSelect<T extends boolean = true> {
   active?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3360,6 +3519,10 @@ export interface VendorsSelect<T extends boolean = true> {
   uuid?: T;
   bankAccounts?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3379,6 +3542,10 @@ export interface VendorBankAccountsSelect<T extends boolean = true> {
   active?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3403,10 +3570,17 @@ export interface ProjectsSelect<T extends boolean = true> {
   startDate?: T;
   targetDate?: T;
   status?: T;
+  cancelReason?: T;
+  cancelledAt?: T;
+  cancelledBy?: T;
   progressPct?: T;
   odooAnalyticRef?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3445,6 +3619,10 @@ export interface StageTemplatesSelect<T extends boolean = true> {
       };
   active?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3476,6 +3654,10 @@ export interface ExpenseCategoriesSelect<T extends boolean = true> {
   active?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3491,6 +3673,10 @@ export interface CashInSourcesSelect<T extends boolean = true> {
   active?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3513,6 +3699,10 @@ export interface CashAccountsSelect<T extends boolean = true> {
   active?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3556,6 +3746,10 @@ export interface WorkSchedulesSelect<T extends boolean = true> {
       };
   active?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3632,6 +3826,10 @@ export interface UomsSelect<T extends boolean = true> {
   active?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3647,6 +3845,10 @@ export interface UrgencyLevelsSelect<T extends boolean = true> {
   active?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3675,6 +3877,10 @@ export interface VehiclesSelect<T extends boolean = true> {
   active?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3695,6 +3901,10 @@ export interface CostCentersSelect<T extends boolean = true> {
   active?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3716,6 +3926,10 @@ export interface SitesSelect<T extends boolean = true> {
   active?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3807,6 +4021,10 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
   source?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -4236,6 +4454,10 @@ export interface RapTemplatesSelect<T extends boolean = true> {
   active?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -4251,6 +4473,10 @@ export interface ResourceTypesSelect<T extends boolean = true> {
   active?: T;
   uuid?: T;
   changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
