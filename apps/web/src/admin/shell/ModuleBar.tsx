@@ -15,6 +15,7 @@ import type { SwitcherState } from './company-switcher'
 import { CompanySwitcher } from './CompanySwitcher'
 import { deriveCrumbs, type Crumb } from './crumbs'
 import type { NavUser } from './modules-server'
+import { isQuickCreateShortcut, type QuickCreateGroup } from './quick-create'
 
 /**
  * Odoo-style top bar (client). Left: launcher button (⊞ → /admin) + current module (link to the module
@@ -27,9 +28,11 @@ import type { NavUser } from './modules-server'
  * Compact mode (≤ 768px): shorter PT label. Keyboard: ↓/Enter/Space opens a menu, ↑/↓ inside, Esc
  * closes and returns focus, visible focus rings (custom.scss). Reduced motion: MotionConfig
  * reducedMotion="user". Below the bar: the breadcrumb line (PageCrumbs) — only on pages that have crumbs.
+ * DRMS 16/10 (owner, "konsep no. 1"): "+ Buat" menu left of the PT switcher — create pages of what the caller may
+ * create (items resolved on the server, ./quick-create.ts), grouped; Alt+N opens it; icon-only "+" under 640px.
  */
 
-type Props = { modules: ResolvedModule[]; user: NavUser; companies?: SwitcherState; bell: React.ReactNode; logout: React.ReactNode }
+type Props = { modules: ResolvedModule[]; user: NavUser; companies?: SwitcherState; quickCreate?: QuickCreateGroup[]; bell: React.ReactNode; logout: React.ReactNode }
 
 const EASE = [0.22, 1, 0.36, 1] as const
 const MENU_ANIM = {
@@ -153,6 +156,87 @@ function AvatarMenu({ user, logout, open, setOpen }: { user: NavUser; logout: Re
   )
 }
 
+// ------------------------------------------------------------------------------ "+ Buat" menu
+
+/** Focus is in a text input / editor: Alt+N is a character there, not the shortcut. */
+function isTyping(t: EventTarget | null): boolean {
+  const el = t as HTMLElement | null
+  if (!el || typeof el.closest !== 'function') return false
+  return el.isContentEditable || el.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]') !== null
+}
+
+function QuickCreateMenu({ groups, open, setOpen }: { groups: QuickCreateGroup[]; open: boolean; setOpen: (v: boolean) => void }) {
+  const id = useId()
+  const btn = useRef<HTMLButtonElement>(null)
+  const menu = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (open) requestAnimationFrame(() => focusables(menu.current)[0]?.focus())
+  }, [open])
+  // Alt+N anywhere (outside text inputs) opens the menu with the first item focused
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!isQuickCreateShortcut(e, isTyping(e.target))) return
+      e.preventDefault()
+      if (open) requestAnimationFrame(() => focusables(menu.current)[0]?.focus())
+      else setOpen(true)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, setOpen])
+  const close = (refocus: boolean) => {
+    setOpen(false)
+    if (refocus) btn.current?.focus()
+  }
+  return (
+    <div className="pk-bar__dd pk-bar__dd--end pk-quick" data-open={open || undefined} onBlur={(e) => closeOnFocusOut(e, setOpen)} data-pk-quick-create>
+      <button
+        ref={btn}
+        type="button"
+        className="pk-quick__btn"
+        aria-expanded={open}
+        aria-controls={id}
+        aria-label="Buat baru"
+        aria-keyshortcuts="Alt+N"
+        title="Buat baru (Alt+N)"
+        onClick={() => setOpen(!open)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            setOpen(true)
+          }
+        }}
+        data-pk-nav-link="quick-create"
+      >
+        <Icon name="add" size={20} />
+        <span className="pk-quick__text" aria-hidden="true">
+          Buat
+        </span>
+      </button>
+      <AnimatePresence>
+        {open ? (
+          <motion.div ref={menu} id={id} className="pk-bar__menu pk-quick__menu" role="group" aria-label="Buat baru" {...MENU_ANIM} onKeyDown={(e) => onMenuKeys(e, menu.current, close)}>
+            {groups.map((g) => (
+              <div key={g.id} className="pk-quick__group" role="group" aria-labelledby={`${id}-${g.id}`} data-mod={g.mod}>
+                <div className="pk-quick__head" id={`${id}-${g.id}`}>
+                  {g.label}
+                </div>
+                {g.items.map((it) => (
+                  <Link key={it.key} href={it.href} className="pk-bar__menu-link pk-quick__link" data-pk-quick={it.key} onClick={() => close(false)}>
+                    <span className="pk-quick__chip" aria-hidden="true">
+                      <Icon name={it.icon} size={16} />
+                    </span>
+                    <span className="pk-bar__label">{it.label}</span>
+                  </Link>
+                ))}
+              </div>
+            ))}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 // ------------------------------------------------------------------------------ breadcrumbs
 
 /**
@@ -218,7 +302,7 @@ function CrumbInner({ c }: { c: Crumb }) {
 
 // ------------------------------------------------------------------------------ bar
 
-export function ModuleBar({ modules, user, companies, bell, logout }: Props) {
+export function ModuleBar({ modules, user, companies, quickCreate, bell, logout }: Props) {
   const pathname = usePathname() ?? '/admin'
   const modId = moduleForPath(pathname)
   const mod = useMemo(() => modules.find((m) => m.id === modId) ?? null, [modules, modId])
@@ -278,6 +362,7 @@ export function ModuleBar({ modules, user, companies, bell, logout }: Props) {
         </div>
 
         <div className="pk-bar__end">
+          {quickCreate?.length ? <QuickCreateMenu groups={quickCreate} open={openKey === 'quick'} setOpen={(v) => setOpenKey(v ? 'quick' : null)} /> : null}
           {companies ? <CompanySwitcher state={companies} compact={compact} open={openKey === 'company'} setOpen={(v) => setOpenKey(v ? 'company' : null)} /> : null}
           {bell}
           <AvatarMenu user={user} logout={logout} open={openKey === 'account'} setOpen={(v) => setOpenKey(v ? 'account' : null)} />
