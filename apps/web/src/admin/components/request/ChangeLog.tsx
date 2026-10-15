@@ -66,13 +66,13 @@ export function ChangeLog({ entries, created, updated }: { entries: HistoryEntry
           </div>
           {pages > 1 ? (
             <nav className="pk-changelog__pager" aria-label="Halaman log perubahan">
-              <button type="button" className="btn btn--style-secondary btn--size-small" disabled={p === 0} onClick={() => setPage(p - 1)} data-pk-action="log-prev">
+              <button type="button" className="btn btn--style-secondary btn--size-small pk-pbtn" disabled={p === 0} onClick={() => setPage(p - 1)} data-pk-action="log-prev">
                 ‹ Sebelumnya
               </button>
               <span aria-live="polite">
                 Halaman {p + 1} dari {pages}
               </span>
-              <button type="button" className="btn btn--style-secondary btn--size-small" disabled={p >= pages - 1} onClick={() => setPage(p + 1)} data-pk-action="log-next">
+              <button type="button" className="btn btn--style-secondary btn--size-small pk-pbtn" disabled={p >= pages - 1} onClick={() => setPage(p + 1)} data-pk-action="log-next">
                 Berikutnya ›
               </button>
             </nav>

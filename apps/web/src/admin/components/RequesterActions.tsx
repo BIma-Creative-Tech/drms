@@ -104,7 +104,7 @@ const base = (id: number) => `/api/v1/expense-requests/${id}`
 const errStyle: React.CSSProperties = { color: 'var(--theme-error-500)', fontSize: 12 }
 const box: React.CSSProperties = { border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16, fontSize: 13 }
 const field: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2, fontSize: 12 }
-const btn = (primary = false) => `btn btn--style-${primary ? 'primary' : 'secondary'} btn--size-small`
+const btn = (primary = false) => `btn btn--style-${primary ? 'primary' : 'secondary'} btn--size-small pk-pbtn`
 
 function useAction() {
   const [busy, setBusy] = useState(false)

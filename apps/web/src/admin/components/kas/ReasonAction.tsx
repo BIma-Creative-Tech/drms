@@ -129,7 +129,7 @@ export function ReasonAction({ url, label, title, description, confirmLabel, fie
             ) : null}
           </div>
           {confirm ? (
-            <label className="pk-fld" style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <label className="pk-check">
               <input
                 type="checkbox"
                 checked={confirmed}

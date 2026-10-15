@@ -25,7 +25,7 @@ export type DecisionBarProps = {
 const STYLE = `
 .pk-decide { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; padding: 10px max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); background: var(--theme-bg, var(--pk-card)); border-top: 1px solid var(--theme-elevation-150); box-shadow: 0 -6px 16px -10px rgb(15 23 42 / .35); }
 .pk-decide__text { margin-right: auto; font-size: 13px; min-width: 0; }
-.pk-decide .btn { margin: 0; min-height: 40px; }
+.pk-decide .btn { margin: 0; } /* size: the shared .pk-pbtn box (custom.scss) */
 /* the fixed bar must not cover the end of the page (lines table, receipts): reserve its measured height */
 /* Payload's <body> is the scroll box (height 100%) — padding on it is not scrollable, so pad the template */
 body:has([data-pk-decision-bar]) .template-default { padding-bottom: calc(var(--pk-decide-h, 96px) + 16px); }

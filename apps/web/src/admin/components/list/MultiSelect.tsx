@@ -167,9 +167,7 @@ export function MultiSelect({ name, label, options, value, allLabel = 'Semua', t
       >
         <span className="pk-ms__value">{summary}</span>
         {value.length > 1 && !live ? <span className="pk-ms__count" aria-hidden="true">{value.length}</span> : null}
-        <span className="pk-ms__caret" aria-hidden="true">
-          ▾
-        </span>
+        <span className="pk-ms__caret pk-caret" aria-hidden="true" />
       </button>
       {open ? (
         <div id={panelId} className="pk-ms__panel" role="group" aria-label={label} style={float ? { position: 'fixed', top: float.top, left: float.left, right: 'auto', bottom: 'auto' } : undefined}>

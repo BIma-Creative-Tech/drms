@@ -2,11 +2,13 @@ import { z } from 'zod'
 
 /**
  * DRMS 13/10 Wave 3 — "Pengguna" tabbed onboarding (ADR 0003 revision 2026-10-13): ONE save of the account (Keycloak),
- * its access per PT (roles), the employee record per PT and the employee's bank accounts.
+ * its access per PT (roles), the employee record per PT, the employee's bank accounts and (DRMS 15/10) its team
+ * assignments.
  * `POST /user-onboarding` (create) · `PATCH /user-onboarding/{userId}` (edit) · `GET /user-onboarding/{userId}`.
  * Pure module (bundled by scripts/gen-openapi.mjs). Messages are Indonesian (shown as-is by the web form).
  */
 const id = z.number().int().positive()
+const businessDate = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, 'Tanggal harus berformat YYYY-MM-DD.')
 
 /** Same set as `ROLES` (access/roles.ts) — inlined: this module is bundled without Payload. */
 export const OnboardingRole = z
@@ -49,17 +51,31 @@ export const OnboardingBankAccountInput = z
   })
   .strict()
 
+/** DRMS 15/10: team assignment of THIS PT's employee (collection `team-assignments`, its hooks stay the guard). */
+export const OnboardingAssignmentInput = z
+  .object({
+    id: id.optional().meta({ description: 'Existing assignment of this PT\'s employee: only roleInProject and endDate change (reason required). Omitted = a NEW assignment (exactly one of project / costCenter / site).' }),
+    project: id.optional(),
+    costCenter: id.optional(),
+    site: id.optional(),
+    roleInProject: z.enum(['pm', 'staff', 'mandor']).meta({ description: 'Role in the assignment (PM / Staff / Mandor). A PM caller cannot assign pm.' }),
+    startDate: businessDate.nullable().optional(),
+    endDate: businessDate.nullable().optional().meta({ description: 'Not before startDate. Set on an existing assignment = the assignment ends (reason required).' }),
+  })
+  .strict()
+
 export const OnboardingCompanyInput = z
   .object({
     company: id,
     roles: z.array(OnboardingRole).max(7).meta({ description: 'Roles in this PT. Empty on an existing membership = membership inactive (history kept); a PT without membership needs ≥ 1 role.' }),
     employee: OnboardingEmployeeInput.nullable().optional().meta({ description: 'null = unlink the employee of this PT (the employee record stays). Omitted = unchanged.' }),
     bankAccounts: z.array(OnboardingBankAccountInput).max(20).optional().meta({ description: 'Bank accounts of THIS PT\'s employee (rows omitted = unchanged; never deleted — deactivate instead).' }),
+    assignments: z.array(OnboardingAssignmentInput).max(50).optional().meta({ description: 'Team assignments of THIS PT\'s employee, written after the employee (a new employee gets them). Rows omitted = unchanged; never deleted — set endDate instead. Locations: active records of this PT readable by the caller.' }),
   })
   .strict()
 
 const reason = z.string().trim().max(1000, 'Alasan maksimal 1000 karakter.').optional().meta({
-  description: 'Change reason for the audit rows. Required (≥ 3 characters) whenever a collection rule asks for it: deactivating the account / an employee / a bank account, changing a bank account\'s number, holder or bank.',
+  description: 'Change reason for the audit rows. Required (≥ 3 characters) whenever a collection rule asks for it: deactivating the account / an employee / a bank account, changing a bank account\'s number, holder or bank, changing the role or end date of a team assignment.',
 })
 
 export const UserOnboardingCreate = z
@@ -102,6 +118,8 @@ const BankAccount = z.object({
   active: z.boolean(),
 })
 
+const Choice = z.object({ id, code: z.string(), name: z.string() })
+
 export const UserOnboardingDetail = z
   .object({
     user: z
@@ -125,7 +143,13 @@ export const UserOnboardingDetail = z
         employee: Employee.nullable(),
         bankAccounts: z.array(BankAccount),
         employeeChoices: z.array(z.object({ id, code: z.string(), name: z.string(), active: z.boolean() })).meta({ description: 'Employees of this PT not linked to another account (the linked one included).' }),
-        assignments: z.array(z.object({ id, label: z.string(), roleInProject: z.string(), startDate: z.string().nullable(), endDate: z.string().nullable() })).meta({ description: 'Team assignments of the linked employee (read-only here).' }),
+        canManageAssignments: z.boolean().meta({ description: 'Admin or PM role IN this PT (team-assignments create rule; a PM only for its team and never role pm).' }),
+        assignments: z
+          .array(z.object({ id, kind: z.enum(['project', 'costCenter', 'site']).nullable(), label: z.string(), roleInProject: z.string(), startDate: z.string().nullable(), endDate: z.string().nullable() }))
+          .meta({ description: 'Team assignments of the linked employee.' }),
+        assignmentChoices: z
+          .object({ projects: z.array(Choice), costCenters: z.array(Choice), sites: z.array(Choice) })
+          .meta({ description: 'Selectable locations of a NEW assignment: active projects (not selesai / arsip), cost centers and sites of this PT, read with the caller\'s access.' }),
       }),
     ),
     banks: z.array(z.object({ id, name: z.string() })),
@@ -148,3 +172,4 @@ export type UserOnboardingCreateBody = z.infer<typeof UserOnboardingCreate>
 export type UserOnboardingUpdateBody = z.infer<typeof UserOnboardingUpdate>
 export type UserOnboardingDetailBody = z.infer<typeof UserOnboardingDetail>
 export type OnboardingCompanyBody = z.infer<typeof OnboardingCompanyInput>
+export type OnboardingAssignmentBody = z.infer<typeof OnboardingAssignmentInput>

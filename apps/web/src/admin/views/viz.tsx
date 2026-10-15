@@ -150,11 +150,13 @@ html[data-theme='dark'] .pk-f3 {
 /* tables */
 .pk-f3 .pk-tw { position: relative; overflow-x: auto; margin: 0 calc(-1 * var(--pk-tw-bleed, 0px)); padding: 0 var(--pk-tw-bleed, 0px); }
 .pk-f3 .pk-card { --pk-tw-bleed: 18px; } /* bleed to the card edge only inside a card (its padding); elsewhere no negative margin → no page overflow at 390 px (MC4-03) */
-.pk-f3 table.pk-t { width: 100%; border-collapse: collapse; font-size: 13px; }
-.pk-f3 .pk-t th { text-align: left; font-size: 12px; font-weight: 600; color: var(--pk-muted-fg); padding: 8px 10px; border-bottom: 1px solid var(--pk-border); white-space: nowrap; }
+/* DRMS 15/10 #6: page tables hug their columns; inside a card and in editors (inputs) they keep the full width */
+.pk-f3 table.pk-t { width: auto; border-collapse: collapse; font-size: 13px; }
+.pk-f3 .pk-card table.pk-t, .pk-f3 table.pk-t:has(input, select, textarea) { width: 100%; }
+.pk-f3 .pk-t th { text-align: left; font-size: 12px; font-weight: 600; color: var(--pk-muted-fg); padding: 8px 12px; border-bottom: 1px solid var(--pk-border); white-space: nowrap; }
 .pk-f3 .pk-t th[aria-sort] { color: var(--pk-fg); }
 .pk-f3 .pk-t th .so { margin-left: 4px; font-size: 10px; opacity: .8; }
-.pk-f3 .pk-t td { padding: 9px 10px; border-bottom: 1px solid var(--pk-border); vertical-align: middle; }
+.pk-f3 .pk-t td { padding: 8px 12px; border-bottom: 1px solid var(--pk-border); vertical-align: middle; }
 .pk-f3 .pk-t tbody tr:last-child td { border-bottom: 0; }
 .pk-f3 .pk-t tbody tr:hover td { background: color-mix(in oklab, var(--pk-primary) 4%, transparent); }
 .pk-f3 .pk-t .n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
