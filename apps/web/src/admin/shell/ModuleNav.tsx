@@ -6,7 +6,7 @@ import { PrivacyGate } from '@/admin/components/privacy/PrivacyGate'
 import { LogoutButton } from '@/components/LogoutButton'
 
 import { ModuleBar } from './ModuleBar'
-import { loadModules, loadNavUser, loadSwitcher } from './modules-server'
+import { loadFeatures, loadModules, loadNavUser, loadSwitcher, quickCreateFor } from './modules-server'
 
 /**
  * admin.components.Nav (Payload 3.90.1 templates/Default: rendered on EVERY page that uses the
@@ -17,6 +17,8 @@ import { loadModules, loadNavUser, loadSwitcher } from './modules-server'
  * DRMS 13/10 #9 — the module landing page has the tiles).
  * Replacing Nav drops before/afterNavLinks and the default logout slot → bell + logout live here.
  * Also hosts the privacy-notice gate (ADR 0018): this is the one server component on every admin page.
+ * DRMS 16/10: the "+ Buat" menu items (quick-create.ts) are resolved here too — the PT features are loaded once and
+ * shared with the module list.
  */
 type Props = {
   payload: Payload
@@ -28,10 +30,17 @@ type Props = {
 
 export async function ModuleNav({ payload, user, permissions, visibleEntities, i18n }: Props) {
   if (!payload?.config || !user) return null
-  const [modules, companies, who] = await Promise.all([loadModules({ payload, user, permissions, visibleEntities, i18n }), loadSwitcher(payload, user), loadNavUser(payload, user)])
+  const featuresP = loadFeatures(payload, user)
+  const [features, modules, companies, who] = await Promise.all([
+    featuresP,
+    featuresP.then((f) => loadModules({ payload, user, permissions, visibleEntities, i18n, features: f })),
+    loadSwitcher(payload, user),
+    loadNavUser(payload, user),
+  ])
+  const quickCreate = quickCreateFor({ user, permissions, visibleEntities, features })
   return (
     <>
-      <ModuleBar modules={modules} user={who} companies={companies} bell={<NotificationBell payload={payload} user={user} />} logout={<LogoutButton />} />
+      <ModuleBar modules={modules} user={who} companies={companies} quickCreate={quickCreate} bell={<NotificationBell payload={payload} user={user} />} logout={<LogoutButton />} />
       {/* ADR 0018 (Q-46): non-dismissable privacy-notice interstitial until the current version is acknowledged */}
       <PrivacyGate user={user as { privacyAckVersion?: unknown }} />
     </>

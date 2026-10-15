@@ -5,6 +5,7 @@ berlaku sejak 10 Okt 2026, ADR 0021), **memantau** pengajuan tim, membuat **lapo
 **absensi tim**, mengelola **penugasan tim**, dan mengajukan **addendum RAB**.
 Anda juga bisa mengajukan dana untuk diri sendiri (lihat [panduan Staff](staff.md) §2–4). Baca juga
 [Hal umum](README.md#hal-umum-untuk-semua-peran).
+Di web, tombol **+ Buat** di bar atas (pintasan **Alt+N**) langsung membuka: Pengajuan baru, **Pembayaran vendor**, Proyek baru, Addendum RAB dan — di PT dengan laporan lapangan — Laporan harian. Laporan progress tetap dari APK.
 
 ![TODO screenshot: Beranda APK PM dengan Pantauan tim](img/pm-beranda.png)
 
