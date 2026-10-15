@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { creatableRelationship } from '@/admin/relationship-create'
 
 import { denyAll } from '@/access/roles'
 import { byRole, fieldRoles, ownEmployee, rolesAllowed } from '@/access/policies'
@@ -49,7 +50,8 @@ export const EmployeeBankAccounts: CollectionConfig = withAudit(
     },
     fields: [
       companyField({ derived: true }),
-      { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true }), admin: { placeholder: 'Pilih karyawan…' } },
+      // DRMS 16/10 (b): "+ Karyawan baru" (plain employee form in a drawer, no user account) — the PT follows the employee
+      creatableRelationship({ name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true }), admin: { placeholder: 'Pilih karyawan…' } }, { company: 'record' }),
       { name: 'bank', type: 'relationship', relationTo: 'banks', label: 'Bank', required: true, admin: { placeholder: 'Pilih bank…' } },
       {
         name: 'accountNo',

@@ -29,6 +29,8 @@ import { RequestStatusCell as RequestStatusCell_08836769fece85e42fb05beb6c632414
 import { RequestStatusField as RequestStatusField_3f8d5a55b1fcbc79eb9e47f3583cb1ed } from '@/admin/components/RequestStatusField'
 import { RequestTitleField as RequestTitleField_a356a4ed347478242de628aded3440b3 } from '@/admin/components/EditableOnlyFields'
 import { CompanyScopedField as CompanyScopedField_17980260c895f93f0d171a2dbc0f4023 } from '@/admin/components/companies/CompanyScopedField'
+import { CreatableRelationshipField as CreatableRelationshipField_ef7bc7d7efcd0a14d3b49f23d5d60a7b } from '@/admin/components/relationship/CreatableRelationshipField'
+import { PartnerRedirect as PartnerRedirect_c986410da9c48e3fdf388193f6abee23 } from '@/admin/views/PartnerRedirect'
 import { IntercompanyPayeeField as IntercompanyPayeeField_573b4ed864973b67f00d4339fc8ca048 } from '@/admin/components/IntercompanyPayeeField'
 import { BankAccountPreview as BankAccountPreview_1615d70b0243139e3dffd45ad2617f07 } from '@/admin/components/BankAccountPreview'
 import { RupiahNumberField as RupiahNumberField_d552ada140febbfef2d7dea921fde6df } from '@/admin/components/RupiahNumberField'
@@ -138,6 +140,8 @@ export const importMap = {
   "@/admin/components/RequestStatusField#RequestStatusField": RequestStatusField_3f8d5a55b1fcbc79eb9e47f3583cb1ed,
   "@/admin/components/EditableOnlyFields#RequestTitleField": RequestTitleField_a356a4ed347478242de628aded3440b3,
   "@/admin/components/companies/CompanyScopedField#CompanyScopedField": CompanyScopedField_17980260c895f93f0d171a2dbc0f4023,
+  "@/admin/components/relationship/CreatableRelationshipField#CreatableRelationshipField": CreatableRelationshipField_ef7bc7d7efcd0a14d3b49f23d5d60a7b,
+  "@/admin/views/PartnerRedirect#PartnerRedirect": PartnerRedirect_c986410da9c48e3fdf388193f6abee23,
   "@/admin/components/IntercompanyPayeeField#IntercompanyPayeeField": IntercompanyPayeeField_573b4ed864973b67f00d4339fc8ca048,
   "@/admin/components/BankAccountPreview#BankAccountPreview": BankAccountPreview_1615d70b0243139e3dffd45ad2617f07,
   "@/admin/components/RupiahNumberField#RupiahNumberField": RupiahNumberField_d552ada140febbfef2d7dea921fde6df,

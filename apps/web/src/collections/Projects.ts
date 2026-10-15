@@ -2,6 +2,7 @@ import { APIError, type CollectionBeforeChangeHook, type CollectionConfig } from
 
 import { readOnlyFieldsGuard } from '@/access/field-guard'
 import { PROJECT_TABS } from '@/admin/config'
+import { creatableRelationship } from '@/admin/relationship-create'
 import { moneyRead } from '@/access/money'
 import { denyAll, hasRole } from '@/access/roles'
 import { assignedProjects, byRole, fieldRoles, rolesAllowed } from '@/access/policies'
@@ -118,7 +119,8 @@ export const Projects: CollectionConfig = withAudit(
           description: 'Menentukan laporan lapangan: kontrak unit → timesheet + servis; aftersales → servis + aktivitas. Umum/konstruksi/trading: belum ada laporan lapangan. Diubah oleh Direktur/Admin.',
         },
       },
-      { name: 'client', type: 'relationship', relationTo: 'clients', label: 'Klien', access: { update: projectEditors }, defaultValue: projectFromClientDefault('client') },
+      // DRMS 16/10 (b): "+ Klien baru" opens the tabbed Klien form in a drawer, in the project's PT
+      creatableRelationship({ name: 'client', type: 'relationship', relationTo: 'clients', label: 'Klien', access: { update: projectEditors }, defaultValue: projectFromClientDefault('client') }, { company: 'form' }),
       // ADR 0023 (Q-S1): the branch office (site) that handles the project — at most one; same PT (companyHook + DB
       // trigger). Report / dashboard filter "Site"; the project keeps its own attendance point (no fallback to the site).
       {

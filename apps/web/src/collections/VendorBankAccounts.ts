@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { creatableRelationship } from '@/admin/relationship-create'
 
 import { denyAll } from '@/access/roles'
 import { byRole, fieldRoles, rolesAllowed } from '@/access/policies'
@@ -51,7 +52,8 @@ export const VendorBankAccounts: CollectionConfig = withAudit(
     },
     fields: [
       companyField({ derived: true }),
-      { name: 'vendor', type: 'relationship', relationTo: 'vendors', label: 'Vendor', required: true, index: true, ...pickerSameCompany({ required: true }), admin: { placeholder: 'Pilih vendor…' } },
+      // DRMS 16/10 (b): "+ Vendor baru" — the PT of the account follows the vendor, so the drawer asks for the PT
+      creatableRelationship({ name: 'vendor', type: 'relationship', relationTo: 'vendors', label: 'Vendor', required: true, index: true, ...pickerSameCompany({ required: true }), admin: { placeholder: 'Pilih vendor…' } }, { company: 'record' }),
       { name: 'bank', type: 'relationship', relationTo: 'banks', label: 'Bank', required: true, admin: { placeholder: 'Pilih bank…' } },
       {
         name: 'accountNo',
