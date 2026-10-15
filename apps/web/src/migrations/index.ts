@@ -85,6 +85,8 @@ import * as migration_20261015_100300_d1310_fundcheck_data from './20261015_1003
 import * as migration_20261015_150000_d1510_finance_rule_data from './20261015_150000_d1510_finance_rule_data';
 import * as migration_20261015_200000_d1510_approval_reroute from './20261015_200000_d1510_approval_reroute';
 import * as migration_20261015_210000_d1510_approval_inflight_trim from './20261015_210000_d1510_approval_inflight_trim';
+import * as migration_20261016_200000_d1610_soft_delete_enums from './20261016_200000_d1610_soft_delete_enums';
+import * as migration_20261016_200100_d1610_soft_delete from './20261016_200100_d1610_soft_delete';
 
 export const migrations = [
   {
@@ -521,5 +523,15 @@ export const migrations = [
     up: migration_20261015_210000_d1510_approval_inflight_trim.up,
     down: migration_20261015_210000_d1510_approval_inflight_trim.down,
     name: '20261015_210000_d1510_approval_inflight_trim',
+  },
+  {
+    up: migration_20261016_200000_d1610_soft_delete_enums.up,
+    down: migration_20261016_200000_d1610_soft_delete_enums.down,
+    name: '20261016_200000_d1610_soft_delete_enums',
+  },
+  {
+    up: migration_20261016_200100_d1610_soft_delete.up,
+    down: migration_20261016_200100_d1610_soft_delete.down,
+    name: '20261016_200100_d1610_soft_delete',
   },
 ];
