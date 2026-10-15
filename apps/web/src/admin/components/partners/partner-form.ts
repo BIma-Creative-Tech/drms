@@ -51,7 +51,7 @@ export function draftFromDetail(detail: Detail, initial?: number | null): Draft 
   return {
     company: r ? r.company : initialCompany(detail.companies, initial),
     name: r?.name ?? '',
-    npwp: r && 'npwp' in r ? (r.npwp ?? '') : '',
+    npwp: 'vendor' in detail ? (detail.vendor?.npwp ?? '') : '',
     address: r?.address ?? '',
     active: r?.active ?? true,
     contacts: (r?.contacts ?? []).map(contactDraft),
