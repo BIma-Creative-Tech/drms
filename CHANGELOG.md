@@ -47,6 +47,12 @@ first, primary contact row. The previous image keeps working (it never reads the
   or creates the primary contact instead.
 - Vendors: the Payload tabs + `join` list of the bank accounts are removed (the tabbed page replaces them; no column).
 
+### Changed
+- **Admin loader blocks input (DRMS 16/10 #2).** From the first moment of a navigation or a save, a transparent shield
+  over the whole page absorbs clicks and Enter / Space until the loader hides (dots still after 180 ms; released by the
+  15 s safety timeout at the latest). Navigations stopped by Payload's "leave without saving?" guard no longer count.
+  ADR 0014 § Amendment 2026-10-16.
+
 ## [0.12.0] - 2026-10-15
 
 **DRMS 15/10 owner feedback: UI fixes, Pengguna with Penugasan in one form, and approval flow PM project → Direktur →

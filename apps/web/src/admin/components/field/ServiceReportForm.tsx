@@ -8,6 +8,8 @@ import { fmtNum } from '@/domain/field/views'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 import { Choice, decOut, DecimalField, LinesEditor, linesOut, PhotoPicker, usePhotos, type LineDraft } from './parts'
 import { DateInput } from '../DateInput'
+import { WrapSelect } from '../WrapSelect'
+import { WrapText } from '../WrapText'
 
 /**
  * FR1 web input "Laporan servis unit" (plan A; same fields as the APK mockup Android-Servis): project
@@ -155,7 +157,7 @@ export function ServiceReportForm({ projects, units, unitsByProject, today, minD
             <label htmlFor={id('project')}>
               Project / kontrak<span className="req" aria-hidden>*</span>
             </label>
-            <select
+            <WrapSelect
               id={id('project')}
               value={projectId}
               onChange={(e) => {
@@ -171,21 +173,21 @@ export function ServiceReportForm({ projects, units, unitsByProject, today, minD
                   {p.label} ({p.kind === 'kontrak_unit' ? 'kontrak unit' : 'aftersales'})
                 </option>
               ))}
-            </select>
+            </WrapSelect>
             {errEl('projectId')}
           </div>
           <div className="pk-fld full">
             <label htmlFor={id('unit')}>
               Unit<span className="req" aria-hidden>*</span>
             </label>
-            <select id={id('unit')} value={unitId} onChange={(e) => setUnitId(e.target.value)} disabled={!project} aria-invalid={err('unitId') ? true : undefined} aria-describedby={desc('unitId', true)}>
+            <WrapSelect id={id('unit')} value={unitId} onChange={(e) => setUnitId(e.target.value)} disabled={!project} aria-invalid={err('unitId') ? true : undefined} aria-describedby={desc('unitId', true)}>
               <option value="">{project ? (unitOpts.length ? '— Pilih unit —' : 'Tidak ada unit untuk project ini') : 'Pilih project dulu'}</option>
               {unitOpts.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.label} — {u.sub}
                 </option>
               ))}
-            </select>
+            </WrapSelect>
             <p className="help" id={id('unitId-h')}>
               {unit ? `${unit.sub}${unit.lastHm !== null ? ` · HM terakhir ${fmtNum(unit.lastHm)}` : ''}` : 'Kontrak unit: unit yang aktif di kontrak. Aftersales: unit milik sendiri atau pelanggan project.'}
             </p>
@@ -234,7 +236,7 @@ export function ServiceReportForm({ projects, units, unitsByProject, today, minD
         </div>
         <div className="pk-fld">
           <label htmlFor={id('helpers')}>Helper (opsional)</label>
-          <input id={id('helpers')} value={helpers} maxLength={200} onChange={(e) => setHelpers(e.target.value)} />
+          <WrapText id={id('helpers')} value={helpers} maxLength={200} onChange={(e) => setHelpers(e.target.value)} />
         </div>
       </section>
 

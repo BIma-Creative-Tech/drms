@@ -4,6 +4,7 @@ import React, { useId, useMemo, useRef, useState } from 'react'
 
 import { problemText } from '../ActionButton'
 import { fieldErrors, newIdemKey } from '../kas/client'
+import { WrapText } from '../WrapText'
 
 /**
  * E4 stage editor (G11, US-29): edits the WHOLE active stage set of a project and saves it with
@@ -164,7 +165,7 @@ export function StageEditor({ projectId, stages, canAddRemove, templates }: { pr
                   <td className="nw">{i + 1}</td>
                   <td>
                     <div className="pk-fld">
-                      <input aria-label={`Nama tahapan ${i + 1}`} value={r.name} maxLength={128} onChange={(e) => update(i, { name: e.target.value })} aria-invalid={nerr ? true : undefined} />
+                      <WrapText aria-label={`Nama tahapan ${i + 1}`} value={r.name} maxLength={128} onChange={(e) => update(i, { name: e.target.value })} aria-invalid={nerr ? true : undefined} />
                       {nerr && dirty ? <p className="err">{nerr}</p> : null}
                     </div>
                   </td>

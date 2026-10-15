@@ -77,7 +77,8 @@ variant (static dots, no scale/glow).
   anchors), submit of a GET filter form to an admin URL, or Payload's `useRouteTransition().isTransitioning`
   (router.push after Save/Duplicate/Delete). Ends when `usePathname()`/`useSearchParams()` change. No
   `loading.tsx`: the admin page renders Payload's template incl. the module bar, a Suspense fallback would blank
-  the shell. The navigation overlay sits under the module bar and lets clicks through.
+  the shell. The navigation overlay sits under the module bar; ~~and lets clicks through~~ — superseded
+  2026-10-16, see the input shield below.
 - Mutations = `window.fetch` wrapped once (`mutation-tracker.ts`), counting in-flight same-origin
   POST/PUT/PATCH/DELETE to `/api/` — Payload's Form, delete, bulk delete/publish/edit, duplicate, reorder all use
   fetch (verified in @payloadcms/ui 3.90.1); custom views' `/api/v1` calls too. The save overlay covers the whole
@@ -94,3 +95,13 @@ variant (static dots, no scale/glow).
 
 **Risk.** Relies on Payload using `fetch` for mutations and on `useRouteTransition` (public `@payloadcms/ui`
 export); re-verify on Payload upgrades. Payload's bulk-upload drawer has its own overlay; ours shows on top.
+
+### Amendment 2026-10-16 — the loader blocks input (owner: "loading screen belum melakukan blocking aktivitas user")
+
+- A transparent input shield (`.pk-loading-shield`, whole page incl. the module bar, `--z-status + 3`, below Payload
+  popups and toasts) is active from the **first moment** of busy — navigation and save alike, without the 180 ms
+  anti-flash delay — until the loader hides; Enter and Space (outside text fields) are swallowed meanwhile. The dots
+  keep their timing. The 15 s safety timeout releases the shield together with the loader.
+- A navigation is counted only when the click reaches `window` (bubble phase) after the capture-phase check: Payload's
+  "leave without saving?" guard stops the event in the capture phase and opens its modal, and a shield over that modal
+  would otherwise lock the page for 15 s.

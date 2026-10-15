@@ -3,6 +3,8 @@ import { useRouter } from 'next/navigation'
 import React, { useId, useState } from 'react'
 
 import { problemText } from '../ActionButton'
+import { WrapSelect } from '../WrapSelect'
+import { WrapText } from '../WrapText'
 
 /**
  * DRMS 10/10 D4 (owner 2026-10-11, RAP for every project with a RAB): RAP templates on the project's RAP tab —
@@ -89,14 +91,14 @@ export function RapTemplateActions({ projectId, templates, empty }: { projectId:
             </p>
           ) : (
             <>
-              <select id={`${uid}-tpl`} value={templateId} onChange={(e) => setTemplateId(e.target.value)} data-pk-field="rap-template">
+              <WrapSelect id={`${uid}-tpl`} value={templateId} onChange={(e) => setTemplateId(e.target.value)} data-pk-field="rap-template">
                 <option value="">Pilih template…</option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} ({t.items} item{t.projectKind ? '' : ', semua jenis'})
                   </option>
                 ))}
-              </select>
+              </WrapSelect>
               <div className="pk-actions">
                 <button type="button" className="pk-kbtn primary" onClick={apply} disabled={busy !== null} data-pk-submit="rap-apply-template">
                   {busy === 'Memakai template…' ? busy : 'Pakai template'}
@@ -108,7 +110,7 @@ export function RapTemplateActions({ projectId, templates, empty }: { projectId:
       ) : (
         <div className="pk-fld">
           <label htmlFor={`${uid}-name`}>Simpan RAP ini sebagai template</label>
-          <input id={`${uid}-name`} type="text" value={name} maxLength={128} placeholder="mis. RAP trading standar" onChange={(e) => setName(e.target.value)} />
+          <WrapText id={`${uid}-name`} value={name} maxLength={128} placeholder="mis. RAP trading standar" onChange={(e) => setName(e.target.value)} />
           <p className="help">Item aktif disimpan sebagai template PT ini untuk project berjenis sama.</p>
           <div className="pk-actions">
             <button type="button" className="pk-kbtn" onClick={save} disabled={busy !== null} data-pk-submit="rap-save-template">

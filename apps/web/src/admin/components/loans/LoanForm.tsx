@@ -5,6 +5,7 @@ import React, { useId, useRef, useState } from 'react'
 import { DateInput } from '../DateInput'
 import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
+import { WrapSelect } from '../WrapSelect'
 
 /**
  * ADR 0022: PM form of an inter-project loan ("Pinjaman antar project") — project peminjam (projects the caller is
@@ -110,7 +111,7 @@ export function LoanForm({ borrowers, lenders, today, initialBorrower, edit }: {
       <div className="pk-kgrid">
         <div className="pk-fld">
           <label htmlFor={`${uid}-b`}>Project peminjam{req}</label>
-          <select
+          <WrapSelect
             id={`${uid}-b`}
             value={borrower}
             disabled={!!edit}
@@ -128,12 +129,12 @@ export function LoanForm({ borrowers, lenders, today, initialBorrower, edit }: {
                 {x.code} {x.name}
               </option>
             ))}
-          </select>
+          </WrapSelect>
           {err('borrowerProjectId') ?? <p className="help">Project yang memakai dana / barang (Anda PM-nya).</p>}
         </div>
         <div className="pk-fld">
           <label htmlFor={`${uid}-l`}>Project pemberi pinjaman{req}</label>
-          <select
+          <WrapSelect
             id={`${uid}-l`}
             value={lender}
             onChange={(e) => {
@@ -150,7 +151,7 @@ export function LoanForm({ borrowers, lenders, today, initialBorrower, edit }: {
                 {x.code} {x.name}
               </option>
             ))}
-          </select>
+          </WrapSelect>
           {err('lenderProjectId') ?? <p className="help">Hanya project di PT yang sama.</p>}
         </div>
         <fieldset className="pk-fld" style={{ border: 0, padding: 0, margin: 0 }}>
