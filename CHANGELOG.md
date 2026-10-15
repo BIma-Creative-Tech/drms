@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-15
+
+**DRMS 15/10 owner feedback: UI fixes, Pengguna with Penugasan in one form, and approval flow PM project → Direktur →
+Owner → Finance (transfer only) for every PT, including the requests already in flight.** PRs #76–#81. Production goes
+0.11.0 → 0.12.0. Web / server only: **no APK release**, and every API change is additive.
+
+**Database migrations** (data only, idempotent, no schema change, one batch in this order):
+`20261015_150000_d1510_finance_rule_data` (#79) → `20261015_200000_d1510_approval_reroute` (#78) →
+`20261015_210000_d1510_approval_inflight_trim` (#80/#81).
+
+**Deploy checklist** (runbook [`alur-persetujuan-2026-10-15.md`](docs/proyekkas/runbooks/alur-persetujuan-2026-10-15.md)):
+staging first, then prod only after the owner's go on the PROD preview.
+1. Take a dump right before the migration. After the first decision in the new flow, the dump is the only rollback.
+2. Run the read-only previews (`src/reroute/preview.sql` and `src/reroute/preview-trim.sql` inside `BEGIN READ ONLY …
+   ROLLBACK`), or the exact dry-run with the new migrate image (`src/reroute/cli.ts -- --dry-run`, both plans).
+3. Deploy (migrate → web + worker), then check the migrate log, one re-routed request (stepper, Log perubahan,
+   PM / Direktur inbox) and PB/DRMS/2610/0004 (no Finance approval step, in the Owner inbox).
+4. Rollback before any decision in the new flow: `payload migrate:down` (newest first). After a decision → restore the
+   dump and the 0.11.0 image.
+
 **Owner decision 2026-10-15 — every PT on PM project → Direktur → Owner, in-flight requests re-routed (d1510)**
 ([ADR 0026 § Amendment 2026-10-15](docs/proyekkas/adr/0026-owner-approval-level-above-direktur.md), notes in ADR 0021 /
 0024). Runbook: [`alur-persetujuan-2026-10-15.md`](docs/proyekkas/runbooks/alur-persetujuan-2026-10-15.md).
