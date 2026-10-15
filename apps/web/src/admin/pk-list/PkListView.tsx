@@ -58,7 +58,8 @@ export async function PkListView(props: ListViewServerProps) {
   const data = await loadPkList({ payload, user, collection: collectionConfig, searchParams, columnsPref: listPreferences?.columns, fieldPermissions })
   const { cfg, query, page, docs } = data
   const plural = label(collectionConfig.labels?.plural, i18n, slug)
-  // DRMS 13/10 W3: users → the tabbed "Pengguna" view for Admins (create + row), see edit-view.ts
+  // DRMS 13/10 W3: users → the tabbed "Pengguna" view for Admins (create + row); DRMS 16/10: clients / vendors → the
+  // tabbed "Klien" / "Vendor" pages (create + row + the "Aksi" link), see edit-view.ts
   const custom = customEditOf(slug, user, adminRoute)
   const createHref = custom ? (props.hasCreatePermission ? custom.createHref : undefined) : props.hasCreatePermission ? props.newDocumentURL : undefined
   const rowHref = (id: unknown) => (custom ? custom.rowHref(String(id)) : `${base}/${encodeURIComponent(String(id))}`)
@@ -81,7 +82,7 @@ export async function PkListView(props: ListViewServerProps) {
     viewType: 'list',
   })
   const byAccessor = new Map(columnState.map((c) => [c.accessor, c]))
-  const shown = data.columns.map((a) => byAccessor.get(a)).filter((c): c is NonNullable<typeof c> => !!c && c.active && !(custom && c.accessor === ROW_ACTIONS_FIELD))
+  const shown = data.columns.map((a) => byAccessor.get(a)).filter((c): c is NonNullable<typeof c> => !!c && c.active && !(custom?.hideRowActions && c.accessor === ROW_ACTIONS_FIELD))
   const sortable = new Set(cfg.columns.filter((c) => c.sortable).map((c) => c.name))
   // DRMS 15/10 #6: columns hug their content; the empty filler cell before "Aksi" (or last) takes the rest of the row
   const actionsAt = shown.findIndex((c) => c.accessor === ROW_ACTIONS_FIELD)

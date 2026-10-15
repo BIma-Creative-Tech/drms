@@ -474,6 +474,16 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /user-onboarding': 'named-pt',
   'PATCH /user-onboarding/:userId': 'named-pt',
   'GET /user-onboarding/:userId': 'document',
+  // DRMS 16/10 Klien / Vendor pages: create = a PT of the caller's selection with the create role (named or the only
+  // one); the record is read / written with the collections' own access (PT of the record)
+  'GET /client-form': 'selection',
+  'GET /client-form/:clientId': 'document',
+  'POST /client-form': 'named-pt',
+  'PATCH /client-form/:clientId': 'document',
+  'GET /vendor-form': 'selection',
+  'GET /vendor-form/:vendorId': 'document',
+  'POST /vendor-form': 'named-pt',
+  'PATCH /vendor-form/:vendorId': 'document',
 }
 
 describe('MC3 — route classes sampled across PTs', () => {
