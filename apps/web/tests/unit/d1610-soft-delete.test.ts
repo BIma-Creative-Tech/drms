@@ -87,9 +87,9 @@ describe('hideDeleted (beforeOperation of every registry collection)', () => {
     expect(hook({ where: { name: { like: 'x' } } }, 'read', null, { overrideAccess: true }).where).toEqual({ and: [{ name: { like: 'x' } }, NOT_DELETED] })
   })
   it('mayShowDeleted: pk-admin of a selected PT or group admin', () => {
-    expect(mayShowDeleted({ user: ptAdmin })).toBe(true)
-    expect(mayShowDeleted({ user: userWith(['pk-owner', 'pk-finance', 'pk-pm']) })).toBe(false)
-    expect(mayShowDeleted({ user: userWith(['pk-staff'], { groupAdmin: true }) })).toBe(true)
+    expect(mayShowDeleted({ user: ptAdmin } as never)).toBe(true)
+    expect(mayShowDeleted({ user: userWith(['pk-owner', 'pk-finance', 'pk-pm']) } as never)).toBe(false)
+    expect(mayShowDeleted({ user: userWith(['pk-staff'], { groupAdmin: true }) } as never)).toBe(true)
     expect(mayShowDeleted({ user: null })).toBe(false)
   })
 })
