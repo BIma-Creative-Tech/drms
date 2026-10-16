@@ -45,7 +45,7 @@ jobs:
           (npx payload migrate 2>&1 | tail -60) | tee "$RUNNER_TEMP/migrate.log" || true
           psql_out=$(node -e "const pg=require('pg');(async()=>{const c=new pg.Client({connectionString:process.env.DATABASE_URL});await c.connect();const r=await c.query('SELECT (SELECT count(*) FROM service_types) st, (SELECT count(*) FROM companies) co, (SELECT count(*) FROM service_reports_rels) rels, (SELECT data_type FROM information_schema.columns WHERE table_name = \'service_reports\' AND column_name = \'service_type\') col, (SELECT count(*) FROM payload_migrations) mig');console.log(JSON.stringify(r.rows));await c.end()})()" 2>&1) || true
           echo "$psql_out" | tee -a "$RUNNER_TEMP/migrate.log"
-          (timeout 300 npx payload migrate:create d1710_drift_check2 --skip-empty < /dev/null 2>&1 | tail -40) | tee "$RUNNER_TEMP/drift.log" || true
+          (timeout 300 npx payload migrate:create d1710_drift_check3 --skip-empty < /dev/null 2>&1 | tail -40) | tee "$RUNNER_TEMP/drift.log" || true
           ls src/migrations | grep drift_check || echo "NO DRIFT FILE" | tee -a "$RUNNER_TEMP/drift.log"
           (timeout 300 npx payload generate:types 2>&1 | tail -20) | tee "$RUNNER_TEMP/types.log" || true
           (timeout 300 npx payload generate:importmap 2>&1 | tail -20) | tee "$RUNNER_TEMP/importmap.log" || true
