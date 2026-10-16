@@ -90,7 +90,7 @@ export const FIELD_STYLE = `
 .pk-f3 .pk-lines { display: grid; gap: 8px; }
 .pk-f3 .pk-lines-h, .pk-f3 .pk-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 120px) 76px 72px auto; gap: 6px; align-items: center; }
 .pk-f3 .pk-lines-h { font-size: 12px; font-weight: 600; color: var(--pk-muted-fg); }
-/* DRMS owner 2026-10-17: service-report spare parts without the "No. part" column */
+/* DRMS owner 2026-10-17: service-report spare parts without the part-number column */
 .pk-f3 .pk-lines.no-pn .pk-lines-h, .pk-f3 .pk-lines.no-pn .pk-line { grid-template-columns: minmax(0, 1fr) 76px 72px auto; }
 /* "Jenis servis" checkbox pills: long names wrap (never cut) */
 .pk-f3 .pk-checks .pk-seg label { min-height: 34px; height: auto; padding: 6px 14px; line-height: 1.3; white-space: normal; overflow-wrap: anywhere; text-align: left; }

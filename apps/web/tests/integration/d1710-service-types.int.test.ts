@@ -398,7 +398,7 @@ describe('web views', () => {
     expect(html).toContain('data-pk-form="service-report"')
     expect(html).toContain('type="checkbox"')
     for (const code of ['perbaikan', 'inspeksi']) expect(html).toContain(`data-pk-choice="${T[code]}"`)
-    expect(html).not.toContain('No. part')
+    expect(html).not.toContain('>No. part<')
     expect(html).toContain('Maks. 25 foto')
     const r = await create(w.users.staffA, { serviceTypeIds: [T.perbaikan, T.inspeksi] })
     const list = await render(FieldServiceList, w.users.pm, ['laporan-servis'], { jenis: String(T.inspeksi) })
@@ -422,7 +422,8 @@ describe('web views', () => {
       const own = await render(FieldServiceDetail, w.users.staffA, ['laporan-servis', 'detail', String(plain.body.id)])
       expect(own).toContain('data-pk-action="service-edit"')
       expect(own).toContain('Perbaikan')
-      expect(own).not.toContain('No. part')
+      expect(own).not.toContain('>No. part<') // neither a table column nor an editor column
+      expect(own).not.toContain('aria-label="No. part 1"')
     } finally {
       await api('PATCH', `/api/service-types/${custom}`, w.users.admin, { active: true, changeReason: 'uji selesai' })
     }
