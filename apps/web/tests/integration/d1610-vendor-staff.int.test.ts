@@ -154,7 +154,7 @@ describe('Staff files a vendor payment (own PT) → the normal Staff flow', () =
     expect(panel.stepper.steps.map((x) => x.key)).toEqual(['diajukan', 'diketahui', 'approval-1', 'approval-2', 'transfer', 'end'])
 
     // PM → Direktur → Owner → Finance transfer → Selesai (no LPJ)
-    expect((await api('POST', `${E}/${d.id}/approve`, w.users.owner, {}, key())).status).toBe(403) // not the Direktur's turn yet
+    expect((await api('POST', `${E}/${d.id}/acknowledge`, w.users.owner, {}, key())).status).toBe(403) // the PM's step, not the Direktur's
     const ack = await ok(api('POST', `${E}/${d.id}/acknowledge`, w.users.pm, {}, key()))
     expect(ack).toMatchObject({ status: 'pending_approval', currentLevel: 1 })
     expect((await ok(api('POST', `${E}/${d.id}/approve`, w.users.owner, {}, key()))).status).toBe('pending_approval')
