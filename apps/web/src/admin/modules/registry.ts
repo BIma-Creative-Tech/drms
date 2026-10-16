@@ -181,6 +181,7 @@ export const MODULES: readonly ModuleDef[] = [
           { collection: 'daily-reports', label: 'Data laporan harian' },
           { collection: 'daily-report-lines', label: 'Data baris laporan harian' },
           { collection: 'resource-types' },
+          { collection: 'service-types' }, // DRMS owner 2026-10-17: "Jenis servis" master (Admin / Direktur)
         ],
       },
     ],
@@ -586,6 +587,7 @@ export const ITEM_ICONS: Readonly<Record<string, IconName>> = {
   '/collections/rap-items': 'tReceiptItem',
   '/collections/rap-templates': 'tCopy',
   '/collections/resource-types': 'master',
+  '/collections/service-types': 'master',
   // Keuangan
   '/collections/expense-requests': 'tReceiptText',
   '/collections/expense-line-snapshots': 'tArchiveBook',

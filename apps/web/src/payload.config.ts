@@ -66,6 +66,7 @@ import { DailyReports } from './collections/DailyReports'
 import { RapItems } from './collections/RapItems'
 import { RapTemplates } from './collections/RapTemplates'
 import { ResourceTypes } from './collections/ResourceTypes'
+import { ServiceTypes } from './collections/ServiceTypes'
 import { UrgencyLevels } from './collections/UrgencyLevels'
 import { Users } from './collections/Users'
 import { Vehicles } from './collections/Vehicles'
@@ -125,7 +126,7 @@ export const MASTER_COLLECTIONS = [
 ]
 
 /** FR1 (ADR 0020): field reports per project kind — contract units + the DRMS reports. */
-export const FIELD_COLLECTIONS = [ContractUnits, ServiceReports, UnitTimesheets, AftersalesActivities, RapItems, RapTemplates, ResourceTypes, DailyReports, DailyReportLines]
+export const FIELD_COLLECTIONS = [ContractUnits, ServiceReports, UnitTimesheets, AftersalesActivities, RapItems, RapTemplates, ResourceTypes, ServiceTypes, DailyReports, DailyReportLines]
 
 /** F2 business documents (T1–T8, period closing). */
 export const FLOW_COLLECTIONS = [

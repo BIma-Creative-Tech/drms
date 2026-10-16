@@ -106,7 +106,8 @@ export const EDIT_WINDOW_HOURS = 24
 export const MAX_HOURS_PER_DAY = 24
 /** A report date may lie at most this many days before the day it reaches the server (offline queue). */
 export const BACKDATE_MAX_DAYS = 14
-export const MAX_PHOTOS: Readonly<Record<FieldReportType, number>> = { service_report: 10, unit_timesheet: 1, aftersales_activity: 5, daily_report: 10 }
+/** Photos per report; service report 10 → 25 (DRMS owner 2026-10-17, ADR 0020 amendment 2026-10-17; DB: migration d1710_service_types). */
+export const MAX_PHOTOS: Readonly<Record<FieldReportType, number>> = { service_report: 25, unit_timesheet: 1, aftersales_activity: 5, daily_report: 10 }
 /** HM / hours / litres: ≥ 0, ≤ 2 decimals. */
 export const MAX_HM = 10_000_000
 
@@ -323,9 +324,28 @@ export const poAgeDays = (poDate: string, asOf: string): number => Math.max(0, d
 
 // ---------------------------------------------------------------- service report
 
+/**
+ * The four LEGACY service types (enum of the 0.13 schema, APK 0.7.0 `ServiceType`). DRMS owner 2026-10-17: "Jenis
+ * servis" is now the per-PT master `service-types` (multi-select on the report) — these codes/names only seed every PT
+ * (migration d1710_service_types + `ensureDefaultServiceTypes`) and map the legacy single `serviceType` /
+ * `service_type` of old clients onto the PT's master row with the same code.
+ */
 export const SERVICE_TYPES = ['servis_berkala', 'perbaikan', 'inspeksi', 'pemasangan'] as const
 export type ServiceType = (typeof SERVICE_TYPES)[number]
 export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = { servis_berkala: 'Servis berkala', perbaikan: 'Perbaikan', inspeksi: 'Inspeksi', pemasangan: 'Pemasangan' }
+/** Seed of the per-PT master (code = legacy enum value). */
+export const DEFAULT_SERVICE_TYPES: ReadonlyArray<{ code: ServiceType; name: string }> = SERVICE_TYPES.map((code) => ({ code, name: SERVICE_TYPE_LABELS[code] }))
+/** Selected service types of one report: 1 … MAX_SERVICE_TYPES, unique (API + sync). */
+export const MAX_SERVICE_TYPES = 20
+export const SERVICE_TYPES_REQUIRED = 'Pilih minimal satu jenis servis.'
+
+/** "Servis berkala, Perbaikan": names of the selected types in selection order (legacy code → its label as fallback). */
+export function serviceTypeNames(types: ReadonlyArray<{ name?: string | null; code?: string | null }> | null | undefined, legacy?: string | null): string {
+  const names = (types ?? []).map((t) => t.name || t.code || '').filter(Boolean)
+  if (names.length > 0) return names.join(', ')
+  if (!legacy) return '—'
+  return SERVICE_TYPE_LABELS[legacy as ServiceType] ?? legacy
+}
 
 /** Start/end time of a service visit (HH:MM, same day): end after start when both are given. */
 export function serviceTimeError(start?: string | null, end?: string | null): FieldIssue | null {

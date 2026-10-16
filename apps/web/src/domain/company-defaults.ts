@@ -7,6 +7,7 @@ import { WEEKDAY_KEYS } from '@/domain/attendance/schedule'
 import { ruleDecisionError } from '@/domain/expense/decision'
 import { stepsError, type AckBy, type AckMode } from '@/domain/expense/rules'
 import { DEFAULT_SEQUENCES } from '@/domain/numbering'
+import { DEFAULT_SERVICE_TYPES } from '@/domain/field/rules'
 import { DEFAULT_RESOURCE_TYPES } from '@/domain/rap/rules'
 import { CASH_IN_SOURCES, DEFAULT_APPROVAL_RULES } from '@/seed/data'
 import { DEFAULT_TZ } from '@/lib/time'
@@ -118,6 +119,21 @@ export async function ensureDefaultResourceTypes(req: PayloadRequest, target: nu
     await req.payload.create({ collection: 'resource-types', data: { company: target, ...r, active: true } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: default master of a PT */, req })
   }
   return DEFAULT_RESOURCE_TYPES.map((r) => r.code)
+}
+
+/**
+ * DRMS owner 2026-10-17: the "Jenis servis" master of PT `target` — the four legacy types (code = the old enum value,
+ * so APK 0.7.0's single `service_type` keeps mapping) when the PT has none at all (never hard-deleted → "none" = never
+ * seeded; a PT that renamed / deactivated / soft-deleted its types is left alone). Existing PTs: migration
+ * 20261017_100000_d1710_service_types. Audited by the collection. SYSTEM-WRITE like the urgency levels.
+ */
+export async function ensureDefaultServiceTypes(req: PayloadRequest, target: number): Promise<string[]> {
+  const res = await req.payload.find({ collection: 'service-types', where: { company: { equals: target } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: masters of the target PT */, req })
+  if (res.docs.length > 0) return []
+  for (const t of DEFAULT_SERVICE_TYPES) {
+    await req.payload.create({ collection: 'service-types', data: { company: target, ...t, active: true } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: default master of a PT */, req })
+  }
+  return DEFAULT_SERVICE_TYPES.map((t) => t.code)
 }
 
 /** req.context flag: the create comes from the seed / go-live import (they apply their own defaults). */

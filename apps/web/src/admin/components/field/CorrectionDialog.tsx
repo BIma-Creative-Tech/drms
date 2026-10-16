@@ -6,7 +6,7 @@ import { parseRupiah, groupRupiah } from '@/lib/rupiah-input'
 import { fmtNum } from '@/domain/field/views'
 
 import { newIdemKey, sendJson, fieldErrors } from '../kas/client'
-import { decOut, LinesEditor, linesFrom, linesOut, type LineDraft } from './parts'
+import { CheckGroup, decOut, LinesEditor, linesFrom, linesOut, PhotoPicker, usePhotos, type LineDraft } from './parts'
 import { WrapSelect } from '../WrapSelect'
 
 /**
@@ -15,6 +15,13 @@ import { WrapSelect } from '../WrapSelect'
  * reason optional). Native modal <dialog> (focus trap, Esc, focus back to the button), the fields of
  * the document prefilled, only CHANGED fields are sent; one Idempotency-Key per opened dialog + body.
  * The server re-checks the role/team, the window, HM_DECREASED, Σ hours ≤ 24 and PO transitions.
+ *
+ * DRMS owner 2026-10-17 (service report only — every other dialog renders and sends exactly as before):
+ * - kind `multiselect`: checkbox pills ("Jenis servis"), the value in selection order; options carry the types
+ *   already on the document even when deactivated ("(nonaktif)"); sent only when the selection changed;
+ * - `photos`: ADD photos (never remove) up to `max` in total — uploaded on save (POST /media/progress-photos, cached
+ *   per file so a retry never uploads twice), then sent as `addPhotoIds`;
+ * - lines `hidePartNo`: no "No. part" input; a stored part no. stays on its line (not sent as a change).
  */
 type Line = { name: string; partNo?: string | null; qty: number; uom?: string | null; note?: string | null }
 export type CorrField =
@@ -22,7 +29,8 @@ export type CorrField =
   | { name: string; label: string; kind: 'decimal'; value: number | null; max?: number; required?: boolean }
   | { name: string; label: string; kind: 'select'; value: string | null; options: Array<{ value: string; label: string }> }
   | { name: string; label: string; kind: 'rupiah'; value: number | null }
-  | { name: string; label: string; kind: 'lines'; value: Line[]; withNote?: boolean }
+  | { name: string; label: string; kind: 'lines'; value: Line[]; withNote?: boolean; hidePartNo?: boolean }
+  | { name: string; label: string; kind: 'multiselect'; value: string[]; options: Array<{ value: string; label: string }>; numeric?: boolean; required?: boolean; requiredMessage?: string; help?: string }
 
 export type CorrectionDialogProps = {
   url: string
@@ -32,31 +40,41 @@ export type CorrectionDialogProps = {
   description: React.ReactNode
   fields: CorrField[]
   testId?: string
+  /** Photos that may be ADDED (service report): `current` already on the document, `max` in total. */
+  photos?: { current: number; max: number }
 }
 
 const initialText = (f: CorrField): string => {
-  if (f.kind === 'lines') return ''
+  if (f.kind === 'lines' || f.kind === 'multiselect') return ''
   if (f.kind === 'decimal') return f.value === null ? '' : fmtNum(f.value)
   if (f.kind === 'rupiah') return f.value === null ? '' : groupRupiah(f.value)
   return f.value ?? ''
 }
 
-export function CorrectionDialog({ url, mode, buttonLabel, title, description, fields, testId }: CorrectionDialogProps) {
+const initialMulti = (fields: CorrField[]): Record<string, string[]> => Object.fromEntries(fields.flatMap((f) => (f.kind === 'multiselect' ? [[f.name, [...f.value]]] : [])))
+
+export function CorrectionDialog({ url, mode, buttonLabel, title, description, fields, testId, photos }: CorrectionDialogProps) {
   const router = useRouter()
   const ref = useRef<HTMLDialogElement>(null)
   const uid = useId()
   const [text, setText] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.name, initialText(f)])))
   const [lines, setLines] = useState<Record<string, LineDraft[]>>(() => Object.fromEntries(fields.filter((f) => f.kind === 'lines').map((f) => [f.name, linesFrom((f as { value: Line[] }).value)])))
+  const [multi, setMulti] = useState<Record<string, string[]>>(() => initialMulti(fields))
   const [reason, setReason] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [busyText, setBusyText] = useState<string | null>(null)
+  const room = photos ? Math.max(0, photos.max - photos.current) : 0
+  const pics = usePhotos(room)
   const idem = useRef<{ body: string; key: string | undefined } | null>(null)
   const required = mode === 'correction'
 
   const open = () => {
     setText(Object.fromEntries(fields.map((f) => [f.name, initialText(f)])))
     setLines(Object.fromEntries(fields.filter((f) => f.kind === 'lines').map((f) => [f.name, linesFrom((f as { value: Line[] }).value)])))
+    setMulti(initialMulti(fields))
+    if (photos) pics.clear()
     setReason('')
     setErrors({})
     setError(null)
@@ -79,6 +97,10 @@ export function CorrectionDialog({ url, mode, buttonLabel, title, description, f
         const before = JSON.stringify(f.value.map((l) => ({ name: l.name, partNo: l.partNo ?? null, qty: l.qty, uom: l.uom ?? null, ...(f.withNote ? { note: l.note ?? null } : {}) })))
         const after = JSON.stringify(out.lines.map((l) => ({ name: l.name, partNo: l.partNo ?? null, qty: l.qty, uom: l.uom ?? null, ...(f.withNote ? { note: l.note ?? null } : {}) })))
         if (before !== after) body[f.name] = out.lines
+      } else if (f.kind === 'multiselect') {
+        const sel = multi[f.name] ?? []
+        if (sel.length === 0 && f.required) errs[f.name] = f.requiredMessage ?? 'Pilih minimal satu.'
+        else if (JSON.stringify(sel) !== JSON.stringify(f.value)) body[f.name] = f.numeric ? sel.map(Number) : sel
       } else if (f.kind === 'decimal') {
         const v = decOut(t, f.max)
         if (v === undefined) errs[f.name] = `Angka tidak valid (maks. 2 desimal${f.max !== undefined ? `, ≤ ${fmtNum(f.max)}` : ''}).`
@@ -105,7 +127,7 @@ export function CorrectionDialog({ url, mode, buttonLabel, title, description, f
       setError('Periksa isian yang ditandai.')
       return
     }
-    if (Object.keys(body).length === 0) {
+    if (Object.keys(body).length === 0 && pics.items.length === 0) {
       setError('Tidak ada perubahan.')
       return
     }
@@ -115,11 +137,19 @@ export function CorrectionDialog({ url, mode, buttonLabel, title, description, f
       return
     }
     if (r) body.reason = r
-    const json = JSON.stringify(body)
-    if (!idem.current || idem.current.body !== json) idem.current = { body: json, key: newIdemKey() }
     setBusy(true)
     setError(null)
+    let uploading = false
     try {
+      if (photos && pics.items.length > 0) {
+        uploading = true
+        setBusyText('Mengunggah foto…')
+        body.addPhotoIds = await pics.uploadAll((d, t) => setBusyText(`Mengunggah foto ${d}/${t}…`))
+        setBusyText(null)
+        uploading = false
+      }
+      const json = JSON.stringify(body)
+      if (!idem.current || idem.current.body !== json) idem.current = { body: json, key: newIdemKey() }
       const res = await sendJson(mode === 'correction' ? 'POST' : 'PATCH', url, body, idem.current.key)
       if (!res.ok) {
         setErrors(fieldErrors(res.data))
@@ -127,11 +157,13 @@ export function CorrectionDialog({ url, mode, buttonLabel, title, description, f
         return
       }
       ref.current?.close()
+      if (photos) pics.clear()
       router.refresh()
-    } catch {
-      setError('Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+    } catch (x) {
+      setError(uploading && x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
     } finally {
       setBusy(false)
+      setBusyText(null)
     }
   }
 
@@ -151,10 +183,17 @@ export function CorrectionDialog({ url, mode, buttonLabel, title, description, f
             {fields.map((f) => {
               const err = errors[f.name]
               const describedBy = err ? fid(`${f.name}-e`) : undefined
+              if (f.kind === 'multiselect') {
+                return (
+                  <div key={f.name} className="full">
+                    <CheckGroup label={f.label} name={fid(f.name)} value={multi[f.name] ?? []} options={f.options} onChange={(v) => setMulti({ ...multi, [f.name]: v })} required={f.required} error={err} help={f.help} />
+                  </div>
+                )
+              }
               if (f.kind === 'lines') {
                 return (
                   <div key={f.name} className="full">
-                    <LinesEditor rows={lines[f.name] ?? []} setRows={(rows) => setLines({ ...lines, [f.name]: rows })} label={f.label} nameLabel="Nama" addLabel="+ Tambah baris" withNote={f.withNote} />
+                    <LinesEditor rows={lines[f.name] ?? []} setRows={(rows) => setLines({ ...lines, [f.name]: rows })} label={f.label} nameLabel="Nama" addLabel="+ Tambah baris" withNote={f.withNote} hidePartNo={f.hidePartNo} />
                     {err ? (
                       <p className="pk-kerr" id={fid(`${f.name}-e`)} role="alert">
                         {err}
@@ -200,6 +239,13 @@ export function CorrectionDialog({ url, mode, buttonLabel, title, description, f
               )
             })}
           </div>
+          {photos ? (
+            room > 0 ? (
+              <PhotoPicker photos={pics} name="addPhotos" label="Tambah foto" help={`Sudah ${photos.current} foto; maks. ${photos.max} foto per laporan. Foto yang sudah ada tidak dapat dihapus.`} error={errors.addPhotoIds ?? errors.photoIds} />
+            ) : (
+              <p className="help">Sudah {photos.current} foto (maksimal {photos.max}) — tidak dapat menambah foto.</p>
+            )
+          ) : null}
           <div className="pk-fld">
             <label htmlFor={fid('reason')}>
               {required ? 'Alasan koreksi' : 'Alasan perubahan (opsional)'}
@@ -224,7 +270,7 @@ export function CorrectionDialog({ url, mode, buttonLabel, title, description, f
               Batal
             </button>
             <button type="submit" className="pk-kbtn primary" disabled={busy} data-pk-confirm={testId}>
-              {busy ? 'Menyimpan…' : mode === 'correction' ? 'Simpan koreksi' : 'Simpan perubahan'}
+              {busy ? (busyText ?? 'Menyimpan…') : mode === 'correction' ? 'Simpan koreksi' : 'Simpan perubahan'}
             </button>
           </div>
         </form>

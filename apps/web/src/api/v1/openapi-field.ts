@@ -80,7 +80,16 @@ export function registerFieldPaths(registry: OpenAPIRegistry, h: Helpers): void 
     update: F.ServiceReportUpdate,
     correction: F.ServiceReportCorrection,
     createSummary:
-      'FR1 Laporan servis unit (SV/YYMM/####): Staff assigned / PM team / Direktur; project kind kontrak_unit or aftersales (409 WRONG_PROJECT_KIND); PT flag off → 403 FEATURE_DISABLED; HM below the unit\'s latest reading → 409 HM_DECREASED; unitStatusAfter updates the unit (menunggu_part notifies the PM)',
+      'FR1 Laporan servis unit (SV/YYMM/####): Staff assigned / PM team / Direktur; project kind kontrak_unit or aftersales (409 WRONG_PROJECT_KIND); PT flag off → 403 FEATURE_DISABLED; HM below the unit\'s latest reading → 409 HM_DECREASED; unitStatusAfter updates the unit (menunggu_part notifies the PM); one or more service types (serviceTypeIds, GET /service-types; legacy serviceType); ≤ 25 photos',
+  })
+  registry.registerPath({
+    method: 'get',
+    path: '/service-types',
+    summary:
+      'DRMS owner 2026-10-17 "Jenis servis" master of the caller\'s selected PTs (?company= narrows; 403 COMPANY_NOT_ALLOWED outside): active types sorted by name, also the inactive ones with includeInactive=1. Managed by Admin / Direktur (Payload collection service-types)',
+    security: h.security,
+    request: { headers: h.deviceHeader, query: F.ServiceTypeListQuery },
+    responses: h.res(200, 'Service types', F.ServiceTypeList, [400, 401, 403, 426, 429]),
   })
   trio({
     path: '/unit-timesheets',

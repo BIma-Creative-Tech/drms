@@ -2,7 +2,7 @@ import type { PayloadRequest } from 'payload'
 import Link from 'next/link'
 import React from 'react'
 
-import { ACTIVITY_KIND_LABELS, addDays, PO_STATUS_LABELS, SERVICE_TYPE_LABELS, UNIT_STATUS_LABELS, type ActivityKind, type PoStatus, type ServiceType, type UnitStatus } from '@/domain/field/rules'
+import { ACTIVITY_KIND_LABELS, addDays, PO_STATUS_LABELS, serviceTypeNames, UNIT_STATUS_LABELS, type ActivityKind, type PoStatus, type UnitStatus } from '@/domain/field/rules'
 import { dailyTimelineEntries } from '@/domain/daily/timeline'
 import { listActivities } from '@/domain/field/aftersales'
 import { listServiceReports } from '@/domain/field/service'
@@ -51,7 +51,7 @@ export async function ProjectTimeline({ req, project, sp, base, i = 0 }: { req: 
       docNo: s.docNo,
       reportDate: s.reportDate,
       unitLabel: s.unit.label ?? `Unit #${s.unit.id}`,
-      serviceTypeLabel: SERVICE_TYPE_LABELS[s.serviceType as ServiceType] ?? String(s.serviceType),
+      serviceTypeLabel: serviceTypeNames(s.serviceTypes, s.serviceType), // DRMS owner 2026-10-17: one or more types
       statusLabel: UNIT_STATUS_LABELS[s.unitStatusAfter as UnitStatus] ?? String(s.unitStatusAfter),
       statusOk: s.unitStatusAfter === 'siap',
       action: s.action,

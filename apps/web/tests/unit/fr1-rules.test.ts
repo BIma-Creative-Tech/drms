@@ -176,7 +176,9 @@ describe('FR1 API / sync contract', () => {
     const ts = { projectId: 1, unitId: 2, reportDate: '2026-10-10', hmStart: 1000, hmEnd: 1008, workHours: 8 }
     expect(UnitTimesheetCreate.safeParse(ts).success).toBe(false)
     expect(UnitTimesheetCreate.safeParse({ ...ts, hmPhotoId: 9 }).success).toBe(true)
-    expect(ServiceReportCreate.safeParse({ projectId: 1, unitId: 2, serviceType: 'perbaikan', action: 'Ganti seal', unitStatusAfter: 'menunggu_part', photoIds: Array.from({ length: 11 }, (_, i) => i + 1) }).success).toBe(false)
+    // DRMS owner 2026-10-17: ≤ 25 photos (26 refused)
+    expect(ServiceReportCreate.safeParse({ projectId: 1, unitId: 2, serviceType: 'perbaikan', action: 'Ganti seal', unitStatusAfter: 'menunggu_part', photoIds: Array.from({ length: 25 }, (_, i) => i + 1) }).success).toBe(true)
+    expect(ServiceReportCreate.safeParse({ projectId: 1, unitId: 2, serviceType: 'perbaikan', action: 'Ganti seal', unitStatusAfter: 'menunggu_part', photoIds: Array.from({ length: 26 }, (_, i) => i + 1) }).success).toBe(false)
   })
 
   it('new sync item types are accepted by the envelope', () => {

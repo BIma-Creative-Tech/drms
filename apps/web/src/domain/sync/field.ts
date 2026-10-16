@@ -20,6 +20,7 @@ import { createActivity, editActivity, type ActivityDoc } from '@/domain/field/a
 import { findByClientUuid, flagsOf, loadRaw, loadVisible, photoIdsOf, revOf, type FieldDoc, type Timing } from '@/domain/field/common'
 import type { FieldReportType } from '@/domain/field/rules'
 import { createServiceReport, editServiceReport, type ServiceDoc } from '@/domain/field/service'
+import { serviceTypeIdsOf, serviceTypeRows } from '@/domain/field/service-types'
 import { createTimesheet, editTimesheet, type TimesheetDoc } from '@/domain/field/timesheet'
 import { getRequestTx } from '@/lib/tx'
 
@@ -83,7 +84,23 @@ export async function fieldCopy(req: PayloadRequest, type: FieldReportType, id: 
   const photos = await photoIdsOf(req, type, d.id)
   if (type === 'service_report') {
     const s = d as unknown as ServiceDoc
-    return { ...base, doc_no: s.docNo ?? null, project_id: relId(s.project)!, unit_id: relId(s.unit)!, report_date: s.reportDate, hour_meter: s.hourMeter === null || s.hourMeter === undefined ? null : n(s.hourMeter), service_type: s.serviceType, action: s.action, unit_status_after: s.unitStatusAfter, photo_media_ids: photos }
+    // DRMS owner 2026-10-17: `service_type` stays the code of the FIRST selected type (APK 0.7.0 only shows it in the
+    // conflict screen — `ServiceType.fromCode(c) ?.label ?? c` — so any master code is safe); + the full selection.
+    const typeIds = serviceTypeIdsOf(s.serviceTypes)
+    const first = typeIds.length ? (await serviceTypeRows(req, [typeIds[0]!])).get(typeIds[0]!)?.code : undefined
+    return {
+      ...base,
+      doc_no: s.docNo ?? null,
+      project_id: relId(s.project)!,
+      unit_id: relId(s.unit)!,
+      report_date: s.reportDate,
+      hour_meter: s.hourMeter === null || s.hourMeter === undefined ? null : n(s.hourMeter),
+      service_type: first ?? s.serviceType ?? '',
+      service_type_ids: typeIds,
+      action: s.action,
+      unit_status_after: s.unitStatusAfter,
+      photo_media_ids: photos,
+    }
   }
   if (type === 'unit_timesheet') {
     const t = d as unknown as TimesheetDoc
@@ -195,6 +212,7 @@ export async function applyFieldItem(c: Ctx, type: FieldReportType, verdict: Tim
         startTime: p.start_time,
         endTime: p.end_time,
         hourMeter: p.hour_meter,
+        serviceTypeIds: p.service_type_ids,
         serviceType: p.service_type,
         complaint: p.complaint,
         action: p.action,
@@ -209,7 +227,6 @@ export async function applyFieldItem(c: Ctx, type: FieldReportType, verdict: Tim
     if (p.report_id !== undefined) reject('NOT_FOUND', 'Laporan tidak ditemukan.', 'payload.report_id')
     required(p.project_id, 'project_id', 'project_id')
     required(p.unit_id, 'unit_id', 'unit_id')
-    required(p.service_type, 'service_type', 'service_type')
     required(p.action, 'action', 'action')
     required(p.unit_status_after, 'unit_status_after', 'unit_status_after')
     const { timing, timeFlags } = timingOf(c, verdict, receivedAt)
@@ -223,7 +240,8 @@ export async function applyFieldItem(c: Ctx, type: FieldReportType, verdict: Tim
         startTime: p.start_time,
         endTime: p.end_time,
         hourMeter: p.hour_meter,
-        serviceType: p.service_type!,
+        serviceTypeIds: p.service_type_ids,
+        serviceType: p.service_type,
         complaint: p.complaint,
         action: p.action!,
         unitStatusAfter: p.unit_status_after!,

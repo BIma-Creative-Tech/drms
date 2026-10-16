@@ -37,6 +37,8 @@ const WITH_COMPANY = [
   'sites',
   // ADR 0027 rekening vendor
   'vendor-bank-accounts',
+  // DRMS owner 2026-10-17: "Jenis servis" master
+  'service-types',
 ].sort()
 
 describe('PT column + PT filter on list views', () => {

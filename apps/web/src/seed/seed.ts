@@ -3,6 +3,7 @@ import sharp from 'sharp'
 
 import { DEFAULT_URGENCY_LEVELS, SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
 import { DEFAULT_RESOURCE_TYPES } from '@/domain/rap/rules'
+import { DEFAULT_SERVICE_TYPES } from '@/domain/field/rules'
 import { DEFAULT_SEQUENCES } from '@/domain/numbering'
 import { normalizePlate } from '@/domain/plates'
 import { withSystemTransaction } from '@/lib/system-tx'
@@ -75,6 +76,8 @@ export async function seed(payload: Payload, data: SeedData = DEFAULT_SEED_DATA)
     }
     // Owner decision 2026-10-09: default "Tingkat Urgensi" (not part of the seed file schema)
     for (const r of DEFAULT_RESOURCE_TYPES) await ensure('resource-types', inPt({ code: { equals: r.code } }), { ...r, company: cid, active: true }, k(`res:${r.code}`))
+    // DRMS owner 2026-10-17: "Jenis servis" master (the four legacy types)
+    for (const t of DEFAULT_SERVICE_TYPES) await ensure('service-types', inPt({ code: { equals: t.code } }), { ...t, company: cid, active: true }, k(`svt:${t.code}`))
     for (const u of DEFAULT_URGENCY_LEVELS) await ensure('urgency-levels', inPt({ code: { equals: u.code } }), { ...u, company: cid, active: true }, k(`urg:${u.code}`))
     for (const s of block.cashInSources) await ensure('cash-in-sources', inPt({ code: { equals: s.code } }), { ...s, company: cid, active: true }, k(`cis:${s.code}`))
     for (const a of block.cashAccounts) await ensure('cash-accounts', inPt({ name: { equals: a.name } }), { ...a, company: cid, openingBalance: 0, active: true }, k(`ca:${a.name}`))
