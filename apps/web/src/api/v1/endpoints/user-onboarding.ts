@@ -1,6 +1,6 @@
 import { APIError, type PayloadRequest } from 'payload'
 
-import { KeycloakAdminError } from '@/auth/keycloak-admin'
+import { KeycloakAdminError, KeycloakPasswordPolicyError } from '@/auth/keycloak-admin'
 import { compensateKeycloak } from '@/domain/users-sync'
 import { loadUserOnboarding, mayOnboard, OnboardingError, saveUserOnboarding, type SaveResult } from '@/domain/user-onboarding/service'
 import { withReqTransaction } from '@/lib/system-tx'
@@ -34,6 +34,10 @@ function toHttp(err: unknown): never {
     throw new HttpError(err.status, title, { detail: err.detail, ...(err.errors.length ? { errors: err.errors } : {}) })
   }
   // Keycloak refused / unreachable (users-sync runs first): nothing saved, the compensation already ran
+  if (err instanceof KeycloakPasswordPolicyError) {
+    // the password is generated here, so this is a platform mismatch — name the policy key for the technical team
+    throw new HttpError(502, 'Bad Gateway', { code: 'KEYCLOAK_FAILED', detail: `Sistem login (Keycloak) menolak kata sandi sementara (kebijakan: ${err.policy}) — tidak ada yang disimpan. Hubungi tim teknis.` })
+  }
   if (err instanceof KeycloakAdminError) {
     throw new HttpError(502, 'Bad Gateway', { code: 'KEYCLOAK_FAILED', detail: 'Sistem login (Keycloak) menolak atau tidak dapat dihubungi — tidak ada yang disimpan. Coba lagi atau hubungi tim teknis.' })
   }
