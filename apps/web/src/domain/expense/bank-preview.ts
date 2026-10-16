@@ -80,7 +80,7 @@ export async function bankPreview(req: PayloadRequest, input: { requestId?: numb
     if (!mayFileIntercompany(req)) fail(404, 'Rekening tidak ditemukan.')
     return intercompanyPreview(req, input.payeeCompanyId)
   }
-  // ADR 0027: a vendor account (vendor payment) — readable through the collection access (Admin / Finance / Direktur / PM of its PT)
+  // ADR 0027: a vendor account (vendor payment) — readable through the collection access (Admin / Finance / Direktur / PM / Staff of its PT)
   if (input.vendorAccountId !== undefined) return vendorPreview(req, { requestId, accountId: input.vendorAccountId, reveal })
   if (requestId === undefined) {
     if (accountId === undefined) fail(400, 'Pilih rekening.')

@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+- **Staff may file a "Pembayaran vendor" (owner 2026-10-16, amends ADR 0027).** "untuk pengajuan vendor dibukakan di
+  level staff": `VENDOR_PAYMENT_ROLES` = Staff, Finance, PM of the request's PT (403 text now "… oleh Staff, Finance atau
+  PM di PT ini."). A Staff vendor payment follows the normal Staff flow — the PT's default rule: PM project (cost center:
+  its manager) → Direktur → Owner → Finance transfer → Selesai (no LPJ); the seeded Finance vendor rule stays
+  Finance-only. Staff now READ `vendors` and `vendor-bank-accounts` of their own PTs (REST, masters types for the APK,
+  bank preview) — never create / update them, never another PT; the Staff panel still hides the Master Data lists.
+  Web form and APK editor offer "Vendor" to Staff; "PT grup" (ADR 0028) unchanged. **No migration**, no contract shape
+  change (OpenAPI descriptions only). APK: the vendor option for Staff ships with the next APK release; older APKs keep
+  hiding it.
+
 ## [0.13.1] - 2026-10-16
 
 **Fix: "Pengguna baru" could not be saved for a new account; a definitive Direktur's representative who is also the

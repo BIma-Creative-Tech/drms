@@ -108,8 +108,9 @@ export const vendorCostCenterAccess = ({ data, siblingData, doc }: { data?: unkn
 }
 
 /**
- * ADR 0027: "Jenis penerima" options of the form — `vendor` only for Finance / PM of the form's PT (D3; the server
- * re-checks: drafts.ts vendorErrors). A stored value stays selectable (a locked request is never re-validated here).
+ * ADR 0027: "Jenis penerima" options of the form — `vendor` only for Staff / Finance / PM of the form's PT (D3; Staff
+ * since owner request 2026-10-16; the server re-checks: drafts.ts vendorErrors). A stored value stays selectable (a
+ * locked request is never re-validated here).
  */
 export const payeeTypeOptions = ({ options, data, req }: { options: Array<string | { label: unknown; value: string }>; data?: unknown; req: PayloadRequest }) => {
   const stored = (data as { payeeType?: unknown } | undefined)?.payeeType
@@ -404,7 +405,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       { name: 'requestStepper', type: 'ui', label: 'Alur pengajuan', admin: { position: 'sidebar', components: { Field: '@/admin/components/request/StepperField#StepperField' } } },
       {
         // ADR 0027 (DRMS 13/10 Wave 4) "Jenis penerima": karyawan (default, as before) or vendor = "Pembayaran vendor"
-        // (Finance / PM only, vendor + rekening vendor + invoice, no LPJ). Required → no admin.condition (schema drift);
+        // (Staff / Finance / PM, vendor + rekening vendor + invoice, no LPJ). Required → no admin.condition (schema drift);
         // the wrapper renders it only while the content is editable.
         name: 'payeeType',
         type: 'select',
@@ -421,7 +422,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         filterOptions: payeeTypeOptions as never,
         admin: {
           placeholder: PLACEHOLDERS.payeeType,
-          description: 'Vendor: Finance / PM membayar invoice vendor ke rekening vendor (tanpa LPJ). PT grup: Finance / PM / Direktur membayar PT lain di grup ke rekening penerimaan antar-PT-nya; kas masuk di PT itu tercatat otomatis saat ditransfer.',
+          description: 'Vendor: Staff / Finance / PM membayar invoice vendor ke rekening vendor (tanpa LPJ). PT grup: Finance / PM / Direktur membayar PT lain di grup ke rekening penerimaan antar-PT-nya; kas masuk di PT itu tercatat otomatis saat ditransfer.',
           components: { Field: '@/admin/components/EditableOnlyFields#PayeeTypeField' },
         },
       },

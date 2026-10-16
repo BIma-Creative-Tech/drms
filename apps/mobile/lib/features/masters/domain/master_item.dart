@@ -33,7 +33,8 @@ abstract final class MasterTypes {
   static const urgencyLevels = 'urgency-levels';
 
   /// ADR 0027 "Pembayaran vendor": vendors of the PT and their accounts (Finance / PM / Direktur / Admin read them;
-  /// Staff get none). `vendor-bank-accounts` needs a server with ADR 0027 (an older one answers 400 for the type) —
+  /// Staff too since the owner request 2026-10-16 — Staff file vendor payments; an older server lists Staff none).
+  /// `vendor-bank-accounts` needs a server with ADR 0027 (an older one answers 400 for the type) —
   /// the APK with this change is released after that server.
   static const vendors = 'vendors';
   static const vendorBankAccounts = 'vendor-bank-accounts';

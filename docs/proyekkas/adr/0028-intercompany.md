@@ -83,7 +83,8 @@ Fields of a `pt_grup` request:
 | lines | normal lines and categories of A (e.g. "Jasa antar PT"); they drive A's KK category as today. |
 
 **Who may file (owner decision 2026-10-14):** Finance, PM or **Direktur (`pk-owner`)** **in A**
-(`INTERCOMPANY_PAYMENT_ROLES`; vendor payments stay Finance + PM, `VENDOR_PAYMENT_ROLES`; `payeeFilerRoles(payee)`
+(`INTERCOMPANY_PAYMENT_ROLES`; vendor payments: Finance + PM, + Staff since 2026-10-16 (ADR 0027 amendment),
+`VENDOR_PAYMENT_ROLES`; `payeeFilerRoles(payee)`
 picks the list), else 403 "Pembayaran antar-PT hanya dapat diajukan oleh Finance, PM atau Direktur di PT ini." Staff,
 Admin and an **Owner (`pk-principal`) without one of these roles cannot** (the owner's answer names Finance, PM and
 Direktur only; "if unclear, not allowed") — checked on the STORED roles (`mayFileIntercompany`, ADR 0026

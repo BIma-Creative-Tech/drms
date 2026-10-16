@@ -121,7 +121,7 @@ abstract class DraftRequest with _$DraftRequest {
     @Default([]) List<int> requesterIds,
     int? bankAccountId,
 
-    /// ADR 0027 "Jenis penerima": vendor = "Pembayaran vendor" (Finance / PM only; type is always Pengajuan Baru,
+    /// ADR 0027 "Jenis penerima": vendor = "Pembayaran vendor" (Staff / Finance / PM; type is always Pengajuan Baru,
     /// no employee account, no LPJ). ADR 0028: ptGrup = "Pembayaran antar-PT" (Finance / PM / Direktur; same shape,
     /// the receiving PT instead of vendor + account). Stored in `local_drafts.vendor_json` (schema v10, the payee JSON).
     @Default(PayeeType.karyawan) PayeeType payeeType,

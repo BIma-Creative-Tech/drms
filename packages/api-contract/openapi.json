@@ -1157,7 +1157,7 @@
           "vendor",
           "pt_grup"
         ],
-        "description": "ADR 0027 \"Jenis penerima\": karyawan = the requester's employee account (default, every request before ADR 0027); vendor = \"Pembayaran vendor\" (Finance / PM only): vendor + vendor account + invoice, type always advance, no LPJ (transfer → completed). ADR 0028: pt_grup = \"Pembayaran antar-PT\" (Finance / PM / Direktur of the paying PT): another PT of the group (payeeCompanyId) paid to its designated receiving account + the receiving PT's document (invoice / memo, required), type always advance, no LPJ; the transfer completes it AND posts a Kas Masuk in the receiving PT. Older apps that do not know a value show it as karyawan and must not send payeeType on such a draft (the server keeps the stored one)."
+        "description": "ADR 0027 \"Jenis penerima\": karyawan = the requester's employee account (default, every request before ADR 0027); vendor = \"Pembayaran vendor\" (Staff / Finance / PM of the request PT; Staff since 2026-10-16): vendor + vendor account + invoice, type always advance, no LPJ (transfer → completed). ADR 0028: pt_grup = \"Pembayaran antar-PT\" (Finance / PM / Direktur of the paying PT): another PT of the group (payeeCompanyId) paid to its designated receiving account + the receiving PT's document (invoice / memo, required), type always advance, no LPJ; the transfer completes it AND posts a Kas Masuk in the receiving PT. Older apps that do not know a value show it as karyawan and must not send payeeType on such a draft (the server keeps the stored one)."
       },
       "RequestStatus": {
         "type": "string",
@@ -3334,7 +3334,7 @@
               "vendor",
               "pt_grup"
             ],
-            "description": "Default karyawan. vendor: only a Finance / PM caller of the request PT (403 otherwise); pt_grup (ADR 0028): only Finance / PM / Direktur of the request PT (403 otherwise). Both: `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself. Omitted on PATCH / sync = the stored payee type stays."
+            "description": "Default karyawan. vendor: only a Staff / Finance / PM caller of the request PT (403 otherwise; Staff since 2026-10-16 — the normal Staff approval flow); pt_grup (ADR 0028): only Finance / PM / Direktur of the request PT (403 otherwise). Both: `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself. Omitted on PATCH / sync = the stored payee type stays."
           },
           "vendorId": {
             "type": [
@@ -3595,7 +3595,7 @@
               "vendor",
               "pt_grup"
             ],
-            "description": "Default karyawan. vendor: only a Finance / PM caller of the request PT (403 otherwise); pt_grup (ADR 0028): only Finance / PM / Direktur of the request PT (403 otherwise). Both: `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself. Omitted on PATCH / sync = the stored payee type stays."
+            "description": "Default karyawan. vendor: only a Staff / Finance / PM caller of the request PT (403 otherwise; Staff since 2026-10-16 — the normal Staff approval flow); pt_grup (ADR 0028): only Finance / PM / Direktur of the request PT (403 otherwise). Both: `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself. Omitted on PATCH / sync = the stored payee type stays."
           },
           "vendorId": {
             "type": [
@@ -7595,7 +7595,7 @@
               "vendor",
               "pt_grup"
             ],
-            "description": "ADR 0027: default karyawan. vendor = vendor payment (Finance / PM only): vendor + vendor account + invoice, no employee account, no LPJ. ADR 0028: pt_grup = payment to another PT of the group (Finance / PM / Direktur): payee_company_id + the receiving PT's document (invoice_*), no LPJ. Omitted on an existing draft = the stored payee type stays (older apps never reset a pt_grup draft)."
+            "description": "ADR 0027: default karyawan. vendor = vendor payment (Staff / Finance / PM; Staff since 2026-10-16): vendor + vendor account + invoice, no employee account, no LPJ. ADR 0028: pt_grup = payment to another PT of the group (Finance / PM / Direktur): payee_company_id + the receiving PT's document (invoice_*), no LPJ. Omitted on an existing draft = the stored payee type stays (older apps never reset a pt_grup draft)."
           },
           "payee_company_id": {
             "type": [

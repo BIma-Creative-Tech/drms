@@ -270,11 +270,25 @@ void main() {
       expect(find.byKey(const Key('draft-payee-pt-grup')), findsNothing);
     });
 
-    testWidgets('Staff: no payee choice at all', (tester) async {
+    testWidgets('Staff: "Vendor" (owner request 2026-10-16) but no "PT grup"', (tester) async {
+      await pumpScreen(
+        tester,
+        DraftEditorScreen(initial: seedDraft(), masters: _mastersWithDirectory, isNew: false),
+        auth: AuthSignedIn(profile: profile(const {Role.staff}), sub: 's'),
+      );
+      expect(find.byKey(const Key('draft-payee-type')), findsOneWidget);
+      expect(find.text('Vendor'), findsOneWidget);
+      expect(find.byKey(const Key('draft-payee-pt-grup')), findsNothing, reason: 'PT grup: Finance / PM / Direktur');
+      await tester.tap(find.text('Vendor'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('draft-vendor')), findsOneWidget);
+    });
+
+    testWidgets('Admin: no payee choice at all', (tester) async {
       await pumpScreen(
         tester,
         DraftEditorScreen(initial: seedDraft(), masters: _masters, isNew: false),
-        auth: AuthSignedIn(profile: profile(const {Role.staff}), sub: 's'),
+        auth: AuthSignedIn(profile: profile(const {Role.admin}), sub: 's'),
       );
       expect(find.byKey(const Key('draft-payee-type')), findsNothing);
     });
@@ -300,7 +314,7 @@ void main() {
         auth: AuthSignedIn(profile: _withIcCapability(Role.effective({Role.principal}), true), sub: 's'),
       );
       expect(find.byKey(const Key('draft-payee-pt-grup')), findsOneWidget);
-      expect(find.text('Vendor'), findsNothing, reason: 'vendor payments stay Finance / PM');
+      expect(find.text('Vendor'), findsNothing, reason: 'vendor payments: Staff / Finance / PM, not the Owner');
     });
 
     testWidgets('capability false wins over the roles: Finance keeps "Vendor" but no "PT grup"', (tester) async {

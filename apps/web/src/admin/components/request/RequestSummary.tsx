@@ -35,7 +35,7 @@ export function RequestSummary({ d, ptName, attachments, canRevealBank, draftBan
     if (value !== null && value !== undefined && value !== '') rows.push([label, value, key])
   }
   add('Jenis', d.typeLabel, 'type')
-  // ADR 0027: vendor payment — the payee is the vendor (Pemohon = the Finance / PM filer)
+  // ADR 0027: vendor payment — the payee is the vendor (Pemohon = the Staff / Finance / PM filer)
   const vendorPay = d.payeeType === 'vendor'
   // ADR 0028: payment to another PT of the group — the payee is that PT (its designated receiving account)
   const icPay = d.payeeType === 'pt_grup'

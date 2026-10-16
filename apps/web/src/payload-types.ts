@@ -1491,7 +1491,7 @@ export interface ExpenseRequest {
   company?: (number | null) | Company;
   docNo?: string | null;
   /**
-   * Vendor: Finance / PM membayar invoice vendor ke rekening vendor (tanpa LPJ). PT grup: Finance / PM / Direktur membayar PT lain di grup ke rekening penerimaan antar-PT-nya; kas masuk di PT itu tercatat otomatis saat ditransfer.
+   * Vendor: Staff / Finance / PM membayar invoice vendor ke rekening vendor (tanpa LPJ). PT grup: Finance / PM / Direktur membayar PT lain di grup ke rekening penerimaan antar-PT-nya; kas masuk di PT itu tercatat otomatis saat ditransfer.
    */
   payeeType: 'karyawan' | 'vendor' | 'pt_grup';
   type: 'advance' | 'reimburse';

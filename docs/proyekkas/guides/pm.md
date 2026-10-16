@@ -61,7 +61,9 @@ tangan**. Beranda PM juga punya kartu **Menunggu tindakan saya**.
 
 ## 1b. Pembayaran vendor (APK dan web, DRMS 13/10)
 
-PM boleh mengajukan **pembayaran invoice vendor** untuk project-nya (selain PM, hanya Finance; Staff tidak).
+PM boleh mengajukan **pembayaran invoice vendor** untuk project-nya (juga Finance dan — sejak permintaan owner 16 Okt
+2026 — Staff). Pembayaran vendor yang diajukan **Staff** di project Anda masuk ke **Persetujuan PM** Anda seperti
+pengajuan Staff lain (lalu Direktur → Owner → transfer Finance).
 - **APK:** Pengajuan → **+** → **Jenis penerima: Vendor** → pilih vendor dan rekening vendor (rekening dibuat dan
   diverifikasi oleh Finance / Admin), isi nomor, tanggal dan jatuh tempo invoice, foto / PDF invoice, baris item →
   **Kirim**. Draft boleh disimpan offline seperti pengajuan lain.

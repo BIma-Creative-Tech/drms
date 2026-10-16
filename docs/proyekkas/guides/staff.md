@@ -96,6 +96,23 @@ tetapi baru bisa diajukan setelah PM mengisi RAP project. Hubungi PM project And
 biaya." · "Rekening tujuan wajib dipilih." · "Data master belum tersedia…" (buka aplikasi saat online sekali) ·
 "Tanggal nota tidak boleh di masa depan" · "Staff hanya dapat mengajukan untuk dirinya sendiri…".
 
+## 2b. Pembayaran vendor (APK dan web, sejak 16 Okt 2026)
+
+Permintaan owner 16 Okt 2026 ("untuk pengajuan vendor dibukakan di level staff"): Staff juga boleh mengajukan
+**pembayaran invoice vendor** — dana ditransfer Finance langsung ke **rekening vendor**, tanpa nota per baris dan tanpa
+LPJ (invoice adalah buktinya).
+- **APK:** Pengajuan → **+** → **Jenis penerima: Vendor** → pilih **Vendor** dan **Rekening vendor** (hanya vendor dan
+  rekening aktif PT Anda; rekening dibuat dan diverifikasi oleh Finance / Admin — Anda hanya memilih), isi nomor,
+  tanggal dan jatuh tempo invoice, foto / PDF invoice, baris item → **Kirim**. Draft boleh disimpan offline.
+- **Web:** **+ Buat pengajuan** → *Jenis penerima* **Vendor** (field yang sama).
+- Project wajib (project yang Anda ditugaskan). Tanpa project (mis. tagihan kantor): kosongkan project lalu pilih
+  **Pusat biaya** tempat Anda ditugaskan.
+- Pemohon = Anda sendiri. Alurnya sama seperti pengajuan Staff lain: **Persetujuan PM** (PM project; untuk pusat biaya:
+  manajernya) → **Direktur** → **Owner** → Finance mentransfer ke rekening vendor → **Selesai**.
+- Satu invoice hanya bisa diajukan sekali per vendor (selama pengajuan lama belum dibatalkan / ditolak).
+- Anda tidak bisa membuat atau mengubah vendor / rekening vendor; bila vendor atau rekeningnya belum ada, minta Finance
+  atau Admin. **Pembayaran antar-PT** tetap hanya untuk Finance, PM dan Direktur.
+
 ## 3. Mengubah, membatalkan, mengajukan ulang
 
 - **Belum ada keputusan (PM/Direktur)?** Buka pengajuan → **Tarik kembali ke Draft** (isi alasan) → **Ubah & ajukan di HP**

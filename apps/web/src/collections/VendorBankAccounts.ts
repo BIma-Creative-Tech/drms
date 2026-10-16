@@ -15,8 +15,8 @@ export const normalizeAccountNo = (v: unknown): unknown => (typeof v === 'string
  * `employee-bank-accounts` — vendor, bank (the shared bank master), account number, holder ("Atas nama"), default
  * flag, verification status (Admin / Finance only), active. PT derived from the vendor (company hook + DB trigger),
  * no delete (deactivate with a reason), a reason on every change of the account data, audited.
- * Access per PT: Admin / Finance create + update; Direktur reads; PM reads (the PM files vendor payments and picks the
- * account); Staff nothing (Staff never files a vendor payment).
+ * Access per PT: Admin / Finance create + update; Direktur reads; PM and Staff read (they file vendor payments and pick
+ * the account — Staff since the owner request 2026-10-16; read only, never create / update).
  */
 export const VendorBankAccounts: CollectionConfig = withAudit(
   {
@@ -28,7 +28,7 @@ export const VendorBankAccounts: CollectionConfig = withAudit(
       defaultColumns: ['vendor', 'bank', 'accountNo', 'accountHolder', 'isDefault', 'verificationStatus', 'active'],
     },
     access: {
-      read: byRole({ 'pk-admin': true, 'pk-finance': true, 'pk-owner': true, 'pk-pm': true }),
+      read: byRole({ 'pk-admin': true, 'pk-finance': true, 'pk-owner': true, 'pk-pm': true, 'pk-staff': true }),
       create: rolesAllowed('pk-admin', 'pk-finance'),
       update: byRole({ 'pk-admin': true, 'pk-finance': true }),
       delete: denyAll,

@@ -28,7 +28,7 @@ export const QUICK_CREATE_ROLES: readonly Role[] = ['pk-admin', 'pk-owner', 'pk-
  * Pengguna (Admin of a PT, DRMS 13/10 W3 — same rule as the registry item "+ Pengguna baru").
  */
 export const QUICK_ROLE_RULES = {
-  vendorPayment: ['pk-finance', 'pk-pm'],
+  vendorPayment: ['pk-finance', 'pk-pm', 'pk-staff'],
   kasWrite: ['pk-finance'],
   dailyReport: ['pk-owner', 'pk-pm', 'pk-staff'],
   addendum: ['pk-pm'],
