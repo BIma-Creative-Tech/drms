@@ -61,7 +61,7 @@ const relsOf = async (id: number) => (await sqlAs('app', 'SELECT service_types_i
 
 beforeAll(async () => {
   installLocalJwks()
-  w = await makeFr1World('d1710')
+  w = await makeFr1World('svjenis') // letters first: the world's plate suffix comes from the tag
   drms = await companyId()
   const rows = (await sqlAs('app', 'SELECT id, code FROM service_types WHERE company_id = $1', [drms])).rows as Array<{ id: number; code: string }>
   for (const r of rows) T[r.code] = r.id

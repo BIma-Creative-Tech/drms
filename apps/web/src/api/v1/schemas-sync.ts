@@ -269,7 +269,7 @@ export const SyncServiceReportPayload = z
       .max(32)
       .nullable()
       .optional()
-      .meta({ description: 'LEGACY single code (must exist in the PT master; ignored when service_type_ids is sent). Edit: a code already on the report keeps its selection, another one replaces it.' }),
+      .meta({ description: 'LEGACY single code (must exist in the PT master). A new report needs exactly one of service_type_ids / service_type; on an edit it is ignored when service_type_ids is sent, else a code already on the report keeps its selection and another one replaces it.' }),
     complaint: optStr(2000),
     action: z.string().trim().min(3).max(4000).optional().meta({ description: 'Required for a new report.' }),
     unit_status_after: z.enum(['siap', 'rusak', 'menunggu_part']).optional().meta({ description: 'Required for a new report.' }),
