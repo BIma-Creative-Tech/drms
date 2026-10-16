@@ -525,7 +525,7 @@ export const SyncServiceReportCopy = z
     unit_id: id,
     report_date: z.string(),
     hour_meter: z.number().nullable(),
-    service_type: z.string().meta({ description: 'Code of the first selected service type (legacy single value).' }),
+    service_type: z.string().meta({ description: 'LEGACY single value: code of the first selected type whose code is one of the four legacy codes (servis_berkala, perbaikan, inspeksi, pemasangan), else of the first selected type.' }),
     service_type_ids: z.array(id).meta({ description: 'DRMS owner 2026-10-17: the selected service types (selection order).' }),
     action: z.string(),
     unit_status_after: z.string(),

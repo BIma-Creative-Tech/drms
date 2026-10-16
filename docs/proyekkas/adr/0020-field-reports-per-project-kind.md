@@ -143,9 +143,11 @@ requests until a PM fills the RAP — intended. The APK learns the rule from `GE
    serves the picker. **Legacy single code** (`serviceType` / `service_type`, the only form of APK 0.7.0) still works
    when no id list is sent: create → the PT's row with that code; edit → unchanged when that code is already on the
    report (APK 0.7.0 resends it on every edit and must not collapse a multi-selection made on the web), else the
-   selection becomes that one type. The DTO keeps `serviceType` = code of the first selected type; the sync server
-   copy keeps `service_type` (APK 0.7.0 shows it only in its conflict screen, falling back to the raw string) and adds
-   `service_type_ids`. DB: `service_reports.service_type` became a nullable varchar written with that first code.
+   selection becomes that one type. The DTO keeps `serviceType` and the sync server copy `service_type` = the code of
+   the first selected type whose code is one of the four legacy codes, else of the first selected type (APK 0.7.0
+   can show / pre-select only the legacy ones; its edit then resends a code that is on the report) and adds
+   `service_type_ids`. DB: `service_reports.service_type` became a nullable varchar written with that same code.
+   Urutan (`sortOrder`): lists sort by it, then name; seeded 1–4, a type created without one gets the PT's highest + 1.
 3. **DB guard of the types** (`service_reports_rels_guard`): the same 24 h window / PM-Direktur correction override as
    the report row, the type must be of the report's PT, the rows are `serviceTypes` only; deferred constraint triggers
    keep ≥ 1 type per report at commit. Payload rewrites the rows on update → DELETE granted on that table only.

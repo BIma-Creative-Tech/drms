@@ -6921,7 +6921,7 @@ export const openapiDocument = {
           },
           "service_type": {
             "type": "string",
-            "description": "Code of the first selected service type (legacy single value)."
+            "description": "LEGACY single value: code of the first selected type whose code is one of the four legacy codes (servis_berkala, perbaikan, inspeksi, pemasangan), else of the first selected type."
           },
           "service_type_ids": {
             "type": "array",
@@ -11508,7 +11508,7 @@ export const openapiDocument = {
               "string",
               "null"
             ],
-            "description": "LEGACY: code of the first selected type."
+            "description": "LEGACY: code of the first selected type whose code is one of the four legacy codes (servis_berkala, perbaikan, inspeksi, pemasangan), else of the first selected type."
           },
           "complaint": {
             "type": [
@@ -12255,7 +12255,7 @@ export const openapiDocument = {
           },
           "sortOrder": {
             "type": "integer",
-            "description": "Urutan (ascending, then name; 0 = default)."
+            "description": "Urutan (ascending, then name). A type created without one gets the highest Urutan of its PT + 1."
           }
         },
         "required": [

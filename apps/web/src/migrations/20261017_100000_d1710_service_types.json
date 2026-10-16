@@ -15102,8 +15102,7 @@
           "name": "sort_order",
           "type": "numeric",
           "primaryKey": false,
-          "notNull": false,
-          "default": 0
+          "notNull": false
         },
         "realised_qty": {
           "name": "realised_qty",
@@ -16041,8 +16040,7 @@
           "name": "sort_order",
           "type": "numeric",
           "primaryKey": false,
-          "notNull": false,
-          "default": 0
+          "notNull": false
         },
         "active": {
           "name": "active",

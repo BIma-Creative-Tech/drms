@@ -18,7 +18,7 @@ import {
 import { createDailyReport, editDailyReport, type DailyDoc, type DailyResource } from '@/domain/daily/service'
 import { createActivity, editActivity, type ActivityDoc } from '@/domain/field/aftersales'
 import { findByClientUuid, flagsOf, loadRaw, loadVisible, photoIdsOf, revOf, type FieldDoc, type Timing } from '@/domain/field/common'
-import type { FieldReportType } from '@/domain/field/rules'
+import { legacyServiceTypeCode, type FieldReportType } from '@/domain/field/rules'
 import { createServiceReport, editServiceReport, type ServiceDoc } from '@/domain/field/service'
 import { serviceTypeIdsOf, serviceTypeRows } from '@/domain/field/service-types'
 import { createTimesheet, editTimesheet, type TimesheetDoc } from '@/domain/field/timesheet'
@@ -84,10 +84,11 @@ export async function fieldCopy(req: PayloadRequest, type: FieldReportType, id: 
   const photos = await photoIdsOf(req, type, d.id)
   if (type === 'service_report') {
     const s = d as unknown as ServiceDoc
-    // DRMS owner 2026-10-17: `service_type` stays the code of the FIRST selected type (APK 0.7.0 only shows it in the
-    // conflict screen — `ServiceType.fromCode(c) ?.label ?? c` — so any master code is safe); + the full selection.
+    // DRMS owner 2026-10-17: `service_type` = first selected LEGACY code, else the first code (`legacyServiceTypeCode`,
+    // same as the REST DTO; APK 0.7.0 shows it in its conflict screen) + the full selection.
     const typeIds = serviceTypeIdsOf(s.serviceTypes)
-    const first = typeIds.length ? (await serviceTypeRows(req, [typeIds[0]!])).get(typeIds[0]!)?.code : undefined
+    const rows = await serviceTypeRows(req, typeIds)
+    const first = legacyServiceTypeCode(typeIds.map((id) => rows.get(id)?.code))
     return {
       ...base,
       doc_no: s.docNo ?? null,

@@ -101,11 +101,20 @@ describe('master "Jenis servis" (per PT)', () => {
   })
 
   it('Admin and Direktur create / rename / deactivate (reason); PM, Staff, Finance read only; code fixed; no delete', async () => {
+    const maxOrder = async () => Number((await sqlAs('app', 'SELECT coalesce(max(sort_order), 0) AS m FROM service_types WHERE company_id = $1', [drms])).rows[0].m)
+    const before = await maxOrder()
+    expect(before).toBeGreaterThanOrEqual(4) // seeded 1–4
     const created = await api('POST', '/api/service-types', w.users.admin, { code: `overhaul-${Date.now() % 10000}`, name: 'Overhaul mesin' })
     expect(created.status, JSON.stringify(created.body)).toBe(201)
     custom = (created.body as { doc: { id: number } }).doc.id
-    const byOwner = await api('POST', '/api/service-types', w.users.owner, { code: `kalibrasi-${Date.now() % 10000}`, name: 'Kalibrasi' })
+    // no Urutan given → the PT's highest + 1 (coordinator decision 2026-10-17)
+    expect((created.body as { doc: { sortOrder: number } }).doc.sortOrder).toBe(before + 1)
+    const next = await api('POST', '/api/service-types', w.users.admin, { code: `rekondisi-${Date.now() % 10000}`, name: 'Rekondisi' })
+    expect((next.body as { doc: { sortOrder: number } }).doc.sortOrder).toBe(before + 2)
+    // an explicit Urutan (also 0) is kept
+    const byOwner = await api('POST', '/api/service-types', w.users.owner, { code: `kalibrasi-${Date.now() % 10000}`, name: 'Kalibrasi', sortOrder: 0 })
     expect(byOwner.status, JSON.stringify(byOwner.body)).toBe(201)
+    expect((byOwner.body as { doc: { sortOrder: number } }).doc.sortOrder).toBe(0)
     expect((await api('PATCH', `/api/service-types/${custom}`, w.users.owner, { name: 'Overhaul mesin & transmisi' })).status).toBe(200)
     for (const u of [w.users.pm, w.users.staffA, w.users.finance]) {
       expect((await api('POST', '/api/service-types', u, { code: `x-${u.id}`, name: 'Tidak boleh' })).status, u.email).toBe(403)
@@ -138,7 +147,7 @@ describe('master "Jenis servis" (per PT)', () => {
     const key = (x: { sortOrder: number; name: string }) => `${String(x.sortOrder).padStart(5, '0')} ${x.name}`
     expect(items.map(key)).toEqual([...items].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'id')).map(key))
     expect(items.find((x) => x.code === 'perbaikan')).toEqual({ id: T.perbaikan, companyId: drms, code: 'perbaikan', name: 'Perbaikan', active: true, sortOrder: 2 })
-    // a new type without Urutan = 0 → listed before the seeded 1–4
+    // "Kalibrasi" was created with an explicit Urutan 0 → listed before the seeded 1–4
     expect(items[0]!.sortOrder).toBe(0)
     expect(items.some((x) => x.id === iid)).toBe(false)
     const all = await api('GET', '/api/v1/service-types?includeInactive=1', w.users.staffA)
@@ -163,6 +172,20 @@ describe('service report: multi-select via REST', () => {
     expect((await sqlAs('app', 'SELECT service_type FROM service_reports WHERE id = $1', [svId])).rows[0].service_type).toBe('perbaikan')
     const list = await api('GET', `/api/v1/service-reports?project=${w.kontrak}`, w.users.pm)
     expect(list.body.items.find((x: { id: number }) => x.id === svId).serviceTypes).toHaveLength(3)
+  })
+
+  it('legacy single value = first selected LEGACY code, else the first code (DTO, column; coordinator decision 2026-10-17)', async () => {
+    const mixed = await create(w.users.staffA, { serviceTypeIds: [custom, T.perbaikan, T.inspeksi] })
+    expect(mixed.status, JSON.stringify(mixed.body)).toBe(201)
+    expect(mixed.body.serviceTypes[0].id).toBe(custom)
+    expect(mixed.body.serviceType).toBe('perbaikan')
+    expect((await sqlAs('app', 'SELECT service_type FROM service_reports WHERE id = $1', [mixed.body.id])).rows[0].service_type).toBe('perbaikan')
+    const customCode = (await sqlAs('app', 'SELECT code FROM service_types WHERE id = $1', [custom])).rows[0].code as string
+    const only = await create(w.users.staffA, { serviceTypeIds: [custom] })
+    expect(only.body.serviceType).toBe(customCode)
+    // an edit re-derives it
+    const e = await api('PATCH', `/api/v1/service-reports/${only.body.id}`, w.users.staffA, { serviceTypeIds: [custom, T.pemasangan] })
+    expect(e.body.serviceType).toBe('pemasangan')
   })
 
   it('legacy create (old enum code) → the PT master row; none / both / duplicates / other PT / inactive → 400', async () => {
@@ -364,6 +387,11 @@ describe('sync service_report.upsert', () => {
     const res = r.body.results[0]
     expect(res, JSON.stringify(r.body)).toMatchObject({ status: 'applied', rev: 1 })
     expect(res.server_service_report).toMatchObject({ service_type: 'pemasangan', service_type_ids: [T.pemasangan, T.inspeksi] })
+    // a custom type first → the copy names the first LEGACY code (APK 0.7.0 shows / pre-selects only those)
+    const it2 = item({ project_id: w.kontrak, unit_id: w.ex01, service_type_ids: [custom, T.inspeksi], action: 'Overhaul + inspeksi', unit_status_after: 'siap' })
+    const r2 = await sync([it2])
+    expect(r2.body.results[0], JSON.stringify(r2.body)).toMatchObject({ status: 'applied' })
+    expect(r2.body.results[0].server_service_report).toMatchObject({ service_type: 'inspeksi', service_type_ids: [custom, T.inspeksi] })
   })
 
   it('APK 0.7.0: legacy service_type on create; an edit resending a code already on the report keeps the web multi-selection', async () => {

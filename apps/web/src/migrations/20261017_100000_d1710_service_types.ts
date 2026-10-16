@@ -10,8 +10,8 @@ import { type MigrateDownArgs, type MigrateUpArgs, sql } from '@payloadcms/db-po
  *   delete_reason);
  * - `service_reports_rels` (hasMany `serviceTypes`, `order` = selection order, FK → service_types ON DELETE cascade —
  *   a type is never hard-deleted, see below; the soft delete's usage check reads this FK → a used type is "used");
- * - `service_reports.service_type`: enum → varchar, NULL allowed (legacy single value = code of the first selected
- *   type, written by the service; a PT's own codes no longer fit the old enum). The 0.13 image keeps reading/writing
+ * - `service_reports.service_type`: enum → varchar, NULL allowed (legacy single value = first selected LEGACY code,
+ *   else the first code — written by the service; a PT's own codes no longer fit the old enum). The 0.13 image keeps reading/writing
  *   it as before (plain strings), so a rollback of the image needs no down migration.
  * Hand-written:
  * 1. service_types: company_id NOT NULL, unique (company_id, code), PT / code / uuid immutable (the code is how APK
@@ -94,7 +94,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   	"company_id" integer,
   	"code" varchar NOT NULL,
   	"name" varchar NOT NULL,
-  	"sort_order" numeric DEFAULT 0,
+  	"sort_order" numeric,
   	"active" boolean DEFAULT true,
   	"uuid" varchar,
   	"is_deleted" boolean DEFAULT false,
