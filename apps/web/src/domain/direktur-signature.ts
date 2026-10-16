@@ -27,6 +27,18 @@ export async function companyDirektur(req: PayloadRequest, companyId: number | n
   return direkturOf(companyId, c?.direktur)
 }
 
+/**
+ * Owner decision 2026-10-16 (`holdsPositionAs`): the decision the caller would take now at `pos` is signed as the PT's
+ * definitive Direktur — the rule of `representationFor` without the media read (the DB index decides last).
+ */
+export async function decidesAsDirektur(
+  req: PayloadRequest,
+  input: { companyId: number | null | undefined; callerId: number; snapshot: Parameters<typeof isDirekturStep>[0]; pos: { position: 'diketahui' | 'approval'; level: number } | null },
+): Promise<boolean> {
+  if (!input.pos || !isDirekturStep(input.snapshot, input.pos.position, input.pos.level)) return false
+  return representationApplies(await companyDirektur(req, input.companyId), input.callerId, true)
+}
+
 export type Representation = {
   companyId: number
   name: string

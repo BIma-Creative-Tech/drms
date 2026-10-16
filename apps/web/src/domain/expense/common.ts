@@ -4,6 +4,7 @@ import { APIError, type PayloadRequest } from 'payload'
 import { employeeIn, exactRolesIn, exactRolesOf, relId, rolesIn, userId, userRoles } from '@/access/roles'
 import { writeAuditDetached } from '@/audit/writer'
 import { displayNames, settings } from '@/domain/companies'
+import { decidesAsDirektur, holdsPositionAs } from '@/domain/direktur-signature'
 import { DEFAULT_TZ, localDateInTz } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
@@ -183,6 +184,16 @@ export async function actorContext(req: PayloadRequest, doc: RequestDoc): Promis
   const isAcknowledger =
     !!snap && !acknowledged && (doc.status === 'pending_ack' || (doc.status === 'pending_approval' && snap.acknowledge === 'optional')) && matchesAcknowledger(snap, caller)
   const matchesCurrentStep = doc.status === 'pending_approval' && matchesStep(step, caller)
+  // owner 2026-10-16: a personal decision and one as the PT's definitive Direktur are separate positions (holdsPositionAs)
+  const decidedBefore = decisions.some((r) => relId(r.actor) === uid && (r.position === 'diketahui' || r.position === 'approval'))
+  const asDirektur =
+    decidedBefore &&
+    (await decidesAsDirektur(req, {
+      companyId: company,
+      callerId: uid,
+      snapshot: snap,
+      pos: matchesCurrentStep ? { position: 'approval', level: doc.currentLevel ?? 1 } : isAcknowledger ? { position: 'diketahui', level: 0 } : null,
+    }))
   return {
     type: doc.type,
     payeeType: payeeOf(doc.payeeType),
@@ -193,7 +204,7 @@ export async function actorContext(req: PayloadRequest, doc: RequestDoc): Promis
     hasDecision: decisions.length > 0,
     isAcknowledger,
     matchesCurrentStep,
-    alreadyDecided: decisions.some((r) => relId(r.actor) === uid && (r.position === 'diketahui' || r.position === 'approval')),
+    alreadyDecided: decidedBefore && holdsPositionAs(decisions, uid, asDirektur),
     pmFlow: snap?.acknowledgeBy === 'scope_manager' && isDecisionSnapshot(snap),
     // ADR 0021: the PM project decides ONLY the request where he is the snapshot's acknowledger.
     lacksDecisionRole: lacksDecisionRole(snap, decisionRoles) && !isAcknowledger,

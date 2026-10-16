@@ -83,6 +83,28 @@ export function representationApplies(cfg: CompanyDirektur | null, callerId: num
   return direkturStep && !!cfg && cfg.representatives.includes(callerId)
 }
 
+/**
+ * Owner decision 2026-10-16 (DRMS, wakil PM + Direktur): G1 "one decision position per person per cycle" counts a
+ * user's PERSONAL decisions and their decisions AS the PT's definitive Direktur (`signatureSource = 'company'`)
+ * separately — a designated representative who decided the PM step with their own signature may still decide the
+ * Direktur step as the definitive Direktur, never two positions under the same identity. `asDirektur` = the
+ * decision the caller would take now is represented. The DB indexes `approvals_one_position_per_person` /
+ * `approvals_settlement_one_position_per_person` (migration 20261016_220000) enforce the same split. Pure.
+ */
+export function holdsPositionAs(
+  rows: ReadonlyArray<{ actor?: unknown; position: string; decision: string; signatureSource?: string | null }>,
+  callerId: number,
+  asDirektur: boolean,
+): boolean {
+  return rows.some(
+    (r) =>
+      relId(r.actor) === callerId &&
+      (r.position === 'diketahui' || r.position === 'approval') &&
+      r.decision !== 'signed' &&
+      (r.signatureSource === COMPANY_SIGNATURE_SOURCE) === asDirektur,
+  )
+}
+
 /** Text of the represented Direktur as printed (PDF box / timeline): "Nama (Jabatan)". Pure. */
 export function direkturLabel(name: string | null | undefined, title?: string | null): string {
   const n = (name ?? '').trim()

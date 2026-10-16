@@ -5,6 +5,7 @@ import {
   decisionPositionOf,
   direkturLabel,
   direkturOf,
+  holdsPositionAs,
   isDirekturAckStep,
   isDirekturApprovalStep,
   isDirekturStep,
@@ -114,5 +115,26 @@ describe('ADR 0025 × ADR 0026 (Owner level)', () => {
     expect(approvalPrintedName({ ...company, representedDirektur: { name: 'Direktur Contoh', title: null } }, 'pk-owner')).toBe('Direktur Contoh (Direktur)')
     expect(approvalPrintedName({ actorName: 'Olivia Owner', signatureSource: 'profile', representedDirektur: null }, 'pk-principal')).toBe('Olivia Owner (Owner)')
     expect(approvalPrintedName({ actorName: 'Budi', signatureSource: 'profile', representedDirektur: null }, null)).toBe('Budi')
+  })
+})
+
+describe('owner 2026-10-16: wakil PM + Direktur (holdsPositionAs)', () => {
+  const pmRow = { actor: 7, position: 'diketahui', decision: 'acknowledged', signatureSource: 'profile' }
+  const dirRow = { actor: 7, position: 'approval', decision: 'approved', signatureSource: COMPANY_SIGNATURE_SOURCE }
+
+  it('a personal PM decision does not block the decision as the definitive Direktur (and the reverse)', () => {
+    expect(holdsPositionAs([pmRow], 7, true)).toBe(false)
+    expect(holdsPositionAs([dirRow], 7, false)).toBe(false)
+  })
+
+  it('two positions under the same identity stay refused (G1)', () => {
+    expect(holdsPositionAs([pmRow], 7, false)).toBe(true)
+    expect(holdsPositionAs([dirRow], 7, true)).toBe(true)
+    expect(holdsPositionAs([{ ...pmRow, signatureSource: null }], 7, false)).toBe(true)
+  })
+
+  it('other users, signatures (Diajukan/Dibuat) and other positions never count', () => {
+    expect(holdsPositionAs([pmRow, dirRow], 8, false)).toBe(false)
+    expect(holdsPositionAs([{ ...pmRow, position: 'diajukan', decision: 'signed' }], 7, false)).toBe(false)
   })
 })

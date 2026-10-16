@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+- **Wakil Direktur definitif juga PM (owner 2026-10-16, amends ADR 0025).** A designated representative who decided the
+  PM step of a request (or LPJ shortfall) with their own signature may now also decide its Direktur step, signed as the
+  PT's definitive Direktur. G1 "one decision position per person per cycle" counts personal and definitive-Direktur
+  decisions separately; two positions under the same identity, and any decision by the requester/creator, stay refused.
+  Migration `20261016_220000_d1610_wakil_pm_direktur` re-creates `approvals_one_position_per_person` and
+  `approvals_settlement_one_position_per_person` with the signature kind in the key (additive for the 0.13.0 image).
+  In-flight requests waiting at the Direktur step (e.g. one whose PM step the representative already decided) become
+  decidable by that representative right after the deploy.
+
 ## [0.13.1] - 2026-10-16
 
 **Fix: "Pengguna baru" could not be saved for a new account.** PRs #91, #92. Production goes 0.13.0 → 0.13.1. Web /
