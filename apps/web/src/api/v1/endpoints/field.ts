@@ -121,7 +121,7 @@ export const correctServiceReportEndpoint = v1({
 
 /**
  * GET /service-types — DRMS owner 2026-10-17: the "Jenis servis" master of the caller's selected PTs (`?company=`
- * narrows), active only unless `includeInactive=1`, sorted by name. Every member reads it (APK picker / labels).
+ * narrows), active only unless `includeInactive=1`, sorted by sortOrder then name. Every member reads it (APK picker / labels).
  */
 export const listServiceTypesEndpoint = v1({
   path: '/service-types',

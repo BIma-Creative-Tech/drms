@@ -17,7 +17,7 @@ import { MAX_SERVICE_TYPES, SERVICE_TYPES_REQUIRED } from './rules'
  * edit → unchanged when that code is already on the report (APK 0.7.0 sends it on every edit: a multi-selection made
  * on the web must not collapse), else the selection becomes that one type.
  */
-export type ServiceTypeRow = { id: number; companyId: number; code: string; name: string; active: boolean; deleted: boolean }
+export type ServiceTypeRow = { id: number; companyId: number; code: string; name: string; active: boolean; sortOrder: number; deleted: boolean }
 
 const rowOf = (d: Record<string, unknown>): ServiceTypeRow => ({
   id: d.id as number,
@@ -25,6 +25,7 @@ const rowOf = (d: Record<string, unknown>): ServiceTypeRow => ({
   code: String(d.code ?? ''),
   name: String(d.name ?? d.code ?? ''),
   active: d.active !== false,
+  sortOrder: Number(d.sortOrder ?? 0) || 0,
   deleted: d.isDeleted === true,
 })
 
@@ -37,7 +38,7 @@ export async function serviceTypeRows(req: PayloadRequest, ids: readonly number[
     where: { id: { in: uniq } },
     depth: 0,
     pagination: false,
-    select: { company: true, code: true, name: true, active: true, isDeleted: true } as never,
+    select: { company: true, code: true, name: true, active: true, sortOrder: true, isDeleted: true } as never,
     overrideAccess: true, // SYSTEM-READ: labels of the types on documents the caller may read / validation of a selection in the report's PT
     req,
   })
@@ -52,7 +53,7 @@ export async function serviceTypeByCode(req: PayloadRequest, company: number, co
     depth: 0,
     limit: 1,
     pagination: false,
-    select: { company: true, code: true, name: true, active: true, isDeleted: true } as never,
+    select: { company: true, code: true, name: true, active: true, sortOrder: true, isDeleted: true } as never,
     overrideAccess: true, // SYSTEM-READ: legacy code → master row of the report's PT (caller checked by the service)
     req,
   })
@@ -127,7 +128,7 @@ export async function resolvePatchServiceTypes(req: PayloadRequest, company: num
 /**
  * GET /api/v1/service-types and the web forms: the types of `companyIds` (default: the caller's selected PTs) the
  * caller may read (collection access: every member), active only unless `includeInactive`; soft-deleted rows never.
- * Sorted by name.
+ * Sorted by `sortOrder` (Urutan) then name (the APK sorts the same way).
  */
 export async function listServiceTypes(req: PayloadRequest, f: { companyIds?: readonly number[]; includeInactive?: boolean }): Promise<ServiceTypeRow[]> {
   const companies = f.companyIds?.length ? [...f.companyIds] : memberCompanies(req)
@@ -135,13 +136,13 @@ export async function listServiceTypes(req: PayloadRequest, f: { companyIds?: re
   const and: Where[] = [{ company: { in: companies } }]
   if (!f.includeInactive) and.push({ active: { equals: true } })
   const r = await req.payload
-    .find({ collection: 'service-types', where: { and }, depth: 0, pagination: false, sort: 'name', user: req.user, overrideAccess: false /* caller's read scope (members of the PT) */, req })
+    .find({ collection: 'service-types', where: { and }, depth: 0, pagination: false, sort: 'sortOrder', user: req.user, overrideAccess: false /* caller's read scope (members of the PT) */, req })
     .catch(() => ({ docs: [] as unknown[] }))
   return (r.docs as Array<Record<string, unknown>>)
     .map(rowOf)
     .filter((t) => !t.deleted)
-    .sort((a, b) => a.name.localeCompare(b.name, 'id') || a.id - b.id)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'id') || a.id - b.id)
 }
 
 /** API / web item. */
-export const serviceTypeItem = (t: ServiceTypeRow) => ({ id: t.id, companyId: t.companyId, code: t.code, name: t.name, active: t.active })
+export const serviceTypeItem = (t: ServiceTypeRow) => ({ id: t.id, companyId: t.companyId, code: t.code, name: t.name, active: t.active, sortOrder: t.sortOrder })
