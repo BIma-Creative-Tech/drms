@@ -48,6 +48,8 @@ export const SOFT_DELETE_ENTRIES: readonly SoftDeleteEntry[] = [
   master('expense-categories'),
   master('urgency-levels'),
   master('resource-types'),
+  // DRMS owner 2026-10-17: "Jenis servis" — used by a report (service_reports_rels FK) → Nonaktifkan only
+  master('service-types'),
   master('vehicles'),
   master('cash-in-sources'),
   master('cash-accounts'),

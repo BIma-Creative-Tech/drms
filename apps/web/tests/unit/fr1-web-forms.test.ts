@@ -6,7 +6,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => undefined, r
 
 import { ActivityForm } from '@/admin/components/field/ActivityForm'
 import { CorrectionDialog } from '@/admin/components/field/CorrectionDialog'
-import { linesOut, newLine } from '@/admin/components/field/parts'
+import { linesFrom, linesOut, newLine } from '@/admin/components/field/parts'
 import { ServiceReportForm } from '@/admin/components/field/ServiceReportForm'
 import { TimesheetForm } from '@/admin/components/field/TimesheetForm'
 import { FIELD_STYLE } from '@/admin/views/field-style'
@@ -24,6 +24,11 @@ describe('Laporan servis form', () => {
       projects: [{ id: 5, label: 'K-001 Sewa PT Kalteng Coal', companyId: 1, kind: 'kontrak_unit' }],
       units: [{ id: 11, label: 'EX-01', sub: 'Excavator · milik sendiri', lastHm: 1023, status: 'siap' }],
       unitsByProject: { '5': [11] },
+      serviceTypes: [
+        { id: 31, companyId: 1, name: 'Servis berkala' },
+        { id: 32, companyId: 1, name: 'Perbaikan sistem hidrolik dan penggantian seal silinder boom' },
+        { id: 41, companyId: 2, name: 'Jenis PT lain' },
+      ],
       today: '2026-10-09',
       minDate: '2026-09-25',
       initialProject: 5,
@@ -41,6 +46,15 @@ describe('Laporan servis form', () => {
     expect(out).toContain('>+ Tambah sparepart</button>')
     expect(out).toContain('+ Tambah foto</label>')
     expect(out).toContain('accept="image/jpeg,image/png,image/webp"')
+  })
+  it('DRMS owner 2026-10-17: Jenis servis = checkbox pills of the project PT only; no "No. part"; 25 photos', () => {
+    expect(out).toContain('type="checkbox"')
+    expect(out).toContain('data-pk-choice="31"')
+    expect(out).toContain('Perbaikan sistem hidrolik dan penggantian seal silinder boom') // long name in full (wraps)
+    expect(out).not.toContain('data-pk-choice="41"') // another PT's type
+    expect(out).not.toContain('No. part')
+    expect(out).toContain('(0/25)')
+    expect(out).toContain('Maks. 25 foto')
   })
 })
 
@@ -98,6 +112,34 @@ describe('correction dialog', () => {
     expect(out).toContain('Alasan koreksi')
     expect(out).toContain('required=""')
     expect(out).toContain('value="1.020"')
+    // other dialogs: no photo picker, no multi-select (unchanged)
+    expect(out).not.toContain('Tambah foto')
+    expect(out).not.toContain('type="checkbox"')
+  })
+  it('service report (DRMS owner 2026-10-17): multi-select incl. an inactive attached type, add photos up to 25, lines without No. part', () => {
+    const out = html(
+      React.createElement(CorrectionDialog, {
+        url: '/api/v1/service-reports/1/corrections',
+        mode: 'correction',
+        buttonLabel: 'Koreksi',
+        title: 'Koreksi laporan servis',
+        description: 'x',
+        fields: [
+          { name: 'serviceTypeIds', label: 'Jenis servis', kind: 'multiselect', value: ['7', '9'], options: [{ value: '7', label: 'Perbaikan' }, { value: '8', label: 'Inspeksi' }, { value: '9', label: 'Overhaul (nonaktif)' }], numeric: true, required: true },
+          { name: 'spareparts', label: 'Sparepart', kind: 'lines', value: [{ name: 'Seal', partNo: 'SL-1', qty: 1 }], withNote: true, hidePartNo: true },
+        ],
+        photos: { current: 23, max: 25 },
+        testId: 's',
+      }),
+    )
+    expect(out).toContain('Overhaul (nonaktif)')
+    expect((out.match(/type="checkbox"[^>]*checked=""/g) ?? []).length).toBe(2)
+    expect(out).toContain('Tambah foto')
+    expect(out).toContain('(0/2)') // room left: 25 − 23
+    expect(out).not.toContain('No. part')
+    const full = html(React.createElement(CorrectionDialog, { url: '/x', mode: 'edit', buttonLabel: 'Ubah', title: 't', description: 'x', fields: [], photos: { current: 25, max: 25 } }))
+    expect(full).toContain('Sudah 25 foto (maksimal 25)')
+    expect(full).not.toContain('Tambah foto')
   })
 })
 
@@ -109,6 +151,10 @@ describe('line rules (spare parts / items)', () => {
       { name: 'Oli', partNo: null, qty: 20.5, uom: null },
     ])
     expect(Object.keys(r.errors)).toEqual(['3', '4'])
+  })
+  it('a stored part no. survives editor rows without that column (linesFrom → linesOut)', () => {
+    const rows = linesFrom([{ name: 'Seal kit', partNo: '707-99', qty: 1, uom: 'SET', note: null }])
+    expect(linesOut(rows, true).lines).toEqual([{ name: 'Seal kit', partNo: '707-99', qty: 1, uom: 'SET', note: null }])
   })
   it('styles: tokens only (no raw colours except white on solid tones), matrix scrolls in its own box', () => {
     expect(FIELD_STYLE).not.toMatch(/#[0-9a-f]{3,6}\b/i)

@@ -11,6 +11,7 @@ import {
   hmGap,
   kindAllows,
   kindOf,
+  legacyServiceTypeCode,
   normalizeUnitCode,
   poAgeDays,
   poStatusAfterDelivery,
@@ -167,6 +168,16 @@ describe('FR1 aftersales: PO status + activity fields', () => {
   })
 })
 
+describe('Jenis servis legacy single value (DRMS owner 2026-10-17)', () => {
+  it('first selected legacy code, else the first code, else null', () => {
+    expect(legacyServiceTypeCode(['overhaul', 'perbaikan', 'inspeksi'])).toBe('perbaikan')
+    expect(legacyServiceTypeCode(['inspeksi', 'perbaikan'])).toBe('inspeksi')
+    expect(legacyServiceTypeCode(['overhaul', 'kalibrasi'])).toBe('overhaul')
+    expect(legacyServiceTypeCode([undefined, 'servis_berkala'])).toBe('servis_berkala')
+    expect(legacyServiceTypeCode([])).toBeNull()
+  })
+})
+
 describe('FR1 API / sync contract', () => {
   it('spare parts are validated text lines (no stock); timesheet needs exactly one HM photo', () => {
     expect(SparepartLines.safeParse([{ name: 'Filter oli', partNo: '600-211', qty: 2, uom: 'PCS' }]).success).toBe(true)
@@ -176,7 +187,9 @@ describe('FR1 API / sync contract', () => {
     const ts = { projectId: 1, unitId: 2, reportDate: '2026-10-10', hmStart: 1000, hmEnd: 1008, workHours: 8 }
     expect(UnitTimesheetCreate.safeParse(ts).success).toBe(false)
     expect(UnitTimesheetCreate.safeParse({ ...ts, hmPhotoId: 9 }).success).toBe(true)
-    expect(ServiceReportCreate.safeParse({ projectId: 1, unitId: 2, serviceType: 'perbaikan', action: 'Ganti seal', unitStatusAfter: 'menunggu_part', photoIds: Array.from({ length: 11 }, (_, i) => i + 1) }).success).toBe(false)
+    // DRMS owner 2026-10-17: ≤ 25 photos (26 refused)
+    expect(ServiceReportCreate.safeParse({ projectId: 1, unitId: 2, serviceType: 'perbaikan', action: 'Ganti seal', unitStatusAfter: 'menunggu_part', photoIds: Array.from({ length: 25 }, (_, i) => i + 1) }).success).toBe(true)
+    expect(ServiceReportCreate.safeParse({ projectId: 1, unitId: 2, serviceType: 'perbaikan', action: 'Ganti seal', unitStatusAfter: 'menunggu_part', photoIds: Array.from({ length: 26 }, (_, i) => i + 1) }).success).toBe(false)
   })
 
   it('new sync item types are accepted by the envelope', () => {

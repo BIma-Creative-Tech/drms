@@ -9,8 +9,9 @@ import { WrapText } from '../WrapText'
 /**
  * FR1 web forms — shared client parts: photo picker (preview, remove, upload on submit with the id
  * cached per file so a retry never uploads twice), the line editor of spare parts / activity items
- * (name, part no., qty, UoM), a decimal field with the Indonesian comma and a choice group (radio
- * pills, .pk-seg). Visible labels, errors linked with aria-describedby, ≥ 44 px on touch.
+ * (name, part no., qty, UoM), a decimal field with the Indonesian comma, a choice group (radio
+ * pills, .pk-seg) and a multi-choice group (checkbox pills, DRMS owner 2026-10-17 "Jenis servis"). Visible labels,
+ * errors linked with aria-describedby, ≥ 44 px on touch.
  */
 
 // ---------------------------------------------------------------- photos
@@ -48,6 +49,15 @@ export function usePhotos(max: number) {
       }
       uploaded.current.delete(key)
       setItems(items.filter((x) => x.key !== key))
+    },
+    /** Drops every picked photo (a dialog re-opened / saved). */
+    clear() {
+      items.forEach((p) => {
+        URL.revokeObjectURL(p.url)
+        urls.current.delete(p.url)
+      })
+      uploaded.current.clear()
+      setItems([])
     },
     /** Upload every photo not uploaded yet; returns all media ids in order. */
     async uploadAll(onProgress?: (done: number, total: number) => void): Promise<number[]> {
@@ -139,10 +149,14 @@ export type LineOut = { name: string; partNo?: string | null; qty: number; uom?:
 let lineSeq = 0
 export const newLine = (l: Partial<LineDraft> = {}): LineDraft => ({ key: `l${++lineSeq}`, name: '', partNo: '', qty: '', uom: '', note: '', ...l })
 
+/**
+ * Stored lines → editor rows. EVERY stored value is kept on the row — also `partNo` when the editor hides that column
+ * (service report, DRMS owner 2026-10-17): `linesOut` sends it back unchanged, so an edit never drops an old part no.
+ */
 export const linesFrom = (xs: ReadonlyArray<{ name: string; partNo?: string | null; qty: number; uom?: string | null; note?: string | null }>): LineDraft[] =>
   xs.map((x) => newLine({ name: x.name, partNo: x.partNo ?? '', qty: fmtNum(x.qty, 3), uom: x.uom ?? '', note: x.note ?? '' }))
 
-/** Rows → API lines; empty rows are dropped; returns errors per row index. */
+/** Rows → API lines; empty rows are dropped; returns errors per row index. A (hidden) `partNo` of a row is kept. */
 export function linesOut(rows: readonly LineDraft[], withNote: boolean): { lines: LineOut[]; errors: Record<number, string> } {
   const lines: LineOut[] = []
   const errors: Record<number, string> = {}
@@ -157,17 +171,21 @@ export function linesOut(rows: readonly LineDraft[], withNote: boolean): { lines
   return { lines, errors }
 }
 
-export function LinesEditor({ rows, setRows, label, nameLabel, addLabel, help, withNote, max = 50 }: { rows: LineDraft[]; setRows: (r: LineDraft[]) => void; label: string; nameLabel: string; addLabel: string; help?: string; withNote?: boolean; max?: number }) {
+/**
+ * Line editor. `hidePartNo` (DRMS owner 2026-10-17: service-report spare parts have no "No. part" input — create,
+ * edit, correction; aftersales items keep it): the column is not shown, a stored part no. stays on its row.
+ */
+export function LinesEditor({ rows, setRows, label, nameLabel, addLabel, help, withNote, hidePartNo, max = 50 }: { rows: LineDraft[]; setRows: (r: LineDraft[]) => void; label: string; nameLabel: string; addLabel: string; help?: string; withNote?: boolean; hidePartNo?: boolean; max?: number }) {
   const uid = useId()
   const errs = useMemo(() => linesOut(rows, !!withNote).errors, [rows, withNote])
   const set = (i: number, k: keyof LineDraft, v: string) => setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)))
   return (
-    <fieldset className="pk-lines">
+    <fieldset className={`pk-lines${hidePartNo ? ' no-pn' : ''}`}>
       <legend>{label}</legend>
       {rows.length > 0 ? (
         <div className="pk-lines-h" aria-hidden>
           <span>{nameLabel}</span>
-          <span>No. part</span>
+          {hidePartNo ? null : <span>No. part</span>}
           <span>Jumlah</span>
           <span>Satuan</span>
           <span />
@@ -176,7 +194,7 @@ export function LinesEditor({ rows, setRows, label, nameLabel, addLabel, help, w
       {rows.map((r, i) => (
         <div key={r.key} className="pk-line" data-pk-line={i + 1}>
           <WrapText aria-label={`${nameLabel} ${i + 1}`} value={r.name} maxLength={160} onChange={(e) => set(i, 'name', e.target.value)} aria-invalid={errs[i] ? true : undefined} aria-describedby={errs[i] ? `${uid}-e${i}` : undefined} />
-          <input aria-label={`No. part ${i + 1}`} value={r.partNo} maxLength={64} onChange={(e) => set(i, 'partNo', e.target.value)} />
+          {hidePartNo ? null : <input aria-label={`No. part ${i + 1}`} value={r.partNo} maxLength={64} onChange={(e) => set(i, 'partNo', e.target.value)} />}
           <input aria-label={`Jumlah ${i + 1}`} value={r.qty} inputMode="decimal" maxLength={12} onChange={(e) => set(i, 'qty', e.target.value)} aria-invalid={errs[i] ? true : undefined} />
           <input aria-label={`Satuan ${i + 1}`} value={r.uom} maxLength={16} placeholder="PCS" onChange={(e) => set(i, 'uom', e.target.value)} />
           <button type="button" className="pk-kbtn sm" onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label={`Hapus baris ${i + 1}`}>
@@ -222,6 +240,47 @@ export function Choice<T extends string>({ label, name, value, options, onChange
           </label>
         ))}
       </div>
+      {error ? (
+        <p className="err" id={`${uid}-e`} role="alert">
+          {error}
+        </p>
+      ) : null}
+    </fieldset>
+  )
+}
+
+// ---------------------------------------------------------------- multi-choice group (checkbox pills)
+
+/**
+ * DRMS owner 2026-10-17 "Jenis servis": pick one or more options (checkbox pills in the .pk-seg style; long names wrap,
+ * never cut — owner 2026-10-16 grid-wrap rule). `value` keeps the SELECTION ORDER (a newly ticked option goes last).
+ */
+export function CheckGroup({ label, name, value, options, onChange, required, error, help, disabled }: { label: string; name: string; value: readonly string[]; options: ReadonlyArray<{ value: string; label: string }>; onChange: (v: string[]) => void; required?: boolean; error?: string | null; help?: React.ReactNode; disabled?: boolean }) {
+  const uid = useId()
+  const toggle = (v: string, on: boolean) => onChange(on ? (value.includes(v) ? [...value] : [...value, v]) : value.filter((x) => x !== v))
+  return (
+    <fieldset className="pk-fld pk-choice pk-checks" aria-describedby={[help ? `${uid}-h` : null, error ? `${uid}-e` : null].filter(Boolean).join(' ') || undefined} disabled={disabled}>
+      <legend className="lbl">
+        {label}
+        {required ? (
+          <span className="req" aria-hidden>
+            *
+          </span>
+        ) : null}
+      </legend>
+      <div className="pk-seg" role="group" aria-label={label}>
+        {options.map((o) => (
+          <label key={o.value} data-pk-choice={o.value}>
+            <input type="checkbox" name={name} value={o.value} checked={value.includes(o.value)} onChange={(e) => toggle(o.value, e.target.checked)} aria-invalid={error ? true : undefined} />
+            {o.label}
+          </label>
+        ))}
+      </div>
+      {help ? (
+        <p className="help" id={`${uid}-h`}>
+          {help}
+        </p>
+      ) : null}
       {error ? (
         <p className="err" id={`${uid}-e`} role="alert">
           {error}

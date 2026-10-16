@@ -75,6 +75,7 @@ describe('grants (least privilege)', () => {
       'payload_preferences',
       'payload_preferences_rels',
       'rap_templates_items', // P3: RAP template lines (array rewritten on update)
+      'service_reports_rels', // DRMS owner 2026-10-17: "Jenis servis" (hasMany rewritten on update; window / PT guarded by service_reports_rels_guard)
       'settlements_rels', // DRMS 10/10 point 13: LPJ photos (hasMany rewritten on update; frozen by settlements_photos_frozen)
       'stage_templates_items',
       'sync_receipts', // F4: purge of expired sync results (30 days, ADR 0010)

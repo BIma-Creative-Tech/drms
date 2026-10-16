@@ -39,13 +39,18 @@ import {
 } from './common'
 import { notifyUnitWaitingPart } from './notify'
 import { namesOf, num, projectRef, str, unitRef, userRef } from './refs'
-import { hmDecreased, isDec2, round2, serviceTimeError, unitClientMismatch, type ServiceType, type UnitStatus } from './rules'
+import { hmDecreased, isDec2, legacyServiceTypeCode, round2, serviceTimeError, unitClientMismatch, type UnitStatus } from './rules'
+import { resolveCreateServiceTypes, resolvePatchServiceTypes, serviceTypeIdsOf, serviceTypeRows, type ServiceTypeRow } from './service-types'
 
 /**
  * FR1 Laporan servis unit (ADR 0020 §5) — the single write path of POST/PATCH /api/v1/service-reports,
  * POST …/{id}/corrections and the sync item `service_report.upsert`. Runs inside the caller's
  * transaction: number SV/YYMM/####, report row, photos, unit status / last HM and the "menunggu part"
  * notification commit or roll back together.
+ *
+ * DRMS owner 2026-10-17 (ADR 0020 amendment 2026-10-17): "Jenis servis" is a MULTI-selection of the PT's master
+ * `service-types` (`serviceTypeIds`; rules + the legacy single code of APK 0.7.0: ./service-types.ts). The legacy
+ * column `serviceType` is written = `legacyServiceTypeCode` (first selected LEGACY code, else the first code). Photos ≤ 25.
  */
 const TYPE = 'service_report' as const
 const LABEL = 'Laporan servis'
@@ -58,7 +63,10 @@ export type ServiceDoc = FieldDoc & {
   startTime?: string | null
   endTime?: string | null
   hourMeter?: number | null
-  serviceType: ServiceType
+  /** Ids of the selected `service-types` (selection order). */
+  serviceTypes?: unknown
+  /** Legacy single code (`legacyServiceTypeCode` of the selection). */
+  serviceType?: string | null
   complaint?: string | null
   action: string
   unitStatusAfter: UnitStatus
@@ -81,7 +89,10 @@ export type ServiceInput = {
   startTime?: string | null
   endTime?: string | null
   hourMeter?: number | null
-  serviceType: ServiceType
+  /** Selected master rows (1 … 20, unique, the report's PT, active on create). */
+  serviceTypeIds?: number[] | null
+  /** LEGACY single code (old clients, APK 0.7.0) — only when serviceTypeIds is absent. */
+  serviceType?: string | null
   complaint?: string | null
   action: string
   unitStatusAfter: UnitStatus
@@ -148,6 +159,7 @@ export async function createServiceReport(req: PayloadRequest, input: ServiceInp
   const unit = await requireUnit(req, input.unitId, project.company)
   if (unitClientMismatch({ owner: unit.owner, client: unit.client }, project.client)) fail(400, 'VALIDATION', 'Unit milik pelanggan lain dari klien project ini.', 'unitId')
   checkContent(input, true)
+  const types = await resolveCreateServiceTypes(req, project.company, input)
   const { today } = await companyDay(req, project.company, timing.time)
   const reportDate = input.reportDate ?? today
   checkReportDate(reportDate, today, 'reportDate')
@@ -168,7 +180,8 @@ export async function createServiceReport(req: PayloadRequest, input: ServiceInp
     startTime: input.startTime ?? null,
     endTime: input.endTime ?? null,
     hourMeter: input.hourMeter === undefined || input.hourMeter === null ? null : round2(input.hourMeter),
-    serviceType: input.serviceType,
+    serviceTypes: types.map((t) => t.id),
+    serviceType: legacyServiceTypeCode(types.map((t) => t.code)),
     complaint: clean(input.complaint),
     action: input.action.trim(),
     unitStatusAfter: input.unitStatusAfter,
@@ -202,6 +215,7 @@ async function applyPatch(req: PayloadRequest, doc: ServiceDoc, patch: ServicePa
   await checkPhotos(req, TYPE, add, current.length)
   const company = relId(doc.company)!
   const unitId = relId(doc.unit)!
+  const types = await resolvePatchServiceTypes(req, company, serviceTypeIdsOf(doc.serviceTypes), patch)
 
   const data: Record<string, unknown> = {}
   const set = (k: keyof ServicePatch, v: unknown, cur: unknown) => {
@@ -211,7 +225,11 @@ async function applyPatch(req: PayloadRequest, doc: ServiceDoc, patch: ServicePa
   set('startTime', patch.startTime, doc.startTime)
   set('endTime', patch.endTime, doc.endTime)
   set('hourMeter', patch.hourMeter === undefined ? undefined : patch.hourMeter === null ? null : round2(patch.hourMeter), num(doc.hourMeter))
-  set('serviceType', patch.serviceType, doc.serviceType)
+  if (types) {
+    data.serviceTypes = types.map((t) => t.id)
+    const legacy = legacyServiceTypeCode(types.map((t) => t.code))
+    if (legacy !== doc.serviceType) data.serviceType = legacy
+  }
   set('complaint', patch.complaint === undefined ? undefined : clean(patch.complaint), doc.complaint)
   set('action', patch.action === undefined ? undefined : patch.action.trim(), doc.action)
   set('unitStatusAfter', patch.unitStatusAfter, doc.unitStatusAfter)
@@ -257,42 +275,54 @@ export async function correctServiceReport(req: PayloadRequest, id: number, patc
 
 // ---------------------------------------------------------------- read side
 
+const typeRef = (t: ServiceTypeRow) => ({ id: t.id, code: t.code, name: t.name, active: t.active })
+
 export async function serviceDtos(req: PayloadRequest, docs: readonly ServiceDoc[]) {
   const n = await namesOf(req, docs)
   const ph = await photosOf(req, TYPE, docs.map((d) => d.id))
-  return docs.map((d) => ({
-    id: d.id,
-    uuid: (d.uuid as string | null) ?? null,
-    companyId: relId(d.company) ?? null,
-    docNo: d.docNo ?? null,
-    project: projectRef(n, d.project),
-    unit: unitRef(n, d.unit),
-    reportDate: d.reportDate,
-    reporter: userRef(n, d.reporter)!,
-    helpers: str(d.helpers),
-    startTime: str(d.startTime),
-    endTime: str(d.endTime),
-    hourMeter: num(d.hourMeter),
-    serviceType: d.serviceType,
-    complaint: str(d.complaint),
-    action: d.action,
-    unitStatusAfter: d.unitStatusAfter,
-    spareparts: Array.isArray(d.spareparts) ? d.spareparts : [],
-    notes: str(d.notes),
-    photos: (ph.get(d.id) ?? []).map(photoDto),
-    offline: d.offline === true,
-    timeTrust: d.timeTrust ?? 'server',
-    source: d.source ?? null,
-    flags: flagsOf(d),
-    receivedAt: d.receivedAt ?? null,
-    editableUntil: d.editableUntil ?? null,
-    editable: isEditable(req, d),
-    correctedAt: d.correctedAt ?? null,
-    correctedBy: userRef(n, d.correctedBy),
-    rev: revOf(d),
-    clientUuid: d.clientUuid ?? null,
-    createdAt: d.createdAt ?? null,
-  }))
+  const types = await serviceTypeRows(req, docs.flatMap((d) => serviceTypeIdsOf(d.serviceTypes)))
+  return docs.map((d) => {
+    const selected = serviceTypeIdsOf(d.serviceTypes).flatMap((id) => {
+      const t = types.get(id)
+      return t ? [typeRef(t)] : []
+    })
+    return {
+      id: d.id,
+      uuid: (d.uuid as string | null) ?? null,
+      companyId: relId(d.company) ?? null,
+      docNo: d.docNo ?? null,
+      project: projectRef(n, d.project),
+      unit: unitRef(n, d.unit),
+      reportDate: d.reportDate,
+      reporter: userRef(n, d.reporter)!,
+      helpers: str(d.helpers),
+      startTime: str(d.startTime),
+      endTime: str(d.endTime),
+      hourMeter: num(d.hourMeter),
+      /** DRMS owner 2026-10-17: the selected types (selection order). */
+      serviceTypes: selected,
+      /** Legacy: first selected LEGACY code (APK 0.7.0 shows / pre-selects only those), else the first code. */
+      serviceType: legacyServiceTypeCode(selected.map((t) => t.code)) ?? str(d.serviceType),
+      complaint: str(d.complaint),
+      action: d.action,
+      unitStatusAfter: d.unitStatusAfter,
+      spareparts: Array.isArray(d.spareparts) ? d.spareparts : [],
+      notes: str(d.notes),
+      photos: (ph.get(d.id) ?? []).map(photoDto),
+      offline: d.offline === true,
+      timeTrust: d.timeTrust ?? 'server',
+      source: d.source ?? null,
+      flags: flagsOf(d),
+      receivedAt: d.receivedAt ?? null,
+      editableUntil: d.editableUntil ?? null,
+      editable: isEditable(req, d),
+      correctedAt: d.correctedAt ?? null,
+      correctedBy: userRef(n, d.correctedBy),
+      rev: revOf(d),
+      clientUuid: d.clientUuid ?? null,
+      createdAt: d.createdAt ?? null,
+    }
+  })
 }
 
 export type ServiceDto = Awaited<ReturnType<typeof serviceDtos>>[number]
@@ -301,7 +331,7 @@ export async function serviceDto(req: PayloadRequest, d: ServiceDoc): Promise<Se
   return (await serviceDtos(req, [d]))[0]!
 }
 
-export type ServiceListFilter = { projectId?: number; unitId?: number; status?: UnitStatus; reporterId?: number; from?: string; to?: string; mine?: boolean; limit: number; after?: number; companyIds?: readonly number[]; q?: string }
+export type ServiceListFilter = { projectId?: number; unitId?: number; status?: UnitStatus; reporterId?: number; serviceTypeId?: number; from?: string; to?: string; mine?: boolean; limit: number; after?: number; companyIds?: readonly number[]; q?: string }
 
 /** Newest first in the caller's read scope (collection access), cursor on id. */
 export async function listServiceReports(req: PayloadRequest, f: ServiceListFilter): Promise<{ items: ServiceDto[]; nextCursor: number | null }> {
@@ -310,6 +340,7 @@ export async function listServiceReports(req: PayloadRequest, f: ServiceListFilt
   if (f.unitId !== undefined) and.push({ unit: { equals: f.unitId } })
   if (f.status) and.push({ unitStatusAfter: { equals: f.status } })
   if (f.reporterId !== undefined) and.push({ reporter: { equals: f.reporterId } })
+  if (f.serviceTypeId !== undefined) and.push({ serviceTypes: { in: [f.serviceTypeId] } }) // web filter "Jenis servis" (DRMS owner 2026-10-17)
   if (f.from) and.push({ reportDate: { greater_than_equal: f.from } })
   if (f.to) and.push({ reportDate: { less_than_equal: f.to } })
   if (f.mine) and.push({ reporter: { equals: userId(req) ?? -1 } })

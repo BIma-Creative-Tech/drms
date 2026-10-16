@@ -90,6 +90,11 @@ export const FIELD_STYLE = `
 .pk-f3 .pk-lines { display: grid; gap: 8px; }
 .pk-f3 .pk-lines-h, .pk-f3 .pk-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 120px) 76px 72px auto; gap: 6px; align-items: center; }
 .pk-f3 .pk-lines-h { font-size: 12px; font-weight: 600; color: var(--pk-muted-fg); }
+/* DRMS owner 2026-10-17: service-report spare parts without the part-number column */
+.pk-f3 .pk-lines.no-pn .pk-lines-h, .pk-f3 .pk-lines.no-pn .pk-line { grid-template-columns: minmax(0, 1fr) 76px 72px auto; }
+/* "Jenis servis" checkbox pills: long names wrap (never cut) */
+.pk-f3 .pk-checks .pk-seg label { min-height: 34px; height: auto; padding: 6px 14px; line-height: 1.3; white-space: normal; overflow-wrap: anywhere; text-align: left; }
+.pk-f3 .pk-checks .pk-seg label:has(input:disabled) { cursor: not-allowed; opacity: .6; }
 .pk-f3 .pk-line :is(input:not([type='checkbox'], [type='radio']), textarea) { width: 100%; min-height: 40px; padding: 6px 8px; font: inherit; font-size: 14px; color: var(--theme-text); background: var(--theme-input-bg, var(--theme-elevation-0)); border: 1px solid var(--pk-input); border-radius: var(--style-radius-s); box-sizing: border-box; }
 .pk-f3 .pk-line :is(input, textarea):focus-visible { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
 .pk-f3 .pk-line :is(input, textarea)[aria-invalid='true'] { border-color: var(--pk-tone-bad-text); }
@@ -103,6 +108,7 @@ export const FIELD_STYLE = `
   .pk-f3 .pk-line { grid-template-columns: minmax(0, 1fr) 76px 72px; padding: 8px; border: 1px solid var(--pk-border); border-radius: var(--style-radius-m); }
   .pk-f3 .pk-line > :is(input, textarea):first-child { grid-column: 1 / -1; }
   .pk-f3 .pk-line > button { grid-column: 1 / -1; justify-self: start; }
+  .pk-f3 .pk-lines.no-pn .pk-line { grid-template-columns: minmax(0, 1fr) 72px; }
 }
 @media (pointer: coarse) { .pk-f3 .pk-line :is(input:not([type='checkbox'], [type='radio']), textarea) { min-height: 44px; } }
 .pk-f3 .pk-photos { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }

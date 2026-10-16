@@ -6,7 +6,7 @@ import { hasRole, hasRoleAny } from '@/access/roles'
 import { CorrectionDialog, type CorrField } from '@/admin/components/field/CorrectionDialog'
 import { TimesheetForm, type TsProject } from '@/admin/components/field/TimesheetForm'
 import { mayReadRates } from '@/domain/field/access'
-import { BACKDATE_MAX_DAYS, addDays, BREAKDOWN_SUGGEST_SERVICE_HOURS, SERVICE_TYPE_LABELS, UNIT_STATUS_LABELS, type ServiceType, type UnitStatus } from '@/domain/field/rules'
+import { BACKDATE_MAX_DAYS, addDays, BREAKDOWN_SUGGEST_SERVICE_HOURS, serviceTypeNames, UNIT_STATUS_LABELS, type UnitStatus } from '@/domain/field/rules'
 import { listServiceReports } from '@/domain/field/service'
 import { timesheetDto, type TimesheetDoc } from '@/domain/field/timesheet'
 import { buildRecap, buildTimesheetMatrix, cellText, ESTIMATE_LABEL, ESTIMATE_NOTE, fmtNum, longDate, monthDays, monthLabel, monthParam, recentMonths, shortDay, type Matrix } from '@/domain/field/views'
@@ -569,7 +569,7 @@ export async function FieldUnitDetail(props: AdminViewServerProps) {
       key: `sv-${s.id}`,
       date: s.reportDate,
       kind: 'servis' as const,
-      title: `${s.docNo ?? `Servis #${s.id}`} · ${SERVICE_TYPE_LABELS[s.serviceType as ServiceType] ?? s.serviceType} · ${UNIT_STATUS_LABELS[s.unitStatusAfter as UnitStatus] ?? s.unitStatusAfter}`,
+      title: `${s.docNo ?? `Servis #${s.id}`} · ${serviceTypeNames(s.serviceTypes, s.serviceType)} · ${UNIT_STATUS_LABELS[s.unitStatusAfter as UnitStatus] ?? s.unitStatusAfter}`,
       detail: [s.action.length > 100 ? `${s.action.slice(0, 99)}…` : s.action, s.hourMeter !== null ? `HM ${fmtNum(s.hourMeter)}` : null, s.reporter.name].filter(Boolean).join(' · '),
       href: `/admin/laporan-servis/detail/${s.id}`,
       flags: s.flags,

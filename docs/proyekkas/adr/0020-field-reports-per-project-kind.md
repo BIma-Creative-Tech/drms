@@ -122,3 +122,41 @@ the after-sales staff (quotations, incoming POs, deliveries). Construction (dail
 **Consequences.** Projects with a RAB but no RAP (e.g. imported go-live projects, the UAT seed project) cannot send
 requests until a PM fills the RAP — intended. The APK learns the rule from `GET /projects/{id}/rap` `rapRequired` and
 `GET /projects` `rapMissing`; older APKs still get the server's 400 with the same message under the project field.
+
+## Amendment 2026-10-17 — Jenis servis as a per-PT master (multi-select), 25 photos, no "No. part" (DRMS owner 2026-10-17)
+
+- **Status:** accepted (owner request 2026-10-17, menu Proyek › Laporan Servis). Branch `feat/d1710-service-jenis`.
+  Supersedes the fixed four-value "jenis servis" enum of §5 and the "≤ 10 photos" of the service report.
+
+**Decision.**
+
+1. **"Jenis servis" is master data per PT** (`service-types`: code, name, active; Master Data group). Managed by the
+   Admin and the Direktur of the PT (Owner implies Direktur), read by every member. Every PT is seeded with the four
+   former values (codes `servis_berkala` / `perbaikan` / `inspeksi` / `pemasangan`) — existing PTs by migration
+   `20261017_100000_d1710_service_types`, new PTs by `ensureDefaultServiceTypes`. The code is fixed once created (field
+   access + DB trigger): it is how APK 0.7.0 still names a type. No hard delete: "Hapus" (ADR 0030 soft delete) only
+   while no report uses the type (FK usage check via `service_reports_rels`), otherwise "Nonaktifkan" with a reason.
+2. **A service report has ONE OR MORE types** (`serviceTypes`, hasMany, selection order; REST `serviceTypeIds`, sync
+   `service_type_ids`, 1–20 unique ids of the report's PT; create: active only; edit / correction: a type already on
+   the report may stay although deactivated, a newly added one must be active). Web: checkbox pills on create, in
+   "Ubah (24 jam)" and "Koreksi"; lists / detail / timelines show the names joined with ", ". `GET /api/v1/service-types`
+   serves the picker. **Legacy single code** (`serviceType` / `service_type`, the only form of APK 0.7.0) still works
+   when no id list is sent: create → the PT's row with that code; edit → unchanged when that code is already on the
+   report (APK 0.7.0 resends it on every edit and must not collapse a multi-selection made on the web), else the
+   selection becomes that one type. The DTO keeps `serviceType` and the sync server copy `service_type` = the code of
+   the first selected type whose code is one of the four legacy codes, else of the first selected type (APK 0.7.0
+   can show / pre-select only the legacy ones; its edit then resends a code that is on the report) and adds
+   `service_type_ids`. DB: `service_reports.service_type` became a nullable varchar written with that same code.
+   Urutan (`sortOrder`): lists sort by it, then name; seeded 1–4, a type created without one gets the PT's highest + 1.
+3. **DB guard of the types** (`service_reports_rels_guard`): the same 24 h window / PM-Direktur correction override as
+   the report row, the type must be of the report's PT, the rows are `serviceTypes` only; deferred constraint triggers
+   keep ≥ 1 type per report at commit. Payload rewrites the rows on update → DELETE granted on that table only.
+4. **Photos per service report: 25** (was 10) — API, sync, DB CHECK and the photo-limit trigger. The web edit and
+   correction dialogs may now ADD photos (never remove) up to that total (`addPhotoIds`).
+5. **No "No. part" input for service-report spare parts** (web create / edit / correction). A part number already
+   stored on a line is kept (sent back unchanged) and shown in the detail only when some line has one. Aftersales
+   items (activity log / PO lines) keep their No. part.
+
+**Consequences.** Reports created before the migration carry exactly their old type. APK 0.7.0 keeps working (single
+type, ≤ 10 photos locally); a newer APK reads `GET /service-types` and sends `service_type_ids`. Down migration is
+refused once a report has more than 10 photos or a type outside the old four / several types (restore the dump).
