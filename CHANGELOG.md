@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-10-16
+
+**Fix: "Pengguna baru" could not be saved for a new account.** PRs #91, #92. Production goes 0.13.0 → 0.13.1. Web /
+server only: **no APK release**, no database migration, no API contract change.
+
+**Deploy checklist:** staging first, then prod. Deploy (migrate is a no-op → web + worker); check `/api/v1/health` and
+create a new user from **Pengguna → + Buat** (the temporary password is shown once).
+Rollback: the 0.13.0 image (no schema change).
+
+### Fixed
+- **Temporary password of a new account meets the realm password policy (#91, #92).** The generated password had upper /
+  lower case letters and digits only; the `drms` realm also requires `specialChars(1)`, so Keycloak refused every new
+  account (`invalidPasswordMinSpecialCharsMessage`) and the form showed "Sistem login (Keycloak) menolak atau tidak dapat
+  dihubungi". It now always contains one of `!@#$%*?-+=`. A password-policy refusal names the policy key in the 502
+  detail (code stays `KEYCLOAK_FAILED`). Existing accounts are not affected.
+
 ## [0.13.0] - 2026-10-16
 
 **DRMS 16/10 owner feedback: one-page tabbed forms (Pengguna, Klien, Vendor), "+ Buat" and "+ … baru" shortcuts,
