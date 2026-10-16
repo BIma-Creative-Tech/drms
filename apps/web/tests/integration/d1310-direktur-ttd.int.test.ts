@@ -6,7 +6,7 @@ import { buildApprovalTimeline } from '@/domain/expense/approval-timeline'
 import { resetRateLimits } from '@/lib/rate-limit'
 import { buildPdfData } from '@/pdf/data'
 
-import { companyId, getTestPayload, sqlAs, sqlError } from './helpers'
+import { addMembership, companyId, getTestPayload, sqlAs, sqlError } from './helpers'
 import { api, asUser, draftBody, makeFlowUser, makeWorld, png, uploadMedia, type FlowUser, type World } from './flow-world'
 
 /**
@@ -234,5 +234,63 @@ describe('5. snapshot', () => {
     const id2 = await pmApproved()
     expect((await api('POST', `${E}/${id2}/approve`, w.users.owner, {}, key())).status).toBe(200)
     expect((await rows(id2)).find((x) => x.position === 'approval')).toMatchObject({ signature_id: sig2, actor_name: 'Direktur Pengganti Uji' })
+  })
+})
+
+describe('6. owner 2026-10-16: wakil PM + Direktur — the PM project who is a representative decides both steps', () => {
+  let wr: World // PM project → Direktur; its PM also holds the Direktur role in the PT
+  let sig6: number
+  const NAME6 = 'Direktur Wakil PM Uji'
+
+  beforeAll(async () => {
+    wr = await makeWorld('TTW', { rule: 'pm_direktur' })
+    await addMembership(wr.users.pm.id, drms, ['pk-pm', 'pk-owner'], wr.emp.pm)
+    sig6 = await uploadMedia('media-signatures', w.users.admin, await png(9006, 800, 300))
+  })
+
+  async function pmAcknowledged(): Promise<number> {
+    const id = await submitted(wr)
+    const ack = await api('POST', `${E}/${id}/acknowledge`, wr.users.pm, {}, key())
+    expect(ack.status, JSON.stringify(ack.body)).toBe(200)
+    return id
+  }
+
+  it('representative: PM step with the own signature, then the Direktur step as the definitive Direktur', async () => {
+    await configure(w.users.admin, { name: NAME6, title: TITLE, signature: sig6, representatives: [w.users.owner.id, wr.users.pm.id] })
+    const id = await pmAcknowledged()
+    const d = (await api('GET', `${E}/${id}`, wr.users.pm)).body
+    expect(d.allowedActions).toContain('approve')
+    expect(d.direkturSignature).toEqual({ name: NAME6, title: TITLE, signatureId: sig6 })
+    const ok = await api('POST', `${E}/${id}/approve`, wr.users.pm, {}, key())
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200)
+    const [pmRow, dirRow] = await rows(id)
+    expect(pmRow).toMatchObject({ position: 'diketahui', actor_id: wr.users.pm.id, signature_source: 'profile', represented_direktur_name: null })
+    expect(dirRow).toMatchObject({ position: 'approval', actor_id: wr.users.pm.id, actor_name: NAME6, signature_id: sig6, signature_source: 'company', represented_direktur_name: NAME6 })
+    const pdf = await asUser(w.users.finance, (req) => buildPdfData(req, id, { internal: false, printedBy: 'test' }))
+    expect(pdf.signatures.find((s) => s.label === 'Approval')!.names).toBe(`${NAME6} (${TITLE})`)
+  })
+
+  it('reject at the Direktur step by the same representative: the definitive Direktur rejects', async () => {
+    const id = await pmAcknowledged()
+    const r = await api('POST', `${E}/${id}/reject`, wr.users.pm, { reason: 'Tidak sesuai anggaran' }, key())
+    expect(r.status, JSON.stringify(r.body)).toBe(200)
+    expect((await rows(id)).find((x) => x.position === 'approval')).toMatchObject({ actor_id: wr.users.pm.id, decision: 'rejected', actor_name: NAME6, signature_source: 'company' })
+  })
+
+  it('a PM who holds the Direktur role but is NOT a representative still decides one position only (G1, app + DB)', async () => {
+    await configure(w.users.admin, { name: NAME6, title: TITLE, signature: sig6, representatives: [w.users.owner.id] })
+    const id = await pmAcknowledged()
+    expect((await api('GET', `${E}/${id}`, wr.users.pm)).body.allowedActions).not.toContain('approve')
+    expect((await api('POST', `${E}/${id}/approve`, wr.users.pm, {}, key())).status).toBe(403)
+    // DB: a second personal decision position of the same user in the cycle
+    const dup = await sqlError(
+      'app',
+      `INSERT INTO approvals (doc_type, request_id, company_id, cycle, position, level, actor_id, actor_name, decision, signature_source, updated_at, created_at)
+       VALUES ('expense_request', $1, $2, 1, 'approval', 1, $3, 'x', 'approved', 'profile', now(), now())`,
+      [id, drms, wr.users.pm.id],
+    )
+    expect(dup?.code, dup?.message).toBe('23505')
+    const ok = await api('POST', `${E}/${id}/approve`, w.users.owner, {}, key())
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200)
   })
 })

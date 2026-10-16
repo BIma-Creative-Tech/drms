@@ -75,6 +75,19 @@ Owner requirement:
      only when the actor is a designated representative of the row's PT holding the Direktur role there (active
      account + membership) and the signature / name / title are the PT's **current** ones.
 
+### Amendment 2026-10-16 — representative also PM (owner decision)
+
+The 2026-10-14 answer "a representative who approved as PM can't decide the Direktur step" is withdrawn. In DRMS the
+PM project (apollowijaya) is also the definitive Direktur's representative and gets signing access twice: the PM step
+with the own signature, the Direktur step with the definitive Direktur's signature. Rule: G1 "one decision position per
+person per cycle" counts a user's personal decisions and their decisions as the definitive Direktur
+(`signature_source = 'company'`) separately (`holdsPositionAs`, `decidesAsDirektur`); the DB indexes
+`approvals_one_position_per_person` / `approvals_settlement_one_position_per_person` carry the same split (migration
+`20261016_220000_d1610_wakil_pm_direktur`). Unchanged: requester/creator never decide (G1 trigger), only designated
+representatives sign as the Direktur (`approvals_signature_company`), addendum and loan decisions keep the strict
+index, and the submit-time position plan (`approversAssignable`) still assumes distinct people — a PT whose only
+Direktur is also the PM project of the request would still be refused at submit.
+
 ## Consequences
 
 - Positive: documents and history name the legal Direktur; the representation is explicit, immutable and auditable;
