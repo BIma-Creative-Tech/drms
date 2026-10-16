@@ -107,14 +107,16 @@ describe('rules: own account, membership change, diffs', () => {
 })
 
 describe('temporary password', () => {
-  it('14 characters, upper + lower + digit, unambiguous alphabet', () => {
+  it('14 characters, upper + lower + digit + special (realm policy), unambiguous alphabet', () => {
     for (let i = 0; i < 50; i++) {
       const p = generateTemporaryPassword()
       expect(p).toHaveLength(14)
       expect(p).toMatch(/[A-Z]/)
       expect(p).toMatch(/[a-z]/)
       expect(p).toMatch(/[2-9]/)
+      expect(p).toMatch(/[!@#$%*?\-+=]/)
       expect(p).not.toMatch(/[0O1lI]/)
+      expect(p).toMatch(/^[A-Za-z2-9!@#$%*?\-+=]+$/)
     }
     expect(generateTemporaryPassword(4)).toHaveLength(10) // never shorter than 10
   })

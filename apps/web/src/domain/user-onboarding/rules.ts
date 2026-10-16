@@ -197,15 +197,18 @@ export function errorPath(prefix: string, field: string | undefined): string {
 const UPPER = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
 const LOWER = 'abcdefghijkmnopqrstuvwxyz'
 const DIGIT = '23456789'
-const ALL = UPPER + LOWER + DIGIT
+// Keyboard-row symbols that survive copy / WhatsApp / typing on a phone (no quotes, backslash, space or look-alikes)
+const SPECIAL = '!@#$%*?-+='
+const ALL = UPPER + LOWER + DIGIT + SPECIAL
 
 /**
  * Temporary password of a new account (shown once to the Admin, Keycloak `temporary: true`): 14 characters with at
- * least one upper case letter, one lower case letter and one digit (any common realm policy), crypto random.
+ * least one upper case letter, one lower case letter, one digit and one special character — the realm policy
+ * (`upperCase(1) lowerCase(1) digits(1) specialChars(1)`, /opt/infra realm-export) refuses anything less — crypto random.
  */
 export function generateTemporaryPassword(length = 14, rnd: (max: number) => number = randomInt): string {
   const n = Math.max(10, length)
-  const chars = [UPPER[rnd(UPPER.length)]!, LOWER[rnd(LOWER.length)]!, DIGIT[rnd(DIGIT.length)]!]
+  const chars = [UPPER[rnd(UPPER.length)]!, LOWER[rnd(LOWER.length)]!, DIGIT[rnd(DIGIT.length)]!, SPECIAL[rnd(SPECIAL.length)]!]
   while (chars.length < n) chars.push(ALL[rnd(ALL.length)]!)
   for (let i = chars.length - 1; i > 0; i--) {
     const j = rnd(i + 1)
