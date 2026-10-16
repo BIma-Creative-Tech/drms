@@ -11,6 +11,7 @@ import {
   hmGap,
   kindAllows,
   kindOf,
+  legacyServiceTypeCode,
   normalizeUnitCode,
   poAgeDays,
   poStatusAfterDelivery,
@@ -164,6 +165,16 @@ describe('FR1 aftersales: PO status + activity fields', () => {
     expect(weekStart('2026-10-10')).toBe('2026-10-05') // Saturday → Monday
     expect(weekStart('2026-10-05')).toBe('2026-10-05')
     expect(weekStart('2026-10-11')).toBe('2026-10-05') // Sunday belongs to the week that started Monday
+  })
+})
+
+describe('Jenis servis legacy single value (DRMS owner 2026-10-17)', () => {
+  it('first selected legacy code, else the first code, else null', () => {
+    expect(legacyServiceTypeCode(['overhaul', 'perbaikan', 'inspeksi'])).toBe('perbaikan')
+    expect(legacyServiceTypeCode(['inspeksi', 'perbaikan'])).toBe('inspeksi')
+    expect(legacyServiceTypeCode(['overhaul', 'kalibrasi'])).toBe('overhaul')
+    expect(legacyServiceTypeCode([undefined, 'servis_berkala'])).toBe('servis_berkala')
+    expect(legacyServiceTypeCode([])).toBeNull()
   })
 })
 

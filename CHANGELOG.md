@@ -10,10 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Laporan servis: "Jenis servis" is master data per PT and a multi-select (DRMS owner 2026-10-17, amends ADR 0020).**
   New collection **Master Data → Jenis servis** (`service-types`, managed by Admin / Direktur, read by every member,
   "Hapus" only while unused, else "Nonaktifkan"); every PT is seeded with Servis berkala / Perbaikan / Inspeksi /
-  Pemasangan (codes = the former values). A report now has one or more types — web form, "Ubah (24 jam)" and "Koreksi"
+  Pemasangan (codes = the former values, Urutan 1–4; a new type gets the PT's highest Urutan + 1). A report now has one or more types — web form, "Ubah (24 jam)" and "Koreksi"
   (a type deactivated since stays selectable there as "(nonaktif)"); names joined with ", " in the list (new filter
   "Jenis servis"), detail, unit history and project timeline. API: `GET /api/v1/service-types`; `serviceTypeIds` on
-  POST / PATCH `/service-reports` and `…/corrections`; DTO `serviceTypes[]` (+ legacy `serviceType` = first code); sync
+  POST / PATCH `/service-reports` and `…/corrections`; DTO `serviceTypes[]` (+ legacy `serviceType` = first selected legacy code, else the first code); sync
   `service_report.upsert` `service_type_ids` and server copy `service_type_ids`. The legacy single `serviceType` /
   `service_type` keeps working for APK 0.7.0 (an edit naming a type already on the report keeps a multi-selection).
 - **Laporan servis: up to 25 photos (was 10)** — API, sync and DB; the edit / correction dialogs may add photos

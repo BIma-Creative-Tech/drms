@@ -39,7 +39,7 @@ import {
 } from './common'
 import { notifyUnitWaitingPart } from './notify'
 import { namesOf, num, projectRef, str, unitRef, userRef } from './refs'
-import { hmDecreased, isDec2, round2, serviceTimeError, unitClientMismatch, type UnitStatus } from './rules'
+import { hmDecreased, isDec2, legacyServiceTypeCode, round2, serviceTimeError, unitClientMismatch, type UnitStatus } from './rules'
 import { resolveCreateServiceTypes, resolvePatchServiceTypes, serviceTypeIdsOf, serviceTypeRows, type ServiceTypeRow } from './service-types'
 
 /**
@@ -50,7 +50,7 @@ import { resolveCreateServiceTypes, resolvePatchServiceTypes, serviceTypeIdsOf, 
  *
  * DRMS owner 2026-10-17 (ADR 0020 amendment 2026-10-17): "Jenis servis" is a MULTI-selection of the PT's master
  * `service-types` (`serviceTypeIds`; rules + the legacy single code of APK 0.7.0: ./service-types.ts). The legacy
- * column `serviceType` is written = the code of the first selected type. Photos ≤ 25 (MAX_PHOTOS).
+ * column `serviceType` is written = `legacyServiceTypeCode` (first selected LEGACY code, else the first code). Photos ≤ 25.
  */
 const TYPE = 'service_report' as const
 const LABEL = 'Laporan servis'
@@ -65,7 +65,7 @@ export type ServiceDoc = FieldDoc & {
   hourMeter?: number | null
   /** Ids of the selected `service-types` (selection order). */
   serviceTypes?: unknown
-  /** Legacy single code = code of the first selected type. */
+  /** Legacy single code (`legacyServiceTypeCode` of the selection). */
   serviceType?: string | null
   complaint?: string | null
   action: string
@@ -181,7 +181,7 @@ export async function createServiceReport(req: PayloadRequest, input: ServiceInp
     endTime: input.endTime ?? null,
     hourMeter: input.hourMeter === undefined || input.hourMeter === null ? null : round2(input.hourMeter),
     serviceTypes: types.map((t) => t.id),
-    serviceType: types[0]!.code,
+    serviceType: legacyServiceTypeCode(types.map((t) => t.code)),
     complaint: clean(input.complaint),
     action: input.action.trim(),
     unitStatusAfter: input.unitStatusAfter,
@@ -227,7 +227,8 @@ async function applyPatch(req: PayloadRequest, doc: ServiceDoc, patch: ServicePa
   set('hourMeter', patch.hourMeter === undefined ? undefined : patch.hourMeter === null ? null : round2(patch.hourMeter), num(doc.hourMeter))
   if (types) {
     data.serviceTypes = types.map((t) => t.id)
-    if (types[0]!.code !== doc.serviceType) data.serviceType = types[0]!.code
+    const legacy = legacyServiceTypeCode(types.map((t) => t.code))
+    if (legacy !== doc.serviceType) data.serviceType = legacy
   }
   set('complaint', patch.complaint === undefined ? undefined : clean(patch.complaint), doc.complaint)
   set('action', patch.action === undefined ? undefined : patch.action.trim(), doc.action)
@@ -300,8 +301,8 @@ export async function serviceDtos(req: PayloadRequest, docs: readonly ServiceDoc
       hourMeter: num(d.hourMeter),
       /** DRMS owner 2026-10-17: the selected types (selection order). */
       serviceTypes: selected,
-      /** Legacy: code of the first selected type. */
-      serviceType: selected[0]?.code ?? str(d.serviceType),
+      /** Legacy: first selected LEGACY code (APK 0.7.0 shows / pre-selects only those), else the first code. */
+      serviceType: legacyServiceTypeCode(selected.map((t) => t.code)) ?? str(d.serviceType),
       complaint: str(d.complaint),
       action: d.action,
       unitStatusAfter: d.unitStatusAfter,

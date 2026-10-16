@@ -269,7 +269,7 @@ export const SyncServiceReportPayload = z
       .max(32)
       .nullable()
       .optional()
-      .meta({ description: 'LEGACY single code (must exist in the PT master; ignored when service_type_ids is sent). Edit: a code already on the report keeps its selection, another one replaces it.' }),
+      .meta({ description: 'LEGACY single code (must exist in the PT master). A new report needs exactly one of service_type_ids / service_type; on an edit it is ignored when service_type_ids is sent, else a code already on the report keeps its selection and another one replaces it.' }),
     complaint: optStr(2000),
     action: z.string().trim().min(3).max(4000).optional().meta({ description: 'Required for a new report.' }),
     unit_status_after: z.enum(['siap', 'rusak', 'menunggu_part']).optional().meta({ description: 'Required for a new report.' }),
@@ -525,7 +525,7 @@ export const SyncServiceReportCopy = z
     unit_id: id,
     report_date: z.string(),
     hour_meter: z.number().nullable(),
-    service_type: z.string().meta({ description: 'Code of the first selected service type (legacy single value).' }),
+    service_type: z.string().meta({ description: 'LEGACY single value: code of the first selected type whose code is one of the four legacy codes (servis_berkala, perbaikan, inspeksi, pemasangan), else of the first selected type.' }),
     service_type_ids: z.array(id).meta({ description: 'DRMS owner 2026-10-17: the selected service types (selection order).' }),
     action: z.string(),
     unit_status_after: z.string(),

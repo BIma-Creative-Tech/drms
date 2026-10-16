@@ -339,6 +339,16 @@ export const DEFAULT_SERVICE_TYPES: ReadonlyArray<{ code: ServiceType; name: str
 export const MAX_SERVICE_TYPES = 20
 export const SERVICE_TYPES_REQUIRED = 'Pilih minimal satu jenis servis.'
 
+/**
+ * LEGACY single value of a selection (REST DTO `serviceType`, sync copy `service_type`, column `service_type`) —
+ * coordinator decision 2026-10-17: the code of the first selected type whose code is one of the four legacy codes (APK
+ * 0.7.0 can show / pre-select only those), else the first selected code; null for an empty selection.
+ */
+export function legacyServiceTypeCode(codes: ReadonlyArray<string | null | undefined>): string | null {
+  const list = codes.filter((c): c is string => typeof c === 'string' && c !== '')
+  return list.find((c) => (SERVICE_TYPES as readonly string[]).includes(c)) ?? list[0] ?? null
+}
+
 /** "Servis berkala, Perbaikan": names of the selected types in selection order (legacy code → its label as fallback). */
 export function serviceTypeNames(types: ReadonlyArray<{ name?: string | null; code?: string | null }> | null | undefined, legacy?: string | null): string {
   const names = (types ?? []).map((t) => t.name || t.code || '').filter(Boolean)

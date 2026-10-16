@@ -197,7 +197,7 @@ export const ServiceReport = z
     endTime: z.string().nullable(),
     hourMeter: z.number().nullable(),
     serviceTypes: z.array(ServiceTypeRef).meta({ description: 'DRMS owner 2026-10-17: the selected service types in selection order (≥ 1; an inactive one stays on old reports).' }),
-    serviceType: z.string().nullable().meta({ description: 'LEGACY: code of the first selected type.' }),
+    serviceType: z.string().nullable().meta({ description: 'LEGACY: code of the first selected type whose code is one of the four legacy codes (servis_berkala, perbaikan, inspeksi, pemasangan), else of the first selected type.' }),
     complaint: z.string().nullable(),
     action: z.string(),
     unitStatusAfter: UnitStatusEnum,
@@ -218,7 +218,7 @@ export const ServiceTypeListQuery = z
   .meta({ id: 'ServiceTypeListQuery' })
 
 export const ServiceTypeItem = z
-  .object({ id, companyId: id, code: z.string(), name: z.string(), active: z.boolean(), sortOrder: z.number().int().meta({ description: 'Urutan (ascending, then name; 0 = default).' }) })
+  .object({ id, companyId: id, code: z.string(), name: z.string(), active: z.boolean(), sortOrder: z.number().int().meta({ description: 'Urutan (ascending, then name). A type created without one gets the highest Urutan of its PT + 1.' }) })
   .meta({ id: 'ServiceTypeItem', description: '"Jenis servis" master row of a PT (DRMS owner 2026-10-17; managed by Admin / Direktur).' })
 
 export const ServiceTypeList = z.object({ items: z.array(ServiceTypeItem) }).meta({ id: 'ServiceTypeList' })

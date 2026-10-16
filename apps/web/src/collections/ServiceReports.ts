@@ -20,7 +20,7 @@ import { USER_NAME_VIEW } from '@/fields/users'
  * DRMS owner 2026-10-17 (ADR 0020 amendment): "Jenis servis" = `serviceTypes`, ONE OR MORE rows of the PT's master
  * `service-types` in selection order (Payload rels table `service_reports_rels`, guarded by the DB like the report
  * itself: 24 h window / correction override, same PT, ≥ 1 type at commit). `serviceType` keeps the LEGACY single
- * value for old readers — now free text = the code of the first selected type (written by the service only).
+ * value for old readers — now free text = the first selected LEGACY code, else the first code (written by the service).
  * Spare-part lines of a service report carry no "No. part" input any more (web); a `partNo` already stored is kept.
  */
 export const ServiceReports: CollectionConfig = withAudit(
