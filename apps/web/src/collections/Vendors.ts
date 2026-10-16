@@ -9,7 +9,8 @@ import { PARTNER_REDIRECT_VIEWS } from '@/admin/partner-routes'
 import { contactsField, contactsHook, legacyContactColumn } from '@/fields/contacts'
 
 /**
- * Vendor (opsional; duplikat nota). Admin/Finance C/R/U, Owner R/U, PM R.
+ * Vendor (opsional; duplikat nota). Admin/Finance C/R/U, Owner R/U, PM R. Staff R (owner request 2026-10-16: Staff file
+ * vendor payments and pick the vendor — read only, PTs of the Staff's mapping; the Staff panel still hides the list).
  * ADR 0027 (DRMS 13/10 Wave 4): the vendor's bank accounts (`vendor-bank-accounts`) are the destination of a vendor
  * payment ("Pembayaran vendor").
  * DRMS 16/10: edited in the tabbed "Vendor" page (/admin/vendor/<id>: Detail Vendor · Rekening · Kontak PIC, one save —
@@ -23,7 +24,7 @@ export const Vendors: CollectionConfig = withAudit(
     // DRMS 16/10 (b): the document pages /collections/vendors/<create|id> → /admin/vendor/<baru|id> (the drawer keeps this form)
     admin: { useAsTitle: 'name', group: 'Master Data', defaultColumns: ['name', 'contact', 'npwp', 'active'], components: { views: PARTNER_REDIRECT_VIEWS } },
     access: {
-      read: byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-finance': true, 'pk-pm': true }),
+      read: byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-finance': true, 'pk-pm': true, 'pk-staff': true }),
       create: rolesAllowed('pk-admin', 'pk-finance'),
       update: byRole({ 'pk-admin': true, 'pk-finance': true, 'pk-owner': true }),
       delete: denyAll,

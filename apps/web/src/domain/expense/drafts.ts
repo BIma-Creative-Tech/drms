@@ -51,7 +51,7 @@ export type DraftInput = {
   lines?: LineInputApi[]
   attachmentIds?: number[]
   clientUuid?: string
-  /** ADR 0027 "Jenis penerima" (default karyawan). `vendor` = Pembayaran vendor (Finance / PM only; type is set to advance). */
+  /** ADR 0027 "Jenis penerima" (default karyawan). `vendor` = Pembayaran vendor (Staff / Finance / PM; type is set to advance). */
   payeeType?: PayeeType
   vendorId?: number | null
   vendorBankAccountId?: number | null
@@ -64,10 +64,14 @@ export type DraftInput = {
   payeeCompanyId?: number | null
 }
 
-/** ADR 0027 (D3): roles that may file a vendor payment, IN the request's PT. */
-export const VENDOR_PAYMENT_ROLES: readonly Role[] = ['pk-finance', 'pk-pm']
+/**
+ * ADR 0027 (D3): roles that may file a vendor payment, IN the request's PT. Owner request 2026-10-16 ("untuk pengajuan
+ * vendor dibukakan di level staff"): Staff too — a Staff's vendor payment follows the normal Staff flow (default rule:
+ * PM project → Direktur → Owner → Finance transfer). PT grup (INTERCOMPANY_PAYMENT_ROLES) is unchanged.
+ */
+export const VENDOR_PAYMENT_ROLES: readonly Role[] = ['pk-finance', 'pk-pm', 'pk-staff']
 
-export const VENDOR_PAYMENT_ROLE_MESSAGE = 'Pembayaran vendor hanya dapat diajukan oleh Finance atau PM di PT ini.'
+export const VENDOR_PAYMENT_ROLE_MESSAGE = 'Pembayaran vendor hanya dapat diajukan oleh Staff, Finance atau PM di PT ini.'
 
 /**
  * ADR 0028 (owner decision 2026-10-14): roles that may file a payment to another PT of the group, IN the paying PT —
@@ -340,9 +344,9 @@ export async function validateContent(
 }
 
 /**
- * ADR 0027 (D3): vendor-payment rules of a draft / submit — filer = Finance or PM of the request's PT, the requester is
- * the filer himself, an active vendor of the PT and an active account OF THAT vendor, invoice number / date / file
- * (required to send), due date not before the invoice date.
+ * ADR 0027 (D3): vendor-payment rules of a draft / submit — filer = Staff, Finance or PM of the request's PT (Staff: owner
+ * request 2026-10-16), the requester is the filer himself, an active vendor of the PT and an active account OF THAT
+ * vendor, invoice number / date / file (required to send), due date not before the invoice date.
  * ADR 0028 (owner 2026-10-14): a PT grup payment the same way — filer = Finance, PM or Direktur of the paying PT, the
  * receiving PT (active, another PT, with a designated receiving account) instead of vendor + account, and the receiving
  * PT's document (invoice / memo: number, date, file required to send).
@@ -358,7 +362,7 @@ async function directPaymentErrors(
   const roles = payeeFilerRoles(payee)
   const roleMessage = vendorPay ? VENDOR_PAYMENT_ROLE_MESSAGE : INTERCOMPANY_PAYMENT_ROLE_MESSAGE
   const kind = vendorPay ? 'Pembayaran vendor' : 'Pembayaran antar-PT'
-  // D3: Finance and PM only (ADR 0028: + Direktur) — checked for the CREATOR in the request's PT (no PT yet: the caller's roles in any selected PT)
+  // D3: Staff (2026-10-16), Finance and PM (ADR 0028 PT grup: Finance, PM, Direktur) — checked for the CREATOR in the request's PT (no PT yet: the caller's roles in any selected PT)
   if (opts.company !== undefined) {
     const mine = await rolesOfUserIn(req, opts.creatorId, opts.company)
     // ADR 0028: PT grup on the STORED roles (an Owner-only user is not a Direktur filer); another creator's are stored anyway
@@ -366,7 +370,7 @@ async function directPaymentErrors(
     if (!filer.some((r) => roles.includes(r))) fail(403, roleMessage)
     // the filer is the applicant: "Pemohon" = exactly his own employee in the PT (routing by his role, ADR 0027)
     if (opts.requesters.length > 0 && (mine.employee === undefined || opts.requesters.length !== 1 || opts.requesters[0] !== mine.employee)) {
-      errors.push({ path: 'requesterIds', message: vendorPay ? 'Pembayaran vendor: pemohon adalah pembuat pengajuan sendiri (Finance / PM).' : 'Pembayaran antar-PT: pemohon adalah pembuat pengajuan sendiri (Finance / PM / Direktur).' })
+      errors.push({ path: 'requesterIds', message: vendorPay ? 'Pembayaran vendor: pemohon adalah pembuat pengajuan sendiri (Staff / Finance / PM).' : 'Pembayaran antar-PT: pemohon adalah pembuat pengajuan sendiri (Finance / PM / Direktur).' })
     }
   } else if (vendorPay ? !hasRoleAny(req, ...roles) : !mayFileIntercompany(req)) fail(403, roleMessage)
   if (c.type !== 'advance') errors.push({ path: 'type', message: `${kind} memakai jenis Pengajuan Baru.` })

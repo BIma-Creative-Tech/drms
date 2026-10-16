@@ -103,8 +103,8 @@ export const SyncDraftUpsertPayload = z
     notes: z.string().max(2000).nullable().optional(),
     requester_ids: z.array(id).max(20).optional(),
     bank_account_id: id.nullable().optional(),
-    // ADR 0027 "Pembayaran vendor" (Finance / PM only; kind is set to advance by the server)
-    payee_type: z.enum(['karyawan', 'vendor', 'pt_grup']).optional().meta({ description: 'ADR 0027: default karyawan. vendor = vendor payment (Finance / PM only): vendor + vendor account + invoice, no employee account, no LPJ. ADR 0028: pt_grup = payment to another PT of the group (Finance / PM / Direktur): payee_company_id + the receiving PT\'s document (invoice_*), no LPJ. Omitted on an existing draft = the stored payee type stays (older apps never reset a pt_grup draft).' }),
+    // ADR 0027 "Pembayaran vendor" (Staff / Finance / PM; kind is set to advance by the server)
+    payee_type: z.enum(['karyawan', 'vendor', 'pt_grup']).optional().meta({ description: 'ADR 0027: default karyawan. vendor = vendor payment (Staff / Finance / PM; Staff since 2026-10-16): vendor + vendor account + invoice, no employee account, no LPJ. ADR 0028: pt_grup = payment to another PT of the group (Finance / PM / Direktur): payee_company_id + the receiving PT\'s document (invoice_*), no LPJ. Omitted on an existing draft = the stored payee type stays (older apps never reset a pt_grup draft).' }),
     payee_company_id: id.nullable().optional().meta({ description: 'ADR 0028: receiving PT of a pt_grup draft (masters type intercompany-payees / GET /intercompany/payees). Omitted = unchanged.' }),
     vendor_id: id.nullable().optional(),
     vendor_bank_account_id: id.nullable().optional().meta({ description: 'ADR 0027: an active account of vendor_id (masters type vendor-bank-accounts).' }),
@@ -239,8 +239,10 @@ export const SyncActivityItem = z
 /**
  * `service_report.upsert` (FR1): creates a service report (Staff assigned / PM team / Direktur, project
  * kind kontrak_unit or aftersales) or edits the reporter's own within 24 h (`base_rev` = server rev).
- * Photos first via POST /api/v1/media/progress-photos (≤ 10). HM below the unit's latest reading →
- * rejected HM_DECREASED.
+ * Photos first via POST /api/v1/media/progress-photos (≤ 25, DRMS owner 2026-10-17). HM below the unit's latest
+ * reading → rejected HM_DECREASED. DRMS owner 2026-10-17: service types = `service_type_ids` (ids of the PT master,
+ * GET /service-types); the legacy single `service_type` (APK 0.7.0) is any code of that master and is used only
+ * without `service_type_ids` — on an edit a code already on the report keeps a multi-selection made on the web.
  */
 export const SyncServiceReportPayload = z
   .object({
@@ -253,13 +255,27 @@ export const SyncServiceReportPayload = z
     start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
     end_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
     hour_meter: dec2(10_000_000).nullable().optional(),
-    service_type: z.enum(['servis_berkala', 'perbaikan', 'inspeksi', 'pemasangan']).optional().meta({ description: 'Required for a new report.' }),
+    service_type_ids: z
+      .array(id)
+      .min(1, 'Pilih minimal satu jenis servis.')
+      .max(20)
+      .refine((xs) => new Set(xs).size === xs.length, 'Jenis servis ganda.')
+      .optional()
+      .meta({ description: 'Jenis servis (1–20, unique, selection order): rows of the report PT\'s master; new ones must be active. A new report needs this or service_type.' }),
+    service_type: z
+      .string()
+      .trim()
+      .min(1)
+      .max(32)
+      .nullable()
+      .optional()
+      .meta({ description: 'LEGACY single code (must exist in the PT master). A new report needs exactly one of service_type_ids / service_type; on an edit it is ignored when service_type_ids is sent, else a code already on the report keeps its selection and another one replaces it.' }),
     complaint: optStr(2000),
     action: z.string().trim().min(3).max(4000).optional().meta({ description: 'Required for a new report.' }),
     unit_status_after: z.enum(['siap', 'rusak', 'menunggu_part']).optional().meta({ description: 'Required for a new report.' }),
     spareparts: z.array(SyncSparepartLine).max(50).optional(),
     notes: optStr(2000),
-    photo_media_ids: z.array(id).max(10).optional().meta({ description: 'On an edit: ids not yet on the report are added (photos are never removed).' }),
+    photo_media_ids: z.array(id).max(25).optional().meta({ description: 'Max 25. On an edit: ids not yet on the report are added (photos are never removed).' }),
     reason: z.string().trim().min(3).max(1000).optional(),
   })
   .strict()
@@ -509,7 +525,8 @@ export const SyncServiceReportCopy = z
     unit_id: id,
     report_date: z.string(),
     hour_meter: z.number().nullable(),
-    service_type: z.string(),
+    service_type: z.string().meta({ description: 'LEGACY single value: code of the first selected type whose code is one of the four legacy codes (servis_berkala, perbaikan, inspeksi, pemasangan), else of the first selected type.' }),
+    service_type_ids: z.array(id).meta({ description: 'DRMS owner 2026-10-17: the selected service types (selection order).' }),
     action: z.string(),
     unit_status_after: z.string(),
     photo_media_ids: z.array(id),

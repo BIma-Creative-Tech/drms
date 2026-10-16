@@ -89,6 +89,7 @@ import * as migration_20261016_100000_d1610_partner_contacts from './20261016_10
 import * as migration_20261016_200000_d1610_soft_delete_enums from './20261016_200000_d1610_soft_delete_enums';
 import * as migration_20261016_200100_d1610_soft_delete from './20261016_200100_d1610_soft_delete';
 import * as migration_20261016_220000_d1610_wakil_pm_direktur from './20261016_220000_d1610_wakil_pm_direktur';
+import * as migration_20261017_100000_d1710_service_types from './20261017_100000_d1710_service_types';
 
 export const migrations = [
   {
@@ -545,5 +546,10 @@ export const migrations = [
     up: migration_20261016_220000_d1610_wakil_pm_direktur.up,
     down: migration_20261016_220000_d1610_wakil_pm_direktur.down,
     name: '20261016_220000_d1610_wakil_pm_direktur',
+  },
+  {
+    up: migration_20261017_100000_d1710_service_types.up,
+    down: migration_20261017_100000_d1710_service_types.down,
+    name: '20261017_100000_d1710_service_types',
   },
 ];

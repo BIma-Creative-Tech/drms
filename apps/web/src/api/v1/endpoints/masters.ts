@@ -34,7 +34,8 @@ const MAP: Record<Exclude<MasterType, 'intercompany-payees'>, { collection: Coll
   'team-assignments': { collection: 'team-assignments', fields: ['employee', 'project', 'costCenter', 'site', 'roleInProject', 'startDate', 'endDate'] },
   // MC3-1: receipt vendor picker (vendor_id) and Kas "sumber kas masuk" — per PT, read access of the collection
   vendors: { collection: 'vendors', fields: ['name', 'contact', 'active'] },
-  // ADR 0027: vendor payment — the chosen vendor's accounts (collection access: Admin / Finance / Direktur / PM)
+  // ADR 0027: vendor payment — the chosen vendor's accounts (collection access: Admin / Finance / Direktur / PM / Staff,
+  // Staff since the owner request 2026-10-16 — Staff file vendor payments too)
   'vendor-bank-accounts': { collection: 'vendor-bank-accounts', fields: ['vendor', 'bank', 'accountNo', 'accountHolder', 'isDefault', 'verificationStatus', 'active'] },
   'cash-in-sources': { collection: 'cash-in-sources', fields: ['code', 'name', 'active'] },
   'urgency-levels': { collection: 'urgency-levels', fields: ['code', 'name', 'rank', 'active'] },

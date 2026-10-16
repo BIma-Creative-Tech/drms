@@ -3,6 +3,7 @@ import type { Endpoint, PayloadRequest } from 'payload'
 import { activityDto, correctActivity, createActivity, editActivity, listActivities, openPos } from '@/domain/field/aftersales'
 import { loadVisible } from '@/domain/field/common'
 import { correctServiceReport, createServiceReport, editServiceReport, listServiceReports, serviceDto, type ServiceDoc } from '@/domain/field/service'
+import { listServiceTypes, serviceTypeItem } from '@/domain/field/service-types'
 import { correctTimesheet, createTimesheet, editTimesheet, listTimesheets, timesheetDto, type TimesheetDoc } from '@/domain/field/timesheet'
 import { listUnits, projectContractUnits } from '@/domain/field/units'
 import type { ActivityDoc } from '@/domain/field/aftersales'
@@ -22,6 +23,7 @@ import {
   ServiceReportCreate,
   ServiceReportListQuery,
   ServiceReportUpdate,
+  ServiceTypeListQuery,
   UnitListQuery,
   UnitTimesheetCorrection,
   UnitTimesheetCreate,
@@ -115,6 +117,21 @@ export const correctServiceReportEndpoint = v1({
   transactional: true,
   idempotent: true,
   handler: async ({ req, body, params }) => json(await serviceDto(req, await correctServiceReport(req, idParam(params), body))),
+})
+
+/**
+ * GET /service-types — DRMS owner 2026-10-17: the "Jenis servis" master of the caller's selected PTs (`?company=`
+ * narrows), active only unless `includeInactive=1`, sorted by sortOrder then name. Every member reads it (APK picker / labels).
+ */
+export const listServiceTypesEndpoint = v1({
+  path: '/service-types',
+  method: 'get',
+  rateLimit: [60, 60_000],
+  handler: async ({ req }) => {
+    const q = query(ServiceTypeListQuery, req.searchParams)
+    const items = await listServiceTypes(req, { companyIds: await companyQuery(req), includeInactive: q.includeInactive !== undefined })
+    return json({ items: items.map(serviceTypeItem) })
+  },
 })
 
 // ---------------------------------------------------------------- unit timesheets
@@ -276,6 +293,7 @@ export const FIELD_ENDPOINTS: Endpoint[] = [
   createServiceReportEndpoint,
   updateServiceReportEndpoint,
   correctServiceReportEndpoint,
+  listServiceTypesEndpoint,
   listTimesheetsEndpoint,
   getTimesheetEndpoint,
   createTimesheetEndpoint,

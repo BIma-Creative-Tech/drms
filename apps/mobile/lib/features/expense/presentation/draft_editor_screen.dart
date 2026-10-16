@@ -163,10 +163,11 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     invoiceNo: _d.isDirectPayment ? (_invoiceNo.text.trim().isEmpty ? null : _invoiceNo.text.trim()) : null,
   );
 
-  /// ADR 0027 (D3): only Finance / PM of the draft's PT file a vendor payment (the server re-checks).
+  /// ADR 0027 (D3): Staff, Finance or PM of the draft's PT file a vendor payment (Staff since the owner request
+  /// 2026-10-16; the server re-checks).
   bool _mayFileVendorPayment() {
     final roles = ref.read(currentProfileProvider)?.forCompany(_d.companyId).roles ?? const <Role>{};
-    return roles.contains(Role.finance) || roles.contains(Role.pm);
+    return mayFileVendorPayment(roles);
   }
 
   /// ADR 0028 (owner decision 2026-10-14): Finance, PM or Direktur of the draft's PT file a PT grup payment — an
@@ -528,8 +529,8 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
         .where((a) => _d.requesterIds.isEmpty || _d.requesterIds.contains((a.extra['employee'] as num?)?.toInt()))
         .toList();
     final urgencies = _byRank(m[MasterTypes.urgencyLevels] ?? const <MasterItem>[]);
-    // ADR 0027: Finance / PM may switch to "Vendor"; the chosen vendor's active accounts. ADR 0028: Finance / PM /
-    // Direktur may switch to "PT grup".
+    // ADR 0027: Staff / Finance / PM may switch to "Vendor"; the chosen vendor's active accounts. ADR 0028: Finance /
+    // PM / Direktur may switch to "PT grup".
     final mayVendor = _mayFileVendorPayment();
     final mayIntercompany = _mayFileIntercompanyPayment();
     // ADR 0028: the receiving PT's document uses the vendor invoice fields under its own names
@@ -626,8 +627,8 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
               ),
             FormGrid(
               children: [
-                // ADR 0027 "Jenis penerima": only Finance / PM see "Vendor", ADR 0028: Finance / PM / Direktur see
-                // "PT grup"; fixed once the server knows the draft
+                // ADR 0027 "Jenis penerima": only Staff / Finance / PM see "Vendor", ADR 0028: Finance / PM / Direktur
+                // see "PT grup"; fixed once the server knows the draft
                 if (mayVendor || mayIntercompany || _d.isDirectPayment)
                   FormGridCell(
                     label: t.fieldPayeeType,
@@ -1084,6 +1085,14 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     );
   }
 }
+
+/// ADR 0027 (D3): roles that file a "Pembayaran vendor" in the draft's PT — Finance, PM and Staff (owner request
+/// 2026-10-16, "untuk pengajuan vendor dibukakan di level staff"). Admin, Direktur and Owner do not; the server
+/// re-checks (403). PT grup has its own rule ([mayFileIntercompanyPayment]).
+const vendorPaymentFilerRoles = {Role.staff, Role.finance, Role.pm};
+
+/// ADR 0027: may a holder of [roles] (in the draft's PT) file a vendor payment?
+bool mayFileVendorPayment(Set<Role> roles) => roles.any(vendorPaymentFilerRoles.contains);
 
 /// ADR 0027: the active accounts of vendor [vendorId] (masters `vendor-bank-accounts`; none before a vendor is chosen).
 List<MasterItem> vendorAccountsOf(Map<String, List<MasterItem>> masters, int? vendorId) => vendorId == null

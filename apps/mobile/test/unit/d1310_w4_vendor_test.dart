@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:proyekkas/features/auth/domain/user_profile.dart';
 import 'package:proyekkas/features/expense/data/draft_repository.dart';
 import 'package:proyekkas/features/expense/data/expense_mappers.dart';
 import 'package:proyekkas/features/expense/domain/draft.dart';
@@ -215,5 +216,18 @@ void main() {
     expect(vendorAccountsOf(masters, null), isEmpty);
     expect(masters[MasterTypes.vendorBankAccounts]!.first.label, 'CV Contoh Material · •••7890');
     expect(MasterTypes.forExpense, containsAll([MasterTypes.vendors, MasterTypes.vendorBankAccounts]));
+  });
+
+  test('owner request 2026-10-16: Staff, Finance and PM file a vendor payment; Admin, Direktur, Owner do not', () {
+    expect(vendorPaymentFilerRoles, {Role.staff, Role.finance, Role.pm});
+    for (final r in [Role.staff, Role.finance, Role.pm]) {
+      expect(mayFileVendorPayment({r}), isTrue, reason: r.code);
+    }
+    for (final r in [Role.admin, Role.owner, Role.principal, Role.operator]) {
+      expect(mayFileVendorPayment({r}), isFalse, reason: r.code);
+    }
+    expect(mayFileVendorPayment(Role.effective({Role.principal})), isFalse, reason: 'Owner (+ implied Direktur)');
+    expect(mayFileVendorPayment({Role.admin, Role.staff}), isTrue);
+    expect(mayFileVendorPayment(const <Role>{}), isFalse);
   });
 }

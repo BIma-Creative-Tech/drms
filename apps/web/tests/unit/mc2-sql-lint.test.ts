@@ -30,6 +30,8 @@ const PER_PT_TABLES = [
   'rap_items', 'rap_templates', 'resource_types', 'daily_reports', 'daily_report_lines',
   // ADR 0023
   'sites',
+  // DRMS owner 2026-10-17
+  'service_types',
 ]
 /** Company helpers (they build `company_id IN (<bound ids>)` from the caller's scope) — a CALL, not a mention. */
 const HELPER_CALL = /\b(?:requestScopeSql|cashScopeSql|ledgerScopeSql|projectScopeSql|costCenterScopeSql|masterScopeSql|companyScopeSql|locationScopeSql|employeeCompanySql|candidateWhere|ptSql|siteScopeSql|homeSiteScopeSql)\(/

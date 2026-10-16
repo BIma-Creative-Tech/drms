@@ -110,6 +110,7 @@ export interface Config {
     'rap-items': RapItem;
     'rap-templates': RapTemplate;
     'resource-types': ResourceType;
+    'service-types': ServiceType;
     'daily-reports': DailyReport;
     'daily-report-lines': DailyReportLine;
     attendances: Attendance;
@@ -180,6 +181,7 @@ export interface Config {
     'rap-items': RapItemsSelect<false> | RapItemsSelect<true>;
     'rap-templates': RapTemplatesSelect<false> | RapTemplatesSelect<true>;
     'resource-types': ResourceTypesSelect<false> | ResourceTypesSelect<true>;
+    'service-types': ServiceTypesSelect<false> | ServiceTypesSelect<true>;
     'daily-reports': DailyReportsSelect<false> | DailyReportsSelect<true>;
     'daily-report-lines': DailyReportLinesSelect<false> | DailyReportLinesSelect<true>;
     attendances: AttendancesSelect<false> | AttendancesSelect<true>;
@@ -1491,7 +1493,7 @@ export interface ExpenseRequest {
   company?: (number | null) | Company;
   docNo?: string | null;
   /**
-   * Vendor: Finance / PM membayar invoice vendor ke rekening vendor (tanpa LPJ). PT grup: Finance / PM / Direktur membayar PT lain di grup ke rekening penerimaan antar-PT-nya; kas masuk di PT itu tercatat otomatis saat ditransfer.
+   * Vendor: Staff / Finance / PM membayar invoice vendor ke rekening vendor (tanpa LPJ). PT grup: Finance / PM / Direktur membayar PT lain di grup ke rekening penerimaan antar-PT-nya; kas masuk di PT itu tercatat otomatis saat ditransfer.
    */
   payeeType: 'karyawan' | 'vendor' | 'pt_grup';
   type: 'advance' | 'reimburse';
@@ -2232,7 +2234,8 @@ export interface ServiceReport {
   startTime?: string | null;
   endTime?: string | null;
   hourMeter?: number | null;
-  serviceType: 'servis_berkala' | 'perbaikan' | 'inspeksi' | 'pemasangan';
+  serviceTypes: (number | ServiceType)[];
+  serviceType?: string | null;
   complaint?: string | null;
   action: string;
   unitStatusAfter: 'siap' | 'rusak' | 'menunggu_part';
@@ -2271,6 +2274,43 @@ export interface ServiceReport {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Pilihan "Jenis servis" pada Laporan servis unit (boleh lebih dari satu per laporan). Kode tidak dapat diubah setelah dibuat.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "service-types".
+ */
+export interface ServiceType {
+  id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
+  /**
+   * Huruf, angka, titik, garis bawah, garis miring atau minus. Tetap setelah disimpan (dipakai aplikasi Android).
+   */
+  code: string;
+  name: string;
+  /**
+   * Urutan tampil di pilihan (kecil dulu, lalu nama).
+   */
+  sortOrder?: number | null;
+  active?: boolean | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -3245,6 +3285,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'resource-types';
         value: number | ResourceType;
+      } | null)
+    | ({
+        relationTo: 'service-types';
+        value: number | ServiceType;
       } | null)
     | ({
         relationTo: 'daily-reports';
@@ -4358,6 +4402,7 @@ export interface ServiceReportsSelect<T extends boolean = true> {
   startTime?: T;
   endTime?: T;
   hourMeter?: T;
+  serviceTypes?: T;
   serviceType?: T;
   complaint?: T;
   action?: T;
@@ -4521,6 +4566,25 @@ export interface ResourceTypesSelect<T extends boolean = true> {
   kind?: T;
   code?: T;
   name?: T;
+  active?: T;
+  uuid?: T;
+  changeReason?: T;
+  isDeleted?: T;
+  deletedAt?: T;
+  deletedBy?: T;
+  deleteReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "service-types_select".
+ */
+export interface ServiceTypesSelect<T extends boolean = true> {
+  company?: T;
+  code?: T;
+  name?: T;
+  sortOrder?: T;
   active?: T;
   uuid?: T;
   changeReason?: T;

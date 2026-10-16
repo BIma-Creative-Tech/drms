@@ -1157,7 +1157,7 @@
           "vendor",
           "pt_grup"
         ],
-        "description": "ADR 0027 \"Jenis penerima\": karyawan = the requester's employee account (default, every request before ADR 0027); vendor = \"Pembayaran vendor\" (Finance / PM only): vendor + vendor account + invoice, type always advance, no LPJ (transfer → completed). ADR 0028: pt_grup = \"Pembayaran antar-PT\" (Finance / PM / Direktur of the paying PT): another PT of the group (payeeCompanyId) paid to its designated receiving account + the receiving PT's document (invoice / memo, required), type always advance, no LPJ; the transfer completes it AND posts a Kas Masuk in the receiving PT. Older apps that do not know a value show it as karyawan and must not send payeeType on such a draft (the server keeps the stored one)."
+        "description": "ADR 0027 \"Jenis penerima\": karyawan = the requester's employee account (default, every request before ADR 0027); vendor = \"Pembayaran vendor\" (Staff / Finance / PM of the request PT; Staff since 2026-10-16): vendor + vendor account + invoice, type always advance, no LPJ (transfer → completed). ADR 0028: pt_grup = \"Pembayaran antar-PT\" (Finance / PM / Direktur of the paying PT): another PT of the group (payeeCompanyId) paid to its designated receiving account + the receiving PT's document (invoice / memo, required), type always advance, no LPJ; the transfer completes it AND posts a Kas Masuk in the receiving PT. Older apps that do not know a value show it as karyawan and must not send payeeType on such a draft (the server keeps the stored one)."
       },
       "RequestStatus": {
         "type": "string",
@@ -3334,7 +3334,7 @@
               "vendor",
               "pt_grup"
             ],
-            "description": "Default karyawan. vendor: only a Finance / PM caller of the request PT (403 otherwise); pt_grup (ADR 0028): only Finance / PM / Direktur of the request PT (403 otherwise). Both: `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself. Omitted on PATCH / sync = the stored payee type stays."
+            "description": "Default karyawan. vendor: only a Staff / Finance / PM caller of the request PT (403 otherwise; Staff since 2026-10-16 — the normal Staff approval flow); pt_grup (ADR 0028): only Finance / PM / Direktur of the request PT (403 otherwise). Both: `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself. Omitted on PATCH / sync = the stored payee type stays."
           },
           "vendorId": {
             "type": [
@@ -3595,7 +3595,7 @@
               "vendor",
               "pt_grup"
             ],
-            "description": "Default karyawan. vendor: only a Finance / PM caller of the request PT (403 otherwise); pt_grup (ADR 0028): only Finance / PM / Direktur of the request PT (403 otherwise). Both: `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself. Omitted on PATCH / sync = the stored payee type stays."
+            "description": "Default karyawan. vendor: only a Staff / Finance / PM caller of the request PT (403 otherwise; Staff since 2026-10-16 — the normal Staff approval flow); pt_grup (ADR 0028): only Finance / PM / Direktur of the request PT (403 otherwise). Both: `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself. Omitted on PATCH / sync = the stored payee type stays."
           },
           "vendorId": {
             "type": [
@@ -6919,7 +6919,16 @@
             ]
           },
           "service_type": {
-            "type": "string"
+            "type": "string",
+            "description": "LEGACY single value: code of the first selected type whose code is one of the four legacy codes (servis_berkala, perbaikan, inspeksi, pemasangan), else of the first selected type."
+          },
+          "service_type_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "description": "DRMS owner 2026-10-17: the selected service types (selection order)."
           },
           "action": {
             "type": "string"
@@ -6966,6 +6975,7 @@
           "report_date",
           "hour_meter",
           "service_type",
+          "service_type_ids",
           "action",
           "unit_status_after",
           "photo_media_ids",
@@ -7595,7 +7605,7 @@
               "vendor",
               "pt_grup"
             ],
-            "description": "ADR 0027: default karyawan. vendor = vendor payment (Finance / PM only): vendor + vendor account + invoice, no employee account, no LPJ. ADR 0028: pt_grup = payment to another PT of the group (Finance / PM / Direktur): payee_company_id + the receiving PT's document (invoice_*), no LPJ. Omitted on an existing draft = the stored payee type stays (older apps never reset a pt_grup draft)."
+            "description": "ADR 0027: default karyawan. vendor = vendor payment (Staff / Finance / PM; Staff since 2026-10-16): vendor + vendor account + invoice, no employee account, no LPJ. ADR 0028: pt_grup = payment to another PT of the group (Finance / PM / Direktur): payee_company_id + the receiving PT's document (invoice_*), no LPJ. Omitted on an existing draft = the stored payee type stays (older apps never reset a pt_grup draft)."
           },
           "payee_company_id": {
             "type": [
@@ -8117,15 +8127,24 @@
             "minimum": 0,
             "maximum": 10000000
           },
+          "service_type_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "minItems": 1,
+            "maxItems": 20,
+            "description": "Jenis servis (1–20, unique, selection order): rows of the report PT's master; new ones must be active. A new report needs this or service_type."
+          },
           "service_type": {
-            "type": "string",
-            "enum": [
-              "servis_berkala",
-              "perbaikan",
-              "inspeksi",
-              "pemasangan"
+            "type": [
+              "string",
+              "null"
             ],
-            "description": "Required for a new report."
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "LEGACY single code (must exist in the PT master). A new report needs exactly one of service_type_ids / service_type; on an edit it is ignored when service_type_ids is sent, else a code already on the report keeps its selection and another one replaces it."
           },
           "complaint": {
             "type": [
@@ -8169,8 +8188,8 @@
               "type": "integer",
               "exclusiveMinimum": 0
             },
-            "maxItems": 10,
-            "description": "On an edit: ids not yet on the report are added (photos are never removed)."
+            "maxItems": 25,
+            "description": "Max 25. On an edit: ids not yet on the report are added (photos are never removed)."
           },
           "reason": {
             "type": "string",
@@ -11476,8 +11495,19 @@
               "null"
             ]
           },
+          "serviceTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceTypeRef"
+            },
+            "description": "DRMS owner 2026-10-17: the selected service types in selection order (≥ 1; an inactive one stays on old reports)."
+          },
           "serviceType": {
-            "$ref": "#/components/schemas/ServiceType"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "LEGACY: code of the first selected type whose code is one of the four legacy codes (servis_berkala, perbaikan, inspeksi, pemasangan), else of the first selected type."
           },
           "complaint": {
             "type": [
@@ -11612,6 +11642,7 @@
           "startTime",
           "endTime",
           "hourMeter",
+          "serviceTypes",
           "serviceType",
           "complaint",
           "action",
@@ -11730,13 +11761,28 @@
           "owner"
         ]
       },
-      "ServiceType": {
-        "type": "string",
-        "enum": [
-          "servis_berkala",
-          "perbaikan",
-          "inspeksi",
-          "pemasangan"
+      "ServiceTypeRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "active"
         ]
       },
       "UnitStatus": {
@@ -11886,9 +11932,6 @@
             "maximum": 10000000,
             "description": "HM at the service; below the unit's latest reading on/before the date → 409 HM_DECREASED (corrections: PM/Direktur)."
           },
-          "serviceType": {
-            "$ref": "#/components/schemas/ServiceType"
-          },
           "complaint": {
             "type": [
               "string",
@@ -11925,14 +11968,34 @@
             ],
             "maxLength": 2000
           },
+          "serviceTypeIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "minItems": 1,
+            "maxItems": 20,
+            "description": "Jenis servis (1–20, unique): active rows of the project PT's master (GET /service-types). Exactly one of serviceTypeIds / serviceType is required (none → 400 VALIDATION path serviceTypeIds \"Pilih minimal satu jenis servis.\")."
+          },
+          "serviceType": {
+            "type": "string",
+            "enum": [
+              "servis_berkala",
+              "perbaikan",
+              "inspeksi",
+              "pemasangan"
+            ],
+            "description": "LEGACY (old clients): one code → the PT master row with that code (must be active). Only when serviceTypeIds is absent."
+          },
           "photoIds": {
             "type": "array",
             "items": {
               "type": "integer",
               "exclusiveMinimum": 0
             },
-            "maxItems": 10,
-            "description": "media-progress-photos ids uploaded by the caller (before/after), max 10."
+            "maxItems": 25,
+            "description": "media-progress-photos ids uploaded by the caller (before/after), max 25."
           },
           "clientUuid": {
             "type": "string",
@@ -11943,7 +12006,6 @@
         "required": [
           "projectId",
           "unitId",
-          "serviceType",
           "action",
           "unitStatusAfter"
         ],
@@ -11983,8 +12045,25 @@
             "maximum": 10000000,
             "description": "HM at the service; below the unit's latest reading on/before the date → 409 HM_DECREASED (corrections: PM/Direktur)."
           },
+          "serviceTypeIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "minItems": 1,
+            "maxItems": 20,
+            "description": "New selection (1–20, unique, the report's PT, selection order kept): a type already on the report may stay although inactive; a newly added one must be active."
+          },
           "serviceType": {
-            "$ref": "#/components/schemas/ServiceType"
+            "type": "string",
+            "enum": [
+              "servis_berkala",
+              "perbaikan",
+              "inspeksi",
+              "pemasangan"
+            ],
+            "description": "LEGACY (APK 0.7.0), ignored when serviceTypeIds is sent: a code already among the report's types keeps the selection unchanged; another code replaces it with that one (active) type."
           },
           "complaint": {
             "type": [
@@ -12022,8 +12101,8 @@
               "type": "integer",
               "exclusiveMinimum": 0
             },
-            "maxItems": 10,
-            "description": "Photos to add (total ≤ 10)."
+            "maxItems": 25,
+            "description": "Photos to add (never removed; total ≤ 25)."
           },
           "reason": {
             "type": "string",
@@ -12068,8 +12147,25 @@
             "maximum": 10000000,
             "description": "HM at the service; below the unit's latest reading on/before the date → 409 HM_DECREASED (corrections: PM/Direktur)."
           },
+          "serviceTypeIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "minItems": 1,
+            "maxItems": 20,
+            "description": "New selection (1–20, unique, the report's PT, selection order kept): a type already on the report may stay although inactive; a newly added one must be active."
+          },
           "serviceType": {
-            "$ref": "#/components/schemas/ServiceType"
+            "type": "string",
+            "enum": [
+              "servis_berkala",
+              "perbaikan",
+              "inspeksi",
+              "pemasangan"
+            ],
+            "description": "LEGACY (APK 0.7.0), ignored when serviceTypeIds is sent: a code already among the report's types keeps the selection unchanged; another code replaces it with that one (active) type."
           },
           "complaint": {
             "type": [
@@ -12107,8 +12203,8 @@
               "type": "integer",
               "exclusiveMinimum": 0
             },
-            "maxItems": 10,
-            "description": "Photos to add (total ≤ 10)."
+            "maxItems": 25,
+            "description": "Photos to add (never removed; total ≤ 25)."
           },
           "reason": {
             "type": "string",
@@ -12121,6 +12217,55 @@
           "reason"
         ],
         "additionalProperties": false
+      },
+      "ServiceTypeList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceTypeItem"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "ServiceTypeItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "companyId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Urutan (ascending, then name). A type created without one gets the highest Urutan of its PT + 1."
+          }
+        },
+        "required": [
+          "id",
+          "companyId",
+          "code",
+          "name",
+          "active",
+          "sortOrder"
+        ],
+        "description": "\"Jenis servis\" master row of a PT (DRMS owner 2026-10-17; managed by Admin / Direktur)."
       },
       "UnitTimesheetList": {
         "type": "object",
@@ -20450,6 +20595,7 @@
           "expense-categories",
           "urgency-levels",
           "resource-types",
+          "service-types",
           "vehicles",
           "cash-in-sources",
           "cash-accounts",
@@ -39120,7 +39266,7 @@
         }
       },
       "post": {
-        "summary": "FR1 Laporan servis unit (SV/YYMM/####): Staff assigned / PM team / Direktur; project kind kontrak_unit or aftersales (409 WRONG_PROJECT_KIND); PT flag off → 403 FEATURE_DISABLED; HM below the unit's latest reading → 409 HM_DECREASED; unitStatusAfter updates the unit (menunggu_part notifies the PM)",
+        "summary": "FR1 Laporan servis unit (SV/YYMM/####): Staff assigned / PM team / Direktur; project kind kontrak_unit or aftersales (409 WRONG_PROJECT_KIND); PT flag off → 403 FEATURE_DISABLED; HM below the unit's latest reading → 409 HM_DECREASED; unitStatusAfter updates the unit (menunggu_part notifies the PM); one or more service types (serviceTypeIds, GET /service-types; legacy serviceType); ≤ 25 photos",
         "security": [
           {
             "bearer": []
@@ -39625,6 +39771,132 @@
             }
           },
           "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/service-types": {
+      "get": {
+        "summary": "DRMS owner 2026-10-17 \"Jenis servis\" master of the caller's selected PTs (?company= narrows; 403 COMPANY_NOT_ALLOWED outside): active types sorted by sortOrder then name, also the inactive ones with includeInactive=1. Managed by Admin / Direktur (Payload collection service-types)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ],
+              "description": "Also the deactivated types (e.g. to label old reports)."
+            },
+            "required": false,
+            "description": "Also the deactivated types (e.g. to label old reports).",
+            "name": "includeInactive",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Service types",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceTypeList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

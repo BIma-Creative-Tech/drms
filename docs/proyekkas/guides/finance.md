@@ -115,6 +115,7 @@ invoice adalah buktinya.
    Anda sendiri; jenis otomatis *Pengajuan Baru*. **Kirim pengajuan**.
 3. **Persetujuan:** pembayaran vendor yang Anda ajukan langsung ke **Direktur**, lalu **Owner** (aturan "Pembayaran
    vendor oleh Finance — Direktur lalu Owner"). Yang diajukan PM: langkah PM dilewati (ia PM project-nya) → Direktur → Owner.
+   Yang diajukan **Staff** (sejak permintaan owner 16 Okt 2026): alur Staff biasa — PM project → Direktur → Owner.
 4. **Transfer:** muncul di **Antrian Transfer** dengan label *Pembayaran vendor: <nama vendor>*; rekening tujuan =
    rekening vendor yang tercatat saat diajukan. Rekening yang belum diverifikasi meminta konfirmasi seperti rekening
    karyawan. Setelah transfer dicatat, pengajuan langsung **Selesai** (tidak ada LPJ). Salah transfer → **Void

@@ -37,7 +37,7 @@ export const PayeeTypeEnum = z
   .meta({
     id: 'PayeeType',
     description:
-      'ADR 0027 "Jenis penerima": karyawan = the requester\'s employee account (default, every request before ADR 0027); vendor = "Pembayaran vendor" (Finance / PM only): vendor + vendor account + invoice, type always advance, no LPJ (transfer → completed). ADR 0028: pt_grup = "Pembayaran antar-PT" (Finance / PM / Direktur of the paying PT): another PT of the group (payeeCompanyId) paid to its designated receiving account + the receiving PT\'s document (invoice / memo, required), type always advance, no LPJ; the transfer completes it AND posts a Kas Masuk in the receiving PT. Older apps that do not know a value show it as karyawan and must not send payeeType on such a draft (the server keeps the stored one).',
+      'ADR 0027 "Jenis penerima": karyawan = the requester\'s employee account (default, every request before ADR 0027); vendor = "Pembayaran vendor" (Staff / Finance / PM of the request PT; Staff since 2026-10-16): vendor + vendor account + invoice, type always advance, no LPJ (transfer → completed). ADR 0028: pt_grup = "Pembayaran antar-PT" (Finance / PM / Direktur of the paying PT): another PT of the group (payeeCompanyId) paid to its designated receiving account + the receiving PT\'s document (invoice / memo, required), type always advance, no LPJ; the transfer completes it AND posts a Kas Masuk in the receiving PT. Older apps that do not know a value show it as karyawan and must not send payeeType on such a draft (the server keeps the stored one).',
   })
 
 export const RequestStatusEnum = z
@@ -120,7 +120,7 @@ const draftFields = {
   lines: z.array(LineInput).max(200).optional(),
   attachmentIds: z.array(id).max(20).optional(),
   // ADR 0027 (DRMS 13/10 Wave 4) "Pembayaran vendor"
-  payeeType: PayeeTypeEnum.optional().meta({ description: 'Default karyawan. vendor: only a Finance / PM caller of the request PT (403 otherwise); pt_grup (ADR 0028): only Finance / PM / Direktur of the request PT (403 otherwise). Both: `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself. Omitted on PATCH / sync = the stored payee type stays.' }),
+  payeeType: PayeeTypeEnum.optional().meta({ description: 'Default karyawan. vendor: only a Staff / Finance / PM caller of the request PT (403 otherwise; Staff since 2026-10-16 — the normal Staff approval flow); pt_grup (ADR 0028): only Finance / PM / Direktur of the request PT (403 otherwise). Both: `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself. Omitted on PATCH / sync = the stored payee type stays.' }),
   vendorId: id.nullable().optional().meta({ description: 'ADR 0027: active vendor of the request PT (GET /masters?types=vendors). Required to submit a vendor payment.' }),
   vendorBankAccountId: id.nullable().optional().meta({ description: 'ADR 0027: active account OF THAT vendor (GET /masters?types=vendor-bank-accounts). Required to submit; snapshotted at submit = the transfer destination.' }),
   invoiceNo: z.string().trim().max(64).nullable().optional().meta({ description: 'ADR 0027: required to submit. Unique per vendor among requests that are not cancelled / rejected (compared upper case, letters + digits only) → else 409 with errors[invoiceNo]. ADR 0028 (pt_grup): the receiving PT\'s document number (invoice / memo), required to submit, unique per receiving PT the same way.' }),

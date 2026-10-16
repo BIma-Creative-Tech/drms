@@ -114,6 +114,9 @@ describe('"+ Buat" items per role (real Payload config)', () => {
     expect(await menuFor(['pk-staff'], true)).toEqual([])
     expect(await menuFor(['pk-operator'])).toEqual([])
     expect(showsQuickCreate(['pk-staff', 'pk-operator'])).toBe(false)
+    // owner 2026-10-16: Staff may file a vendor payment (VENDOR_PAYMENT_ROLES) — from the request form ("Jenis penerima"),
+    // the "+ Buat" menu stays without a Staff button
+    expect(QUICK_ROLE_RULES.vendorPayment).toContain('pk-staff')
     // a Staff who is also PM in the selected PT gets the PM menu
     expect(labels(await menuFor(['pk-staff', 'pk-pm']))).toContain('Pengajuan baru')
   })

@@ -32,7 +32,9 @@ const clientUuid = z.uuid().optional().meta({ description: 'Client id; a replay 
 export const PROJECT_KIND_VALUES = ['umum', 'konstruksi', 'kontrak_unit', 'aftersales', 'trading'] as const
 export const ProjectKindEnum = z.enum(PROJECT_KIND_VALUES).meta({ id: 'ProjectKind', description: 'ADR 0020: kontrak_unit → timesheet + servis; aftersales → servis + aktivitas; others: no field reports (konstruksi: P3).' })
 export const UnitStatusEnum = z.enum(['siap', 'rusak', 'menunggu_part']).meta({ id: 'UnitStatus' })
-export const ServiceTypeEnum = z.enum(['servis_berkala', 'perbaikan', 'inspeksi', 'pemasangan']).meta({ id: 'ServiceType' })
+export const ServiceTypeEnum = z
+  .enum(['servis_berkala', 'perbaikan', 'inspeksi', 'pemasangan'])
+  .meta({ id: 'ServiceType', description: 'LEGACY single service type (code of the PT master row seeded from the old enum). DRMS owner 2026-10-17: use serviceTypeIds.' })
 export const ActivityKindEnum = z.enum(['penawaran', 'po_masuk', 'pengiriman', 'penagihan', 'kunjungan', 'lainnya']).meta({ id: 'AftersalesActivityKind' })
 export const PoStatusEnum = z.enum(['belum_kirim', 'sebagian', 'terkirim', 'batal']).meta({ id: 'PoStatus' })
 
@@ -72,6 +74,7 @@ const Photo = z
   .meta({ id: 'FieldPhoto' })
 
 const Ref = z.object({ id, name: z.string().nullable() })
+const ServiceTypeRef = z.object({ id, code: z.string(), name: z.string(), active: z.boolean() }).meta({ id: 'ServiceTypeRef' })
 const ProjectRef = z.object({ id, code: z.string().nullable(), name: z.string().nullable(), kind: ProjectKindEnum.nullable() }).meta({ id: 'FieldProjectRef' })
 const UnitRef = z
   .object({ id, label: z.string().nullable(), unitCode: z.string().nullable(), plateDisplay: z.string().nullable(), type: z.string().nullable(), owner: z.enum(['sendiri', 'pelanggan']).nullable() })
@@ -104,12 +107,21 @@ const listQuery = {
 
 // ---------------------------------------------------------------- service reports
 
+/** DRMS owner 2026-10-17: photos of a service report 10 → 25. */
+export const MAX_SERVICE_PHOTOS = 25
+
+/** DRMS owner 2026-10-17: ids of the PT master `service-types` (GET /service-types), selection order kept. */
+const serviceTypeIds = z
+  .array(id)
+  .min(1, 'Pilih minimal satu jenis servis.')
+  .max(20)
+  .refine((xs) => new Set(xs).size === xs.length, 'Jenis servis ganda.')
+
 const serviceContent = {
   helpers: optText(200).meta({ description: 'Helper (names, text).' }),
   startTime: hhmm.nullable().optional(),
   endTime: hhmm.nullable().optional(),
   hourMeter: dec2(10_000_000).nullable().optional().meta({ description: 'HM at the service; below the unit\'s latest reading on/before the date → 409 HM_DECREASED (corrections: PM/Direktur).' }),
-  serviceType: ServiceTypeEnum,
   complaint: optText(2000),
   action: z.string().trim().min(3).max(4000).meta({ description: 'Tindakan / pekerjaan.' }),
   unitStatusAfter: UnitStatusEnum.meta({ description: 'Unit status after the service → vehicles.status (menunggu_part notifies the project PM).' }),
@@ -124,7 +136,11 @@ export const ServiceReportCreate = z
     unitId: id.meta({ description: 'Unit of the project PT; a customer-owned unit must belong to the project\'s client when the project has one.' }),
     reportDate: businessDate.optional().meta({ description: 'Default: today (company TZ). Not in the future, ≤ 14 days back.' }),
     ...serviceContent,
-    photoIds: z.array(id).max(10).optional().meta({ description: 'media-progress-photos ids uploaded by the caller (before/after), max 10.' }),
+    serviceTypeIds: serviceTypeIds
+      .optional()
+      .meta({ description: 'Jenis servis (1–20, unique): active rows of the project PT\'s master (GET /service-types). Exactly one of serviceTypeIds / serviceType is required (none → 400 VALIDATION path serviceTypeIds "Pilih minimal satu jenis servis.").' }),
+    serviceType: ServiceTypeEnum.optional().meta({ description: 'LEGACY (old clients): one code → the PT master row with that code (must be active). Only when serviceTypeIds is absent.' }),
+    photoIds: z.array(id).max(MAX_SERVICE_PHOTOS).optional().meta({ description: 'media-progress-photos ids uploaded by the caller (before/after), max 25.' }),
     clientUuid,
   })
   .strict()
@@ -135,13 +151,18 @@ const servicePatch = {
   startTime: serviceContent.startTime,
   endTime: serviceContent.endTime,
   hourMeter: serviceContent.hourMeter,
-  serviceType: ServiceTypeEnum.optional(),
+  serviceTypeIds: serviceTypeIds
+    .optional()
+    .meta({ description: 'New selection (1–20, unique, the report\'s PT, selection order kept): a type already on the report may stay although inactive; a newly added one must be active.' }),
+  serviceType: ServiceTypeEnum.optional().meta({
+    description: 'LEGACY (APK 0.7.0), ignored when serviceTypeIds is sent: a code already among the report\'s types keeps the selection unchanged; another code replaces it with that one (active) type.',
+  }),
   complaint: serviceContent.complaint,
   action: serviceContent.action.optional(),
   unitStatusAfter: UnitStatusEnum.optional(),
   spareparts: SparepartLines.optional(),
   notes: serviceContent.notes,
-  addPhotoIds: z.array(id).max(10).optional().meta({ description: 'Photos to add (total ≤ 10).' }),
+  addPhotoIds: z.array(id).max(MAX_SERVICE_PHOTOS).optional().meta({ description: 'Photos to add (never removed; total ≤ 25).' }),
 }
 
 export const ServiceReportUpdate = z
@@ -175,7 +196,8 @@ export const ServiceReport = z
     startTime: z.string().nullable(),
     endTime: z.string().nullable(),
     hourMeter: z.number().nullable(),
-    serviceType: ServiceTypeEnum,
+    serviceTypes: z.array(ServiceTypeRef).meta({ description: 'DRMS owner 2026-10-17: the selected service types in selection order (≥ 1; an inactive one stays on old reports).' }),
+    serviceType: z.string().nullable().meta({ description: 'LEGACY: code of the first selected type whose code is one of the four legacy codes (servis_berkala, perbaikan, inspeksi, pemasangan), else of the first selected type.' }),
     complaint: z.string().nullable(),
     action: z.string(),
     unitStatusAfter: UnitStatusEnum,
@@ -187,6 +209,19 @@ export const ServiceReport = z
   .meta({ id: 'ServiceReport' })
 
 export const ServiceReportList = z.object({ items: z.array(ServiceReport), nextCursor: z.string().nullable() }).meta({ id: 'ServiceReportList' })
+
+export const ServiceTypeListQuery = z
+  .object({
+    company: companyFilterParam,
+    includeInactive: z.enum(['1', 'true']).optional().meta({ description: 'Also the deactivated types (e.g. to label old reports).' }),
+  })
+  .meta({ id: 'ServiceTypeListQuery' })
+
+export const ServiceTypeItem = z
+  .object({ id, companyId: id, code: z.string(), name: z.string(), active: z.boolean(), sortOrder: z.number().int().meta({ description: 'Urutan (ascending, then name). A type created without one gets the highest Urutan of its PT + 1.' }) })
+  .meta({ id: 'ServiceTypeItem', description: '"Jenis servis" master row of a PT (DRMS owner 2026-10-17; managed by Admin / Direktur).' })
+
+export const ServiceTypeList = z.object({ items: z.array(ServiceTypeItem) }).meta({ id: 'ServiceTypeList' })
 
 // ---------------------------------------------------------------- unit timesheets
 

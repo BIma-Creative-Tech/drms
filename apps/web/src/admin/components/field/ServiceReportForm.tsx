@@ -2,11 +2,11 @@
 import { useRouter } from 'next/navigation'
 import React, { useId, useMemo, useRef, useState } from 'react'
 
-import { SERVICE_TYPE_LABELS, SERVICE_TYPES, UNIT_STATUS_LABELS, UNIT_STATUSES, type ServiceType, type UnitStatus } from '@/domain/field/rules'
+import { MAX_PHOTOS, SERVICE_TYPES_REQUIRED, UNIT_STATUS_LABELS, UNIT_STATUSES, type UnitStatus } from '@/domain/field/rules'
 import { fmtNum } from '@/domain/field/views'
 
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
-import { Choice, decOut, DecimalField, LinesEditor, linesOut, PhotoPicker, usePhotos, type LineDraft } from './parts'
+import { CheckGroup, Choice, decOut, DecimalField, LinesEditor, linesOut, PhotoPicker, usePhotos, type LineDraft } from './parts'
 import { DateInput } from '../DateInput'
 import { WrapSelect } from '../WrapSelect'
 import { WrapText } from '../WrapText'
@@ -14,19 +14,24 @@ import { WrapText } from '../WrapText'
 /**
  * FR1 web input "Laporan servis unit" (plan A; same fields as the APK mockup Android-Servis): project
  * (kontrak_unit / aftersales) → unit (contract units of the project / units of the PT), date, HM, start/
- * end time, service type, complaint, action, helper, spare parts (text only, no stock), unit status after
- * the service, photos before/after (≤ 10) and notes. POST /api/v1/service-reports with an
+ * end time, service types, complaint, action, helper, spare parts (text only, no stock), unit status after
+ * the service, photos before/after (≤ 25) and notes. DRMS owner 2026-10-17: "Jenis servis" = one or more ACTIVE
+ * types of the selected project's PT master (checkbox pills, sent as `serviceTypeIds` in selection order); spare
+ * parts without a "No. part" input; up to 25 photos. POST /api/v1/service-reports with an
  * Idempotency-Key (same body → same key) and a clientUuid per form (a retry is replayed, never a second
  * report). The server re-checks flag, access, kind, HM_DECREASED, unit/client and the date window.
  */
 export type SvProject = { id: number; label: string; companyId: number; kind: string }
 export type SvUnit = { id: number; label: string; sub: string; lastHm: number | null; status: string }
+/** Active "Jenis servis" of the PTs the caller may report in (GET /service-types read model, server-side). */
+export type SvServiceType = { id: number; companyId: number; name: string }
 
 export type ServiceReportFormProps = {
   projects: SvProject[]
   units: SvUnit[]
   /** project id → unit ids offered for it */
   unitsByProject: Record<string, number[]>
+  serviceTypes: SvServiceType[]
   today: string
   minDate: string
   initialProject?: number
@@ -35,7 +40,7 @@ export type ServiceReportFormProps = {
 
 const uuid = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined)
 
-export function ServiceReportForm({ projects, units, unitsByProject, today, minDate, initialProject, initialUnit }: ServiceReportFormProps) {
+export function ServiceReportForm({ projects, units, unitsByProject, serviceTypes, today, minDate, initialProject, initialUnit }: ServiceReportFormProps) {
   const router = useRouter()
   const uid = useId()
   const id = (n: string) => `${uid}-${n}`
@@ -48,14 +53,14 @@ export function ServiceReportForm({ projects, units, unitsByProject, today, minD
   const [hm, setHm] = useState('')
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
-  const [type, setType] = useState<ServiceType | ''>('')
+  const [typeIds, setTypeIds] = useState<string[]>([])
   const [complaint, setComplaint] = useState('')
   const [action, setAction] = useState('')
   const [helpers, setHelpers] = useState('')
   const [lines, setLines] = useState<LineDraft[]>([])
   const [status, setStatus] = useState<UnitStatus | ''>('')
   const [notes, setNotes] = useState('')
-  const photos = usePhotos(10)
+  const photos = usePhotos(MAX_PHOTOS.service_report)
   const [busy, setBusy] = useState<string | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [summary, setSummary] = useState<string | null>(null)
@@ -67,6 +72,9 @@ export function ServiceReportForm({ projects, units, unitsByProject, today, minD
   const hmLow = typeof hmVal === 'number' && unit?.lastHm !== null && unit?.lastHm !== undefined && hmVal < unit.lastHm
   const project = projects.find((p) => String(p.id) === projectId) ?? null
   const parts = linesOut(lines, true)
+  /** Types of the selected project's PT (a selection never mixes PTs). */
+  const typeOpts = project ? serviceTypes.filter((t) => t.companyId === project.companyId).map((t) => ({ value: String(t.id), label: t.name })) : []
+  const typeSel = typeIds.filter((v) => typeOpts.some((o) => o.value === v))
 
   const err = (k: string) => errors[k]
   const errEl = (k: string) =>
@@ -85,7 +93,7 @@ export function ServiceReportForm({ projects, units, unitsByProject, today, minD
     if (!date || date > today || date < minDate) v.reportDate = `Tanggal antara ${minDate} dan ${today}.`
     if (hmVal === undefined) v.hourMeter = 'HM harus angka ≥ 0, maks. 2 desimal.'
     if (start && end && end <= start) v.endTime = 'Jam selesai harus setelah jam mulai.'
-    if (!type) v.serviceType = 'Pilih jenis servis.'
+    if (typeSel.length === 0) v.serviceTypeIds = SERVICE_TYPES_REQUIRED
     if (action.trim().length < 3) v.action = 'Tindakan / pekerjaan wajib diisi (min. 3 karakter).'
     if (!status) v.unitStatusAfter = 'Pilih status unit setelah servis.'
     if (Object.keys(parts.errors).length) v.spareparts = 'Periksa baris sparepart.'
@@ -108,7 +116,7 @@ export function ServiceReportForm({ projects, units, unitsByProject, today, minD
         hourMeter: hmVal ?? null,
         startTime: start || null,
         endTime: end || null,
-        serviceType: type,
+        serviceTypeIds: typeSel.map(Number),
         complaint: complaint.trim() || null,
         action: action.trim(),
         helpers: helpers.trim() || null,
@@ -222,7 +230,17 @@ export function ServiceReportForm({ projects, units, unitsByProject, today, minD
 
       <section className="pk-fsec" aria-labelledby={id('s-job')}>
         <h2 id={id('s-job')}>Pekerjaan</h2>
-        <Choice label="Jenis servis" name={`${uid}-type`} value={type} onChange={setType} required error={err('serviceType')} options={SERVICE_TYPES.map((t) => ({ value: t, label: SERVICE_TYPE_LABELS[t] }))} />
+        <CheckGroup
+          label="Jenis servis"
+          name={`${uid}-type`}
+          value={typeSel}
+          onChange={setTypeIds}
+          required
+          disabled={!project}
+          error={err('serviceTypeIds') ?? err('serviceType')}
+          help={project ? (typeOpts.length ? 'Boleh lebih dari satu.' : 'Belum ada jenis servis aktif di PT ini — hubungi Admin (Master Data → Jenis servis).') : 'Pilih project dulu.'}
+          options={typeOpts}
+        />
         <div className="pk-fld">
           <label htmlFor={id('complaint')}>Keluhan</label>
           <textarea id={id('complaint')} value={complaint} maxLength={2000} rows={2} onChange={(e) => setComplaint(e.target.value)} />
@@ -242,7 +260,7 @@ export function ServiceReportForm({ projects, units, unitsByProject, today, minD
 
       <section className="pk-fsec" aria-labelledby={id('s-parts')}>
         <h2 id={id('s-parts')}>Sparepart dipakai</h2>
-        <LinesEditor rows={lines} setRows={setLines} label="Sparepart" nameLabel="Nama sparepart" addLabel="+ Tambah sparepart" withNote help="Catatan saja — stok sparepart tidak dikelola di aplikasi." />
+        <LinesEditor rows={lines} setRows={setLines} label="Sparepart" nameLabel="Nama sparepart" addLabel="+ Tambah sparepart" withNote hidePartNo help="Catatan saja — stok sparepart tidak dikelola di aplikasi." />
         {errEl('spareparts')}
       </section>
 
@@ -259,7 +277,7 @@ export function ServiceReportForm({ projects, units, unitsByProject, today, minD
 
       <section className="pk-fsec" aria-labelledby={id('s-photo')}>
         <h2 id={id('s-photo')}>Foto & catatan</h2>
-        <PhotoPicker photos={photos} name="photos" label="Foto sebelum / sesudah" help="Maks. 10 foto. JPEG/PNG; diperkecil ≤ 1600 px dan lokasi EXIF dihapus di server." error={err('photoIds')} />
+        <PhotoPicker photos={photos} name="photos" label="Foto sebelum / sesudah" help="Maks. 25 foto. JPEG/PNG; diperkecil ≤ 1600 px dan lokasi EXIF dihapus di server." error={err('photoIds')} />
         <div className="pk-fld">
           <label htmlFor={id('notes')}>Catatan</label>
           <textarea id={id('notes')} value={notes} maxLength={2000} rows={2} onChange={(e) => setNotes(e.target.value)} />

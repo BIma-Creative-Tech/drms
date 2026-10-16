@@ -172,7 +172,8 @@ export const MASTER_TYPES = [
   'clients',
   // ADR 0023: sites (kantor cabang) — attendance locations + per-caller `home` / `assigned` / `team`
   'sites',
-  // ADR 0027: vendor accounts — destination picker of a vendor payment (Finance / PM / Direktur / Admin read; Staff: none)
+  // ADR 0027: vendor accounts — destination picker of a vendor payment (Finance / PM / Direktur / Admin read; Staff read
+  // since the owner request 2026-10-16)
   'vendor-bank-accounts',
   // ADR 0028: payee directory of a "PT grup" payment per paying PT (Finance / PM / Direktur of that PT; others: none)
   'intercompany-payees',
