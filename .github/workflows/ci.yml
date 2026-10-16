@@ -1,22 +1,72 @@
-# THROWAWAY (branch tmp/d1710-service-gen only, never merged): runs the repo generators on the CI runner
-# (no node on the host) and uploads their output: OpenAPI, Payload types, import map, a schema drift check of the
-# hand-written migration snapshot, plus typecheck / lint / unit-test logs.
+# ProyekKas CI (CLAUDE.md §3.6/§3.7, ADR 0002 §5). Runs on GitHub (BIma-Creative-Tech/drms);
+# syntax checked with actionlint. Actions pinned by commit SHA (resolved with `git ls-remote`),
+# tool images pinned by digest (the same images used locally for the F1 evidence).
+# Images (E10): job `image` builds web (runner) + migrate on the GitHub runner (never on the VPS), gates them
+# with Trivy and — on develop, release tags and ci/ghcr-* only — pushes them to GHCR (private):
+#   ghcr.io/bima-creative-tech/proyekkas-web · ghcr.io/bima-creative-tech/proyekkas-migrate
+#   develop  → sha-<sha7> + <pkg version>-stg-<sha7>   (staging)
+#   vX.Y.Z   → X.Y.Z  (prod; tag must be on main, = package.json version, never overwritten)
+#   ci/ghcr-* → test-<sha7>
+# Runbook: docs/proyekkas/runbooks/ci-ghcr.md.
 name: ci
 
 on:
+  push:
+    # ci/ghcr-*: throwaway branches to test the GHCR publish (images tagged test-<sha7> only).
+    # feat/** and fix/** run via pull_request only (a push + PR used to run the whole pipeline twice).
+    branches: [main, develop, "ci/ghcr-*"]
+    # Release tags vX.Y.Z → images X.Y.Z (prod). mobile-v* tags belong to mobile.yml.
+    tags: ["v*.*.*"]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   NODE_VERSION: 24.21.0
   NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
-  gen:
+  verify:
+    name: lint · typecheck · unit + coverage · openapi drift
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 40
+    timeout-minutes: 30 # self-hosted = 2 vCPU
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          # GitHub cache on GitHub-hosted only; self-hosted: npm_config_cache is a persistent dir of the runner image.
+          cache: ${{ runner.environment == 'github-hosted' && 'npm' || '' }}
+          package-manager-cache: ${{ runner.environment == 'github-hosted' }}
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      # E9: unit tests with the coverage gate (thresholds in apps/web/vitest.config.ts)
+      - run: npm run test:coverage
+      - name: OpenAPI contract up to date (packages/api-contract/openapi.json)
+        run: npm run check:openapi
+      # ADR 0018: the app bundles docs/proyekkas/legal/pemberitahuan-privasi.md (docs/ is not in the image context)
+      - name: Privacy notice bundle up to date (src/legal/privacy-notice.generated.ts)
+        run: npm run check:privacy-notice
+      - name: npm audit (high+)
+        run: npm audit --omit=dev --audit-level=high
+
+  integration:
+    name: integration ${{ matrix.part }} (throwaway Postgres, migrations as owner, tests as app role)
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
+    # The full suite outgrew one job on the shared 4-core self-hosted host (~100 min under load): two halves of the files
+    # (alternating, sorted) plus the F3 KPI data-set file (520 generated requests) on its own.
+    timeout-minutes: ${{ matrix.part == 'f3' && 90 || 70 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [a, b, f3]
     services:
       postgres:
         image: postgres:16.15-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
@@ -30,47 +80,486 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
+          # GitHub cache on GitHub-hosted only; self-hosted: npm_config_cache is a persistent dir of the runner image.
           cache: ${{ runner.environment == 'github-hosted' && 'npm' || '' }}
           package-manager-cache: ${{ runner.environment == 'github-hosted' }}
       - run: npm ci --no-audit --no-fund
-      - name: DB + migrations + generators
+      - name: Throwaway role passwords
+        run: |
+          for v in OWNER APP RO; do
+            p="$(openssl rand -hex 24)"
+            echo "::add-mask::$p"
+            echo "PK_F1_${v}_PASSWORD=$p" >> "$GITHUB_ENV"
+          done
+      - name: Create owner/app/ro roles and pk_test
         env:
           PG_SUPERUSER_URL: postgres://postgres:ci-throwaway-superuser@127.0.0.1:5432/postgres
+        run: node apps/web/test-env/ci-bootstrap.mjs
+      - name: Throwaway SMTP sink (Mailpit, MIT; STARTTLS required + AUTH, throwaway CA, loopback only)
         run: |
-          for v in OWNER APP RO; do p="$(openssl rand -hex 24)"; echo "::add-mask::$p"; export "PK_F1_${v}_PASSWORD=$p"; done
-          node apps/web/test-env/ci-bootstrap.mjs
+          d="$RUNNER_TEMP/smtp"; mkdir -p "$d"; cd "$d"
+          openssl req -x509 -newkey rsa:2048 -nodes -keyout ca.key -out ca.crt -days 1 -subj "/CN=pk-smtp CI CA"
+          openssl req -newkey rsa:2048 -nodes -keyout server.key -out server.csr -subj "/CN=localhost"
+          printf 'subjectAltName=DNS:localhost\nextendedKeyUsage=serverAuth\n' > ext.cnf
+          openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 1 -extfile ext.cnf
+          p="$(openssl rand -hex 24)"; echo "::add-mask::$p"
+          printf '%s' "$p" > smtp_password; echo "no-reply@pk-smtp.test:$p" > auth.txt; chmod 644 ./*
+          docker run -d --name pk-smtp-mailpit --memory 96m --cap-drop ALL --security-opt no-new-privileges:true \
+            -p 127.0.0.1:1025:1025 -p 127.0.0.1:8025:8025 -v "$d:/certs:ro" \
+            axllent/mailpit:v1.31.2@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d \
+            --smtp-tls-cert /certs/server.crt --smtp-tls-key /certs/server.key --smtp-require-starttls \
+            --smtp-auth-file /certs/auth.txt --smtp-disable-rdns --max 100
+          {
+            echo "PK_TEST_SMTP_HOST=localhost"
+            echo "PK_TEST_SMTP_PORT=1025"
+            echo "PK_TEST_SMTP_USER=no-reply@pk-smtp.test"
+            echo "PK_TEST_SMTP_PASSWORD_FILE=$d/smtp_password"
+            echo "PK_TEST_MAILPIT_API=http://127.0.0.1:8025"
+            echo "NODE_EXTRA_CA_CERTS=$d/ca.crt"
+          } >> "$GITHUB_ENV"
+      - name: Integration tests
+        env:
+          PART: ${{ matrix.part }}
+        run: |
+          export PK_TEST_DATABASE_URL="postgres://pk_test_app:${PK_F1_APP_PASSWORD}@127.0.0.1:5432/pk_test"
+          export PK_TEST_DATABASE_URL_OWNER="postgres://pk_test_owner:${PK_F1_OWNER_PASSWORD}@127.0.0.1:5432/pk_test"
+          export PK_TEST_DATABASE_URL_RO="postgres://pk_test_ro:${PK_F1_RO_PASSWORD}@127.0.0.1:5432/pk_test"
           cd apps/web
-          export DATABASE_URL="postgres://pk_test_owner:${PK_F1_OWNER_PASSWORD}@127.0.0.1:5432/pk_test"
-          export PAYLOAD_SECRET=gen-throwaway-secret-0123456789abcdef PK_SKIP_ENV_CHECK=true LOG_LEVEL=warn
-          (npx payload migrate 2>&1 | tail -60) | tee "$RUNNER_TEMP/migrate.log" || true
-          psql_out=$(node -e "const pg=require('pg');(async()=>{const c=new pg.Client({connectionString:process.env.DATABASE_URL});await c.connect();const r=await c.query('SELECT (SELECT count(*) FROM service_types) st, (SELECT count(*) FROM companies) co, (SELECT count(*) FROM service_reports_rels) rels, (SELECT data_type FROM information_schema.columns WHERE table_name = \'service_reports\' AND column_name = \'service_type\') col, (SELECT count(*) FROM payload_migrations) mig');console.log(JSON.stringify(r.rows));await c.end()})()" 2>&1) || true
-          echo "$psql_out" | tee -a "$RUNNER_TEMP/migrate.log"
-          (timeout 300 npx payload migrate:create d1710_drift_check2 --skip-empty < /dev/null 2>&1 | tail -40) | tee "$RUNNER_TEMP/drift.log" || true
-          ls src/migrations | grep drift_check || echo "NO DRIFT FILE" | tee -a "$RUNNER_TEMP/drift.log"
-          (timeout 300 npx payload generate:types 2>&1 | tail -20) | tee "$RUNNER_TEMP/types.log" || true
-          (timeout 300 npx payload generate:importmap 2>&1 | tail -20) | tee "$RUNNER_TEMP/importmap.log" || true
-      - name: gen openapi
-        run: npm run gen:openapi -w apps/web 2>&1 | tee "$RUNNER_TEMP/openapi.log" || true
-      - name: typecheck
-        run: npm run typecheck 2>&1 | tee "$RUNNER_TEMP/typecheck.log" || true
-      - name: lint
-        run: npm run lint 2>&1 | tee "$RUNNER_TEMP/lint.log" || true
-      - name: unit tests
-        run: |
-          cd apps/web
-          npx vitest run 2>&1 | tail -150 | tee "$RUNNER_TEMP/unit.log" || true
-      - name: collect
-        if: always()
-        run: |
-          mkdir -p "$RUNNER_TEMP/out"
-          cp "$RUNNER_TEMP"/*.log "$RUNNER_TEMP/out/" 2>/dev/null || true
-          git status --short > "$RUNNER_TEMP/out/status.txt"
-          git diff > "$RUNNER_TEMP/out/all.diff"
-          cp apps/web/src/migrations/*drift_check* "$RUNNER_TEMP/out/" 2>/dev/null || true
-          cat "$RUNNER_TEMP/out/status.txt"
-      - uses: actions/upload-artifact@v4
-        if: always()
+          if [ "$PART" = f3 ]; then
+            files="tests/integration/f3-kpi-reconciliation.int.test.ts"
+          else
+            k=$([ "$PART" = a ] && echo 1 || echo 0)
+            files=$(ls tests/integration/*.int.test.ts | grep -v '/f3-kpi-reconciliation\.' | awk -v k="$k" 'NR % 2 == k')
+          fi
+          echo "$files"
+          # shellcheck disable=SC2086 # one argument per file
+          TZ=Asia/Makassar npx vitest run -c vitest.integration.config.ts $files
+
+  security:
+    name: gitleaks · semgrep · trivy fs · hadolint
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 30 # self-hosted = 2 vCPU
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          name: gen
-          path: ${{ runner.temp }}/out
-          retention-days: 2
+          fetch-depth: 0
+      - name: gitleaks (full history)
+        run: >-
+          docker run --rm -v "$PWD:/repo" -w /repo
+          zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git --no-banner --redact --exit-code 1 /repo
+      - name: semgrep (OWASP + TypeScript + project rules)
+        run: >-
+          docker run --rm -v "$PWD:/src" -w /src
+          semgrep/semgrep:1.177.0@sha256:acaac22ffc7b7cc5926de0751b223bce0b2491c33d18422fa72f632c78d81198
+          semgrep scan --error --metrics=off
+          --config p/owasp-top-ten --config p/typescript --config .semgrep/proyekkas.yml
+          --exclude node_modules --exclude docs
+      - name: trivy fs (vulns, secrets, misconfig — fail on CRITICAL)
+        run: >-
+          docker run --rm -v "$PWD:/src" -w /src
+          aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+          fs --scanners vuln,secret,misconfig --severity CRITICAL --exit-code 1 --skip-dirs docs .
+      - name: hadolint
+        run: >-
+          docker run --rm -i
+          hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
+          < apps/web/Dockerfile
+
+  image:
+    name: image build (runner + migrate) · trivy · GHCR push
+    needs: [verify, integration, security]
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 75 # self-hosted = 2 vCPU; release tags build without cache
+    permissions:
+      contents: read
+      packages: write # GHCR push with GITHUB_TOKEN (read-only on fork PRs; push steps are skipped there)
+    env:
+      REGISTRY: ghcr.io
+      WEB_IMAGE: ghcr.io/bima-creative-tech/proyekkas-web
+      MIGRATE_IMAGE: ghcr.io/bima-creative-tech/proyekkas-migrate
+      TRIVY_IMAGE: aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # release tags: verify the tagged commit is on main
+
+      - name: Tags, labels, publish decision
+        id: meta
+        env:
+          REF: ${{ github.ref }}
+          EVENT: ${{ github.event_name }}
+          RUNNER_ENV: ${{ runner.environment }}
+        run: |
+          set -euo pipefail
+          sha7="${GITHUB_SHA::7}"
+          pkg="$(jq -r .version package.json)" # jq: node is not on PATH in the self-hosted runner image
+          publish=false; tags=""; version="$pkg-dev-$sha7"
+          if [[ "$EVENT" == "push" ]]; then
+            case "$REF" in
+              refs/tags/v*)
+                ver="${REF#refs/tags/v}"
+                [[ "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::release tag must be vX.Y.Z (got ${REF#refs/tags/})"; exit 1; }
+                [[ "$ver" == "$pkg" ]] || { echo "::error::tag v$ver != package.json version $pkg"; exit 1; }
+                git fetch --no-tags origin main
+                git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+                  || { echo "::error::release tag v$ver is not on main"; exit 1; }
+                publish=true; tags="$ver"; version="$ver" ;;
+              refs/heads/develop)
+                publish=true; tags="sha-$sha7 $pkg-stg-$sha7"; version="$pkg-stg-$sha7" ;;
+              refs/heads/ci/ghcr-*)
+                publish=true; tags="test-$sha7"; version="test-$sha7" ;;
+            esac
+          fi
+          # Build cache (plan 12 §4/§7): release tags vX.Y.Z → no cache at all (reproducible, no stale/poisoned layers).
+          # GitHub-hosted → type=gha. Self-hosted → none here; the buildx `docker` driver uses the runner's own dockerd
+          # layer cache (persistent /srv/ci/docker).
+          no_cache=false; gha=false
+          if [[ "$EVENT" == "push" && "$REF" == refs/tags/v* ]]; then no_cache=true
+          elif [[ "$RUNNER_ENV" == "github-hosted" ]]; then gha=true; fi
+          {
+            echo "no_cache=$no_cache"
+            for name in web migrate; do
+              other=migrate; [[ $name == migrate ]] && other=web
+              if [[ $gha == true ]]; then
+                printf '%s_cache_from<<EOF_CACHE\ntype=gha,scope=pk-%s\ntype=gha,scope=pk-%s\nEOF_CACHE\n' "$name" "$name" "$other"
+                echo "${name}_cache_to=type=gha,mode=max,scope=pk-$name"
+              else
+                echo "${name}_cache_from="; echo "${name}_cache_to="
+              fi
+            done
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "publish=$publish"
+            echo "tags=$tags"
+            echo "version=$version"
+            # Reproducible image config/timestamps (created = commit time).
+            echo "epoch=$(git log -1 --format=%ct)"
+            created="$(git log -1 --format=%cI)"
+            echo "created=$created"
+            # OCI labels (same for the local-only build and the published one).
+            for name in web migrate; do
+              echo "${name}_labels<<EOF_LABELS"
+              echo "org.opencontainers.image.title=proyekkas-$name"
+              echo "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+              echo "org.opencontainers.image.revision=$GITHUB_SHA"
+              echo "org.opencontainers.image.version=$version"
+              echo "org.opencontainers.image.created=$created"
+              echo "org.opencontainers.image.vendor=BIma-Creative-Tech"
+              echo "org.opencontainers.image.licenses=NOASSERTION"
+              if [[ $name == web ]]; then
+                echo "org.opencontainers.image.description=ProyekKas DRMS web + worker (worker: node apps/web/dist/worker.mjs)"
+              else
+                echo "org.opencontainers.image.description=ProyekKas DRMS one-shot payload migrate (OWNER role) + idempotent seed"
+              fi
+              echo "EOF_LABELS"
+            done
+          } >> "$GITHUB_OUTPUT"
+          echo "publish=$publish tags=[$tags] version=$version no_cache=$no_cache gha_cache=$gha runner=$RUNNER_ENV"
+
+      # Self-hosted, local-only builds: buildx `docker` driver = BuildKit of the job's own (inner) dockerd, its layer
+      # cache persists on the runner (needs the containerd image store, default for a fresh Docker 29 daemon).
+      # Publishing runs ALWAYS use docker-container: the docker driver cannot push-by-digest ("push-by-digest is
+      # currently not implemented for docker driver", infra plan 12 R10 F2, run 36409822758).
+      - name: Buildx driver
+        id: bx
+        env:
+          RUNNER_ENV: ${{ runner.environment }}
+          PUBLISH: ${{ steps.meta.outputs.publish }}
+        run: |
+          driver=docker-container
+          if [[ "$RUNNER_ENV" == "self-hosted" && "$PUBLISH" != "true" ]]; then
+            if docker info --format '{{json .DriverStatus}}' | grep -q 'io.containerd.snapshotter'; then
+              driver=docker
+            else
+              echo "::warning::inner dockerd without the containerd image store → buildx docker-container (no layer cache)"
+            fi
+          fi
+          echo "driver=$driver" | tee -a "$GITHUB_OUTPUT"
+      # Self-hosted (sysbox): buildkitd in docker-container would start every RUN step in a nested pid namespace, where
+      # sysbox-fs 0.7.1 leaks an unreaped helper → the build hangs forever (plan 12 R10, publishing run of 47ac6cd).
+      # --oci-worker-no-process-sandbox keeps RUN steps in buildkitd's own pid ns; the job container is already the
+      # sandbox. GitHub-hosted keeps the action's default flags.
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          driver: ${{ steps.bx.outputs.driver }}
+          buildkitd-flags: ${{ runner.environment == 'self-hosted' && '--oci-worker-no-process-sandbox' || '--allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host' }}
+
+      # Build ONCE per target. Publishing runs push an UNTAGGED manifest (push-by-digest); Trivy scans exactly that
+      # digest; only a passing digest gets tags (imagetools create). Nothing tagged is ever unscanned.
+      # Other runs (PRs, feat/**) load the image locally and scan it; nothing leaves the runner.
+      - name: Login to GHCR
+        if: steps.meta.outputs.publish == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Refuse to overwrite an existing release tag
+        if: steps.meta.outputs.publish == 'true' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          TAG: ${{ steps.meta.outputs.tags }}
+        run: |
+          for img in "$WEB_IMAGE" "$MIGRATE_IMAGE"; do
+            if docker buildx imagetools inspect "$img:$TAG" >/dev/null 2>&1; then
+              echo "::error::$img:$TAG already exists — release tags are immutable (rollback path). Bump the version."
+              exit 1
+            fi
+          done
+
+      - name: Build web (runner target) → local (attempt 1)
+        if: steps.meta.outputs.publish != 'true'
+        id: web-local-1
+        continue-on-error: true # transient registry/network errors (Docker Hub blip 2026-10-02) → one retry below
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: runner
+          platforms: linux/amd64
+          load: true
+          provenance: false
+          tags: proyekkas-web:ci
+          labels: ${{ steps.meta.outputs.web_labels }}
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.web_cache_from }}
+          cache-to: ${{ steps.meta.outputs.web_cache_to }}
+      - name: Back off before retrying web (local)
+        if: ${{ steps.web-local-1.outcome == 'failure' }}
+        run: sleep 45
+      - name: Build web (runner target) → local (attempt 2)
+        if: ${{ steps.web-local-1.outcome == 'failure' }}
+        id: web-local-2
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: runner
+          platforms: linux/amd64
+          load: true
+          provenance: false
+          tags: proyekkas-web:ci
+          labels: ${{ steps.meta.outputs.web_labels }}
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.web_cache_from }}
+          cache-to: ${{ steps.meta.outputs.web_cache_to }}
+      - name: Build migrate target → local (attempt 1)
+        if: steps.meta.outputs.publish != 'true'
+        id: migrate-local-1
+        continue-on-error: true # transient registry/network errors (Docker Hub blip 2026-10-02) → one retry below
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: migrate
+          platforms: linux/amd64
+          load: true
+          provenance: false
+          tags: proyekkas-migrate:ci
+          labels: ${{ steps.meta.outputs.migrate_labels }}
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.migrate_cache_from }}
+          cache-to: ${{ steps.meta.outputs.migrate_cache_to }}
+      - name: Back off before retrying migrate (local)
+        if: ${{ steps.migrate-local-1.outcome == 'failure' }}
+        run: sleep 45
+      - name: Build migrate target → local (attempt 2)
+        if: ${{ steps.migrate-local-1.outcome == 'failure' }}
+        id: migrate-local-2
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: migrate
+          platforms: linux/amd64
+          load: true
+          provenance: false
+          tags: proyekkas-migrate:ci
+          labels: ${{ steps.meta.outputs.migrate_labels }}
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.migrate_cache_from }}
+          cache-to: ${{ steps.meta.outputs.migrate_cache_to }}
+
+      - name: Build web (runner target) → GHCR by digest (untagged) + SBOM + provenance (attempt 1)
+        if: steps.meta.outputs.publish == 'true'
+        id: web-push-1
+        continue-on-error: true # transient registry/network errors (Docker Hub blip 2026-10-02) → one retry below
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: runner
+          platforms: linux/amd64
+          outputs: type=image,name=${{ env.WEB_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          sbom: true
+          provenance: mode=max
+          labels: ${{ steps.meta.outputs.web_labels }}
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.web_cache_from }}
+          cache-to: ${{ steps.meta.outputs.web_cache_to }}
+      - name: Back off before retrying web (push)
+        if: ${{ steps.web-push-1.outcome == 'failure' }}
+        run: sleep 45
+      - name: Build web (runner target) → GHCR by digest (untagged) + SBOM + provenance (attempt 2)
+        if: ${{ steps.web-push-1.outcome == 'failure' }}
+        id: web-push-2
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: runner
+          platforms: linux/amd64
+          outputs: type=image,name=${{ env.WEB_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          sbom: true
+          provenance: mode=max
+          labels: ${{ steps.meta.outputs.web_labels }}
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.web_cache_from }}
+          cache-to: ${{ steps.meta.outputs.web_cache_to }}
+      - name: Build migrate target → GHCR by digest (untagged) + SBOM + provenance (attempt 1)
+        if: steps.meta.outputs.publish == 'true'
+        id: migrate-push-1
+        continue-on-error: true # transient registry/network errors (Docker Hub blip 2026-10-02) → one retry below
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: migrate
+          platforms: linux/amd64
+          outputs: type=image,name=${{ env.MIGRATE_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          sbom: true
+          provenance: mode=max
+          labels: ${{ steps.meta.outputs.migrate_labels }}
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.migrate_cache_from }}
+          cache-to: ${{ steps.meta.outputs.migrate_cache_to }}
+      - name: Back off before retrying migrate (push)
+        if: ${{ steps.migrate-push-1.outcome == 'failure' }}
+        run: sleep 45
+      - name: Build migrate target → GHCR by digest (untagged) + SBOM + provenance (attempt 2)
+        if: ${{ steps.migrate-push-1.outcome == 'failure' }}
+        id: migrate-push-2
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: migrate
+          platforms: linux/amd64
+          outputs: type=image,name=${{ env.MIGRATE_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          sbom: true
+          provenance: mode=max
+          labels: ${{ steps.meta.outputs.migrate_labels }}
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.migrate_cache_from }}
+          cache-to: ${{ steps.meta.outputs.migrate_cache_to }}
+
+      - name: Scan targets
+        id: scan
+        env:
+          PUBLISH: ${{ steps.meta.outputs.publish }}
+          WEB_DIGEST: ${{ steps.web-push-1.outputs.digest || steps.web-push-2.outputs.digest }}
+          MIGRATE_DIGEST: ${{ steps.migrate-push-1.outputs.digest || steps.migrate-push-2.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [[ "$PUBLISH" == "true" ]]; then
+            for d in "$WEB_DIGEST" "$MIGRATE_DIGEST"; do
+              [[ "$d" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::missing digest from push-by-digest"; exit 1; }
+            done
+            { echo "web=$WEB_IMAGE@$WEB_DIGEST"; echo "migrate=$MIGRATE_IMAGE@$MIGRATE_DIGEST"; } >> "$GITHUB_OUTPUT"
+          else
+            { echo "web=proyekkas-web:ci"; echo "migrate=proyekkas-migrate:ci"; } >> "$GITHUB_OUTPUT"
+          fi
+      - name: Trivy report (HIGH + CRITICAL incl. unfixed — informational, job summary)
+        env:
+          WEB_REF: ${{ steps.scan.outputs.web }}
+          MIGRATE_REF: ${{ steps.scan.outputs.migrate }}
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Self-hosted: persistent TRIVY_CACHE_DIR from the runner image (outside _work — Trivy writes it as root,
+          # which the runner could not clean from _temp). GitHub-hosted: per-job dir as before.
+          tcache="${TRIVY_CACHE_DIR:-$RUNNER_TEMP/trivy-cache}"
+          mkdir -p "$tcache"
+          {
+            echo "### Trivy image scan (trivy 0.74.0)"
+            echo "| image | CRITICAL fixable | CRITICAL unfixed | HIGH fixable | HIGH unfixed |"
+            echo "|---|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for name in web migrate; do
+            ref="WEB_REF"; [[ $name == migrate ]] && ref="MIGRATE_REF"; img="${!ref}"
+            out="$RUNNER_TEMP/trivy-$name.json"
+            tcache="$tcache" .github/scripts/trivy-image.sh \
+              image --quiet --platform linux/amd64 --severity HIGH,CRITICAL --exit-code 0 --format json "$img" > "$out"
+            jq -r '[.Results[]?.Vulnerabilities[]?] | "  \(length) HIGH/CRITICAL:", (.[] | "  \(.Severity) \(.PkgName) \(.InstalledVersion) \(.VulnerabilityID) fixed=\(.FixedVersion // "-")")' "$out"
+            jq -r --arg img "$img" '[.Results[]?.Vulnerabilities[]?] as $v
+              | def n(s; f): [$v[] | select(.Severity == s and ((.FixedVersion // "") != "") == f)] | length;
+              "| \($img) | \(n("CRITICAL"; true)) | \(n("CRITICAL"; false)) | \(n("HIGH"; true)) | \(n("HIGH"; false)) |"' \
+              "$out" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Trivy gate (fail on fixable CRITICAL — the digest stays untagged)
+        env:
+          WEB_REF: ${{ steps.scan.outputs.web }}
+          MIGRATE_REF: ${{ steps.scan.outputs.migrate }}
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail # a failing first image must fail the step (the loop used to continue)
+          tcache="${TRIVY_CACHE_DIR:-$RUNNER_TEMP/trivy-cache}"
+          mkdir -p "$tcache"
+          # exit 3 = fixable CRITICAL found (fails the job, never retried); network errors retried in the script
+          for img in "$WEB_REF" "$MIGRATE_REF"; do
+            tcache="$tcache" .github/scripts/trivy-image.sh \
+              image --quiet --platform linux/amd64 --severity CRITICAL --exit-code 3 --ignore-unfixed "$img"
+          done
+
+      - name: Tag the scanned digests
+        if: steps.meta.outputs.publish == 'true'
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          WEB_REF: ${{ steps.scan.outputs.web }}
+          MIGRATE_REF: ${{ steps.scan.outputs.migrate }}
+        run: |
+          set -euo pipefail
+          for pair in "$WEB_IMAGE=$WEB_REF" "$MIGRATE_IMAGE=$MIGRATE_REF"; do
+            img="${pair%%=*}"; src="${pair#*=}"; args=()
+            for t in $TAGS; do args+=(-t "$img:$t"); done
+            docker buildx imagetools create "${args[@]}" "$src"
+          done
+      - name: Summary (image@digest for the deploy .env)
+        if: steps.meta.outputs.publish == 'true'
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          WEB_DIGEST: ${{ steps.web-push-1.outputs.digest || steps.web-push-2.outputs.digest }}
+          MIGRATE_DIGEST: ${{ steps.migrate-push-1.outputs.digest || steps.migrate-push-2.outputs.digest }}
+        run: |
+          set -euo pipefail
+          t="${TAGS%% *}"
+          for pair in "$WEB_IMAGE:$t=$WEB_DIGEST" "$MIGRATE_IMAGE:$t=$MIGRATE_DIGEST"; do
+            got="$(docker buildx imagetools inspect "${pair%%=*}" --format '{{json .Manifest}}' | jq -r .digest)"
+            [[ "$got" == "${pair#*=}" ]] || { echo "::error::${pair%%=*} → $got, expected ${pair#*=}"; exit 1; }
+          done
+          {
+            echo "### GHCR images"
+            echo '```'
+            echo "PK_WEB_IMAGE=$WEB_IMAGE:$t@$WEB_DIGEST"
+            echo "PK_MIGRATE_IMAGE=$MIGRATE_IMAGE:$t@$MIGRATE_DIGEST"
+            echo '```'
+            echo "Tags: \`$TAGS\` · commit \`$GITHUB_SHA\`"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
