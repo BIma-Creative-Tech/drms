@@ -86,11 +86,8 @@ class FieldApi {
   /// `GET /service-types?includeInactive=1` — the service types ("Jenis servis") of every PT of the caller, inactive
   /// ones included (a report keeps showing the name of a type deactivated later).
   Future<List<ServiceType>> serviceTypes() => client.run(
-    (d) => d.get<dynamic>(
-      '/service-types',
-      queryParameters: {'includeInactive': '1'},
-      options: ApiClient.allCompanies(),
-    ),
+    (d) =>
+        d.get<dynamic>('/service-types', queryParameters: {'includeInactive': '1'}, options: ApiClient.allCompanies()),
     (data) => [for (final t in fList((data as Json)['items'])) ServiceType.fromJson(fMap(t))],
   );
 
