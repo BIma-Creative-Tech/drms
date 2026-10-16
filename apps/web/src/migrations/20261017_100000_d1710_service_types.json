@@ -15102,7 +15102,8 @@
           "name": "sort_order",
           "type": "numeric",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": 0
         },
         "realised_qty": {
           "name": "realised_qty",

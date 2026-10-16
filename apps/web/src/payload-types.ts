@@ -2295,7 +2295,7 @@ export interface ServiceType {
   code: string;
   name: string;
   /**
-   * Urutan tampil di pilihan (kecil dulu, lalu nama).
+   * Urutan tampil di pilihan (kecil dulu, lalu nama). Kosong saat dibuat = setelah yang terakhir.
    */
   sortOrder?: number | null;
   active?: boolean | null;
