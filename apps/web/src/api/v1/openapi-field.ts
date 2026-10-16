@@ -86,7 +86,7 @@ export function registerFieldPaths(registry: OpenAPIRegistry, h: Helpers): void 
     method: 'get',
     path: '/service-types',
     summary:
-      'DRMS owner 2026-10-17 "Jenis servis" master of the caller\'s selected PTs (?company= narrows; 403 COMPANY_NOT_ALLOWED outside): active types sorted by name, also the inactive ones with includeInactive=1. Managed by Admin / Direktur (Payload collection service-types)',
+      'DRMS owner 2026-10-17 "Jenis servis" master of the caller\'s selected PTs (?company= narrows; 403 COMPANY_NOT_ALLOWED outside): active types sorted by sortOrder then name, also the inactive ones with includeInactive=1. Managed by Admin / Direktur (Payload collection service-types)',
     security: h.security,
     request: { headers: h.deviceHeader, query: F.ServiceTypeListQuery },
     responses: h.res(200, 'Service types', F.ServiceTypeList, [400, 401, 403, 426, 429]),

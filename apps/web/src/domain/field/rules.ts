@@ -334,7 +334,7 @@ export const SERVICE_TYPES = ['servis_berkala', 'perbaikan', 'inspeksi', 'pemasa
 export type ServiceType = (typeof SERVICE_TYPES)[number]
 export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = { servis_berkala: 'Servis berkala', perbaikan: 'Perbaikan', inspeksi: 'Inspeksi', pemasangan: 'Pemasangan' }
 /** Seed of the per-PT master (code = legacy enum value). */
-export const DEFAULT_SERVICE_TYPES: ReadonlyArray<{ code: ServiceType; name: string }> = SERVICE_TYPES.map((code) => ({ code, name: SERVICE_TYPE_LABELS[code] }))
+export const DEFAULT_SERVICE_TYPES: ReadonlyArray<{ code: ServiceType; name: string; sortOrder: number }> = SERVICE_TYPES.map((code, i) => ({ code, name: SERVICE_TYPE_LABELS[code], sortOrder: i + 1 }))
 /** Selected service types of one report: 1 … MAX_SERVICE_TYPES, unique (API + sync). */
 export const MAX_SERVICE_TYPES = 20
 export const SERVICE_TYPES_REQUIRED = 'Pilih minimal satu jenis servis.'

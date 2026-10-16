@@ -12,10 +12,11 @@ import { companyField, companyHook } from '@/fields/company'
  * `service_type_ids`). Seeded per PT with the four legacy types (code = the 0.13 enum value `servis_berkala` /
  * `perbaikan` / `inspeksi` / `pemasangan`: migration 20261017_100000_d1710_service_types for existing PTs,
  * `ensureDefaultServiceTypes` for a new one) — the code is how APK 0.7.0 (single `service_type`) still finds the row,
- * so it is fixed once created (field access + DB `service_types_protect`). Managed by Admin + Direktur (Owner implies
- * Direktur), read by every member; never hard-deleted — "Hapus" (ADR 0030 soft delete) only while no report uses the
- * type (FK usage check), otherwise "Nonaktifkan" with a reason: an inactive type stays on old reports and is no longer
- * offered for new selections.
+ * so it is fixed once created (field access + DB `service_types_protect`). Pickers / GET /api/v1/service-types sort by
+ * `sortOrder` (Urutan, 0 = default) then name; the four seeded types get 1–4 (their former order). Managed by Admin +
+ * Direktur (Owner implies Direktur), read by every member; never hard-deleted — "Hapus" (ADR 0030 soft delete) only
+ * while no report uses the type (FK usage check), otherwise "Nonaktifkan" with a reason: an inactive type stays on old
+ * reports and is no longer offered for new selections.
  */
 export const ServiceTypes: CollectionConfig = withAudit(
   {
@@ -24,10 +25,10 @@ export const ServiceTypes: CollectionConfig = withAudit(
     admin: {
       useAsTitle: 'name',
       group: 'Master Data',
-      defaultColumns: ['code', 'name', 'active'],
+      defaultColumns: ['code', 'name', 'sortOrder', 'active'],
       description: 'Pilihan "Jenis servis" pada Laporan servis unit (boleh lebih dari satu per laporan). Kode tidak dapat diubah setelah dibuat.',
     },
-    defaultSort: 'name',
+    defaultSort: 'sortOrder',
     access: {
       read: anyMember,
       create: rolesAllowed('pk-admin', 'pk-owner'),
@@ -39,6 +40,16 @@ export const ServiceTypes: CollectionConfig = withAudit(
       companyField(),
       { ...codeField('Kode', 32, { perCompany: true }), access: { update: () => false }, admin: { description: 'Huruf, angka, titik, garis bawah, garis miring atau minus. Tetap setelah disimpan (dipakai aplikasi Android).' } },
       { name: 'name', type: 'text', label: 'Nama', required: true, maxLength: 120 },
+      {
+        name: 'sortOrder',
+        type: 'number',
+        label: 'Urutan',
+        defaultValue: 0,
+        min: 0,
+        max: 9999,
+        validate: (v: unknown) => (v === null || v === undefined || (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 9999) ? true : 'Urutan: bilangan bulat 0–9999.'),
+        admin: { description: 'Urutan tampil di pilihan (kecil dulu, lalu nama).' },
+      },
       activeField(),
       uuidField(),
     ],

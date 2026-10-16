@@ -218,7 +218,7 @@ export const ServiceTypeListQuery = z
   .meta({ id: 'ServiceTypeListQuery' })
 
 export const ServiceTypeItem = z
-  .object({ id, companyId: id, code: z.string(), name: z.string(), active: z.boolean() })
+  .object({ id, companyId: id, code: z.string(), name: z.string(), active: z.boolean(), sortOrder: z.number().int().meta({ description: 'Urutan (ascending, then name; 0 = default).' }) })
   .meta({ id: 'ServiceTypeItem', description: '"Jenis servis" master row of a PT (DRMS owner 2026-10-17; managed by Admin / Direktur).' })
 
 export const ServiceTypeList = z.object({ items: z.array(ServiceTypeItem) }).meta({ id: 'ServiceTypeList' })

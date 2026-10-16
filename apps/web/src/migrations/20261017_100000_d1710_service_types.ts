@@ -6,7 +6,8 @@ import { type MigrateDownArgs, type MigrateUpArgs, sql } from '@payloadcms/db-po
  * columns of ADR 0030, service_reports_rels, payload_locked_documents_rels.service_types_id, service_type as varchar).
  *
  * Payload part (generated shape):
- * - `service_types` (company, code, name, active, uuid + is_deleted / deleted_at / deleted_by_id / delete_reason);
+ * - `service_types` (company, code, name, sort_order, active, uuid + is_deleted / deleted_at / deleted_by_id /
+ *   delete_reason);
  * - `service_reports_rels` (hasMany `serviceTypes`, `order` = selection order, FK → service_types ON DELETE cascade —
  *   a type is never hard-deleted, see below; the soft delete's usage check reads this FK → a used type is "used");
  * - `service_reports.service_type`: enum → varchar, NULL allowed (legacy single value = code of the first selected
@@ -24,18 +25,38 @@ import { type MigrateDownArgs, type MigrateUpArgs, sql } from '@payloadcms/db-po
  *    `pk.field_override = 'correction'` (PM/Direktur correction; 'system' never touches the types), the type of the
  *    report's PT (cross-company reference), only `serviceTypes` rows, parent immutable. Payload rewrites the rows on
  *    update (DELETE + INSERT in the same transaction) → DELETE is granted to the app role and passes the same window.
- *    Deferred constraint triggers: a report has ≥ 1 type at commit (insert of a report, update/delete of its rows).
+ *    Deferred constraint triggers: a report has ≥ 1 type at commit (insert of a report, update/delete of its rows); a
+ *    report inserted WITHOUT types but with a legacy code (the 0.13 image after an image rollback) gets the PT's type
+ *    with that code instead of being refused — the image rollback needs no down migration.
  * 4. Photos: CHECK service_reports_photo_count ≤ 25 and pk_field_photo_limit 'service_report' → 25 (other types as
  *    before: timesheet 1, aftersales 5, daily report 10).
  * Down: refused while a report has more than 10 photos, a type code outside the old enum or more than one type
  * (not representable before) — restore the pre-deploy dump instead; otherwise back to the enum + 10 photos.
  */
+/** Former enum order = `sort_order` 1–4 (Urutan). */
 const LEGACY: ReadonlyArray<[code: string, name: string]> = [
   ['servis_berkala', 'Servis berkala'],
   ['perbaikan', 'Perbaikan'],
   ['inspeksi', 'Inspeksi'],
   ['pemasangan', 'Pemasangan'],
 ]
+
+/** Data step 2a (idempotent, exported for the integration test): the four legacy types for every PT without any type. */
+export const SEED_SERVICE_TYPES_SQL = `
+  INSERT INTO service_types (company_id, code, name, sort_order, active, uuid)
+  SELECT c.id, d.code, d.name, d.sort_order, true, gen_random_uuid()::text
+    FROM companies c CROSS JOIN (VALUES ${LEGACY.map(([c, n], i) => `('${c}', '${n}', ${i + 1})`).join(', ')}) AS d(code, name, sort_order)
+   WHERE NOT EXISTS (SELECT 1 FROM service_types s WHERE s.company_id = c.id)
+   ORDER BY c.id, d.code;`
+
+/** Data step 2b (idempotent, exported for the integration test): a report without types → its PT's row of its legacy code. */
+export const BACKFILL_SERVICE_REPORT_TYPES_SQL = `
+  INSERT INTO service_reports_rels ("order", parent_id, path, service_types_id)
+  SELECT 1, r.id, 'serviceTypes', st.id
+    FROM service_reports r
+    JOIN service_types st ON st.company_id = r.company_id AND st.code = r.service_type::text
+   WHERE NOT EXISTS (SELECT 1 FROM service_reports_rels x WHERE x.parent_id = r.id)
+   ORDER BY r.id;`
 
 /** Tables of this migration that carry the ADR 0030 soft-delete columns (registry `master('service-types')`). */
 export const D1710_SOFT_DELETE_TABLES = ['service_types'] as const
@@ -73,6 +94,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   	"company_id" integer,
   	"code" varchar NOT NULL,
   	"name" varchar NOT NULL,
+  	"sort_order" numeric DEFAULT 0,
   	"active" boolean DEFAULT true,
   	"uuid" varchar,
   	"is_deleted" boolean DEFAULT false,
@@ -117,25 +139,15 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   CREATE UNIQUE INDEX service_types_company_code_uq ON service_types (company_id, code);
   ALTER TABLE service_types ADD CONSTRAINT service_types_soft_delete_state CHECK ("is_deleted" IS NOT TRUE OR ("deleted_at" IS NOT NULL AND char_length(btrim(coalesce("delete_reason", ''))) >= 3));
   ALTER TABLE service_types ADD CONSTRAINT service_types_code_format CHECK (code ~ '^[A-Za-z0-9._/-]{1,32}$' AND char_length(btrim(name)) > 0);
+  ALTER TABLE service_types ADD CONSTRAINT service_types_sort_order CHECK (sort_order IS NULL OR (sort_order >= 0 AND sort_order <= 9999 AND sort_order = trunc(sort_order)));
   CREATE TRIGGER service_types_protect BEFORE UPDATE ON service_types FOR EACH ROW EXECUTE FUNCTION pk_protect_columns('company_id', 'code', 'uuid');
   CREATE TRIGGER service_types_no_delete BEFORE DELETE ON service_types FOR EACH ROW EXECUTE FUNCTION pk_reject_mutation();
   CREATE TRIGGER service_types_no_truncate BEFORE TRUNCATE ON service_types FOR EACH STATEMENT EXECUTE FUNCTION pk_reject_mutation();`)
 
   // ---- 2. data: the four legacy types per PT, every existing report → its type (before the rels guard exists)
-  const values = LEGACY.map(([c, n]) => `('${c}', '${n}')`).join(', ')
   await db.execute(
-    sql.raw(`
-  INSERT INTO service_types (company_id, code, name, active, uuid)
-  SELECT c.id, d.code, d.name, true, gen_random_uuid()::text
-    FROM companies c CROSS JOIN (VALUES ${values}) AS d(code, name)
-   WHERE NOT EXISTS (SELECT 1 FROM service_types s WHERE s.company_id = c.id)
-   ORDER BY c.id, d.code;
-
-  INSERT INTO service_reports_rels ("order", parent_id, path, service_types_id)
-  SELECT 1, r.id, 'serviceTypes', st.id
-    FROM service_reports r
-    JOIN service_types st ON st.company_id = r.company_id AND st.code = r.service_type::text
-   ORDER BY r.id;
+    sql.raw(`${SEED_SERVICE_TYPES_SQL}
+${BACKFILL_SERVICE_REPORT_TYPES_SQL}
 
   DO $pk$
   DECLARE
@@ -207,11 +219,21 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
     ELSE
       rid := NEW.parent_id;
     END IF;
-    IF EXISTS (SELECT 1 FROM service_reports s WHERE s.id = rid)
-       AND NOT EXISTS (SELECT 1 FROM service_reports_rels x WHERE x.parent_id = rid AND x.path = 'serviceTypes' AND x.service_types_id IS NOT NULL) THEN
-      RAISE EXCEPTION 'service report % needs at least one service type', rid USING ERRCODE = '23514';
+    IF NOT EXISTS (SELECT 1 FROM service_reports s WHERE s.id = rid)
+       OR EXISTS (SELECT 1 FROM service_reports_rels x WHERE x.parent_id = rid AND x.path = 'serviceTypes' AND x.service_types_id IS NOT NULL) THEN
+      RETURN NULL;
     END IF;
-    RETURN NULL;
+    IF TG_TABLE_NAME = 'service_reports' THEN
+      -- a writer that knows only the legacy column (the 0.13 image after an image rollback): its code → the PT's type
+      INSERT INTO service_reports_rels ("order", parent_id, path, service_types_id)
+      SELECT 1, s.id, 'serviceTypes', t.id
+        FROM service_reports s JOIN service_types t ON t.company_id = s.company_id AND t.code = s.service_type
+       WHERE s.id = rid;
+      IF FOUND THEN
+        RETURN NULL;
+      END IF;
+    END IF;
+    RAISE EXCEPTION 'service report % needs at least one service type', rid USING ERRCODE = '23514';
   END
   $fn$;
   CREATE CONSTRAINT TRIGGER service_reports_types_present AFTER INSERT ON service_reports
