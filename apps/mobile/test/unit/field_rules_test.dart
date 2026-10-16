@@ -4,6 +4,7 @@ import 'package:proyekkas/features/expense/data/expense_mappers.dart';
 import 'package:proyekkas/features/field_reports/application/field_providers.dart';
 import 'package:proyekkas/features/field_reports/domain/field_models.dart';
 import 'package:proyekkas/features/field_reports/domain/field_rules.dart';
+import 'package:proyekkas/features/field_reports/presentation/field_conflict_screen.dart' show serviceTypesOfCopy;
 import 'package:proyekkas/features/sync/domain/sync_models.dart';
 
 /// FR1 (ADR 0020, requirements v1.3) APK rules: dates, HM, hours, kind-specific fields, sync payloads, error
@@ -50,7 +51,8 @@ const okService = ServiceContent(
   hourMeter: 1025,
   startTime: '08:30',
   endTime: '13:15',
-  serviceType: ServiceType.perbaikan,
+  serviceTypeIds: [7, 8],
+  serviceTypeNames: {7: 'Perbaikan', 8: 'Inspeksi'},
   complaint: 'Boom turun sendiri',
   action: 'Ganti seal kit boom',
   spareparts: [
@@ -148,7 +150,7 @@ void main() {
         const ServiceContent(
           unitId: 9,
           hourMeter: 1020,
-          serviceType: ServiceType.inspeksi,
+          serviceTypeIds: [8],
           action: 'Cek',
           unitStatusAfter: UnitStatus.siap,
         ),
@@ -171,12 +173,31 @@ void main() {
         today: today,
       );
       expect(e.keys, containsAll(['unit', 'serviceType', 'action', 'unitStatusAfter', 'endTime', 'parts']));
+      expect(e['serviceType'], 'Pilih minimal satu jenis servis.');
       expect(validateService(service(okService), today: '2026-10-30'), contains('date'));
     });
 
-    test('photos ≤ 10 incl. those already on the server', () {
-      final d = service(okService).copyWith(serverPhotoCount: 8);
-      expect(validateService(d, today: today)['photos'], 'Maksimal 10 foto.');
+    test('jenis servis: one or several master types; a legacy code of an APK < 0.8.0 still counts', () {
+      ServiceContent types(List<int> ids, {String? legacy}) => ServiceContent(
+        unitId: 9,
+        serviceTypeIds: ids,
+        legacyServiceType: legacy,
+        action: 'Ganti seal',
+        unitStatusAfter: UnitStatus.siap,
+      );
+      expect(validateService(service(types(const [7])), today: today), isEmpty);
+      expect(validateService(service(types(const [7, 8, 9])), today: today), isEmpty);
+      final none = validateService(service(types(const [])), today: today);
+      expect(none['serviceType'], 'Pilih minimal satu jenis servis.');
+      expect(validateService(service(types(const [], legacy: 'perbaikan')), today: today), isEmpty);
+    });
+
+    test('photos ≤ 25 (owner 2026-10-17) incl. those already on the server', () {
+      expect(FieldReportType.serviceReport.maxPhotos, 25);
+      expect(validateService(service(okService).copyWith(serverPhotoCount: 22), today: today), isEmpty);
+      final d = service(okService).copyWith(serverPhotoCount: 23); // 23 + 3 new
+      expect(validateService(d, today: today)['photos'], 'Maksimal 25 foto.');
+      expect(fieldErrorMessage('PHOTO_LIMIT', null), contains('servis 25'));
     });
 
     test('sync payload of a new report: identity, content, before+after photo placeholders; blank rows dropped', () {
@@ -185,7 +206,8 @@ void main() {
       expect(p['project_id'], 41);
       expect(p['unit_id'], 9);
       expect(p['report_date'], today);
-      expect(p['service_type'], 'perbaikan');
+      expect(p['service_type_ids'], [7, 8]);
+      expect(p.containsKey('service_type'), isFalse, reason: 'the new APK never sends the legacy code');
       expect(p['unit_status_after'], 'menunggu_part');
       expect(p['hour_meter'], 1025);
       expect(p['spareparts'], [
@@ -202,10 +224,87 @@ void main() {
     test('edit payload: server id, no identity fields, reason', () {
       final p = fieldSyncPayload(service(okService, serverId: 77).copyWith(reason: 'Salah ketik HM'));
       expect(p['report_id'], 77);
+      expect(p['service_type_ids'], [7, 8], reason: 'edit sends the ids too');
       expect(p.keys, isNot(contains('project_id')));
       expect(p.keys, isNot(contains('unit_id')));
       expect(p.keys, isNot(contains('report_client_uuid')));
       expect(p['reason'], 'Salah ketik HM');
+    });
+
+    test('spare part no. of a loaded row is kept in the payload (input hidden, value not dropped)', () {
+      final p = fieldSyncPayload(service(okService, serverId: 77));
+      expect((p['spareparts'] as List).single['part_no'], '707-99-47570');
+    });
+
+    test('APK < 0.8.0 draft: stored enum code → legacy; mapped to the PT type of the same code when cached', () {
+      final old = ServiceContent.fromJson({'unitId': 9, 'serviceType': 'perbaikan', 'action': 'Ganti seal'});
+      expect(old.serviceTypeIds, isEmpty);
+      expect((old.legacyServiceType, old.serviceTypeLabel()), ('perbaikan', 'perbaikan'));
+      final p = fieldSyncPayload(service(old));
+      expect(p['service_type'], 'perbaikan');
+      expect(p.containsKey('service_type_ids'), isFalse);
+      const types = [
+        ServiceType(id: 70, companyId: 3, code: 'perbaikan', name: 'Perbaikan', active: false),
+        ServiceType(id: 71, companyId: 3, code: 'perbaikan', name: 'Perbaikan (baru)'),
+        ServiceType(id: 72, companyId: 3, code: 'inspeksi', name: 'Inspeksi'),
+      ];
+      expect(matchLegacyServiceType(types, 'perbaikan')!.id, 71, reason: 'an active type first');
+      expect(matchLegacyServiceType(types.take(1), 'perbaikan')!.id, 70);
+      expect(matchLegacyServiceType(types, 'pemasangan'), isNull);
+      final mapped = mapLegacyServiceType(p, types);
+      expect(mapped['service_type_ids'], [71]);
+      expect(mapped.containsKey('service_type'), isFalse);
+      expect(mapped['action'], 'Ganti seal');
+      expect(mapLegacyServiceType(p, const []), same(p), reason: 'no cache yet: the legacy code is sent');
+      final fresh = fieldSyncPayload(service(okService));
+      expect(mapLegacyServiceType(fresh, types), same(fresh));
+      // the new content round-trips (local JSON)
+      final back = ServiceContent.fromJson(okService.toJson());
+      expect(back.serviceTypeIds, [7, 8]);
+      expect(back.serviceTypeNames, {7: 'Perbaikan', 8: 'Inspeksi'});
+      expect(back.legacyServiceType, isNull);
+      expect(service(okService).summary, 'EX-01 · Perbaikan, Inspeksi · HM 1.025');
+      expect(service(okService).summaryWith({7: 'Perbaikan berat'}), 'EX-01 · Perbaikan berat, Inspeksi · HM 1.025');
+      expect(const ServiceContent(serviceTypeIds: [5]).serviceTypeLabel(), '#5');
+    });
+
+    test('server record: serviceTypes → ids + names of the edit draft; older server: legacy code', () {
+      final r = FieldRecord(FieldReportType.serviceReport, {
+        'id': 77,
+        'companyId': 3,
+        'project': {'id': 41},
+        'unit': {'id': 9, 'unitCode': 'EX-01'},
+        'reportDate': today,
+        'serviceTypes': [
+          {'id': 7, 'code': 'perbaikan', 'name': 'Perbaikan', 'active': true},
+          {'id': 9, 'code': 'las', 'name': 'Las', 'active': false},
+        ],
+        'serviceType': 'perbaikan',
+        'spareparts': [
+          {'name': 'Seal kit', 'partNo': '707-99', 'qty': 1, 'uom': 'set'},
+        ],
+      });
+      expect(r.title, 'EX-01 · Perbaikan, Las');
+      final c = r.toDraft(clientUuid: 'u').service;
+      expect(c.serviceTypeIds, [7, 9]);
+      expect(c.serviceTypeNames, {7: 'Perbaikan', 9: 'Las'});
+      expect(c.legacyServiceType, isNull);
+      expect(c.spareparts.single.partNo, '707-99');
+      final old = FieldRecord(FieldReportType.serviceReport, {'id': 1, 'serviceType': 'inspeksi'});
+      expect(old.title, 'inspeksi');
+      expect(old.toDraft(clientUuid: 'v').service.legacyServiceType, 'inspeksi');
+      final las = ServiceType.fromJson({'id': 9, 'company': 3, 'code': 'las', 'name': 'Las', 'active': false});
+      expect((las.id, las.companyId, las.code, las.name, las.active), (9, 3, 'las', 'Las', false));
+    });
+
+    test('conflict screen: server copy service_type_ids → cached names, "#id" when unknown, else legacy code', () {
+      final copy = {
+        'service_type_ids': [7, 99],
+        'service_type': 'perbaikan',
+      };
+      expect(serviceTypesOfCopy(copy, {7: 'Perbaikan'}), 'Perbaikan, #99');
+      expect(serviceTypesOfCopy({'service_type': 'perbaikan'}, const {}), 'perbaikan');
+      expect(serviceTypesOfCopy(const {}, const {}), '');
     });
   });
 

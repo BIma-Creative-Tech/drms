@@ -158,7 +158,11 @@ class SyncEngine {
         await _markRejected(item, msg, code: 'MEDIA_MISSING');
         continue;
       }
-      payloads[item.opUuid] = resolved;
+      final f = field;
+      // a service report queued by an APK before 0.8.0: legacy `service_type` code → the PT's type id when cached
+      payloads[item.opUuid] = f != null && item.type == SyncItemType.serviceReportUpsert
+          ? await f.upgradeLegacyServicePayload(sub, item.companyId, resolved)
+          : resolved;
       ready.add(item);
     }
     if (ready.isEmpty) return SyncRunResult(SyncRunOutcome.partial, needsCompany: held, privacyAckRequired: privacyAck);

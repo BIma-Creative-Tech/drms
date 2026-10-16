@@ -345,6 +345,23 @@ class FieldResourceTypes extends Table {
   Set<Column<Object>> get primaryKey => {userSub, id};
 }
 
+/// Schema v11 (owner 2026-10-17): cache of the service types ("Jenis servis") of the user's PTs (`GET /service-types
+/// ?includeInactive=1`). The service report offers the active types of the project's PT; inactive ones keep the names
+/// of reports that use them.
+@DataClassName('FieldServiceTypeRow')
+class FieldServiceTypes extends Table {
+  TextColumn get userSub => text()();
+  IntColumn get id => integer()();
+  IntColumn get companyId => integer()();
+  TextColumn get code => text().withDefault(const Constant(''))();
+  TextColumn get name => text().withDefault(const Constant(''))();
+  BoolColumn get active => boolean().withDefault(const Constant(true))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {userSub, id};
+}
+
 /// Offline outbox (`POST /api/v1/sync/batch` items). `opUuid` = item `client_uuid` = idempotency key.
 class Outbox extends Table {
   TextColumn get opUuid => text()();
@@ -408,13 +425,15 @@ class KvEntries extends Table {
     // v6 (P3 konstruksi daily reports)
     FieldRapItems,
     FieldResourceTypes,
+    // v11 (service types per PT)
+    FieldServiceTypes,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -460,6 +479,9 @@ class AppDatabase extends _$AppDatabase {
       // v10 (ADR 0027 "Pembayaran vendor"): vendor data of a draft (JSON), nullable. Existing drafts keep NULL = paid
       // to an employee account, exactly as before.
       if (from < 10) await m.addColumn(localDrafts, localDrafts.vendorJson);
+      // v11 (owner 2026-10-17): service types ("Jenis servis") per PT. Additive only; a service report queued by an
+      // older APK keeps its single legacy code and is mapped to the PT's type of the same code when it is sent.
+      if (from < 11) await m.createTable(fieldServiceTypes);
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');

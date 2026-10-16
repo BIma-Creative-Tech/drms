@@ -146,7 +146,7 @@ Map<String, String> validateService(FieldDraft d, {required String today, double
   if ((st ?? '').isNotEmpty && (en ?? '').isNotEmpty && !e.containsKey('startTime') && !e.containsKey('endTime')) {
     if (en!.compareTo(st!) <= 0) e['endTime'] = 'Jam selesai harus setelah jam mulai.';
   }
-  if (c.serviceType == null) e['serviceType'] = 'Pilih jenis servis.';
+  if (!c.hasServiceType) e['serviceType'] = 'Pilih minimal satu jenis servis.';
   final action = c.action.trim();
   if (action.length < 3) e['action'] = 'Tindakan / pekerjaan wajib diisi (min. 3 karakter).';
   final lenErrors = {
@@ -332,6 +332,9 @@ Json fieldSyncPayload(FieldDraft d) {
       : <String, dynamic>{d.type.uuidKey: d.clientUuid, 'project_id': d.projectId};
   switch (d.content) {
     case final ServiceContent c:
+      // ≥ 1 master id; only a report of an APK before 0.8.0 that the cache could not map yet sends its legacy code
+      final typeIds = c.serviceTypeIds.isEmpty ? null : [...c.serviceTypeIds];
+      final legacyType = typeIds == null ? c.legacyServiceType : null;
       return {
         ...head,
         if (!d.isEdit) ...{'unit_id': c.unitId, 'report_date': d.reportDate},
@@ -339,7 +342,8 @@ Json fieldSyncPayload(FieldDraft d) {
         'start_time': _t(c.startTime ?? ''),
         'end_time': _t(c.endTime ?? ''),
         'hour_meter': c.hourMeter == null ? null : _r2(c.hourMeter!),
-        'service_type': c.serviceType?.code,
+        'service_type_ids': ?typeIds,
+        'service_type': ?legacyType,
         'complaint': _t(c.complaint),
         'action': c.action.trim(),
         'unit_status_after': c.unitStatusAfter?.code,
@@ -423,6 +427,21 @@ Json fieldSyncPayload(FieldDraft d) {
   }
 }
 
+/// A `service_report.upsert` queued by an APK before 0.8.0 carries the single legacy `service_type` code and no
+/// `service_type_ids`: it is sent with the id of the PT's type of the same code once the cache knows one ([types] =
+/// the types of the item's PT), else unchanged (the server still accepts the legacy code).
+Json mapLegacyServiceType(Json payload, Iterable<ServiceType> types) {
+  final code = payload['service_type'];
+  if (code is! String || payload['service_type_ids'] is List) return payload;
+  final match = matchLegacyServiceType(types, code);
+  if (match == null) return payload;
+  return {
+    for (final e in payload.entries)
+      if (e.key != 'service_type') e.key: e.value,
+    'service_type_ids': [match.id],
+  };
+}
+
 /// Indonesian text for the FR1 sync / API error codes (requirements v1.3; the server message is kept for
 /// codes without a fixed text).
 String fieldErrorMessage(String? code, String? serverMessage) {
@@ -438,7 +457,7 @@ String fieldErrorMessage(String? code, String? serverMessage) {
     'CLIENT_UUID_CONFLICT' => 'ID laporan bentrok dengan data pengguna lain. Buat laporan baru.',
     'NOT_EDITABLE' => 'Laporan hanya bisa diubah pelapornya dalam 24 jam. Setelah itu minta koreksi PM/Direktur.',
     'FORBIDDEN' => 'Anda tidak ditugaskan ke project ini atau tidak berhak membuat laporan ini.',
-    'PHOTO_LIMIT' => 'Jumlah foto melebihi batas (servis & laporan harian 10, timesheet 1 foto HM, aftersales 5).',
+    'PHOTO_LIMIT' => 'Jumlah foto melebihi batas (servis 25, laporan harian 10, timesheet 1 foto HM, aftersales 5).',
     'MEDIA_IN_USE' => 'Foto sudah dipakai di laporan lain. Ambil foto baru.',
     'MEDIA_MISSING' => 'Foto belum diterima server. Coba kirim lagi.',
     'NOT_FOUND' => 'Data (project/unit/pelanggan/PO) tidak ditemukan atau tidak bisa Anda akses.',

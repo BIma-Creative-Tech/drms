@@ -620,6 +620,53 @@ class FieldRepository {
     ];
   }
 
+  /// Replaces the cached service types of the user (full pull of every PT, inactive ones included).
+  Future<void> putServiceTypes(String sub, List<ServiceType> types) => db.transaction(() async {
+    await (db.delete(db.fieldServiceTypes)..where((t) => t.userSub.equals(sub))).go();
+    await db.batch((b) {
+      for (final t in types) {
+        b.insert(
+          db.fieldServiceTypes,
+          FieldServiceTypesCompanion.insert(
+            userSub: sub,
+            id: t.id,
+            companyId: t.companyId,
+            code: Value(t.code),
+            name: Value(t.name),
+            active: Value(t.active),
+            sortOrder: Value(t.sortOrder),
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
+      }
+    });
+  });
+
+  /// Cached service types (of PT [companyId] when given; inactive ones included), in sort order then by name.
+  Future<List<ServiceType>> serviceTypes(String sub, {int? companyId}) async {
+    final q = db.select(db.fieldServiceTypes)..where((t) => t.userSub.equals(sub));
+    if (companyId != null) q.where((t) => t.companyId.equals(companyId));
+    q.orderBy([(t) => OrderingTerm.asc(t.sortOrder), (t) => OrderingTerm.asc(t.name)]);
+    return [
+      for (final r in await q.get())
+        ServiceType(
+          id: r.id,
+          companyId: r.companyId,
+          code: r.code,
+          name: r.name,
+          active: r.active,
+          sortOrder: r.sortOrder,
+        ),
+    ];
+  }
+
+  /// A `service_report.upsert` of an APK before 0.8.0 (legacy `service_type` code, no ids) gets the id of its PT's
+  /// type with that code when the cache knows one ([mapLegacyServiceType]); everything else is unchanged.
+  Future<Json> upgradeLegacyServicePayload(String sub, int? companyId, Json payload) async {
+    if (companyId == null || payload['service_type'] is! String) return payload;
+    return mapLegacyServiceType(payload, await serviceTypes(sub, companyId: companyId));
+  }
+
   /// After a delivered daily report: the realisation of its work items moves on (so the next report's
   /// over-RAP hint is right while offline).
   Future<void> _learnDaily(String sub, DailyContent c) async {

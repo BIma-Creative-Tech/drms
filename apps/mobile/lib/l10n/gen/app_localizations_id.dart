@@ -2691,6 +2691,18 @@ class AppLocalizationsId extends AppLocalizations {
   String get fieldServiceType => 'Jenis servis';
 
   @override
+  String get fieldServiceTypeHelp => 'Boleh pilih lebih dari satu.';
+
+  @override
+  String fieldServiceTypeInactive(String name) {
+    return '$name (nonaktif)';
+  }
+
+  @override
+  String get fieldServiceTypesEmpty =>
+      'Belum ada jenis servis untuk PT ini. Buka Laporan Lapangan saat online (tarik ke bawah), atau minta Admin menambahkannya di web.';
+
+  @override
   String get fieldComplaint => 'Keluhan';
 
   @override
@@ -2703,7 +2715,7 @@ class AppLocalizationsId extends AppLocalizations {
   String get fieldSpareparts => 'Sparepart dipakai';
 
   @override
-  String get fieldPartNameHeader => 'Nama / no. part';
+  String get fieldPartNameHeader => 'Nama sparepart';
 
   @override
   String get fieldPartNameHint => 'Nama sparepart';

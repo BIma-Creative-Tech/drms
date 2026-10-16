@@ -66,6 +66,10 @@ class _FieldConflictScreenState extends ConsumerState<FieldConflictScreen> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final value = ref.watch(_draftProvider(widget.uuid));
+    final service = value.value?.type == FieldReportType.serviceReport;
+    final names = service
+        ? (ref.watch(fieldServiceTypeNamesProvider).value ?? const <int, String>{})
+        : const <int, String>{};
     return Scaffold(
       appBar: AppBar(title: Text(t.fieldConflictTitle)),
       body: AsyncBody<FieldDraft?>(
@@ -86,7 +90,7 @@ class _FieldConflictScreenState extends ConsumerState<FieldConflictScreen> {
               Text(d.type.label, style: Theme.of(context).textTheme.titleMedium),
               Text([d.projectLabel, d.reportDate].where((e) => e.isNotEmpty).join(' · ')),
               const SizedBox(height: 12),
-              for (final row in _rows(t, d, c)) _Compare(label: row.$1, server: row.$2, mine: row.$3),
+              for (final row in _rows(t, d, c, names)) _Compare(label: row.$1, server: row.$2, mine: row.$3),
               const SizedBox(height: 16),
               FilledButton.icon(
                 key: const Key('field-conflict-use-server'),
@@ -113,8 +117,8 @@ class _FieldConflictScreenState extends ConsumerState<FieldConflictScreen> {
     );
   }
 
-  /// (label, server, mine) of the fields the server copy carries.
-  List<(String, String, String)> _rows(AppLocalizations t, FieldDraft d, Json c) {
+  /// (label, server, mine) of the fields the server copy carries. [names]: id → name of the cached service types.
+  List<(String, String, String)> _rows(AppLocalizations t, FieldDraft d, Json c, Map<int, String> names) {
     String n(Object? v) => fDblN(v) == null ? '-' : fmtNum(fDblN(v)!);
     String s(Object? v) => (v == null || '$v'.isEmpty) ? '-' : '$v';
     final photos = d.type == FieldReportType.unitTimesheet
@@ -124,11 +128,7 @@ class _FieldConflictScreenState extends ConsumerState<FieldConflictScreen> {
       case final ServiceContent m:
         return [
           (t.fieldHmAtService, n(c['hour_meter']), m.hourMeter == null ? '-' : fmtNum(m.hourMeter!)),
-          (
-            t.fieldServiceType,
-            ServiceType.fromCode(c['service_type'])?.label ?? s(c['service_type']),
-            m.serviceType?.label ?? '-',
-          ),
+          (t.fieldServiceType, s(serviceTypesOfCopy(c, names)), s(m.serviceTypeLabel(names))),
           (t.fieldAction, s(c['action']), m.action.trim().isEmpty ? '-' : m.action.trim()),
           (
             t.fieldUnitStatusAfter,
@@ -163,6 +163,13 @@ class _FieldConflictScreenState extends ConsumerState<FieldConflictScreen> {
         ];
     }
   }
+}
+
+/// Service types of a server copy (`SyncServiceReportCopy`): names of `service_type_ids` from the cache ("#id" when
+/// unknown), else the legacy `service_type` code.
+String serviceTypesOfCopy(Json c, Map<int, String> names) {
+  final ids = [for (final e in fList(c['service_type_ids'])) ?fIntN(e)];
+  return ids.isEmpty ? fStr(c['service_type']) : ids.map((id) => names[id] ?? '#$id').join(', ');
 }
 
 class _Compare extends StatelessWidget {

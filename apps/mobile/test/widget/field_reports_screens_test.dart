@@ -147,6 +147,13 @@ const ex01 = FieldUnit(
 const ex02 = FieldUnit(id: 10, companyId: 3, label: 'EX-02', unitCode: 'EX-02', type: 'Excavator');
 const dz01 = FieldUnit(id: 11, companyId: 3, label: 'DZ-01', unitCode: 'DZ-01', type: 'Dozer');
 
+/// "Jenis servis" master of PT 3 (Las deactivated on the web).
+const serviceTypes = [
+  ServiceType(id: 7, companyId: 3, code: 'perbaikan', name: 'Perbaikan'),
+  ServiceType(id: 8, companyId: 3, code: 'inspeksi', name: 'Inspeksi'),
+  ServiceType(id: 9, companyId: 3, code: 'las', name: 'Las', active: false),
+];
+
 FieldContractUnit cu(FieldUnit u) => FieldContractUnit(
   id: u.id + 100,
   companyId: 3,
@@ -233,6 +240,8 @@ void main() {
         ),
       ),
       myFieldRecordsProvider.overrideWith((ref) async => const []),
+      fieldServiceTypesProvider.overrideWith((ref, c) async => c == 3 ? serviceTypes : const <ServiceType>[]),
+      fieldServiceTypeNamesProvider.overrideWith((ref) async => {for (final t in serviceTypes) t.id: t.name}),
       fieldPhotoCaptureProvider.overrideWithValue((context, title) async => Uint8List.fromList([1, 2, 3])),
       localPhotoProvider.overrideWith((ref, uuid) async => null),
       ...extra,
@@ -319,6 +328,8 @@ void main() {
       expect(find.text('EX-01 · Excavator PC200-8'), findsOneWidget);
       expect(find.textContaining('HM terakhir 1.023'), findsWidgets);
       expect(find.text('Catatan saja — stok sparepart tidak dikelola di aplikasi.'), findsOneWidget);
+      expect(find.text('Maksimal 25 foto per laporan.'), findsOneWidget);
+      expect(find.byKey(const Key('service-type-las')), findsNothing, reason: 'inactive types are not offered');
       await tester.enterText(find.byKey(const Key('service-hm')), '1020');
       await tester.pump();
       expect(find.textContaining('Lebih kecil dari HM terakhir unit (1.023)'), findsOneWidget);
@@ -333,6 +344,7 @@ void main() {
       await tester.enterText(find.byKey(const Key('part-name-0')), 'Seal kit boom');
       await tester.enterText(find.byKey(const Key('part-qty-0')), '1');
       await tester.enterText(find.byKey(const Key('part-uom-0')), 'set');
+      expect(find.byKey(const Key('part-partno-0')), findsNothing, reason: 'no "No. part" on the service report');
       await tester.ensureVisible(find.byKey(const Key('unit-status-menunggu_part')));
       await tester.tap(find.byKey(const Key('unit-status-menunggu_part')));
       await tester.pump();
@@ -349,10 +361,9 @@ void main() {
       expect(online, isTrue);
       final c = d.service;
       expect((d.projectId, d.companyId, d.reportDate), (41, 3, today));
-      expect(
-        (c.unitId, c.hourMeter, c.serviceType, c.unitStatusAfter),
-        (9, 1025.0, ServiceType.perbaikan, UnitStatus.menungguPart),
-      );
+      expect((c.unitId, c.hourMeter, c.unitStatusAfter), (9, 1025.0, UnitStatus.menungguPart));
+      expect(c.serviceTypeIds, [7]);
+      expect(c.serviceTypeNames, {7: 'Perbaikan'});
       expect(c.filledParts.single.summary, 'Seal kit boom 1 set');
       expect(c.beforePhotos, ['ph-1']);
       expect(service.autosaved, isNotEmpty, reason: 'draft autosaved while typing');
@@ -364,7 +375,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(service.submitted, isEmpty);
       expect(find.text('Pilih unit.'), findsOneWidget);
-      expect(find.text('Pilih jenis servis.'), findsOneWidget);
+      expect(find.text('Pilih minimal satu jenis servis.'), findsOneWidget);
       expect(find.text('Pilih status unit setelah servis.'), findsOneWidget);
     });
 
@@ -379,6 +390,127 @@ void main() {
       await tester.tap(find.byKey(const Key('unit-option-11')));
       await tester.pumpAndSettle();
       expect(find.text('DZ-01 · Dozer'), findsOneWidget);
+    });
+  });
+
+  group('Laporan Servis Unit — jenis servis per PT, no part no., 25 photos (owner 2026-10-17)', () {
+    FieldDraft draft(ServiceContent c) => FieldDraft(
+      clientUuid: 'sv-local',
+      type: FieldReportType.serviceReport,
+      companyId: 3,
+      projectId: 41,
+      projectLabel: 'K-001 — Sewa Kalteng Coal',
+      reportDate: today,
+      content: c,
+    );
+
+    testWidgets('several types; a chosen type deactivated later stays "(nonaktif)"; loaded part no. kept', (
+      tester,
+    ) async {
+      final d = draft(
+        const ServiceContent(
+          unitId: 9,
+          unitLabel: 'EX-01',
+          hourMeter: 1025,
+          serviceTypeIds: [9],
+          serviceTypeNames: {9: 'Las'},
+          action: 'Las bucket',
+          unitStatusAfter: UnitStatus.siap,
+          spareparts: [PartLine(name: 'Kawat las', partNo: 'KL-26', qty: 1, uom: 'kg')],
+        ),
+      );
+      await pump(tester, ServiceReportScreen(initial: d));
+      expect(find.text('Las (nonaktif)'), findsOneWidget);
+      expect(find.text('Boleh pilih lebih dari satu.'), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('service-type-perbaikan')));
+      await tester.tap(find.byKey(const Key('service-type-perbaikan')));
+      await tester.tap(find.byKey(const Key('service-type-inspeksi')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('service-type-inspeksi'))); // toggled off again
+      await tester.pump();
+      expect(find.byKey(const Key('part-partno-0')), findsNothing);
+      await tester.ensureVisible(find.byKey(const Key('part-qty-0')));
+      await tester.enterText(find.byKey(const Key('part-qty-0')), '2');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('service-submit')));
+      await tester.pumpAndSettle();
+      final c = service.submitted.single.$1.service;
+      expect(c.serviceTypeIds, [9, 7]);
+      expect(c.serviceTypeNames, {9: 'Las', 7: 'Perbaikan'});
+      expect((c.spareparts.single.qty, c.spareparts.single.partNo), (2.0, 'KL-26'));
+    });
+
+    testWidgets('all types toggled off → "Pilih minimal satu jenis servis."', (tester) async {
+      final d = draft(
+        const ServiceContent(
+          unitId: 9,
+          hourMeter: 1025,
+          serviceTypeIds: [7],
+          action: 'Ganti seal',
+          unitStatusAfter: UnitStatus.siap,
+        ),
+      );
+      await pump(tester, ServiceReportScreen(initial: d));
+      await tester.ensureVisible(find.byKey(const Key('service-type-perbaikan')));
+      await tester.tap(find.byKey(const Key('service-type-perbaikan')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('service-submit')));
+      await tester.pumpAndSettle();
+      expect(service.submitted, isEmpty);
+      expect(find.text('Pilih minimal satu jenis servis.'), findsOneWidget);
+    });
+
+    testWidgets('draft of an APK < 0.8.0: legacy code → the PT type of that code; unknown code kept as legacy', (
+      tester,
+    ) async {
+      // content_json as the old APK stored it: the single enum code under `serviceType`
+      final old = ServiceContent.fromJson({
+        'unitId': 9,
+        'hourMeter': 1025,
+        'serviceType': 'perbaikan',
+        'action': 'Ganti seal',
+        'unitStatusAfter': 'siap',
+      });
+      await pump(tester, ServiceReportScreen(initial: draft(old)));
+      await tester.tap(find.byKey(const Key('service-submit')));
+      await tester.pumpAndSettle();
+      final mapped = service.submitted.single.$1.service;
+      expect(mapped.serviceTypeIds, [7]);
+      expect(mapped.legacyServiceType, isNull);
+    });
+
+    testWidgets('unknown legacy code stays chosen (sent as the legacy code)', (tester) async {
+      final d = draft(
+        const ServiceContent(
+          unitId: 9,
+          hourMeter: 1025,
+          legacyServiceType: 'pemasangan',
+          action: 'Pasang GPS',
+          unitStatusAfter: UnitStatus.siap,
+        ),
+      );
+      await pump(tester, ServiceReportScreen(initial: d));
+      expect(find.byKey(const Key('service-type-pemasangan')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('service-submit')));
+      await tester.pumpAndSettle();
+      final c = service.submitted.single.$1.service;
+      expect(c.serviceTypeIds, isEmpty);
+      expect(c.legacyServiceType, 'pemasangan');
+    });
+
+    testWidgets('aftersales items keep the "No. part" input', (tester) async {
+      await pump(
+        tester,
+        Scaffold(
+          body: PartLinesEditor(
+            lines: const [PartLine(name: 'Filter', partNo: 'F-1', qty: 4, uom: 'pcs')],
+            onChanged: (_) {},
+            nameHeader: 'Item',
+            addLabel: 'Tambah',
+          ),
+        ),
+      );
+      expect(find.byKey(const Key('part-partno-0')), findsOneWidget);
     });
   });
 

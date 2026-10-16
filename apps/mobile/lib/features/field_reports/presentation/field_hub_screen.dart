@@ -179,15 +179,20 @@ class _HistoryTab extends ConsumerWidget {
   }
 }
 
-class _LocalCard extends StatelessWidget {
+class _LocalCard extends ConsumerWidget {
   const _LocalCard({required this.draft});
   final FieldDraft draft;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final d = draft;
+    // service report: the names of its service types from the cache
+    final names = d.type == FieldReportType.serviceReport
+        ? (ref.watch(fieldServiceTypeNamesProvider).value ?? const <int, String>{})
+        : const <int, String>{};
+    final summary = d.summaryWith(names);
     final decide =
         d.conflictCopy != null && (d.syncState == FieldSyncState.conflict || d.syncState == FieldSyncState.rejected);
     return Card(
@@ -210,7 +215,7 @@ class _LocalCard extends StatelessWidget {
                 [fieldDateLabel(d.reportDate), d.projectLabel].where((e) => e.isNotEmpty).join(' · '),
                 style: theme.textTheme.bodySmall,
               ),
-              if (d.summary.isNotEmpty) Text(d.summary, style: theme.textTheme.titleSmall),
+              if (summary.isNotEmpty) Text(summary, style: theme.textTheme.titleSmall),
               if (d.isEdit) Text(t.fieldEditTag(d.docNo ?? '#${d.serverId}'), style: theme.textTheme.bodySmall),
               if (d.lastError != null)
                 Padding(

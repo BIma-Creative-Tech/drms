@@ -54,7 +54,7 @@ void main() {
       raw.execute("INSERT INTO kv_entries VALUES ('masters:$sub:3', '{}')");
     });
     addTearDown(db.close);
-    expect(db.schemaVersion, 10); // v5 field tables; v6 (P3) + v7 (D3) + v8 (D4) + v9 (sites) + v10 (vendor) on top
+    expect(db.schemaVersion, 11); // v5 field tables; v6 (P3) + v7 (D3) + v8 (D4) + v9 (sites) + v10 (vendor) + v11 (service types) on top
     final draft = (await (db.select(db.localDrafts)..where((t) => t.clientUuid.equals('d-5'))).getSingle());
     expect((draft.title, draft.urgencyLevelId, draft.companyId), ('BBM genset', 2, 3));
     expect((await OutboxRepository(db).all(sub)).single.opUuid, 'op-1');
@@ -175,7 +175,7 @@ void main() {
           unitId: 9,
           unitLabel: 'EX-01',
           hourMeter: 1025,
-          serviceType: ServiceType.perbaikan,
+          serviceTypeIds: const [7],
           action: 'Ganti seal kit boom',
           unitStatusAfter: UnitStatus.menungguPart,
           spareparts: const [PartLine(name: 'Seal kit boom', qty: 1, uom: 'set')],
@@ -230,6 +230,8 @@ void main() {
         expect(p['report_client_uuid'], d.clientUuid);
         expect(p['photo_media_ids'], [901, 902]);
         expect(p['unit_status_after'], 'menunggu_part');
+        expect(p['service_type_ids'], [7]);
+        expect(p.containsKey('service_type'), isFalse);
         expect(await repo.load(sub, d.clientUuid), isNull);
         expect(await drafts.media(d.service.photoUuids.first), isNull, reason: 'photos are on the server now');
         final unit = (await repo.units(sub)).single;
@@ -526,10 +528,35 @@ void main() {
             },
           );
         });
+        String? includeInactive;
+        server.on('GET', '/api/v1/service-types', (req, body) {
+          includeInactive = req.uri.queryParameters['includeInactive'];
+          return (
+            200,
+            {
+              'items': [
+                {'id': 7, 'companyId': 3, 'code': 'perbaikan', 'name': 'Perbaikan', 'active': true},
+                {'id': 8, 'companyId': 3, 'code': 'inspeksi', 'name': 'Inspeksi', 'active': true, 'sortOrder': 0},
+                {'id': 9, 'companyId': 3, 'code': 'las', 'name': 'Las', 'active': false},
+                {'id': 20, 'companyId': 4, 'code': 'perbaikan', 'name': 'Perbaikan PT lain', 'active': true},
+              ],
+            },
+          );
+        });
+        // a type cached earlier that the server no longer returns is dropped
+        await repo.putServiceTypes(sub, const [ServiceType(id: 5, companyId: 3, code: 'lama', name: 'Lama')]);
         // a customer cached earlier that the master no longer lists (deactivated) is dropped
         await repo.putClients(sub, const [FieldClient(id: 9, companyId: 3, name: 'CV Nonaktif')]);
         expect(await service.refreshCaches(sub, projects, today: today, membershipIds: [3]), isTrue);
         expect(masterTypes, contains('clients'));
+        expect(includeInactive, '1');
+        final types = await repo.serviceTypes(sub, companyId: 3);
+        expect(types.map((t) => (t.id, t.name, t.active)), [
+          (8, 'Inspeksi', true),
+          (9, 'Las', false),
+          (7, 'Perbaikan', true),
+        ]);
+        expect((await repo.serviceTypes(sub)).map((t) => t.id), containsAll([7, 8, 9, 20]));
         expect(since, isNull);
         await service.refreshCaches(sub, projects, today: today, membershipIds: [3]);
         expect(since, '2026-10-09T06:00:00Z', reason: 'second pull is a delta');
@@ -552,6 +579,50 @@ void main() {
       },
     );
 
+    test('service report queued by an APK < 0.8.0 (legacy code): sent as the PT type id once cached', () async {
+      answerBatch('applied');
+      // the old APK queued `service_type` (single enum code) and no `service_type_ids`
+      Future<String> queueLegacy(String uuid) => outbox.enqueueReport(
+        type: SyncItemType.serviceReportUpsert,
+        sub: sub,
+        reportUuid: uuid,
+        payload: {
+          'report_client_uuid': uuid,
+          'project_id': 41,
+          'unit_id': 9,
+          'report_date': today,
+          'service_type': 'perbaikan',
+          'action': 'Ganti seal',
+          'unit_status_after': 'siap',
+        },
+        photoUuids: const [],
+        deviceTime: '2026-10-09T08:00:00+08:00',
+        elapsedMs: 1,
+        bootId: 'b',
+        offline: true,
+        companyId: 3,
+      );
+      Map<String, dynamic> sent() =>
+          (((batches.last['items'] as List).single as Map)['payload'] as Map).cast<String, dynamic>();
+
+      // no cache yet → the legacy code goes out unchanged (the server still accepts it)
+      await queueLegacy('legacy-1');
+      expect((await engine.run(sub)).outcome, SyncRunOutcome.done);
+      expect(sent()['service_type'], 'perbaikan');
+      expect(sent().containsKey('service_type_ids'), isFalse);
+
+      // cached: the type of the item's PT with the same code (never another PT's)
+      await repo.putServiceTypes(sub, const [
+        ServiceType(id: 20, companyId: 4, code: 'perbaikan', name: 'Perbaikan PT lain'),
+        ServiceType(id: 7, companyId: 3, code: 'perbaikan', name: 'Perbaikan'),
+      ]);
+      await queueLegacy('legacy-2');
+      await engine.run(sub);
+      expect(sent()['service_type_ids'], [7]);
+      expect(sent().containsKey('service_type'), isFalse);
+      expect(sent()['action'], 'Ganti seal');
+    });
+
     test('offline refresh returns false and keeps the caches', () async {
       await repo.putClients(sub, [const FieldClient(id: 4, companyId: 3, name: 'CV Maju Jaya')]);
       await server.close();
@@ -564,6 +635,26 @@ void main() {
       expect((await repo.clients(sub)).single.name, 'CV Maju Jaya');
       server = await MockServer.start(); // tearDown closes it
     });
+  });
+
+  test('database v10 → v11: service types cache created; a report of the old APK keeps its legacy code', () async {
+    const ts = 1790000000;
+    final db = oldPhoneDb(10, (raw) {
+      raw.execute(
+        'INSERT INTO local_field_reports (client_uuid, user_sub, company_id, report_type, project_id, report_date, '
+        "content_json, sync_state, created_at, updated_at) VALUES ('sv-old', '$sub', 3, 'service_report', 41, "
+        "'$today', '{\"unitId\":9,\"serviceType\":\"perbaikan\",\"action\":\"Ganti seal\"}', 'queued', $ts, $ts)",
+      );
+    });
+    addTearDown(db.close);
+    expect(db.schemaVersion, 11);
+    final repo = FieldRepository(db);
+    final old = (await repo.load(sub, 'sv-old'))!;
+    expect(old.service.serviceTypeIds, isEmpty);
+    expect(old.service.legacyServiceType, 'perbaikan');
+    await repo.putServiceTypes(sub, const [ServiceType(id: 7, companyId: 3, code: 'perbaikan', name: 'Perbaikan')]);
+    expect((await repo.serviceTypes(sub, companyId: 3)).single.name, 'Perbaikan');
+    expect(await repo.serviceTypes(sub, companyId: 4), isEmpty);
   });
 
   test('rejected create can be fixed and sent again (new op, same report uuid in the payload)', () async {
