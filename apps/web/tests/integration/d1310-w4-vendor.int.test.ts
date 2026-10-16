@@ -11,8 +11,9 @@ import { api, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, ty
 
 /**
  * DRMS 13/10 Wave 4a (ADR 0027) "Pembayaran vendor" through the real API + DB guards:
- * - vendor accounts (`vendor-bank-accounts`): PT from the vendor, Staff cannot read, masters type for the APK;
- * - who files: Finance and PM only (Staff 403); Pemohon = the filer; type forced to Pengajuan Baru;
+ * - vendor accounts (`vendor-bank-accounts`): PT from the vendor, Staff / PM read (picker), masters type for the APK;
+ * - who files: Finance and PM (owner 2026-10-16: Staff too — d1610-vendor-staff.int.test.ts; Admin 403); Pemohon = the
+ *   filer; type forced to Pengajuan Baru;
  * - approval through the generic engine: Finance → seeded rule "Pembayaran vendor oleh Finance — Direktur lalu Owner"
  *   (ADR 0026: Direktur, then the Owner level);
  *   PM → the project's PM → Direktur rule with the PM step skipped (G1-2);
@@ -102,13 +103,14 @@ async function vendorBody(user: FlowUser, over: Record<string, unknown> = {}) {
 }
 
 describe('vendor accounts', () => {
-  it('PT derived from the vendor; Staff cannot read them (collection + masters); PM reads them for the picker', async () => {
+  it('PT derived from the vendor; Staff (owner 2026-10-16) and PM read them for the picker (collection + masters)', async () => {
     const row = (await sqlAs('app', 'SELECT company_id, label FROM vendor_bank_accounts WHERE id = $1', [accVerified])).rows[0]
     expect(row.company_id).toBe(pt)
     expect(row.label).toMatch(/^CV Contoh Material ••\d{4}$/)
-    expect((await api('GET', '/api/vendor-bank-accounts', w.users.staffA)).status).toBe(403)
+    const staffRest = await ok(api('GET', `/api/vendor-bank-accounts?depth=0&where[id][in]=${accVerified},${accUnverified},${accOther}`, w.users.staffA))
+    expect(staffRest.docs.map((d: { id: number }) => d.id)).toEqual(expect.arrayContaining([accVerified, accUnverified, accOther]))
     const staffMasters = await ok(api('GET', '/api/v1/masters?types=vendor-bank-accounts', w.users.staffA))
-    expect(staffMasters.types['vendor-bank-accounts'].items).toEqual([])
+    expect(staffMasters.types['vendor-bank-accounts'].items.map((i: { id: number }) => i.id)).toEqual(expect.arrayContaining([accVerified, accUnverified, accOther]))
     const pmMasters = await ok(api('GET', '/api/v1/masters?types=vendor-bank-accounts', pmV))
     expect(pmMasters.types['vendor-bank-accounts'].items.map((i: { id: number }) => i.id)).toEqual(expect.arrayContaining([accVerified, accUnverified, accOther]))
     // DB: no delete, digits only
@@ -118,9 +120,10 @@ describe('vendor accounts', () => {
 })
 
 describe('who may file a vendor payment (D3)', () => {
-  it('Staff → 403; Finance → Draft of type advance, Pemohon = the filer, no employee account', async () => {
-    const staff = await api('POST', E, w.users.staffA, { ...(await vendorBody(w.users.staffA)), projectId: w.project }, key())
-    expect(staff.status, JSON.stringify(staff.body)).toBe(403)
+  it('Admin → 403 (Staff may since 2026-10-16); Finance → Draft of type advance, Pemohon = the filer, no employee account', async () => {
+    const admin = await api('POST', E, w.users.admin, { ...(await vendorBody(w.users.admin)), projectId: w.project }, key())
+    expect(admin.status, JSON.stringify(admin.body)).toBe(403)
+    expect(admin.body.title).toBe('Pembayaran vendor hanya dapat diajukan oleh Staff, Finance atau PM di PT ini.')
     const d = await ok(api('POST', E, financeV, await vendorBody(financeV, { type: 'reimburse' }), key()), 201)
     expect(d).toMatchObject({ status: 'draft', type: 'advance', payeeType: 'vendor', typeLabel: 'Pembayaran vendor', bankAccountId: null, vendorBankAccountId: accVerified })
     expect(d.vendor).toMatchObject({ id: vendor, name: 'CV Contoh Material' })

@@ -31,7 +31,7 @@ export const RequestTypeField: SelectFieldClientComponent = (props) => {
 /**
  * DRMS 16/10 "+ Buat" › "Pembayaran vendor": `?penerima=vendor` (or `pt_grup`) on the CREATE form presets "Jenis
  * penerima" once, exactly like the user picking it (form state refresh included) — only when that option is offered to
- * the caller (filterOptions: Finance / PM for vendor, ADR 0027); the server re-checks on save (drafts.ts). The user can
+ * the caller (filterOptions: Staff / Finance / PM for vendor, ADR 0027); the server re-checks on save (drafts.ts). The user can
  * switch back; an existing request is never touched.
  */
 function usePayeePreset(path: string) {

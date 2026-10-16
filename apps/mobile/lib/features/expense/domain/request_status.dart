@@ -11,7 +11,7 @@ enum RequestType {
 }
 
 /// ADR 0027 (DRMS 13/10 Wave 4) "Jenis penerima": `karyawan` (default, the requester's account) or `vendor` =
-/// "Pembayaran vendor" (Finance / PM only: vendor + vendor account + invoice, always Pengajuan Baru, no LPJ).
+/// "Pembayaran vendor" (Staff / Finance / PM: vendor + vendor account + invoice, always Pengajuan Baru, no LPJ).
 /// ADR 0028 (DRMS 13/10 Phase B): `pt_grup` = "Pembayaran antar-PT" (Finance / PM / Direktur of the paying PT: another
 /// PT of the group, paid to its designated receiving account + the receiving PT's document; always Pengajuan Baru, no
 /// LPJ; the transfer also posts a Kas Masuk in the receiving PT).

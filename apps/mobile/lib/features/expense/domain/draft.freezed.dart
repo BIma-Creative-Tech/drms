@@ -624,7 +624,7 @@ mixin _$DraftRequest {
  int? get projectId;/// D2: no longer chosen by the requester (Finance sets the cost center at transfer). Kept only for drafts
 /// written before D2; never sent to the server any more.
  int? get costCenterId; String? get neededDate;/// Owner decision 2026-10-09: "Tingkat urgensi" (`urgency-levels` master of the draft's PT).
- int? get urgencyLevelId; String? get notes; List<int> get requesterIds; int? get bankAccountId;/// ADR 0027 "Jenis penerima": vendor = "Pembayaran vendor" (Finance / PM only; type is always Pengajuan Baru,
+ int? get urgencyLevelId; String? get notes; List<int> get requesterIds; int? get bankAccountId;/// ADR 0027 "Jenis penerima": vendor = "Pembayaran vendor" (Staff / Finance / PM; type is always Pengajuan Baru,
 /// no employee account, no LPJ). ADR 0028: ptGrup = "Pembayaran antar-PT" (Finance / PM / Direktur; same shape,
 /// the receiving PT instead of vendor + account). Stored in `local_drafts.vendor_json` (schema v10, the payee JSON).
  PayeeType get payeeType; int? get vendorId; int? get vendorBankAccountId;/// ADR 0028: the receiving PT (`payeeCompanyId`, payee directory / masters `intercompany-payees`).
@@ -880,7 +880,7 @@ class _DraftRequest extends DraftRequest {
 }
 
 @override final  int? bankAccountId;
-/// ADR 0027 "Jenis penerima": vendor = "Pembayaran vendor" (Finance / PM only; type is always Pengajuan Baru,
+/// ADR 0027 "Jenis penerima": vendor = "Pembayaran vendor" (Staff / Finance / PM; type is always Pengajuan Baru,
 /// no employee account, no LPJ). ADR 0028: ptGrup = "Pembayaran antar-PT" (Finance / PM / Direktur; same shape,
 /// the receiving PT instead of vendor + account). Stored in `local_drafts.vendor_json` (schema v10, the payee JSON).
 @override@JsonKey() final  PayeeType payeeType;

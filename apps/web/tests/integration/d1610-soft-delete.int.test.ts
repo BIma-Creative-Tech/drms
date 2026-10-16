@@ -77,7 +77,10 @@ describe('master: Hapus of an unused row, hidden everywhere, Pulihkan', () => {
     // PM reads vendors but may not update them
     const pm = await check(w.users.pm, 'vendors', vendor)
     expect(pm.body).toMatchObject({ action: null, canDelete: false })
-    expect((await check(w.users.staffA, 'vendors', vendor)).status).toBe(404) // Staff cannot read vendors
+    // owner 2026-10-16: Staff read vendors (vendor-payment picker) — read only, like the PM
+    const staff = await check(w.users.staffA, 'vendors', vendor)
+    expect(staff.status, JSON.stringify(staff.body)).toBe(200)
+    expect(staff.body).toMatchObject({ action: null, canDelete: false })
     expect((await check(w.users.admin, 'cash-entries', 1)).status).toBe(404) // not a soft-delete collection
   })
 

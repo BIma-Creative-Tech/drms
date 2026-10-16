@@ -314,7 +314,9 @@ buat/ubah aturan sementara dengan level 1 = Direktur pengganti (user bernama), l
 - Setiap PT mendapat aturan **"Pembayaran vendor oleh Finance — Direktur lalu Owner"** (Jenis penerima *Vendor*, Peran
   pemohon *Finance*, Diketahui *Tidak dipakai*, level 1 *Direktur*, level 2 *Owner*, prioritas 20). Pembayaran vendor oleh
   PM memakai aturan default PT (PM project → Direktur → Owner; langkah PM dilewati karena ia PM project-nya).
-- Pembayaran vendor hanya bisa diajukan Finance atau PM. Admin / Direktur / Staff tidak.
+- Pembayaran vendor bisa diajukan Finance, PM dan — sejak permintaan owner 16 Okt 2026 — **Staff** (alur Staff biasa:
+  aturan default PT, PM project → Direktur → Owner). Admin / Direktur / Owner tidak. Staff hanya **melihat** vendor dan
+  rekening vendor PT-nya (untuk memilih); membuat / mengubahnya tetap Admin / Finance.
 - Menonaktifkan aturan vendor (dengan alasan) → pembayaran vendor oleh Finance mengikuti aturan default.
 
 ### 4c. Pembayaran antar-PT (DRMS 13/10 Phase B, ADR 0028)

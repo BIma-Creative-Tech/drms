@@ -102,12 +102,13 @@ describe('ADR 0028 state machine: the transfer completes a PT grup payment, no L
 })
 
 describe('ADR 0028 filer roles (owner decision 2026-10-14)', () => {
-  it('PT grup: Finance, PM and Direktur — never Staff, Admin or Owner (pk-principal) alone; vendor stays Finance + PM', () => {
+  it('PT grup: Finance, PM and Direktur — never Staff, Admin or Owner (pk-principal) alone; vendor: Finance + PM + Staff (2026-10-16)', () => {
     expect([...INTERCOMPANY_PAYMENT_ROLES].sort()).toEqual(['pk-finance', 'pk-owner', 'pk-pm'])
     for (const r of ['pk-staff', 'pk-admin', 'pk-principal', 'pk-operator'] as const) expect(INTERCOMPANY_PAYMENT_ROLES).not.toContain(r)
     expect(payeeFilerRoles('pt_grup')).toBe(INTERCOMPANY_PAYMENT_ROLES)
     expect(payeeFilerRoles('vendor')).toBe(VENDOR_PAYMENT_ROLES)
-    expect([...VENDOR_PAYMENT_ROLES].sort()).toEqual(['pk-finance', 'pk-pm'])
+    // owner request 2026-10-16 ("untuk pengajuan vendor dibukakan di level staff"): Staff file vendor payments too
+    expect([...VENDOR_PAYMENT_ROLES].sort()).toEqual(['pk-finance', 'pk-pm', 'pk-staff'])
   })
 })
 

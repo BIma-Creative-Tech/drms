@@ -2,7 +2,8 @@
 
 - **Status:** Accepted — implemented on `feat/d1310-w4-vendor` (DRMS 13/10 Wave 4a). Decisions D3 approved by the
   owner; the open points were answered by the client on 2026-10-14 (see "Client answers"). Staging first; no
-  production deploy without separate owner approval.
+  production deploy without separate owner approval. **Amended 2026-10-16:** Staff may file vendor payments too (section
+  "Amendment 2026-10-16").
 - **Date:** 2026-10-14
 - **Author:** nextjs developer (branch `feat/d1310-w4-vendor`, from `feat/d1310-w3-dash`)
 - **Related:** ADR 0005 (cash ledger), ADR 0006 (audit), ADR 0007 (numbering), ADR 0008 (PDF), ADR 0010 (APK offline),
@@ -110,6 +111,36 @@ payments therefore stay on the generic rule engine, nothing names a step.
 4. Partial / term payments of one invoice: **no** — one invoice = one request (duplicate rule unchanged).
 5. Amount band on the Finance vendor rule: **no**. The upcoming Owner level is a separate change (after PR #62) on the
    generic rule engine.
+
+## Amendment 2026-10-16 — Staff may file vendor payments
+
+Owner request 2026-10-16: *"untuk pengajuan vendor dibukakan di level staff"*. Decision 3 and client answer 3 are
+widened; everything else of this ADR is unchanged.
+
+1. **Who may file** — Staff (`pk-staff`), Finance or PM **in the request's PT** (`VENDOR_PAYMENT_ROLES` =
+   `['pk-finance', 'pk-pm', 'pk-staff']`; 403 "Pembayaran vendor hanya dapat diajukan oleh Staff, Finance atau PM di PT
+   ini."). Admin, Direktur and an Owner (`pk-principal`) without one of these roles still cannot. "PT grup" (ADR 0028,
+   `INTERCOMPANY_PAYMENT_ROLES`) is **unchanged** (Finance / PM / Direktur). The existing Staff rules apply as for any
+   Staff request: Pemohon = the Staff himself (QA-15 + the filer rule), only projects / cost centers the Staff is
+   assigned to (G10), vendor and account of the request's PT.
+2. **Approval** — no new rule and **no migration**: a Staff vendor payment takes the **normal Staff flow**, the PT's
+   default rule ("Default — PM project lalu Direktur"): **PM project** ("Diketahui" = Persetujuan PM; on a cost center
+   without project: its manager) → **Direktur** → **Owner** → Finance transfer → Selesai (no LPJ). The seeded rule
+   "Pembayaran vendor oleh Finance — Direktur lalu Owner" keeps "Peran pemohon = Finance" and therefore does not match a
+   Staff requester (a Staff who also holds Finance in the PT is a Finance requester, as before). Rules an Admin added with
+   "Jenis penerima = Vendor" and no "Peran pemohon" apply to Staff vendor payments too — check them before the rollout.
+3. **Read access** — Staff READ `vendors` and `vendor-bank-accounts` of the PTs they are mapped to (collection access,
+   so also REST, the masters types `vendors` / `vendor-bank-accounts` of the APK and the bank preview of the form), never
+   of another PT; **no** create / update (Admin / Finance as before; the vendor page `/admin/vendor/<id>` opens read-only).
+   The Staff panel still hides the Master Data lists (`STAFF_VISIBLE_COLLECTIONS` unchanged); the pickers of the request
+   form work through the relationship drawer. Vendor account numbers are business data shown in full to their readers
+   (like the PM since this ADR); the snapshot at submit is unchanged.
+4. **Visible** — web: "Jenis penerima" offers *Vendor* to a Staff of the form's PT (the "+ Buat" menu stays without a
+   Staff button: Staff use **+ Buat pengajuan**); APK: the editor offers *Vendor* to Staff (`mayFileVendorPayment`).
+   A Staff sees the amounts of his own request (owner decision, unchanged). OpenAPI descriptions updated
+   (no contract shape change).
+5. **Rollback** — `git revert` (code only); Staff vendor payments already filed stay valid and continue through their
+   snapshot.
 
 ## Rollout
 

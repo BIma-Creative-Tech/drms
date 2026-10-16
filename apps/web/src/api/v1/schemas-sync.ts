@@ -103,8 +103,8 @@ export const SyncDraftUpsertPayload = z
     notes: z.string().max(2000).nullable().optional(),
     requester_ids: z.array(id).max(20).optional(),
     bank_account_id: id.nullable().optional(),
-    // ADR 0027 "Pembayaran vendor" (Finance / PM only; kind is set to advance by the server)
-    payee_type: z.enum(['karyawan', 'vendor', 'pt_grup']).optional().meta({ description: 'ADR 0027: default karyawan. vendor = vendor payment (Finance / PM only): vendor + vendor account + invoice, no employee account, no LPJ. ADR 0028: pt_grup = payment to another PT of the group (Finance / PM / Direktur): payee_company_id + the receiving PT\'s document (invoice_*), no LPJ. Omitted on an existing draft = the stored payee type stays (older apps never reset a pt_grup draft).' }),
+    // ADR 0027 "Pembayaran vendor" (Staff / Finance / PM; kind is set to advance by the server)
+    payee_type: z.enum(['karyawan', 'vendor', 'pt_grup']).optional().meta({ description: 'ADR 0027: default karyawan. vendor = vendor payment (Staff / Finance / PM; Staff since 2026-10-16): vendor + vendor account + invoice, no employee account, no LPJ. ADR 0028: pt_grup = payment to another PT of the group (Finance / PM / Direktur): payee_company_id + the receiving PT\'s document (invoice_*), no LPJ. Omitted on an existing draft = the stored payee type stays (older apps never reset a pt_grup draft).' }),
     payee_company_id: id.nullable().optional().meta({ description: 'ADR 0028: receiving PT of a pt_grup draft (masters type intercompany-payees / GET /intercompany/payees). Omitted = unchanged.' }),
     vendor_id: id.nullable().optional(),
     vendor_bank_account_id: id.nullable().optional().meta({ description: 'ADR 0027: an active account of vendor_id (masters type vendor-bank-accounts).' }),
