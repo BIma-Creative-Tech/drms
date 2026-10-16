@@ -88,6 +88,7 @@ import * as migration_20261015_210000_d1510_approval_inflight_trim from './20261
 import * as migration_20261016_100000_d1610_partner_contacts from './20261016_100000_d1610_partner_contacts';
 import * as migration_20261016_200000_d1610_soft_delete_enums from './20261016_200000_d1610_soft_delete_enums';
 import * as migration_20261016_200100_d1610_soft_delete from './20261016_200100_d1610_soft_delete';
+import * as migration_20261016_220000_d1610_wakil_pm_direktur from './20261016_220000_d1610_wakil_pm_direktur';
 
 export const migrations = [
   {
@@ -539,5 +540,10 @@ export const migrations = [
     up: migration_20261016_200100_d1610_soft_delete.up,
     down: migration_20261016_200100_d1610_soft_delete.down,
     name: '20261016_200100_d1610_soft_delete',
+  },
+  {
+    up: migration_20261016_220000_d1610_wakil_pm_direktur.up,
+    down: migration_20261016_220000_d1610_wakil_pm_direktur.down,
+    name: '20261016_220000_d1610_wakil_pm_direktur',
   },
 ];

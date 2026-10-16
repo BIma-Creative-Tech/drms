@@ -7,7 +7,7 @@ import { notificationTemplate, pushEnabled } from '@/domain/notifications'
 import { formatRupiah } from '@/lib/money'
 import { requestMeta } from '@/lib/request-meta'
 
-import { isDirekturStep, signDecision, signerColumns, type DecisionSigner } from '@/domain/direktur-signature'
+import { decidesAsDirektur, holdsPositionAs, isDirekturStep, signDecision, signerColumns, type DecisionSigner } from '@/domain/direktur-signature'
 
 import { actorContext, fail, ids, loadRaw, loadVisible, requireActionAudited, selfApprovalAllowed, type RequestDoc } from './common'
 import { DIREKTUR_VIA_PM_SELF, isDecisionRole, isNoApproval, isSelfApproval, lacksDecisionRole, noApprovalNote } from './decision'
@@ -85,13 +85,23 @@ async function ctxOf(req: PayloadRequest, raw: RequestDoc, s: SettlementDoc, row
       { status, approvalSnapshot: snap, g1Exception: raw.g1Exception },
       { isCreator: relId(raw.createdBy) === uid, isRequester: await isRequesterOf(req, raw, uid), isAcknowledger, matchesCurrentStep },
     )
+  // owner 2026-10-16: a personal decision and one as the PT's definitive Direktur are separate positions (holdsPositionAs)
+  const decidedBefore = decisions.some((r) => relId(r.actor) === uid)
+  const asDirektur =
+    decidedBefore &&
+    (await decidesAsDirektur(req, {
+      companyId: company,
+      callerId: uid,
+      snapshot: snap,
+      pos: matchesCurrentStep ? { position: 'approval', level: s.shortfallApprovalLevel ?? 1 } : isAcknowledger ? { position: 'diketahui', level: 0 } : null,
+    }))
   return {
     roles,
     status,
     selfInvolved: involved.has(uid) && !exempt,
     isAcknowledger,
     matchesCurrentStep,
-    alreadyDecided: decisions.some((r) => relId(r.actor) === uid),
+    alreadyDecided: decidedBefore && holdsPositionAs(decisions, uid, asDirektur),
     // ADR 0021: the PM project decides only as the snapshot's acknowledger.
     lacksDecisionRole: lacksDecisionRole(snap, roles) && !isAcknowledger,
   }
