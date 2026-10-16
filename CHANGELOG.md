@@ -6,8 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-10-16
+
+**Fix: "Pengguna baru" could not be saved for a new account; a definitive Direktur's representative who is also the
+project PM may now decide both steps.** PRs #91, #92, #94. Production goes 0.13.0 → 0.13.1. Web / server only: **no APK
+release**, no API contract change.
+
+**Database migration** (one; additive, the 0.13.0 image keeps working): `20261016_220000_d1610_wakil_pm_direktur` (#94:
+re-creates `approvals_one_position_per_person` and `approvals_settlement_one_position_per_person` with
+`coalesce(signature_source = 'company', false)` in the key).
+
+**Deploy checklist:** staging first, then prod.
+1. Take a dump (+ `.env.pre-0.13.1`) right before the migration.
+2. Deploy (migrate → web + worker), then check: the migrate log; `/api/v1/health`; `\d approvals` shows both
+   indexes with the signature-kind column; create a new user from **Pengguna → +
+   Buat** (the temporary password is shown once). Prod: PB/DRMS/2610/0006 (Direktur L1) now offers "Setujui" to the
+   representative, signed as the definitive Direktur.
+3. Rollback: the 0.13.0 image **without** `migrate:down` (the weaker index is harmless for 0.13.0; down is refused once a
+   representative held both positions in one cycle); otherwise restore the dump + the 0.13.0 image.
+
+### Fixed
+- **Temporary password of a new account meets the realm password policy (#91, #92).** The generated password had upper /
+  lower case letters and digits only; the `drms` realm also requires `specialChars(1)`, so Keycloak refused every new
+  account (`invalidPasswordMinSpecialCharsMessage`) and the form showed "Sistem login (Keycloak) menolak atau tidak dapat
+  dihubungi". It now always contains one of `!@#$%*?-+=`. A password-policy refusal names the policy key in the 502
+  detail (code stays `KEYCLOAK_FAILED`). Existing accounts are not affected.
+
 ### Changed
-- **Wakil Direktur definitif juga PM (owner 2026-10-16, amends ADR 0025).** A designated representative who decided the
+- **Wakil Direktur definitif juga PM (#94, owner 2026-10-16, amends ADR 0025).** A designated representative who decided the
   PM step of a request (or LPJ shortfall) with their own signature may now also decide its Direktur step, signed as the
   PT's definitive Direktur. G1 "one decision position per person per cycle" counts personal and definitive-Direktur
   decisions separately; two positions under the same identity, and any decision by the requester/creator, stay refused.
