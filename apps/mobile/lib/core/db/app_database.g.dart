@@ -11864,6 +11864,453 @@ class FieldResourceTypesCompanion
   }
 }
 
+class $FieldServiceTypesTable extends FieldServiceTypes
+    with TableInfo<$FieldServiceTypesTable, FieldServiceTypeRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FieldServiceTypesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _userSubMeta = const VerificationMeta(
+    'userSub',
+  );
+  @override
+  late final GeneratedColumn<String> userSub = GeneratedColumn<String>(
+    'user_sub',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<int> companyId = GeneratedColumn<int>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _codeMeta = const VerificationMeta('code');
+  @override
+  late final GeneratedColumn<String> code = GeneratedColumn<String>(
+    'code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _activeMeta = const VerificationMeta('active');
+  @override
+  late final GeneratedColumn<bool> active = GeneratedColumn<bool>(
+    'active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    userSub,
+    id,
+    companyId,
+    code,
+    name,
+    active,
+    sortOrder,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'field_service_types';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FieldServiceTypeRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('user_sub')) {
+      context.handle(
+        _userSubMeta,
+        userSub.isAcceptableOrUnknown(data['user_sub']!, _userSubMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userSubMeta);
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('code')) {
+      context.handle(
+        _codeMeta,
+        code.isAcceptableOrUnknown(data['code']!, _codeMeta),
+      );
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    }
+    if (data.containsKey('active')) {
+      context.handle(
+        _activeMeta,
+        active.isAcceptableOrUnknown(data['active']!, _activeMeta),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {userSub, id};
+  @override
+  FieldServiceTypeRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FieldServiceTypeRow(
+      userSub: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_sub'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}company_id'],
+      )!,
+      code: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}code'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      active: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}active'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+    );
+  }
+
+  @override
+  $FieldServiceTypesTable createAlias(String alias) {
+    return $FieldServiceTypesTable(attachedDatabase, alias);
+  }
+}
+
+class FieldServiceTypeRow extends DataClass
+    implements Insertable<FieldServiceTypeRow> {
+  final String userSub;
+  final int id;
+  final int companyId;
+  final String code;
+  final String name;
+  final bool active;
+  final int sortOrder;
+  const FieldServiceTypeRow({
+    required this.userSub,
+    required this.id,
+    required this.companyId,
+    required this.code,
+    required this.name,
+    required this.active,
+    required this.sortOrder,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['user_sub'] = Variable<String>(userSub);
+    map['id'] = Variable<int>(id);
+    map['company_id'] = Variable<int>(companyId);
+    map['code'] = Variable<String>(code);
+    map['name'] = Variable<String>(name);
+    map['active'] = Variable<bool>(active);
+    map['sort_order'] = Variable<int>(sortOrder);
+    return map;
+  }
+
+  FieldServiceTypesCompanion toCompanion(bool nullToAbsent) {
+    return FieldServiceTypesCompanion(
+      userSub: Value(userSub),
+      id: Value(id),
+      companyId: Value(companyId),
+      code: Value(code),
+      name: Value(name),
+      active: Value(active),
+      sortOrder: Value(sortOrder),
+    );
+  }
+
+  factory FieldServiceTypeRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FieldServiceTypeRow(
+      userSub: serializer.fromJson<String>(json['userSub']),
+      id: serializer.fromJson<int>(json['id']),
+      companyId: serializer.fromJson<int>(json['companyId']),
+      code: serializer.fromJson<String>(json['code']),
+      name: serializer.fromJson<String>(json['name']),
+      active: serializer.fromJson<bool>(json['active']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'userSub': serializer.toJson<String>(userSub),
+      'id': serializer.toJson<int>(id),
+      'companyId': serializer.toJson<int>(companyId),
+      'code': serializer.toJson<String>(code),
+      'name': serializer.toJson<String>(name),
+      'active': serializer.toJson<bool>(active),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+    };
+  }
+
+  FieldServiceTypeRow copyWith({
+    String? userSub,
+    int? id,
+    int? companyId,
+    String? code,
+    String? name,
+    bool? active,
+    int? sortOrder,
+  }) => FieldServiceTypeRow(
+    userSub: userSub ?? this.userSub,
+    id: id ?? this.id,
+    companyId: companyId ?? this.companyId,
+    code: code ?? this.code,
+    name: name ?? this.name,
+    active: active ?? this.active,
+    sortOrder: sortOrder ?? this.sortOrder,
+  );
+  FieldServiceTypeRow copyWithCompanion(FieldServiceTypesCompanion data) {
+    return FieldServiceTypeRow(
+      userSub: data.userSub.present ? data.userSub.value : this.userSub,
+      id: data.id.present ? data.id.value : this.id,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      code: data.code.present ? data.code.value : this.code,
+      name: data.name.present ? data.name.value : this.name,
+      active: data.active.present ? data.active.value : this.active,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldServiceTypeRow(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('code: $code, ')
+          ..write('name: $name, ')
+          ..write('active: $active, ')
+          ..write('sortOrder: $sortOrder')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(userSub, id, companyId, code, name, active, sortOrder);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FieldServiceTypeRow &&
+          other.userSub == this.userSub &&
+          other.id == this.id &&
+          other.companyId == this.companyId &&
+          other.code == this.code &&
+          other.name == this.name &&
+          other.active == this.active &&
+          other.sortOrder == this.sortOrder);
+}
+
+class FieldServiceTypesCompanion extends UpdateCompanion<FieldServiceTypeRow> {
+  final Value<String> userSub;
+  final Value<int> id;
+  final Value<int> companyId;
+  final Value<String> code;
+  final Value<String> name;
+  final Value<bool> active;
+  final Value<int> sortOrder;
+  final Value<int> rowid;
+  const FieldServiceTypesCompanion({
+    this.userSub = const Value.absent(),
+    this.id = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.code = const Value.absent(),
+    this.name = const Value.absent(),
+    this.active = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FieldServiceTypesCompanion.insert({
+    required String userSub,
+    required int id,
+    required int companyId,
+    this.code = const Value.absent(),
+    this.name = const Value.absent(),
+    this.active = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : userSub = Value(userSub),
+       id = Value(id),
+       companyId = Value(companyId);
+  static Insertable<FieldServiceTypeRow> custom({
+    Expression<String>? userSub,
+    Expression<int>? id,
+    Expression<int>? companyId,
+    Expression<String>? code,
+    Expression<String>? name,
+    Expression<bool>? active,
+    Expression<int>? sortOrder,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (userSub != null) 'user_sub': userSub,
+      if (id != null) 'id': id,
+      if (companyId != null) 'company_id': companyId,
+      if (code != null) 'code': code,
+      if (name != null) 'name': name,
+      if (active != null) 'active': active,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FieldServiceTypesCompanion copyWith({
+    Value<String>? userSub,
+    Value<int>? id,
+    Value<int>? companyId,
+    Value<String>? code,
+    Value<String>? name,
+    Value<bool>? active,
+    Value<int>? sortOrder,
+    Value<int>? rowid,
+  }) {
+    return FieldServiceTypesCompanion(
+      userSub: userSub ?? this.userSub,
+      id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
+      code: code ?? this.code,
+      name: name ?? this.name,
+      active: active ?? this.active,
+      sortOrder: sortOrder ?? this.sortOrder,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (userSub.present) {
+      map['user_sub'] = Variable<String>(userSub.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<int>(companyId.value);
+    }
+    if (code.present) {
+      map['code'] = Variable<String>(code.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (active.present) {
+      map['active'] = Variable<bool>(active.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldServiceTypesCompanion(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('code: $code, ')
+          ..write('name: $name, ')
+          ..write('active: $active, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -11887,6 +12334,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $FieldRapItemsTable fieldRapItems = $FieldRapItemsTable(this);
   late final $FieldResourceTypesTable fieldResourceTypes =
       $FieldResourceTypesTable(this);
+  late final $FieldServiceTypesTable fieldServiceTypes =
+      $FieldServiceTypesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -11907,6 +12356,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     fieldRecentTimesheets,
     fieldRapItems,
     fieldResourceTypes,
+    fieldServiceTypes,
   ];
 }
 
@@ -18205,6 +18655,268 @@ typedef $$FieldResourceTypesTableProcessedTableManager =
       FieldResourceTypeRow,
       PrefetchHooks Function()
     >;
+typedef $$FieldServiceTypesTableCreateCompanionBuilder =
+    FieldServiceTypesCompanion Function({
+      required String userSub,
+      required int id,
+      required int companyId,
+      Value<String> code,
+      Value<String> name,
+      Value<bool> active,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+typedef $$FieldServiceTypesTableUpdateCompanionBuilder =
+    FieldServiceTypesCompanion Function({
+      Value<String> userSub,
+      Value<int> id,
+      Value<int> companyId,
+      Value<String> code,
+      Value<String> name,
+      Value<bool> active,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+
+class $$FieldServiceTypesTableFilterComposer
+    extends Composer<_$AppDatabase, $FieldServiceTypesTable> {
+  $$FieldServiceTypesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get active => $composableBuilder(
+    column: $table.active,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FieldServiceTypesTableOrderingComposer
+    extends Composer<_$AppDatabase, $FieldServiceTypesTable> {
+  $$FieldServiceTypesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get active => $composableBuilder(
+    column: $table.active,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FieldServiceTypesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FieldServiceTypesTable> {
+  $$FieldServiceTypesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get userSub =>
+      $composableBuilder(column: $table.userSub, builder: (column) => column);
+
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get companyId =>
+      $composableBuilder(column: $table.companyId, builder: (column) => column);
+
+  GeneratedColumn<String> get code =>
+      $composableBuilder(column: $table.code, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<bool> get active =>
+      $composableBuilder(column: $table.active, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+}
+
+class $$FieldServiceTypesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FieldServiceTypesTable,
+          FieldServiceTypeRow,
+          $$FieldServiceTypesTableFilterComposer,
+          $$FieldServiceTypesTableOrderingComposer,
+          $$FieldServiceTypesTableAnnotationComposer,
+          $$FieldServiceTypesTableCreateCompanionBuilder,
+          $$FieldServiceTypesTableUpdateCompanionBuilder,
+          (
+            FieldServiceTypeRow,
+            BaseReferences<
+              _$AppDatabase,
+              $FieldServiceTypesTable,
+              FieldServiceTypeRow
+            >,
+          ),
+          FieldServiceTypeRow,
+          PrefetchHooks Function()
+        > {
+  $$FieldServiceTypesTableTableManager(
+    _$AppDatabase db,
+    $FieldServiceTypesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FieldServiceTypesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FieldServiceTypesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FieldServiceTypesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> userSub = const Value.absent(),
+                Value<int> id = const Value.absent(),
+                Value<int> companyId = const Value.absent(),
+                Value<String> code = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<bool> active = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldServiceTypesCompanion(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                code: code,
+                name: name,
+                active: active,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String userSub,
+                required int id,
+                required int companyId,
+                Value<String> code = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<bool> active = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldServiceTypesCompanion.insert(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                code: code,
+                name: name,
+                active: active,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$FieldServiceTypesTable, FieldServiceTypeRow>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $FieldServiceTypesTable,
+                    FieldServiceTypeRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FieldServiceTypesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FieldServiceTypesTable,
+      FieldServiceTypeRow,
+      $$FieldServiceTypesTableFilterComposer,
+      $$FieldServiceTypesTableOrderingComposer,
+      $$FieldServiceTypesTableAnnotationComposer,
+      $$FieldServiceTypesTableCreateCompanionBuilder,
+      $$FieldServiceTypesTableUpdateCompanionBuilder,
+      (
+        FieldServiceTypeRow,
+        BaseReferences<
+          _$AppDatabase,
+          $FieldServiceTypesTable,
+          FieldServiceTypeRow
+        >,
+      ),
+      FieldServiceTypeRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -18239,4 +18951,6 @@ class $AppDatabaseManager {
       $$FieldRapItemsTableTableManager(_db, _db.fieldRapItems);
   $$FieldResourceTypesTableTableManager get fieldResourceTypes =>
       $$FieldResourceTypesTableTableManager(_db, _db.fieldResourceTypes);
+  $$FieldServiceTypesTableTableManager get fieldServiceTypes =>
+      $$FieldServiceTypesTableTableManager(_db, _db.fieldServiceTypes);
 }
