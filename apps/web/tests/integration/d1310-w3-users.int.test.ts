@@ -75,7 +75,8 @@ describe('POST /api/v1/user-onboarding — one save', () => {
     const b = r.body as Body
     expect(b.created).toBe(true)
     expect(b.linkedExistingAccount).toBe(false)
-    expect(b.temporaryPassword).toMatch(/^[A-Za-z2-9]{14}$/)
+    expect(b.temporaryPassword).toMatch(/^[A-Za-z2-9!@#$%*?\-+=]{14}$/)
+    expect(b.temporaryPassword).toMatch(/[!@#$%*?\-+=]/) // realm policy specialChars(1)
     expect(r.headers.get('cache-control')).toBe('no-store')
 
     // Keycloak: created with the temporary password (UPDATE_PASSWORD), no execute-actions mail
