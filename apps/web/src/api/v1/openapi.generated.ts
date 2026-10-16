@@ -6920,7 +6920,16 @@ export const openapiDocument = {
             ]
           },
           "service_type": {
-            "type": "string"
+            "type": "string",
+            "description": "Code of the first selected service type (legacy single value)."
+          },
+          "service_type_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "description": "DRMS owner 2026-10-17: the selected service types (selection order)."
           },
           "action": {
             "type": "string"
@@ -6967,6 +6976,7 @@ export const openapiDocument = {
           "report_date",
           "hour_meter",
           "service_type",
+          "service_type_ids",
           "action",
           "unit_status_after",
           "photo_media_ids",
@@ -8118,15 +8128,24 @@ export const openapiDocument = {
             "minimum": 0,
             "maximum": 10000000
           },
+          "service_type_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "minItems": 1,
+            "maxItems": 20,
+            "description": "Jenis servis (1–20, unique, selection order): rows of the report PT's master; new ones must be active. A new report needs this or service_type."
+          },
           "service_type": {
-            "type": "string",
-            "enum": [
-              "servis_berkala",
-              "perbaikan",
-              "inspeksi",
-              "pemasangan"
+            "type": [
+              "string",
+              "null"
             ],
-            "description": "Required for a new report."
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "LEGACY single code (must exist in the PT master; ignored when service_type_ids is sent). Edit: a code already on the report keeps its selection, another one replaces it."
           },
           "complaint": {
             "type": [
@@ -8170,8 +8189,8 @@ export const openapiDocument = {
               "type": "integer",
               "exclusiveMinimum": 0
             },
-            "maxItems": 10,
-            "description": "On an edit: ids not yet on the report are added (photos are never removed)."
+            "maxItems": 25,
+            "description": "Max 25. On an edit: ids not yet on the report are added (photos are never removed)."
           },
           "reason": {
             "type": "string",
@@ -11477,8 +11496,19 @@ export const openapiDocument = {
               "null"
             ]
           },
+          "serviceTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceTypeRef"
+            },
+            "description": "DRMS owner 2026-10-17: the selected service types in selection order (≥ 1; an inactive one stays on old reports)."
+          },
           "serviceType": {
-            "$ref": "#/components/schemas/ServiceType"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "LEGACY: code of the first selected type."
           },
           "complaint": {
             "type": [
@@ -11613,6 +11643,7 @@ export const openapiDocument = {
           "startTime",
           "endTime",
           "hourMeter",
+          "serviceTypes",
           "serviceType",
           "complaint",
           "action",
@@ -11731,13 +11762,28 @@ export const openapiDocument = {
           "owner"
         ]
       },
-      "ServiceType": {
-        "type": "string",
-        "enum": [
-          "servis_berkala",
-          "perbaikan",
-          "inspeksi",
-          "pemasangan"
+      "ServiceTypeRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "active"
         ]
       },
       "UnitStatus": {
@@ -11887,9 +11933,6 @@ export const openapiDocument = {
             "maximum": 10000000,
             "description": "HM at the service; below the unit's latest reading on/before the date → 409 HM_DECREASED (corrections: PM/Direktur)."
           },
-          "serviceType": {
-            "$ref": "#/components/schemas/ServiceType"
-          },
           "complaint": {
             "type": [
               "string",
@@ -11926,14 +11969,34 @@ export const openapiDocument = {
             ],
             "maxLength": 2000
           },
+          "serviceTypeIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "minItems": 1,
+            "maxItems": 20,
+            "description": "Jenis servis (1–20, unique): active rows of the project PT's master (GET /service-types). Exactly one of serviceTypeIds / serviceType is required (none → 400 VALIDATION path serviceTypeIds \"Pilih minimal satu jenis servis.\")."
+          },
+          "serviceType": {
+            "type": "string",
+            "enum": [
+              "servis_berkala",
+              "perbaikan",
+              "inspeksi",
+              "pemasangan"
+            ],
+            "description": "LEGACY (old clients): one code → the PT master row with that code (must be active). Only when serviceTypeIds is absent."
+          },
           "photoIds": {
             "type": "array",
             "items": {
               "type": "integer",
               "exclusiveMinimum": 0
             },
-            "maxItems": 10,
-            "description": "media-progress-photos ids uploaded by the caller (before/after), max 10."
+            "maxItems": 25,
+            "description": "media-progress-photos ids uploaded by the caller (before/after), max 25."
           },
           "clientUuid": {
             "type": "string",
@@ -11944,7 +12007,6 @@ export const openapiDocument = {
         "required": [
           "projectId",
           "unitId",
-          "serviceType",
           "action",
           "unitStatusAfter"
         ],
@@ -11984,8 +12046,25 @@ export const openapiDocument = {
             "maximum": 10000000,
             "description": "HM at the service; below the unit's latest reading on/before the date → 409 HM_DECREASED (corrections: PM/Direktur)."
           },
+          "serviceTypeIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "minItems": 1,
+            "maxItems": 20,
+            "description": "New selection (1–20, unique, the report's PT, selection order kept): a type already on the report may stay although inactive; a newly added one must be active."
+          },
           "serviceType": {
-            "$ref": "#/components/schemas/ServiceType"
+            "type": "string",
+            "enum": [
+              "servis_berkala",
+              "perbaikan",
+              "inspeksi",
+              "pemasangan"
+            ],
+            "description": "LEGACY (APK 0.7.0), ignored when serviceTypeIds is sent: a code already among the report's types keeps the selection unchanged; another code replaces it with that one (active) type."
           },
           "complaint": {
             "type": [
@@ -12023,8 +12102,8 @@ export const openapiDocument = {
               "type": "integer",
               "exclusiveMinimum": 0
             },
-            "maxItems": 10,
-            "description": "Photos to add (total ≤ 10)."
+            "maxItems": 25,
+            "description": "Photos to add (never removed; total ≤ 25)."
           },
           "reason": {
             "type": "string",
@@ -12069,8 +12148,25 @@ export const openapiDocument = {
             "maximum": 10000000,
             "description": "HM at the service; below the unit's latest reading on/before the date → 409 HM_DECREASED (corrections: PM/Direktur)."
           },
+          "serviceTypeIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "minItems": 1,
+            "maxItems": 20,
+            "description": "New selection (1–20, unique, the report's PT, selection order kept): a type already on the report may stay although inactive; a newly added one must be active."
+          },
           "serviceType": {
-            "$ref": "#/components/schemas/ServiceType"
+            "type": "string",
+            "enum": [
+              "servis_berkala",
+              "perbaikan",
+              "inspeksi",
+              "pemasangan"
+            ],
+            "description": "LEGACY (APK 0.7.0), ignored when serviceTypeIds is sent: a code already among the report's types keeps the selection unchanged; another code replaces it with that one (active) type."
           },
           "complaint": {
             "type": [
@@ -12108,8 +12204,8 @@ export const openapiDocument = {
               "type": "integer",
               "exclusiveMinimum": 0
             },
-            "maxItems": 10,
-            "description": "Photos to add (total ≤ 10)."
+            "maxItems": 25,
+            "description": "Photos to add (never removed; total ≤ 25)."
           },
           "reason": {
             "type": "string",
@@ -12122,6 +12218,55 @@ export const openapiDocument = {
           "reason"
         ],
         "additionalProperties": false
+      },
+      "ServiceTypeList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceTypeItem"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "ServiceTypeItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "companyId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Urutan (ascending, then name; 0 = default)."
+          }
+        },
+        "required": [
+          "id",
+          "companyId",
+          "code",
+          "name",
+          "active",
+          "sortOrder"
+        ],
+        "description": "\"Jenis servis\" master row of a PT (DRMS owner 2026-10-17; managed by Admin / Direktur)."
       },
       "UnitTimesheetList": {
         "type": "object",
@@ -20451,6 +20596,7 @@ export const openapiDocument = {
           "expense-categories",
           "urgency-levels",
           "resource-types",
+          "service-types",
           "vehicles",
           "cash-in-sources",
           "cash-accounts",
@@ -39121,7 +39267,7 @@ export const openapiDocument = {
         }
       },
       "post": {
-        "summary": "FR1 Laporan servis unit (SV/YYMM/####): Staff assigned / PM team / Direktur; project kind kontrak_unit or aftersales (409 WRONG_PROJECT_KIND); PT flag off → 403 FEATURE_DISABLED; HM below the unit's latest reading → 409 HM_DECREASED; unitStatusAfter updates the unit (menunggu_part notifies the PM)",
+        "summary": "FR1 Laporan servis unit (SV/YYMM/####): Staff assigned / PM team / Direktur; project kind kontrak_unit or aftersales (409 WRONG_PROJECT_KIND); PT flag off → 403 FEATURE_DISABLED; HM below the unit's latest reading → 409 HM_DECREASED; unitStatusAfter updates the unit (menunggu_part notifies the PM); one or more service types (serviceTypeIds, GET /service-types; legacy serviceType); ≤ 25 photos",
         "security": [
           {
             "bearer": []
@@ -39626,6 +39772,132 @@ export const openapiDocument = {
             }
           },
           "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/service-types": {
+      "get": {
+        "summary": "DRMS owner 2026-10-17 \"Jenis servis\" master of the caller's selected PTs (?company= narrows; 403 COMPANY_NOT_ALLOWED outside): active types sorted by sortOrder then name, also the inactive ones with includeInactive=1. Managed by Admin / Direktur (Payload collection service-types)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ],
+              "description": "Also the deactivated types (e.g. to label old reports)."
+            },
+            "required": false,
+            "description": "Also the deactivated types (e.g. to label old reports).",
+            "name": "includeInactive",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Service types",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceTypeList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

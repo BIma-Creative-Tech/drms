@@ -51,7 +51,7 @@ const initialText = (f: CorrField): string => {
   return f.value ?? ''
 }
 
-const initialMulti = (fields: CorrField[]): Record<string, string[]> => Object.fromEntries(fields.flatMap((f) => (f.kind === 'multiselect' ? [[f.name, [...f.value]]] : [])))
+const initialMulti = (fields: CorrField[]): Record<string, string[]> => Object.fromEntries(fields.flatMap((f): Array<[string, string[]]> => (f.kind === 'multiselect' ? [[f.name, [...f.value]]] : [])))
 
 export function CorrectionDialog({ url, mode, buttonLabel, title, description, fields, testId, photos }: CorrectionDialogProps) {
   const router = useRouter()
