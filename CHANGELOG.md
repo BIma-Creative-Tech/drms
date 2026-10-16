@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+- **Laporan servis: "Jenis servis" is master data per PT and a multi-select (DRMS owner 2026-10-17, amends ADR 0020).**
+  New collection **Master Data → Jenis servis** (`service-types`, managed by Admin / Direktur, read by every member,
+  "Hapus" only while unused, else "Nonaktifkan"); every PT is seeded with Servis berkala / Perbaikan / Inspeksi /
+  Pemasangan (codes = the former values, Urutan 1–4; a new type gets the PT's highest Urutan + 1). A report now has one or more types — web form, "Ubah (24 jam)" and "Koreksi"
+  (a type deactivated since stays selectable there as "(nonaktif)"); names joined with ", " in the list (new filter
+  "Jenis servis"), detail, unit history and project timeline. API: `GET /api/v1/service-types`; `serviceTypeIds` on
+  POST / PATCH `/service-reports` and `…/corrections`; DTO `serviceTypes[]` (+ legacy `serviceType` = first selected legacy code, else the first code); sync
+  `service_report.upsert` `service_type_ids` and server copy `service_type_ids`. The legacy single `serviceType` /
+  `service_type` keeps working for APK 0.7.0 (an edit naming a type already on the report keeps a multi-selection).
+- **Laporan servis: up to 25 photos (was 10)** — API, sync and DB; the edit / correction dialogs may add photos
+  (never remove) up to that total.
+- **Laporan servis: no "No. part" input for spare parts** (create, edit, correction); part numbers already stored are
+  kept and shown in the detail only when present. Aftersales items keep their No. part.
+
+**Database migration** (one): `20261017_100000_d1710_service_types` — creates `service_types` (+ soft-delete columns,
+unique PT + code, PT / code immutable, no DELETE) and `service_reports_rels` (guarded like the report: 24 h window /
+correction override, same PT, ≥ 1 type at commit), seeds the four types per PT, backfills every report with its old type,
+turns `service_reports.service_type` into a nullable varchar (first type's code) and raises the photo limit to 25
+(CHECK + `pk_field_photo_limit`). The 0.13.1 image keeps reading the legacy column (rollback of the image needs no down);
+down is refused once a report has > 10 photos or several / custom types.
+
 ## [0.13.1] - 2026-10-16
 
 **Fix: "Pengguna baru" could not be saved for a new account; a definitive Direktur's representative who is also the

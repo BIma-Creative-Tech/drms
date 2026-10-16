@@ -52,7 +52,7 @@ export type PkListConfig = {
  */
 export const FILTER_TARGETS: ReadonlySet<string> = new Set([
   'projects', 'employees', 'users', 'clients', 'vendors', 'cost-centers', 'sites', 'urgency-levels', 'expense-categories',
-  'cash-accounts', 'cash-in-sources', 'banks', 'vehicles', 'uoms', 'resource-types', 'project-stages', 'stage-templates',
+  'cash-accounts', 'cash-in-sources', 'banks', 'vehicles', 'uoms', 'resource-types', 'service-types', 'project-stages', 'stage-templates',
   'work-schedules', 'rap-templates', 'approval-rules',
 ])
 

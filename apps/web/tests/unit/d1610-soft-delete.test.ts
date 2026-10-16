@@ -19,6 +19,7 @@ import { andNotDeleted, isIdLookup, mentionsField, NOT_DELETED, ONLY_DELETED, re
 import { closedProjectMessage, isClosedProjectStatus, PROJECT_CLOSED_STATUSES } from '@/domain/projects/status'
 import { migrations } from '@/migrations'
 import { SOFT_DELETE_TABLES } from '@/migrations/20261016_200100_d1610_soft_delete'
+import { D1710_SOFT_DELETE_TABLES } from '@/migrations/20261017_100000_d1710_service_types'
 
 /**
  * D1610 (ADR 0030): soft delete per row ("Hapus"), the central "hide deleted rows" read rule, restore and
@@ -160,7 +161,8 @@ describe('registry vs the real config, the migration and the snapshot', () => {
     const s = names.indexOf('20261016_200100_d1610_soft_delete')
     expect(e).toBeGreaterThan(0)
     expect(s).toBe(e + 1)
-    expect([...SOFT_DELETE_TABLES].sort()).toEqual(SOFT_DELETE_ENTRIES.map((x) => x.table).sort())
+    // later migrations create their soft-deletable tables with the columns from the start (DRMS owner 2026-10-17: service_types)
+    expect([...SOFT_DELETE_TABLES, ...D1710_SOFT_DELETE_TABLES].sort()).toEqual(SOFT_DELETE_ENTRIES.map((x) => x.table).sort())
     const dir = join(__dirname, '../../src/migrations')
     const enums = readFileSync(join(dir, '20261016_200000_d1610_soft_delete_enums.ts'), 'utf8')
     expect(enums).toContain(`"enum_projects_status" ADD VALUE IF NOT EXISTS 'dibatalkan'`)

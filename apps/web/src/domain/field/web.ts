@@ -230,6 +230,7 @@ const FIELD_LABELS: Record<string, string> = {
   location: 'lokasi',
   notes: 'catatan',
   serviceType: 'jenis servis',
+  serviceTypes: 'jenis servis', // DRMS owner 2026-10-17: multi-select of the PT master
   complaint: 'keluhan',
   action: 'tindakan',
   unitStatusAfter: 'status unit',

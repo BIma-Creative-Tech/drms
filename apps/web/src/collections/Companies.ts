@@ -5,7 +5,7 @@ import { companiesWithRole, denyAll, isGroupAdmin, memberCompanies, relId } from
 import { reasonOnChange, reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { percentField, rupiahField, uuidField } from '@/fields/common'
 import { SELFIE_RETENTION_DEFAULT_MONTHS } from '@/domain/attendance/retention-policy'
-import { copyCompanyDefaults, ensureDefaultResourceTypes, ensureDefaultUrgencyLevels, ensureSystemCashInSources, SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
+import { copyCompanyDefaults, ensureDefaultResourceTypes, ensureDefaultServiceTypes, ensureDefaultUrgencyLevels, ensureSystemCashInSources, SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
 import { DEFAULT_TZ, isValidTimeZone } from '@/lib/time'
 
 import { DIREKTUR_FIELDS, linkDirekturSignature, validateDirektur } from './companies-direktur'
@@ -80,11 +80,13 @@ const copyDefaultsOnCreate: CollectionAfterChangeHook = async ({ doc, operation,
     await ensureSystemCashInSources(req, doc.id as number)
     await ensureDefaultUrgencyLevels(req, doc.id as number)
     await ensureDefaultResourceTypes(req, doc.id as number)
+    await ensureDefaultServiceTypes(req, doc.id as number)
     return doc
   }
   await copyCompanyDefaults(req, doc.id as number, { from: choice?.from ?? null })
   await ensureDefaultUrgencyLevels(req, doc.id as number)
   await ensureDefaultResourceTypes(req, doc.id as number)
+  await ensureDefaultServiceTypes(req, doc.id as number)
   return doc
 }
 

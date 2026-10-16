@@ -159,7 +159,7 @@ describe('MC4 extra (d) — saved list columns get the PT column once (migration
   it('the migration names exactly the collections with a PT list column (+ collections created after it)', () => {
     // collections created after that released data migration had no saved list preferences to fix
     // (withCompanyListUi puts `company` into their defaultColumns from the start)
-    const AFTER_MC4 = ['contract-units', 'service-reports', 'unit-timesheets', 'aftersales-activities', 'urgency-levels', 'rap-items', 'rap-templates', 'resource-types', 'daily-reports', 'daily-report-lines', 'project-loans', 'project-loan-repayments', 'sites', 'vendor-bank-accounts']
+    const AFTER_MC4 = ['contract-units', 'service-reports', 'unit-timesheets', 'aftersales-activities', 'urgency-levels', 'rap-items', 'rap-templates', 'resource-types', 'daily-reports', 'daily-report-lines', 'project-loans', 'project-loan-repayments', 'sites', 'vendor-bank-accounts', 'service-types']
     const got = config.collections.filter((c) => companyFieldOf(c as unknown as CollectionConfig)).map((c) => c.slug).sort()
     expect([...LIST_COMPANY_SLUGS, ...AFTER_MC4].sort()).toEqual(got)
     for (const s of AFTER_MC4) expect(LIST_COMPANY_SLUGS as readonly string[]).not.toContain(s)

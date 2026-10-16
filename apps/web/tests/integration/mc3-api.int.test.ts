@@ -409,6 +409,7 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'GET /aftersales-activities': 'selection',
   'GET /aftersales/open-pos': 'selection',
   'GET /units': 'selection',
+  'GET /service-types': 'selection', // DRMS owner 2026-10-17: "Jenis servis" master of the selected PTs
   'GET /service-reports/:id': 'document',
   'PATCH /service-reports/:id': 'document',
   'POST /service-reports/:id/corrections': 'document',
