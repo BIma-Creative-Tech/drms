@@ -1,6 +1,6 @@
 'use client'
 import { RelationshipField, useFormFields } from '@payloadcms/ui'
-import type { RelationshipFieldClientComponent } from 'payload'
+import type { RelationshipFieldClientProps } from 'payload'
 import React from 'react'
 
 /** Shown in the disabled picker until the form has a PT (DRMS 13/10 Pengajuan #3/#5). */
@@ -12,17 +12,21 @@ export const PICK_COMPANY_FIRST = 'Pilih PT terlebih dahulu'
  * whose options `filterOptions` (fields/company.ts companyScopedOptions) narrows to that PT. A single-PT user
  * never sees the lock: CompanyField prefills the PT on create. UI only — the company hook + DB trigger keep
  * cross-PT values impossible.
+ * DRMS UI feedback 17/10 #4: `waitFor` / `waitLabel` (CompanyLockedField) — a derived form's picker waits for the
+ * parent its PT comes from instead ("Pilih karyawan terlebih dahulu").
  */
-export const CompanyScopedField: RelationshipFieldClientComponent = (props) => {
+export function CompanyScopedField(props: RelationshipFieldClientProps & { waitFor?: string; waitLabel?: string }) {
+  const { waitFor = 'company', waitLabel, ...fieldProps } = props
   const hasCompany = useFormFields(([fields]) => {
-    const v = fields.company?.value
-    return v !== undefined && v !== null && v !== ''
+    const v = fields[waitFor]?.value
+    return v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)
   })
-  if (hasCompany) return <RelationshipField {...props} />
-  const field = { ...props.field, admin: { ...props.field.admin, placeholder: `${PICK_COMPANY_FIRST}…` } }
+  if (hasCompany) return <RelationshipField {...fieldProps} />
+  const text = waitLabel ? `Pilih ${waitLabel} terlebih dahulu` : PICK_COMPANY_FIRST
+  const field = { ...fieldProps.field, admin: { ...fieldProps.field.admin, placeholder: `${text}…` } }
   return (
-    <div data-pk-needs-company={props.field.name}>
-      <RelationshipField {...props} field={field} readOnly />
+    <div data-pk-needs-company={fieldProps.field.name} data-pk-wait-for={waitFor}>
+      <RelationshipField {...fieldProps} field={field} readOnly />
     </div>
   )
 }

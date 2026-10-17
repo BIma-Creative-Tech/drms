@@ -19,7 +19,7 @@ import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseListQuery } from '@/admin/list-query'
 
 import { BtnLink, dateParam, FIELD_CREATORS, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf } from './field-ui'
-import { ptView, PtChip } from './pt'
+import { ptOptionsOf, ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, type Col } from './viz'
 import { DateInput } from '../components/DateInput'
@@ -117,7 +117,7 @@ export async function FieldDailyList(props: AdminViewServerProps) {
           Project
           <select name="project" defaultValue={q.project ? String(q.project) : ''}>
             <option value="">Semua project</option>
-            {d.projects.map((p) => (
+            {ptOptionsOf(d.projects, d.pt).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.label}
               </option>

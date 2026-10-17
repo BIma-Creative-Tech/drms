@@ -4,6 +4,7 @@ import React, { useEffect, useId, useRef, useState } from 'react'
 
 import { ACTIVITY_KIND_LABELS, ACTIVITY_KINDS, RELATES_TO_PO, type ActivityKind } from '@/domain/field/rules'
 import { itemsText } from '@/domain/field/views'
+import { codeFrom, ptOptions } from '@/lib/pt-options'
 
 import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
@@ -27,13 +28,32 @@ type OpenPo = { id: number; docNo: string | null; activityDate: string; ageDays:
 const DOC_LABEL: Record<ActivityKind, string> = { penawaran: 'No. penawaran (Q)', po_masuk: 'No. PO', pengiriman: 'No. surat jalan (SJ)', penagihan: 'No. invoice (INV)', kunjungan: 'No. dokumen', lainnya: 'No. dokumen' }
 const uuid = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined)
 
-export function ActivityForm({ projects, clients, today, minDate, initial }: { projects: AsProject[]; clients: AsClient[]; today: string; minDate: string; initial?: { project?: number; client?: number; kind?: ActivityKind; relatesTo?: number } }) {
+export function ActivityForm({
+  projects,
+  clients,
+  ptCodes,
+  today,
+  minDate,
+  initial,
+}: {
+  projects: AsProject[]
+  clients: AsClient[]
+  /** DRMS UI 17/10 #4: PT codes while several PTs are selected — clients are tagged `[CS1]` until a project narrows them. */
+  ptCodes?: Record<number, string>
+  today: string
+  minDate: string
+  initial?: { project?: number; client?: number; kind?: ActivityKind; relatesTo?: number }
+}) {
   const router = useRouter()
   const uid = useId()
   const id = (n: string) => `${uid}-${n}`
   const [projectId, setProjectId] = useState(initial?.project ? String(initial.project) : projects.length === 1 ? String(projects[0]!.id) : '')
   const project = projects.find((p) => String(p.id) === projectId) ?? null
-  const clientOpts = clients.filter((c) => !project || c.companyId === project.companyId)
+  // DRMS UI 17/10 #4: the project's PT only; before a project, every PT's clients tagged `[CS1]` (same names per PT)
+  const clientOpts = ptOptions(
+    clients.map((c) => ({ ...c, label: c.name })),
+    { code: codeFrom(ptCodes), company: project?.companyId ?? null, multi: ptCodes !== undefined },
+  )
   const [clientId, setClientId] = useState(initial?.client ? String(initial.client) : project?.clientId ? String(project.clientId) : '')
   const client = clientOpts.find((c) => String(c.id) === clientId) ?? null
   const [kind, setKind] = useState<ActivityKind | ''>(initial?.kind ?? '')
@@ -202,7 +222,7 @@ export function ActivityForm({ projects, clients, today, minDate, initial }: { p
             <option value="">— Pilih pelanggan —</option>
             {clientOpts.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name}
+                {c.label}
               </option>
             ))}
           </WrapSelect>

@@ -6,7 +6,7 @@ import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { kindOf, RATE_BASES, RATE_FIELD_ROLES } from '@/domain/field/rules'
 import { isBusinessDate } from '@/domain/expense/types'
 import { rupiahField, uuidField } from '@/fields/common'
-import { companyField, companyHook } from '@/fields/company'
+import { andParentCompany, companyField, companyHook, lockedUntilCompany, sameCompanyOptions } from '@/fields/company'
 import { validationError } from '@/lib/validation'
 
 import { businessDateField } from './fields-f2'
@@ -50,6 +50,20 @@ const contractRules: CollectionBeforeChangeHook = async ({ data, originalDoc, re
   return data
 }
 
+const KONTRAK_UNIT: Where = { kind: { equals: 'kontrak_unit' } }
+
+/** Project picker: unit-contract projects (of the stored contract's PT on edit). */
+export const contractProjectOptions = (args: { data?: unknown }): Where => {
+  const same = sameCompanyOptions(args)
+  return same === true ? KONTRAK_UNIT : { and: [same, KONTRAK_UNIT] }
+}
+
+/**
+ * DRMS UI feedback 17/10 #4: unit picker — OWN units of the chosen project's PT (unit codes / names repeat across PTs);
+ * no project yet → no units. Kept with Payload's save-time re-validation (owner rule; the editor reads the PT's units).
+ */
+export const sameCompanyAsProject = andParentCompany({ owner: { equals: 'sendiri' } }, { field: 'project', collection: 'projects' })
+
 /**
  * Unit kontrak (FR1, ADR 0020 §4): a unit of the own fleet rented out in a project of kind
  * kontrak_unit for a period, with the contract rate (per jam with a monthly minimum, or per bulan).
@@ -77,8 +91,8 @@ export const ContractUnits: CollectionConfig = withAudit(
     hooks: { beforeChange: [companyHook('contract-units', { derive: [{ field: 'project', collection: 'projects' }], check: [{ field: 'unit', collection: 'vehicles' }] }), contractRules] },
     fields: [
       companyField({ derived: true }),
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', required: true, index: true, filterOptions: { kind: { equals: 'kontrak_unit' } } },
-      { name: 'unit', type: 'relationship', relationTo: 'vehicles', label: 'Unit', required: true, index: true, filterOptions: { owner: { equals: 'sendiri' } } },
+      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', required: true, index: true, filterOptions: contractProjectOptions },
+      lockedUntilCompany({ name: 'unit', type: 'relationship', relationTo: 'vehicles', label: 'Unit', required: true, index: true, filterOptions: sameCompanyAsProject }, { field: 'project', label: 'project' }),
       {
         type: 'row',
         fields: [

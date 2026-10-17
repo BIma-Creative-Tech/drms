@@ -17,7 +17,7 @@ import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseListQuery } from '@/admin/list-query'
 
 import { BtnLink, dateParam, FIELD_CREATORS, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf, UnitStatusPill } from './field-ui'
-import { ptView, PtChip } from './pt'
+import { ptOptionsOf, ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, type Col } from './viz'
 import { DateInput } from '../components/DateInput'
@@ -158,7 +158,7 @@ export async function FieldServiceList(props: AdminViewServerProps) {
           Project
           <select name="project" defaultValue={q.project ? String(q.project) : ''}>
             <option value="">Semua project</option>
-            {d.projects.map((p) => (
+            {ptOptionsOf(d.projects, d.pt).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.label}
               </option>
@@ -169,7 +169,7 @@ export async function FieldServiceList(props: AdminViewServerProps) {
           Unit
           <select name="unit" defaultValue={q.unit ? String(q.unit) : ''}>
             <option value="">Semua unit</option>
-            {d.units.map((u) => (
+            {ptOptionsOf(d.units, d.pt).map((u) => (
               <option key={u.id} value={u.id}>
                 {u.label}
               </option>
@@ -191,9 +191,12 @@ export async function FieldServiceList(props: AdminViewServerProps) {
           Jenis servis
           <select name="jenis" defaultValue={q.serviceType ? String(q.serviceType) : ''}>
             <option value="">Semua</option>
-            {d.types.map((t) => (
+            {ptOptionsOf(
+              d.types.map((t) => ({ id: t.id, companyId: t.companyId, label: `${t.name}${t.active ? '' : ' (nonaktif)'}` })),
+              d.pt,
+            ).map((t) => (
               <option key={t.id} value={t.id}>
-                {`${d.pt.multi ? `${d.pt.ref(t.companyId)?.shortCode ?? ''} · ` : ''}${t.name}${t.active ? '' : ' (nonaktif)'}`}
+                {t.label}
               </option>
             ))}
           </select>
@@ -281,7 +284,7 @@ export async function FieldServiceNew(props: AdminViewServerProps) {
     const today = await todayOf(req, companies[0])
     // DRMS owner 2026-10-17: active "Jenis servis" of the PTs the caller may report in
     const serviceTypes = (await listServiceTypes(req, { companyIds: companies })).map((t) => ({ id: t.id, companyId: t.companyId, name: t.name }))
-    return { projects, contracts, units, today, serviceTypes }
+    return { projects, contracts, units, today, serviceTypes, pt: await ptView(req) }
   })
   const unitsByProject: Record<string, number[]> = {}
   for (const p of d.projects) {
@@ -311,7 +314,7 @@ export async function FieldServiceNew(props: AdminViewServerProps) {
           {d.projects.length === 0 ? (
             <EmptyState text="Tidak ada project kontrak unit / aftersales yang dapat Anda laporkan (Staff: project yang ditugaskan; PM: project tim)." />
           ) : (
-            <ServiceReportForm projects={d.projects.map((p) => ({ id: p.id, label: p.label, companyId: p.companyId, kind: p.kind }))} units={units} unitsByProject={unitsByProject} serviceTypes={d.serviceTypes} today={d.today} minDate={addDays(d.today, -BACKDATE_MAX_DAYS)} initialProject={idParam(sp.project)} initialUnit={idParam(sp.unit)} />
+            <ServiceReportForm projects={ptOptionsOf(d.projects, d.pt).map((p) => ({ id: p.id, label: p.label, companyId: p.companyId, kind: p.kind }))} units={units} unitsByProject={unitsByProject} serviceTypes={d.serviceTypes} today={d.today} minDate={addDays(d.today, -BACKDATE_MAX_DAYS)} initialProject={idParam(sp.project)} initialUnit={idParam(sp.unit)} />
           )}
         </Card>
         <Card id="service-help" title="Aturan" span={4}>

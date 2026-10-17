@@ -6,7 +6,7 @@ import { reasonOnChange, reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, rupiahField, uuidField } from '@/fields/common'
 
 import { businessDateField } from './fields-f2'
-import { companyField, companyHook, pickerSameCompany, siteOptions } from '@/fields/company'
+import { companyField, companyHook, lockedUntilCompany, pickerSameCompany, siteOptions } from '@/fields/company'
 import { validationError } from '@/lib/validation'
 
 /**
@@ -119,7 +119,7 @@ export const CashAccounts: CollectionConfig = withAudit(
       }),
       // ADR 0023 (Q-S7): petty cash of a branch office — filter of the cash book / K-01 balances and the per-site balance
       // on the dashboards. Cash rules are unchanged (still a PT account).
-      {
+      lockedUntilCompany({
         name: 'site',
         type: 'relationship',
         relationTo: 'sites',
@@ -128,7 +128,7 @@ export const CashAccounts: CollectionConfig = withAudit(
         ...pickerSameCompany(),
         filterOptions: siteOptions,
         admin: { placeholder: 'Pilih site…', description: 'Opsional: kas kecil / rekening kantor cabang ini (saldo per site di dashboard).' },
-      },
+      }),
       {
         // ADR 0028: payments from the other PTs of the group arrive here (automatic Kas Masuk "Antar PT")
         name: 'intercompanyReceiving',

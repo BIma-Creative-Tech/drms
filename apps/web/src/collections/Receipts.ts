@@ -8,7 +8,7 @@ import { byVisibleRequest, denyDeleteLogged } from '@/domain/expense/access'
 import { RUPIAH_MARK, uuidField } from '@/fields/common'
 
 import { businessDateField, ro } from './fields-f2'
-import { companyField, companyHook } from '@/fields/company'
+import { companyField, companyHook, pickerSameCompany } from '@/fields/company'
 import { USER_NAME_VIEW } from '@/fields/users'
 
 /**
@@ -33,7 +33,8 @@ export const Receipts: CollectionConfig = withAudit(
       { name: 'receiptNo', type: 'text', label: 'Nomor nota', maxLength: 64 },
       { name: 'receiptNoNorm', type: 'text', index: true, admin: { ...ro, hidden: true } },
       // F2e UAT: not rendered for staff (no read access to vendors → the input's query was a 403).
-      { name: 'vendor', type: 'relationship', relationTo: 'vendors', label: 'Vendor (master)', admin: { condition: (_d, _s, { user }) => !isStaffOnly(user) } },
+      // DRMS UI 17/10 #4: vendors of the request's PT only (same names in every PT)
+      { name: 'vendor', type: 'relationship', relationTo: 'vendors', label: 'Vendor (master)', ...pickerSameCompany({ parent: { field: 'request', collection: 'expense-requests' } }), admin: { condition: (_d, _s, { user }) => !isStaffOnly(user) } },
       { name: 'vendorName', type: 'text', label: 'Vendor / toko', required: true, maxLength: 160 },
       { name: 'vendorNorm', type: 'text', index: true, admin: { ...ro, hidden: true } },
       businessDateField('receiptDate', 'Tanggal nota', { required: true }),

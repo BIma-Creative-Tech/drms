@@ -15,6 +15,7 @@ import { validationError } from '@/lib/validation'
  * The DB triggers of migration `*_mc1_security` are the final guard (`cross-company reference`).
  */
 const COMPANY_FIELD = '@/admin/components/companies/CompanyField#CompanyField'
+export const COMPANY_LOCKED_FIELD = '@/admin/components/companies/CompanyLockedField#CompanyLockedField'
 
 export function companyField(opts: { derived?: boolean; createRoles?: readonly Role[] } = {}): RelationshipField {
   const field: RelationshipField = {
@@ -213,21 +214,117 @@ export function companyScopedOptions(roles: readonly Role[]) {
   }
 }
 
+type FilterArgs = { data?: unknown; user?: unknown; req?: PayloadRequest }
+type FilterResult = boolean | Where
+
+/**
+ * DRMS UI feedback 17/10 #4: the PT of a master form whose PT is CHOSEN in the form (companyField() without
+ * `createRoles`): the chosen `company`, else the caller's only selected PT (the company hook's default on save).
+ */
+export function formOrSoleCompany(data: unknown, user: unknown): number | undefined {
+  const c = relId((data as { company?: unknown } | undefined)?.company)
+  if (c !== undefined || !user) return c
+  return soleCompany({ user } as never)
+}
+
+/** No user = a system request (seed, job, Local API without user) — never an admin picker. */
+const isSystemCall = (user: unknown, req: PayloadRequest | undefined) => !user && !req?.user
+
+/**
+ * DRMS UI feedback 17/10 #4: `filterOptions` of a per-PT picker on a chosen-PT master form — rows of the form's PT
+ * (formOrSoleCompany); no PT yet (several PTs selected, none chosen) → no options instead of every PT's rows, which
+ * carry the same names in each PT. The list view's filters (data `{}`) keep every readable row.
+ */
+export const formCompanyOptions = ({ data, user, req }: FilterArgs): FilterResult => {
+  if (isListFilter(data)) return true
+  const c = formOrSoleCompany(data, user ?? req?.user)
+  if (c !== undefined) return { company: { equals: c } }
+  return isSystemCall(user, req) // a seed / job is no picker; an admin form without a PT → no options
+}
+
+/** The per-PT picker of a DERIVED form whose PT comes from `field` (a `collection` row) chosen in the same form. */
+export type CompanyParent = { field: string; collection: CollectionSlug }
+
+function anyId(v: unknown): number | undefined {
+  if (typeof v === 'string' && /^\d{1,12}$/.test(v)) return Number(v)
+  if (v && typeof v === 'object' && 'value' in v) return anyId((v as { value: unknown }).value)
+  return relId(v)
+}
+
+/**
+ * PT of a derived form: the PT of the chosen parent (read with the CALLER's access — the editor can read the parent it
+ * picked), else the stored document's PT, else the caller's only selected PT.
+ */
+export async function parentCompany(data: unknown, parent: CompanyParent, user: unknown, req: PayloadRequest | undefined): Promise<number | undefined> {
+  const id = anyId((data as Record<string, unknown> | undefined)?.[parent.field])
+  if (id !== undefined && req?.payload) {
+    const r = await req.payload
+      .find({ collection: parent.collection, where: { id: { equals: id } }, limit: 1, depth: 0, pagination: false, select: { company: true } as never, user: req.user, overrideAccess: false /* the caller's readable parent only */, req })
+      .catch(() => null)
+    const c = relId((r?.docs[0] as { company?: unknown } | undefined)?.company)
+    if (c !== undefined) return c
+  }
+  return formOrSoleCompany(data, user)
+}
+
+/**
+ * DRMS UI feedback 17/10 #4: `filterOptions` of a per-PT picker on a DERIVED form (team assignment, budget line, nota,
+ * contract unit) — rows of the parent's PT (parentCompany); no parent yet → no options. List filters unchanged.
+ */
+export function parentCompanyOptions(parent: CompanyParent) {
+  return async ({ data, user, req }: FilterArgs): Promise<FilterResult> => {
+    if (isListFilter(data)) return true
+    // a system write (seed / job, no user) is no picker: Payload's save-time re-validation must not reject it
+    if (isSystemCall(user, req)) return true
+    const c = await parentCompany(data, parent, user ?? req?.user, req)
+    return c === undefined ? false : { company: { equals: c } }
+  }
+}
+
+const combine = (base: FilterResult, extra: Where): FilterResult => (base === true ? extra : base === false ? false : { and: [base, extra] })
+
+/** `base` (default: the form's PT, formCompanyOptions) AND a fixed condition (active sites, operational cost centers …). */
+export function andCompany(extra: Where, base: (args: FilterArgs) => FilterResult = formCompanyOptions) {
+  return (args: FilterArgs): FilterResult => combine(base(args), extra)
+}
+
+/** parentCompanyOptions AND a fixed condition. */
+export function andParentCompany(extra: Where, parent: CompanyParent) {
+  const base = parentCompanyOptions(parent)
+  return async (args: FilterArgs): Promise<FilterResult> => combine(await base(args), extra)
+}
+
 /**
  * Picker-only PT filter (MC2-4, "employee picker filtered by PT"): `filterOptions` narrows the admin
  * dropdown to the document's PT, while the save-time re-validation of filterOptions (which re-reads
  * the referenced rows with the CALLER's access) is switched off — same pattern as
  * `expense-requests.bankAccount`. Cross-PT values stay impossible: `companyHook` + DB trigger
  * `pk_same_company` (`cross-company reference`).
- * `createRoles` (DRMS 13/10, opt-in): no options until the PT is chosen (companyScopedOptions) — for a form whose
- * PT is a chosen master PT (expense requests). Without it, a derived-PT form (e.g. team assignments: PT from the
- * employee) keeps every readable row before the PT is known.
+ * Which rows before the PT is known (DRMS UI feedback 17/10 #4 — never every PT's same-named rows):
+ * - default: chosen-PT master form → the form's PT, else the only selected PT, else none (formCompanyOptions);
+ * - `createRoles` (DRMS 13/10): the form's PT, else the only creatable PT, else none (companyScopedOptions);
+ * - `parent`: derived form → the PT of the parent picked in the form, else none (parentCompanyOptions);
+ * - `decidesCompany`: this picker IS the parent of a derived form (team assignment → employee, rekening → vendor):
+ *   every readable row until the document has a PT (sameCompanyOptions).
  */
-export function pickerSameCompany(opts: { required?: boolean; createRoles?: readonly Role[] } = {}) {
+export function pickerSameCompany(opts: { required?: boolean; createRoles?: readonly Role[]; parent?: CompanyParent; decidesCompany?: boolean } = {}) {
   return {
-    filterOptions: opts.createRoles ? companyScopedOptions(opts.createRoles) : sameCompanyOptions,
+    filterOptions: opts.createRoles ? companyScopedOptions(opts.createRoles) : opts.parent ? parentCompanyOptions(opts.parent) : opts.decidesCompany ? sameCompanyOptions : formCompanyOptions,
     validate: (v: unknown) => (opts.required && (v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0)) ? 'Wajib diisi.' : true),
   } as const
+}
+
+/**
+ * DRMS UI feedback 17/10 #4: the picker stays disabled ("Pilih PT terlebih dahulu" / "Pilih <wait.label> terlebih
+ * dahulu") until the form's PT — or, on a derived form, the parent `wait.field` — is chosen, when several PTs are
+ * selected (CompanyLockedField). Pair with `pickerSameCompany()` / `pickerSameCompany({ parent })`.
+ */
+export function lockedUntilCompany<T extends RelationshipField>(field: T, wait?: { field: string; label: string }): T {
+  return {
+    ...field,
+    admin: { ...field.admin, components: { ...field.admin?.components, Field: COMPANY_LOCKED_FIELD } },
+    custom: { ...field.custom, ...(wait ? { pkWaitFor: wait.field, pkWaitLabel: wait.label } : {}) },
+  } as T
 }
 
 /**
@@ -247,9 +344,8 @@ export function requireCompanyWhenAmbiguous(
 /**
  * ADR 0023: `filterOptions` of a `site` picker — ACTIVE sites of the document's PT (an inactive site is not
  * selectable; a stored one stays). Use with `pickerSameCompany()` (no save-time re-validation; the company hook +
- * DB trigger `pk_same_company` keep cross-PT values impossible).
+ * DB trigger `pk_same_company` keep cross-PT values impossible). No PT yet → no sites (formCompanyOptions); a derived
+ * form uses `andParentCompany(ACTIVE_ONLY, parent)`.
  */
-export const siteOptions = (args: { data?: unknown }): Where => {
-  const same = sameCompanyOptions(args)
-  return same === true ? { active: { not_equals: false } } : { and: [same, { active: { not_equals: false } }] }
-}
+export const ACTIVE_ONLY: Where = { active: { not_equals: false } }
+export const siteOptions = andCompany(ACTIVE_ONLY)

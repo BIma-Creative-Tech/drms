@@ -27,7 +27,7 @@ import { formatServerTime } from '@/pdf/format'
 
 import { ChartHover } from './ChartHover'
 import { F3Root } from './f3-ui'
-import { foreignPtParam, PtChip, ptView, type PtView } from './pt'
+import { foreignPtParam, PtChip, ptOptionsOf, ptView, type PtView } from './pt'
 import { EditButton, PtNotAllowed } from './shared'
 import { Bento, Card, DashHead, DataTable, EmptyState, HBarList, KpiRow, KpiTile, StatusPill, TableView, VIZ_STYLE } from './viz'
 import { settings as companySettings } from '@/domain/companies'
@@ -187,13 +187,6 @@ const ptParam = (sp: SP, pts: readonly number[]) => {
   const v = idParam(sp, 'pt')
   return v !== undefined && pts.includes(v) ? v : undefined
 }
-/** Filter options: only the chosen PT's, labels prefixed `[CS1]` while several PTs are shown. */
-function ptOptions<T extends { id: number; label: string; companyId: number | null }>(list: readonly T[], pt: PtView, chosen: number | undefined): T[] {
-  return list
-    .filter((o) => chosen === undefined || o.companyId === chosen)
-    .map((o) => (pt.multi && chosen === undefined && o.companyId !== null ? { ...o, label: `[${pt.ref(o.companyId)?.shortCode ?? o.companyId}] ${o.label}` } : o))
-}
-
 function PtSelect({ pt, pts, value }: { pt: PtView; pts: readonly number[]; value: number | undefined }) {
   if (!pt.multi || pts.length < 2) return null
   return (
@@ -432,7 +425,7 @@ export async function AbsensiToday(props: AdminViewServerProps) {
           Project
           <select name="project" defaultValue={String(idParam(sp, 'project') ?? '')}>
             <option value="">Semua project</option>
-            {ptOptions(loc.projects, pt, chosen).map((o) => (
+            {ptOptionsOf(loc.projects, pt, chosen).map((o) => (
               <option key={o.id} value={o.id}>
                 {o.label}
               </option>
@@ -443,14 +436,14 @@ export async function AbsensiToday(props: AdminViewServerProps) {
           Pusat biaya
           <select name="pusat" defaultValue={String(idParam(sp, 'pusat') ?? '')}>
             <option value="">Semua pusat biaya</option>
-            {ptOptions(loc.costCenters, pt, chosen).map((o) => (
+            {ptOptionsOf(loc.costCenters, pt, chosen).map((o) => (
               <option key={o.id} value={o.id}>
                 {o.label}
               </option>
             ))}
           </select>
         </label>
-        <SiteSelect options={ptOptions(loc.sites, pt, chosen)} value={idParam(sp, 'site')} />
+        <SiteSelect options={ptOptionsOf(loc.sites, pt, chosen)} value={idParam(sp, 'site')} />
         <button type="submit" className="pk-kbtn primary">
           Terapkan
         </button>
@@ -803,7 +796,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
             Karyawan
             <select name="karyawan" defaultValue={String(idParam(sp, 'karyawan') ?? '')}>
               <option value="">— Seluruh tim (grid) —</option>
-              {ptOptions(d.employees, d.pt, d.chosen).map((o) => (
+              {ptOptionsOf(d.employees, d.pt, d.chosen).map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
                 </option>
@@ -820,7 +813,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
                 Project
                 <select name="project" defaultValue={String(idParam(sp, 'project') ?? '')}>
                   <option value="">Semua</option>
-                  {ptOptions(d.loc.projects, d.pt, d.chosen).map((o) => (
+                  {ptOptionsOf(d.loc.projects, d.pt, d.chosen).map((o) => (
                     <option key={o.id} value={o.id}>
                       {o.label}
                     </option>
@@ -831,14 +824,14 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
                 Pusat biaya
                 <select name="pusat" defaultValue={String(idParam(sp, 'pusat') ?? '')}>
                   <option value="">Semua</option>
-                  {ptOptions(d.loc.costCenters, d.pt, d.chosen).map((o) => (
+                  {ptOptionsOf(d.loc.costCenters, d.pt, d.chosen).map((o) => (
                     <option key={o.id} value={o.id}>
                       {o.label}
                     </option>
                   ))}
                 </select>
               </label>
-              <SiteSelect options={ptOptions(d.loc.sites, d.pt, d.chosen)} value={idParam(sp, 'site')} all="Semua" />
+              <SiteSelect options={ptOptionsOf(d.loc.sites, d.pt, d.chosen)} value={idParam(sp, 'site')} all="Semua" />
             </>
           ) : null}
           <button type="submit" className="pk-kbtn primary">

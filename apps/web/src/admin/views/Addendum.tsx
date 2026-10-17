@@ -20,7 +20,7 @@ import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseListQuery } from '@/admin/list-quer
 import { F3Root } from './f3-ui'
 import { Frame } from './frame'
 import { Alert, dateTimeId } from './progress-ui'
-import { PtChip, ptView } from './pt'
+import { PtChip, ptOptionsOf, ptView } from './pt'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText, rp, StatusPill, VIZ_STYLE, type Col } from './viz'
 import { NoAccess } from './NoAccess'
 
@@ -158,9 +158,12 @@ export async function AddendumList(props: AdminViewServerProps) {
           Project
           <select name="project" defaultValue={project ? String(project) : ''}>
             <option value="">Semua project</option>
-            {d.projects.map((p) => (
+            {ptOptionsOf(
+              d.projects.map((p) => ({ id: p.id, companyId: relId(p.company) ?? null, label: `${p.code} ${p.name}` })),
+              pt,
+            ).map((p) => (
               <option key={p.id} value={p.id}>
-                {p.code} {p.name}
+                {p.label}
               </option>
             ))}
           </select>

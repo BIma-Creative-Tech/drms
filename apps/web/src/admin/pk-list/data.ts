@@ -1,12 +1,13 @@
 import type { Payload, SanitizedCollectionConfig, SanitizedFieldsPermissions, TypedUser, Where } from 'payload'
 
-import { companyContextOf } from '@/access/roles'
+import { companyContextOf, relId } from '@/access/roles'
 import { pageOfFind, type PageOf } from '@/admin/list-query'
 import { companyLabels } from '@/admin/components/companies/labels'
 import { spValue } from '@/admin/list-query'
 import { mayShowDeleted } from '@/domain/soft-delete/collection'
 import { softDeleteEntry } from '@/domain/soft-delete/registry'
 import { ONLY_DELETED, WITH_DELETED } from '@/domain/soft-delete/where'
+import { ptOptions } from '@/lib/pt-options'
 
 import { buildPkListConfig, topLevelFields, type PkListConfig } from './config'
 import { activeColumns, companyScope, parsePkQuery, pkWhere, type PkQuery } from './query'
@@ -82,23 +83,32 @@ function titleOf(doc: Record<string, unknown>, useAsTitle: string | undefined): 
   return typeof t === 'string' && t.trim() !== '' ? t : typeof t === 'number' ? String(t) : `#${String(doc.id)}`
 }
 
-async function relationshipOptions(payload: Payload, user: TypedUser | null | undefined, relationTo: string, selected: readonly string[]): Promise<FilterOption[]> {
+/**
+ * PT context of the relationship filters (DRMS UI feedback 17/10 #4): per-PT masters carry the same names in every PT —
+ * with the list's PT filter on ONE PT only that PT's rows, else (2+ PTs selected) labels tagged `[CS1]`.
+ */
+type PtContext = { company: number | null; multi: boolean; code: (id: number) => string }
+
+async function relationshipOptions(payload: Payload, user: TypedUser | null | undefined, relationTo: string, selected: readonly string[], pt: PtContext): Promise<FilterOption[]> {
   const target = (payload.collections as Record<string, { config: SanitizedCollectionConfig } | undefined>)[relationTo]?.config
   if (!target) return []
   const useAsTitle = typeof target.admin?.useAsTitle === 'string' ? target.admin.useAsTitle : undefined
   const titleField = useAsTitle ? topLevelFields(target.fields).find((f) => f.name === useAsTitle) : undefined
   const stored = !!titleField && !titleField.virtual
+  const perPt = topLevelFields(target.fields).some((f) => f.name === 'company' && f.type === 'relationship' && f.relationTo === 'companies')
   try {
     const res = await payload.find({
       collection: relationTo as never,
       depth: 0,
       limit: OPTION_LIMIT,
       sort: stored ? useAsTitle : 'id',
-      ...(stored ? { select: { [useAsTitle!]: true } as never } : {}),
+      ...(stored ? { select: (perPt ? { [useAsTitle!]: true, company: true } : { [useAsTitle!]: true }) as never } : {}),
+      ...(perPt && pt.company !== null ? { where: { company: { equals: pt.company } } } : {}),
       overrideAccess: false, // the caller's readable rows only (PT selection included)
       user,
     })
-    const opts = (res.docs as unknown as Array<Record<string, unknown>>).map((d) => ({ value: String(d.id), label: titleOf(d, useAsTitle) }))
+    const rows = (res.docs as unknown as Array<Record<string, unknown>>).map((d) => ({ id: String(d.id), label: titleOf(d, useAsTitle), companyId: perPt ? (relId(d.company) ?? null) : null }))
+    const opts: FilterOption[] = ptOptions(rows, { code: pt.code, multi: perPt && pt.multi && pt.company === null }).map((o) => ({ value: o.id, label: o.label }))
     // a selected value outside the first OPTION_LIMIT rows stays visible (and removable)
     for (const v of selected) if (!opts.some((o) => o.value === v)) opts.push({ value: v, label: `#${v}` })
     return opts
@@ -154,22 +164,30 @@ export async function loadPkList({ payload, user, collection, searchParams, colu
     error = 'Filter pada tautan ini tidak dapat dipakai untuk daftar ini. Klik Reset untuk menampilkan semua data.'
   }
 
+  // URL PT ids outside the selection never reach the where (companyScope) — and are not shown as ticked
+  query.companies = companyScope(query.companies, selected)
+  const multiPt = (selected?.length ?? 0) >= 2
+  const labels = multiPt ? await companyLabels(payload) : null
+  const pt: PtContext = {
+    // the list filtered to exactly one PT → the relationship filters offer that PT's rows only
+    company: query.companies.length === 1 ? query.companies[0]! : null,
+    multi: multiPt && query.companies.length !== 1,
+    code: (id) => labels?.get(id)?.shortCode ?? `#${id}`,
+  }
+
   const relOptions: Record<string, FilterOption[]> = {}
   await Promise.all(
     cfg.filters.map(async (f) => {
-      if (f.kind === 'relationship' && readable(f.name)) relOptions[f.name] = await relationshipOptions(payload, user, f.relationTo, query.filters[f.name] ?? [])
+      if (f.kind === 'relationship' && readable(f.name)) relOptions[f.name] = await relationshipOptions(payload, user, f.relationTo, query.filters[f.name] ?? [], pt)
     }),
   )
 
   let companies: FilterOption[] | null = null
-  if (cfg.hasCompany && readable('company') && (selected?.length ?? 0) >= 2) {
-    const labels = await companyLabels(payload)
+  if (cfg.hasCompany && readable('company') && labels) {
     companies = selected!
       .map((id) => ({ value: String(id), label: labels.get(id)?.shortCode ?? `#${id}`, title: labels.get(id)?.name }))
       .sort((a, b) => a.label.localeCompare(b.label))
   }
-  // URL PT ids outside the selection never reach the where (companyScope) — and are not shown as ticked
-  query.companies = companyScope(query.companies, selected)
 
   return { cfg, query, where, docs: page.items as Array<Record<string, unknown>>, page, columns, available, relOptions, companies, error, deleted }
 }
