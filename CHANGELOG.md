@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-17
+
+**UI feedback 17/10 (5 points): no "Rp"/placeholder overlap, one Edit on Pengajuan biaya (Riwayat = action-bar
+button), RAP entered with the item form (Excel optional), PT-scoped options for multi-PT users, edit pages = add
+pages.** PRs #103, #104, #105, #106. Web only: **no migration**, no API contract change; APK stays 0.8.0. Production
+was never on 0.14.0, so prod goes 0.13.1 → 0.15.0 and runs the 0.14.0 migration (`20261017_100000_d1710_service_types`).
+
 ### UI feedback 17/10
 
 #### Fixed (#1–#3, PR-A; web only, no migration, no contract change)
