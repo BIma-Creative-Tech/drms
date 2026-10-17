@@ -138,7 +138,7 @@ describe('request page server parts (panel-data)', () => {
     expect(await panel(w.users.staffB, src.id)).toBeNull()
     // UI feedback 17/10 #2: "Riwayat" is an action-bar link for every reader
     expect(actionBarProps(own).historyHref).toBe(`/admin/collections/expense-requests/${src.id}/riwayat`)
-    expect(fin.historyHref).toBe(own.historyHref)
+    expect(fin.historyHref).toBe(`/admin/collections/expense-requests/${src.id}/riwayat`)
   })
 
   it('UI feedback 17/10 #2 — Riwayat page: history rows + "← Kembali ke pengajuan"; no read → not found', async () => {
