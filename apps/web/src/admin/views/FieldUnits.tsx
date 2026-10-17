@@ -22,7 +22,7 @@ import { matchesQuery, paginate, parseListQuery } from '@/admin/list-query'
 import { EditButton } from './shared'
 import { BtnLink, FIELD_CREATORS, FIELD_OFFICE, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf, Tabs, UnitStatusPill, dateParam } from './field-ui'
 import { ProjectTimeline } from './field-timeline'
-import { ptView, PtChip } from './pt'
+import { ptOptionsOf, ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText, StatusPill, type Col } from './viz'
 
@@ -705,7 +705,8 @@ export async function FieldTimesheetNew(props: AdminViewServerProps) {
     return { projects, contracts, units, today }
   })
   const hm = new Map(d.units.map((u) => [u.id, u.lastHourMeter]))
-  const tsProjects: TsProject[] = d.projects
+  // DRMS UI 17/10 #4: project labels tagged `[CS1]` while several PTs are selected
+  const tsProjects: TsProject[] = ptOptionsOf(d.projects, await ptView(req))
     .map((p) => ({
       projectId: p.id,
       label: p.label,

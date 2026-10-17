@@ -238,7 +238,7 @@ export async function FieldDailyNew(props: AdminViewServerProps) {
           ) : (
             <DailyReportForm
               mode="create"
-              projects={d.projects.map((p) => ({ id: p.id, label: p.label, companyId: p.companyId }))}
+              projects={ptOptionsOf(d.projects, await ptView(req)).map((p) => ({ id: p.id, label: p.label, companyId: p.companyId }))}
               itemsByProject={d.items}
               resourcesByCompany={d.resources}
               today={d.today}

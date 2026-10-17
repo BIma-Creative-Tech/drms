@@ -5,7 +5,7 @@ import { denyAll, hasRole, relId } from '@/access/roles'
 import { anyOf, byRole, rolesAllowed, teamCostCenters, teamProjects, teamSites } from '@/access/policies'
 import { resolveScope } from '@/access/scope'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
-import { ACTIVE_ONLY, andParentCompany, companyField, companyHook, lockedUntilCompany, pickerSameCompany } from '@/fields/company'
+import { companyField, companyHook, lockedUntilCompany, pickerSameCompany, siteOptions } from '@/fields/company'
 
 /**
  * Penugasan tim: employee ↔ project XOR cost center XOR site (form item 9; ADR 0023 site = kantor cabang), role,
@@ -44,10 +44,6 @@ const guard: CollectionBeforeChangeHook = async ({ data, originalDoc, operation,
   return data
 }
 
-/** DRMS UI 17/10 #4: the assignment's PT = the chosen employee's (companyHook derive) — the location pickers follow it. */
-const EMPLOYEE = { field: 'employee', collection: 'employees' } as const
-const WAIT_EMPLOYEE = { field: 'employee', label: 'karyawan' }
-
 export const TeamAssignments: CollectionConfig = withAudit(
   {
     slug: 'team-assignments',
@@ -59,16 +55,17 @@ export const TeamAssignments: CollectionConfig = withAudit(
       update: byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-pm': anyOf(teamProjects(), teamCostCenters(), teamSites()) }),
       delete: denyAll,
     },
-    hooks: { beforeChange: [companyHook('team-assignments', { derive: [{ field: 'employee', collection: 'employees' }], check: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'site', collection: 'sites' }] }), guard] },
+    hooks: { beforeChange: [companyHook('team-assignments', { derive: [{ field: 'employee', collection: 'employees' }], check: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'site', collection: 'sites' }], companyIsFilter: true }), guard] },
     fields: [
-      companyField({ derived: true }),
-      // DRMS 16/10 (b): "+ Karyawan baru" (plain employee form in a drawer, no user account) — the PT follows the employee
-      creatableRelationship({ name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true, decidesCompany: true }), admin: { placeholder: 'Pilih karyawan…' } }, { company: 'record' }),
-      // DRMS UI 17/10 #4: project / pusat biaya / site of the chosen employee's PT only; wait for the employee
-      lockedUntilCompany({ name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany({ parent: EMPLOYEE }), admin: { placeholder: 'Pilih project…' } }, WAIT_EMPLOYEE),
-      lockedUntilCompany({ name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany({ parent: EMPLOYEE }), admin: { placeholder: 'Pilih pusat biaya…' } }, WAIT_EMPLOYEE),
+      // DRMS UI 17/10 #4 (owner 2026-10-17): PT picker that only filters the pickers below (the PT follows the employee)
+      companyField({ derived: true, filter: true }),
+      // DRMS 16/10 (b): "+ Karyawan baru" (plain employee form in a drawer, no user account); DRMS UI 17/10 #4: employees,
+      // projects, pusat biaya and sites of the chosen PT only — locked ("Pilih PT terlebih dahulu") until it has a value
+      creatableRelationship({ name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true }), admin: { placeholder: 'Pilih karyawan…' } }, { company: 'form', lock: true }),
+      lockedUntilCompany({ name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany(), admin: { placeholder: 'Pilih project…' } }),
+      lockedUntilCompany({ name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany(), admin: { placeholder: 'Pilih pusat biaya…' } }),
       // ADR 0023 (Q-S5): assignment to a branch office for a period (attendance at the site; PM role = on-behalf there)
-      lockedUntilCompany({ name: 'site', type: 'relationship', relationTo: 'sites', label: 'Site', index: true, ...pickerSameCompany({ parent: EMPLOYEE }), filterOptions: andParentCompany(ACTIVE_ONLY, EMPLOYEE), admin: { placeholder: 'Pilih site…' } }, WAIT_EMPLOYEE),
+      lockedUntilCompany({ name: 'site', type: 'relationship', relationTo: 'sites', label: 'Site', index: true, ...pickerSameCompany(), filterOptions: siteOptions, admin: { placeholder: 'Pilih site…' } }),
       {
         name: 'roleInProject',
         type: 'select',

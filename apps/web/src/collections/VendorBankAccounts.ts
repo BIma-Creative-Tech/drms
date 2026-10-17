@@ -41,7 +41,7 @@ export const VendorBankAccounts: CollectionConfig = withAudit(
         },
       ],
       beforeChange: [
-        companyHook('vendor-bank-accounts', { derive: [{ field: 'vendor', collection: 'vendors' }] }),
+        companyHook('vendor-bank-accounts', { derive: [{ field: 'vendor', collection: 'vendors' }], companyIsFilter: true }),
         ({ data, originalDoc }) => {
           const no = typeof data.accountNo === 'string' ? data.accountNo : typeof originalDoc?.accountNo === 'string' ? originalDoc.accountNo : ''
           const holder = data.accountHolder !== undefined ? data.accountHolder : originalDoc?.accountHolder
@@ -51,9 +51,11 @@ export const VendorBankAccounts: CollectionConfig = withAudit(
       ],
     },
     fields: [
-      companyField({ derived: true }),
-      // DRMS 16/10 (b): "+ Vendor baru" — the PT of the account follows the vendor, so the drawer asks for the PT
-      creatableRelationship({ name: 'vendor', type: 'relationship', relationTo: 'vendors', label: 'Vendor', required: true, index: true, ...pickerSameCompany({ required: true, decidesCompany: true }), admin: { placeholder: 'Pilih vendor…' } }, { company: 'record' }),
+      // DRMS UI 17/10 #4 (owner 2026-10-17): PT picker that only filters the Vendor picker (same names in several PTs)
+      companyField({ derived: true, filter: true }),
+      // DRMS 16/10 (b): "+ Vendor baru"; DRMS UI 17/10 #4: vendors of the chosen PT only — empty and locked ("Pilih PT
+      // terlebih dahulu") until the PT filter has a value; the drawer starts in that PT. The account's PT follows the vendor.
+      creatableRelationship({ name: 'vendor', type: 'relationship', relationTo: 'vendors', label: 'Vendor', required: true, index: true, ...pickerSameCompany({ required: true }), admin: { placeholder: 'Pilih vendor…' } }, { company: 'form', lock: true }),
       { name: 'bank', type: 'relationship', relationTo: 'banks', label: 'Bank', required: true, admin: { placeholder: 'Pilih bank…' } },
       {
         name: 'accountNo',

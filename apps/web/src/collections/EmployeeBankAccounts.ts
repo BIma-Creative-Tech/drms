@@ -40,7 +40,7 @@ export const EmployeeBankAccounts: CollectionConfig = withAudit(
           return data
         },
       ],
-      beforeChange: [companyHook('employee-bank-accounts', { derive: [{ field: 'employee', collection: 'employees' }] }),
+      beforeChange: [companyHook('employee-bank-accounts', { derive: [{ field: 'employee', collection: 'employees' }], companyIsFilter: true }),
         ({ data }) => {
           const no = typeof data.accountNo === 'string' ? data.accountNo : ''
           data.label = no ? `${String(data.accountHolder ?? '').trim()} ••${no.slice(-4)}` : data.label
@@ -49,9 +49,11 @@ export const EmployeeBankAccounts: CollectionConfig = withAudit(
       ],
     },
     fields: [
-      companyField({ derived: true }),
-      // DRMS 16/10 (b): "+ Karyawan baru" (plain employee form in a drawer, no user account) — the PT follows the employee
-      creatableRelationship({ name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true, decidesCompany: true }), admin: { placeholder: 'Pilih karyawan…' } }, { company: 'record' }),
+      // DRMS UI 17/10 #4 (owner 2026-10-17): PT picker that only filters the Karyawan picker
+      companyField({ derived: true, filter: true }),
+      // DRMS 16/10 (b): "+ Karyawan baru" (plain employee form in a drawer, no user account); DRMS UI 17/10 #4: employees of
+      // the chosen PT only — locked until the PT filter has a value. The account's PT follows the employee.
+      creatableRelationship({ name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true }), admin: { placeholder: 'Pilih karyawan…' } }, { company: 'form', lock: true }),
       { name: 'bank', type: 'relationship', relationTo: 'banks', label: 'Bank', required: true, admin: { placeholder: 'Pilih bank…' } },
       {
         name: 'accountNo',
