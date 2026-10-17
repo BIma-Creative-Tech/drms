@@ -32,19 +32,23 @@ export async function RiwayatView(props: DocumentViewServerProps) {
 
   async function loadRows(): Promise<{ rows: HistoryRow[]; denied: boolean }> {
     if (!collection || !docType || !Number.isSafeInteger(id)) return { rows: [], denied: false }
-    return withReqTransaction(req, async () => {
-      if (collection.slug === 'expense-requests') {
-        const ok = await loadVisible(req, id).then(
+    // Visibility first, OUTSIDE the history transaction: a refused findByID (404/403) makes Payload kill the req's
+    // transaction, and the commit of withReqTransaction then failed ("no active transaction") — the page crashed
+    // instead of showing "Dokumen tidak ditemukan." (found by the UI feedback 17/10 #2 test).
+    const isExpense = collection.slug === 'expense-requests'
+    const visible = isExpense
+      ? await loadVisible(req, id).then(
           () => true,
           () => false,
         )
-        return ok ? { rows: await requestHistory(req, id), denied: false } : { rows: [], denied: true }
-      }
-      const visible = await req.payload
-        .findByID({ collection: collection.slug as CollectionSlug, id, depth: 0, user: req.user, overrideAccess: false, req })
-        .catch(() => null)
-      return visible ? { rows: await historyRows(req, [{ docType, ids: [String(id)] }]), denied: false } : { rows: [], denied: true }
-    })
+      : await req.payload
+          .findByID({ collection: collection.slug as CollectionSlug, id, depth: 0, user: req.user, overrideAccess: false, req })
+          .then(
+            () => true,
+            () => false,
+          )
+    if (!visible) return { rows: [], denied: true }
+    return withReqTransaction(req, async () => ({ rows: isExpense ? await requestHistory(req, id) : await historyRows(req, [{ docType, ids: [String(id)] }]), denied: false }))
   }
   const tz = (await companySettings(req)).timezone || process.env.TZ || DEFAULT_TZ
   return (

@@ -240,7 +240,7 @@ describe('/admin/rap/:id', () => {
 
   it('UI feedback 17/10 #3 — project RAP tab: the item form for the PM, Excel / template optional (folded below it)', async () => {
     const pm = await tab(w.users.pm, kon)
-    expect(pm).toContain('id="project-rap-manage"')
+    expect(pm).toContain('data-pk-card="project-rap-manage"')
     expect(pm).toContain('data-pk-rap-editor="edit"')
     expect(pm).toMatch(/<button(?![^>]*disabled)[^>]*data-pk-action="rap-item-add"/)
     expect(pm).toMatch(/<button(?![^>]*disabled)[^>]*data-pk-action="rap-item-edit-A.1"/)
