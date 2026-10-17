@@ -8,6 +8,8 @@ import { lineMasterOptions, LINE_PICK_COMPANY_FIRST } from '@/admin/components/l
 import { sameCompanyAsProject } from '@/collections/ContractUnits'
 import {
   andCompany,
+  companyField,
+  companyHook,
   COMPANY_LOCKED_FIELD,
   formCompanyOptions,
   formOrSoleCompany,
@@ -164,6 +166,9 @@ describe('Payload pickers: no every-PT list before the PT is known', () => {
       ['employees', 'workSchedule'],
       ['employees', 'homeSite'],
       ['cash-accounts', 'site'],
+      ['team-assignments', 'project'],
+      ['team-assignments', 'costCenter'],
+      ['team-assignments', 'site'],
     ] as const
     for (const [slug, name] of locked) {
       const f = field(slug, name)
@@ -172,17 +177,44 @@ describe('Payload pickers: no every-PT list before the PT is known', () => {
       expect((f.filterOptions as (a: unknown) => unknown)({ data: FORM, user: user(null) }), `${slug}.${name}`).toBe(false)
     }
     expect(field('vehicles', 'project').filterOptions).toBe(formCompanyOptions)
-    for (const name of ['project', 'costCenter', 'site']) expect(field('team-assignments', name).custom, name).toMatchObject({ pkWaitFor: 'employee', pkWaitLabel: 'karyawan' })
     expect(field('budget-lines', 'category').custom).toMatchObject({ pkWaitFor: 'project' })
     expect(field('contract-units', 'unit').filterOptions).toBe(sameCompanyAsProject)
     expect(field('contract-units', 'unit').custom).toMatchObject({ pkWaitFor: 'project' })
-    // the parent pickers of derived forms keep every readable row until the document has a PT
-    for (const [slug, name] of [['team-assignments', 'employee'], ['employee-bank-accounts', 'employee'], ['vendor-bank-accounts', 'vendor'], ['project-stages', 'project'], ['budget-lines', 'project']] as const) {
+    // the project parent pickers keep every readable row until the document has a PT (projects carry unique codes)
+    for (const [slug, name] of [['project-stages', 'project'], ['budget-lines', 'project']] as const) {
       expect(field(slug, name).filterOptions, `${slug}.${name}`).toBe(sameCompanyOptions)
+    }
+    // owner 2026-10-17: Karyawan / Vendor parents wait for the PT filter of their form (empty before it, then its PT)
+    for (const [slug, name] of [['team-assignments', 'employee'], ['employee-bank-accounts', 'employee'], ['vendor-bank-accounts', 'vendor']] as const) {
+      const f = field(slug, name)
+      expect(f.filterOptions, `${slug}.${name}`).toBe(formCompanyOptions)
+      expect(f.admin?.components?.Field, `${slug}.${name}`).toMatchObject({ clientProps: { pkCreate: { company: 'form', lock: true } } })
+      const pt = field(slug, 'company') as F & { access?: { create?: unknown; update?: () => boolean } }
+      expect(pt.custom, `${slug}.company`).toMatchObject({ pkFilterCompany: true })
+      expect(pt.access?.create, `${slug}.company`).toBeUndefined()
+      expect(pt.access?.update?.(), `${slug}.company`).toBe(false)
     }
     // Klien / Pelanggan (drawer "+"): the form PT's clients only
     expect(field('projects', 'client').filterOptions).toBe(formCompanyOptions)
     expect(typeof field('receipts', 'vendor').filterOptions).toBe('function')
+  })
+
+  it('PT filter of a derived form: the selected PTs; one selected PT is the default; the list filter unchanged', () => {
+    const f = companyField({ derived: true, filter: true }) as unknown as { filterOptions: (a: unknown) => unknown; defaultValue: (a: unknown) => unknown; admin: { position?: string } }
+    expect(f.filterOptions({ data: FORM, user: user(null) })).toEqual({ id: { in: [1, 2] } })
+    expect(f.filterOptions({ data: FORM, user: user([2]) })).toEqual({ id: { in: [2] } })
+    expect(f.filterOptions({ data: {}, user: user(null) })).toBe(true)
+    expect(f.defaultValue({ user: user([2]) })).toBe(2)
+    expect(f.defaultValue({ user: user(null) })).toBeUndefined()
+    expect(f.admin.position).toBeUndefined() // top of the form, not the sidebar
+  })
+
+  it('companyIsFilter: on create the stored PT is the parent PT, never the submitted filter value', async () => {
+    const req = { user: undefined, context: {}, payload: { find: async () => ({ docs: [{ id: 7, company: 2 }] }) }, t: (k: string) => k } as unknown as PayloadRequest
+    const run = (filter: boolean) =>
+      companyHook('team-assignments', { derive: [{ field: 'employee', collection: 'employees' }], companyIsFilter: filter })({ data: { company: 1, employee: 7 }, operation: 'create', req } as never) as Promise<{ company: number }>
+    expect((await run(true)).company).toBe(2)
+    await expect(run(false)).rejects.toBeTruthy() // without the flag a mismatching PT stays an error
   })
 
   it('lockedUntilCompany keeps the field and its admin options', () => {

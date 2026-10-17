@@ -44,12 +44,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     (kategori, project, pusat biaya), Project (klien, site, pusat biaya), Site (jadwal kerja, pusat biaya), Karyawan
     (jadwal kerja, site penempatan), Akun kas (site) list the form's PT only — with several PTs selected they stay
     disabled with "Pilih PT terlebih dahulu" until the PT is chosen (one selected PT: that PT, nothing to choose).
-    Derived forms follow their parent: Penugasan tim (project / pusat biaya / site wait for the Karyawan), Anggaran
-    project (kategori of the project's PT), Unit kontrak (own units of the project's PT), Nota (vendor of the
-    request's PT).
+    Derived forms follow their parent: Anggaran project (kategori of the project's PT), Unit kontrak (own units of
+    the project's PT), Nota (vendor of the request's PT).
+  - **Rekening karyawan, Rekening vendor, Penugasan tim — PT filter (owner 2026-10-17):** a "PT" picker at the top of
+    the create form that only filters: until a PT is chosen the Karyawan / Vendor picker (and, on Penugasan tim,
+    project / pusat biaya / site) is empty and disabled with "Pilih PT terlebih dahulu", afterwards it lists that PT's
+    records only; "+ Karyawan / Vendor baru" starts in that PT. One selected PT → preselected (no extra step). An
+    existing record shows its PT (from the Karyawan / Vendor) as the badge, not editable. The stored PT still follows
+    the Karyawan / Vendor (company hook `companyIsFilter`); nothing new is stored — no migration.
   - **Custom views:** filters of Laporan servis (project, unit, Jenis servis), Laporan harian, Aftersales (project,
     pelanggan), Laporan progress and Addendum carry `[CS1]` while more than one PT is selected; the service-report and
-    aftersales forms tag their project lists, and the aftersales form tags clients until a project narrows them.
+    aftersales forms tag their project lists, and the aftersales form tags clients until a project narrows them; the
+    Laporan harian and Timesheet unit create forms tag their project lists too.
   - **Lists (relationship filters):** labels of per-PT masters carry `[CS1]` with 2+ PTs selected; with the list's
     PT filter on one PT they show that PT's options only.
   No migration, no API change; the company hook and DB trigger still reject cross-PT references.

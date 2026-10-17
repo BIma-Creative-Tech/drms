@@ -26,6 +26,8 @@ let user: TypedUser
 const tag = `PTO${randomUUID().slice(0, 6)}`
 const cat: Record<'A' | 'B', number> = { A: 0, B: 0 }
 let projectB = 0
+const emp: Record<'A' | 'B', number> = { A: 0, B: 0 }
+const ven: Record<'A' | 'B', number> = { A: 0, B: 0 }
 
 const field = (slug: string, name: string) =>
   p.collections[slug as 'vehicles'].config.flattenedFields.find((f) => f.name === name) as unknown as { filterOptions: (a: unknown) => boolean | Where | Promise<boolean | Where> }
@@ -47,6 +49,11 @@ beforeAll(async () => {
   cat.A = await sysCreate('expense-categories', { company: A, code: `${tag}M`, name: `${tag} Material` })
   cat.B = await sysCreate('expense-categories', { company: B, code: `${tag}M`, name: `${tag} Material` })
   for (const c of [A, B]) await sysCreate('urgency-levels', { company: c, code: `${tag}N`, name: `${tag} Normal`, rank: 5 })
+  // the same person / supplier in both PTs (Karyawan and Vendor are per PT)
+  emp.A = await sysCreate('employees', { company: A, code: `${tag}-E`, name: `${tag} Budi` })
+  emp.B = await sysCreate('employees', { company: B, code: `${tag}-E`, name: `${tag} Budi` })
+  ven.A = await sysCreate('vendors', { company: A, name: `${tag} Toko Jaya`, active: true })
+  ven.B = await sysCreate('vendors', { company: B, name: `${tag} Toko Jaya`, active: true })
   projectB = await sysCreate('projects', { company: B, pm: await fixturePm(B), code: `${tag}-PB`, name: `${tag} proyek B`, status: 'berjalan', budget: 0 })
 })
 
@@ -104,5 +111,38 @@ describe('list filters (PkListView): PT tag on same-named options', () => {
     expect(normal(d.relOptions.urgencyLevel!.map((o) => o.label))).toEqual([`${tag} Normal`])
     const inA = (await withContext(admin, [A])) as unknown as TypedUser
     expect(normal((await load(inA, {})).relOptions.urgencyLevel!.map((o) => o.label))).toEqual([`${tag} Normal`])
+  })
+})
+
+describe('derived forms: PT filter picker (Rekening karyawan / vendor, Penugasan tim — owner 2026-10-17)', () => {
+  const rows = async (collection: 'employees' | 'vendors', name: string, where: boolean | Where) =>
+    where === false ? [] : (await p.find({ collection, where: { and: [{ name: { equals: name } }, ...(where === true ? [] : [where])] }, depth: 0, pagination: false, user, overrideAccess: false })).docs.map((d) => d.id)
+
+  it('Karyawan / Vendor picker: empty (locked) before the PT filter, then that PT only; one selected PT → preselected', async () => {
+    for (const [slug, name, coll, label, ids] of [
+      ['team-assignments', 'employee', 'employees', `${tag} Budi`, emp],
+      ['employee-bank-accounts', 'employee', 'employees', `${tag} Budi`, emp],
+      ['vendor-bank-accounts', 'vendor', 'vendors', `${tag} Toko Jaya`, ven],
+    ] as const) {
+      const f = field(slug, name).filterOptions
+      // the readable list itself has both PTs' rows ("duplicates") …
+      expect((await rows(coll, label, true)).length, slug).toBe(2)
+      // … the picker shows nothing until the PT filter is set, then only that PT's row
+      expect(await f({ data: { active: true }, user }), slug).toBe(false)
+      expect(await rows(coll, label, await f({ data: { active: true, company: B }, user })), slug).toEqual([ids.B])
+      expect(await rows(coll, label, await f({ data: { active: true, company: A }, user })), slug).toEqual([ids.A])
+      // the PT filter itself: the selected PTs; with ONE selected PT it is the default (no extra step)
+      const pt = field(slug, 'company') as unknown as { filterOptions: (a: unknown) => unknown; defaultValue: (a: unknown) => unknown }
+      expect(pt.filterOptions({ data: { active: true }, user })).toEqual({ id: { in: expect.arrayContaining([A, B]) } })
+      const inB = (await withContext(admin, [B])) as unknown as TypedUser
+      expect(pt.defaultValue({ user: inB })).toBe(B)
+      expect(await rows(coll, label, await f({ data: { active: true }, user: inB })), slug).toEqual([ids.B])
+    }
+  })
+
+  it('the stored PT still follows the parent — the filter value is not stored (no new column)', async () => {
+    const id = await sysCreate('team-assignments', { company: A, employee: emp.B, project: projectB, roleInProject: 'staff' })
+    const doc = await p.findByID({ collection: 'team-assignments', id, depth: 0, overrideAccess: true /* SYSTEM-READ: assertion */ })
+    expect(relId(doc.company)).toBe(B)
   })
 })

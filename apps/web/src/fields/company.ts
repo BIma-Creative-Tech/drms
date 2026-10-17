@@ -2,7 +2,7 @@ import { APIError, type CollectionBeforeChangeHook, type CollectionSlug, type Pa
 import { relationship as relationshipValidation } from 'payload/shared'
 
 import { PENDING_CREATE_ROLES } from '@/access/policies'
-import { companiesWithRole, hasRole, relId, soleCompany, type Role } from '@/access/roles'
+import { companiesWithRole, hasRole, memberCompanies, relId, soleCompany, type Role } from '@/access/roles'
 import { defaultCompanyForWrite } from '@/domain/companies'
 import { validationError } from '@/lib/validation'
 
@@ -17,7 +17,35 @@ import { validationError } from '@/lib/validation'
 const COMPANY_FIELD = '@/admin/components/companies/CompanyField#CompanyField'
 export const COMPANY_LOCKED_FIELD = '@/admin/components/companies/CompanyLockedField#CompanyLockedField'
 
-export function companyField(opts: { derived?: boolean; createRoles?: readonly Role[] } = {}): RelationshipField {
+/**
+ * `filter` (DRMS UI feedback 17/10 #4, owner 2026-10-17; derived forms only — rekening karyawan / vendor, penugasan
+ * tim): the derived PT becomes a PT picker at the top of the CREATE form that only FILTERS the parent picker (Karyawan /
+ * Vendor exist with the same name in several PTs). It offers the PTs selected in the PT switcher; exactly one → prefilled
+ * (defaultValue + CompanyField badge). The stored PT still comes from the parent: the company hook (`companyIsFilter`)
+ * ignores the submitted value on create, so nothing new is stored (no migration). An existing document shows the PT
+ * badge (immutable, update access false).
+ */
+export function companyField(opts: { derived?: boolean; createRoles?: readonly Role[]; filter?: boolean } = {}): RelationshipField {
+  if (opts.derived && opts.filter) {
+    return {
+      name: 'company',
+      type: 'relationship',
+      relationTo: 'companies',
+      label: 'PT',
+      index: true,
+      access: { update: () => false },
+      filterOptions: ({ data, user }) => {
+        if (isListFilter(data)) return true
+        const ids = user ? memberCompanies({ user } as never) : []
+        return ids.length === 0 ? false : { id: { in: ids } }
+      },
+      // picker-only filter: no save-time re-read of the PT with the caller's access (the hook derives the PT anyway)
+      validate: (value, options) => relationshipValidation(value, { ...options, filterOptions: undefined }),
+      defaultValue: ({ user }: { user?: unknown }) => (user ? soleCompany({ user } as never) : undefined),
+      admin: { description: 'Pilih PT dulu — daftar di bawah mengikuti PT ini. PT data mengikuti karyawan / vendor yang dipilih; tidak dapat diubah setelah dibuat.', placeholder: 'Pilih PT…', components: { Field: COMPANY_FIELD } },
+      custom: { pkFilterCompany: true },
+    }
+  }
   const field: RelationshipField = {
     name: 'company',
     type: 'relationship',
@@ -135,13 +163,15 @@ export const CROSS_COMPANY_MESSAGE = 'Data harus dari PT yang sama (cross-compan
  * them that are set must agree); `check` = further per-PT references that must belong to the same PT.
  * On create it also enforces the role a REST/Local create needs IN the resolved PT (rolesAllowed).
  */
-export function companyHook(slug: CollectionSlug, opts: { derive?: CompanyRef[]; check?: CompanyRef[] } = {}): CollectionBeforeChangeHook {
+export function companyHook(slug: CollectionSlug, opts: { derive?: CompanyRef[]; check?: CompanyRef[]; companyIsFilter?: boolean } = {}): CollectionBeforeChangeHook {
   return async ({ data, originalDoc, operation, req }) => {
     const d = data as Record<string, unknown>
     const prev = (originalDoc ?? {}) as Record<string, unknown>
     let company = relId(prev.company)
     if (operation === 'create') {
-      const given = relId(d.company)
+      // `companyIsFilter` (companyField({ derived, filter })): the submitted PT only filtered the parent picker — the
+      // stored PT is the parent's, exactly as before the filter existed (then the value was dropped by field access)
+      const given = opts.companyIsFilter ? undefined : relId(d.company)
       let derived: number | undefined
       for (const ref of opts.derive ?? []) {
         const ids = refIds(d, ref)

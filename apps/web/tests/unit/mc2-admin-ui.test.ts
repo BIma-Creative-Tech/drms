@@ -128,13 +128,11 @@ describe('employee ↔ PT mapping', () => {
     expect(pickerSameCompany().validate(undefined)).toBe(true)
     expect(pickerSameCompany({ required: true }).validate([])).toBe('Wajib diisi.')
     expect(pickerSameCompany({ required: true }).validate(4)).toBe(true)
-    for (const [slug, field] of [['team-assignments', 'employee'], ['employee-bank-accounts', 'employee']] as const) {
+    // DRMS UI 17/10 #4: pickers wait for the form's PT (master forms) / the PT filter (derived forms, owner 2026-10-17)
+    for (const [slug, field] of [['employees', 'workSchedule'], ['team-assignments', 'employee'], ['employee-bank-accounts', 'employee']] as const) {
       const f = config.collections.find((c) => c.slug === slug)!.flattenedFields.find((x) => x.name === field) as { filterOptions?: unknown }
-      expect(f.filterOptions, `${slug}.${field}`).toBe(sameCompanyOptions)
+      expect(f.filterOptions, `${slug}.${field}`).toBe(formCompanyOptions)
     }
-    // DRMS UI 17/10 #4: a chosen-PT master form's picker waits for the PT (no every-PT list)
-    const ws = config.collections.find((c) => c.slug === 'employees')!.flattenedFields.find((x) => x.name === 'workSchedule') as { filterOptions?: unknown }
-    expect(ws.filterOptions).toBe(formCompanyOptions)
     // QA-15: "Diajukan Oleh" = the PT filter + own employee only for Staff-only users (tests/unit/qa-flow.test.ts)
     const req = config.collections.find((c) => c.slug === 'expense-requests')!.flattenedFields.find((x) => x.name === 'requesters') as { filterOptions?: (a: unknown) => unknown }
     expect(req.filterOptions!({ data: { company: 2 }, user: { roles: ['pk-pm'] } })).toEqual({ company: { equals: 2 } })

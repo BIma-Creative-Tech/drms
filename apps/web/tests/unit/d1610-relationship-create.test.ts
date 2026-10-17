@@ -80,9 +80,10 @@ describe('which pickers get the drawer "+"', () => {
       'projects.client': { company: 'form' },
       'expense-requests.vendor': { company: 'form', lock: true },
       'expense-requests.requesters': { company: 'form', lock: true },
-      'vendor-bank-accounts.vendor': { company: 'record' },
-      'team-assignments.employee': { company: 'record' },
-      'employee-bank-accounts.employee': { company: 'record' },
+      // DRMS UI 17/10 #4 (owner 2026-10-17): the derived forms got a PT filter picker → the parent picker waits for it
+      'vendor-bank-accounts.vendor': { company: 'form', lock: true },
+      'team-assignments.employee': { company: 'form', lock: true },
+      'employee-bank-accounts.employee': { company: 'form', lock: true },
       'vehicles.client': { company: 'form' },
     })
   })

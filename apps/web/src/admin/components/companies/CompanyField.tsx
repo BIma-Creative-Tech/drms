@@ -2,7 +2,7 @@ import { RelationshipField } from '@payloadcms/ui'
 import type { RelationshipFieldServerComponent } from 'payload'
 import React from 'react'
 
-import { relId, type Role } from '@/access/roles'
+import { relId, soleCompany, type Role } from '@/access/roles'
 import { creatableCompanies } from '@/fields/company'
 
 import { CompanyBadge } from './CompanyBadge'
@@ -16,6 +16,8 @@ import { companyLabels } from './labels'
  * On create the normal PT picker stays (the companyField description explains when it is required) — except
  * for a form with `createRoles` (DRMS 13/10 Pengajuan #1/#2) where exactly one PT is possible: prefilled and
  * read-only (CompanyPrefill).
+ * DRMS UI feedback 17/10 #4: the PT FILTER of a derived form (companyField({ derived, filter })) — one selected PT →
+ * prefilled the same way (no extra step); several → the picker; an existing document → the badge (from its parent).
  */
 export const CompanyField: RelationshipFieldServerComponent = async (props) => {
   const { id, data, field, clientField, path, readOnly, schemaPath, permissions, req } = props
@@ -25,8 +27,15 @@ export const CompanyField: RelationshipFieldServerComponent = async (props) => {
     const l = (await companyLabels(req.payload)).get(company)
     return <CompanyBadge shortCode={l?.shortCode ?? `#${company}`} name={l?.name ?? null} />
   }
-  const roles = (field.custom as { pkCreateRoles?: readonly Role[] } | undefined)?.pkCreateRoles
+  const custom = field.custom as { pkCreateRoles?: readonly Role[]; pkFilterCompany?: boolean } | undefined
+  const roles = custom?.pkCreateRoles
   const picker = <RelationshipField field={clientField as never} path={path ?? 'company'} readOnly={readOnly} schemaPath={schemaPath} permissions={permissions} />
+  if (!existing && custom?.pkFilterCompany) {
+    const only = soleCompany(req)
+    if (only === undefined) return picker
+    const l = (await companyLabels(req.payload)).get(only)
+    return <CompanyPrefill path={path ?? 'company'} id={only} shortCode={l?.shortCode ?? `#${only}`} name={l?.name ?? null} />
+  }
   if (existing || !roles) return picker
   const allowed = creatableCompanies(req.user, roles)
   if (allowed.length === 1) {
