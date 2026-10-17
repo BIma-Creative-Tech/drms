@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-17
+
+**Laporan servis: "Jenis servis" as per-PT master data (multi-select), up to 25 photos, no "No. part"; Staff may file a
+vendor payment; APK 0.8.0.** PRs #95, #96, #99, #100. Production goes 0.13.1 → 0.14.0. **APK 0.8.0** (`mobile-v0.8.0`)
+needs server 0.14.0; APK 0.7.0 keeps working against 0.14.0 (legacy `service_type` accepted). CI on main was restored
+(#99) after the throwaway workflow of #97.
+
 ### Changed
 - **Staff may file a "Pembayaran vendor" (owner 2026-10-16, amends ADR 0027).** "untuk pengajuan vendor dibukakan di
   level staff": `VENDOR_PAYMENT_ROLES` = Staff, Finance, PM of the request's PT (403 text now "… oleh Staff, Finance atau
