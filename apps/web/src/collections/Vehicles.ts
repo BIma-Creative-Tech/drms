@@ -7,7 +7,7 @@ import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, odooRefField, uuidField } from '@/fields/common'
 import { normalizeUnitCode, UNIT_STATUS_LABELS, UNIT_STATUSES, unitErrors } from '@/domain/field/rules'
 import { formatPlate, normalizePlate, PLATE_RE } from '@/domain/plates'
-import { companyField, companyHook } from '@/fields/company'
+import { companyField, companyHook, lockedUntilCompany, pickerSameCompany } from '@/fields/company'
 import { validationError } from '@/lib/validation'
 
 const system = { create: () => false, update: () => false }
@@ -140,11 +140,12 @@ export const Vehicles: CollectionConfig = withAudit(
             ],
           },
           // DRMS 16/10 (b): "+ Klien baru" (tabbed Klien form in a drawer, the vehicle's PT)
-          creatableRelationship({ name: 'client', type: 'relationship', relationTo: 'clients', label: 'Pelanggan', index: true, admin: { condition: (data) => data?.owner === 'pelanggan', description: 'Wajib bila milik pelanggan.' } }, { company: 'form' }),
+          creatableRelationship({ name: 'client', type: 'relationship', relationTo: 'clients', label: 'Pelanggan', index: true, ...pickerSameCompany(), admin: { condition: (data) => data?.owner === 'pelanggan', description: 'Wajib bila milik pelanggan.' } }, { company: 'form' }),
         ],
       },
-      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya default' },
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project default' },
+      // DRMS UI 17/10 #4: the vehicle's PT only (same names in every PT); waits for the PT with several PTs selected
+      lockedUntilCompany({ name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya default', ...pickerSameCompany() }),
+      lockedUntilCompany({ name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project default', ...pickerSameCompany() }),
       {
         name: 'status',
         type: 'select',

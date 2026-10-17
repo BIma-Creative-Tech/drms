@@ -2,7 +2,7 @@ import type { AdminViewServerProps, PayloadRequest } from 'payload'
 import Link from 'next/link'
 import React from 'react'
 
-import { hasRoleAny } from '@/access/roles'
+import { hasRoleAny, relId } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
 import { ListToolbar, Pager } from '@/admin/components/list/ListToolbar'
@@ -26,7 +26,7 @@ import { ChartHover } from './ChartHover'
 import { FIELD_STYLE, Tabs } from './field-ui'
 import { ProjectTimeline } from './field-timeline'
 import { Frame } from './frame'
-import { ptView } from './pt'
+import { ptOptionsOf, ptView } from './pt'
 import { Alert, dateId, dateTimeId, ProgressLegend, ProgressTable, ProgressTonePill, ProgressVsBudgetRows } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText, rp, StatusPill, TableView, type Col } from './viz'
 import { NoAccess } from './NoAccess'
@@ -372,11 +372,11 @@ export async function ProgressReportList(props: AdminViewServerProps) {
   const lq = parseListQuery(props.searchParams)
   const d = await withReqTransaction(req, async () => {
     const page = await listReports(req, { projectId: q.project, stageId: q.stage, from: q.from, to: q.to, limit: lq.per, after: q.before, q: lq.q })
-    const projects = (await req.payload.find({ collection: 'projects', sort: 'code', depth: 0, pagination: false, select: { code: true, name: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; code: string; name: string }>
+    const projects = (await req.payload.find({ collection: 'projects', sort: 'code', depth: 0, pagination: false, select: { code: true, name: true, company: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; code: string; name: string; company?: unknown }>
     const stages = q.project
       ? ((await req.payload.find({ collection: 'project-stages', where: { project: { equals: q.project } }, sort: 'sequence', depth: 0, pagination: false, select: { name: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; name: string }>)
       : []
-    return { page, projects, stages }
+    return { page, projects, stages, pt: await ptView(req) }
   })
   const filtered = Boolean(q.project || q.stage || q.from || q.to || lq.q)
   const keep = (extra: Record<string, string>) => {
@@ -474,9 +474,12 @@ export async function ProgressReportList(props: AdminViewServerProps) {
           Project
           <select name="project" defaultValue={q.project ? String(q.project) : ''}>
             <option value="">Semua project</option>
-            {d.projects.map((p) => (
+            {ptOptionsOf(
+              d.projects.map((p) => ({ id: p.id, companyId: relId(p.company) ?? null, label: `${p.code} ${p.name}` })),
+              d.pt,
+            ).map((p) => (
               <option key={p.id} value={p.id}>
-                {p.code} {p.name}
+                {p.label}
               </option>
             ))}
           </select>

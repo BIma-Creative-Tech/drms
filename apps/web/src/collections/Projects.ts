@@ -12,7 +12,7 @@ import { PROJECT_KIND_LABELS, PROJECT_KINDS } from '@/domain/field/rules'
 import { projectFromClientDefault } from '@/domain/partners/project-prefill'
 import { progressWriteGuard } from '@/domain/progress/guards'
 import { codeField, odooRefField, percentField, rupiahField, uuidField } from '@/fields/common'
-import { companyField, companyHook, pickerSameCompany, siteOptions } from '@/fields/company'
+import { companyField, companyHook, lockedUntilCompany, pickerSameCompany, siteOptions } from '@/fields/company'
 import { USER_NAME_VIEW, userPicker } from '@/fields/users'
 
 export const PROJECT_STATUSES = [
@@ -138,10 +138,10 @@ export const Projects: CollectionConfig = withAudit(
         },
       },
       // DRMS 16/10 (b): "+ Klien baru" opens the tabbed Klien form in a drawer, in the project's PT
-      creatableRelationship({ name: 'client', type: 'relationship', relationTo: 'clients', label: 'Klien', access: { update: projectEditors }, defaultValue: projectFromClientDefault('client') }, { company: 'form' }),
+      creatableRelationship({ name: 'client', type: 'relationship', relationTo: 'clients', label: 'Klien', access: { update: projectEditors }, defaultValue: projectFromClientDefault('client'), ...pickerSameCompany() }, { company: 'form' }),
       // ADR 0023 (Q-S1): the branch office (site) that handles the project — at most one; same PT (companyHook + DB
       // trigger). Report / dashboard filter "Site"; the project keeps its own attendance point (no fallback to the site).
-      {
+      lockedUntilCompany({
         name: 'site',
         type: 'relationship',
         relationTo: 'sites',
@@ -151,7 +151,7 @@ export const Projects: CollectionConfig = withAudit(
         ...pickerSameCompany(),
         filterOptions: siteOptions,
         admin: { placeholder: 'Pilih site…', description: 'Kantor cabang yang menangani project ini (opsional).' },
-      },
+      }),
       { name: 'address', type: 'textarea', label: 'Alamat', maxLength: 500 },
       {
         type: 'row',
@@ -176,7 +176,7 @@ export const Projects: CollectionConfig = withAudit(
       },
       // D2 (DRMS 10/10): default cost center of the project's money — Finance gets it pre-selected when recording a
       // transfer (transfers.costCenter, mandatory there). Optional; same PT (companyHook check).
-      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya (default transfer)', index: true, access: { update: projectEditors }, ...pickerSameCompany(), admin: { placeholder: 'Pilih pusat biaya…', description: 'Diusulkan ke Finance saat mencatat transfer pengajuan project ini.' } },
+      lockedUntilCompany({ name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya (default transfer)', index: true, access: { update: projectEditors }, ...pickerSameCompany(), admin: { placeholder: 'Pilih pusat biaya…', description: 'Diusulkan ke Finance saat mencatat transfer pengajuan project ini.' } }),
       // RAB = contract value: money roles of the project's PT only (owner 2026-10-11: hidden from Staff on web, API and
       // APK; Operator/Anggota reads its assigned project for the attendance location only) — access/money.ts
       { ...rupiahField('budget', 'RAB (Rp)'), access: { read: moneyRead('projects'), update: projectEditors } },

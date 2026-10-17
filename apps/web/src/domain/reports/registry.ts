@@ -34,6 +34,7 @@ import {
 } from './kpi'
 import { BUDGET_LABELS, dateRange, formatPct, lastDay, monthRange, periodLabel } from './rules'
 import { companyRefs } from '@/domain/companies'
+import { ptLabel } from '@/lib/pt-options'
 
 import {
   auditScope,
@@ -166,12 +167,12 @@ export function siteParam(sp: URLSearchParams): number | null {
 }
 export const effectiveScope = (scope: ReportScope, sp: URLSearchParams): ReportScope => narrowToSite(narrowToCompanies(scope, ptParam(sp)), siteParam(sp))
 
-/** Prefix of master labels when the scope spans more than one PT (`[CS1] `). */
-async function ptPrefix(req: PayloadRequest, scope: ReportScope): Promise<(companyId: unknown) => string> {
+/** Master option label, PT-tagged (`[CS1] Material`, lib/pt-options.ts) when the scope spans more than one PT. */
+async function ptPrefix(req: PayloadRequest, scope: ReportScope): Promise<(companyId: unknown, label: string) => string> {
   const ids = scopeCompanies(scope)
-  if (ids.length <= 1) return () => ''
+  if (ids.length <= 1) return (_c, label) => label
   const refs = new Map((await companyRefs(req, ids)).map((r) => [r.id, r.shortCode]))
-  return (c) => `[${refs.get(Number(c)) ?? c}] `
+  return (c, label) => ptLabel(refs.get(Number(c)) ?? String(c), label)
 }
 
 const fmtDate = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`
@@ -183,29 +184,29 @@ const qs = (params: Record<string, string | number | undefined>) =>
 async function projectOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
   const pre = await ptPrefix(req, scope)
   const r = await rows(req, sql`SELECT p.id, p.company_id, p.code, p.name FROM projects p WHERE ${projectScopeSql(scope)} ORDER BY p.code, p.company_id`)
-  return r.map((x) => ({ value: String(x.id), label: `${pre(x.company_id)}${x.code} ${x.name}` }))
+  return r.map((x) => ({ value: String(x.id), label: pre(x.company_id, `${x.code} ${x.name}`) }))
 }
 async function costCenterOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
   const pre = await ptPrefix(req, scope)
   const r = await rows(req, sql`SELECT cc.id, cc.company_id, cc.code, cc.name FROM cost_centers cc WHERE ${costCenterScopeSql(scope)} ORDER BY cc.code, cc.company_id`)
-  return r.map((x) => ({ value: String(x.id), label: `${pre(x.company_id)}${x.code} ${x.name}` }))
+  return r.map((x) => ({ value: String(x.id), label: pre(x.company_id, `${x.code} ${x.name}`) }))
 }
 /** Categories of the scope's PTs (per PT: never merged across PTs). */
 async function categoryOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
   const pre = await ptPrefix(req, scope)
   const r = await rows(req, sql`SELECT x.id, x.company_id, x.code, x.name FROM expense_categories x WHERE ${masterScopeSql(scope, 'x')} ORDER BY x.code, x.company_id`)
-  return r.map((x) => ({ value: String(x.id), label: `${pre(x.company_id)}${x.code} ${x.name}` }))
+  return r.map((x) => ({ value: String(x.id), label: pre(x.company_id, `${x.code} ${x.name}`) }))
 }
 /** Cash accounts of the scope's LEDGER PTs (Finance/Owner). */
 async function accountOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
   const pre = await ptPrefix(req, scope)
   const r = await rows(req, sql`SELECT a.id, a.company_id, a.name FROM cash_accounts a WHERE ${ledgerScopeSql(scope, 'a')} ORDER BY a.name, a.company_id`)
-  return r.map((x) => ({ value: String(x.id), label: `${pre(x.company_id)}${x.name}` }))
+  return r.map((x) => ({ value: String(x.id), label: pre(x.company_id, `${x.name}`) }))
 }
 async function vehicleOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
   const pre = await ptPrefix(req, scope)
   const r = await rows(req, sql`SELECT v.id, v.company_id, coalesce(v.unit_code || coalesce(' · ' || v.plate_display, ''), v.plate_display, v.plate_no) AS plate, v.type FROM vehicles v WHERE ${masterScopeSql(scope, 'v')} ORDER BY 3`)
-  return r.map((x) => ({ value: String(x.id), label: `${pre(x.company_id)}${x.plate} (${x.type})` }))
+  return r.map((x) => ({ value: String(x.id), label: pre(x.company_id, `${x.plate} (${x.type})`) }))
 }
 async function requesterOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
   const pre = await ptPrefix(req, scope)
@@ -214,7 +215,7 @@ async function requesterOptions(req: PayloadRequest, scope: ReportScope): Promis
     sql`SELECT DISTINCT e.id, e.company_id, e.code, e.name FROM expense_requests er JOIN expense_requests_rels rr ON rr.parent_id = er.id AND rr.path = 'requesters'
         JOIN employees e ON e.id = rr.employees_id WHERE ${requestScopeSql(scope)} ORDER BY e.name`,
   )
-  return r.map((x) => ({ value: String(x.id), label: `${pre(x.company_id)}${x.name} (${x.code})` }))
+  return r.map((x) => ({ value: String(x.id), label: pre(x.company_id, `${x.name} (${x.code})`) }))
 }
 
 const sel = (name: string, label: string, sp: URLSearchParams, options: Option[]): FilterField => ({ name, label, kind: 'select', options, value: sp.get(name) ?? '' })
@@ -1168,7 +1169,7 @@ async function siteField(req: PayloadRequest, scope: ReportScope, sp: URLSearchP
   const pre = await ptPrefix(req, scope)
   const r = await rows(req, sql`SELECT s.id, s.company_id, s.code, s.name, coalesce(s.active, true) AS active FROM sites s WHERE ${siteScopeSql(scope)} ORDER BY s.code, s.company_id`)
   if (r.length === 0) return []
-  return [sel(SITE_PARAM, 'Site', sp, r.map((x) => ({ value: String(x.id), label: `${pre(x.company_id)}${x.code} ${x.name}${x.active ? '' : ' (nonaktif)'}` })))]
+  return [sel(SITE_PARAM, 'Site', sp, r.map((x) => ({ value: String(x.id), label: pre(x.company_id, `${x.code} ${x.name}${x.active ? '' : ' (nonaktif)'}`) })))]
 }
 
 function withCompanies(def: ReportDef): ReportDef {

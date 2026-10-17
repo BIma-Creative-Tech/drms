@@ -4,9 +4,22 @@
  * computed and never typed; qty ≤ 3 decimals, a unit when qty is set, whole Rupiah amounts.
  */
 import { computeLineTotal, isValidQty } from '@/domain/expense/lines'
+import { ptOptions, type PtOption } from '@/lib/pt-options'
 import { groupRupiah, parseRupiah } from '@/lib/rupiah-input'
 
 export { computeLineTotal }
+
+/** Shown in the line dialog's Kategori / Kendaraan pickers until the request has a PT (same text as CompanyScopedField). */
+export const LINE_PICK_COMPANY_FIRST = 'Pilih PT terlebih dahulu'
+
+/**
+ * DRMS UI feedback 17/10 #4: Kategori / Kendaraan options of the line dialog = the request's PT only (per-PT masters carry
+ * the same names in every PT, so a multi-PT user saw each one twice); unique ids; no PT chosen yet → none (the pickers
+ * wait with "Pilih PT terlebih dahulu"). The server still rejects a cross-PT reference (company hook + DB trigger).
+ */
+export function lineMasterOptions<T extends PtOption>(list: readonly T[], company: number | null): T[] {
+  return company === null ? [] : ptOptions(list, { code: (id) => `#${id}`, company })
+}
 
 /** Line fields of the Payload form state (`lines.<i>.<name>`). */
 export const LINE_FIELD_NAMES = ['description', 'qty', 'uom', 'unitPrice', 'total', 'receiptAmount', 'category', 'vehicle', 'notes', 'rapItem'] as const
