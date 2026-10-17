@@ -154,7 +154,8 @@ class FieldNote extends StatelessWidget {
   }
 }
 
-/// Grid of mutually exclusive options (service type 2 columns, unit status 3 columns), ≥ 40 px targets.
+/// Grid of options (unit status 3 columns: mutually exclusive; service types 2 columns: several via [isSelected]),
+/// ≥ 40 px targets.
 class ChoiceGrid<T> extends StatelessWidget {
   const ChoiceGrid({
     super.key,
@@ -166,9 +167,13 @@ class ChoiceGrid<T> extends StatelessWidget {
     this.keyPrefix = 'choice',
     this.code,
     this.selectedColor,
+    this.isSelected,
   });
   final List<T> options;
   final T? selected;
+
+  /// Multi-select: whether [T] is chosen (instead of `== selected`); [onSelected] then toggles it.
+  final bool Function(T)? isSelected;
   final String Function(T) label;
   final String Function(T)? code;
   final ValueChanged<T>? onSelected;
@@ -185,46 +190,51 @@ class ChoiceGrid<T> extends StatelessWidget {
         return Wrap(
           spacing: 6,
           runSpacing: 6,
-          children: [
-            for (final o in options)
-              SizedBox(
-                width: w,
-                height: 44,
-                child: Material(
-                  color: o == selected ? (selectedColor?.call(o) ?? scheme.primary) : scheme.surface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    side: o == selected ? BorderSide.none : BorderSide(color: scheme.outlineVariant),
-                  ),
-                  child: InkWell(
-                    key: Key('$keyPrefix-${code?.call(o) ?? '$o'}'),
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: onSelected == null ? null : () => onSelected!(o),
-                    child: Semantics(
-                      selected: o == selected,
-                      button: true,
-                      child: Center(
-                        child: Text(
-                          label(o),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: o == selected ? scheme.onPrimary : scheme.onSurface,
-                            fontWeight: o == selected ? FontWeight.w700 : FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
+          children: [for (final o in options) _cell(scheme, o, w, isSelected?.call(o) ?? o == selected)],
         );
       },
     );
   }
+
+  /// One option; at least 44 px high, a long name wraps.
+  Widget _cell(ColorScheme scheme, T o, double w, bool sel) => SizedBox(
+    width: w,
+    child: Material(
+      color: sel ? (selectedColor?.call(o) ?? scheme.primary) : scheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: sel ? BorderSide.none : BorderSide(color: scheme.outlineVariant),
+      ),
+      child: InkWell(
+        key: Key('$keyPrefix-${code?.call(o) ?? '$o'}'),
+        borderRadius: BorderRadius.circular(10),
+        onTap: onSelected == null ? null : () => onSelected!(o),
+        child: Semantics(
+          selected: sel,
+          button: true,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: Center(
+                child: Text(
+                  label(o),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: sel ? scheme.onPrimary : scheme.onSurface,
+                    fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
-/// Spare-part / item rows: name, qty, unit (+ part no. below). Text only, no stock.
+/// Spare-part / item rows: name, qty, unit (+ part no. below unless [showPartNo] is off). Text only, no stock.
 class PartLinesEditor extends StatefulWidget {
   const PartLinesEditor({
     super.key,
@@ -235,6 +245,7 @@ class PartLinesEditor extends StatefulWidget {
     this.keyPrefix = 'part',
     this.enabled = true,
     this.withNote = false,
+    this.showPartNo = true,
   });
   final List<PartLine> lines;
   final ValueChanged<List<PartLine>> onChanged;
@@ -243,6 +254,10 @@ class PartLinesEditor extends StatefulWidget {
   final String keyPrefix;
   final bool enabled;
   final bool withNote;
+
+  /// "No. part" input under each row. Off for the service report (owner 2026-10-17); the part no. of a row loaded
+  /// from an older report is kept unchanged (not shown, not dropped).
+  final bool showPartNo;
 
   @override
   State<PartLinesEditor> createState() => _PartLinesEditorState();
@@ -310,6 +325,7 @@ class _PartLinesEditorState extends State<PartLinesEditor> {
           name: _name[i].text,
           qty: parseDec(_qty[i].text),
           uom: _uom[i].text.trim().isEmpty ? null : _uom[i].text.trim(),
+          // hidden input: the controller still holds the loaded part no.
           partNo: _partNo[i].text.trim().isEmpty ? null : _partNo[i].text.trim(),
         ),
     ];
@@ -414,23 +430,25 @@ class _PartLinesEditorState extends State<PartLinesEditor> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        key: Key('${widget.keyPrefix}-partno-$i'),
-                        controller: _partNo[i],
-                        enabled: widget.enabled,
-                        maxLength: 64,
-                        style: theme.textTheme.bodySmall,
-                        decoration: InputDecoration(isDense: true, counterText: '', hintText: t.fieldPartNoHint),
-                        onChanged: (_) => _emit(),
+                if (widget.showPartNo) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          key: Key('${widget.keyPrefix}-partno-$i'),
+                          controller: _partNo[i],
+                          enabled: widget.enabled,
+                          maxLength: 64,
+                          style: theme.textTheme.bodySmall,
+                          decoration: InputDecoration(isDense: true, counterText: '', hintText: t.fieldPartNoHint),
+                          onChanged: (_) => _emit(),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 40),
-                  ],
-                ),
+                      const SizedBox(width: 40),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

@@ -18,9 +18,9 @@ import 'widgets/field_widgets.dart';
 import '../../../shared/widgets/pick_hint.dart';
 
 /// Laporan Servis Unit (mockup "Android-Servis", ADR 0020 §5): project / contract, unit (search by code or
-/// plate), date (today, ≤ 14 days back), HM (not below the unit's last HM), start/end, service type, complaint,
-/// action, helper, spare parts (text only), unit status after the service, photos before/after (≤ 10), notes.
-/// Autosaved as a draft; "Kirim" queues it for the offline sync.
+/// plate), date (today, ≤ 14 days back), HM (not below the unit's last HM), start/end, service types (≥ 1 of the
+/// PT's master, owner 2026-10-17), complaint, action, helper, spare parts (text only, no part no.), unit status after
+/// the service, photos before/after (≤ 25), notes. Autosaved as a draft; "Kirim" queues it for the offline sync.
 class ServiceReportScreen extends ConsumerStatefulWidget {
   const ServiceReportScreen({super.key, this.initial, this.projectId, this.unitId});
   final FieldDraft? initial;
@@ -51,7 +51,9 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
   String _unitLabel = '';
   FieldUnit? _unit;
   List<(String, double)> _readings = const [];
-  ServiceType? _serviceType;
+  List<int> _typeIds = const [];
+  Map<int, String> _typeNames = const {};
+  String? _legacyType;
   UnitStatus? _status;
   List<PartLine> _parts = const [];
   List<String> _before = const [];
@@ -84,7 +86,9 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
       _hm.text = decInput(c.hourMeter);
       _start.text = c.startTime ?? '';
       _end.text = c.endTime ?? '';
-      _serviceType = c.serviceType;
+      _typeIds = c.serviceTypeIds;
+      _typeNames = c.serviceTypeNames;
+      _legacyType = c.legacyServiceType;
       _complaint.text = c.complaint;
       _action.text = c.action;
       _helpers.text = c.helpers;
@@ -135,7 +139,12 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
         hourMeter: parseDec(_hm.text),
         startTime: _start.text.trim().isEmpty ? null : _start.text.trim(),
         endTime: _end.text.trim().isEmpty ? null : _end.text.trim(),
-        serviceType: _serviceType,
+        serviceTypeIds: _typeIds,
+        serviceTypeNames: {
+          for (final id in _typeIds)
+            if (_typeNames[id] case final String name) id: name,
+        },
+        legacyServiceType: _typeIds.isEmpty ? _legacyType : null,
         complaint: _complaint.text,
         action: _action.text,
         helpers: _helpers.text,
@@ -192,6 +201,34 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
     }, 'unit');
     await _loadReadings();
   }
+
+  /// Multi-select of the PT's service types (≥ 1); the pseudo type of a legacy code ([_legacyId]) is only removed.
+  void _toggleType(ServiceType v) => _set(() {
+    if (v.id == _legacyId) {
+      _legacyType = null;
+    } else if (_typeIds.contains(v.id)) {
+      _typeIds = [..._typeIds]..remove(v.id);
+    } else {
+      _typeIds = [..._typeIds, v.id];
+      _typeNames = {..._typeNames, v.id: v.name};
+    }
+  }, 'serviceType');
+
+  /// Options: the PT's active types + every chosen one (an inactive or not yet cached type stays shown) + the
+  /// legacy code of a report from an APK before 0.8.0 that the cache cannot map.
+  List<ServiceType> _typeOptions(List<ServiceType> types) {
+    final known = {for (final t in types) t.id};
+    return [
+      for (final t in types)
+        if (t.active || _typeIds.contains(t.id)) t,
+      for (final id in _typeIds)
+        if (!known.contains(id)) ServiceType(id: id, companyId: _companyId ?? 0, name: _typeNames[id] ?? '#$id'),
+      if (_typeIds.isEmpty && _legacyType != null)
+        ServiceType(id: _legacyId, companyId: _companyId ?? 0, code: _legacyType!, name: _legacyType!),
+    ];
+  }
+
+  static const _legacyId = -1;
 
   Future<void> _pickTime(TextEditingController c) async {
     final now = TimeOfDay.now();
@@ -296,6 +333,19 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
       _unit = unit;
       if (_unitLabel.isEmpty) _unitLabel = unit.code;
     }
+    final typesAsync = _companyId == null ? null : ref.watch(fieldServiceTypesProvider(_companyId!));
+    final types = typesAsync?.value ?? const <ServiceType>[];
+    if (_typeIds.isEmpty && _legacyType != null) {
+      // a draft of an APK before 0.8.0: its single code becomes the PT's type with that code once the cache has it
+      final m = matchLegacyServiceType(types, _legacyType);
+      if (m != null) {
+        _typeIds = [m.id];
+        _typeNames = {m.id: m.name};
+        _legacyType = null;
+      }
+    }
+    final typeOptions = _typeOptions(types);
+    final noTypes = typeOptions.isEmpty && (typesAsync?.hasValue ?? false);
     final floor = _floor();
     final hm = parseDec(_hm.text);
     final hmBelow = !_isEdit && hm != null && floor != null && hm < floor - 0.005;
@@ -386,6 +436,11 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
                   ? null
                   : (v) => _set(() {
                       final p = projects.firstWhere((p) => p.id == v);
+                      if (p.companyId != _companyId) {
+                        // service types are per PT
+                        _typeIds = const [];
+                        _typeNames = const {};
+                      }
                       _projectId = v;
                       _companyId = p.companyId;
                       _projectLabel = p.label;
@@ -466,12 +521,15 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
                       children: [
                         ChoiceGrid<ServiceType>(
                           keyPrefix: 'service-type',
-                          options: ServiceType.values,
-                          selected: _serviceType,
-                          label: (v) => v.label,
-                          code: (v) => v.code,
-                          onSelected: _busy ? null : (v) => _set(() => _serviceType = v, 'serviceType'),
+                          options: typeOptions,
+                          selected: null,
+                          isSelected: (v) => v.id == _legacyId || _typeIds.contains(v.id),
+                          label: (v) => v.active ? v.name : t.fieldServiceTypeInactive(v.name),
+                          code: (v) => v.code.isEmpty ? '${v.id}' : v.code,
+                          onSelected: _busy ? null : _toggleType,
                         ),
+                        if (noTypes) FieldNote(text: t.fieldServiceTypesEmpty, warn: true),
+                        if (typeOptions.isNotEmpty) FieldNote(text: t.fieldServiceTypeHelp),
                         if (_errors['serviceType'] != null) FieldNote(text: _errors['serviceType']!, error: true),
                       ],
                     ),
@@ -527,6 +585,7 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
                 nameHeader: t.fieldPartNameHeader,
                 addLabel: t.fieldAddSparepart,
                 enabled: !_busy,
+                showPartNo: false,
                 onChanged: (v) => _set(() => _parts = v, 'parts'),
               ),
               if (_errors['parts'] != null) FieldNote(text: _errors['parts']!, error: true),

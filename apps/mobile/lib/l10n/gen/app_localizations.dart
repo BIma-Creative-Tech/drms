@@ -4819,6 +4819,24 @@ abstract class AppLocalizations {
   /// **'Jenis servis'**
   String get fieldServiceType;
 
+  /// No description provided for @fieldServiceTypeHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Boleh pilih lebih dari satu.'**
+  String get fieldServiceTypeHelp;
+
+  /// No description provided for @fieldServiceTypeInactive.
+  ///
+  /// In id, this message translates to:
+  /// **'{name} (nonaktif)'**
+  String fieldServiceTypeInactive(String name);
+
+  /// No description provided for @fieldServiceTypesEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada jenis servis untuk PT ini. Buka Laporan Lapangan saat online (tarik ke bawah), atau minta Admin menambahkannya di web.'**
+  String get fieldServiceTypesEmpty;
+
   /// No description provided for @fieldComplaint.
   ///
   /// In id, this message translates to:
@@ -4846,7 +4864,7 @@ abstract class AppLocalizations {
   /// No description provided for @fieldPartNameHeader.
   ///
   /// In id, this message translates to:
-  /// **'Nama / no. part'**
+  /// **'Nama sparepart'**
   String get fieldPartNameHeader;
 
   /// No description provided for @fieldPartNameHint.

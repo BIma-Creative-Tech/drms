@@ -29,7 +29,7 @@ void main() {
       );
     });
     addTearDown(db.close);
-    expect(db.schemaVersion, 10);
+    expect(db.schemaVersion, 11);
     final repo = DraftRepository(db);
     final before = (await repo.load(sub, 'd-8'))!;
     final line = before.lines.single;

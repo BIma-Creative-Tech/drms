@@ -190,7 +190,8 @@ class FieldService {
 
   /// Refreshes the offline caches of the user's field projects: units (delta), contract units (no rates),
   /// recent timesheets (HM prefill), open POs (no value), the customers of the aftersales picker and (P3
-  /// konstruksi) the RAP items without prices + the PT's manpower / equipment types. Customers
+  /// konstruksi) the RAP items without prices + the PT's manpower / equipment types, and the service types ("Jenis
+  /// servis", per PT) when a project offers the service report. Customers
   /// come from the `clients` master of each PT (refreshed here with the other masters of [membershipIds], per PT
   /// with ETag / version like every master); customers seen in units / POs / activities are only merged in (they
   /// are the whole list when the PT's master has none, e.g. a server without the type). A project the server
@@ -204,6 +205,9 @@ class FieldService {
     final from = addDays(today, -(fieldBackdateMaxDays + 1));
     final seen = <FieldClient>[];
     try {
+      if (projects.any((p) => p.kind.reportTypes.contains(FieldReportType.serviceReport))) {
+        await _refreshServiceTypes(sub);
+      }
       for (final p in projects) {
         try {
           if (p.kind == ProjectKind.konstruksi) {
@@ -258,6 +262,16 @@ class FieldService {
       return true;
     } on NetworkException {
       return false;
+    }
+  }
+
+  /// Service types of every PT of the user (inactive ones too). A server without the endpoint (404) or a refusal
+  /// keeps the cached types; offline ends the refresh (NetworkException).
+  Future<void> _refreshServiceTypes(String sub) async {
+    try {
+      await repo.putServiceTypes(sub, await api.serviceTypes());
+    } on ProblemException {
+      // older server / refused: the cached types stay
     }
   }
 

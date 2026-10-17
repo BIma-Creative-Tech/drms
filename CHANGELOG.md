@@ -37,6 +37,20 @@ turns `service_reports.service_type` into a nullable varchar (first type's code)
 (CHECK + `pk_field_photo_limit`). The 0.13.1 image keeps reading the legacy column (rollback of the image needs no down);
 down is refused once a report has > 10 photos or several / custom types.
 
+### Changed (APK 0.8.0, `mobile-v0.8.0`)
+
+- **Laporan Servis Unit — "Jenis servis" from the PT's master, several per report (owner 2026-10-17).** The fixed list
+  (servis berkala / perbaikan / inspeksi / pemasangan) is gone: the editor offers the active service types of the
+  project's PT (`GET /service-types?includeInactive=1`, cached offline in the new drift table `field_service_types`,
+  schema **v11**, additive; refreshed with the other field caches) as a multi-select ("Pilih minimal satu jenis
+  servis."). A chosen type deactivated later stays shown as "… (nonaktif)". `service_report.upsert` sends
+  `service_type_ids` (create and edit) and no longer the legacy `service_type`; the hub, the record sheet and the
+  conflict screen show the names (cache; "#id" / the legacy code as fallback). A report queued or drafted by an older
+  APK (single legacy code, no ids) is sent with the id of its PT's type of the same code once the cache knows it,
+  otherwise with the legacy `service_type` (the server still accepts it).
+- **Laporan Servis Unit — no "No. part" input** on the spare-part rows (Aftersales keeps it); the part no. of a row
+  loaded from an older report is kept, not dropped. **Photos before/after: up to 25** (was 10).
+
 ## [0.13.1] - 2026-10-16
 
 **Fix: "Pengguna baru" could not be saved for a new account; a definitive Direktur's representative who is also the

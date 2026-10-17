@@ -257,7 +257,7 @@ void main() {
       );
     });
     addTearDown(db.close);
-    expect(db.schemaVersion, 10);
+    expect(db.schemaVersion, 11);
     final repo = FieldRepository(db);
     expect((await repo.load(sub, 'sv-5'))!.service.action, 'Cek');
     await repo.putRap(

@@ -177,6 +177,22 @@ final fieldResourceTypesProvider = FutureProvider.autoDispose.family<List<Resour
   return ref.watch(fieldRepositoryProvider).resourceTypes(sub, companyId);
 });
 
+/// Service types ("Jenis servis") of PT [companyId] (cache; inactive ones included, the picker offers the active ones).
+final fieldServiceTypesProvider = FutureProvider.autoDispose.family<List<ServiceType>, int>((ref, companyId) async {
+  final sub = ref.watch(currentSubProvider);
+  if (sub == null) return const [];
+  ref.watch(fieldCacheRevisionProvider);
+  return ref.watch(fieldRepositoryProvider).serviceTypes(sub, companyId: companyId);
+});
+
+/// id → name of every cached service type (hub list, conflict screen).
+final fieldServiceTypeNamesProvider = FutureProvider.autoDispose<Map<int, String>>((ref) async {
+  final sub = ref.watch(currentSubProvider);
+  if (sub == null) return const {};
+  ref.watch(fieldCacheRevisionProvider);
+  return {for (final t in await ref.watch(fieldRepositoryProvider).serviceTypes(sub)) t.id: t.name};
+});
+
 /// Field reports on this phone not yet applied by the server (drafts, queued, conflicts, rejections).
 final openFieldDraftsProvider = StreamProvider<List<FieldDraft>>((ref) {
   final sub = ref.watch(currentSubProvider);

@@ -1892,11 +1892,21 @@
   "fieldEnd": "Selesai",
   "fieldWork": "Pekerjaan",
   "fieldServiceType": "Jenis servis",
+  "fieldServiceTypeHelp": "Boleh pilih lebih dari satu.",
+  "fieldServiceTypeInactive": "{name} (nonaktif)",
+  "@fieldServiceTypeInactive": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldServiceTypesEmpty": "Belum ada jenis servis untuk PT ini. Buka Laporan Lapangan saat online (tarik ke bawah), atau minta Admin menambahkannya di web.",
   "fieldComplaint": "Keluhan",
   "fieldAction": "Tindakan / pekerjaan",
   "fieldHelpers": "Helper (opsional)",
   "fieldSpareparts": "Sparepart dipakai",
-  "fieldPartNameHeader": "Nama / no. part",
+  "fieldPartNameHeader": "Nama sparepart",
   "fieldPartNameHint": "Nama sparepart",
   "fieldPartNoHint": "No. part (opsional)",
   "fieldUomHint": "set",

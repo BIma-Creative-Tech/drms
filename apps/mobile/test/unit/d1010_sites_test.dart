@@ -67,7 +67,7 @@ void main() {
       );
     });
     addTearDown(db.close);
-    expect(db.schemaVersion, 10);
+    expect(db.schemaVersion, 11);
     final outbox = OutboxRepository(db);
     final old = (await outbox.all(sub)).single;
     expect((old.opUuid, old.siteId, old.status, old.companyId), ('op-old', null, 'pending', 1));

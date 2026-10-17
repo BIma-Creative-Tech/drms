@@ -61,7 +61,7 @@ enum ProjectKind {
 }
 
 enum FieldReportType {
-  serviceReport('service_report', 'service_report.upsert', 'Laporan Servis Unit', 10),
+  serviceReport('service_report', 'service_report.upsert', 'Laporan Servis Unit', 25),
   unitTimesheet('unit_timesheet', 'unit_timesheet.upsert', 'Timesheet Unit', 1),
   aftersalesActivity('aftersales_activity', 'aftersales_activity.upsert', 'Aktivitas Aftersales', 5),
 
@@ -77,7 +77,8 @@ enum FieldReportType {
   final String syncType;
   final String label;
 
-  /// Photos per record (server MAX_PHOTOS: 10 / exactly 1 HM photo / 5).
+  /// Photos per record (server MAX_PHOTOS: service 25 (owner 2026-10-17) / exactly 1 HM photo / aftersales 5 / daily
+  /// report 10).
   final int maxPhotos;
 
   static FieldReportType? fromCode(String? c) => values.where((t) => t.code == c).firstOrNull;
@@ -121,16 +122,40 @@ enum FieldReportType {
   static FieldReportType? fromSegment(String? s) => values.where((t) => t.segment == s).firstOrNull;
 }
 
-enum ServiceType {
-  servisBerkala('servis_berkala', 'Servis berkala'),
-  perbaikan('perbaikan', 'Perbaikan'),
-  inspeksi('inspeksi', 'Inspeksi'),
-  pemasangan('pemasangan', 'Pemasangan');
-
-  const ServiceType(this.code, this.label);
+/// "Jenis servis" of a PT (owner 2026-10-17: a per-PT master managed on the web instead of the fixed list
+/// servis_berkala / perbaikan / inspeksi / pemasangan). `GET /service-types`, cached in `field_service_types`
+/// (inactive ones too: a report that has one keeps showing its name).
+class ServiceType {
+  const ServiceType({
+    required this.id,
+    required this.companyId,
+    this.code = '',
+    this.name = '',
+    this.active = true,
+    this.sortOrder = 0,
+  });
+  final int id;
+  final int companyId;
   final String code;
-  final String label;
-  static ServiceType? fromCode(Object? c) => values.where((v) => v.code == c).firstOrNull;
+  final String name;
+  final bool active;
+  final int sortOrder;
+
+  factory ServiceType.fromJson(Json j) => ServiceType(
+    id: fInt(j['id']),
+    companyId: fInt(j['companyId'] ?? j['company']),
+    code: fStr(j['code']),
+    name: fStr(j['name']),
+    active: j['active'] != false,
+    sortOrder: fInt(j['sortOrder']),
+  );
+}
+
+/// The PT's type with the legacy [code] of a report written by an APK before 0.8.0 (single enum code, no ids):
+/// an active one first. [types] = the types of the report's PT.
+ServiceType? matchLegacyServiceType(Iterable<ServiceType> types, String? code) {
+  if (code == null || code.isEmpty) return null;
+  return types.where((t) => t.code == code && t.active).firstOrNull ?? types.where((t) => t.code == code).firstOrNull;
 }
 
 enum UnitStatus {
@@ -315,7 +340,9 @@ class ServiceContent extends FieldContent {
     this.hourMeter,
     this.startTime,
     this.endTime,
-    this.serviceType,
+    this.serviceTypeIds = const [],
+    this.serviceTypeNames = const {},
+    this.legacyServiceType,
     this.complaint = '',
     this.action = '',
     this.helpers = '',
@@ -330,7 +357,16 @@ class ServiceContent extends FieldContent {
   final double? hourMeter;
   final String? startTime;
   final String? endTime;
-  final ServiceType? serviceType;
+
+  /// Jenis servis (≥ 1): ids of the PT's service types (`service_type_ids`).
+  final List<int> serviceTypeIds;
+
+  /// Names of [serviceTypeIds] when they were chosen / loaded (fallback when the cache does not know an id).
+  final Map<int, String> serviceTypeNames;
+
+  /// Single enum code of a report written by an APK before 0.8.0 (no ids). Mapped to the PT's type with the same
+  /// code once the cache knows it; until then it is sent as the legacy `service_type` (the server accepts it).
+  final String? legacyServiceType;
   final String complaint;
   final String action;
   final String helpers;
@@ -350,6 +386,15 @@ class ServiceContent extends FieldContent {
       if (!p.isBlank) p,
   ];
 
+  bool get hasServiceType => serviceTypeIds.isNotEmpty || (legacyServiceType ?? '').isNotEmpty;
+
+  /// "Perbaikan, Inspeksi": names from [names] (cache), else the names kept with the report, else "#id"; the legacy
+  /// code of a report from an APK before 0.8.0.
+  String serviceTypeLabel([Map<int, String> names = const {}]) {
+    if (serviceTypeIds.isEmpty) return legacyServiceType ?? '';
+    return [for (final id in serviceTypeIds) names[id] ?? serviceTypeNames[id] ?? '#$id'].join(', ');
+  }
+
   @override
   Json toJson() => {
     'unitId': unitId,
@@ -357,7 +402,9 @@ class ServiceContent extends FieldContent {
     'hourMeter': hourMeter,
     'startTime': startTime,
     'endTime': endTime,
-    'serviceType': serviceType?.code,
+    'serviceTypeIds': serviceTypeIds,
+    'serviceTypeNames': _idMap(serviceTypeNames, (v) => v),
+    'legacyServiceType': legacyServiceType,
     'complaint': complaint,
     'action': action,
     'helpers': helpers,
@@ -374,7 +421,10 @@ class ServiceContent extends FieldContent {
     hourMeter: fDblN(j['hourMeter']),
     startTime: fStrN(j['startTime']),
     endTime: fStrN(j['endTime']),
-    serviceType: ServiceType.fromCode(j['serviceType']),
+    serviceTypeIds: [for (final e in fList(j['serviceTypeIds'])) ?fIntN(e)],
+    serviceTypeNames: _byId(j['serviceTypeNames'], fStr),
+    // APK < 0.8.0 stored the single enum code as `serviceType`
+    legacyServiceType: fStrN(j['legacyServiceType'] ?? j['serviceType']),
     complaint: fStr(j['complaint']),
     action: fStr(j['action']),
     helpers: fStr(j['helpers']),
@@ -894,10 +944,13 @@ class FieldDraft {
   );
 
   /// One line for lists: "EX-01 · HM 1.025" / "CV Maju Jaya · Pengiriman SJ-0441".
-  String get summary => switch (content) {
+  String get summary => summaryWith();
+
+  /// [summary] with the service type names of the cache ([serviceTypeNames], id → name).
+  String summaryWith([Map<int, String> serviceTypeNames = const {}]) => switch (content) {
     final ServiceContent c => [
       c.unitLabel,
-      c.serviceType?.label ?? '',
+      c.serviceTypeLabel(serviceTypeNames),
       if (c.hourMeter != null) 'HM ${fmtNum(c.hourMeter!)}',
     ].where((e) => e.isNotEmpty).join(' · '),
     final TimesheetContent c => [
@@ -1200,6 +1253,19 @@ class FieldRecord {
     if (fIntN(fMap(raw['hmPhoto'])['id']) case final int hm) hm,
   ];
 
+  /// Service report: `serviceTypes` [{id, code, name, active}] (owner 2026-10-17; an older server only sends the
+  /// single `serviceType` code).
+  List<Json> get serviceTypes => [for (final x in fList(raw['serviceTypes'])) fMap(x)];
+
+  /// "Perbaikan, Inspeksi", else the legacy `serviceType` code.
+  String get serviceTypeLabel {
+    final names = [
+      for (final x in serviceTypes)
+        if (fStr(x['name']).isNotEmpty) fStr(x['name']),
+    ];
+    return names.isEmpty ? fStr(raw['serviceType']) : names.join(', ');
+  }
+
   List<PartLine> get parts => switch (type) {
     FieldReportType.serviceReport => _lines(raw['spareparts']),
     FieldReportType.aftersalesActivity => _lines(raw['items']),
@@ -1219,10 +1285,7 @@ class FieldRecord {
 
   /// Title line of lists.
   String get title => switch (type) {
-    FieldReportType.serviceReport => [
-      unitCode,
-      ServiceType.fromCode(raw['serviceType'])?.label ?? '',
-    ].where((e) => e.isNotEmpty).join(' · '),
+    FieldReportType.serviceReport => [unitCode, serviceTypeLabel].where((e) => e.isNotEmpty).join(' · '),
     FieldReportType.unitTimesheet => unitCode,
     FieldReportType.aftersalesActivity => [clientName, kind?.label ?? ''].where((e) => e.isNotEmpty).join(' · '),
     FieldReportType.dailyReport =>
@@ -1264,7 +1327,12 @@ class FieldRecord {
         hourMeter: fDblN(raw['hourMeter']),
         startTime: fStrN(raw['startTime']),
         endTime: fStrN(raw['endTime']),
-        serviceType: ServiceType.fromCode(raw['serviceType']),
+        serviceTypeIds: [for (final x in serviceTypes) ?fIntN(x['id'])],
+        serviceTypeNames: {
+          for (final x in serviceTypes)
+            if (fIntN(x['id']) case final int id) id: fStr(x['name']),
+        },
+        legacyServiceType: serviceTypes.isEmpty ? fStrN(raw['serviceType']) : null,
         complaint: fStr(raw['complaint']),
         action: fStr(raw['action']),
         helpers: fStr(raw['helpers']),
