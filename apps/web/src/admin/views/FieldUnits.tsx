@@ -3,7 +3,6 @@ import Link from 'next/link'
 import React from 'react'
 
 import { hasRole, hasRoleAny } from '@/access/roles'
-import { CorrectionDialog, type CorrField } from '@/admin/components/field/CorrectionDialog'
 import { TimesheetForm, type TsProject } from '@/admin/components/field/TimesheetForm'
 import { mayReadRates } from '@/domain/field/access'
 import { BACKDATE_MAX_DAYS, addDays, BREAKDOWN_SUGGEST_SERVICE_HOURS, serviceTypeNames, UNIT_STATUS_LABELS, type UnitStatus } from '@/domain/field/rules'
@@ -20,7 +19,7 @@ import { ListToolbar, Pager } from '@/admin/components/list/ListToolbar'
 import { matchesQuery, paginate, parseListQuery } from '@/admin/list-query'
 
 import { EditButton } from './shared'
-import { BtnLink, FIELD_CREATORS, FIELD_OFFICE, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf, Tabs, UnitStatusPill, dateParam } from './field-ui'
+import { BtnLink, EditLink, editModeOf, FIELD_CREATORS, FIELD_OFFICE, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf, Tabs, UnitStatusPill, dateParam } from './field-ui'
 import { ProjectTimeline } from './field-timeline'
 import { ptOptionsOf, ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
@@ -38,6 +37,8 @@ import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText,
 const contractHref = (id: number, q = '') => `/admin/unit-kontrak/kontrak/${id}${q}`
 const unitHref = (id: number) => `/admin/unit-kontrak/unit/${id}`
 const tsHref = (id: number) => `/admin/unit-kontrak/timesheet/detail/${id}`
+/** UI feedback 17/10 #5: edit (reporter, 24 h) / correction (PM / Direktur) page = the input form, same layout. */
+const tsEditHref = (id: number, correction = false) => `/admin/unit-kontrak/timesheet/${id}/ubah${correction ? '?koreksi=1' : ''}`
 const tsNewHref = (p: { project?: number; unit?: number; date?: string }) => {
   const u = new URLSearchParams()
   if (p.project) u.set('project', String(p.project))
@@ -691,6 +692,21 @@ export async function FieldUnitDetail(props: AdminViewServerProps) {
 
 // ================================================================ timesheet: web input
 
+/** "Aturan" card of the input AND the edit page (UI feedback 17/10 #5: same layout). */
+function TimesheetRules() {
+  return (
+    <Card id="timesheet-help" title="Aturan" span={4}>
+      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
+        <li>Unit harus aktif di kontrak pada tanggal tersebut.</li>
+        <li>HM akhir ≥ HM awal. HM awal berbeda dari HM akhir sebelumnya → ditandai <b>selisih HM</b> untuk PM.</li>
+        <li>Jam kerja + standby + breakdown maks. 24; breakdown wajib alasan.</li>
+        <li>Foto meter HM wajib (1 foto).</li>
+        <li>Tanggal paling lama {BACKDATE_MAX_DAYS} hari ke belakang.</li>
+      </ul>
+    </Card>
+  )
+}
+
 export async function FieldTimesheetNew(props: AdminViewServerProps) {
   const gate = await fieldGate(props, FIELD_CREATORS)
   if (!gate.ok) return gate.page
@@ -732,15 +748,7 @@ export async function FieldTimesheetNew(props: AdminViewServerProps) {
             <TimesheetForm projects={tsProjects} today={d.today} minDate={addDays(d.today, -BACKDATE_MAX_DAYS)} initialProject={initialProject} initialUnit={idParam(sp.unit)} initialDate={dateParam(sp.tanggal)} />
           )}
         </Card>
-        <Card id="timesheet-help" title="Aturan" span={4}>
-          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
-            <li>Unit harus aktif di kontrak pada tanggal tersebut.</li>
-            <li>HM akhir ≥ HM awal. HM awal berbeda dari HM akhir sebelumnya → ditandai <b>selisih HM</b> untuk PM.</li>
-            <li>Jam kerja + standby + breakdown maks. 24; breakdown wajib alasan.</li>
-            <li>Foto meter HM wajib (1 foto).</li>
-            <li>Tanggal paling lama {BACKDATE_MAX_DAYS} hari ke belakang.</li>
-          </ul>
-        </Card>
+        <TimesheetRules />
       </Bento>
     </FieldFrame>
   )
@@ -776,18 +784,6 @@ export async function FieldTimesheetDetail(props: AdminViewServerProps) {
   }
   const { t, history, tz } = d
   const corrector = mayCorrectIn(req, t.companyId)
-  const fields: CorrField[] = [
-    { name: 'hmStart', label: 'HM awal', kind: 'decimal', value: t.hmStart, required: true },
-    { name: 'hmEnd', label: 'HM akhir', kind: 'decimal', value: t.hmEnd, required: true },
-    { name: 'workHours', label: 'Jam kerja', kind: 'decimal', value: t.workHours, max: 24, required: true },
-    { name: 'standbyHours', label: 'Jam standby', kind: 'decimal', value: t.standbyHours, max: 24 },
-    { name: 'breakdownHours', label: 'Jam breakdown', kind: 'decimal', value: t.breakdownHours, max: 24 },
-    { name: 'breakdownReason', label: 'Alasan breakdown', kind: 'text', value: t.breakdownReason, max: 500 },
-    { name: 'fuelLiters', label: 'BBM (liter)', kind: 'decimal', value: t.fuelLiters, max: 100_000 },
-    { name: 'operatorName', label: 'Operator', kind: 'text', value: t.operatorName, max: 128 },
-    { name: 'location', label: 'Lokasi', kind: 'text', value: t.location, max: 200 },
-    { name: 'notes', label: 'Catatan', kind: 'textarea', value: t.notes, max: 2000 },
-  ]
   const unitName = t.unit.label ?? `Unit #${t.unit.id}`
   return (
     <FieldFrame props={props} name="timesheet-detail">
@@ -798,32 +794,24 @@ export async function FieldTimesheetDetail(props: AdminViewServerProps) {
           </BtnLink>
           <BtnLink href={unitHref(t.unit.id)}>Unit</BtnLink>
           {t.editable ? (
-            <CorrectionDialog
-              url={`/api/v1/unit-timesheets/${t.id}`}
-              mode="edit"
-              buttonLabel="Ubah (24 jam)"
-              title="Ubah timesheet"
-              description="Anda pelapor timesheet ini dan masih dalam 24 jam. Hanya isian yang berubah yang dikirim."
-              fields={fields}
-              testId="timesheet-edit"
-            />
+            <EditLink href={tsEditHref(t.id)} action="timesheet-edit" primary>
+              Ubah (24 jam)
+            </EditLink>
           ) : null}
           {corrector ? (
-            <CorrectionDialog
-              url={`/api/v1/unit-timesheets/${t.id}/corrections`}
-              mode="correction"
-              buttonLabel="Koreksi"
-              title="Koreksi timesheet"
-              description="Koreksi oleh PM project / Direktur, kapan saja, dengan alasan. Timesheet ditandai “dikoreksi” dan HM terakhir unit dihitung ulang."
-              fields={fields}
-              testId="timesheet-correct"
-            />
+            <EditLink href={tsEditHref(t.id, true)} action="timesheet-correct">
+              Koreksi
+            </EditLink>
           ) : null}
         </div>
       </DashHead>
       {one(sp.baru) === '1' ? (
         <Alert tone="ok" attr="created">
           <p>Timesheet tersimpan.</p>
+        </Alert>
+      ) : one(sp.disimpan) === '1' ? (
+        <Alert tone="ok" attr="saved">
+          <p>Perubahan tersimpan dan tercatat di riwayat.</p>
         </Alert>
       ) : null}
       {t.flags.length ? (
@@ -896,3 +884,91 @@ export async function FieldTimesheetDetail(props: AdminViewServerProps) {
   )
 }
 
+
+// ================================================================ timesheet: edit / correction (UI feedback 17/10 #5)
+
+/**
+ * `/unit-kontrak/timesheet/:id/ubah` — the reporter's edit within 24 h, `?koreksi=1` the PM / Direktur correction: the
+ * input form (`TimesheetForm`, same sections, order and "Aturan" card) with contract, date and unit disabled, the stored
+ * values and HM photo, and "Alasan" last. Who may open it = who saw the former dialog; the API re-checks everything.
+ */
+export async function FieldTimesheetEdit(props: AdminViewServerProps) {
+  const gate = await fieldGate(props, FIELD_READERS)
+  if (!gate.ok) return gate.page
+  const req = props.initPageResult.req as PayloadRequest
+  const mode = editModeOf(spOf(props))
+  const id = segmentNum(props, 2)
+  const d = await withReqTransaction(req, async () => {
+    const doc = id ? await visibleFieldDoc<TimesheetDoc>(req, 'unit_timesheet', id) : null
+    if (!doc) return null
+    const t = await timesheetDto(req, doc)
+    return { t, today: await todayOf(req, t.companyId) }
+  })
+  const back = (id2: number | null) => (
+    <BtnLink href={id2 ? tsHref(id2) : '/admin/unit-kontrak'} icon="arrowLeft">
+      {id2 ? 'Kembali ke timesheet' : 'Unit & kontrak'}
+    </BtnLink>
+  )
+  if (!d) {
+    return (
+      <FieldFrame props={props} name="timesheet-ubah">
+        <DashHead title="Timesheet tidak ditemukan">{back(null)}</DashHead>
+      </FieldFrame>
+    )
+  }
+  const { t } = d
+  const unitName = t.unit.label ?? `Unit #${t.unit.id}`
+  const allowed = mode === 'edit' ? t.editable : mayCorrectIn(req, t.companyId)
+  const title = `${mode === 'edit' ? 'Ubah' : 'Koreksi'} timesheet ${unitName} · ${dateId(t.reportDate)}`
+  if (!allowed || t.companyId === null) {
+    return (
+      <FieldFrame props={props} name="timesheet-ubah">
+        <DashHead title={title}>{back(t.id)}</DashHead>
+        <Alert tone="bad" attr="not-editable">
+          <p>{mode === 'edit' ? 'Timesheet ini tidak dapat diubah lagi: hanya pelapor, dalam 24 jam sejak dibuat. Setelah itu koreksi oleh PM project / Direktur.' : 'Koreksi timesheet hanya oleh PM project (tim) atau Direktur.'}</p>
+        </Alert>
+      </FieldFrame>
+    )
+  }
+  const project: TsProject = {
+    projectId: t.project.id,
+    label: `${t.project.code ?? ''} ${t.project.name ?? ''}`.trim(),
+    companyId: t.companyId,
+    units: [{ contractUnitId: t.contractUnitId ?? 0, unitId: t.unit.id, label: unitName, startDate: t.reportDate, endDate: t.reportDate, active: true, lastHm: null }],
+  }
+  return (
+    <FieldFrame props={props} name="timesheet-ubah">
+      <DashHead title={title} note={mode === 'edit' ? 'Pelapor, dalam 24 jam sejak dibuat · hanya isian yang berubah yang dikirim · tercatat di riwayat' : 'Koreksi PM project / Direktur dengan alasan · timesheet ditandai “dikoreksi” dan HM terakhir unit dihitung ulang'}>
+        <div className="pk-kact">{back(t.id)}</div>
+      </DashHead>
+      <Bento>
+        <Card id="timesheet-form" title={mode === 'edit' ? 'Ubah timesheet (24 jam)' : 'Koreksi timesheet'} span={8}>
+          <TimesheetForm
+            mode={mode}
+            report={{
+              id: t.id,
+              projectId: t.project.id,
+              unitId: t.unit.id,
+              reportDate: t.reportDate,
+              hmStart: t.hmStart,
+              hmEnd: t.hmEnd,
+              workHours: t.workHours,
+              standbyHours: t.standbyHours,
+              breakdownHours: t.breakdownHours,
+              breakdownReason: t.breakdownReason,
+              fuelLiters: t.fuelLiters,
+              operatorName: t.operatorName,
+              location: t.location,
+              notes: t.notes,
+              hmPhoto: t.hmPhoto ? { id: t.hmPhoto.id, url: t.hmPhoto.url, thumbUrl: t.hmPhoto.thumbUrl } : null,
+            }}
+            projects={[project]}
+            today={d.today}
+            minDate={t.reportDate}
+          />
+        </Card>
+        <TimesheetRules />
+      </Bento>
+    </FieldFrame>
+  )
+}

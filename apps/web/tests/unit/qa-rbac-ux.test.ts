@@ -258,7 +258,9 @@ describe('QA-31 kas edit: proof editable, date/account/amount shown locked', () 
 
   it('edit form shows the locked fields and a proof input', () => {
     const f = src('admin/components/kas/CashEntryForm.tsx')
-    for (const k of ['entryDate', 'cashAccountId', 'amount']) expect(f).toContain(`data-pk-locked="${k}"`)
+    for (const k of ['entryDate', 'amount']) expect(f).toContain(`data-pk-locked="${k}"`)
+    // UI feedback 17/10 #5: the account keeps its create select, disabled (data-pk-locked="cashAccountId" at render time)
+    expect(f).toContain("select('cashAccountId', 'Akun kas', options.accounts, entry.accountId ?? null, { locked: true })")
     expect(f).toContain('data-pk-field="proof"')
   })
 })

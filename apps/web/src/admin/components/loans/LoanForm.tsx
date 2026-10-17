@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import React, { useId, useRef, useState } from 'react'
 
@@ -14,6 +15,8 @@ import { WrapSelect } from '../WrapSelect'
  * creates + submits in one call (POST /api/v1/project-loans {submit:true}); "Simpan draft" keeps a Draft. Edit mode
  * PATCHes a Draft (borrower fixed). Inline errors under each field (server errors mapped by path); one
  * Idempotency-Key per content version.
+ * UI feedback 17/10 #5: the edit page `/pinjaman/:id/ubah` renders this form with the layout of "Ajukan pinjaman"; in
+ * edit mode the draft button reads "Simpan perubahan" and "Batal" goes back to the loan (borrower disabled).
  */
 export type LoanProjectOpt = { id: number; code: string; name: string; companyId: number }
 
@@ -268,8 +271,13 @@ export function LoanForm({ borrowers, lenders, today, initialBorrower, edit }: {
           {busy === 'submit' ? 'Mengajukan…' : 'Ajukan ke Direktur'}
         </button>
         <button type="button" className="pk-kbtn" disabled={busy !== null} onClick={() => void send('draft')} data-pk-action="loan-draft">
-          {busy === 'draft' ? 'Menyimpan…' : 'Simpan draft'}
+          {busy === 'draft' ? 'Menyimpan…' : edit ? 'Simpan perubahan' : 'Simpan draft'}
         </button>
+        {edit ? (
+          <Link className="pk-kbtn" href={`/admin/pinjaman/detail/${edit.id}`} data-pk-action="loan-cancel-edit">
+            Batal
+          </Link>
+        ) : null}
       </div>
     </form>
   )

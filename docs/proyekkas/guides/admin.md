@@ -435,6 +435,9 @@ semua isian tab ini untuk kembali ke tanda tangan pribadi.
 
 - **Absensi → Jadwal & hari libur:** jadwal default (08.00–17.00, toleransi 15 menit, Senin–Sabtu), jadwal per
   karyawan, **hari libur**, dan **Geofence pusat biaya** (Latitude, Longitude, Radius, tombol **Cek di peta ↗**).
+  Hari libur: **+ Tambah hari libur** di kartu itu; **Ubah** pada baris membuka isian yang sama di tempat yang sama
+  (tanggal, keterangan, lalu **Alasan perubahan** wajib) → **Simpan perubahan** / **Batal** (sejak 17 Okt 2026; Direktur
+  juga boleh mengubah).
   Jadwal kerja default diatur per PT (**Perusahaan (PT) → Operasional → Jadwal kerja default**).
 - Titik & radius **project** diisi di **Proyek → Project**. Lokasi tanpa titik tidak bisa dipakai absen; titik tanpa
   radius memakai **Radius geofence default** PT itu. Server menambah toleransi akurasi GPS HP (maks. 50 m) ke radius.

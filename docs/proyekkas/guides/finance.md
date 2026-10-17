@@ -226,9 +226,10 @@ Nomor `KM/…` atau `KK/…` terbit dan saldo langsung berubah.
 - **Kas keluar yang membuat saldo akun minus** memunculkan dialog dengan saldo sekarang dan sesudahnya. **Tetap
   simpan** hanya bila dana memang ada (mis. setoran belum dicatat); konfirmasi tercatat di Audit Log. Void (jurnal
   balik) tidak ditanya.
-- **Ubah:** hanya kas manual di periode terbuka; alasan wajib. Halaman ubah memakai tata letak yang sama dengan
-  catat kas: tanggal, akun dan nominal tampil **terkunci** (koreksi → void lalu catat ulang); **bukti** bisa ditambah
-  atau diganti (**Lihat bukti saat ini** → pilih file baru).
+- **Ubah:** hanya kas manual di periode terbuka; alasan wajib. Halaman ubah = halaman catat kas (form + kartu
+  **Aturan**, urutan isian sama): tanggal, akun dan nominal tampil di kotak yang sama tetapi **terkunci** (abu-abu;
+  koreksi → void lalu catat ulang); **bukti** bisa ditambah atau diganti (**Lihat bukti saat ini** → pilih file baru);
+  **Alasan perubahan** di paling bawah → **Simpan perubahan** atau **Batal** (sejak 17 Okt 2026).
 - **Void:** tombol **Void** + alasan → baris asli bertanda *Void* dan muncul *Jurnal balik*. Kas dari transfer
   dibatalkan lewat **Void transfer**.
 

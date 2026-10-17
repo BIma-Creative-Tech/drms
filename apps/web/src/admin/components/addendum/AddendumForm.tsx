@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import React, { useId, useRef, useState } from 'react'
 
@@ -14,6 +15,8 @@ import { WrapSelect } from '../WrapSelect'
  * "Simpan draft" keeps a Draft. Edit mode PATCHes a Draft. Live preview RAB lama → baru; inline
  * errors under each field (server errors mapped by path); one Idempotency-Key per content version.
  * QA-03: Nominal through the shared Rupiah field (decimals / minus / other characters refused inline).
+ * UI feedback 17/10 #5: the edit page `/addendum/:id/ubah` renders this form with the layout of "Ajukan addendum RAB";
+ * in edit mode the draft button reads "Simpan perubahan" and "Batal" goes back to the addendum (project disabled).
  */
 export type ProjectOpt = { id: number; code: string; name: string; budget: number | null }
 
@@ -202,8 +205,13 @@ export function AddendumForm({ projects, initialProject, edit }: { projects: Pro
           {busy === 'submit' ? 'Mengajukan…' : 'Ajukan ke Direktur'}
         </button>
         <button type="button" className="pk-kbtn" disabled={busy !== null} onClick={() => void send('draft')} data-pk-action="addendum-draft">
-          {busy === 'draft' ? 'Menyimpan…' : 'Simpan draft'}
+          {busy === 'draft' ? 'Menyimpan…' : edit ? 'Simpan perubahan' : 'Simpan draft'}
         </button>
+        {edit ? (
+          <Link className="pk-kbtn" href={`/admin/addendum/detail/${edit.id}`} data-pk-action="addendum-cancel-edit">
+            Batal
+          </Link>
+        ) : null}
       </div>
     </form>
   )

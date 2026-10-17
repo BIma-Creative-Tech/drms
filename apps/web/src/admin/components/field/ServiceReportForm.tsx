@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import React, { useId, useMemo, useRef, useState } from 'react'
 
@@ -6,7 +7,7 @@ import { MAX_PHOTOS, SERVICE_TYPES_REQUIRED, UNIT_STATUS_LABELS, UNIT_STATUSES, 
 import { fmtNum } from '@/domain/field/views'
 
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
-import { CheckGroup, Choice, decOut, DecimalField, LinesEditor, linesOut, PhotoPicker, usePhotos, type LineDraft } from './parts'
+import { CheckGroup, Choice, decOut, DecimalField, LinesEditor, linesFrom, linesOut, PhotoPicker, ReasonField, usePhotos, type ExistingPhoto, type LineDraft } from './parts'
 import { DateInput } from '../DateInput'
 import { WrapSelect } from '../WrapSelect'
 import { WrapText } from '../WrapText'
@@ -20,13 +21,46 @@ import { WrapText } from '../WrapText'
  * parts without a "No. part" input; up to 25 photos. POST /api/v1/service-reports with an
  * Idempotency-Key (same body → same key) and a clientUuid per form (a retry is replayed, never a second
  * report). The server re-checks flag, access, kind, HM_DECREASED, unit/client and the date window.
+ *
+ * UI feedback 17/10 #5 ("edit = add"): the SAME form is the edit page `/laporan-servis/:id/ubah` — `mode="edit"` (the
+ * reporter within 24 h, PATCH, reason optional) or `mode="correction"` (PM / Direktur, POST …/corrections, reason
+ * required). Same sections, order and widgets; project, unit and date stay in place but disabled; the stored photos
+ * are shown (never removed — the API only adds), new ones are added / removed before saving as on create; "Alasan"
+ * is the last field. Only CHANGED fields are sent. The server rules (24 h window, team / role, HM_DECREASED, audit)
+ * are unchanged.
  */
 export type SvProject = { id: number; label: string; companyId: number; kind: string }
 export type SvUnit = { id: number; label: string; sub: string; lastHm: number | null; status: string }
 /** Active "Jenis servis" of the PTs the caller may report in (GET /service-types read model, server-side). */
 export type SvServiceType = { id: number; companyId: number; name: string }
 
+type Part = { name: string; partNo?: string | null; qty: number; uom?: string | null; note?: string | null }
+
+/** The stored report on the edit page (`mode` edit / correction). */
+export type SvReport = {
+  id: number
+  projectId: number
+  unitId: number
+  reportDate: string
+  hourMeter: number | null
+  startTime: string | null
+  endTime: string | null
+  /** selection order */
+  serviceTypeIds: number[]
+  complaint: string | null
+  action: string
+  helpers: string | null
+  unitStatusAfter: UnitStatus
+  spareparts: Part[]
+  notes: string | null
+  photos: ExistingPhoto[]
+}
+
 export type ServiceReportFormProps = {
+  /** default `create` */
+  mode?: 'create' | 'edit' | 'correction'
+  /** edit / correction */
+  report?: SvReport
   projects: SvProject[]
   units: SvUnit[]
   /** project id → unit ids offered for it */
@@ -39,28 +73,34 @@ export type ServiceReportFormProps = {
 }
 
 const uuid = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined)
+const partsJson = (xs: readonly Part[]) => JSON.stringify(xs.map((l) => ({ name: l.name, partNo: l.partNo ?? null, qty: l.qty, uom: l.uom ?? null, note: l.note ?? null })))
+const text = (v: string) => v.trim() || null
 
-export function ServiceReportForm({ projects, units, unitsByProject, serviceTypes, today, minDate, initialProject, initialUnit }: ServiceReportFormProps) {
+export function ServiceReportForm({ mode = 'create', report, projects, units, unitsByProject, serviceTypes, today, minDate, initialProject, initialUnit }: ServiceReportFormProps) {
   const router = useRouter()
   const uid = useId()
   const id = (n: string) => `${uid}-${n}`
-  const [projectId, setProjectId] = useState<string>(initialProject ? String(initialProject) : projects.length === 1 ? String(projects[0]!.id) : '')
+  const r0 = mode === 'create' ? undefined : report
+  const locked = r0 !== undefined
+  const [projectId, setProjectId] = useState<string>(r0 ? String(r0.projectId) : initialProject ? String(initialProject) : projects.length === 1 ? String(projects[0]!.id) : '')
   const offered = useMemo(() => new Set(unitsByProject[projectId] ?? []), [unitsByProject, projectId])
   const unitOpts = units.filter((u) => offered.has(u.id))
-  const [unitId, setUnitId] = useState<string>(initialUnit ? String(initialUnit) : '')
+  const [unitId, setUnitId] = useState<string>(r0 ? String(r0.unitId) : initialUnit ? String(initialUnit) : '')
   const unit = units.find((u) => String(u.id) === unitId && offered.has(u.id)) ?? null
-  const [date, setDate] = useState(today)
-  const [hm, setHm] = useState('')
-  const [start, setStart] = useState('')
-  const [end, setEnd] = useState('')
-  const [typeIds, setTypeIds] = useState<string[]>([])
-  const [complaint, setComplaint] = useState('')
-  const [action, setAction] = useState('')
-  const [helpers, setHelpers] = useState('')
-  const [lines, setLines] = useState<LineDraft[]>([])
-  const [status, setStatus] = useState<UnitStatus | ''>('')
-  const [notes, setNotes] = useState('')
-  const photos = usePhotos(MAX_PHOTOS.service_report)
+  const [date, setDate] = useState(r0?.reportDate ?? today)
+  const [hm, setHm] = useState(r0?.hourMeter !== null && r0?.hourMeter !== undefined ? fmtNum(r0.hourMeter) : '')
+  const [start, setStart] = useState(r0?.startTime ?? '')
+  const [end, setEnd] = useState(r0?.endTime ?? '')
+  const [typeIds, setTypeIds] = useState<string[]>(() => (r0 ? r0.serviceTypeIds.map(String) : []))
+  const [complaint, setComplaint] = useState(r0?.complaint ?? '')
+  const [action, setAction] = useState(r0?.action ?? '')
+  const [helpers, setHelpers] = useState(r0?.helpers ?? '')
+  const [lines, setLines] = useState<LineDraft[]>(() => (r0 ? linesFrom(r0.spareparts) : []))
+  const [status, setStatus] = useState<UnitStatus | ''>(r0?.unitStatusAfter ?? '')
+  const [notes, setNotes] = useState(r0?.notes ?? '')
+  const [reason, setReason] = useState('')
+  const existing = r0?.photos ?? []
+  const photos = usePhotos(Math.max(0, MAX_PHOTOS.service_report - existing.length))
   const [busy, setBusy] = useState<string | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [summary, setSummary] = useState<string | null>(null)
@@ -85,22 +125,72 @@ export function ServiceReportForm({ projects, units, unitsByProject, serviceType
     ) : null
   const desc = (k: string, help?: boolean) => [err(k) ? id(`${k}-e`) : null, help ? id(`${k}-h`) : null].filter(Boolean).join(' ') || undefined
 
+  /** Edit / correction: only the changed fields (+ new photos, reason) → PATCH / POST …/corrections. */
+  const saveChanges = async (r: SvReport) => {
+    const body: Record<string, unknown> = {}
+    if ((hmVal ?? null) !== r.hourMeter) body.hourMeter = hmVal ?? null
+    if ((start || null) !== r.startTime) body.startTime = start || null
+    if ((end || null) !== r.endTime) body.endTime = end || null
+    if (JSON.stringify(typeSel.map(Number)) !== JSON.stringify(r.serviceTypeIds)) body.serviceTypeIds = typeSel.map(Number)
+    if (text(complaint) !== r.complaint) body.complaint = text(complaint)
+    if (action.trim() !== r.action) body.action = action.trim()
+    if (text(helpers) !== r.helpers) body.helpers = text(helpers)
+    if (status && status !== r.unitStatusAfter) body.unitStatusAfter = status
+    if (partsJson(parts.lines) !== partsJson(r.spareparts)) body.spareparts = parts.lines
+    if (text(notes) !== r.notes) body.notes = text(notes)
+    if (Object.keys(body).length === 0 && photos.items.length === 0) {
+      setSummary('Tidak ada perubahan untuk disimpan.')
+      summaryRef.current?.focus()
+      return
+    }
+    setSummary(null)
+    try {
+      if (photos.items.length) {
+        setBusy('Mengunggah foto…')
+        body.addPhotoIds = await photos.uploadAll((d, t) => setBusy(`Mengunggah foto ${d}/${t}…`))
+      }
+      setBusy('Menyimpan…')
+      if (reason.trim()) body.reason = reason.trim()
+      const json = JSON.stringify(body)
+      if (!idem.current || idem.current.body !== json) idem.current = { body: json, key: newIdemKey() }
+      const res = mode === 'correction' ? await sendJson('POST', `/api/v1/service-reports/${r.id}/corrections`, body, idem.current.key) : await sendJson('PATCH', `/api/v1/service-reports/${r.id}`, body, idem.current.key)
+      if (!res.ok) {
+        setErrors(fieldErrors(res.data))
+        setSummary(res.error)
+        summaryRef.current?.focus()
+        return
+      }
+      router.push(`/admin/laporan-servis/detail/${r.id}?disimpan=1`)
+      router.refresh()
+    } catch (x) {
+      setSummary(x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+      summaryRef.current?.focus()
+    } finally {
+      setBusy(null)
+    }
+  }
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     const v: Record<string, string> = {}
     if (!project) v.projectId = 'Pilih project.'
     if (!unit) v.unitId = 'Pilih unit.'
-    if (!date || date > today || date < minDate) v.reportDate = `Tanggal antara ${minDate} dan ${today}.`
+    if (!locked && (!date || date > today || date < minDate)) v.reportDate = `Tanggal antara ${minDate} dan ${today}.`
     if (hmVal === undefined) v.hourMeter = 'HM harus angka ≥ 0, maks. 2 desimal.'
     if (start && end && end <= start) v.endTime = 'Jam selesai harus setelah jam mulai.'
     if (typeSel.length === 0) v.serviceTypeIds = SERVICE_TYPES_REQUIRED
     if (action.trim().length < 3) v.action = 'Tindakan / pekerjaan wajib diisi (min. 3 karakter).'
     if (!status) v.unitStatusAfter = 'Pilih status unit setelah servis.'
     if (Object.keys(parts.errors).length) v.spareparts = 'Periksa baris sparepart.'
+    if (mode === 'correction' && reason.trim().length < 3) v.reason = 'Alasan koreksi wajib diisi (minimal 3 karakter).'
     setErrors(v)
     if (Object.keys(v).length) {
       setSummary(`Periksa ${Object.keys(v).length} isian yang ditandai.`)
       summaryRef.current?.focus()
+      return
+    }
+    if (r0) {
+      await saveChanges(r0)
       return
     }
     setSummary(null)
@@ -147,8 +237,10 @@ export function ServiceReportForm({ projects, units, unitsByProject, serviceType
     }
   }
 
+  const submitLabel = mode === 'create' ? 'Kirim laporan servis' : mode === 'edit' ? 'Simpan perubahan' : 'Simpan koreksi'
+
   return (
-    <form className="pk-kform" onSubmit={submit} noValidate data-pk-form="service-report">
+    <form className="pk-kform" onSubmit={submit} noValidate data-pk-form={mode === 'create' ? 'service-report' : `service-report-${mode}`}>
       <div ref={summaryRef} tabIndex={-1} aria-live="assertive">
         {summary ? (
           <div className="pk-alert bad" role="alert">
@@ -168,12 +260,14 @@ export function ServiceReportForm({ projects, units, unitsByProject, serviceType
             <WrapSelect
               id={id('project')}
               value={projectId}
+              disabled={locked}
               onChange={(e) => {
                 setProjectId(e.target.value)
                 setUnitId('')
               }}
               aria-invalid={err('projectId') ? true : undefined}
               aria-describedby={desc('projectId')}
+              data-pk-locked={locked ? 'project' : undefined}
             >
               <option value="">— Pilih project —</option>
               {projects.map((p) => (
@@ -188,7 +282,7 @@ export function ServiceReportForm({ projects, units, unitsByProject, serviceType
             <label htmlFor={id('unit')}>
               Unit<span className="req" aria-hidden>*</span>
             </label>
-            <WrapSelect id={id('unit')} value={unitId} onChange={(e) => setUnitId(e.target.value)} disabled={!project} aria-invalid={err('unitId') ? true : undefined} aria-describedby={desc('unitId', true)}>
+            <WrapSelect id={id('unit')} value={unitId} onChange={(e) => setUnitId(e.target.value)} disabled={!project || locked} data-pk-locked={locked ? 'unit' : undefined} aria-invalid={err('unitId') ? true : undefined} aria-describedby={desc('unitId', true)}>
               <option value="">{project ? (unitOpts.length ? '— Pilih unit —' : 'Tidak ada unit untuk project ini') : 'Pilih project dulu'}</option>
               {unitOpts.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -205,7 +299,7 @@ export function ServiceReportForm({ projects, units, unitsByProject, serviceType
             <label htmlFor={id('date')}>
               Tanggal<span className="req" aria-hidden>*</span>
             </label>
-            <DateInput id={id('date')} type="date" value={date} min={minDate} max={today} onChange={(e) => setDate(e.target.value)} aria-invalid={err('reportDate') ? true : undefined} aria-describedby={desc('reportDate')} />
+            <DateInput id={id('date')} type="date" value={date} min={locked ? undefined : minDate} max={locked ? undefined : today} disabled={locked} data-pk-locked={locked ? 'reportDate' : undefined} onChange={(e) => setDate(e.target.value)} aria-invalid={err('reportDate') ? true : undefined} aria-describedby={desc('reportDate')} />
             {errEl('reportDate')}
           </div>
           <DecimalField
@@ -277,20 +371,34 @@ export function ServiceReportForm({ projects, units, unitsByProject, serviceType
 
       <section className="pk-fsec" aria-labelledby={id('s-photo')}>
         <h2 id={id('s-photo')}>Foto & catatan</h2>
-        <PhotoPicker photos={photos} name="photos" label="Foto sebelum / sesudah" help="Maks. 25 foto. JPEG/PNG; diperkecil ≤ 1600 px dan lokasi EXIF dihapus di server." error={err('photoIds')} />
+        <PhotoPicker
+          photos={photos}
+          existing={existing}
+          name="photos"
+          label="Foto sebelum / sesudah"
+          help={locked ? `Maks. 25 foto per laporan (sudah ${existing.length}). Foto yang tersimpan tidak dapat dihapus. JPEG/PNG; diperkecil ≤ 1600 px dan lokasi EXIF dihapus di server.` : 'Maks. 25 foto. JPEG/PNG; diperkecil ≤ 1600 px dan lokasi EXIF dihapus di server.'}
+          error={err('photoIds') ?? err('addPhotoIds')}
+        />
         <div className="pk-fld">
           <label htmlFor={id('notes')}>Catatan</label>
           <textarea id={id('notes')} value={notes} maxLength={2000} rows={2} onChange={(e) => setNotes(e.target.value)} />
         </div>
       </section>
 
+      {locked ? <ReasonField id={id('reason')} required={mode === 'correction'} value={reason} onChange={setReason} error={err('reason')} /> : null}
+
       <div className="pk-fsubmit">
         <p className="pk-note" aria-live="polite">
           {unit ? unit.label : 'Unit belum dipilih'}
           {typeof hmVal === 'number' ? ` · HM ${unit?.lastHm !== null && unit?.lastHm !== undefined ? `${fmtNum(unit.lastHm)} → ` : ''}${fmtNum(hmVal)}` : ''} · {parts.lines.length} sparepart · {photos.items.length} foto
         </p>
-        <button type="submit" className="pk-kbtn primary" disabled={busy !== null} data-pk-submit="service-report">
-          {busy ?? 'Kirim laporan servis'}
+        {r0 ? (
+          <Link className="pk-kbtn" href={`/admin/laporan-servis/detail/${r0.id}`} prefetch={false}>
+            Batal
+          </Link>
+        ) : null}
+        <button type="submit" className="pk-kbtn primary" disabled={busy !== null} data-pk-submit={mode === 'create' ? 'service-report' : `service-report-${mode}`}>
+          {busy ?? submitLabel}
         </button>
       </div>
     </form>

@@ -649,6 +649,20 @@ async function formContext(req: PayloadRequest, company: number) {
   return withReqTransaction(req, async () => ({ todayDate: await businessToday(req, company), lockDate: await currentLockDate(req, company), lk: lookupsOf(await cashLookups(req), company) }))
 }
 
+/** "Aturan" card of "Catat kas" AND "Edit" (UI feedback 17/10 #5: the edit page = the create layout, form 8 + card 4). */
+function KasRules({ lockDate }: { lockDate: string | null }) {
+  return (
+    <Card id="kas-help" title="Aturan" span={4}>
+      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
+        <li>Kas masuk wajib sumber; kas keluar wajib kategori.</li>
+        <li>Dibebankan ke project <em>atau</em> pusat biaya, tidak keduanya.</li>
+        <li>Tanggal tidak boleh di masa depan atau di periode yang sudah ditutup{lockDate ? ` (s/d ${dayMonth(lockDate)})` : ''}.</li>
+        <li>Setelah tersimpan, nominal/tanggal/akun tidak bisa diedit — gunakan Void lalu catat ulang.</li>
+      </ul>
+    </Card>
+  )
+}
+
 export async function KasNew(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const acc = kasAccessIn(req)
@@ -686,14 +700,7 @@ export async function KasNew(props: AdminViewServerProps) {
         <Card id="kas-form" title="Transaksi baru" span={8}>
           <CashEntryForm mode="create" today={todayDate} minDate={minPostingDate(lockDate)} lockDate={lockDate} initialDirection={sp.arah === 'keluar' ? 'out' : 'in'} options={formOptions(lk)} />
         </Card>
-        <Card id="kas-help" title="Aturan" span={4}>
-          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
-            <li>Kas masuk wajib sumber; kas keluar wajib kategori.</li>
-            <li>Dibebankan ke project <em>atau</em> pusat biaya, tidak keduanya.</li>
-            <li>Tanggal tidak boleh di masa depan atau di periode yang sudah ditutup{lockDate ? ` (s/d ${dayMonth(lockDate)})` : ''}.</li>
-            <li>Setelah tersimpan, nominal/tanggal/akun tidak bisa diedit — gunakan Void lalu catat ulang.</li>
-          </ul>
-        </Card>
+        <KasRules lockDate={lockDate} />
       </Bento>
     </Frame>
   )
@@ -740,7 +747,7 @@ export async function KasEdit(props: AdminViewServerProps) {
               minDate={minPostingDate(lockDate)}
               lockDate={lockDate}
               initialDirection={e.direction}
-              options={formOptions(lk, [relId(e.category), relId(e.cashInSource), relId(e.project), relId(e.costCenter), relId(e.vehicle)])}
+              options={formOptions(lk, [relId(e.cashAccount), relId(e.category), relId(e.cashInSource), relId(e.project), relId(e.costCenter), relId(e.vehicle)])}
               entry={{
                 id: e.id,
                 entryNo: e.entryNo,
@@ -748,6 +755,7 @@ export async function KasEdit(props: AdminViewServerProps) {
                 entryDate: e.entryDate,
                 amount: e.amount,
                 account: labelOf(lk.accounts, relId(e.cashAccount) ?? null) ?? '',
+                accountId: relId(e.cashAccount) ?? null,
                 description: e.description ?? '',
                 categoryId: relId(e.category) ?? null,
                 cashInSourceId: relId(e.cashInSource) ?? null,
@@ -758,6 +766,7 @@ export async function KasEdit(props: AdminViewServerProps) {
               }}
             />
           </Card>
+          <KasRules lockDate={lockDate} />
         </Bento>
       ) : (
         <div className="pk-alert bad" data-pk-not-editable>

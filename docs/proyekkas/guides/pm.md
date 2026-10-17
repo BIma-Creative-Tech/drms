@@ -98,6 +98,15 @@ kas masuk di PT penerima tercatat otomatis, pengajuan **Selesai** (tanpa LPJ). A
 - Laporan hanya dibuat dari APK. Di web Anda bisa membaca semua laporan tim (**Laporan progress**).
 - Laporan progress otomatis masuk ke PT project yang dipilih — tidak perlu memilih PT.
 
+### 2a. Mengubah dan mengoreksi laporan lapangan (web, sejak 17 Okt 2026)
+
+Laporan harian, laporan servis, aktivitas aftersales dan timesheet unit diubah di **halaman yang sama dengan form
+isiannya** (bukan kotak dialog): buka laporan → **Ubah (24 jam)** (pelapor, 24 jam sejak dibuat) atau **Koreksi**
+(PM project / Direktur, kapan saja). Project, unit, tanggal (aftersales: pelanggan, jenis, PO) tampil abu-abu dan tidak
+bisa diubah; foto yang sudah tersimpan tampil (tidak bisa dihapus), foto baru bisa ditambah. **Alasan** ada di paling
+bawah — wajib untuk koreksi. **Simpan perubahan** / **Simpan koreksi**, atau **Batal** kembali ke laporan. Laporan
+ditandai "dikoreksi" dan perubahan tercatat di **Riwayat & koreksi**.
+
 **Progress vs anggaran:** Laporan progress → tab **Project**, atau web **Progress project**. Hijau = sesuai;
 kuning = perlu perhatian; merah = anggaran terpakai mendahului progress lebih dari 8 poin.
 
@@ -160,6 +169,9 @@ PM"). Dashboard PM menampilkan kartu **"Project Anda belum punya RAP"** berisi p
 2. Pilih project, isi **Tambahan RAB** dan **Alasan** → **Ajukan** (web: **Ajukan ke Direktur**).
 3. Status: **Menunggu Direktur** → **Menunggu Finance** → **Disetujui** (RAB project bertambah) atau **Ditolak**
    (alasan tampil).
+4. Draft (web): buka addendum → **Ubah draft** → halaman yang sama dengan "Ajukan addendum RAB" (project terkunci) →
+   **Simpan perubahan** atau **Ajukan ke Direktur**; **Batal** kembali. Pinjaman antar project: sama (**Ubah draft**,
+   project peminjam terkunci).
 
 Butuh internet. Hanya untuk project yang Anda pegang dan sudah punya RAB.
 

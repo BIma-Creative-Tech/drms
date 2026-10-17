@@ -2,10 +2,9 @@ import type { AdminViewServerProps, PayloadRequest } from 'payload'
 import Link from 'next/link'
 import React from 'react'
 
-import { CorrectionDialog, type CorrField } from '@/admin/components/field/CorrectionDialog'
 import { ServiceReportForm, type SvUnit } from '@/admin/components/field/ServiceReportForm'
 import { companyById } from '@/domain/companies'
-import { addDays, BACKDATE_MAX_DAYS, MAX_PHOTOS, serviceTypeNames, SERVICE_TYPES_REQUIRED, UNIT_STATUS_LABELS, UNIT_STATUSES, unitClientMismatch, type UnitStatus } from '@/domain/field/rules'
+import { addDays, BACKDATE_MAX_DAYS, MAX_PHOTOS, serviceTypeNames, UNIT_STATUS_LABELS, UNIT_STATUSES, unitClientMismatch, type UnitStatus } from '@/domain/field/rules'
 import { listServiceReports, serviceDto, type ServiceDoc, type ServiceDto } from '@/domain/field/service'
 import { listServiceTypes } from '@/domain/field/service-types'
 import { fmtNum, longDate } from '@/domain/field/views'
@@ -16,7 +15,7 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseListQuery } from '@/admin/list-query'
 
-import { BtnLink, dateParam, FIELD_CREATORS, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf, UnitStatusPill } from './field-ui'
+import { BtnLink, dateParam, EditLink, editModeOf, FIELD_CREATORS, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf, UnitStatusPill } from './field-ui'
 import { ptOptionsOf, ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, type Col } from './viz'
@@ -32,11 +31,13 @@ import { DateInput } from '../components/DateInput'
  * DRMS owner 2026-10-17: "Jenis servis" = one or more types of the PT master `service-types` (names joined ", " in the
  * list / detail; list filter "Jenis servis"; multi-select in the form, "Ubah (24 jam)" and "Koreksi" — a type
  * deactivated since stays selectable there as "(nonaktif)" while it is on the report); no "No. part" input for spare
- * parts (the detail shows the column only for old lines that have one); ≤ 25 photos, the edit / correction dialogs may
+ * parts (the detail shows the column only for old lines that have one); ≤ 25 photos, the edit / correction pages may
  * ADD photos up to that total (never remove).
  */
 const listHref = '/admin/laporan-servis'
 const detailHref = (id: number) => `/admin/laporan-servis/detail/${id}`
+/** UI feedback 17/10 #5: edit (reporter, 24 h) / correction (PM / Direktur) page = the input form, same layout. */
+const editHref = (id: number, correction = false) => `/admin/laporan-servis/${id}/ubah${correction ? '?koreksi=1' : ''}`
 
 export async function FieldServiceList(props: AdminViewServerProps) {
   const gate = await fieldGate(props, FIELD_READERS)
@@ -271,6 +272,22 @@ export async function FieldServiceList(props: AdminViewServerProps) {
 
 // ================================================================ web input
 
+/** "Aturan" card of the input AND the edit page (UI feedback 17/10 #5: same layout). */
+function ServiceRules() {
+  return (
+    <Card id="service-help" title="Aturan" span={4}>
+      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
+        <li>HM tidak boleh lebih kecil dari HM terakhir unit (salah ketik: koreksi oleh PM/Direktur).</li>
+        <li>Status unit setelah servis mengubah status unit; “Menunggu part” memberi notifikasi ke PM.</li>
+        <li>Sparepart hanya dicatat (tanpa stok).</li>
+        <li>Jenis servis boleh lebih dari satu (daftar diatur Admin/Direktur di Master Data).</li>
+        <li>Maks. 25 foto sebelum/sesudah.</li>
+        <li>Laporan tidak bisa dihapus.</li>
+      </ul>
+    </Card>
+  )
+}
+
 export async function FieldServiceNew(props: AdminViewServerProps) {
   const gate = await fieldGate(props, FIELD_CREATORS)
   if (!gate.ok) return gate.page
@@ -317,16 +334,7 @@ export async function FieldServiceNew(props: AdminViewServerProps) {
             <ServiceReportForm projects={ptOptionsOf(d.projects, d.pt).map((p) => ({ id: p.id, label: p.label, companyId: p.companyId, kind: p.kind }))} units={units} unitsByProject={unitsByProject} serviceTypes={d.serviceTypes} today={d.today} minDate={addDays(d.today, -BACKDATE_MAX_DAYS)} initialProject={idParam(sp.project)} initialUnit={idParam(sp.unit)} />
           )}
         </Card>
-        <Card id="service-help" title="Aturan" span={4}>
-          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
-            <li>HM tidak boleh lebih kecil dari HM terakhir unit (salah ketik: koreksi oleh PM/Direktur).</li>
-            <li>Status unit setelah servis mengubah status unit; “Menunggu part” memberi notifikasi ke PM.</li>
-            <li>Sparepart hanya dicatat (tanpa stok).</li>
-            <li>Jenis servis boleh lebih dari satu (daftar diatur Admin/Direktur di Master Data).</li>
-            <li>Maks. 25 foto sebelum/sesudah.</li>
-            <li>Laporan tidak bisa dihapus.</li>
-          </ul>
-        </Card>
+        <ServiceRules />
       </Bento>
     </FieldFrame>
   )
@@ -345,9 +353,7 @@ export async function FieldServiceDetail(props: AdminViewServerProps) {
     if (!doc) return null
     const r = await serviceDto(req, doc)
     const co = r.companyId ? await companyById(req, r.companyId).catch(() => null) : null
-    // options of the edit / correction dialogs: active types of the report's PT (+ the attached ones, below)
-    const types = r.companyId ? await listServiceTypes(req, { companyIds: [r.companyId] }) : []
-    return { r, types, history: await historyOf(req, 'service_report', r.id), tz: co?.timezone || process.env.TZ || DEFAULT_TZ }
+    return { r, history: await historyOf(req, 'service_report', r.id), tz: co?.timezone || process.env.TZ || DEFAULT_TZ }
   })
   const back = (
     <BtnLink href={listHref} icon="arrowLeft">
@@ -361,27 +367,9 @@ export async function FieldServiceDetail(props: AdminViewServerProps) {
       </FieldFrame>
     )
   }
-  const { r, types, history, tz } = d
-  const typeOptions = [
-    ...types.map((t) => ({ value: String(t.id), label: t.name })),
-    // a type deactivated since stays on the report (and may stay selected); never offered to new reports
-    ...r.serviceTypes.filter((t) => !types.some((x) => x.id === t.id)).map((t) => ({ value: String(t.id), label: `${t.name} (nonaktif)` })),
-  ]
-  const fields: CorrField[] = [
-    { name: 'hourMeter', label: 'HM saat servis', kind: 'decimal', value: r.hourMeter },
-    { name: 'startTime', label: 'Jam mulai', kind: 'time', value: r.startTime },
-    { name: 'endTime', label: 'Jam selesai', kind: 'time', value: r.endTime },
-    { name: 'serviceTypeIds', label: 'Jenis servis', kind: 'multiselect', value: r.serviceTypes.map((t) => String(t.id)), options: typeOptions, numeric: true, required: true, requiredMessage: SERVICE_TYPES_REQUIRED, help: 'Boleh lebih dari satu.' },
-    { name: 'unitStatusAfter', label: 'Status unit setelah servis', kind: 'select', value: r.unitStatusAfter, options: UNIT_STATUSES.map((t) => ({ value: t, label: UNIT_STATUS_LABELS[t] })) },
-    { name: 'helpers', label: 'Helper', kind: 'text', value: r.helpers, max: 200 },
-    { name: 'complaint', label: 'Keluhan', kind: 'textarea', value: r.complaint, max: 2000 },
-    { name: 'action', label: 'Tindakan / pekerjaan', kind: 'textarea', value: r.action, max: 4000, required: true },
-    { name: 'spareparts', label: 'Sparepart', kind: 'lines', value: r.spareparts as Array<{ name: string; qty: number }>, withNote: true, hidePartNo: true },
-    { name: 'notes', label: 'Catatan', kind: 'textarea', value: r.notes, max: 2000 },
-  ]
+  const { r, history, tz } = d
   const unitName = r.unit.label ?? `Unit #${r.unit.id}`
   const parts = r.spareparts as Array<{ name: string; partNo?: string | null; qty: number; uom?: string | null; note?: string | null }>
-  const photoRoom = { current: r.photos.length, max: MAX_PHOTOS.service_report }
   // "No. part" is no longer entered (DRMS owner 2026-10-17): the column only for old lines that carry one
   const withPartNo = parts.some((p) => typeof p.partNo === 'string' && p.partNo.trim() !== '')
   const partCols: Col<(typeof parts)[number] & { i: number }>[] = [
@@ -398,25 +386,24 @@ export async function FieldServiceDetail(props: AdminViewServerProps) {
           {back}
           <BtnLink href={`/admin/unit-kontrak/unit/${r.unit.id}`}>Unit</BtnLink>
           {r.editable ? (
-            <CorrectionDialog url={`/api/v1/service-reports/${r.id}`} mode="edit" buttonLabel="Ubah (24 jam)" title="Ubah laporan servis" description="Anda pelapor dan masih dalam 24 jam. Hanya isian yang berubah yang dikirim." fields={fields} photos={photoRoom} testId="service-edit" />
+            <EditLink href={editHref(r.id)} action="service-edit" primary>
+              Ubah (24 jam)
+            </EditLink>
           ) : null}
           {mayCorrectIn(req, r.companyId) ? (
-            <CorrectionDialog
-              url={`/api/v1/service-reports/${r.id}/corrections`}
-              mode="correction"
-              buttonLabel="Koreksi"
-              title="Koreksi laporan servis"
-              description="Koreksi oleh PM project / Direktur, kapan saja, dengan alasan. Laporan ditandai “dikoreksi”; status & HM terakhir unit dihitung ulang."
-              fields={fields}
-              photos={photoRoom}
-              testId="service-correct"
-            />
+            <EditLink href={editHref(r.id, true)} action="service-correct">
+              Koreksi
+            </EditLink>
           ) : null}
         </div>
       </DashHead>
       {one(sp.baru) === '1' ? (
         <Alert tone="ok" attr="created">
           <p>Laporan servis tersimpan{r.unitStatusAfter === 'menunggu_part' ? ' — PM project diberi notifikasi unit menunggu part' : ''}.</p>
+        </Alert>
+      ) : one(sp.disimpan) === '1' ? (
+        <Alert tone="ok" attr="saved">
+          <p>Perubahan tersimpan dan tercatat di riwayat.</p>
         </Alert>
       ) : null}
       {r.flags.length ? (
@@ -487,6 +474,107 @@ export async function FieldServiceDetail(props: AdminViewServerProps) {
         <Card id="service-history" title="Riwayat & koreksi" span={5} i={8}>
           <History entries={history} tz={tz} />
         </Card>
+      </Bento>
+    </FieldFrame>
+  )
+}
+
+// ================================================================ edit / correction (UI feedback 17/10 #5)
+
+/**
+ * `/laporan-servis/:id/ubah` — the reporter's edit within 24 h, `?koreksi=1` the PM / Direktur correction: the input
+ * form (`ServiceReportForm`, same sections, order and "Aturan" card) with project, unit and date disabled, the stored
+ * values and photos, and "Alasan" last. Who may open it = who saw the former dialog (`editable` / `mayCorrectIn`);
+ * the API re-checks everything (24 h window, team / role, HM_DECREASED, audit).
+ */
+export async function FieldServiceEdit(props: AdminViewServerProps) {
+  const gate = await fieldGate(props, FIELD_READERS)
+  if (!gate.ok) return gate.page
+  const req = props.initPageResult.req as PayloadRequest
+  const mode = editModeOf(spOf(props))
+  const id = segmentNum(props, 1)
+  const d = await withReqTransaction(req, async () => {
+    const doc = id ? await visibleFieldDoc<ServiceDoc>(req, 'service_report', id) : null
+    if (!doc) return null
+    const r = await serviceDto(req, doc)
+    // options: the ACTIVE types of the report's PT + the attached ones deactivated since ("(nonaktif)", may stay selected)
+    const types = r.companyId ? await listServiceTypes(req, { companyIds: [r.companyId] }) : []
+    return { r, types, today: await todayOf(req, r.companyId) }
+  })
+  const back = (id2: number | null) => (
+    <BtnLink href={id2 ? detailHref(id2) : listHref} icon="arrowLeft">
+      {id2 ? 'Kembali ke laporan' : 'Laporan servis'}
+    </BtnLink>
+  )
+  if (!d) {
+    return (
+      <FieldFrame props={props} name="servis-ubah">
+        <DashHead title="Laporan tidak ditemukan">{back(null)}</DashHead>
+      </FieldFrame>
+    )
+  }
+  const { r, types, today } = d
+  const allowed = mode === 'edit' ? r.editable : mayCorrectIn(req, r.companyId)
+  const title = `${mode === 'edit' ? 'Ubah' : 'Koreksi'} ${r.docNo ?? `laporan servis #${r.id}`}`
+  if (!allowed || r.companyId === null) {
+    return (
+      <FieldFrame props={props} name="servis-ubah">
+        <DashHead title={title}>{back(r.id)}</DashHead>
+        <Alert tone="bad" attr="not-editable">
+          <p>{mode === 'edit' ? 'Laporan ini tidak dapat diubah lagi: hanya pelapor, dalam 24 jam sejak dibuat. Setelah itu koreksi oleh PM project / Direktur.' : 'Koreksi laporan servis hanya oleh PM project (tim) atau Direktur.'}</p>
+        </Alert>
+      </FieldFrame>
+    )
+  }
+  const companyId = r.companyId
+  const serviceTypes = [
+    ...types.map((t) => ({ id: t.id, companyId, name: t.name })),
+    ...r.serviceTypes.filter((t) => !types.some((x) => x.id === t.id)).map((t) => ({ id: t.id, companyId, name: `${t.name} (nonaktif)` })),
+  ]
+  const unitName = r.unit.label ?? `Unit #${r.unit.id}`
+  const unit: SvUnit = {
+    id: r.unit.id,
+    label: unitName,
+    sub: [r.unit.type, r.unit.owner === 'pelanggan' ? 'milik pelanggan' : r.unit.owner === 'sendiri' ? 'milik sendiri' : null].filter(Boolean).join(' · '),
+    // no client-side "HM below the last reading" hint here: the unit's last HM may be this very report (server re-checks)
+    lastHm: null,
+    status: r.unitStatusAfter,
+  }
+  return (
+    <FieldFrame props={props} name="servis-ubah">
+      <DashHead title={title} note={mode === 'edit' ? 'Pelapor, dalam 24 jam sejak dibuat · hanya isian yang berubah yang dikirim · tercatat di riwayat' : 'Koreksi PM project / Direktur dengan alasan · laporan ditandai “dikoreksi”; status & HM terakhir unit dihitung ulang'}>
+        <div className="pk-kact">{back(r.id)}</div>
+      </DashHead>
+      <Bento>
+        <Card id="service-form" title={mode === 'edit' ? 'Ubah laporan (24 jam)' : 'Koreksi laporan'} span={8}>
+          <ServiceReportForm
+            mode={mode}
+            report={{
+              id: r.id,
+              projectId: r.project.id,
+              unitId: r.unit.id,
+              reportDate: r.reportDate,
+              hourMeter: r.hourMeter,
+              startTime: r.startTime,
+              endTime: r.endTime,
+              serviceTypeIds: r.serviceTypes.map((t) => t.id),
+              complaint: r.complaint,
+              action: r.action,
+              helpers: r.helpers,
+              unitStatusAfter: r.unitStatusAfter as UnitStatus,
+              spareparts: r.spareparts as Array<{ name: string; partNo?: string | null; qty: number; uom?: string | null; note?: string | null }>,
+              notes: r.notes,
+              photos: r.photos.map((p) => ({ id: p.id, url: p.url, thumbUrl: p.thumbUrl })),
+            }}
+            projects={[{ id: r.project.id, label: `${r.project.code ?? ''} ${r.project.name ?? ''}`.trim(), companyId, kind: r.project.kind ?? 'kontrak_unit' }]}
+            units={[unit]}
+            unitsByProject={{ [String(r.project.id)]: [r.unit.id] }}
+            serviceTypes={serviceTypes}
+            today={today}
+            minDate={r.reportDate}
+          />
+        </Card>
+        <ServiceRules />
       </Bento>
     </FieldFrame>
   )

@@ -74,6 +74,7 @@ import { ProgressReportDetail as ProgressReportDetail_a083428db0b5e65b9a4db721d5
 import { AddendumList as AddendumList_06d7ee0480b4dc608c229f2cd74032b3 } from '@/admin/views/Addendum'
 import { AddendumNew as AddendumNew_06d7ee0480b4dc608c229f2cd74032b3 } from '@/admin/views/Addendum'
 import { AddendumDetail as AddendumDetail_06d7ee0480b4dc608c229f2cd74032b3 } from '@/admin/views/Addendum'
+import { AddendumEdit as AddendumEdit_06d7ee0480b4dc608c229f2cd74032b3 } from '@/admin/views/Addendum'
 import { NotificationsView as NotificationsView_c3b608bcff53bfc6e9104ed1897a90d5 } from '@/admin/views/Notifikasi'
 import { KeamananAkunView as KeamananAkunView_6681b9a15a5eb31c998645ca38ba9da9 } from '@/admin/views/KeamananAkun'
 import { UnauthorizedView as UnauthorizedView_401f81a3e6a8507dd399c4318d1104a0 } from '@/admin/views/NoAccess'
@@ -83,13 +84,16 @@ import { FieldContractDetail as FieldContractDetail_fbe9056c3fd855882d87e1ac7f3b
 import { FieldUnitDetail as FieldUnitDetail_fbe9056c3fd855882d87e1ac7f3b0327 } from '@/admin/views/FieldUnits'
 import { FieldTimesheetNew as FieldTimesheetNew_fbe9056c3fd855882d87e1ac7f3b0327 } from '@/admin/views/FieldUnits'
 import { FieldTimesheetDetail as FieldTimesheetDetail_fbe9056c3fd855882d87e1ac7f3b0327 } from '@/admin/views/FieldUnits'
+import { FieldTimesheetEdit as FieldTimesheetEdit_fbe9056c3fd855882d87e1ac7f3b0327 } from '@/admin/views/FieldUnits'
 import { FieldServiceList as FieldServiceList_2d301ec73d56aa7c0054d7908bb911ed } from '@/admin/views/FieldService'
 import { FieldServiceNew as FieldServiceNew_2d301ec73d56aa7c0054d7908bb911ed } from '@/admin/views/FieldService'
 import { FieldServiceDetail as FieldServiceDetail_2d301ec73d56aa7c0054d7908bb911ed } from '@/admin/views/FieldService'
+import { FieldServiceEdit as FieldServiceEdit_2d301ec73d56aa7c0054d7908bb911ed } from '@/admin/views/FieldService'
 import { FieldAftersalesRecap as FieldAftersalesRecap_5c4757a0e1a870290c655f812acb2805 } from '@/admin/views/FieldAftersales'
 import { FieldActivityList as FieldActivityList_5c4757a0e1a870290c655f812acb2805 } from '@/admin/views/FieldAftersales'
 import { FieldActivityNew as FieldActivityNew_5c4757a0e1a870290c655f812acb2805 } from '@/admin/views/FieldAftersales'
 import { FieldActivityDetail as FieldActivityDetail_5c4757a0e1a870290c655f812acb2805 } from '@/admin/views/FieldAftersales'
+import { FieldActivityEdit as FieldActivityEdit_5c4757a0e1a870290c655f812acb2805 } from '@/admin/views/FieldAftersales'
 import { FieldDailyList as FieldDailyList_ded092a2d290d4acb50f0fbf9f77715a } from '@/admin/views/FieldDaily'
 import { FieldDailyNew as FieldDailyNew_ded092a2d290d4acb50f0fbf9f77715a } from '@/admin/views/FieldDaily'
 import { FieldDailyDetail as FieldDailyDetail_ded092a2d290d4acb50f0fbf9f77715a } from '@/admin/views/FieldDaily'
@@ -98,6 +102,7 @@ import { ModuleLanding as ModuleLanding_72aa9cb004784b713db133bbda520731 } from 
 import { LoanList as LoanList_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
 import { LoanNew as LoanNew_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
 import { LoanDetail as LoanDetail_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
+import { LoanEdit as LoanEdit_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
 import { IcLoanList as IcLoanList_b223b638967a0af97c0e72d82469d43e } from '@/admin/views/IntercompanyLoans'
 import { IcLoanNew as IcLoanNew_b223b638967a0af97c0e72d82469d43e } from '@/admin/views/IntercompanyLoans'
 import { IcLoanDetail as IcLoanDetail_b223b638967a0af97c0e72d82469d43e } from '@/admin/views/IntercompanyLoans'
@@ -186,6 +191,7 @@ export const importMap = {
   "@/admin/views/Addendum#AddendumList": AddendumList_06d7ee0480b4dc608c229f2cd74032b3,
   "@/admin/views/Addendum#AddendumNew": AddendumNew_06d7ee0480b4dc608c229f2cd74032b3,
   "@/admin/views/Addendum#AddendumDetail": AddendumDetail_06d7ee0480b4dc608c229f2cd74032b3,
+  "@/admin/views/Addendum#AddendumEdit": AddendumEdit_06d7ee0480b4dc608c229f2cd74032b3,
   "@/admin/views/Notifikasi#NotificationsView": NotificationsView_c3b608bcff53bfc6e9104ed1897a90d5,
   "@/admin/views/KeamananAkun#KeamananAkunView": KeamananAkunView_6681b9a15a5eb31c998645ca38ba9da9,
   "@/admin/views/NoAccess#UnauthorizedView": UnauthorizedView_401f81a3e6a8507dd399c4318d1104a0,
@@ -195,13 +201,16 @@ export const importMap = {
   "@/admin/views/FieldUnits#FieldUnitDetail": FieldUnitDetail_fbe9056c3fd855882d87e1ac7f3b0327,
   "@/admin/views/FieldUnits#FieldTimesheetNew": FieldTimesheetNew_fbe9056c3fd855882d87e1ac7f3b0327,
   "@/admin/views/FieldUnits#FieldTimesheetDetail": FieldTimesheetDetail_fbe9056c3fd855882d87e1ac7f3b0327,
+  "@/admin/views/FieldUnits#FieldTimesheetEdit": FieldTimesheetEdit_fbe9056c3fd855882d87e1ac7f3b0327,
   "@/admin/views/FieldService#FieldServiceList": FieldServiceList_2d301ec73d56aa7c0054d7908bb911ed,
   "@/admin/views/FieldService#FieldServiceNew": FieldServiceNew_2d301ec73d56aa7c0054d7908bb911ed,
   "@/admin/views/FieldService#FieldServiceDetail": FieldServiceDetail_2d301ec73d56aa7c0054d7908bb911ed,
+  "@/admin/views/FieldService#FieldServiceEdit": FieldServiceEdit_2d301ec73d56aa7c0054d7908bb911ed,
   "@/admin/views/FieldAftersales#FieldAftersalesRecap": FieldAftersalesRecap_5c4757a0e1a870290c655f812acb2805,
   "@/admin/views/FieldAftersales#FieldActivityList": FieldActivityList_5c4757a0e1a870290c655f812acb2805,
   "@/admin/views/FieldAftersales#FieldActivityNew": FieldActivityNew_5c4757a0e1a870290c655f812acb2805,
   "@/admin/views/FieldAftersales#FieldActivityDetail": FieldActivityDetail_5c4757a0e1a870290c655f812acb2805,
+  "@/admin/views/FieldAftersales#FieldActivityEdit": FieldActivityEdit_5c4757a0e1a870290c655f812acb2805,
   "@/admin/views/FieldDaily#FieldDailyList": FieldDailyList_ded092a2d290d4acb50f0fbf9f77715a,
   "@/admin/views/FieldDaily#FieldDailyNew": FieldDailyNew_ded092a2d290d4acb50f0fbf9f77715a,
   "@/admin/views/FieldDaily#FieldDailyDetail": FieldDailyDetail_ded092a2d290d4acb50f0fbf9f77715a,
@@ -210,6 +219,7 @@ export const importMap = {
   "@/admin/views/Loans#LoanList": LoanList_e5d452935824a68d96fdc373e55d7f95,
   "@/admin/views/Loans#LoanNew": LoanNew_e5d452935824a68d96fdc373e55d7f95,
   "@/admin/views/Loans#LoanDetail": LoanDetail_e5d452935824a68d96fdc373e55d7f95,
+  "@/admin/views/Loans#LoanEdit": LoanEdit_e5d452935824a68d96fdc373e55d7f95,
   "@/admin/views/IntercompanyLoans#IcLoanList": IcLoanList_b223b638967a0af97c0e72d82469d43e,
   "@/admin/views/IntercompanyLoans#IcLoanNew": IcLoanNew_b223b638967a0af97c0e72d82469d43e,
   "@/admin/views/IntercompanyLoans#IcLoanDetail": IcLoanDetail_b223b638967a0af97c0e72d82469d43e,

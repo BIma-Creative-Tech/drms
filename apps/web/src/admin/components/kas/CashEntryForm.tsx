@@ -22,6 +22,9 @@ import { WrapSelect } from '../WrapSelect'
  * QA 2026-10-08: Nominal through the shared Rupiah field (QA-03/QA-12: decimals / minus refused inline,
  * never stripped); Tanggal `min` = the later of the lock date + 1 and the picked account's opening-
  * balance date (QA-05); a cash-out that would make the balance negative asks "Tetap simpan" (QA-04).
+ * UI feedback 17/10 #5 ("edit = add"): edit mode renders the create form field for field — Tanggal, Akun kas and
+ * Nominal keep their date picker / account select / Rupiah field, disabled (never swapped for text inputs) — and adds
+ * only "Alasan perubahan" at the end; the page puts it next to the same "Aturan" card.
  */
 export type Opt = { id: number; label: string; requiresVehicle?: boolean; openingDate?: string | null }
 
@@ -39,6 +42,8 @@ export type CashEntryFormProps = {
     entryDate: string
     amount: number
     account: string
+    /** the entry's cash account (shown selected in the disabled account select) */
+    accountId?: number | null
     description: string
     categoryId: number | null
     cashInSourceId: number | null
@@ -61,7 +66,7 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
   const edit = mode === 'edit' && entry
   const [direction, setDirection] = useState<'in' | 'out'>(entry?.direction ?? initialDirection)
   const [scope, setScope] = useState<Scope>(entry?.projectId ? 'project' : entry?.costCenterId ? 'pusat' : 'none')
-  const amount = useRupiah(null, { minusMessage: CASH_MINUS_MESSAGE })
+  const amount = useRupiah(mode === 'edit' && entry ? entry.amount : null, { minusMessage: CASH_MINUS_MESSAGE })
   const [accountId, setAccountId] = useState<string>(options.accounts.length === 1 ? String(options.accounts[0]!.id) : '')
   const opening = options.accounts.find((a) => String(a.id) === accountId)?.openingDate ?? null
   const [prompt, setPrompt] = useState<OverridePrompt | null>(null)
@@ -204,8 +209,8 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
     }
   }
 
-  const select = (name: string, label: string, opts: Opt[], value: number | null | undefined, o: { required?: boolean; empty?: string; help?: string; onPick?: (v: string) => void } = {}) => (
-    <div className="pk-fld">
+  const select = (name: string, label: string, opts: Opt[], value: number | null | undefined, o: { required?: boolean; empty?: string; help?: string; onPick?: (v: string) => void; locked?: boolean } = {}) => (
+    <div className="pk-fld" data-pk-locked={o.locked ? name : undefined}>
       <label htmlFor={id(name)}>
         {label}
         {o.required ? (
@@ -220,7 +225,8 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
         defaultValue={value ? String(value) : ''}
         required={o.required}
         aria-invalid={err(name) ? true : undefined}
-        aria-describedby={described(name, !!o.help)}
+        aria-describedby={o.locked ? id('locked-h') : described(name, !!o.help)}
+        disabled={o.locked}
         onChange={o.onPick ? (e) => o.onPick!(e.target.value) : undefined}
         data-pk-field={name}
       >
@@ -263,16 +269,6 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
         </div>
       ) : null}
 
-      {edit ? (
-        <div className="pk-alert info">
-          <b aria-hidden>i</b>
-          <p>
-            <strong>{entry.entryNo}</strong> · {entry.entryDate} · {entry.account} · {entry.direction === 'in' ? 'masuk' : 'keluar'} <strong>{formatRupiah(entry.amount)}</strong>
-            <br />
-            Nominal, tanggal, akun dan arah tidak dapat diubah — untuk itu void transaksi ini lalu catat ulang.
-          </p>
-        </div>
-      ) : null}
       {/* QA-31: same layout as "buat baru"; locked fields are shown disabled in edit mode */}
       <fieldset style={{ border: 0, padding: 0, margin: 0 }} disabled={Boolean(edit)} data-pk-locked={edit ? 'direction' : undefined}>
         <legend style={{ padding: 0, marginBottom: 6, fontSize: 13, fontWeight: 600 }}>
@@ -321,18 +317,15 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
           </>
         ) : (
           <>
-            {/* QA-31: locked in edit mode (ADR 0005 §5) — shown, not hidden */}
-            <div className="pk-fld">
+            {/* QA-31 / UI feedback 17/10 #5: locked in edit mode (ADR 0005 §5) — the create widgets, disabled */}
+            <div className="pk-fld" data-pk-locked="entryDate">
               <label htmlFor={id('entryDate')}>Tanggal</label>
-              <DateInput id={id('entryDate')} type="date" value={entry.entryDate} disabled readOnly aria-describedby={id('locked-h')} data-pk-locked="entryDate" />
+              <DateInput id={id('entryDate')} type="date" value={entry.entryDate} disabled readOnly aria-describedby={id('locked-h')} />
             </div>
-            <div className="pk-fld">
-              <label htmlFor={id('cashAccountId')}>Akun kas</label>
-              <input id={id('cashAccountId')} type="text" value={entry.account} disabled readOnly aria-describedby={id('locked-h')} data-pk-locked="cashAccountId" />
-            </div>
-            <div className="pk-fld">
+            {select('cashAccountId', 'Akun kas', options.accounts, entry.accountId ?? null, { locked: true })}
+            <div className="pk-fld" data-pk-locked="amount">
               <label htmlFor={id('amount')}>Nominal</label>
-              <input id={id('amount')} type="text" value={formatRupiah(entry.amount)} disabled readOnly aria-describedby={id('locked-h')} data-pk-locked="amount" />
+              <RupiahInput id={id('amount')} field={amount} disabled describedBy={id('locked-h')} testId="amount" />
               <p id={id('locked-h')} className="help">
                 Tanggal, akun dan nominal terkunci — koreksi dengan Void lalu catat ulang.
               </p>

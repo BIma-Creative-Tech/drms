@@ -40,7 +40,8 @@ const REQUESTER_ACTIONS = ['submit', 'withdraw', 'cancel', 'resubmit', 'add_rece
  * StepperField), "Rincian item" with receipts and flags, transfers, LPJ, the requester actions (creator /
  * requesters: `allowedActions` of the domain DTO, the same guard the service enforces) and "Log perubahan".
  * Decisions, "Cetak" and "Duplikat" are in the action bar (RequestActionBar). Sections marked `data-pk-read` belong
- * to read mode (custom.scss hides them while the form is edited). Actions call the existing /api/v1 endpoints
+ * to read mode (custom.scss hides them while the form is edited); since UI feedback 17/10 #5 the header section too (edit
+ * mode = the "Pengajuan baru" layout: PT in its form slot, no header, no stepper column). Actions call the existing /api/v1 endpoints
  * (guards, audit, idempotency, notifications unchanged). Data: panel-data.ts (fresh req + transaction as the
  * logged-in user; visibility = collection read access), read once per render for the three page parts.
  */

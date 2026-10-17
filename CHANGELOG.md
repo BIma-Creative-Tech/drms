@@ -60,6 +60,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     PT filter on one PT they show that PT's options only.
   No migration, no API change; the company hook and DB trigger still reject cross-PT references.
 
+#### Changed (#5 "edit = add", PR-C; web only, no migration, no API change)
+
+- **Every edit page now looks like its create page** (user decision 17/10: all master + transaction pages): same
+  component, layout, card width and field order; a field that cannot change after creation stays in its create widget,
+  **disabled** (never hidden, never swapped for a text box); edit-only fields (**Alasan**, Status PO, …) come last; only
+  the title and the buttons differ (**Simpan perubahan** / **Batal**). The server rules (24 h window, correction by PM /
+  Direktur with reason, period lock, audit, access) are unchanged.
+  - **Pengajuan biaya:** edit mode = the "Pengajuan baru" layout — the PT stays in its form slot (read-only), the panel
+    header (number, PT, status, Tahapan saat ini) and the **Alur pengajuan** column are shown in read mode only.
+  - **Kas:** **Edit** (`/kas/:id/ubah`) has the "Catat kas" layout with the **Aturan** card; Tanggal, Akun kas and
+    Nominal keep their date picker / account select / Rupiah field, disabled (were text boxes; the summary box above the
+    form is gone).
+  - **Laporan harian:** **Ubah (24 jam)** / **Koreksi** use the layout of "Laporan baru" (form + **Aturan**, was full
+    width); stored photos shown in the photo picker; **Batal** next to the submit button.
+  - **Laporan servis, Aktivitas aftersales, Timesheet unit:** **Ubah (24 jam)** and **Koreksi** open an edit page
+    (`/laporan-servis/:id/ubah`, `/aftersales/aktivitas/:id/ubah`, `/unit-kontrak/timesheet/:id/ubah`; `?koreksi=1` for
+    the correction) with the input form instead of a dialog with a different field set: project / unit / date (customer,
+    kind, PO) disabled, the stored photos shown and new ones added or removed as on create (the API still only adds;
+    timesheet: the HM photo stays), the value of an activity disabled for whoever may not see it, **Status PO**
+    (correction of a PO masuk) and **Alasan** last; only changed fields are sent. The generic correction dialog is gone
+    (no form without a page left).
+  - **Addendum RAB / Pinjaman antar project:** **Ubah draft** is its own page (`/addendum/:id/ubah`,
+    `/pinjaman/:id/ubah`) with the layout of "Ajukan …" (form + **Alur**), instead of a second form inside the detail
+    card; project (borrower) disabled; "Simpan draft" reads **Simpan perubahan**, plus **Batal**.
+  - **Hari libur:** **Ubah** edits in the same inline widget as **+ Tambah hari libur** on Absensi › Jadwal & hari libur
+    (with **Alasan perubahan**, required by the audit rule) instead of the Payload page.
+  - **PT of an existing master record:** the badge sits in the picker's place and size (label "PT", control-height
+    box), so the form no longer shifts between create and edit.
+  Guides (Finance §5, PM, Direktur, Admin) describe the edit pages.
+
 ## [0.14.0] - 2026-10-17
 
 **Laporan servis: "Jenis servis" as per-PT master data (multi-select), up to 25 photos, no "No. part"; Staff may file a

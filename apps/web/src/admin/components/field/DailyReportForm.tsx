@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import React, { useId, useMemo, useRef, useState } from 'react'
 
@@ -6,7 +7,7 @@ import { WEATHER, WEATHER_LABELS, type Weather } from '@/domain/daily/rules'
 import { fmtNum } from '@/domain/field/views'
 
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
-import { Choice, decOut, DecimalField, PhotoPicker, usePhotos } from './parts'
+import { Choice, decOut, DecimalField, PhotoPicker, ReasonField, usePhotos, type ExistingPhoto } from './parts'
 import { DateInput } from '../DateInput'
 import { WrapSelect } from '../WrapSelect'
 
@@ -42,7 +43,7 @@ export type DailyReportFormProps = {
   minDate: string
   initialProject?: number
   /** edit / correction */
-  report?: { id: number; projectId: number; reportDate: string; values: DrValues; photoCount: number }
+  report?: { id: number; projectId: number; reportDate: string; values: DrValues; photoCount: number; /** stored photos, shown in the picker (UI feedback 17/10 #5) */ photos?: ExistingPhoto[] }
 }
 
 const uuid = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined)
@@ -330,16 +331,8 @@ export function DailyReportForm({ mode, projects, itemsByProject, resourcesByCom
           <textarea id={id('notes')} value={notes} maxLength={2000} rows={2} onChange={(e) => setNotes(e.target.value)} aria-invalid={err('notes') ? true : undefined} />
           {errEl('notes')}
         </div>
-        <PhotoPicker photos={photos} name="photos" label={mode === 'create' ? 'Foto pekerjaan' : 'Tambah foto'} help={`Maks. 10 foto per laporan${report ? ` (sudah ${report.photoCount})` : ''}. Diperkecil dan lokasi EXIF dihapus di server.`} error={err('photoIds')} />
-        {mode !== 'create' ? (
-          <div className="pk-fld">
-            <label htmlFor={id('reason')}>
-              Alasan{mode === 'correction' ? <span className="req" aria-hidden>*</span> : ' (opsional)'}
-            </label>
-            <textarea id={id('reason')} value={reason} maxLength={1000} rows={2} onChange={(e) => setReason(e.target.value)} aria-invalid={err('reason') ? true : undefined} />
-            {errEl('reason')}
-          </div>
-        ) : null}
+        <PhotoPicker photos={photos} existing={report?.photos} name="photos" label="Foto pekerjaan" help={`Maks. 10 foto per laporan${report ? ` (sudah ${report.photoCount})` : ''}. Diperkecil dan lokasi EXIF dihapus di server.`} error={err('photoIds')} />
+        {mode !== 'create' ? <ReasonField id={id('reason')} required={mode === 'correction'} value={reason} onChange={setReason} error={err('reason')} /> : null}
       </section>
 
       <div className="pk-fsubmit">
@@ -347,6 +340,11 @@ export function DailyReportForm({ mode, projects, itemsByProject, resourcesByCom
           {Object.values(work).filter((x) => (decOut(x) ?? 0) > 0).length} item pekerjaan · {workerCount} pekerja · {photos.items.length} foto
           {over.length ? ` · ⚠ ${over.length} melebihi RAP` : ''}
         </p>
+        {report && mode !== 'create' ? (
+          <Link className="pk-kbtn" href={`/admin/laporan-harian/detail/${report.id}`} prefetch={false}>
+            Batal
+          </Link>
+        ) : null}
         <button type="submit" className="pk-kbtn primary" disabled={busy !== null} data-pk-submit={`daily-report-${mode}`}>
           {busy ?? submitLabel}
         </button>

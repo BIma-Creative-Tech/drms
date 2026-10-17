@@ -79,7 +79,14 @@ export function usePhotos(max: number) {
 
 export type PhotosState = ReturnType<typeof usePhotos>
 
-export function PhotoPicker({ photos, label, help, required, error, name }: { photos: PhotosState; label: string; help?: string; required?: boolean; error?: string | null; name: string }) {
+/** A photo already stored on the document (edit pages, UI feedback 17/10 #5): shown first, never removed. */
+export type ExistingPhoto = { id: number; url: string; thumbUrl: string }
+
+/**
+ * `existing` (edit pages): the stored photos are shown in the same picker before the new ones — without "Hapus" (the
+ * API only adds photos); the counter is stored + new of the document maximum, and `photos.max` is the room left.
+ */
+export function PhotoPicker({ photos, label, help, required, error, name, existing = [] }: { photos: PhotosState; label: string; help?: string; required?: boolean; error?: string | null; name: string; existing?: readonly ExistingPhoto[] }) {
   const uid = useId()
   const full = photos.items.length >= photos.max
   return (
@@ -92,15 +99,24 @@ export function PhotoPicker({ photos, label, help, required, error, name }: { ph
           </span>
         ) : null}{' '}
         <small style={{ fontWeight: 400, color: 'var(--pk-muted-fg)' }}>
-          ({photos.items.length}/{photos.max})
+          ({existing.length + photos.items.length}/{existing.length + photos.max})
         </small>
       </span>
       <ul className="pk-photos" aria-labelledby={`${uid}-l`}>
+        {existing.map((p, i) => (
+          <li key={`s${p.id}`} data-pk-photo-stored={p.id}>
+            <a href={p.url} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`stored-${uid}`} data-pk-lightbox-title={`Foto tersimpan ${i + 1}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API thumbnail */}
+              <img src={p.thumbUrl} alt={`Foto tersimpan ${i + 1}`} loading="lazy" />
+            </a>
+            <small className="pk-photo-tag">tersimpan</small>
+          </li>
+        ))}
         {photos.items.map((p, i) => (
           <li key={p.key}>
             {/* eslint-disable-next-line @next/next/no-img-element -- local preview (object URL) */}
-            <img src={p.url} alt={`Pratinjau foto ${i + 1}`} />
-            <button type="button" className="pk-kbtn sm danger" onClick={() => photos.remove(p.key)} aria-label={`Hapus foto ${i + 1}`}>
+            <img src={p.url} alt={`Pratinjau foto ${existing.length + i + 1}`} />
+            <button type="button" className="pk-kbtn sm danger" onClick={() => photos.remove(p.key)} aria-label={`Hapus foto ${existing.length + i + 1}`}>
               Hapus
             </button>
           </li>
@@ -134,6 +150,36 @@ export function PhotoPicker({ photos, label, help, required, error, name }: { ph
       ) : null}
       {error ? (
         <p className="err" id={`${uid}-e`} role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------- reason (edit pages)
+
+/**
+ * UI feedback 17/10 #5: the edit-only "Alasan" field, the LAST field of an edit / correction page — required (≥ 3
+ * characters) for a PM / Direktur correction, optional for the reporter's own edit within 24 h. Audited server-side.
+ */
+export function ReasonField({ id, required, value, onChange, error }: { id: string; required: boolean; value: string; onChange: (v: string) => void; error?: string | null }) {
+  return (
+    <div className="pk-fld" data-pk-field="reason">
+      <label htmlFor={id}>
+        {required ? 'Alasan koreksi' : 'Alasan perubahan (opsional)'}
+        {required ? (
+          <span className="req" aria-hidden>
+            *
+          </span>
+        ) : null}
+      </label>
+      <textarea id={id} value={value} maxLength={1000} rows={2} required={required} onChange={(e) => onChange(e.target.value)} aria-invalid={error ? true : undefined} aria-describedby={[`${id}-h`, error ? `${id}-e` : null].filter(Boolean).join(' ')} />
+      <p className="help" id={`${id}-h`}>
+        {required ? 'Tercatat di audit log dan riwayat laporan. Minimal 3 karakter.' : 'Tercatat di audit log.'}
+      </p>
+      {error ? (
+        <p className="err" id={`${id}-e`} role="alert">
           {error}
         </p>
       ) : null}
@@ -220,10 +266,10 @@ export function LinesEditor({ rows, setRows, label, nameLabel, addLabel, help, w
 
 // ---------------------------------------------------------------- choice group (radio pills)
 
-export function Choice<T extends string>({ label, name, value, options, onChange, required, error }: { label: string; name: string; value: T | ''; options: ReadonlyArray<{ value: T; label: string }>; onChange: (v: T) => void; required?: boolean; error?: string | null }) {
+export function Choice<T extends string>({ label, name, value, options, onChange, required, error, disabled }: { label: string; name: string; value: T | ''; options: ReadonlyArray<{ value: T; label: string }>; onChange: (v: T) => void; required?: boolean; error?: string | null; disabled?: boolean }) {
   const uid = useId()
   return (
-    <fieldset className="pk-fld pk-choice" aria-describedby={error ? `${uid}-e` : undefined}>
+    <fieldset className="pk-fld pk-choice" aria-describedby={error ? `${uid}-e` : undefined} disabled={disabled}>
       <legend className="lbl">
         {label}
         {required ? (

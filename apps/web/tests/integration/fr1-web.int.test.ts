@@ -7,9 +7,9 @@ vi.mock('@payloadcms/next/templates', () => ({ DefaultTemplate: ({ children }: {
 vi.mock('@payloadcms/ui', () => ({ Gutter: ({ children }: { children: ReactNode }) => React.createElement('div', { 'data-gutter': '' }, children) }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => undefined, refresh: () => undefined }), usePathname: () => '/admin' }))
 
-import { FieldActivityDetail, FieldActivityList, FieldActivityNew, FieldAftersalesRecap } from '@/admin/views/FieldAftersales'
+import { FieldActivityDetail, FieldActivityEdit, FieldActivityList, FieldActivityNew, FieldAftersalesRecap } from '@/admin/views/FieldAftersales'
 import { FieldServiceDetail, FieldServiceList, FieldServiceNew } from '@/admin/views/FieldService'
-import { FieldContractDetail, FieldContracts, FieldTimesheetDetail, FieldTimesheetNew, FieldUnitDetail } from '@/admin/views/FieldUnits'
+import { FieldContractDetail, FieldContracts, FieldTimesheetDetail, FieldTimesheetEdit, FieldTimesheetNew, FieldUnitDetail } from '@/admin/views/FieldUnits'
 import { ProjectProgressView } from '@/admin/views/Progress'
 import { addDays } from '@/domain/field/rules'
 import { contractsOf, enabledCompanies, historyOf } from '@/domain/field/web'
@@ -185,6 +185,26 @@ describe('Unit & kontrak', () => {
     const own = await render(FieldTimesheetDetail, w.users.staffA, ['unit-kontrak', 'timesheet', 'detail', String(tsGapId)])
     expect(own).toContain('data-pk-action="timesheet-edit"')
     expect(own).not.toContain('data-pk-action="timesheet-correct"')
+    // UI feedback 17/10 #5: links to the edit page (no dialog)
+    expect(own).toContain(`href="/admin/unit-kontrak/timesheet/${tsGapId}/ubah"`)
+    expect(html).toContain(`href="/admin/unit-kontrak/timesheet/${tsGapId}/ubah?koreksi=1"`)
+    expect(own).not.toContain('<dialog')
+  })
+  it('timesheet edit / correction page (UI feedback 17/10 #5): the input layout (form 8 + "Aturan"), contract / date / unit disabled, HM photo kept', async () => {
+    const created = await render(FieldTimesheetNew, w.users.staffA, ['unit-kontrak', 'timesheet', 'baru'], { project: String(w.kontrak) })
+    const edit = await render(FieldTimesheetEdit, w.users.staffA, ['unit-kontrak', 'timesheet', String(tsGapId), 'ubah'])
+    const cards = (h: string) => [...h.matchAll(/data-pk-card="([^"]+)"/g)].map((m) => m[1])
+    expect(cards(edit)).toEqual(cards(created))
+    expect(edit).toContain('data-pk-card="timesheet-help"')
+    expect(edit).toContain('data-pk-form="unit-timesheet-edit"')
+    for (const k of ['project', 'reportDate', 'unit']) expect(edit, k).toMatch(new RegExp(`<(select|input)[^>]*(data-pk-locked="${k}"[^>]*disabled=""|disabled=""[^>]*data-pk-locked="${k}")`))
+    expect(edit).toContain('value="1.015"') // HM akhir prefilled
+    expect(edit).toContain('data-pk-photo-stored=')
+    const fix = await render(FieldTimesheetEdit, w.users.pm, ['unit-kontrak', 'timesheet', String(tsGapId), 'ubah'], { koreksi: '1' })
+    expect(fix).toContain('data-pk-form="unit-timesheet-correction"')
+    expect(fix).toContain('Alasan koreksi')
+    // the PM is not the reporter → the reporter's edit page refuses
+    expect(await render(FieldTimesheetEdit, w.users.pm, ['unit-kontrak', 'timesheet', String(tsGapId), 'ubah'])).toContain('data-pk-alert="not-editable"')
   })
   it('timesheet form: the contract with its active unit for an assigned Staff', async () => {
     const html = await render(FieldTimesheetNew, w.users.staffA, ['unit-kontrak', 'timesheet', 'baru'], { project: String(w.kontrak) })
@@ -237,6 +257,19 @@ describe('Aftersales', () => {
     expect(pm).not.toMatch(/Rp\s?\d|4\.250\.000/)
     expect(pm).toContain('data-pk-action="activity-correct"')
     expect(pm).toContain('data-pk-link="catat-pengiriman"') // open PO → record a delivery
+  })
+  it('activity edit / correction page (UI feedback 17/10 #5): input layout, customer / kind / date disabled; the value stays hidden from the PM', async () => {
+    const own = await render(FieldActivityEdit, w.users.staffA, ['aftersales', 'aktivitas', String(poId), 'ubah'])
+    expect(own).toContain('data-pk-card="activity-form"')
+    expect(own).toContain('data-pk-card="activity-help"')
+    expect(own).toContain('data-pk-form="aftersales-activity-edit"')
+    for (const k of ['client', 'activityDate']) expect(own, k).toMatch(new RegExp(`<(select|input)[^>]*(data-pk-locked="${k}"[^>]*disabled=""|disabled=""[^>]*data-pk-locked="${k}")`))
+    expect(own).toContain('value="4.250.000"') // the reporter sees (and may change) the value
+    const pm = await render(FieldActivityEdit, w.users.pm, ['aftersales', 'aktivitas', String(poId), 'ubah'], { koreksi: '1' })
+    expect(pm).toContain('data-pk-form="aftersales-activity-correction"')
+    expect(pm).not.toMatch(/Rp\s?\d|4\.250\.000/)
+    expect(pm).toContain('data-pk-field="poStatus"') // correction of a PO masuk: "Status PO" before the reason
+    expect(pm.indexOf('data-pk-field="poStatus"')).toBeLessThan(pm.indexOf('data-pk-field="reason"'))
   })
   it('quick input form for the assigned Staff', async () => {
     const html = await render(FieldActivityNew, w.users.staffA, ['aftersales', 'aktivitas', 'baru'], { jenis: 'pengiriman', po: String(poId) })
