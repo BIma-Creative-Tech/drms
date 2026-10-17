@@ -9,7 +9,7 @@ import { formatRupiah } from '@/lib/money'
 import { KAS_STYLE } from '../kas/style'
 import { LineCard } from './LineCard'
 import { RupiahInput, useRupiah } from '../RupiahInput'
-import { draftOf, draftTotal, formatQty, LINE_FIELD_NAMES, parseDraft, relValue, rowValues, type LineDraft, type LineDraftErrors, type LineValues } from './line-form'
+import { draftOf, draftTotal, formatQty, LINE_FIELD_NAMES, LINE_PICK_COMPANY_FIRST, lineMasterOptions, parseDraft, relValue, rowValues, type LineDraft, type LineDraftErrors, type LineValues } from './line-form'
 import { WrapSelect } from '../WrapSelect'
 import { isMultilineText, WrapText } from '../WrapText'
 
@@ -23,7 +23,7 @@ import { isMultilineText, WrapText } from '../WrapText'
  * or removed (receipts are linked to them) — only edited. A line saved before D3 (no unit price) shows
  * "Lengkapi Qty & Harga satuan"; the request cannot be sent until it is completed (server rule).
  */
-type Opt = { id: number; label: string; short?: string; company?: number | null; requiresVehicle?: boolean; defaultUom?: number | null; active?: boolean }
+type Opt = { id: number; label: string; short?: string; companyId?: number | null; requiresVehicle?: boolean; defaultUom?: number | null; active?: boolean }
 type Masters = { uoms: Opt[]; categories: Opt[]; vehicles: Opt[]; error: string | null }
 /** D4: RAP items of the request's project (all, inactive ones only to name a stored line); `loaded` per project id. */
 type RapState = { project: number | null; items: Opt[]; loading: boolean; error: string | null; required: boolean }
@@ -45,8 +45,8 @@ function useMasters(): Masters {
         if (!alive) return
         setM({
           uoms: u.map((d) => ({ id: d.id as number, label: `${String(d.name ?? '')}${d.code ? ` (${String(d.code)})` : ''}`, short: String(d.name ?? d.code ?? '') })),
-          categories: c.map((d) => ({ id: d.id as number, label: String(d.name ?? ''), company: relValue(d.company), requiresVehicle: d.requiresVehicle === true, defaultUom: relValue(d.defaultUom) })),
-          vehicles: v.map((d) => ({ id: d.id as number, label: String(d.displayName ?? d.plateDisplay ?? d.plateNo ?? `#${String(d.id)}`), company: relValue(d.company) })),
+          categories: c.map((d) => ({ id: d.id as number, label: String(d.name ?? ''), companyId: relValue(d.company), requiresVehicle: d.requiresVehicle === true, defaultUom: relValue(d.defaultUom) })),
+          vehicles: v.map((d) => ({ id: d.id as number, label: String(d.displayName ?? d.plateDisplay ?? d.plateNo ?? `#${String(d.id)}`), companyId: relValue(d.company) })),
           error: null,
         })
       })
@@ -123,8 +123,9 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
   const masters = useMasters()
   const rap = useRapItems(state.project)
   const rapActive = rap.items.filter((o) => o.active !== false)
-  const categories = masters.categories.filter((c) => state.company === null || c.company === null || c.company === undefined || c.company === state.company)
-  const vehicles = masters.vehicles.filter((v) => state.company === null || v.company === null || v.company === undefined || v.company === state.company)
+  // DRMS UI 17/10 #4: only the request's PT (same names in every PT); none until the PT is chosen
+  const categories = lineMasterOptions(masters.categories, state.company)
+  const vehicles = lineMasterOptions(masters.vehicles, state.company)
   const nameOf = (list: Opt[], id: number | null, short = false) => {
     const o = id === null ? undefined : list.find((x) => x.id === id)
     return id === null ? '—' : ((short ? o?.short : undefined) ?? o?.label ?? `#${id}`)
@@ -209,7 +210,7 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
                   </td>
                   <td style={{ ...cell, minWidth: 110 }} data-label="Uraian" data-span="full" data-primary>
                     {v.description || <em style={{ color: 'var(--pk-muted-fg)' }}>(tanpa uraian)</em>}
-                    {v.vehicle ? <div style={{ fontSize: 12, fontWeight: 400 }}>Kendaraan {nameOf(vehicles, v.vehicle)}</div> : null}
+                    {v.vehicle ? <div style={{ fontSize: 12, fontWeight: 400 }}>Kendaraan {nameOf(masters.vehicles, v.vehicle)}</div> : null}
                     {v.rapItem ? (
                       <div style={{ fontSize: 12, fontWeight: 400 }} data-pk-line-rap={i + 1}>
                         RAP {nameOf(rap.items, v.rapItem, true)}
@@ -232,7 +233,7 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
                     {errs.length > 0 ? <div className="rowerr">{errs.join(' ')}</div> : null}
                   </td>
                   <td style={cell} data-label="Kategori">
-                    {nameOf(categories, v.category)}
+                    {nameOf(masters.categories, v.category)}
                   </td>
                   <td style={numCell} data-label="Qty">
                     {v.qty === null ? '1' : formatQty(v.qty)}
@@ -301,8 +302,8 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
               description={v.description}
               total={v.total}
               qtyPrice={`${v.qty === null ? '1' : formatQty(v.qty)}${v.uom ? ` ${nameOf(masters.uoms, v.uom, true)}` : ''}${v.unitPrice === null ? '' : ` × ${rp(v.unitPrice)}`}`}
-              category={v.category === null ? null : nameOf(categories, v.category)}
-              vehicle={v.vehicle ? nameOf(vehicles, v.vehicle) : null}
+              category={v.category === null ? null : nameOf(masters.categories, v.category)}
+              vehicle={v.vehicle ? nameOf(masters.vehicles, v.vehicle) : null}
               rap={v.rapItem ? nameOf(rap.items, v.rapItem, true) : null}
               notes={v.notes || null}
               receiptAmount={v.receiptAmount}
@@ -346,6 +347,7 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
           otherTotal={grand - (editing === 'new' ? 0 : (values[editing]?.total ?? 0))}
           rap={{ project: state.project, items: rapActive, all: rap.items, loading: rap.loading, error: rap.error, required: rap.required }}
           uoms={masters.uoms}
+          company={state.company}
           categories={categories}
           vehicles={vehicles}
           onSave={save}
@@ -358,7 +360,7 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
 
 type RapPick = { project: number | null; items: Opt[]; all: Opt[]; loading: boolean; error: string | null; required: boolean }
 
-function LineDialog(props: { no: number; initial: LineValues | null; otherTotal: number; rap: RapPick; uoms: Opt[]; categories: Opt[]; vehicles: Opt[]; onSave: (v: LineValues) => void; onClose: () => void }) {
+function LineDialog(props: { no: number; initial: LineValues | null; otherTotal: number; rap: RapPick; uoms: Opt[]; company: number | null; categories: Opt[]; vehicles: Opt[]; onSave: (v: LineValues) => void; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null)
   const uid = useId()
   const [d, setD] = useState<LineDraft>(() => draftOf(props.initial))
@@ -420,6 +422,13 @@ function LineDialog(props: { no: number; initial: LineValues | null; otherTotal:
     ) : null
   }
   const aria = (k: keyof LineDraft) => (errors[k] ? { 'aria-invalid': true as const, 'aria-describedby': `${uid}-${k}-e` } : {})
+  // DRMS UI 17/10 #4: Kategori / Kendaraan are per PT — locked until the request's PT is chosen
+  const noCompany = props.company === null
+  const waitHint = noCompany ? (
+    <p className="help" data-pk-line-needs-company style={{ margin: 0 }}>
+      Pilih <strong>PT</strong> pengajuan dulu — kategori dan kendaraan diambil dari PT itu.
+    </p>
+  ) : null
 
   return (
     <dialog ref={ref} className="pk-dlg pk-lines-dlg" aria-labelledby={`${uid}-t`} onCancel={props.onClose} onKeyDown={onKeyDown} data-pk-dialog="line">
@@ -480,23 +489,23 @@ function LineDialog(props: { no: number; initial: LineValues | null; otherTotal:
             <label htmlFor={`${uid}-cat`}>
               Kategori<span className="req" aria-hidden>*</span>
             </label>
-            <WrapSelect id={`${uid}-cat`} value={d.category} onChange={set('category')} data-pk-line-field="category" {...aria('category')}>
-              <option value="">Pilih kategori…</option>
+            <WrapSelect id={`${uid}-cat`} value={d.category} onChange={set('category')} disabled={noCompany} data-pk-line-field="category" {...aria('category')}>
+              <option value="">{noCompany ? `${LINE_PICK_COMPANY_FIRST}…` : 'Pilih kategori…'}</option>
               {props.categories.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
                 </option>
               ))}
             </WrapSelect>
-            {err('category')}
+            {err('category') ?? waitHint}
           </div>
           {needsVehicle || d.vehicle ? (
             <div className="pk-fld">
               <label htmlFor={`${uid}-veh`}>
                 Kendaraan{needsVehicle ? <span className="req" aria-hidden>*</span> : null}
               </label>
-              <WrapSelect id={`${uid}-veh`} value={d.vehicle} onChange={set('vehicle')} data-pk-line-field="vehicle" {...aria('vehicle')}>
-                <option value="">Pilih kendaraan…</option>
+              <WrapSelect id={`${uid}-veh`} value={d.vehicle} onChange={set('vehicle')} disabled={noCompany} data-pk-line-field="vehicle" {...aria('vehicle')}>
+                <option value="">{noCompany ? `${LINE_PICK_COMPANY_FIRST}…` : 'Pilih kendaraan…'}</option>
                 {props.vehicles.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.label}

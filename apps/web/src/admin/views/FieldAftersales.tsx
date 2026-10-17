@@ -19,7 +19,7 @@ import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseListQuery } from '@/admin/list-query'
 
 import { BtnLink, dateParam, FIELD_CREATORS, FIELD_OFFICE, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf } from './field-ui'
-import { ptView, PtChip } from './pt'
+import { ptCodes, ptOptionsOf, ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, rp, StatusPill, type Col } from './viz'
 import { DateInput } from '../components/DateInput'
@@ -121,7 +121,7 @@ export async function FieldAftersalesRecap(props: AdminViewServerProps) {
             Project
             <select name="project" defaultValue={projectId ? String(projectId) : ''}>
               <option value="">Semua project</option>
-              {d.projects.map((p) => (
+              {ptOptionsOf(d.projects, d.pt).map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.label}
                 </option>
@@ -299,9 +299,12 @@ export async function FieldActivityList(props: AdminViewServerProps) {
           Pelanggan
           <select name="pelanggan" defaultValue={q.client ? String(q.client) : ''}>
             <option value="">Semua</option>
-            {d.clients.map((c) => (
+            {ptOptionsOf(
+              d.clients.map((c) => ({ ...c, label: c.name })),
+              d.pt,
+            ).map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name}
+                {c.label}
               </option>
             ))}
           </select>
@@ -333,7 +336,7 @@ export async function FieldActivityList(props: AdminViewServerProps) {
             Project
             <select name="project" defaultValue={q.project ? String(q.project) : ''}>
               <option value="">Semua</option>
-              {d.projects.map((p) => (
+              {ptOptionsOf(d.projects, d.pt).map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.label}
                 </option>
@@ -407,7 +410,7 @@ export async function FieldActivityNew(props: AdminViewServerProps) {
     const projects = await fieldProjects(req, ['aftersales'], companies)
     const clients = await clientsOf(req, [...new Set(projects.map((p) => p.companyId))])
     const today = await todayOf(req, companies[0])
-    return { projects, clients, today }
+    return { projects, clients, today, pt: await ptView(req) }
   })
   const kind = one(sp.jenis)
   return (
@@ -425,8 +428,9 @@ export async function FieldActivityNew(props: AdminViewServerProps) {
             <EmptyState text="Tidak ada project aftersales yang dapat Anda laporkan (Staff: project yang ditugaskan; PM: project tim)." />
           ) : (
             <ActivityForm
-              projects={d.projects.map((p) => ({ id: p.id, label: p.label, companyId: p.companyId, clientId: p.clientId }))}
+              projects={ptOptionsOf(d.projects, d.pt).map((p) => ({ id: p.id, label: p.label, companyId: p.companyId, clientId: p.clientId }))}
               clients={d.clients}
+              ptCodes={d.pt.multi ? ptCodes(d.pt) : undefined}
               today={d.today}
               minDate={addDays(d.today, -BACKDATE_MAX_DAYS)}
               initial={{ project: idParam(sp.project), client: idParam(sp.pelanggan), kind: (ACTIVITY_KINDS as readonly string[]).includes(kind ?? '') ? (kind as ActivityKind) : undefined, relatesTo: idParam(sp.po) }}

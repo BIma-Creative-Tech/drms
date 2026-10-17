@@ -5,7 +5,7 @@ import { denyAll, hasRole, relId } from '@/access/roles'
 import { anyOf, byRole, rolesAllowed, teamCostCenters, teamProjects, teamSites } from '@/access/policies'
 import { resolveScope } from '@/access/scope'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
-import { companyField, companyHook, pickerSameCompany, siteOptions } from '@/fields/company'
+import { ACTIVE_ONLY, andParentCompany, companyField, companyHook, lockedUntilCompany, pickerSameCompany } from '@/fields/company'
 
 /**
  * Penugasan tim: employee ↔ project XOR cost center XOR site (form item 9; ADR 0023 site = kantor cabang), role,
@@ -44,6 +44,10 @@ const guard: CollectionBeforeChangeHook = async ({ data, originalDoc, operation,
   return data
 }
 
+/** DRMS UI 17/10 #4: the assignment's PT = the chosen employee's (companyHook derive) — the location pickers follow it. */
+const EMPLOYEE = { field: 'employee', collection: 'employees' } as const
+const WAIT_EMPLOYEE = { field: 'employee', label: 'karyawan' }
+
 export const TeamAssignments: CollectionConfig = withAudit(
   {
     slug: 'team-assignments',
@@ -59,11 +63,12 @@ export const TeamAssignments: CollectionConfig = withAudit(
     fields: [
       companyField({ derived: true }),
       // DRMS 16/10 (b): "+ Karyawan baru" (plain employee form in a drawer, no user account) — the PT follows the employee
-      creatableRelationship({ name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true }), admin: { placeholder: 'Pilih karyawan…' } }, { company: 'record' }),
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany(), admin: { placeholder: 'Pilih project…' } },
-      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany(), admin: { placeholder: 'Pilih pusat biaya…' } },
+      creatableRelationship({ name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true, decidesCompany: true }), admin: { placeholder: 'Pilih karyawan…' } }, { company: 'record' }),
+      // DRMS UI 17/10 #4: project / pusat biaya / site of the chosen employee's PT only; wait for the employee
+      lockedUntilCompany({ name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany({ parent: EMPLOYEE }), admin: { placeholder: 'Pilih project…' } }, WAIT_EMPLOYEE),
+      lockedUntilCompany({ name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany({ parent: EMPLOYEE }), admin: { placeholder: 'Pilih pusat biaya…' } }, WAIT_EMPLOYEE),
       // ADR 0023 (Q-S5): assignment to a branch office for a period (attendance at the site; PM role = on-behalf there)
-      { name: 'site', type: 'relationship', relationTo: 'sites', label: 'Site', index: true, ...pickerSameCompany(), filterOptions: siteOptions, admin: { placeholder: 'Pilih site…' } },
+      lockedUntilCompany({ name: 'site', type: 'relationship', relationTo: 'sites', label: 'Site', index: true, ...pickerSameCompany({ parent: EMPLOYEE }), filterOptions: andParentCompany(ACTIVE_ONLY, EMPLOYEE), admin: { placeholder: 'Pilih site…' } }, WAIT_EMPLOYEE),
       {
         name: 'roleInProject',
         type: 'select',

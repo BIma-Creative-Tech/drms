@@ -30,6 +30,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   atau impor Excel bila banyak." The card link "Ubah item RAP" became "Halaman RAP proyek". PM guide §4a and the
   Riwayat note of the guide README updated.
 
+#### Fixed (#4, PR #103)
+
+- **"Duplicate" options for users of several PTs (UI feedback 17/10 #4).** Per-PT masters carry the same name in every
+  PT (Kategori "Material", Jenis servis "Pemasangan", urgensi "Normal" …), and pickers listed all selected PTs at once.
+  One rule now applies everywhere: (a) only the options of the form's PT once it is known, (b) the PT code before the
+  label while a list still spans several PTs (`[CS1] Material`), (c) duplicate ids dropped. Shared helper
+  `ptOptions` / `ptLabel` (`lib/pt-options.ts`, re-exported by `admin/views/pt.tsx`) replaces the private copies in
+  Kas, Absensi and the report filters.
+  - **Pengajuan biaya, line dialog:** Kategori and Kendaraan list the request's PT only; before a PT is chosen both
+    are disabled with "Pilih PT terlebih dahulu".
+  - **Master / derived forms (Payload pickers):** Kendaraan (pusat biaya, project, pelanggan), Aturan approval
+    (kategori, project, pusat biaya), Project (klien, site, pusat biaya), Site (jadwal kerja, pusat biaya), Karyawan
+    (jadwal kerja, site penempatan), Akun kas (site) list the form's PT only — with several PTs selected they stay
+    disabled with "Pilih PT terlebih dahulu" until the PT is chosen (one selected PT: that PT, nothing to choose).
+    Derived forms follow their parent: Penugasan tim (project / pusat biaya / site wait for the Karyawan), Anggaran
+    project (kategori of the project's PT), Unit kontrak (own units of the project's PT), Nota (vendor of the
+    request's PT).
+  - **Custom views:** filters of Laporan servis (project, unit, Jenis servis), Laporan harian, Aftersales (project,
+    pelanggan), Laporan progress and Addendum carry `[CS1]` while more than one PT is selected; the service-report and
+    aftersales forms tag their project lists, and the aftersales form tags clients until a project narrows them.
+  - **Lists (relationship filters):** labels of per-PT masters carry `[CS1]` with 2+ PTs selected; with the list's
+    PT filter on one PT they show that PT's options only.
+  No migration, no API change; the company hook and DB trigger still reject cross-PT references.
+
 ## [0.14.0] - 2026-10-17
 
 **Laporan servis: "Jenis servis" as per-PT master data (multi-select), up to 25 photos, no "No. part"; Staff may file a

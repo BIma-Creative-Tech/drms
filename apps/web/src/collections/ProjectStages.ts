@@ -5,7 +5,7 @@ import { assignedProjects, byRole, rolesAllowed, teamProjects } from '@/access/p
 import { reasonOnChange, withAudit } from '@/audit/hooks'
 import { progressWriteGuard, stageRecalcHook, stageWeightGuard } from '@/domain/progress/guards'
 import { activeField, percentField, uuidField } from '@/fields/common'
-import { companyField, companyHook } from '@/fields/company'
+import { companyField, companyHook, pickerSameCompany } from '@/fields/company'
 
 /**
  * Tahapan project. `progressPct` only changes via progress reports (E4, requirements §1 #7): field
@@ -36,7 +36,7 @@ export const ProjectStages: CollectionConfig = withAudit(
     hooks: { beforeOperation: [progressWriteGuard('project-stages')], beforeChange: [companyHook('project-stages', { derive: [{ field: 'project', collection: 'projects' }] }), stageWeightGuard], afterChange: [stageRecalcHook] },
     fields: [
       companyField({ derived: true }),
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', required: true, index: true, access: { update: () => false } },
+      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', required: true, index: true, access: { update: () => false }, ...pickerSameCompany({ required: true, decidesCompany: true }) },
       { name: 'name', type: 'text', label: 'Nama tahapan', required: true, maxLength: 128 },
       percentField('weightPct', 'Bobot (%)'),
       { name: 'sequence', type: 'number', label: 'Urutan', min: 1, required: true },

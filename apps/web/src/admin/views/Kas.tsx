@@ -41,7 +41,7 @@ import { formatServerTime } from '@/pdf/format'
 
 import { ChartHover } from './ChartHover'
 import { F3Root } from './f3-ui'
-import { foreignPtParam, PtChip, ptView, type PtView } from './pt'
+import { foreignPtParam, PtChip, ptOptions, ptView, type PtView } from './pt'
 import { PtNotAllowed } from './shared'
 import { PerPt } from './pt-breakdown'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, rp, StatusPill, VIZ_STYLE, type Col } from './viz'
@@ -111,16 +111,12 @@ function ptParam(sp: SP, allowed: readonly number[]): number | undefined {
 /** The only PT, else the chosen one (`undefined` = the user must pick). */
 const onePt = (sp: SP, allowed: readonly number[]) => (allowed.length === 1 ? allowed[0] : ptParam(sp, allowed))
 const ptCode = (pt: PtView, id: number | null | undefined) => pt.ref(id)?.shortCode ?? (typeof id === 'number' ? `#${id}` : '—')
-/** Options of ONE PT (form pickers; the DB rejects cross-PT references anyway). */
-const lookupsOf = (lk: Lookups, company: number | undefined): Lookups => {
-  if (company === undefined) return lk
-  const f = <T extends Option>(l: T[]) => l.filter((o) => o.companyId === company)
-  return { accounts: f(lk.accounts), sites: f(lk.sites), projects: f(lk.projects), costCenters: f(lk.costCenters), categories: f(lk.categories), sources: f(lk.sources), vehicles: f(lk.vehicles) }
-}
-/** Labels prefixed `[CS1]` while several PTs are listed (mc2-contract §1 master option labels). */
-const labelled = (lk: Lookups, pt: PtView, on: boolean): Lookups => {
-  if (!on) return lk
-  const f = <T extends Option>(l: T[]) => l.map((o) => ({ ...o, label: `[${ptCode(pt, o.companyId)}] ${o.label}` }))
+/**
+ * Options of ONE PT when `company` is known (form pickers; the DB rejects cross-PT references anyway), else every PT's
+ * options with labels prefixed `[CS1]` while several PTs are listed (mc2-contract §1; pt.tsx ptOptionsOf).
+ */
+const lookupsOf = (lk: Lookups, company: number | undefined, tag?: { pt: PtView; multi: boolean }): Lookups => {
+  const f = <T extends Option>(l: T[]) => ptOptions(l, { code: (id) => (tag ? ptCode(tag.pt, id) : `#${id}`), company, multi: tag?.multi ?? false })
   return { accounts: f(lk.accounts), sites: f(lk.sites), projects: f(lk.projects), costCenters: f(lk.costCenters), categories: f(lk.categories), sources: f(lk.sources), vehicles: f(lk.vehicles) }
 }
 const lockText = (pt: PtView, locks: ReadonlyArray<{ companyId: number; lockDate: string | null }>) =>
@@ -233,7 +229,7 @@ export async function KasBook(props: AdminViewServerProps) {
     return { todayDate, locks, lk, page, bal, flowPeriod, flows, flash: flash as unknown as CashEntryDoc | null }
   })
   const { todayDate, locks, page, bal, flowPeriod, flows, flash } = d
-  const lk = labelled(lookupsOf(d.lk, q.pt), pt, multi && q.pt === undefined)
+  const lk = lookupsOf(d.lk, q.pt, { pt, multi })
   const lockOf = (c: number | null) => locks.find((l) => l.companyId === c)?.lockDate ?? null
   const writeIn = (c: number | null) => c !== null && acc.write.includes(c)
   // ADR 0023 (Q-S7): with a site filter the totals / tiles cover the accounts flagged with that site
