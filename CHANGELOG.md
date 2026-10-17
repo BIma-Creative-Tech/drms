@@ -19,7 +19,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   own "Edit". The expense-request page has no tab row any more (`EXPENSE_REQUEST_VIEWS`: default tab hidden, the
   `/riwayat` view keeps its route but no tab); **Riwayat** is a button of the action bar (next to Cetak / Duplikat /
   Edit, read mode, every status) and the Riwayat page has **← Kembali ke pengajuan**. Kas, Nota, Transfer and LPJ keep
-  their Riwayat tab.
+  their Riwayat tab. Also fixed: a Riwayat page opened by a user who may not read the document crashed ("no active
+  transaction") instead of showing "Dokumen tidak ditemukan." — the visibility check now runs before the history
+  transaction (every collection with Riwayat).
 - **#3 RAP is entered with the item form, Excel is optional**: the project's **RAP** tab → **Kelola RAP** now holds the
   same item form as Proyek › RAP (**+ Tambah item** / **Ubah**, grand total, lock and "Sudah terpakai" rules), with
   "Template Excel kosong", "Unduh RAP", RAP templates and the Excel import folded below it in **Impor / template Excel
