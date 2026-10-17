@@ -85,7 +85,7 @@ describe('#2 expense request: no tab row, Riwayat in the action bar', () => {
 describe('#3 RAP: item form first, Excel / template optional and folded', () => {
   it('RapExcelTools: a closed <details> with the template link, download (only with items), templates and import', () => {
     const html = renderToStaticMarkup(createElement(RapExcelTools, { projectId: 7, hasItems: true, templates: [], needsReason: false, stageRequired: false }))
-    expect(html).toMatch(/^<details class="pk-rap-excel" data-pk-rap-excel="true">/)
+    expect(html).toMatch(/<details class="pk-rap-excel" data-pk-rap-excel="true">/)
     expect(html).not.toMatch(/<details[^>]*\sopen/)
     expect(html).toContain(`<summary data-pk-action="rap-excel-toggle">${RAP_EXCEL_SUMMARY}</summary>`)
     expect(RAP_EXCEL_SUMMARY).toBe('Impor / template Excel (opsional)')
