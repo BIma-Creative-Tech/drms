@@ -17,6 +17,20 @@ export const RIWAYAT_TAB = {
 }
 
 /**
+ * UI feedback 17/10 #2: the expense-request page has no tab row — Payload's default "Edit" tab duplicated the action
+ * bar's own "Edit" (read/edit toggle). "Riwayat" is a button of the action bar (action-bar.ts `historyHref`) and the
+ * `/riwayat` route stays: a view with a path but no tab is still routed (Payload getCustomViewByRoute); the Riwayat
+ * page links back to the request. The other collections keep RIWAYAT_TAB.
+ */
+export const EXPENSE_REQUEST_VIEWS = {
+  default: { tab: { condition: () => false } },
+  riwayat: {
+    Component: RIWAYAT_TAB.riwayat.Component,
+    path: RIWAYAT_TAB.riwayat.path,
+  },
+}
+
+/**
  * DRMS 10/10 point 7: project detail tabs — "Proyek" (the form = default view, renamed), "RAP" (plan vs realisation,
  * D4) and "Pengajuan" (the project's expense requests). Document views of the Projects collection.
  */

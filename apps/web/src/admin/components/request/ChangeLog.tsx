@@ -13,7 +13,7 @@ const td: React.CSSProperties = { padding: '4px 6px', borderBottom: '1px solid v
  * (domain/history.ts: the request + its receipts, transfers, LPJ, and cash entries for the office roles): who, when,
  * action, field old → new, status change, reason; newest first, 20 per page, collapsed by default. The created /
  * last-changed times (Payload's document meta is hidden on this page, Wave 1 #13) head the section. The full table
- * with source / device stays in the "Riwayat" tab. Rows are pre-formatted on the server (history-format.ts).
+ * with source / device stays on the "Riwayat" page (action-bar button). Rows are pre-formatted on the server (history-format.ts).
  */
 export function ChangeLog({ entries, created, updated }: { entries: HistoryEntry[]; created: string | null; updated: string | null }) {
   const [page, setPage] = useState(0)

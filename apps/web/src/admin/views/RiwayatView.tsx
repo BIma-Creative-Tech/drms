@@ -20,6 +20,8 @@ import { settings as companySettings } from '@/domain/companies'
  * where (web/apk/job + app version + device id). Expense requests include their receipts,
  * transfers, LPJ (and cash entries for Finance/Owner/Admin). Access: the document must be readable
  * by the caller (collection access, overrideAccess:false) — else nothing is shown.
+ * UI feedback 17/10 #2: the expense-request page has no tab row (config EXPENSE_REQUEST_VIEWS) — its Riwayat page is
+ * opened from the action bar and links back to the request.
  */
 export async function RiwayatView(props: DocumentViewServerProps) {
   const req = props.initPageResult.req
@@ -47,6 +49,13 @@ export async function RiwayatView(props: DocumentViewServerProps) {
   const tz = (await companySettings(req)).timezone || process.env.TZ || DEFAULT_TZ
   return (
     <Gutter>
+      {collection?.slug === 'expense-requests' && Number.isSafeInteger(id) ? (
+        <p style={{ margin: '16px 0 0' }}>
+          <a className="btn btn--style-secondary btn--size-small pk-pbtn" style={{ margin: 0 }} href={`/admin/collections/expense-requests/${id}`} data-pk-link="back-to-request">
+            ← Kembali ke pengajuan
+          </a>
+        </p>
+      ) : null}
       <h2 style={{ margin: '16px 0' }}>Riwayat</h2>
       {denied ? <Empty text="Dokumen tidak ditemukan." /> : rows.length === 0 ? <Empty text="Belum ada riwayat." /> : null}
       {rows.length > 0 ? (

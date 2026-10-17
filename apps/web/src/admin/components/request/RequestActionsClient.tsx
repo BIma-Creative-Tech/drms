@@ -18,13 +18,13 @@ const idemKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ?
 /**
  * DRMS 13/10 Persetujuan #5/#7/#12: the action bar of the expense-request page, one row in Payload's document
  * controls before "Simpan": [Tolak] [Setujui] (decision for the current actor, from the server's `allowedActions`) ·
- * Finance flow links · [Cetak] · [Duplikat] · [Edit] / [Batal]. "Simpan" is Payload's own submit (RequestSaveButton,
- * shown in edit mode only), so validation, the audit reason and the save flow stay Payload's.
+ * Finance flow links · [Cetak] · [Duplikat] · [Riwayat] · [Edit] / [Batal]. "Simpan" is Payload's own submit
+ * (RequestSaveButton, shown in edit mode only), so validation, the audit reason and the save flow stay Payload's.
  * Edit → the page's Payload form fields appear with the loaded data (`data-pk-mode="edit"` on <main>); Batal resets
  * the form to the saved document and returns to read mode; a successful save (new `updatedAt`) returns to read mode
  * and refreshes the server-rendered panels.
  */
-export function RequestActionsClient({ id, decision, flowLinks, pdfs, canDuplicate }: RequestActionsProps) {
+export function RequestActionsClient({ id, decision, flowLinks, pdfs, canDuplicate, historyHref }: RequestActionsProps) {
   const router = useRouter()
   const ref = useRef<HTMLDivElement>(null)
   const { data, hasSavePermission } = useDocumentInfo()
@@ -112,6 +112,12 @@ export function RequestActionsClient({ id, decision, flowLinks, pdfs, canDuplica
         <PrintMenu pdfs={pdfs} />
       ) : null}
       {canDuplicate && mode === 'read' ? <DuplicateButton id={id} /> : null}
+      {/* UI feedback 17/10 #2: the history page as a button (the page has no tab row any more), read mode, every status */}
+      {mode === 'read' ? (
+        <a className={BTN} href={historyHref} data-pk-link="history">
+          Riwayat
+        </a>
+      ) : null}
       {gate === 'editable' && mode === 'read' ? (
         <button type="button" className={BTN} onClick={startEdit} data-pk-action="edit">
           Edit

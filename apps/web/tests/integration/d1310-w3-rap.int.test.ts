@@ -2,13 +2,14 @@ import { randomUUID } from 'node:crypto'
 
 import React, { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { createLocalReq, type AdminViewServerProps } from 'payload'
+import { createLocalReq, type AdminViewServerProps, type DocumentViewServerProps } from 'payload'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@payloadcms/next/templates', () => ({ DefaultTemplate: ({ children }: { children: ReactNode }) => children }))
 vi.mock('@payloadcms/ui', () => ({ Gutter: ({ children }: { children: ReactNode }) => React.createElement('div', { 'data-gutter': '' }, children) }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => undefined, refresh: () => undefined }), usePathname: () => '/admin' }))
 
+import { ProjectRapTab } from '@/admin/views/ProjectTabs'
 import { RapIndex, RapProject } from '@/admin/views/Rap'
 import { loadRapOverview } from '@/domain/rap/overview-load'
 import { RAP_USED_REASON_MESSAGE } from '@/domain/rap/rules'
@@ -56,6 +57,13 @@ async function resolve(node: ReactNode): Promise<ReactNode> {
 
 async function render(view: (p: Props) => Promise<ReactNode>, user: FlowUser, segments: string[], sp: Record<string, string> = {}): Promise<string> {
   return renderToStaticMarkup(React.createElement(React.Fragment, null, await resolve(await view(await propsFor(user, segments, sp)))))
+}
+
+/** The project's RAP tab (Payload document view of `projects`, docID = the project). */
+async function tab(user: FlowUser, id: number): Promise<string> {
+  const req = await createLocalReq({ user: { ...user, collection: 'users' } as never }, await getTestPayload())
+  const props = { initPageResult: { req, docID: id, locale: undefined, permissions: {}, visibleEntities: { collections: [], globals: [] } }, searchParams: {} } as unknown as DocumentViewServerProps
+  return renderToStaticMarkup(React.createElement(React.Fragment, null, await resolve(await ProjectRapTab(props))))
 }
 
 const index = (u: FlowUser, sp: Record<string, string> = {}) => render(RapIndex, u, ['rap'], sp)
@@ -224,6 +232,40 @@ describe('/admin/rap/:id', () => {
     expect(html).toContain('data-pk-form="rap-import"')
     expect(html).toContain('href="/api/v1/rap/template.xlsx"')
     expect(html).toContain('Grand total')
+    // UI feedback 17/10 #3: the form first, the Excel / template tools folded (closed) below it
+    expect(html).toMatch(/<details class="pk-rap-excel" data-pk-rap-excel="true">/)
+    expect(html.indexOf('data-pk-rap-editor=')).toBeLessThan(html.indexOf('data-pk-rap-excel'))
+    expect(html.indexOf('data-pk-rap-excel')).toBeLessThan(html.indexOf('data-pk-form="rap-import"'))
+  })
+
+  it('UI feedback 17/10 #3 — project RAP tab: the item form for the PM, Excel / template optional (folded below it)', async () => {
+    const pm = await tab(w.users.pm, kon)
+    expect(pm).toContain('id="project-rap-manage"')
+    expect(pm).toContain('data-pk-rap-editor="edit"')
+    expect(pm).toMatch(/<button(?![^>]*disabled)[^>]*data-pk-action="rap-item-add"/)
+    expect(pm).toMatch(/<button(?![^>]*disabled)[^>]*data-pk-action="rap-item-edit-A.1"/)
+    expect(pm).toContain('data-pk-rap-grand-total="2000000"')
+    expect(pm).toMatch(/<details class="pk-rap-excel" data-pk-rap-excel="true">/)
+    expect(pm.indexOf('data-pk-rap-editor=')).toBeLessThan(pm.indexOf('data-pk-rap-excel'))
+    expect(pm.indexOf('data-pk-rap-excel')).toBeLessThan(pm.indexOf('data-pk-form="rap-import"'))
+    expect(pm).toContain(`href="/admin/rap/${kon}"`)
+    expect(pm).not.toContain('>Ubah item RAP<')
+    // an empty RAP that is required: the banner points to the form; the form shows its empty state with "+ Tambah item"
+    const empty = await tab(w.users.pm, umum)
+    expect(empty).toContain('data-pk-alert="rap-missing"')
+    expect(empty).toContain('Tambah item RAP lewat form di bawah (+ Tambah item), atau impor Excel bila banyak.')
+    expect(empty).toContain('data-pk-rap-editor="edit"')
+    expect(empty).toMatch(/<button(?![^>]*disabled)[^>]*data-pk-action="rap-item-add"/)
+    expect(empty).toContain('data-pk-rap-excel')
+    // no RAP editor role: neither the form nor the Excel tools; Staff never sees money
+    for (const u of [w.users.finance, w.users.staffA]) {
+      const html = await tab(u, kon)
+      expect(html, u.email).toContain('data-pk-rap-item="A.1"')
+      expect(html, u.email).not.toContain('data-pk-rap-editor')
+      expect(html, u.email).not.toContain('data-pk-rap-excel')
+      expect(html, u.email).not.toContain('data-pk-form="rap-import"')
+    }
+    expect(await tab(w.users.staffA, kon)).not.toMatch(MONEY)
   })
 
   it('Finance: money, read only (no add / edit buttons, no upload)', async () => {

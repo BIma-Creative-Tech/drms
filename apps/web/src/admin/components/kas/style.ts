@@ -34,7 +34,10 @@ export const KAS_STYLE = `
 .pk-fld .err { font-size: 12px; color: var(--pk-tone-bad-text); margin: 0; font-weight: 600; }
 .pk-money { position: relative; }
 .pk-money > span { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--pk-muted-fg); pointer-events: none; }
-.pk-money > input { padding-left: 36px; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 16px; }
+/* UI feedback 17/10 #1: the generic .pk-fld input rule above (0,2,1; padding 8px 10px) beat a plain .pk-money > input
+   (0,1,1), so the typed amount started under the prefix. The .pk-fld selector mirrors that rule's :not() (0,3,1): the
+   prefix room wins whatever the order. */
+.pk-money > input, .pk-fld .pk-money > input:not([type='checkbox'], [type='radio']) { padding-left: 36px; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 16px; }
 .pk-seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 999px; background: var(--pk-muted-bg); border: 1px solid var(--pk-border); width: fit-content; max-width: 100%; }
 .pk-seg label { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--pk-muted-fg); cursor: pointer; }
 .pk-seg input { position: absolute; opacity: 0; pointer-events: none; }

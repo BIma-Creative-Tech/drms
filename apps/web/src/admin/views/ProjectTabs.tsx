@@ -3,10 +3,11 @@ import type { DocumentViewServerProps, PayloadRequest, Where } from 'payload'
 import React from 'react'
 
 import { employeeIn, hasRoleAny, relId, rolesIn, userId } from '@/access/roles'
-import { RapImport } from '@/admin/components/field/RapImport'
-import { RapTemplateActions } from '@/admin/components/field/RapTemplateActions'
 import { KAS_STYLE } from '@/admin/components/kas/style'
 import { ListToolbar, Pager } from '@/admin/components/list/ListToolbar'
+import { RapExcelTools } from '@/admin/components/rap/RapExcelTools'
+import { RapItemsEditor } from '@/admin/components/rap/RapItemsEditor'
+import { loadRapEditor, rapEditorItems } from '@/admin/components/rap/rap-editor-data'
 import { allowedValues, filterValues, matchesQuery, pageOfFind, paginate, parseListQuery, searchWhere } from '@/admin/list-query'
 import { listItem } from '@/domain/expense/dto'
 import type { RequestDoc } from '@/domain/expense/common'
@@ -28,8 +29,10 @@ import { Card, DataTable, EmptyState, KpiRow, KpiTile, Meter, StatusPill, VIZ_ST
  * of the Projects collection (Payload edit tabs); the project must be readable by the caller (collection access),
  * else nothing is shown. RAP money only for the price roles (DTO of loadRap). Tables: search + filter + pages (D8);
  * at ≤ 640 px RAP items are cards (APK layout, as the request lines). D4 owner 2026-10-11: RAP for EVERY project kind
- * with a RAB — the tab also manages the RAP (Excel import / export, templates of the project kind) for the PM and the
- * Direktur/Admin; konstruksi keeps its daily-report RAP page (stage progress, weekly recap) under Laporan harian.
+ * with a RAB — the tab also manages the RAP for the PM and the Direktur/Admin; konstruksi keeps its daily-report RAP
+ * page (stage progress, weekly recap) under Laporan harian. UI feedback 17/10 #3: "Kelola RAP" = the item form
+ * (RapItemsEditor "+ Tambah item" / "Ubah", as /admin/rap/:id) first, Excel import / export and the templates of the
+ * project kind folded below it (RapExcelTools, closed by default).
  */
 const idOf = (props: DocumentViewServerProps) => Number(props.initPageResult.docID ?? (props.doc as { id?: unknown } | undefined)?.id)
 
@@ -58,10 +61,12 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
   const id = idOf(props)
   const data = Number.isSafeInteger(id)
     ? await withReqTransaction(req, async () => {
-        const p = (await req.payload.findByID({ collection: 'projects', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req }).catch(() => null)) as { kind?: string | null } | null
+        const p = (await req.payload.findByID({ collection: 'projects', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req }).catch(() => null)) as { kind?: string | null; status?: string | null; company?: unknown } | null
         if (!p) return null
         const rap = await loadRap(req, id)
-        return { kind: kindOf(p.kind), rap, templates: rap.canEdit && rap.items.length === 0 ? await rapTemplatesFor(req, id) : [] }
+        // the item form only for the RAP editors (same condition as the Kelola RAP card)
+        const editor = rap.canEdit ? await loadRapEditor(req, { id, company: relId(p.company) ?? -1, status: p.status }, rap) : null
+        return { kind: kindOf(p.kind), rap, editor, templates: rap.canEdit && rap.items.length === 0 ? await rapTemplatesFor(req, id) : [] }
       }).catch(() => null)
     : null
   if (!data) {
@@ -71,7 +76,7 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
       </TabRoot>
     )
   }
-  const { rap, kind, templates } = data
+  const { rap, kind, editor, templates } = data
   const prices = rap.budget !== null
   const stageOf = (i: Item) => (i.stage ? `${i.stage.name} · ` : '')
   const sp = props.searchParams as Record<string, string | string[] | undefined> | undefined
@@ -148,7 +153,7 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
             </p>
             <p>
               {rap.canEdit
-                ? 'Project ini punya RAB, jadi wajib punya RAP: pengajuan project ini baru bisa dikirim setelah RAP terisi. Isi RAP lewat template atau impor Excel di bawah.'
+                ? 'Project ini punya RAB, jadi wajib punya RAP: pengajuan project ini baru bisa dikirim setelah RAP terisi. Tambah item RAP lewat form di bawah (+ Tambah item), atau impor Excel bila banyak.'
                 : 'Project ini punya RAB, jadi wajib punya RAP: pengajuan project ini baru bisa dikirim setelah PM / Direktur mengisi RAP.'}
             </p>
           </Alert>
@@ -253,27 +258,16 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
           </Card>
         </>
       )}
-      {rap.canEdit ? (
+      {rap.canEdit && editor ? (
         <Card
           id="project-rap-manage"
           title="Kelola RAP"
-          sub={rap.drivesProgress ? 'Konstruksi: tahapan wajib; pekerjaan menggerakkan progress tahapan' : 'Rencana biaya project: tahapan opsional, progress tetap manual'}
-          // DRMS 13/10 Wave 3: item-by-item form (tambah / ubah) on Proyek › RAP
-          action={{ href: `/admin/rap/${id}`, label: 'Ubah item RAP' }}
+          sub={`${rap.drivesProgress ? 'Konstruksi: tahapan wajib; pekerjaan menggerakkan progress tahapan' : 'Rencana biaya project: tahapan opsional, progress tetap manual'} · item tidak pernah dihapus (nonaktifkan bila tidak dipakai)`}
+          // UI feedback 17/10 #3: the item form is here; the RAP page of the project (Proyek › RAP) has the same form + filters
+          action={{ href: `/admin/rap/${id}`, label: 'Halaman RAP proyek' }}
         >
-          <div className="pk-kact" style={{ marginBottom: 12 }}>
-            {rap.items.length ? (
-              <a className="pk-kbtn" href={`/api/v1/projects/${id}/rap.xlsx`} data-pk-link="rap-download">
-                Unduh RAP (.xlsx)
-              </a>
-            ) : null}
-            <a className="pk-kbtn" href="/api/v1/rap/template.xlsx" data-pk-link="rap-template">
-              Template Excel kosong
-            </a>
-          </div>
-          <RapTemplateActions projectId={id} templates={templates} empty={rap.items.length === 0} />
-          <h3 style={{ fontSize: 14, margin: '16px 0 8px' }}>Impor RAP dari Excel</h3>
-          <RapImport projectId={id} needsReason={rap.needsReason} stageRequired={rap.drivesProgress} />
+          <RapItemsEditor projectId={id} items={rapEditorItems(rap)} stages={editor.stages} uoms={editor.uoms} prices={rap.totals !== null} mode={editor.mode} stageRequired={rap.drivesProgress} drivesProgress={rap.drivesProgress} />
+          <RapExcelTools projectId={id} hasItems={rap.items.length > 0} templates={templates} needsReason={rap.needsReason} stageRequired={rap.drivesProgress} />
         </Card>
       ) : null}
     </TabRoot>
