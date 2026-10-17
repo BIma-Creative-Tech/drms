@@ -44,14 +44,7 @@ describe('#1 Rupiah input: prefix and placeholder', () => {
     expect(html).toContain('<div class="pk-money"><span aria-hidden="true">Rp</span><input id="amt"')
     expect(html).not.toContain('placeholder')
   })
-
-  it('the Koreksi dialog Rupiah field (own .pk-money markup) carries no placeholder either', () => {
-    const dlg = src('src/admin/components/field/CorrectionDialog.tsx')
-    const at = dlg.indexOf("f.kind === 'rupiah' ? (")
-    expect(at).toBeGreaterThan(-1)
-    expect(dlg.slice(at, at + 300)).toContain('className="pk-money"')
-    expect(dlg).not.toContain('placeholder')
-  })
+  // (the field-report Koreksi dialog with its own .pk-money markup is gone since #5 — the forms use RupiahInput)
 })
 
 describe('#2 expense request: no tab row, Riwayat in the action bar', () => {

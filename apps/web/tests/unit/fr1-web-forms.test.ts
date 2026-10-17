@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => undefined, refresh: () => undefined }) }))
 
 import { ActivityForm } from '@/admin/components/field/ActivityForm'
-import { CorrectionDialog } from '@/admin/components/field/CorrectionDialog'
 import { linesFrom, linesOut, newLine } from '@/admin/components/field/parts'
 import { ServiceReportForm } from '@/admin/components/field/ServiceReportForm'
 import { TimesheetForm } from '@/admin/components/field/TimesheetForm'
@@ -104,42 +103,96 @@ describe('Aktivitas aftersales form', () => {
   })
 })
 
-describe('correction dialog', () => {
-  it('PM/Direktur correction: required reason, a real button, modal dialog', () => {
-    const out = html(React.createElement(CorrectionDialog, { url: '/api/v1/unit-timesheets/1/corrections', mode: 'correction', buttonLabel: 'Koreksi', title: 'Koreksi timesheet', description: 'x', fields: [{ name: 'hmStart', label: 'HM awal', kind: 'decimal', value: 1020 }], testId: 't' }))
-    expect(out).toContain('<button type="button" class="pk-kbtn" data-pk-action="t">Koreksi</button>')
-    expect(out).toContain('<dialog')
-    expect(out).toContain('Alasan koreksi')
-    expect(out).toContain('required=""')
-    expect(out).toContain('value="1.020"')
-    // other dialogs: no photo picker, no multi-select (unchanged)
-    expect(out).not.toContain('Tambah foto')
-    expect(out).not.toContain('type="checkbox"')
-  })
-  it('service report (DRMS owner 2026-10-17): multi-select incl. an inactive attached type, add photos up to 25, lines without No. part', () => {
+/**
+ * UI feedback 17/10 #5 ("edit = add"): the former Ubah / Koreksi dialogs are the input forms in `mode` edit /
+ * correction — same field set; project / unit / date (and customer / kind / PO) disabled in place; stored photos shown,
+ * new ones added; "Alasan" the last field (required for a correction); "Simpan perubahan" / "Simpan koreksi" + "Batal".
+ */
+describe('edit / correction mode of the input forms', () => {
+  const disabled = (out: string, attr: string) => expect(out, attr).toMatch(new RegExp(`<(select|input)[^>]*data-pk-locked="${attr}"[^>]*disabled=""|<(select|input)[^>]*disabled=""[^>]*data-pk-locked="${attr}"`))
+  it('service report correction: same sections, locked project / unit / date, stored photos, inactive type, reason last', () => {
     const out = html(
-      React.createElement(CorrectionDialog, {
-        url: '/api/v1/service-reports/1/corrections',
+      React.createElement(ServiceReportForm, {
         mode: 'correction',
-        buttonLabel: 'Koreksi',
-        title: 'Koreksi laporan servis',
-        description: 'x',
-        fields: [
-          { name: 'serviceTypeIds', label: 'Jenis servis', kind: 'multiselect', value: ['7', '9'], options: [{ value: '7', label: 'Perbaikan' }, { value: '8', label: 'Inspeksi' }, { value: '9', label: 'Overhaul (nonaktif)' }], numeric: true, required: true },
-          { name: 'spareparts', label: 'Sparepart', kind: 'lines', value: [{ name: 'Seal', partNo: 'SL-1', qty: 1 }], withNote: true, hidePartNo: true },
+        report: {
+          id: 7,
+          projectId: 5,
+          unitId: 11,
+          reportDate: '2026-10-08',
+          hourMeter: 1020,
+          startTime: '08:00',
+          endTime: null,
+          serviceTypeIds: [31, 39],
+          complaint: null,
+          action: 'Ganti seal',
+          helpers: null,
+          unitStatusAfter: 'siap',
+          spareparts: [{ name: 'Seal', partNo: 'SL-1', qty: 1 }],
+          notes: null,
+          photos: [{ id: 501, url: '/api/v1/media/progress-photos/501/file', thumbUrl: '/t/501' }],
+        },
+        projects: [{ id: 5, label: 'K-001 Sewa', companyId: 1, kind: 'kontrak_unit' }],
+        units: [{ id: 11, label: 'EX-01', sub: 'Excavator', lastHm: null, status: 'siap' }],
+        unitsByProject: { '5': [11] },
+        serviceTypes: [
+          { id: 31, companyId: 1, name: 'Servis berkala' },
+          { id: 39, companyId: 1, name: 'Overhaul (nonaktif)' },
         ],
-        photos: { current: 23, max: 25 },
-        testId: 's',
+        today: '2026-10-09',
+        minDate: '2026-10-08',
       }),
     )
+    expect(out).toContain('data-pk-form="service-report-correction"')
+    for (const l of ['Project / kontrak', 'Unit', 'Tanggal', 'HM saat servis', 'Jenis servis', 'Tindakan / pekerjaan', 'Sparepart', 'Status unit', 'Foto sebelum / sesudah', 'Catatan']) expect(out, l).toContain(l)
+    for (const k of ['project', 'unit', 'reportDate']) disabled(out, k)
+    expect(out).toContain('value="1.020"')
     expect(out).toContain('Overhaul (nonaktif)')
     expect((out.match(/type="checkbox"[^>]*checked=""/g) ?? []).length).toBe(2)
-    expect(out).toContain('Tambah foto')
-    expect(out).toContain('(0/2)') // room left: 25 − 23
+    expect(out).toContain('data-pk-photo-stored="501"')
+    expect(out).toContain('(1/25)')
     expect(out).not.toContain('No. part')
-    const full = html(React.createElement(CorrectionDialog, { url: '/x', mode: 'edit', buttonLabel: 'Ubah', title: 't', description: 'x', fields: [], photos: { current: 25, max: 25 } }))
-    expect(full).toContain('Sudah 25 foto (maksimal 25)')
-    expect(full).not.toContain('Tambah foto')
+    expect(out).toContain('Alasan koreksi')
+    expect(out.indexOf('data-pk-field="reason"')).toBeGreaterThan(out.indexOf('Foto sebelum / sesudah'))
+    expect(out).toContain('href="/admin/laporan-servis/detail/7"')
+    expect(out).toContain('Simpan koreksi')
+  })
+  it('aftersales edit: customer / kind / date disabled, hidden value disabled, reason optional', () => {
+    const out = html(
+      React.createElement(ActivityForm, {
+        mode: 'edit',
+        activity: { id: 4, projectId: 9, clientId: 3, kind: 'penawaran', activityDate: '2026-10-08', docNo: 'Q-1', items: [], value: null, valueVisible: false, followUpDate: null, receiver: null, relatesTo: null, poStatus: null, notes: null, photos: [] },
+        projects: [{ id: 9, label: 'AS-01', companyId: 1, clientId: 3 }],
+        clients: [{ id: 3, name: 'CV Maju Jaya', companyId: 1 }],
+        today: '2026-10-09',
+        minDate: '2026-10-08',
+      }),
+    )
+    expect(out).toContain('data-pk-form="aftersales-activity-edit"')
+    for (const k of ['project', 'client', 'activityDate']) disabled(out, k)
+    expect(out).toMatch(/<fieldset class="pk-fld pk-choice"[^>]*disabled=""/)
+    expect(out).toContain('Nilai hanya terlihat dan diubah oleh Direktur/Finance/Admin dan pelapor.')
+    expect(out).toContain('Alasan perubahan (opsional)')
+    expect(out).toContain('Simpan perubahan')
+    expect(out).not.toContain('PO ini sudah terkirim semua')
+  })
+  it('timesheet edit: contract / date / unit disabled, stored HM photo (not replaceable), reason last', () => {
+    const out = html(
+      React.createElement(TimesheetForm, {
+        mode: 'edit',
+        report: { id: 12, projectId: 5, unitId: 11, reportDate: '2026-10-08', hmStart: 1020, hmEnd: 1028, workHours: 8, standbyHours: 0, breakdownHours: 0, breakdownReason: null, fuelLiters: null, operatorName: 'Op', location: null, notes: null, hmPhoto: { id: 77, url: '/u/77', thumbUrl: '/t/77' } },
+        projects: [{ projectId: 5, label: 'K-001', companyId: 1, units: [{ contractUnitId: 1, unitId: 11, label: 'EX-01', startDate: '2026-10-08', endDate: '2026-10-08', active: true, lastHm: null }] }],
+        today: '2026-10-09',
+        minDate: '2026-10-08',
+      }),
+    )
+    expect(out).toContain('data-pk-form="unit-timesheet-edit"')
+    for (const k of ['project', 'reportDate', 'unit']) disabled(out, k)
+    expect(out).toContain('value="1.028"')
+    expect(out).toContain('data-pk-photo-stored="77"')
+    expect(out).toContain('Foto meter HM tersimpan dan tidak dapat diganti.')
+    expect(out).not.toContain('+ Tambah foto')
+    expect(out).toContain('Alasan perubahan (opsional)')
+    expect(out).toContain('href="/admin/unit-kontrak/timesheet/detail/12"')
   })
 })
 

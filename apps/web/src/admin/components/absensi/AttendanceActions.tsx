@@ -344,9 +344,17 @@ export function DefaultSchedule({ current, companyId, options, disabled }: { cur
 }
 
 /** New holiday (POST /api/holidays; Admin). */
-export function HolidayAdd({ year }: { year: string }) {
-  const [date, setDate] = useState('')
-  const [name, setName] = useState('')
+/**
+ * Hari libur — add (POST /api/holidays; Admin) AND, since UI feedback 17/10 #5, edit in the SAME inline widget (PATCH
+ * /api/holidays/{id}; Admin / Direktur, `?libur=<id>` on /absensi/jadwal — was the full Payload page): same fields and
+ * order; the edit-only "Alasan perubahan" last (the collection requires a reason on every update, audited); "Simpan
+ * perubahan" / "Batal".
+ */
+export function HolidayAdd({ year, edit, cancelHref }: { year: string; edit?: { id: number; date: string; name: string }; cancelHref?: string }) {
+  const router = useRouter()
+  const [date, setDate] = useState(edit?.date ?? '')
+  const [name, setName] = useState(edit?.name ?? '')
+  const [reason, setReason] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const { busy, msg, run } = useSave()
   const uid = useId()
@@ -358,13 +366,19 @@ export function HolidayAdd({ year }: { year: string }) {
         e.preventDefault()
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return setErr('Pilih tanggal.')
         if (name.trim().length < 3) return setErr('Keterangan minimal 3 karakter.')
+        if (edit && reason.trim().length < 3) return setErr('Alasan perubahan minimal 3 karakter.')
         setErr(null)
+        if (edit) {
+          if (await run('PATCH', `/api/holidays/${edit.id}?depth=0`, { date, name: name.trim(), changeReason: reason.trim() }, `Hari libur ${date} diperbarui.`) && cancelHref) router.push(cancelHref)
+          return
+        }
         if (await run('POST', '/api/holidays?depth=0', { date, name: name.trim() }, `Hari libur ${date} ditambahkan.`)) {
           setDate('')
           setName('')
         }
       }}
-      data-pk-form="holiday-add"
+      data-pk-form={edit ? 'holiday-edit' : 'holiday-add'}
+      data-pk-holiday-id={edit?.id}
     >
       <div className="pk-fld">
         <label htmlFor={`${uid}-d`}>Tanggal</label>
@@ -374,9 +388,20 @@ export function HolidayAdd({ year }: { year: string }) {
         <label htmlFor={`${uid}-n`}>Keterangan</label>
         <WrapText id={`${uid}-n`} value={name} maxLength={128} onChange={(e) => setName(e.target.value)} required placeholder="mis. Hari Kemerdekaan RI" />
       </div>
+      {edit ? (
+        <div className="pk-fld grow" data-pk-field="changeReason">
+          <label htmlFor={`${uid}-r`}>Alasan perubahan</label>
+          <WrapText id={`${uid}-r`} value={reason} maxLength={1000} onChange={(e) => setReason(e.target.value)} required placeholder="Tercatat di audit log" />
+        </div>
+      ) : null}
       <button type="submit" className="pk-kbtn primary" disabled={busy}>
-        {busy ? 'Menyimpan…' : '+ Tambah hari libur'}
+        {busy ? 'Menyimpan…' : edit ? 'Simpan perubahan' : '+ Tambah hari libur'}
       </button>
+      {edit && cancelHref ? (
+        <Link className="pk-kbtn" href={cancelHref} prefetch={false}>
+          Batal
+        </Link>
+      ) : null}
       {err ? (
         <p className="pk-kerr" role="alert">
           {err}

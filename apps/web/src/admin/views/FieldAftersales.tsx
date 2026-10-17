@@ -4,7 +4,6 @@ import React from 'react'
 
 import { hasRoleAny } from '@/access/roles'
 import { ActivityForm } from '@/admin/components/field/ActivityForm'
-import { CorrectionDialog, type CorrField } from '@/admin/components/field/CorrectionDialog'
 import { companyById } from '@/domain/companies'
 import { activityDto, activityDtos, listActivities, openPos, type ActivityDoc, type ActivityDto } from '@/domain/field/aftersales'
 import { mayReadRates } from '@/domain/field/access'
@@ -18,7 +17,7 @@ import { xlsxEnabled } from '@/lib/xlsx'
 import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseListQuery } from '@/admin/list-query'
 
-import { BtnLink, dateParam, FIELD_CREATORS, FIELD_OFFICE, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf } from './field-ui'
+import { BtnLink, dateParam, EditLink, editModeOf, FIELD_CREATORS, FIELD_OFFICE, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf } from './field-ui'
 import { ptCodes, ptOptionsOf, ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, rp, StatusPill, type Col } from './viz'
@@ -35,6 +34,8 @@ import { DateInput } from '../components/DateInput'
 const recapHref = '/admin/aftersales'
 const listHref = '/admin/aftersales/aktivitas'
 const detailHref = (id: number) => `/admin/aftersales/aktivitas/detail/${id}`
+/** UI feedback 17/10 #5: edit (reporter, 24 h) / correction (PM / Direktur) page = the input form, same layout. */
+const editHref = (id: number, correction = false) => `/admin/aftersales/aktivitas/${id}/ubah${correction ? '?koreksi=1' : ''}`
 const newHref = (p: Record<string, string | number | undefined>) => {
   const u = new URLSearchParams()
   for (const [k, v] of Object.entries(p)) if (v !== undefined) u.set(k, String(v))
@@ -400,6 +401,20 @@ export async function FieldActivityList(props: AdminViewServerProps) {
 
 // ================================================================ quick input
 
+/** "Aturan" card of the input AND the edit page (UI feedback 17/10 #5: same layout). */
+function ActivityRules() {
+  return (
+    <Card id="activity-help" title="Aturan" span={4}>
+      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
+        <li>Pengiriman wajib mengacu ke PO masuk pelanggan yang sama; “sudah terkirim semua” menutup PO.</li>
+        <li>Penawaran dengan tanggal follow-up memunculkan pengingat ke pelapor dan PM.</li>
+        <li>Nilai (Rp) opsional, hanya terlihat oleh Direktur/Finance/Admin dan pelapor.</li>
+        <li>Aktivitas tidak bisa dihapus.</li>
+      </ul>
+    </Card>
+  )
+}
+
 export async function FieldActivityNew(props: AdminViewServerProps) {
   const gate = await fieldGate(props, FIELD_CREATORS)
   if (!gate.ok) return gate.page
@@ -437,14 +452,7 @@ export async function FieldActivityNew(props: AdminViewServerProps) {
             />
           )}
         </Card>
-        <Card id="activity-help" title="Aturan" span={4}>
-          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
-            <li>Pengiriman wajib mengacu ke PO masuk pelanggan yang sama; “sudah terkirim semua” menutup PO.</li>
-            <li>Penawaran dengan tanggal follow-up memunculkan pengingat ke pelapor dan PM.</li>
-            <li>Nilai (Rp) opsional, hanya terlihat oleh Direktur/Finance/Admin dan pelapor.</li>
-            <li>Aktivitas tidak bisa dihapus.</li>
-          </ul>
-        </Card>
+        <ActivityRules />
       </Bento>
     </FieldFrame>
   )
@@ -483,15 +491,6 @@ export async function FieldActivityDetail(props: AdminViewServerProps) {
   const rates = mayReadRates(req, a.companyId)
   const showValue = a.valueVisible
   const open = kind === 'po_masuk' && a.poStatus !== null && OPEN_PO_STATUSES.includes(a.poStatus as PoStatus)
-  const base: CorrField[] = [
-    { name: 'docNo', label: 'No. dokumen', kind: 'text', value: a.docNo, max: 64 },
-    ...(kind === 'penawaran' ? [{ name: 'followUpDate', label: 'Tanggal follow-up', kind: 'date' as const, value: a.followUpDate }] : []),
-    ...(kind === 'pengiriman' ? [{ name: 'receiver', label: 'Penerima', kind: 'text' as const, value: a.receiver, max: 128 }] : []),
-    ...(showValue ? [{ name: 'value', label: 'Nilai (Rp)', kind: 'rupiah' as const, value: a.value }] : []),
-    { name: 'items', label: 'Item', kind: 'lines', value: a.items as Array<{ name: string; qty: number }> },
-    { name: 'notes', label: 'Catatan', kind: 'textarea', value: a.notes, max: 2000 },
-  ]
-  const correction: CorrField[] = kind === 'po_masuk' && a.poStatus ? [...base, { name: 'poStatus', label: 'Status PO', kind: 'select', value: a.poStatus, options: PO_STATUSES.map((s) => ({ value: s, label: PO_STATUS_LABELS[s] })) }] : base
   const creator = mayCreateIn(req, a.companyId ?? 0)
   const items = a.items as Array<{ name: string; partNo?: string | null; qty: number; uom?: string | null }>
   return (
@@ -504,23 +503,25 @@ export async function FieldActivityDetail(props: AdminViewServerProps) {
               Catat pengiriman
             </BtnLink>
           ) : null}
-          {a.editable ? <CorrectionDialog url={`/api/v1/aftersales-activities/${a.id}`} mode="edit" buttonLabel="Ubah (24 jam)" title="Ubah aktivitas" description="Anda pelapor dan masih dalam 24 jam. Hanya isian yang berubah yang dikirim." fields={base} testId="activity-edit" /> : null}
+          {a.editable ? (
+            <EditLink href={editHref(a.id)} action="activity-edit" primary>
+              Ubah (24 jam)
+            </EditLink>
+          ) : null}
           {mayCorrectIn(req, a.companyId) ? (
-            <CorrectionDialog
-              url={`/api/v1/aftersales-activities/${a.id}/corrections`}
-              mode="correction"
-              buttonLabel="Koreksi"
-              title="Koreksi aktivitas"
-              description="Koreksi oleh PM project / Direktur, kapan saja, dengan alasan. PO yang dibatalkan tidak dapat dibuka lagi."
-              fields={correction}
-              testId="activity-correct"
-            />
+            <EditLink href={editHref(a.id, true)} action="activity-correct">
+              Koreksi
+            </EditLink>
           ) : null}
         </div>
       </DashHead>
       {one(sp.baru) === '1' ? (
         <Alert tone="ok" attr="created">
           <p>Aktivitas tersimpan.</p>
+        </Alert>
+      ) : one(sp.disimpan) === '1' ? (
+        <Alert tone="ok" attr="saved">
+          <p>Perubahan tersimpan dan tercatat di riwayat.</p>
         </Alert>
       ) : null}
       {a.flags.length ? (
@@ -607,6 +608,91 @@ export async function FieldActivityDetail(props: AdminViewServerProps) {
         <Card id="activity-history" title="Riwayat & koreksi" span={kind === 'po_masuk' ? 12 : 5} i={8}>
           <History entries={history} tz={tz} />
         </Card>
+      </Bento>
+    </FieldFrame>
+  )
+}
+
+// ================================================================ edit / correction (UI feedback 17/10 #5)
+
+/**
+ * `/aftersales/aktivitas/:id/ubah` — the reporter's edit within 24 h, `?koreksi=1` the PM / Direktur correction: the
+ * quick-input form (`ActivityForm`, same fields, order and "Aturan" card) with project, customer, date, kind and PO
+ * disabled, the stored values and photos, "Status PO" (correction of a PO masuk) and "Alasan" last. Who may open it =
+ * who saw the former dialog; the API re-checks everything.
+ */
+export async function FieldActivityEdit(props: AdminViewServerProps) {
+  const gate = await fieldGate(props, FIELD_READERS)
+  if (!gate.ok) return gate.page
+  const req = props.initPageResult.req as PayloadRequest
+  const mode = editModeOf(spOf(props))
+  const id = segmentNum(props, 2)
+  const d = await withReqTransaction(req, async () => {
+    const doc = id ? await visibleFieldDoc<ActivityDoc>(req, 'aftersales_activity', id) : null
+    if (!doc) return null
+    const a = await activityDto(req, doc)
+    return { a, today: await todayOf(req, a.companyId) }
+  })
+  const back = (id2: number | null) => (
+    <BtnLink href={id2 ? detailHref(id2) : listHref} icon="arrowLeft">
+      {id2 ? 'Kembali ke aktivitas' : 'Aktivitas aftersales'}
+    </BtnLink>
+  )
+  if (!d) {
+    return (
+      <FieldFrame props={props} name="aktivitas-ubah">
+        <DashHead title="Aktivitas tidak ditemukan">{back(null)}</DashHead>
+      </FieldFrame>
+    )
+  }
+  const { a } = d
+  const kind = a.kind as ActivityKind
+  const allowed = mode === 'edit' ? a.editable : mayCorrectIn(req, a.companyId)
+  const title = `${mode === 'edit' ? 'Ubah' : 'Koreksi'} ${ACTIVITY_KIND_LABELS[kind]}${a.docNo ? ` · ${a.docNo}` : ''}`
+  if (!allowed || a.companyId === null) {
+    return (
+      <FieldFrame props={props} name="aktivitas-ubah">
+        <DashHead title={title}>{back(a.id)}</DashHead>
+        <Alert tone="bad" attr="not-editable">
+          <p>{mode === 'edit' ? 'Aktivitas ini tidak dapat diubah lagi: hanya pelapor, dalam 24 jam sejak dibuat. Setelah itu koreksi oleh PM project / Direktur.' : 'Koreksi aktivitas hanya oleh PM project (tim) atau Direktur.'}</p>
+        </Alert>
+      </FieldFrame>
+    )
+  }
+  const companyId = a.companyId
+  return (
+    <FieldFrame props={props} name="aktivitas-ubah">
+      <DashHead title={title} note={mode === 'edit' ? 'Pelapor, dalam 24 jam sejak dibuat · hanya isian yang berubah yang dikirim · tercatat di riwayat' : 'Koreksi PM project / Direktur dengan alasan · PO yang dibatalkan tidak dapat dibuka lagi'}>
+        <div className="pk-kact">{back(a.id)}</div>
+      </DashHead>
+      <Bento>
+        <Card id="activity-form" title={mode === 'edit' ? 'Ubah aktivitas (24 jam)' : 'Koreksi aktivitas'} span={8}>
+          <ActivityForm
+            mode={mode}
+            activity={{
+              id: a.id,
+              projectId: a.project.id,
+              clientId: a.client.id,
+              kind,
+              activityDate: a.activityDate,
+              docNo: a.docNo,
+              items: a.items as Array<{ name: string; partNo?: string | null; qty: number; uom?: string | null }>,
+              value: a.valueVisible ? a.value : null,
+              valueVisible: a.valueVisible,
+              followUpDate: a.followUpDate,
+              receiver: a.receiver,
+              relatesTo: a.relatesTo ? { id: a.relatesTo.id, label: a.relatesTo.docNo ?? `PO #${a.relatesTo.id}` } : null,
+              poStatus: (a.poStatus as PoStatus | null) ?? null,
+              notes: a.notes,
+              photos: a.photos.map((p) => ({ id: p.id, url: p.url, thumbUrl: p.thumbUrl })),
+            }}
+            projects={[{ id: a.project.id, label: `${a.project.code ?? ''} ${a.project.name ?? ''}`.trim(), companyId, clientId: a.client.id }]}
+            clients={[{ id: a.client.id, name: a.client.name ?? `Pelanggan #${a.client.id}`, companyId }]}
+            today={d.today}
+            minDate={a.activityDate}
+          />
+        </Card>
+        <ActivityRules />
       </Bento>
     </FieldFrame>
   )

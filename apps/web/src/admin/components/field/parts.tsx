@@ -266,10 +266,10 @@ export function LinesEditor({ rows, setRows, label, nameLabel, addLabel, help, w
 
 // ---------------------------------------------------------------- choice group (radio pills)
 
-export function Choice<T extends string>({ label, name, value, options, onChange, required, error }: { label: string; name: string; value: T | ''; options: ReadonlyArray<{ value: T; label: string }>; onChange: (v: T) => void; required?: boolean; error?: string | null }) {
+export function Choice<T extends string>({ label, name, value, options, onChange, required, error, disabled }: { label: string; name: string; value: T | ''; options: ReadonlyArray<{ value: T; label: string }>; onChange: (v: T) => void; required?: boolean; error?: string | null; disabled?: boolean }) {
   const uid = useId()
   return (
-    <fieldset className="pk-fld pk-choice" aria-describedby={error ? `${uid}-e` : undefined}>
+    <fieldset className="pk-fld pk-choice" aria-describedby={error ? `${uid}-e` : undefined} disabled={disabled}>
       <legend className="lbl">
         {label}
         {required ? (

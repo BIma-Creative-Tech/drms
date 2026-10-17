@@ -1245,6 +1245,8 @@ export async function AbsensiJadwal(props: AdminViewServerProps) {
   const def = d.schedules.find((s) => s.id === d.defaultId)
   const withGeo = d.costCenters.filter((c) => c.lat !== null && c.lng !== null).length
   const upcoming = d.holidays.filter((h) => h.date >= d.today)
+  const editId = Number(one(sp, 'libur'))
+  const editing = Number.isSafeInteger(editId) && editId > 0 ? (d.holidays.find((h) => h.id === editId) ?? null) : null
   const y = Number(d.year)
   return (
     <Frame props={props} name="absensi-jadwal">
@@ -1325,7 +1327,12 @@ export async function AbsensiJadwal(props: AdminViewServerProps) {
               </Link>
             ))}
           </nav>
-          {canCreate ? (
+          {/* UI feedback 17/10 #5: "Ubah" edits in the same inline widget as "Tambah" (`?libur=<id>`), not the Payload page */}
+          {editing && canWrite ? (
+            <div style={{ marginBottom: 12 }}>
+              <HolidayAdd key={editing.id} year={d.year} edit={editing} cancelHref={`/admin/absensi/jadwal?tahun=${d.year}#hari-libur`} />
+            </div>
+          ) : canCreate ? (
             <div style={{ marginBottom: 12 }}>
               <HolidayAdd year={d.year} />
             </div>
@@ -1350,7 +1357,7 @@ export async function AbsensiJadwal(props: AdminViewServerProps) {
               },
               { key: 'n', label: 'Keterangan', cell: (h) => (h.date < d.today ? <span style={{ color: 'var(--pk-muted-fg)' }}>{h.name}</span> : h.name) },
               ...(canWrite
-                ? [{ key: 'e', label: 'Aksi', num: true, cell: (h: (typeof d.holidays)[number]) => <EditButton href={`/admin/collections/holidays/${h.id}`} name={`hari libur ${h.name}`} /> }]
+                ? [{ key: 'e', label: 'Aksi', num: true, cell: (h: (typeof d.holidays)[number]) => <EditButton href={`/admin/absensi/jadwal?tahun=${d.year}&libur=${h.id}#hari-libur`} name={`hari libur ${h.name}`} /> }]
                 : []),
             ]}
           />

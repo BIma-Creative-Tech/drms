@@ -116,7 +116,8 @@ sama beserta waktu dibuat dan terakhir diubah.
 flag) dan **Log perubahan**; kanan — **Alur pengajuan** (Diajukan → PM → Direktur → Transfer → LPJ → Selesai; yang
 sedang berjalan bertanda **Tahapan saat ini**). Di HP alurnya tampil setelah ringkasan. Tombol ada di bar aksi atas:
 **Setujui** / **Tolak** (bila giliran Anda), **Cetak**, **Duplikat**, **Edit** → **Simpan** / **Batal** (hanya Draft
-atau Revisi Nota milik Anda).
+atau Revisi Nota milik Anda). Sejak 17 Okt 2026 tampilan **Edit** sama dengan **Pengajuan baru**: PT tetap di tempatnya
+(terkunci), tanpa kepala halaman dan kolom alur — keduanya kembali setelah **Simpan** / **Batal**.
 
 **HP hilang atau ganti HP:** segera lapor Admin agar perangkat dicabut.
 

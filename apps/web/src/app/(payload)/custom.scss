@@ -1544,6 +1544,43 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     white-space: nowrap;
   }
 
+  // UI feedback 17/10 #5: the PT of an existing document (and the one-PT create prefill) — CompanyBadge — takes the PT
+  // picker's slot and size: the same "PT" label above, a box as tall and wide as the relationship control (40 px, the
+  // input border and radius, the disabled-input background), so switching create ↔ edit never shifts the form.
+  .field-type.pk-company-field {
+    display: block;
+    margin-bottom: var(--spacing-field, 20px);
+
+    > .field-label {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .pk-company-field__box {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      box-sizing: border-box;
+      width: 100%;
+      min-width: 0;
+      min-height: 40px;
+      padding: 4px 10px;
+      border: 1px solid var(--theme-elevation-150);
+      border-radius: var(--style-radius-s);
+      background: var(--theme-elevation-50);
+      cursor: not-allowed;
+    }
+
+    .pk-pt-badge {
+      border: 0;
+      padding: 0;
+    }
+
+    > .field-description {
+      margin-top: 6px;
+    }
+  }
+
   // the PT column holds a short chip: no 150 px minimum (Payload's default cell width), so the identifying
   // column (name / title) stays on screen at 390 px
   .table {
@@ -2387,8 +2424,12 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
       padding-block: 6px;
     }
 
-    // the PT is a badge in the panel header (Persetujuan #8)
-    &.collection-edit--is-editing [data-pk-field='company'] {
+    // UI feedback 17/10 #5 ("edit = add"): EDIT mode looks like "Pengajuan baru" — the PT stays in its create slot (the
+    // first field; CompanyField's badge in the picker's place and size, read-only: the PT never changes after create),
+    // the panel header (number, PT, status, Tahapan saat ini) and the stepper column belong to READ mode only. READ mode
+    // hides every input incl. the PT (rule below); the header shows the PT badge there (Persetujuan #8).
+    &[data-pk-mode='edit'] [data-pk-panel='workflow'] [data-pk-section='header'],
+    &[data-pk-mode='edit'] .document-fields__sidebar-wrap {
       display: none;
     }
   }
@@ -2688,11 +2729,11 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
         grid-column: 1 / -1;
       }
 
-      > :is(.field-type.text, .field-type.select, .field-type.relationship, .field-type.number, .field-type.date-time-field, [data-pk-needs-company]) {
+      > :is(.field-type.text, .field-type.select, .field-type.relationship, .field-type.number, .field-type.date-time-field, .field-type.pk-company-field, [data-pk-needs-company]) {
         grid-column: auto;
       }
 
-      > :is(.field-type.text, .field-type.select, .field-type.relationship, .field-type.number, .field-type.date-time-field),
+      > :is(.field-type.text, .field-type.select, .field-type.relationship, .field-type.number, .field-type.date-time-field, .field-type.pk-company-field),
       > [data-pk-needs-company] > .field-type {
         @include pk-label-left-cell;
 

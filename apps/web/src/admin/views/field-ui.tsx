@@ -81,6 +81,22 @@ export function BtnLink({ href, children, primary, icon, small, attr }: { href: 
   )
 }
 
+/**
+ * UI feedback 17/10 #5: "Ubah (24 jam)" / "Koreksi" on a field-report detail = a link to the report's edit page
+ * (`…/:id/ubah`, `?koreksi=1` for the PM / Direktur correction) — the same form and layout as "baru", no dialog.
+ * `data-pk-action` keeps the hooks of the former dialog buttons.
+ */
+export function EditLink({ href, action, primary, children }: { href: string; action: string; primary?: boolean; children: React.ReactNode }) {
+  return (
+    <Link className={`pk-kbtn${primary ? ' primary' : ''}`} href={href} prefetch={false} data-pk-action={action}>
+      {children}
+    </Link>
+  )
+}
+
+/** Edit page of a field report: `?koreksi=1` → correction (PM / Direktur), else the reporter's edit (24 h). */
+export const editModeOf = (sp: SP): 'edit' | 'correction' => (one(sp.koreksi) === '1' ? 'correction' : 'edit')
+
 /** Row action "Buka" (.pk-row-act) — accessible name names the row. */
 export function OpenAction({ href, name, label = 'Buka' }: { href: string; name: string; label?: string }) {
   return (

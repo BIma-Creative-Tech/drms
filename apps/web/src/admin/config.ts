@@ -113,6 +113,8 @@ export const S2A_ADMIN_VIEWS = {
   addendumList: { Component: '@/admin/views/Addendum#AddendumList', path: '/addendum' as const, exact: true, meta: { title: 'Addendum RAB' } },
   addendumNew: { Component: '@/admin/views/Addendum#AddendumNew', path: '/addendum/baru' as const, exact: true, meta: { title: 'Ajukan addendum RAB' } },
   addendumDetail: { Component: '@/admin/views/Addendum#AddendumDetail', path: '/addendum/detail/:id' as const, exact: true, meta: { title: 'Addendum RAB' } },
+  // UI feedback 17/10 #5: "Ubah draft" = its own page with the layout of "Ajukan addendum RAB" (was embedded in the detail)
+  addendumEdit: { Component: '@/admin/views/Addendum#AddendumEdit', path: '/addendum/:id/ubah' as const, exact: true, meta: { title: 'Ubah draft addendum RAB' } },
 }
 
 /** S3e (US-05, S-04): the caller's notifications (bell in the top module bar, src/admin/shell/ModuleNav.tsx). */
@@ -173,13 +175,17 @@ export const FR1_ADMIN_VIEWS = {
   fieldUnit: { Component: '@/admin/views/FieldUnits#FieldUnitDetail', path: '/unit-kontrak/unit/:id' as const, exact: true, meta: { title: 'Unit' } },
   fieldTimesheetNew: { Component: '@/admin/views/FieldUnits#FieldTimesheetNew', path: '/unit-kontrak/timesheet/baru' as const, exact: true, meta: { title: 'Isi timesheet' } },
   fieldTimesheet: { Component: '@/admin/views/FieldUnits#FieldTimesheetDetail', path: '/unit-kontrak/timesheet/detail/:id' as const, exact: true, meta: { title: 'Timesheet unit' } },
+  // UI feedback 17/10 #5: "Ubah (24 jam)" / "Koreksi" (`?koreksi=1`) = the input form as a page (was a dialog), same for servis / aktivitas
+  fieldTimesheetEdit: { Component: '@/admin/views/FieldUnits#FieldTimesheetEdit', path: '/unit-kontrak/timesheet/:id/ubah' as const, exact: true, meta: { title: 'Ubah timesheet' } },
   fieldServiceList: { Component: '@/admin/views/FieldService#FieldServiceList', path: '/laporan-servis' as const, exact: true, meta: { title: 'Laporan servis' } },
   fieldServiceNew: { Component: '@/admin/views/FieldService#FieldServiceNew', path: '/laporan-servis/baru' as const, exact: true, meta: { title: 'Laporan servis baru' } },
   fieldService: { Component: '@/admin/views/FieldService#FieldServiceDetail', path: '/laporan-servis/detail/:id' as const, exact: true, meta: { title: 'Laporan servis' } },
+  fieldServiceEdit: { Component: '@/admin/views/FieldService#FieldServiceEdit', path: '/laporan-servis/:id/ubah' as const, exact: true, meta: { title: 'Ubah laporan servis' } },
   fieldAftersales: { Component: '@/admin/views/FieldAftersales#FieldAftersalesRecap', path: '/aftersales' as const, exact: true, meta: { title: 'Aftersales' } },
   fieldActivities: { Component: '@/admin/views/FieldAftersales#FieldActivityList', path: '/aftersales/aktivitas' as const, exact: true, meta: { title: 'Aktivitas aftersales' } },
   fieldActivityNew: { Component: '@/admin/views/FieldAftersales#FieldActivityNew', path: '/aftersales/aktivitas/baru' as const, exact: true, meta: { title: 'Catat aktivitas' } },
   fieldActivity: { Component: '@/admin/views/FieldAftersales#FieldActivityDetail', path: '/aftersales/aktivitas/detail/:id' as const, exact: true, meta: { title: 'Aktivitas aftersales' } },
+  fieldActivityEdit: { Component: '@/admin/views/FieldAftersales#FieldActivityEdit', path: '/aftersales/aktivitas/:id/ubah' as const, exact: true, meta: { title: 'Ubah aktivitas aftersales' } },
   // P3 konstruksi: Laporan harian (list / input / detail incl. ?ubah=1 / ?koreksi=1) + RAP & weekly recap of a project
   fieldDailyList: { Component: '@/admin/views/FieldDaily#FieldDailyList', path: '/laporan-harian' as const, exact: true, meta: { title: 'Laporan harian' } },
   fieldDailyNew: { Component: '@/admin/views/FieldDaily#FieldDailyNew', path: '/laporan-harian/baru' as const, exact: true, meta: { title: 'Laporan harian baru' } },
@@ -203,6 +209,8 @@ export const LOAN_ADMIN_VIEWS = {
   loanList: { Component: '@/admin/views/Loans#LoanList', path: '/pinjaman' as const, exact: true, meta: { title: 'Pinjaman antar project' } },
   loanNew: { Component: '@/admin/views/Loans#LoanNew', path: '/pinjaman/baru' as const, exact: true, meta: { title: 'Ajukan pinjaman antar project' } },
   loanDetail: { Component: '@/admin/views/Loans#LoanDetail', path: '/pinjaman/detail/:id' as const, exact: true, meta: { title: 'Pinjaman antar project' } },
+  // UI feedback 17/10 #5: "Ubah draft" = its own page with the layout of "Ajukan pinjaman" (was embedded in the detail)
+  loanEdit: { Component: '@/admin/views/Loans#LoanEdit', path: '/pinjaman/:id/ubah' as const, exact: true, meta: { title: 'Ubah draft pinjaman' } },
 }
 
 /**

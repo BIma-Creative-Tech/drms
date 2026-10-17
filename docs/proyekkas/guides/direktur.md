@@ -121,6 +121,10 @@ Toleransi diubah oleh Admin/Direktur di data PT (Pengaturan operasional).
 Web **Laporan progress** atau HP **Laporan progress**: semua project, terbaru di atas, filter project/tahapan/tanggal,
 klik foto untuk ukuran penuh. Anda juga boleh membuat laporan dari HP (sama seperti PM).
 
+**Koreksi laporan lapangan** (laporan harian, servis, aktivitas aftersales, timesheet; web): buka laporan →
+**Koreksi** → halaman form yang sama dengan isian laporan (project, unit, tanggal terkunci) → ubah isian → **Alasan
+koreksi** (wajib, paling bawah) → **Simpan koreksi**. Lihat juga Panduan PM §2a.
+
 ## 6. Keuangan
 
 - **Kas** (baca saja; transaksi kas yang dikonfirmasi meski saldo menjadi minus dan transfer ke rekening belum

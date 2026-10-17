@@ -9,7 +9,7 @@ vi.mock('@payloadcms/next/templates', () => ({ DefaultTemplate: ({ children }: {
 vi.mock('@payloadcms/ui', () => ({ Gutter: ({ children }: { children: ReactNode }) => React.createElement('div', { 'data-gutter': '' }, children) }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => undefined, refresh: () => undefined }), usePathname: () => '/admin' }))
 
-import { FieldServiceDetail, FieldServiceList, FieldServiceNew } from '@/admin/views/FieldService'
+import { FieldServiceDetail, FieldServiceEdit, FieldServiceList, FieldServiceNew } from '@/admin/views/FieldService'
 import { SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
 import { resetRateLimits } from '@/lib/rate-limit'
 import { BACKFILL_SERVICE_REPORT_TYPES_SQL, SEED_SERVICE_TYPES_SQL } from '@/migrations/20261017_100000_d1710_service_types'
@@ -435,23 +435,34 @@ describe('web views', () => {
     expect(list).toContain(`data-pk-row="${r.body.docNo}"`)
   })
 
-  it('detail: names joined, multi-select + photos in the dialogs, inactive attached type "(nonaktif)", "No. part" column only when stored', async () => {
+  it('detail + edit pages (UI feedback 17/10 #5): names joined, multi-select + photos on the edit page, inactive attached type "(nonaktif)", "No. part" column only when stored', async () => {
     const withPn = await create(w.users.staffA, { serviceTypeIds: [custom, T.perbaikan], spareparts: [{ name: 'Seal', partNo: 'SL-9', qty: 1 }] })
     const plain = await create(w.users.staffA, { serviceTypeIds: [T.perbaikan], spareparts: [{ name: 'Baut', qty: 4 }] })
     await api('PATCH', `/api/service-types/${custom}`, w.users.admin, { active: false, changeReason: 'uji tampilan' })
     try {
       const pm = await render(FieldServiceDetail, w.users.pm, ['laporan-servis', 'detail', String(withPn.body.id)])
+      expect(pm).toContain(`href="/admin/laporan-servis/${withPn.body.id}/ubah?koreksi=1"`)
       expect(pm).toContain('data-pk-action="service-correct"')
-      expect(pm).toContain('(nonaktif)')
-      expect(pm).toContain('Tambah foto')
+      expect(pm).not.toContain('<dialog')
       expect(pm).toContain('foto maks. 25')
       expect(pm).toContain('>No. part<') // table column for the stored part no.
-      expect(pm).not.toContain('aria-label="No. part 1"') // …but no input in the dialog
+      const fix = await render(FieldServiceEdit, w.users.pm, ['laporan-servis', String(withPn.body.id), 'ubah'], { koreksi: '1' })
+      expect(fix).toContain('data-pk-form="service-report-correction"')
+      expect(fix).toContain('data-pk-card="service-help"') // same "Aturan" card as the input page
+      expect(fix).toContain('(nonaktif)')
+      expect(fix).toContain('+ Tambah foto')
+      expect(fix).not.toContain('aria-label="No. part 1"') // no part-no. input on the edit page either
       const own = await render(FieldServiceDetail, w.users.staffA, ['laporan-servis', 'detail', String(plain.body.id)])
       expect(own).toContain('data-pk-action="service-edit"')
       expect(own).toContain('Perbaikan')
-      expect(own).not.toContain('>No. part<') // neither a table column nor an editor column
-      expect(own).not.toContain('aria-label="No. part 1"')
+      expect(own).not.toContain('>No. part<') // no table column
+      const edit = await render(FieldServiceEdit, w.users.staffA, ['laporan-servis', String(plain.body.id), 'ubah'])
+      expect(edit).toContain('data-pk-form="service-report-edit"')
+      expect(edit).not.toContain('aria-label="No. part 1"')
+      // the PM is not the reporter: the reporter's edit page refuses (the correction page is his)
+      const pmEdit = await render(FieldServiceEdit, w.users.pm, ['laporan-servis', String(plain.body.id), 'ubah'])
+      expect(pmEdit).toContain('data-pk-alert="not-editable"')
+      expect(pmEdit).not.toContain('data-pk-form=')
     } finally {
       await api('PATCH', `/api/service-types/${custom}`, w.users.admin, { active: true, changeReason: 'uji selesai' })
     }

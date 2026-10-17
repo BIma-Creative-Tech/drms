@@ -207,6 +207,20 @@ export async function FieldDailyList(props: AdminViewServerProps) {
 
 // ================================================================ web input
 
+/** "Aturan" card of the input AND the edit / correction page (UI feedback 17/10 #5: same layout). */
+function DailyRules() {
+  return (
+    <Card id="daily-help" title="Aturan" span={4}>
+      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
+        <li>Isi volume pekerjaan hari ini per item RAP — progress tahapan dihitung otomatis dari realisasi.</li>
+        <li>Material (masuk / terpakai) dicatat untuk stok, tidak dihitung ke progress.</li>
+        <li>Melebihi volume RAP boleh, tetapi wajib catatan; PM project diberi notifikasi.</li>
+        <li>Maks. 10 foto. Laporan tidak bisa dihapus.</li>
+      </ul>
+    </Card>
+  )
+}
+
 export async function FieldDailyNew(props: AdminViewServerProps) {
   const gate = await fieldGate(props, FIELD_CREATORS)
   if (!gate.ok) return gate.page
@@ -247,14 +261,7 @@ export async function FieldDailyNew(props: AdminViewServerProps) {
             />
           )}
         </Card>
-        <Card id="daily-help" title="Aturan" span={4}>
-          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
-            <li>Isi volume pekerjaan hari ini per item RAP — progress tahapan dihitung otomatis dari realisasi.</li>
-            <li>Material (masuk / terpakai) dicatat untuk stok, tidak dihitung ke progress.</li>
-            <li>Melebihi volume RAP boleh, tetapi wajib catatan; PM project diberi notifikasi.</li>
-            <li>Maks. 10 foto. Laporan tidak bisa dihapus.</li>
-          </ul>
-        </Card>
+        <DailyRules />
       </Bento>
     </FieldFrame>
   )
@@ -322,12 +329,13 @@ export async function FieldDailyDetail(props: AdminViewServerProps) {
         <DashHead title={`${mode === 'edit' ? 'Ubah' : 'Koreksi'} ${r.docNo ?? `laporan #${r.id}`}`} note={`${longDate(r.reportDate)} · ${r.project.code ?? ''} ${r.project.name ?? ''}`}>
           <div className="pk-kact">
             <BtnLink href={detailHref(r.id)} icon="arrowLeft">
-              Batal
+              Kembali ke laporan
             </BtnLink>
           </div>
         </DashHead>
         <Bento>
-          <Card id="daily-form" title={mode === 'edit' ? 'Ubah (24 jam)' : 'Koreksi'} sub={mode === 'correction' ? 'Selisih dicatat sebagai koreksi dengan alasan; laporan ditandai “dikoreksi”.' : 'Selisih volume dicatat di riwayat.'} span={12}>
+          {/* UI feedback 17/10 #5: same layout as "Laporan baru" (form 8 + "Aturan" 4) */}
+          <Card id="daily-form" title={mode === 'edit' ? 'Ubah (24 jam)' : 'Koreksi'} sub={mode === 'correction' ? 'Selisih dicatat sebagai koreksi dengan alasan; laporan ditandai “dikoreksi”.' : 'Selisih volume dicatat di riwayat.'} span={8}>
             <DailyReportForm
               mode={mode}
               projects={[{ id: r.project.id, label: `${r.project.code ?? ''} ${r.project.name ?? ''}`.trim(), companyId: r.companyId! }]}
@@ -335,9 +343,10 @@ export async function FieldDailyDetail(props: AdminViewServerProps) {
               resourcesByCompany={form.resources}
               today={form.today}
               minDate={r.reportDate}
-              report={{ id: r.id, projectId: r.project.id, reportDate: r.reportDate, values: valuesOf(r), photoCount: r.photos.length }}
+              report={{ id: r.id, projectId: r.project.id, reportDate: r.reportDate, values: valuesOf(r), photoCount: r.photos.length, photos: r.photos.map((p) => ({ id: p.id, url: p.url, thumbUrl: p.thumbUrl })) }}
             />
           </Card>
+          <DailyRules />
         </Bento>
       </FieldFrame>
     )

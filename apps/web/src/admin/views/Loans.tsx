@@ -37,6 +37,7 @@ import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, Meter, r
  */
 const READERS = ['pk-owner', 'pk-admin', 'pk-finance', 'pk-pm'] as const
 export const loanHref = (id: number) => `/admin/pinjaman/detail/${id}`
+const loanEditHref = (id: number) => `/admin/pinjaman/${id}/ubah`
 
 export const LOAN_TONE: Record<LoanStatus, PillTone> = { draft: 'none', pending_approval: 'wait', approved: 'progress', partially_repaid: 'progress', repaid: 'ok', rejected: 'bad', cancelled: 'none' }
 
@@ -230,6 +231,20 @@ export async function LoanList(props: AdminViewServerProps) {
 
 // ================================================================ new
 
+/** "Alur" card of "Ajukan pinjaman" AND "Ubah draft" (UI feedback 17/10 #5: same layout). */
+function LoanFlowHelp() {
+  return (
+    <Card id="loan-help" title="Alur" span={4}>
+      <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.7 }}>
+        <li>PM project peminjam mengajukan nilai, jatuh tempo dan alasan.</li>
+        <li>Direktur menyetujui atau menolak dengan alasan. PM project pemberi diberi tahu.</li>
+        <li>Tidak ada transaksi kas: pinjaman tercatat sebagai klaim antar project (sisa dipantau).</li>
+        <li>Pengembalian dicatat PM peminjam atau Finance sampai Lunas; lewat jatuh tempo = Terlambat.</li>
+      </ol>
+    </Card>
+  )
+}
+
 export async function LoanNew(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const d = hasRoleAny(req, 'pk-pm') ? await withReqTransaction(req, async () => ({ options: await loanProjectOptions(req), today: await today(req) })) : null
@@ -259,14 +274,7 @@ export async function LoanNew(props: AdminViewServerProps) {
         <Card id="loan-form" title="Pinjaman baru" span={8}>
           <LoanForm borrowers={d.options.borrowers} lenders={d.options.lenders} today={d.today} initialBorrower={d.options.borrowers.some((p) => p.id === initial) ? initial : undefined} />
         </Card>
-        <Card id="loan-help" title="Alur" span={4}>
-          <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.7 }}>
-            <li>PM project peminjam mengajukan nilai, jatuh tempo dan alasan.</li>
-            <li>Direktur menyetujui atau menolak dengan alasan. PM project pemberi diberi tahu.</li>
-            <li>Tidak ada transaksi kas: pinjaman tercatat sebagai klaim antar project (sisa dipantau).</li>
-            <li>Pengembalian dicatat PM peminjam atau Finance sampai Lunas; lewat jatuh tempo = Terlambat.</li>
-          </ol>
-        </Card>
+        <LoanFlowHelp />
       </Bento>
     </Frame>
   )
@@ -297,8 +305,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
     const doc = id ? await loadVisibleLoan(req, id).catch(() => null) : null
     if (!doc) return null
     const l = await loanDetail(req, doc)
-    const edit = l.allowedActions.includes('edit') ? await loanProjectOptions(req) : null
-    return { l, tz: await tzOf(req), today: await today(req, l.companyId), edit }
+    return { l, tz: await tzOf(req), today: await today(req, l.companyId) }
   })
   const back = (
     <Link className="pk-kbtn" href="/admin/pinjaman">
@@ -371,6 +378,12 @@ export async function LoanDetail(props: AdminViewServerProps) {
           <Link className="pk-kbtn" href={`/admin/collections/projects/${l.borrowerProject.id}/pinjaman`}>
             Project peminjam
           </Link>
+          {/* UI feedback 17/10 #5: the draft is edited on its own page (layout of "Ajukan pinjaman") */}
+          {acts.has('edit') ? (
+            <Link className="pk-kbtn" href={loanEditHref(l.id)} data-pk-link="loan-edit">
+              Ubah draft
+            </Link>
+          ) : null}
         </div>
       </DashHead>
       {sp.diajukan ? (
@@ -469,17 +482,6 @@ export async function LoanDetail(props: AdminViewServerProps) {
             </dd>
           </dl>
           <Notes l={l} />
-          {acts.has('edit') && d.edit ? (
-            <div style={{ marginTop: 16 }}>
-              <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>Ubah draft</h3>
-              <LoanForm
-                borrowers={d.edit.borrowers}
-                lenders={d.edit.lenders}
-                today={d.today}
-                edit={{ id: l.id, borrowerProjectId: l.borrowerProject.id, lenderProjectId: l.lenderProject.id, kind: l.kind, amount: l.amount, reason: l.reason, loanDate: l.loanDate, dueDate: l.dueDate }}
-              />
-            </div>
-          ) : null}
         </Card>
         <Card id="loan-flow" title="Alur persetujuan" sub="PM peminjam mengajukan · Direktur memutuskan" span={5} i={5}>
           <ol className="pk-tl" data-pk-flow>
@@ -674,5 +676,70 @@ export async function LoanInboxSection({ req }: { req: PayloadRequest }) {
         )}
       </section>
     </F3Root>
+  )
+}
+
+// ================================================================ edit draft (UI feedback 17/10 #5)
+
+/**
+ * `/pinjaman/:id/ubah` — "Ubah draft": the form of "Ajukan pinjaman antar project" with the same layout (form 8 +
+ * "Alur" 4), the borrower project shown disabled. Only while the server allows `edit` (the PM's own Draft); PATCH
+ * /api/v1/project-loans re-checks it.
+ */
+export async function LoanEdit(props: AdminViewServerProps) {
+  const req = props.initPageResult.req
+  if (!hasRoleAny(req, ...READERS)) return <NoAccess props={props} />
+  const seg = ((props.params as { segments?: string[] } | undefined)?.segments ?? [])[1] ?? ''
+  const id = /^\d{1,10}$/.test(seg) ? Number(seg) : 0
+  const d = await withReqTransaction(req, async () => {
+    const doc = id ? await loadVisibleLoan(req, id).catch(() => null) : null
+    if (!doc) return null
+    const l = await loanDetail(req, doc)
+    return { l, options: l.allowedActions.includes('edit') ? await loanProjectOptions(req) : null, today: await today(req, l.companyId) }
+  })
+  if (!d) {
+    return (
+      <Frame props={props} name="pinjaman-ubah">
+        <DashHead title="Pinjaman tidak ditemukan">
+          <Link className="pk-kbtn" href="/admin/pinjaman">
+            ← Pinjaman antar project
+          </Link>
+        </DashHead>
+      </Frame>
+    )
+  }
+  const { l } = d
+  const back = (
+    <Link className="pk-kbtn" href={loanHref(l.id)}>
+      ← Kembali ke pinjaman
+    </Link>
+  )
+  if (!d.options) {
+    return (
+      <Frame props={props} name="pinjaman-ubah">
+        <DashHead title={`Ubah ${l.docNo ?? `draft pinjaman #${l.id}`}`}>{back}</DashHead>
+        <Alert tone="bad" attr="not-editable">
+          <p>Hanya draft milik PM project peminjam yang dapat diubah. Pinjaman yang sudah diajukan tidak dapat diubah lagi.</p>
+        </Alert>
+      </Frame>
+    )
+  }
+  return (
+    <Frame props={props} name="pinjaman-ubah">
+      <DashHead title={`Ubah draft pinjaman #${l.id}`} note="Nomor PJ diberikan saat diajukan. Direktur menyetujui; PM project pemberi diberi tahu.">
+        {back}
+      </DashHead>
+      <Bento>
+        <Card id="loan-form" title="Ubah draft" span={8}>
+          <LoanForm
+            borrowers={d.options.borrowers}
+            lenders={d.options.lenders}
+            today={d.today}
+            edit={{ id: l.id, borrowerProjectId: l.borrowerProject.id, lenderProjectId: l.lenderProject.id, kind: l.kind, amount: l.amount, reason: l.reason, loanDate: l.loanDate, dueDate: l.dueDate }}
+          />
+        </Card>
+        <LoanFlowHelp />
+      </Bento>
+    </Frame>
   )
 }

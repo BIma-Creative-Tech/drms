@@ -32,6 +32,7 @@ import { NoAccess } from './NoAccess'
  */
 const READERS = ['pk-owner', 'pk-finance', 'pk-pm'] as const
 export const addendumHref = (id: number) => `/admin/addendum/detail/${id}`
+const addendumEditHref = (id: number) => `/admin/addendum/${id}/ubah`
 
 export const ADDENDUM_TONE: Record<AddendumStatus, PillTone> = { draft: 'none', pending_ack: 'wait', pending_approval: 'progress', approved: 'ok', rejected: 'bad', cancelled: 'none' }
 
@@ -221,6 +222,20 @@ export async function AddendumList(props: AdminViewServerProps) {
 
 // ================================================================ new
 
+/** "Alur" card of "Ajukan addendum RAB" AND "Ubah draft" (UI feedback 17/10 #5: same layout). */
+function AddendumFlowHelp() {
+  return (
+    <Card id="addendum-help" title="Alur" span={4}>
+      <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.7 }}>
+        <li>PM mengajukan nominal tambahan + alasan.</li>
+        <li>Direktur menyetujui (Diketahui) atau menolak dengan alasan.</li>
+        <li>Finance menyetujui atau menolak dengan alasan.</li>
+        <li>Setelah disetujui, RAB project = RAB terkini + tambahan (tercatat di audit log).</li>
+      </ol>
+    </Card>
+  )
+}
+
 export async function AddendumNew(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const projects = hasRoleAny(req, 'pk-pm') ? await withReqTransaction(req, () => addendumProjectOptions(req)) : []
@@ -251,14 +266,7 @@ export async function AddendumNew(props: AdminViewServerProps) {
         <Card id="addendum-form" title="Addendum baru" span={8}>
           <AddendumForm projects={projects} initialProject={projects.some((p) => p.id === initial) ? initial : undefined} />
         </Card>
-        <Card id="addendum-help" title="Alur" span={4}>
-          <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.7 }}>
-            <li>PM mengajukan nominal tambahan + alasan.</li>
-            <li>Direktur menyetujui (Diketahui) atau menolak dengan alasan.</li>
-            <li>Finance menyetujui atau menolak dengan alasan.</li>
-            <li>Setelah disetujui, RAB project = RAB terkini + tambahan (tercatat di audit log).</li>
-          </ol>
-        </Card>
+        <AddendumFlowHelp />
       </Bento>
     </Frame>
   )
@@ -285,8 +293,7 @@ export async function AddendumDetail(props: AdminViewServerProps) {
   const d = await withReqTransaction(req, async () => {
     const doc = id ? await loadVisibleAddendum(req, id).catch(() => null) : null
     if (!doc) return null
-    const projects = await addendumProjectOptions(req)
-    return { a: await addendumDetail(req, doc), tz: await tzOf(req), projects }
+    return { a: await addendumDetail(req, doc), tz: await tzOf(req) }
   })
   const back = (
     <Link className="pk-kbtn" href="/admin/addendum">
@@ -319,6 +326,12 @@ export async function AddendumDetail(props: AdminViewServerProps) {
           <Link className="pk-kbtn" href={`/admin/progress/project/${a.project.id}`}>
             Project
           </Link>
+          {/* UI feedback 17/10 #5: the draft is edited on its own page (layout of "Ajukan addendum RAB") */}
+          {acts.has('edit') ? (
+            <Link className="pk-kbtn" href={addendumEditHref(a.id)} data-pk-link="addendum-edit">
+              Ubah draft
+            </Link>
+          ) : null}
         </div>
       </DashHead>
       {sp.diajukan ? (
@@ -413,12 +426,6 @@ export async function AddendumDetail(props: AdminViewServerProps) {
           <p className="pk-pre" data-pk-field="reason">
             {a.reason}
           </p>
-          {acts.has('edit') ? (
-            <div style={{ marginTop: 16 }}>
-              <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>Ubah draft</h3>
-              <AddendumForm projects={d.projects} edit={{ id: a.id, projectId: a.project.id, addition: a.addition, reason: a.reason }} />
-            </div>
-          ) : null}
         </Card>
         <Card id="addendum-flow" title="Alur persetujuan" sub={a.approvalRule ? `Aturan: ${a.approvalRule.name}` : 'Aturan ditentukan saat diajukan'} span={5} i={4}>
           <ol className="pk-tl" data-pk-flow>
@@ -531,5 +538,67 @@ export async function AddendumInboxSection({ req }: { req: PayloadRequest }) {
       )}
     </section>
     </F3Root>
+  )
+}
+
+// ================================================================ edit draft (UI feedback 17/10 #5)
+
+/**
+ * `/addendum/:id/ubah` — "Ubah draft": the form of "Ajukan addendum RAB" with the same layout (form 8 + "Alur" 4),
+ * the project shown disabled. Only while the server allows `edit` (the PM's own Draft); PATCH /api/v1/budget-addenda
+ * re-checks it.
+ */
+export async function AddendumEdit(props: AdminViewServerProps) {
+  const req = props.initPageResult.req
+  if (!hasRoleAny(req, ...READERS)) return <Denied props={props} title="Addendum RAB" />
+  const seg = ((props.params as { segments?: string[] } | undefined)?.segments ?? [])[1] ?? ''
+  const id = /^\d{1,10}$/.test(seg) ? Number(seg) : 0
+  const d = await withReqTransaction(req, async () => {
+    const doc = id ? await loadVisibleAddendum(req, id).catch(() => null) : null
+    if (!doc) return null
+    const a = await addendumDetail(req, doc)
+    return { a, projects: a.allowedActions.includes('edit') ? await addendumProjectOptions(req) : [] }
+  })
+  if (!d) {
+    return (
+      <Frame props={props} name="addendum-ubah">
+        <DashHead title="Addendum tidak ditemukan">
+          <Link className="pk-kbtn" href="/admin/addendum">
+            ← Addendum RAB
+          </Link>
+        </DashHead>
+      </Frame>
+    )
+  }
+  const { a } = d
+  const back = (
+    <Link className="pk-kbtn" href={addendumHref(a.id)}>
+      ← Kembali ke addendum
+    </Link>
+  )
+  if (!a.allowedActions.includes('edit')) {
+    return (
+      <Frame props={props} name="addendum-ubah">
+        <DashHead title={`Ubah ${a.docNo ?? `draft addendum #${a.id}`}`}>{back}</DashHead>
+        <Alert tone="bad" attr="not-editable">
+          <p>Hanya draft milik PM pengaju yang dapat diubah. Addendum yang sudah diajukan tidak dapat diubah lagi.</p>
+        </Alert>
+      </Frame>
+    )
+  }
+  // the draft's project stays listed (disabled) even when the caller is no longer its PM
+  const projects = d.projects.some((p) => p.id === a.project.id) ? d.projects : [{ id: a.project.id, code: a.project.code ?? '', name: a.project.name ?? '', budget: a.project.budget }, ...d.projects]
+  return (
+    <Frame props={props} name="addendum-ubah">
+      <DashHead title={`Ubah draft addendum #${a.id}`} note="Nomor ADD/YYMM/#### diberikan saat diajukan. Direktur menyetujui, lalu Finance.">
+        {back}
+      </DashHead>
+      <Bento>
+        <Card id="addendum-form" title="Ubah draft" span={8}>
+          <AddendumForm projects={projects} edit={{ id: a.id, projectId: a.project.id, addition: a.addition, reason: a.reason }} />
+        </Card>
+        <AddendumFlowHelp />
+      </Bento>
+    </Frame>
   )
 }

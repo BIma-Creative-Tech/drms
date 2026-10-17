@@ -115,6 +115,7 @@ export const FIELD_STYLE = `
 .pk-f3 .pk-photos li { display: grid; gap: 6px; justify-items: start; }
 .pk-f3 .pk-photos img { width: 96px; height: 96px; object-fit: cover; border-radius: var(--style-radius-m); border: 1px solid var(--pk-border); background: var(--viz-track); display: block; }
 .pk-f3 .pk-photos li.add { align-self: center; }
+.pk-f3 .pk-photos .pk-photo-tag { font-size: 11.5px; color: var(--pk-muted-fg); } /* edit pages: a stored photo (never removed) */
 .pk-f3 .pk-photos label.pk-kbtn:has(+ input:focus-visible) { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
 .pk-f3 .pk-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .pk-f3 .pk-hours { display: flex; gap: 2px; height: 10px; border-radius: 999px; background: var(--viz-track); overflow: hidden; }
@@ -123,6 +124,7 @@ export const FIELD_STYLE = `
 .pk-f3 .pk-hours.over { outline: 2px solid var(--pk-tone-bad-text); outline-offset: 1px; }
 .pk-f3 .pk-check { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; font-size: 14px; font-weight: 600; cursor: pointer; } /* box: native normalisation (custom.scss) */
 .pk-f3 .pk-fsubmit { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; padding-top: 4px; }
+.pk-f3 .pk-fsubmit > .pk-note { flex: 1 1 12rem; } /* edit pages: Batal + submit stay together at the end */
 .pk-f3 .pk-fsubmit .pk-note { margin: 0; }
 .pk-f3 .pk-fsubmit .pk-kbtn { min-height: 46px; padding: 0 22px; font-size: 15px; }
 @media (max-width: 559px) { .pk-f3 .pk-fsubmit .pk-kbtn { width: 100%; } }
