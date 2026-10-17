@@ -108,8 +108,8 @@ saat pengajuan menunggu keputusannya (bila dinyalakan Admin).
 (**Antrean kirim**): *Menunggu* → *Terkirim*. Bila *Ditolak*, buka datanya, baca alasan, perbaiki, simpan lagi.
 **Jangan keluar (logout) atau hapus aplikasi** selama masih ada data *Menunggu*.
 
-**Riwayat:** setiap pengajuan punya tab **Riwayat** (web) / ikon jam (APK): siapa mengubah apa, kapan, dari
-perangkat apa. Di web, bagian **Log perubahan** di bawah halaman pengajuan (klik untuk membuka) memuat ringkasan yang
+**Riwayat:** setiap pengajuan punya tombol **Riwayat** di baris tombol atas (web, sejak 17 Okt 2026; kembali lewat
+**← Kembali ke pengajuan**) / ikon jam (APK): siapa mengubah apa, kapan, dari perangkat apa. Di web, bagian **Log perubahan** di bawah halaman pengajuan (klik untuk membuka) memuat ringkasan yang
 sama beserta waktu dibuat dan terakhir diubah.
 
 **Halaman pengajuan (web):** kiri — nomor, badge PT, status, **Rincian pengajuan**, **Rincian item** (baris, nota,

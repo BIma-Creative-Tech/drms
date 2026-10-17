@@ -6,7 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-### Fixed
+### UI feedback 17/10
+
+#### Fixed (#1–#3, PR-A; web only, no migration, no contract change)
+
+- **#1 "Rp" prefix and placeholder overlapped** in every Rupiah input of the custom forms (Kas, Pinjaman, Addendum, the
+  expense-line and RAP item dialogs, Koreksi): since the 15/10 checkbox fix the generic `.pk-fld` input rule (padding
+  8 × 10 px) out-ranked `.pk-money > input`, so the amount started under "Rp". The prefix room now has its own
+  higher-specificity rule (`.pk-fld .pk-money > input:not(…)`), and `RupiahInput` has no placeholder "0" any more — the
+  "Rp" prefix already marks the field.
+- **#2 Pengajuan biaya had two "Edit" controls**: Payload's document tab row ("Edit | Riwayat") above the action bar's
+  own "Edit". The expense-request page has no tab row any more (`EXPENSE_REQUEST_VIEWS`: default tab hidden, the
+  `/riwayat` view keeps its route but no tab); **Riwayat** is a button of the action bar (next to Cetak / Duplikat /
+  Edit, read mode, every status) and the Riwayat page has **← Kembali ke pengajuan**. Kas, Nota, Transfer and LPJ keep
+  their Riwayat tab. Also fixed: a Riwayat page opened by a user who may not read the document crashed ("no active
+  transaction") instead of showing "Dokumen tidak ditemukan." — the visibility check now runs before the history
+  transaction (every collection with Riwayat).
+- **#3 RAP is entered with the item form, Excel is optional**: the project's **RAP** tab → **Kelola RAP** now holds the
+  same item form as Proyek › RAP (**+ Tambah item** / **Ubah**, grand total, lock and "Sudah terpakai" rules), with
+  "Template Excel kosong", "Unduh RAP", RAP templates and the Excel import folded below it in **Impor / template Excel
+  (opsional)** (closed by default). `/admin/rap/:id` shows the same order (the separate "Upload Excel & template" card
+  is folded into the item card). Banner for an empty required RAP: "Tambah item RAP lewat form di bawah (+ Tambah item),
+  atau impor Excel bila banyak." The card link "Ubah item RAP" became "Halaman RAP proyek". PM guide §4a and the
+  Riwayat note of the guide README updated.
+
+#### Fixed (#4, PR #103)
+
 - **"Duplicate" options for users of several PTs (UI feedback 17/10 #4).** Per-PT masters carry the same name in every
   PT (Kategori "Material", Jenis servis "Pemasangan", urgensi "Normal" …), and pickers listed all selected PTs at once.
   One rule now applies everywhere: (a) only the options of the form's PT once it is known, (b) the PT code before the

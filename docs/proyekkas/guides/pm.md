@@ -131,14 +131,15 @@ Selama RAP kosong, pengajuan project itu **tidak bisa dikirim** (pemohon melihat
 PM"). Dashboard PM menampilkan kartu **"Project Anda belum punya RAP"** berisi project tim yang perlu diisi.
 
 1. Buka menu **Proyek → RAP proyek** (sejak 13 Okt 2026): daftar project dengan status RAP (**Ada · n item** /
-   **Belum ada (wajib)**), Total RAP vs RAB, saring PT / status / RAP. Klik baris project. (Dari project: tab **RAP** →
-   **Ubah item RAP**.)
-2. Isi RAP dengan salah satu cara:
-   - **Per item:** **+ Tambah item** → isi kode, uraian, jenis (pekerjaan/material), tahapan, satuan, volume, harga
-     satuan (jumlah dihitung otomatis) → **Tambah item**. Ubah item lewat tombol **Ubah**; item tidak pernah dihapus —
-     set **Status: Nonaktif** bila tidak dipakai lagi. Baris **Grand total** di bawah tabel = jumlah item aktif.
-   - **Pakai template** (template RAP PT ini untuk jenis project yang sama), atau **Template Excel kosong** → isi kode,
-     uraian, jenis, satuan, volume, harga satuan → kartu **Upload Excel & template** → **Pratinjau** → **Simpan RAP**.
+   **Belum ada (wajib)**), Total RAP vs RAB, saring PT / status / RAP. Klik baris project. Atau langsung dari project:
+   tab **RAP** → kartu **Kelola RAP** (sejak 17 Okt 2026 berisi form yang sama).
+2. Isi RAP — utamanya lewat form:
+   - **Per item (utama):** **+ Tambah item** → isi kode, uraian, jenis (pekerjaan/material), tahapan, satuan, volume,
+     harga satuan (jumlah dihitung otomatis) → **Tambah item**. Ubah item lewat tombol **Ubah**; item tidak pernah
+     dihapus — set **Status: Nonaktif** bila tidak dipakai lagi. Baris **Grand total** di bawah tabel = jumlah item aktif.
+   - **Excel (opsional, bila item banyak):** buka lipatan **Impor / template Excel (opsional)** di bawah form →
+     **Pakai template** (template RAP PT ini untuk jenis project yang sama), atau **Template Excel kosong** → isi kode,
+     uraian, jenis, satuan, volume, harga satuan → **Impor RAP dari Excel** → **Pratinjau** → **Simpan RAP**.
    Setelah ada realisasi laporan harian, RAP terkunci: tombol tampil abu-abu untuk PM; perubahan hanya oleh
    Direktur/Admin dengan alasan.
    **Item "Sudah terpakai"** (sejak 13 Okt 2026, keputusan pemilik): item yang sudah punya realisasi — dipakai baris

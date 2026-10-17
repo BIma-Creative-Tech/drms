@@ -225,11 +225,11 @@ describe('Persetujuan #5/#6: page structure', () => {
     expect(fields().find((f) => f.name === 'approvalSnapshot')?.admin?.hidden).toBe(true)
   })
 
-  it('action bar: decision, Finance flow link, Cetak (menu for office), Duplikat', () => {
+  it('action bar: decision, Finance flow link, Cetak (menu for office), Duplikat, Riwayat', () => {
     const d = (over: Record<string, unknown> = {}) => ({ id: 4, type: 'advance', docNo: 'PB/1', allowedActions: [] as string[], ...over }) as never
     const decision = { step: 'approve' as const, label: 'Setujui', confirm: 'Setujui?', canReject: true, stepLabel: 'Persetujuan Direktur' }
     const staff = actionBarProps({ d: d(), office: false, canDuplicate: true, decision: null })
-    expect(staff).toEqual({ id: 4, decision: null, flowLinks: [], pdfs: [{ href: '/api/v1/expense-requests/4/pdf', label: 'PDF Pengajuan Biaya' }], canDuplicate: true })
+    expect(staff).toEqual({ id: 4, decision: null, flowLinks: [], pdfs: [{ href: '/api/v1/expense-requests/4/pdf', label: 'PDF Pengajuan Biaya' }], canDuplicate: true, historyHref: '/admin/collections/expense-requests/4/riwayat' })
     const fin = actionBarProps({ d: d({ allowedActions: ['transfer'] }), office: true, canDuplicate: false, decision })
     expect(fin.pdfs.map((p) => p.href)).toEqual(['/api/v1/expense-requests/4/pdf', '/api/v1/expense-requests/4/pdf?variant=internal'])
     expect(fin.flowLinks).toEqual([{ href: '/admin/antrian-transfer', label: 'Catat transfer', testId: 'transfer' }])

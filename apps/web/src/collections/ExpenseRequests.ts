@@ -1,6 +1,6 @@
 import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionConfig, type FilterOptionsProps, type PayloadRequest, type Where } from 'payload'
 
-import { RIWAYAT_TAB } from '@/admin/config'
+import { EXPENSE_REQUEST_VIEWS } from '@/admin/config'
 
 import { employeeIn, ownEmployees, relId, rolesIn, rolesOf, userId, type Role } from '@/access/roles'
 import { fieldNever, rolesAllowed } from '@/access/policies'
@@ -372,9 +372,10 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       defaultColumns: ['docNo', 'type', 'title', 'urgencyLevel', 'status', 'grandTotal', 'createdBy', 'updatedAt'],
       listSearchableFields: ['docNo', 'title'],
       // Lead review (d): "Simpan" only while the content is editable (new / Draft / Revisi Nota); DRMS 13/10 Persetujuan #5/#7/#12:
-      // the action bar (decisions, Cetak, Duplikat, Edit/Batal) in the document controls row before "Simpan".
+      // the action bar (decisions, Cetak, Duplikat, Riwayat, Edit/Batal) in the document controls row before "Simpan".
+      // UI feedback 17/10 #2: no tab row (EXPENSE_REQUEST_VIEWS) — "Riwayat" is an action-bar button, /riwayat stays routed.
       components: {
-        views: { edit: RIWAYAT_TAB },
+        views: { edit: EXPENSE_REQUEST_VIEWS },
         edit: { SaveButton: '@/admin/components/RequestSaveButton#RequestSaveButton', beforeDocumentControls: ['@/admin/components/request/RequestActionBar#RequestActionBar'] },
       },
     },

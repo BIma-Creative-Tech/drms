@@ -1,9 +1,13 @@
 import { randomUUID } from 'node:crypto'
 
+import React, { type ReactNode } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { createLocalReq, type DocumentViewServerProps } from 'payload'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { actionBarProps } from '@/admin/components/request/action-bar'
 import { loadRequestPanel } from '@/admin/components/request/panel-data'
+import { RiwayatView } from '@/admin/views/RiwayatView'
 import { addDays } from '@/domain/expense/types'
 import { resetRateLimits } from '@/lib/rate-limit'
 
@@ -15,9 +19,13 @@ import { api, draftBody, makeWorld, png, upload, type FlowUser, type World } fro
  * real API — a clean NEW Draft (same PT, project, title, requesters, account, lines; no number, approvals, transfers,
  * receipts, flags, attachments, "Nominal sesuai nota"), audited `duplicated_from` on the new draft; the caller must
  * read the source and hold a create role in its PT (Q-09 on-behalf rule unchanged); Payload's own duplicate is off.
- * Plus the request page's server parts (panel-data: stepper, change log, action bar) for the same request.
+ * Plus the request page's server parts (panel-data: stepper, change log, action bar) for the same request, and its
+ * Riwayat page (UI feedback 17/10 #2: action-bar button → /riwayat → "← Kembali ke pengajuan"). Payload's Gutter /
+ * DefaultTemplate are stubbed.
  */
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {}, push: () => {} }) }))
+vi.mock('@payloadcms/ui', () => ({ Gutter: ({ children }: { children: ReactNode }) => React.createElement('div', { 'data-gutter': '' }, children) }))
+vi.mock('@payloadcms/next/templates', () => ({ DefaultTemplate: ({ children }: { children: ReactNode }) => children }))
 
 let w: World
 const E = '/api/v1/expense-requests'
@@ -58,6 +66,14 @@ async function transferredRequest(): Promise<{ id: number; docNo: string; lineId
 }
 
 const panel = async (user: FlowUser, id: number) => loadRequestPanel(await getTestPayload(), { ...user, collection: 'users' } as never, id)
+
+/** The Riwayat document view of one expense request, rendered for `user`. */
+async function riwayat(user: FlowUser, id: number): Promise<string> {
+  const payload = await getTestPayload()
+  const req = await createLocalReq({ user: { ...user, collection: 'users' } as never }, payload)
+  const props = { initPageResult: { req, docID: id, collectionConfig: payload.collections['expense-requests'].config }, doc: { id } } as unknown as DocumentViewServerProps
+  return renderToStaticMarkup(React.createElement(React.Fragment, null, await RiwayatView(props)))
+}
 
 describe('POST /expense-requests/:id/duplicate', () => {
   it('the requester gets a clean Draft of a transferred request (no number, approvals, transfers, receipts, flags, attachments)', async () => {
@@ -120,5 +136,21 @@ describe('request page server parts (panel-data)', () => {
     // the Direktur reads it but may not file for the Staff (the endpoint answers 403) → no "Duplikat"
     expect(actionBarProps((await panel(w.users.owner, src.id))!).canDuplicate).toBe(false)
     expect(await panel(w.users.staffB, src.id)).toBeNull()
+    // UI feedback 17/10 #2: "Riwayat" is an action-bar link for every reader
+    expect(actionBarProps(own).historyHref).toBe(`/admin/collections/expense-requests/${src.id}/riwayat`)
+    expect(fin.historyHref).toBe(`/admin/collections/expense-requests/${src.id}/riwayat`)
+  })
+
+  it('UI feedback 17/10 #2 — Riwayat page: history rows + "← Kembali ke pengajuan"; no read → not found', async () => {
+    const c = await ok(api('POST', E, w.users.staffA, draftBody(w), key()), 201)
+    await ok(api('POST', `${E}/${c.id}/submit`, w.users.staffA, {}, key()))
+    const html = await riwayat(w.users.staffA, c.id)
+    expect(html).toContain(`href="/admin/collections/expense-requests/${c.id}" data-pk-link="back-to-request"`)
+    expect(html).toContain('← Kembali ke pengajuan')
+    expect(html.indexOf('back-to-request')).toBeLessThan(html.indexOf('>Riwayat</h2>'))
+    expect(html).toContain('Riwayat dokumen')
+    expect(html).not.toContain('Belum ada riwayat.')
+    const other = await riwayat(w.users.staffB, c.id)
+    expect(other).toContain('Dokumen tidak ditemukan.')
   })
 })

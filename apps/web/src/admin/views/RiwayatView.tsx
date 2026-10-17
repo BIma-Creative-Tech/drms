@@ -20,6 +20,8 @@ import { settings as companySettings } from '@/domain/companies'
  * where (web/apk/job + app version + device id). Expense requests include their receipts,
  * transfers, LPJ (and cash entries for Finance/Owner/Admin). Access: the document must be readable
  * by the caller (collection access, overrideAccess:false) — else nothing is shown.
+ * UI feedback 17/10 #2: the expense-request page has no tab row (config EXPENSE_REQUEST_VIEWS) — its Riwayat page is
+ * opened from the action bar and links back to the request.
  */
 export async function RiwayatView(props: DocumentViewServerProps) {
   const req = props.initPageResult.req
@@ -30,23 +32,34 @@ export async function RiwayatView(props: DocumentViewServerProps) {
 
   async function loadRows(): Promise<{ rows: HistoryRow[]; denied: boolean }> {
     if (!collection || !docType || !Number.isSafeInteger(id)) return { rows: [], denied: false }
-    return withReqTransaction(req, async () => {
-      if (collection.slug === 'expense-requests') {
-        const ok = await loadVisible(req, id).then(
+    // Visibility first, OUTSIDE the history transaction: a refused findByID (404/403) makes Payload kill the req's
+    // transaction, and the commit of withReqTransaction then failed ("no active transaction") — the page crashed
+    // instead of showing "Dokumen tidak ditemukan." (found by the UI feedback 17/10 #2 test).
+    const isExpense = collection.slug === 'expense-requests'
+    const visible = isExpense
+      ? await loadVisible(req, id).then(
           () => true,
           () => false,
         )
-        return ok ? { rows: await requestHistory(req, id), denied: false } : { rows: [], denied: true }
-      }
-      const visible = await req.payload
-        .findByID({ collection: collection.slug as CollectionSlug, id, depth: 0, user: req.user, overrideAccess: false, req })
-        .catch(() => null)
-      return visible ? { rows: await historyRows(req, [{ docType, ids: [String(id)] }]), denied: false } : { rows: [], denied: true }
-    })
+      : await req.payload
+          .findByID({ collection: collection.slug as CollectionSlug, id, depth: 0, user: req.user, overrideAccess: false, req })
+          .then(
+            () => true,
+            () => false,
+          )
+    if (!visible) return { rows: [], denied: true }
+    return withReqTransaction(req, async () => ({ rows: isExpense ? await requestHistory(req, id) : await historyRows(req, [{ docType, ids: [String(id)] }]), denied: false }))
   }
   const tz = (await companySettings(req)).timezone || process.env.TZ || DEFAULT_TZ
   return (
     <Gutter>
+      {collection?.slug === 'expense-requests' && Number.isSafeInteger(id) ? (
+        <p style={{ margin: '16px 0 0' }}>
+          <a className="btn btn--style-secondary btn--size-small pk-pbtn" style={{ margin: 0 }} href={`/admin/collections/expense-requests/${id}`} data-pk-link="back-to-request">
+            ← Kembali ke pengajuan
+          </a>
+        </p>
+      ) : null}
       <h2 style={{ margin: '16px 0' }}>Riwayat</h2>
       {denied ? <Empty text="Dokumen tidak ditemukan." /> : rows.length === 0 ? <Empty text="Belum ada riwayat." /> : null}
       {rows.length > 0 ? (

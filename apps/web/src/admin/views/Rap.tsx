@@ -3,18 +3,17 @@ import type { AdminViewServerProps, PayloadRequest } from 'payload'
 import React from 'react'
 
 import { hasRoleAny, relId } from '@/access/roles'
-import { RapImport } from '@/admin/components/field/RapImport'
-import { RapTemplateActions } from '@/admin/components/field/RapTemplateActions'
 import { ClickableRow } from '@/admin/components/list/ClickableRow'
 import { ListToolbar, Pager } from '@/admin/components/list/ListToolbar'
+import { RapExcelTools } from '@/admin/components/rap/RapExcelTools'
 import { RapItemsEditor } from '@/admin/components/rap/RapItemsEditor'
-import { rapEditMode, type RapItemView } from '@/admin/components/rap/rap-item-form'
+import { loadRapEditor, rapItemView } from '@/admin/components/rap/rap-editor-data'
 import { allowedValues, filterValues, idValues, matchesQuery, paginate, parseListQuery } from '@/admin/list-query'
 import { PROJECT_STATUSES } from '@/collections/Projects'
 import { kindOf, PROJECT_KIND_LABELS, type ProjectKind } from '@/domain/field/rules'
 import { filterOverview, overviewTotals, RAP_STATE_LABELS, RAP_STATES, rapOverRab, rapVsRab, type RapOverviewRow, type RapState } from '@/domain/rap/overview'
 import { loadRapOverview } from '@/domain/rap/overview-load'
-import { loadRap, rapRoles, rapTemplatesFor } from '@/domain/rap/service'
+import { loadRap, rapTemplatesFor } from '@/domain/rap/service'
 import { formatNumber } from '@/lib/money'
 import { withReqTransaction } from '@/lib/system-tx'
 
@@ -33,8 +32,9 @@ import { Card, DashHead, EmptyState, KpiRow, KpiTile, rp, StatusPill } from './v
  *   clickable rows, totals row at the bottom. RAP total only for the RAP price roles of the project, RAB only where
  *   the RAB field is readable (domain/rap/overview.ts).
  * - `/admin/rap/:id` (RapProject): the items of one project with "+ Tambah item" / "Ubah" (RapItemsEditor → the
- *   existing /api/v1 RAP item endpoints), grand total row, and the Excel upload / template tools (RapImport,
- *   RapTemplateActions) for the RAP editors — same rules as the project's RAP tab (loadRap: visibility, prices, lock).
+ *   existing /api/v1 RAP item endpoints), grand total row, and below it the Excel upload / template tools folded in
+ *   "Impor / template Excel (opsional)" (RapExcelTools, UI feedback 17/10 #3) for the RAP editors — same order and
+ *   rules as the project's RAP tab (loadRap: visibility, prices, lock; rap-editor-data loadRapEditor).
  * Readers = every project role (Staff sees items and quantities, never money); the menu entry is for the office
  * roles and the PM (the Staff menu stays the project list, owner 2026-10-11). The server re-checks every write.
  */
@@ -201,29 +201,6 @@ export async function RapIndex(props: AdminViewServerProps) {
 
 // ================================================================ one project
 
-type Rap = Awaited<ReturnType<typeof loadRap>>
-type Item = Rap['items'][number]
-
-const toView = (i: Item): RapItemView => ({
-  id: i.id,
-  code: i.code,
-  description: i.description,
-  kind: i.kind,
-  stageId: i.stage?.id ?? null,
-  stageName: i.stage?.name ?? null,
-  uomId: i.uom.id,
-  uomCode: i.uom.code,
-  volume: i.volume,
-  // money keys exist only for the price roles (loadRap DTO) — never copied otherwise
-  ...('unitPrice' in i ? { unitPrice: i.unitPrice ?? null, value: i.value ?? null } : {}),
-  ...(i.realisedAmount !== undefined ? { realisedAmount: i.realisedAmount } : {}),
-  weightPct: i.weightPct,
-  active: i.active,
-  realised: i.realised,
-  received: i.received,
-  used: i.used,
-})
-
 export async function RapProject(props: AdminViewServerProps) {
   const r = req(props)
   if (!hasRoleAny(r, ...READERS)) return <NoAccess props={props} />
@@ -242,10 +219,9 @@ export async function RapProject(props: AdminViewServerProps) {
         if (!p) return null
         const company = relId(p.company) ?? -1
         const rap = await loadRap(r, id)
-        const roles = await rapRoles(r, { id, company })
+        const editor = await loadRapEditor(r, { id, company, status: p.status }, rap)
         const templates = rap.canEdit && rap.items.length === 0 ? await rapTemplatesFor(r, id) : []
-        const uoms = (await r.payload.find({ collection: 'uoms', where: { active: { not_equals: false } }, sort: 'code', depth: 0, pagination: false, user: r.user, overrideAccess: false /* shared master, caller's read access */, req: r }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; code?: string; name?: string }>
-        return { p, company, rap, roles, templates, uoms }
+        return { p, company, rap, editor, templates }
       }).catch(() => null)
     : null
   if (!data) {
@@ -260,9 +236,9 @@ export async function RapProject(props: AdminViewServerProps) {
       </Frame>
     )
   }
-  const { p, rap, roles, templates } = data
+  const { p, rap, editor, templates } = data
   const pt = await ptView(r)
-  const mode = rapEditMode(roles, rap.locked, p.status === 'arsip' || p.status === 'dibatalkan')
+  const { mode } = editor
   const prices = rap.totals !== null
   const path = rapHref(id)
   const q = sp(props)
@@ -270,7 +246,7 @@ export async function RapProject(props: AdminViewServerProps) {
   const tahap = filterValues(lq, 'tahap')
   const statuses = allowedValues(lq, 'status', ['aktif', 'nonaktif', 'terpakai'] as const)
   const items = rap.items
-    .map(toView)
+    .map(rapItemView)
     .filter(
       (i) =>
         // default: active items + deactivated items that carry realisation (as the project tab)
@@ -278,10 +254,6 @@ export async function RapProject(props: AdminViewServerProps) {
         (tahap.length === 0 || tahap.includes(String(i.stageId ?? ''))) &&
         matchesQuery([i.code, i.description, i.stageName ?? ''], lq.q),
     )
-  // pickers: active stages (+ an inactive stage still named by an item), active units (+ a unit still named by an item)
-  const stageOpts = rap.stages.filter((s) => s.active || rap.items.some((i) => i.stage?.id === s.id)).map((s) => ({ id: s.id, label: s.active ? s.name : `${s.name} (nonaktif)` }))
-  const uomOpts = data.uoms.map((u) => ({ id: u.id, label: `${u.code ?? ''}${u.name && u.name !== u.code ? ` — ${u.name}` : ''}` }))
-  for (const i of rap.items) if (!uomOpts.some((u) => u.id === i.uom.id)) uomOpts.push({ id: i.uom.id, label: i.uom.code })
   const t = rap.totals
   const b = rap.budget
   const kind = kindOf(p.kind)
@@ -369,25 +341,10 @@ export async function RapProject(props: AdminViewServerProps) {
             },
           ]}
         />
-        <RapItemsEditor projectId={id} items={items} stages={stageOpts} uoms={uomOpts} prices={prices} mode={mode} stageRequired={rap.drivesProgress} drivesProgress={rap.drivesProgress} />
+        <RapItemsEditor projectId={id} items={items} stages={editor.stages} uoms={editor.uoms} prices={prices} mode={mode} stageRequired={rap.drivesProgress} drivesProgress={rap.drivesProgress} />
+        {/* UI feedback 17/10 #3: the form first; Excel / template folded below it (same order as the project's RAP tab) */}
+        {rap.canEdit ? <RapExcelTools projectId={id} hasItems={rap.items.length > 0} templates={templates} needsReason={rap.needsReason} stageRequired={rap.drivesProgress} /> : null}
       </Card>
-      {rap.canEdit ? (
-        <Card id="rap-upload" title="Upload Excel & template" sub="Isi atau perbarui RAP sekaligus dari file Excel (pratinjau dulu), atau pakai template RAP PT ini">
-          <div className="pk-kact" style={{ marginBottom: 12 }}>
-            <a className="pk-kbtn" href="/api/v1/rap/template.xlsx" data-pk-link="rap-template">
-              Template Excel kosong
-            </a>
-            {rap.items.length ? (
-              <a className="pk-kbtn" href={`/api/v1/projects/${id}/rap.xlsx`} data-pk-link="rap-download">
-                Unduh RAP (.xlsx)
-              </a>
-            ) : null}
-          </div>
-          <RapTemplateActions projectId={id} templates={templates} empty={rap.items.length === 0} />
-          <h3 style={{ fontSize: 14, margin: '16px 0 8px' }}>Upload Excel RAP</h3>
-          <RapImport projectId={id} needsReason={rap.needsReason} stageRequired={rap.drivesProgress} />
-        </Card>
-      ) : null}
     </Frame>
   )
 }

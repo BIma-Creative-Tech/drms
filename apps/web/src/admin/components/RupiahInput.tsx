@@ -66,7 +66,7 @@ export function RupiahInput({
         value={field.text}
         onChange={(e) => field.onChange(e.target.value)}
         onBlur={field.onBlur}
-        placeholder="0"
+        // UI feedback 17/10 #1: no placeholder — the "Rp" prefix already marks the money field
         maxLength={24}
         required={required}
         disabled={disabled}
