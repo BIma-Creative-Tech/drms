@@ -1,11 +1,11 @@
-import type { CollectionBeforeChangeHook, CollectionConfig, Where } from 'payload'
+import type { CollectionBeforeChangeHook, CollectionConfig } from 'payload'
 
 import { denyAll, relId } from '@/access/roles'
 import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { siteFromCostCenterDefault } from '@/domain/sites'
 import { activeField, codeField, uuidField } from '@/fields/common'
-import { companyField, companyHook, pickerSameCompany, sameCompanyOptions } from '@/fields/company'
+import { andCompany, companyField, companyHook, lockedUntilCompany, pickerSameCompany } from '@/fields/company'
 import { validationError } from '@/lib/validation'
 
 /**
@@ -108,15 +108,15 @@ export const Sites: CollectionConfig = withAudit(
           },
         ],
       },
-      {
+      lockedUntilCompany({
         name: 'defaultWorkSchedule',
         type: 'relationship',
         relationTo: 'work-schedules',
         label: 'Jadwal kerja default',
         ...pickerSameCompany(),
         admin: { placeholder: 'Pilih jadwal kerja…', description: 'Untuk karyawan dengan site penempatan ini yang tidak punya jadwal sendiri. Kosong = jadwal default perusahaan.' },
-      },
-      {
+      }),
+      lockedUntilCompany({
         name: 'costCenter',
         type: 'relationship',
         relationTo: 'cost-centers',
@@ -124,12 +124,9 @@ export const Sites: CollectionConfig = withAudit(
         index: true,
         defaultValue: siteFromCostCenterDefault('costCenter'),
         ...pickerSameCompany(),
-        filterOptions: (args: { data?: unknown }): Where => {
-          const same = sameCompanyOptions(args)
-          return same === true ? { type: { equals: 'operational' } } : { and: [same, { type: { equals: 'operational' } }] }
-        },
+        filterOptions: andCompany({ type: { equals: 'operational' } }),
         admin: { placeholder: 'Pilih pusat biaya…', description: 'Pusat biaya operasional kantor cabang; diusulkan ke Finance untuk project site ini yang belum punya pusat biaya.' },
-      },
+      }),
       activeField(),
       uuidField(),
     ],

@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { withCompanyContext, type Role } from '@/access/roles'
 import { opensRow } from '@/admin/components/list/ClickableRow'
 import { bankAccountOptions, REQUEST_CREATE_ROLES, requesterOptions } from '@/collections/ExpenseRequests'
-import { companyField, companyScopedOptions, creatableCompanies, formCompany, isListFilter, pickerSameCompany, sameCompanyOptions } from '@/fields/company'
+import { companyField, companyScopedOptions, creatableCompanies, formCompany, formCompanyOptions, isListFilter, pickerSameCompany, sameCompanyOptions } from '@/fields/company'
 import { TIMELINE_STATE_LABELS } from '@/domain/expense/approval-timeline'
 
 /** DRMS 13/10 Wave 1: expense-request form PT scoping (Pengajuan #1–#3, #5) and approval-page cleanups (Persetujuan). */
@@ -85,9 +85,11 @@ describe('Pengajuan #3/#5: dependent pickers are empty until the PT is known', (
     expect(opts({ data: FORM, user: user(null) })).toBe(false) // urgency levels of every PT no longer listed
     expect(opts({ data: FORM, user: user([1]) })).toEqual({ company: { equals: 1 } }) // Staff with one PT: prefilled
     expect(opts({ data: {}, user: user(null) })).toBe(true)
-    // the shared default (derived-PT forms such as team assignments) is unchanged
+    // the parent picker of a derived-PT form (team assignments → employee) keeps every readable row until a PT exists;
+    // DRMS UI 17/10 #4: the default of a chosen-PT master form now waits for the PT too (formCompanyOptions)
     expect(sameCompanyOptions({ data: FORM })).toBe(true)
-    expect(pickerSameCompany().filterOptions).toBe(sameCompanyOptions)
+    expect(pickerSameCompany({ decidesCompany: true }).filterOptions).toBe(sameCompanyOptions)
+    expect(pickerSameCompany().filterOptions).toBe(formCompanyOptions)
   })
 
   it('expense-requests: project + urgency use the scoped filter and the "Pilih PT terlebih dahulu" field', () => {

@@ -2,8 +2,12 @@ import type { PayloadRequest } from 'payload'
 import React from 'react'
 
 import { companyContextOf, memberCompanies } from '@/access/roles'
+import { ptOptions, type PtOption } from '@/lib/pt-options'
 
 import { companyLabels, type CompanyLabel } from '../components/companies/labels'
+
+export { codeFrom, ptLabel, ptOptions, spansSeveralPts } from '@/lib/pt-options'
+export type { PtOption } from '@/lib/pt-options'
 
 /**
  * PT column / badge of the custom admin views (MC2-4, wireframe §4 "Kolom PT … hanya tampil bila
@@ -34,6 +38,25 @@ export async function ptView(req: PayloadRequest): Promise<PtView> {
       return l ? { id, shortCode: l.shortCode, name: l.name } : { id, shortCode: `#${id}` }
     },
   }
+}
+
+/** PT code of a company id in this view (`#id` when unknown). */
+export const ptCodeOf =
+  (pt: PtView) =>
+  (id: number): string =>
+    pt.ref(id)?.shortCode ?? `#${id}`
+
+/**
+ * DRMS UI feedback 17/10 #4: option list of a view filter / form (lib/pt-options.ts) — only `company`'s options when it
+ * is known, else every PT's options tagged `[CS1]` while more than one PT is selected (same rule as the PT column).
+ */
+export function ptOptionsOf<T extends PtOption>(list: readonly T[], pt: PtView, company?: number | null): T[] {
+  return ptOptions(list, { code: ptCodeOf(pt), company, multi: pt.multi })
+}
+
+/** PT codes of the selected PTs as a plain map — for client forms that tag / narrow their own lists. */
+export function ptCodes(pt: PtView): Record<number, string> {
+  return Object.fromEntries(pt.selected.map((id) => [id, ptCodeOf(pt)(id)]))
 }
 
 /** Company of a queue item / row: the backend `company` ref (`mc2-contract.md` §3) or a plain `companyId`. */

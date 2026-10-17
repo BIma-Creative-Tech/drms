@@ -6,7 +6,7 @@ import { byRole, rolesAllowed, anyMember } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, codeField, odooRefField, uuidField } from '@/fields/common'
 
-import { companyField, companyHook, pickerSameCompany, requireCompanyWhenAmbiguous, siteOptions } from '@/fields/company'
+import { companyField, companyHook, lockedUntilCompany, pickerSameCompany, requireCompanyWhenAmbiguous, siteOptions } from '@/fields/company'
 import { validationError } from '@/lib/validation'
 import { ATTENDANCE_TYPE_LABEL, ATTENDANCE_TYPES, DEFAULT_ATTENDANCE_TYPE } from '@/domain/attendance/area'
 import { adminCreatePrefill, applyUserAccount, readUserAccount, USER_ACCOUNT, userAccountOptions, userAccountReadAccess, validateUserAccount } from '@/domain/employee-user-link'
@@ -124,10 +124,10 @@ export const Employees: CollectionConfig = withAudit(
         },
       },
       // E6: jadwal kerja karyawan (kosong = jadwal default di Setting perusahaan).
-      { name: 'workSchedule', type: 'relationship', relationTo: 'work-schedules', label: 'Jadwal kerja', ...pickerSameCompany(), admin: { description: 'Kosong = jadwal default site penempatan, lalu jadwal default perusahaan.' } },
+      lockedUntilCompany({ name: 'workSchedule', type: 'relationship', relationTo: 'work-schedules', label: 'Jadwal kerja', ...pickerSameCompany(), admin: { description: 'Kosong = jadwal default site penempatan, lalu jadwal default perusahaan.' } }),
       // ADR 0023 (Q-S5): "Site penempatan" — the branch office where the employee is stationed: may check in there
       // without a team assignment; its default work schedule applies when the employee has none; report filter.
-      {
+      lockedUntilCompany({
         name: 'homeSite',
         type: 'relationship',
         relationTo: 'sites',
@@ -136,7 +136,7 @@ export const Employees: CollectionConfig = withAudit(
         ...pickerSameCompany(),
         filterOptions: siteOptions,
         admin: { placeholder: 'Pilih site…', description: 'Kantor cabang tempat karyawan ditempatkan (opsional): boleh absen di site ini tanpa penugasan tim.' },
-      },
+      }),
       // DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13): where the employee may check in — OnSite: any registered location
       // of the PT with a point (site, project, cost center; no assignment needed); Non-OnSite: head office + branch
       // offices (sites) only. Default OnSite (= no check-in that worked before is refused). Rule: domain/attendance/area.ts.

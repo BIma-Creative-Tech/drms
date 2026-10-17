@@ -4,7 +4,7 @@ import { denyAll } from '@/access/roles'
 import { byRole, rolesAllowed, teamProjects } from '@/access/policies'
 import { reasonOnAnyUpdate, withAudit } from '@/audit/hooks'
 import { rupiahField } from '@/fields/common'
-import { companyField, companyHook } from '@/fields/company'
+import { companyField, companyHook, lockedUntilCompany, pickerSameCompany } from '@/fields/company'
 
 /** RAB per kategori (opsional). Owner C/R/U; Finance/Admin R; PM R team. Every change needs a reason. */
 export const BudgetLines: CollectionConfig = withAudit(
@@ -21,8 +21,12 @@ export const BudgetLines: CollectionConfig = withAudit(
     hooks: { beforeChange: [companyHook('budget-lines', { derive: [{ field: 'project', collection: 'projects' }], check: [{ field: 'category', collection: 'expense-categories' }] })] },
     fields: [
       companyField({ derived: true }),
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', required: true, index: true, access: { update: () => false } },
-      { name: 'category', type: 'relationship', relationTo: 'expense-categories', label: 'Kategori', required: true, access: { update: () => false } },
+      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', required: true, index: true, access: { update: () => false }, ...pickerSameCompany({ required: true, decidesCompany: true }) },
+      // DRMS UI 17/10 #4: categories of the chosen project's PT only (same names in every PT)
+      lockedUntilCompany(
+        { name: 'category', type: 'relationship', relationTo: 'expense-categories', label: 'Kategori', required: true, access: { update: () => false }, ...pickerSameCompany({ required: true, parent: { field: 'project', collection: 'projects' } }) },
+        { field: 'project', label: 'project' },
+      ),
       rupiahField('amount', 'Nominal (Rp)', { required: true }),
     ],
     indexes: [{ fields: ['project', 'category'], unique: true }],

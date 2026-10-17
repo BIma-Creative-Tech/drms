@@ -8,7 +8,7 @@ import { isDecisionRole, REQUESTER_ROLE_OPTIONS, ruleDecisionError, SCOPE_MANAGE
 import { stepsError, type AckBy, type AckMode } from '@/domain/expense/rules'
 import { PAYEE_TYPE_LABELS } from '@/domain/expense/types'
 import { activeField, rupiahField } from '@/fields/common'
-import { companyField, companyHook } from '@/fields/company'
+import { companyField, companyHook, lockedUntilCompany, pickerSameCompany } from '@/fields/company'
 import { userPicker } from '@/fields/users'
 
 const roleOptions = ROLES.map((r) => ({ label: ROLE_LABELS[r], value: r }))
@@ -116,9 +116,10 @@ export const ApprovalRules: CollectionConfig = withAudit(
       },
       rupiahField('minAmount', 'Nominal minimum (Rp)', { required: true }),
       rupiahField('maxAmount', 'Nominal maksimum (Rp, kosong = tanpa batas)'),
-      { name: 'category', type: 'relationship', relationTo: 'expense-categories', label: 'Kategori (opsional)' },
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project (opsional)' },
-      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya (opsional)' },
+      // DRMS UI 17/10 #4: the rule's PT only (same names in every PT); waits for the PT with several PTs selected
+      lockedUntilCompany({ name: 'category', type: 'relationship', relationTo: 'expense-categories', label: 'Kategori (opsional)', ...pickerSameCompany() }),
+      lockedUntilCompany({ name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project (opsional)', ...pickerSameCompany() }),
+      lockedUntilCompany({ name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya (opsional)', ...pickerSameCompany() }),
       {
         // ADR 0024 (owner 2026-10-11): rule selection by the requester's role IN THE PT (every requester)
         name: 'requesterRoles',
