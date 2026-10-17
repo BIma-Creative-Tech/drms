@@ -8,6 +8,7 @@ import { geofenceError } from '@/domain/attendance/calendar'
 import { errorLine } from '@/lib/field-labels'
 
 import { newIdemKey, sendJson, uploadSelfie } from '../kas/client'
+import { gpsErrorMessage, policyBlocks } from './camera'
 import { CAMERA_STYLE, CameraCapture } from './CameraCapture'
 import { DateInput } from '../DateInput'
 import { WrapSelect } from '../WrapSelect'
@@ -541,7 +542,7 @@ export function areaNote(locations: readonly SelfCheckLocation[], fix: { lat: nu
 function getPosition(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!('geolocation' in navigator)) return reject(new Error('Perangkat/browser ini tidak mendukung GPS.'))
-    navigator.geolocation.getCurrentPosition(resolve, (e) => reject(new Error(e.message || 'Gagal mengambil lokasi GPS. Izinkan akses lokasi lalu coba lagi.')), {
+    navigator.geolocation.getCurrentPosition(resolve, (e) => reject(new Error(gpsErrorMessage(e, policyBlocks(document, 'geolocation')))), {
       enableHighAccuracy: true,
       timeout: 15_000,
       maximumAge: 0,

@@ -1,7 +1,7 @@
 'use client'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
-import { CAMERA_CONSTRAINTS, cameraErrorMessage, cameraSupported, captureSize, NO_CAMERA } from './camera'
+import { CAMERA_CONSTRAINTS, cameraErrorMessage, cameraSupported, captureSize, NO_CAMERA, policyBlocks } from './camera'
 
 type State = { s: 'idle' } | { s: 'starting' } | { s: 'live' } | { s: 'shot'; url: string } | { s: 'error'; text: string }
 
@@ -37,7 +37,7 @@ export function CameraCapture({ disabled, onChange }: { disabled?: boolean; onCh
       setState({ s: 'live' })
     } catch (err) {
       stop()
-      setState({ s: 'error', text: cameraErrorMessage(err) })
+      setState({ s: 'error', text: cameraErrorMessage(err, policyBlocks(document, 'camera')) })
     }
   }
 

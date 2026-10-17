@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- **Web Absensi › Absen: clear message when the camera / GPS is blocked by the server's `Permissions-Policy`**, distinct
+  from the user denying the browser prompt. Prod and staging send `camera=(), geolocation=()` from the platform Traefik
+  middleware `security-headers` (it overrides the app's `camera=(self), geolocation=(self)` set since 0.10.0), so
+  "Deteksi lokasi otomatis" and "Buka kamera" failed for every account with the misleading "Izin … ditolak" text. The
+  header itself is fixed in Traefik (DRMS-only middleware, infra); no migration, no contract change.
+
 ## [0.15.0] - 2026-10-17
 
 **UI feedback 17/10 (5 points): no "Rp"/placeholder overlap, one Edit on Pengajuan biaya (Riwayat = action-bar
