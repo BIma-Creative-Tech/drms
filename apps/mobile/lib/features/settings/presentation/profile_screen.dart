@@ -116,6 +116,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 subtitle: Text(p.employee!.homeSiteLabel!),
               ),
           ],
+          // User 2026-10-19: the web avatar menu, 1:1 (own signature; 2FA status → web page).
+          if (p != null) ...[
+            ListTile(
+              key: const Key('profile-account'),
+              leading: const Icon(Icons.draw_outlined),
+              title: Text(t.accountTitle),
+              subtitle: Text(t.accountSubtitle),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/account'),
+            ),
+            ListTile(
+              key: const Key('profile-security'),
+              leading: const Icon(Icons.security_outlined),
+              title: Text(t.securityTitle),
+              subtitle: Text(t.security2faTitle),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/security'),
+            ),
+            const Divider(),
+          ],
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: Text(t.profileVersion),

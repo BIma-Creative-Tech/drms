@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/companies/presentation/unassigned_screen.dart';
+import '../features/account/presentation/account_screen.dart';
+import '../features/account/presentation/security_screen.dart';
 import '../features/addendum/presentation/addendum_screens.dart';
 import '../features/app_config/application/app_config_providers.dart';
 import '../features/app_config/domain/app_config.dart';
@@ -139,6 +141,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       // User 2026-10-18: the offline sync queue moved from the bottom bar to Profil.
       GoRoute(path: '/queue', builder: (_, _) => const QueueScreen()),
+      // User 2026-10-19: the web avatar menu "Profil & tanda tangan" / "Keamanan akun" (opened from Profil).
+      GoRoute(path: '/account', builder: (_, _) => const AccountScreen()),
+      GoRoute(path: '/security', builder: (_, _) => const SecurityScreen()),
       // Web `/admin/modul/<id>`: the sub-menu of one Beranda module.
       GoRoute(
         path: '/modul/:id',

@@ -18,6 +18,7 @@ import { mediaFileEndpoint, mediaSignedUrlEndpoint, uploadMediaEndpoint } from '
 import { NOTIFICATION_ENDPOINTS } from './endpoints/notifications'
 import { meEndpoint } from './endpoints/me'
 import { meCompaniesEndpoint } from './endpoints/me-companies'
+import { meAccountEndpoint, meSecurityEndpoint, meSignatureEndpoint } from './endpoints/me-account'
 import { meModulesEndpoint } from './endpoints/me-modules'
 import { openapiEndpoint } from './endpoints/openapi'
 import { privacyAckEndpoint, privacyNoticeEndpoint } from './endpoints/privacy'
@@ -41,6 +42,9 @@ export const v1Endpoints: Endpoint[] = [
   // MC2-4: web PT switcher (cookie pk-company-ids)
   meCompaniesEndpoint,
   meModulesEndpoint,
+  meAccountEndpoint,
+  meSignatureEndpoint,
+  meSecurityEndpoint,
   mastersEndpoint,
   registerDeviceEndpoint,
   revokeDeviceEndpoint,

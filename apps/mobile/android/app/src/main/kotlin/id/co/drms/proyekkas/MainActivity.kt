@@ -1,5 +1,8 @@
 package id.co.drms.proyekkas
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -21,6 +24,9 @@ import java.util.concurrent.Executors
  * (POST /api/v1/devices/register `integrity`), never used to block. No third-party plugin and no
  * extra permission: su/Magisk files + test-keys build tags (root), well-known emulator build
  * properties, and the Settings.Global developer-options / ADB switches.
+ *
+ * Browser (user 2026-10-19): `open` hands an https URL to the default browser (ACTION_VIEW) — the APK "Keamanan
+ * akun" opens the web 2FA page this way. Anything but https is refused; no browser installed → false.
  *
  * Threading: since Flutter 3.29 the Dart UI isolate runs on the Android main thread by default
  * (engine `Settings::merged_platform_ui_thread = kEnabled`, Flutter 3.47.5 common/settings.h), so a
@@ -68,6 +74,25 @@ class MainActivity : FlutterActivity() {
                                 null // best effort: "not measured"
                             }
                             mainHandler.post { result.success(report) }
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "id.co.drms.proyekkas/browser")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "open" -> {
+                        val uri = (call.argument<String>("url"))?.let { Uri.parse(it) }
+                        if (uri == null || uri.scheme != "https") {
+                            result.success(false)
+                        } else {
+                            try {
+                                startActivity(Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE))
+                                result.success(true)
+                            } catch (e: ActivityNotFoundException) {
+                                result.success(false)
+                            }
                         }
                     }
                     else -> result.notImplemented()

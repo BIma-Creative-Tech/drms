@@ -35,6 +35,8 @@ const Map<String, String> webToApk = {
   // Pengguna & Akses / Sistem (personal)
   '/collections/users': '/profile',
   '/notifikasi': '/notifications',
+  // Avatar menu (user 2026-10-19, phase 2)
+  '/keamanan-akun': '/security',
   '/collections/notifications': '/notifications',
 };
 
