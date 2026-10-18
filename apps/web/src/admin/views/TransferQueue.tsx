@@ -194,6 +194,25 @@ export async function TransferQueue(props: AdminViewServerProps) {
                       amountText={`Transfer ${rp(r.approvedAmount)}`}
                       costCenter={{ options: costCenters.filter((c) => c.company === itemCompany(r)), defaultId: r.costCenter?.id ?? null }}
                     />
+                    {/* D1810: Finance cancels an approved request instead of transferring it (e.g. the amount really approved in
+                        the field differs) — reason mandatory, the server re-checks role + status (state.ts `cancel`). */}
+                    <div style={{ marginTop: 8 }} data-pk-queue-cancel={r.id}>
+                      <ReasonAction
+                        url={`/api/v1/expense-requests/${r.id}/cancel`}
+                        label="Batalkan pengajuan"
+                        title={`Batalkan pengajuan ${r.docNo ?? ''}?`}
+                        description={
+                          <>
+                            Nominal disetujui di sistem: <strong>{rp(r.approvedAmount)}</strong>. Pengajuan dibatalkan (tidak dihapus), keluar dari antrian transfer, dan pemohon
+                            mendapat notifikasi. Bila nominal yang di-ACC di lapangan berbeda, pemohon mengajukan ulang (Duplikat) dengan nominal yang benar.
+                          </>
+                        }
+                        fieldLabel="Alasan pembatalan"
+                        confirmLabel="Batalkan pengajuan"
+                        variant="secondary"
+                        testId={`cancel-request-${r.id}`}
+                      />
+                    </div>
                   </td>
                 </tr>
               ) : null}

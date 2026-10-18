@@ -13,18 +13,21 @@ import { setRequestMode, useRequestMode } from './mode'
 
 // .pk-pbtn: the shared button box (custom.scss, DRMS 15/10 #5) — every control of this bar is 38 px, 13 px/600
 const BTN = 'btn btn--style-secondary btn--size-small pk-pbtn'
+// D1810: e.g. the amount really approved in the field differs from the request — the requester files a new one (Duplikat)
+const CANCEL_PROMPT = { field: 'reason', message: 'Alasan pembatalan (wajib, min. 3 karakter):', minLength: 3 }
+const CANCEL_NOTE = 'Pengajuan dibatalkan (tidak dihapus) dan keluar dari antrian transfer; pemohon mendapat notifikasi. Bila nominal yang disetujui berbeda, pemohon mengajukan ulang (Duplikat) dengan nominal yang benar.'
 const idemKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined)
 
 /**
  * DRMS 13/10 Persetujuan #5/#7/#12: the action bar of the expense-request page, one row in Payload's document
  * controls before "Simpan": [Tolak] [Setujui] (decision for the current actor, from the server's `allowedActions`) ·
- * Finance flow links · [Cetak] · [Duplikat] · [Riwayat] · [Edit] / [Batal]. "Simpan" is Payload's own submit
+ * Finance flow links · [Batalkan pengajuan] (D1810: Finance / Owner, reason mandatory) · [Cetak] · [Duplikat] · [Riwayat] · [Edit] / [Batal]. "Simpan" is Payload's own submit
  * (RequestSaveButton, shown in edit mode only), so validation, the audit reason and the save flow stay Payload's.
  * Edit → the page's Payload form fields appear with the loaded data (`data-pk-mode="edit"` on <main>); Batal resets
  * the form to the saved document and returns to read mode; a successful save (new `updatedAt`) returns to read mode
  * and refreshes the server-rendered panels.
  */
-export function RequestActionsClient({ id, decision, flowLinks, pdfs, canDuplicate, historyHref }: RequestActionsProps) {
+export function RequestActionsClient({ id, decision, flowLinks, pdfs, canDuplicate, canCancel, historyHref }: RequestActionsProps) {
   const router = useRouter()
   const ref = useRef<HTMLDivElement>(null)
   const { data, hasSavePermission } = useDocumentInfo()
@@ -104,6 +107,9 @@ export function RequestActionsClient({ id, decision, flowLinks, pdfs, canDuplica
           {l.label}
         </a>
       ))}
+      {canCancel && mode === 'read' ? (
+        <ActionButton url={`/api/v1/expense-requests/${id}/cancel`} label="Batalkan pengajuan" prompt={CANCEL_PROMPT} confirm={CANCEL_NOTE} testId="office-cancel" />
+      ) : null}
       {pdfs.length === 1 ? (
         <a className={BTN} href={pdfs[0]!.href} data-pk-action="print">
           Cetak
