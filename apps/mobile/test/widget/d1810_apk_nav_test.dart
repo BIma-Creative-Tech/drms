@@ -156,6 +156,7 @@ void main() {
         '/attendance',
         '/profile',
         '/notifications',
+        '/security',
       };
       for (final e in webToApk.entries) {
         expect(known, contains(Uri.parse(e.value).path), reason: e.key);
