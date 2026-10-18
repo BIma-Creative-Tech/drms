@@ -1,7 +1,7 @@
 import type { Access, AccessArgs, FieldAccess, PayloadRequest, Where } from 'payload'
 
 import { companiesWithRole, hasRole, hasRoleAny, isGroupAdmin, membershipsOf, relId, rolesIn, userRoles, type Role } from './roles'
-import { inIds, NO_ROWS, resolveScope, type Scope } from './scope'
+import { employeesOnProjects, inIds, NO_ROWS, resolveScope, type Scope } from './scope'
 
 /**
  * Per-role access rules → one Payload access function (requirements v1.1 §4, architecture §7.2),
@@ -136,6 +136,12 @@ export const teamSites =
   (field = 'site'): Rule =>
   async ({ scope }) =>
     inIds(field, (await scope()).teamSites)
+
+/** D1810 (owner 2026-10-18): records whose `field` (an employees relationship) is a member of one of the user's team projects. */
+export const teamProjectEmployees =
+  (field = 'employee'): Rule =>
+  async ({ req, scope }) =>
+    inIds(field, await employeesOnProjects(req, (await scope()).teamProjects))
 
 /** Combines rules for one role with OR (e.g. PM: team projects OR team cost centers). */
 export function anyOf(...rules: Rule[]): Rule {

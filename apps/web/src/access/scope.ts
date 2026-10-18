@@ -40,6 +40,33 @@ const EMPTY: Omit<Scope, 'userId' | 'companyId'> = {
   assignedSites: [],
 }
 
+/** A team assignment that is active now: started (or no start) and not ended before today. */
+function activeAssignmentWindow(now: Date, today: Date): Where[] {
+  return [
+    { or: [{ startDate: { exists: false } }, { startDate: { less_than_equal: now.toISOString() } }] },
+    { or: [{ endDate: { exists: false } }, { endDate: { greater_than_equal: today.toISOString() } }] },
+  ]
+}
+
+/**
+ * D1810 (owner decision 2026-10-18): employees with an ACTIVE team assignment to one of `projectIds` — the people a
+ * PM may file a request for (drafts.ts Q-09) and whose bank accounts the PM may pick (masked, EmployeeBankAccounts).
+ */
+export async function employeesOnProjects(req: PayloadRequest, projectIds: readonly number[]): Promise<number[]> {
+  if (projectIds.length === 0) return []
+  const now = new Date()
+  const res = await req.payload.find({
+    collection: 'team-assignments',
+    where: { and: [{ project: { in: [...projectIds] } }, ...activeAssignmentWindow(now, startOfLocalDay(now, process.env.TZ || DEFAULT_TZ))] },
+    depth: 0,
+    pagination: false,
+    select: { employee: true },
+    overrideAccess: true, // SYSTEM-READ: scope resolution
+    req,
+  })
+  return sortU((res.docs as Array<{ employee?: unknown }>).map((d) => relId(d.employee)).filter((e): e is number => e !== undefined))
+}
+
 type AssignmentRow = { project?: unknown; costCenter?: unknown; site?: unknown; roleInProject?: unknown }
 
 const sortU = (s: Iterable<number>) => [...new Set(s)].sort((a, b) => a - b)
@@ -89,11 +116,7 @@ export async function resolveScope(req: PayloadRequest, companyId: number | null
       : req.payload.find({
           collection: 'team-assignments',
           where: {
-            and: [
-              { employee: { in: employeeIds } },
-              { or: [{ startDate: { exists: false } }, { startDate: { less_than_equal: now.toISOString() } }] },
-              { or: [{ endDate: { exists: false } }, { endDate: { greater_than_equal: today.toISOString() } }] },
-            ],
+            and: [{ employee: { in: employeeIds } }, ...activeAssignmentWindow(now, today)],
           },
           depth: 0,
           pagination: false,

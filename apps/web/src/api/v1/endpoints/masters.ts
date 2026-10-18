@@ -8,6 +8,7 @@ import { companyById } from '@/domain/companies'
 import { today } from '@/domain/expense/common'
 import { siteFlagsFor, type SiteFlags } from '@/domain/sites'
 import { mayFileIntercompany } from '@/domain/expense/drafts'
+import { direkturEmployees } from '@/domain/expense/on-behalf'
 import { payeeDirectory } from '@/domain/intercompany/service'
 import { INCLUDE_DELETED, softDeleteEntry } from '@/domain/soft-delete/registry'
 import { ONLY_DELETED } from '@/domain/soft-delete/where'
@@ -153,25 +154,6 @@ async function withoutDeletedProjects(req: PayloadRequest, items: Item[]): Promi
   const res = await req.payload.find({ collection: 'projects', where: { and: [{ id: { in: ids } }, ONLY_DELETED] }, depth: 0, pagination: false, select: { id: true } as never, overrideAccess: true /* SYSTEM-READ: which assigned projects are soft-deleted (ids only) */, req })
   const gone = new Set((res.docs as unknown as Array<{ id: number }>).map((d) => d.id))
   return gone.size === 0 ? items : items.filter((i) => !gone.has(relId(i.project) ?? -1))
-}
-
-/** Employees whose active account holds Direktur (pk-owner) or Owner (pk-principal, ADR 0026) through an active membership (ADR 0024). */
-async function direkturEmployees(req: PayloadRequest, employeeIds: number[]): Promise<Set<number>> {
-  const res = await req.payload.find({
-    collection: 'company-memberships',
-    where: { and: [{ employee: { in: employeeIds } }, { roles: { in: ['pk-owner', 'pk-principal'] } }, { active: { equals: true } }] },
-    depth: 0,
-    pagination: false,
-    select: { employee: true, user: true },
-    overrideAccess: true, // SYSTEM-READ: Direktur marker of employees the caller may already read
-    req,
-  })
-  const rows = res.docs as unknown as Array<{ employee?: unknown; user?: unknown }>
-  const users = [...new Set(rows.map((r) => relId(r.user)).filter((x): x is number => x !== undefined))]
-  if (users.length === 0) return new Set()
-  const active = await req.payload.find({ collection: 'users', where: { and: [{ id: { in: users } }, { active: { equals: true } }] }, depth: 0, pagination: false, select: { email: true }, overrideAccess: true /* SYSTEM-READ: active accounts */, req })
-  const ok = new Set(active.docs.map((d) => d.id as number))
-  return new Set(rows.filter((r) => ok.has(relId(r.user) ?? -1)).map((r) => relId(r.employee)).filter((x): x is number => x !== undefined))
 }
 
 const digest = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex')

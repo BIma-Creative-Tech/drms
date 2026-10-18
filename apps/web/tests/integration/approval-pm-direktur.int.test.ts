@@ -8,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { addDays } from '@/domain/expense/types'
 import { down as migrationDown, up as migrationUp } from '@/migrations/20261010_130000_approval_pm_direktur'
 import { resetRateLimits } from '@/lib/rate-limit'
+import { PM_ON_BEHALF_MESSAGE } from '@/domain/expense/on-behalf'
 import { buildPdfData } from '@/pdf/data'
 
 import { auditRows, getTestPayload, sqlAs, sqlError } from './helpers'
@@ -246,7 +247,7 @@ describe('6. A Direktur request (ADR 0024 supersedes the ADR 0021 PM-files-for-t
   it('the PM can no longer file for a Direktur (403 at the draft); the legacy flow is covered by d1010-e-approval', async () => {
     const c = await api('POST', E, w.users.pm, draftBody(w, { requesterIds: [dirEmp], bankAccountId: accDir }), key())
     expect(c.status).toBe(403)
-    expect(JSON.stringify(c.body)).toContain('Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain.')
+    expect(JSON.stringify(c.body)).toContain(PM_ON_BEHALF_MESSAGE) // D1810: the PM files for his project's team only
   })
 
   it('without the exception the DB still refuses the creator (G1): raw insert on a Staff request', async () => {
@@ -265,9 +266,10 @@ describe('6. A Direktur request (ADR 0024 supersedes the ADR 0021 PM-files-for-t
     expect(ok.body.status).toBe('approved')
   })
 
-  it('a PM may not file on behalf of a Staff of another person either', async () => {
-    const c = await api('POST', E, w.users.pm, draftBody(w, { requesterIds: [w.emp.a], bankAccountId: w.accA }), key())
-    expect(c.status).toBe(403)
+  it('D1810 (owner 2026-10-18): the PM files on behalf of a Staff of his project; G1 skips his own PM step', async () => {
+    const r = await submitted(w.users.pm, { requesterIds: [w.emp.a], bankAccountId: w.accA })
+    // the creator PM is the only PM project → "Persetujuan PM" skipped, the Direktur decides
+    expect(r.body).toMatchObject({ status: 'pending_approval', currentLevel: 1, approvalRule: { skipped: [{ position: 'diketahui', userId: w.users.pm.id, reason: 'PM project adalah pemohon/pembuat' }] } })
   })
 })
 

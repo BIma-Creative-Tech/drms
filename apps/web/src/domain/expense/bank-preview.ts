@@ -12,7 +12,8 @@ import { mayFileIntercompany } from './drafts'
  * DRMS 10/10 8e (WA-04): the destination account shown under the "Rekening tujuan" picker (draft) and
  * as the frozen snapshot (after submit) — bank · holder · MASKED number, plus the full number on an
  * explicit "reveal" only for the people the request DTO already shows it to (dto.ts `fullBank`):
- * the request's creator / requesters and Finance / Direktur / Admin of the document's PT.
+ * the request's requesters and Finance / Direktur / Admin of the document's PT (D1810: no longer a creator who is
+ * none of the requesters — before, only office roles could be one).
  *
  * - `requestId` given: the request must be visible to the caller (loadVisible → 404). Draft → the
  *   live account (`accountId` = the picker value, default the saved one); it must belong to the
@@ -86,12 +87,14 @@ export async function bankPreview(req: PayloadRequest, input: { requestId?: numb
     if (accountId === undefined) fail(400, 'Pilih rekening.')
     const acc = await readableAccount(req, accountId)
     if (!acc) fail(404, 'Rekening tidak ditemukan.')
-    return out('account', { bankName: await bankName(req, acc.bank), accountNo: acc.accountNo, accountHolder: acc.accountHolder }, true, reveal)
+    // D1810: a PM reads his team's accounts with the number already masked (EmployeeBankAccounts) — no reveal then
+    return out('account', { bankName: await bankName(req, acc.bank), accountNo: acc.accountNo, accountHolder: acc.accountHolder }, /^[0-9]+$/.test(acc.accountNo ?? ''), reveal)
   }
   const doc = await loadVisible(req, requestId)
   const company = relId((doc as { company?: unknown }).company)
   const emp = employeeIn(req, company)
-  const own = relId(doc.createdBy) === userId(req) || (emp !== undefined && ids(doc.requesters).includes(emp))
+  // D1810: = dto.ts `fullBank` — the requesters and office roles (not a creator who is no requester)
+  const own = emp !== undefined && ids(doc.requesters).includes(emp)
   const full = own || hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], company)
   if (doc.status !== 'draft') {
     const s = doc.bankSnapshot

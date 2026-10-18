@@ -70,9 +70,9 @@ export async function detail(req: PayloadRequest, id: number) {
     requesters: (doc.requesters ?? []).map((r) => relId(r)),
     currentLevel: doc.currentLevel,
   } as RequestDoc)
-  const own = ctx.isCreator || ctx.isRequester
-  // ADR 0016 §5: the full account number for office roles OF THE DOCUMENT's PT only
-  const fullBank = own || hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], relId((doc as { company?: unknown }).company))
+  // ADR 0016 §5: the full account number for office roles OF THE DOCUMENT's PT only. D1810: for the requesters,
+  // not for a creator who is none of them (a PM filing on behalf of his team sees the requester's number masked).
+  const fullBank = ctx.isRequester || hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], relId((doc as { company?: unknown }).company))
   const approvals = await approvalsOf(req, id)
   const receipts = await receiptsOf(req, id)
   const flags = (
