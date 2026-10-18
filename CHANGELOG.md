@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Web: Finance can cancel an approved Pengajuan biaya (reason mandatory)** — "Batalkan pengajuan" in the request
+  page's action bar and on every item of Antrian Transfer. Case: the request says Rp 5 jt and was approved (Owner /
+  Direktur), but only Rp 3 jt was really approved in the field; Finance cancels instead of transferring, the requester
+  is notified and files again (Duplikat) with the right amount. The server already allowed it (state machine
+  `cancel` from Disetujui / Nota Terverifikasi / Revisi Nota for Finance / Owner, reason ≥ 3 characters, audited) and
+  the APK already showed it; only the web had no button for a non-requester. Web only: no migration, no API contract
+  change.
+
 ## [0.15.1] - 2026-10-18
 
 **Web Absensi › Absen fixes** (PRs #108, #109). Web only: **no migration**, no API contract change; APK stays 0.8.0.
