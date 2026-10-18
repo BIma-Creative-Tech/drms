@@ -148,9 +148,10 @@ describe('read scopes (own / team / assigned / all)', () => {
     expect(await ids(users['pk-finance'], 'cost-centers')).toEqual(expect.arrayContaining([assignedCc, otherCc]))
   })
 
-  it('employee bank accounts: staff only own, PM none of others, finance all', async () => {
+  it('employee bank accounts: staff only own, PM his project team\'s (D1810, number masked), finance all', async () => {
     expect(await ids(users['pk-staff'], 'employee-bank-accounts')).toEqual([ownAccount])
-    expect(await ids(users['pk-pm'], 'employee-bank-accounts')).toEqual([])
+    // D1810 (owner 2026-10-18): the staff is assigned to the PM's team project; the other employee is not
+    expect(await ids(users['pk-pm'], 'employee-bank-accounts')).toEqual([ownAccount])
     expect(await ids(users['pk-finance'], 'employee-bank-accounts')).toEqual(expect.arrayContaining([ownAccount, otherAccount]))
   })
 

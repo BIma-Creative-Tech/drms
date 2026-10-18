@@ -14,12 +14,16 @@ import { companyField, companyHook, pickerSameCompany } from '@/fields/company'
  * D1810 (owner decision 2026-10-18): a PM also reads the accounts of the members of his team projects (to file a
  * request on their behalf), with the number MASKED (`maskForeignNumber`).
  */
-export const maskForeignNumber: FieldHook = ({ value, siblingData, overrideAccess, req }) => {
+export const maskForeignNumber: FieldHook = async ({ value, siblingData, overrideAccess, req }) => {
   // system reads (overrideAccess, e.g. the submit snapshot = the transfer destination) keep the full number
-  if (overrideAccess !== false || typeof value !== 'string') return value
-  const row = siblingData as { company?: unknown; employee?: unknown } | undefined
-  if (isGroupAdmin(req) || hasRole(req, ['pk-admin', 'pk-finance', 'pk-owner'], relId(row?.company))) return value
-  return ownEmployees(req).includes(relId(row?.employee) ?? -1) ? value : `••••${value.slice(-4)}` // = dto.ts maskAccountNo
+  if (overrideAccess !== false || typeof value !== 'string' || isGroupAdmin(req)) return value
+  let row = (siblingData ?? {}) as { id?: unknown; company?: unknown; employee?: unknown }
+  // a read with `select` may leave out the PT / owner — look them up (SYSTEM-READ, the row is already readable)
+  if ((row.company === undefined || row.employee === undefined) && typeof row.id === 'number') {
+    row = ((await req.payload.findByID({ collection: 'employee-bank-accounts', id: row.id, depth: 0, select: { company: true, employee: true }, overrideAccess: true, req, disableErrors: true })) ?? {}) as typeof row
+  }
+  if (hasRole(req, ['pk-admin', 'pk-finance', 'pk-owner'], relId(row.company))) return value
+  return ownEmployees(req).includes(relId(row.employee) ?? -1) ? value : `••••${value.slice(-4)}` // = dto.ts maskAccountNo
 }
 
 export const EmployeeBankAccounts: CollectionConfig = withAudit(

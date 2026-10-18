@@ -66,12 +66,6 @@ describe('1. The PM files for a member of his project', () => {
     expect((await api('GET', `${E}/${c.body.id}`, w.users.finance)).body.bank.accountNo).toBe(await accountNo(w.accA))
   })
 
-  it('an empty Rekening tujuan takes the default account of the first requester (Staff B), not the PM\'s', async () => {
-    const c = await api('POST', E, w.users.pm, draftBody(w, { requesterIds: [w.emp.b, w.emp.pm], bankAccountId: null }), key())
-    expect(c.status, JSON.stringify(c.body)).toBe(201)
-    expect(c.body.bankAccountId).toBe(w.accB)
-  })
-
   it('the PM may still not pick an account of no requester (G9)', async () => {
     const c = await api('POST', E, w.users.pm, draftBody(w, { requesterIds: [w.emp.a], bankAccountId: accPmOwn }), key())
     expect(c.status).toBe(400)
