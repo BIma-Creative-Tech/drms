@@ -6,6 +6,7 @@ import pg from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { NO_APPROVAL_PDF_LABEL, PRINCIPAL_NO_APPROVAL_NOTE } from '@/domain/expense/decision'
+import { PM_ON_BEHALF_MESSAGE } from '@/domain/expense/on-behalf'
 import { MSG_OWNER_OWN_REQUEST } from '@/domain/expense/snapshot'
 import { addDays } from '@/domain/expense/types'
 import { resetRateLimits } from '@/lib/rate-limit'
@@ -160,7 +161,8 @@ describe('2. An Owner request filed by someone else is refused; a Direktur\'s ow
   it('PM → 403 at the draft; Admin on behalf of the Owner → 409 at submit (stays Draft); the 2026-10-10 PM wording is gone', async () => {
     const pm = await api('POST', E, w.users.pm, ownerBody(), key())
     expect(pm.status).toBe(403)
-    expect(JSON.stringify(pm.body)).toContain('Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain.')
+    // D1810: the PM files for his project's team only — never for a Direktur / Owner
+    expect(JSON.stringify(pm.body)).toContain(PM_ON_BEHALF_MESSAGE)
     const r = await submitted(w.users.admin, ownerBody(), 409)
     expect(JSON.stringify(r.body)).toContain(MSG_OWNER_OWN_REQUEST)
     expect(JSON.stringify(r.body)).not.toContain('dibuat oleh PM project')

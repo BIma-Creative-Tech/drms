@@ -34,6 +34,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   the APK already showed it; only the web had no button for a non-requester. Web only: no migration, no API contract
   change.
 
+### Changed
+
+- **PM files a Pengajuan biaya on behalf of his project team** (owner decision 2026-10-18, revises the Q-09 default)
+  — so the money goes to the requester's account, not the creator's. The PM of the request's project may set
+  "Diajukan Oleh" to employees with an active team assignment to that project (himself optional) and pick their
+  account as Rekening tujuan; an empty Rekening tujuan still takes the first requester's default account. Not for an
+  employee of another project, a Direktur / Owner (ADR 0024 / 0026) or a cost-center request (403 with a clear
+  message); Staff stay self-only (QA-15). The PM now reads his team's `employee-bank-accounts` with the number
+  **masked** (`••••1234`, web picker, APK masters, account preview); system reads — the submit snapshot = the
+  transfer destination — keep the full number. The request detail shows the full number to the requesters and
+  Finance / Direktur / Admin (no longer to a creator who is none of the requesters). "Dibuat Oleh" stays the PM; the
+  PM step of his own on-behalf request is skipped by G1 (creator) like before for a PM requester. APK needs no
+  update. No migration.
+
 ## [0.15.1] - 2026-10-18
 
 **Web Absensi › Absen fixes** (PRs #108, #109). Web only: **no migration**, no API contract change; APK stays 0.8.0.

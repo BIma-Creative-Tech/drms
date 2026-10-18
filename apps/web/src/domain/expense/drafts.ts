@@ -12,6 +12,7 @@ import { rapRequirement } from '@/domain/rap/budget'
 import { RAP_MISSING_MESSAGE } from '@/domain/rap/rules'
 
 import { normalizeLines, validateLines } from './lines'
+import { pmMayFileFor, PM_ON_BEHALF_MESSAGE } from './on-behalf'
 import { copyReceiptsForResubmit } from './receipts'
 import { INACTIVE_FOR_DUPLICATES, isBusinessDate, isDirectPayment, normalizeInvoiceNo, payeeOf, STATUS_LABELS, type PayeeType, type RequestStatus, type RequestType } from './types'
 import { assertDocumentUnused, INTERCOMPANY_NO_ACCOUNT, payeeCompanyErrors } from '@/domain/intercompany/service'
@@ -254,7 +255,8 @@ export async function validateContent(
     }
   }
 
-  // Requesters (US-40): ≥ 1 active employee; Staff/PM only for themselves (Q-09 default).
+  // Requesters (US-40): ≥ 1 active employee; Staff/PM only for themselves (Q-09 default; D1810: the PM also for
+  // the team of the request's project).
   const uniq = [...new Set(c.requesterIds)]
   if (uniq.length !== c.requesterIds.length) errors.push({ path: 'requesterIds', message: 'Pemohon tidak boleh ganda.' })
   if (opts.forSubmit && uniq.length === 0) errors.push({ path: 'requesterIds', message: 'Minimal 1 pemohon (Diajukan Oleh).' })
@@ -268,16 +270,20 @@ export async function validateContent(
   const ownPt = company ?? (derived.length === 1 ? derived[0] : undefined)
   // QA-15 (owner decision 2026-10-08): a user whose ONLY role in the request's PT is Staff requests for
   // themselves only — "Diajukan Oleh" = exactly their own employee. PM keeps Q-09 (themselves, may add
-  // co-requesters); Admin/Finance may represent others (QA-MC4-09 above). Checked for the CREATOR of the
-  // request (also at submit, so an older draft that breaks the rule cannot be sent) and for a Staff-only
-  // caller who changes the requesters of someone else's draft. Before Q-09 (clearer message for Staff).
+  // co-requesters; D1810: or the team of a project he leads); Admin/Finance may represent others (QA-MC4-09
+  // above). Checked for the CREATOR of the request (also at submit, so an older draft that breaks the rule
+  // cannot be sent) and for a Staff-only caller who changes the requesters of someone else's draft. Before Q-09
+  // (clearer message for Staff).
   if (uniq.length > 0) await assertStaffSelfOnly(req, uniq, ownPt, opts)
   // ADR 0024 (owner decision 2026-10-11): the PM no longer files on a Direktur's behalf (ADR 0021
   // `direktur_via_pm` withdrawn) — a Direktur files his own request (zero-step rule → Finance transfer queue).
+  // D1810 (owner decision 2026-10-18): the PM of the request's project also files for its team members (pmMayFileFor).
   if (!onBehalf) {
     const creatorEmp = ownPt !== undefined ? employeeIn(req, ownPt) : relId((req.user as { employee?: unknown } | null)?.employee)
     if (userId(req) === opts.creatorId && (creatorEmp === undefined || (uniq.length > 0 && !uniq.includes(creatorEmp)))) {
-      fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain.')
+      const pm = await pmMayFileFor(req, { company: ownPt, projectId: c.projectId, requesters: uniq, own: creatorEmp })
+      if (pm === false) fail(403, PM_ON_BEHALF_MESSAGE)
+      if (pm === undefined) fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain.')
     }
   }
 
