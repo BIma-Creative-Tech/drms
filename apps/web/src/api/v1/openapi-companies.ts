@@ -19,4 +19,12 @@ export function registerCompanyPaths(registry: OpenAPIRegistry, h: Helpers): voi
     request: { body: { content: { 'application/json': { schema: C.MeCompaniesBody } } } },
     responses: h.res(200, 'Selection stored (Set-Cookie)', C.MeCompaniesResult, [400, 401, 403, 409, 413, 429]),
   })
+  registry.registerPath({
+    method: 'get',
+    path: '/me/modules',
+    summary:
+      'Web launcher modules of the caller for the selected PTs (X-Company-Ids): same visibility as /admin (Payload permissions, admin.hidden, view roles, PT features) with badges. APK menu 1:1 with the web; menu only, every route re-checks.',
+    security: h.security,
+    responses: h.res(200, 'Visible modules (registry order)', C.MeModules, [401, 426, 429]),
+  })
 }

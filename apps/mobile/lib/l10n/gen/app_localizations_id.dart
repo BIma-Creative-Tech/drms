@@ -166,10 +166,22 @@ class AppLocalizationsId extends AppLocalizations {
   String get navInbox => 'Persetujuan';
 
   @override
-  String get navQueue => 'Antrean';
+  String get navQueue => 'Antrean sinkron';
 
   @override
   String get navProfile => 'Profil';
+
+  @override
+  String get navDashboard => 'Dashboard';
+
+  @override
+  String get navTransfer => 'Antrian Transfer';
+
+  @override
+  String get navAttendance => 'Absensi';
+
+  @override
+  String get navProjects => 'Proyek';
 
   @override
   String greeting(String name) {
@@ -4237,5 +4249,30 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String icLoanQueueTitle(int count) {
     return 'Pencairan pinjaman antar-PT ($count)';
+  }
+
+  @override
+  String get homeMenuTitle => 'Menu';
+
+  @override
+  String get homeMenuEmpty => 'Akun Anda belum punya akses ke modul mana pun. Hubungi Admin.';
+
+  @override
+  String get dashboardEmpty => 'Belum ada dashboard untuk peran Anda.';
+
+  @override
+  String menuComingSoon(String label) {
+    return '$label segera hadir di APK. Sementara buka lewat web.';
+  }
+
+  @override
+  String get menuComingSoonShort => 'Segera hadir di APK';
+
+  @override
+  String get profileQueueEmpty => 'Semua data sudah terkirim';
+
+  @override
+  String profileQueueCount(int count) {
+    return '$count item belum terkirim';
   }
 }

@@ -17,3 +17,24 @@ export const MeCompaniesResult = z
     all: z.boolean().meta({ description: 'true = every membership selected (no cookie stored).' }),
   })
   .meta({ id: 'MeCompaniesResult' })
+
+/** User 2026-10-18: web launcher modules for the APK menu (GET /me/modules). */
+const MeModuleItem = z.object({
+  href: z.string().meta({ description: 'Web route relative to /admin (e.g. /persetujuan, /collections/projects); the APK maps it to its own screen.' }),
+  label: z.string(),
+  kind: z.enum(['collection', 'global', 'view']),
+  badge: z.number().int(),
+})
+export const MeModules = z
+  .object({
+    modules: z.array(
+      z.object({
+        id: z.string().meta({ description: 'Module id (dashboard, persetujuan, proyek, keuangan, absensi, laporan, pengguna, master, media, pengaturan, sistem).' }),
+        label: z.string(),
+        hint: z.string(),
+        badge: z.number().int(),
+        sections: z.array(z.object({ label: z.string().nullable(), items: z.array(MeModuleItem) })),
+      }),
+    ),
+  })
+  .meta({ id: 'MeModules' })

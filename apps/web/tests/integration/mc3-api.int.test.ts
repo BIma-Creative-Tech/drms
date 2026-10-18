@@ -302,6 +302,7 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'GET /privacy-notice': 'public', // ADR 0018: the bundled notice text, no user data
   'GET /me': 'own',
   'POST /me/companies': 'own',
+  'GET /me/modules': 'own', // user 2026-10-18: the caller's own web launcher menu (APK Beranda)
   'POST /me/privacy-ack': 'own', // ADR 0018: the caller's own acknowledgement
   'POST /devices/register': 'own',
   'POST /admin/test-email': 'own',

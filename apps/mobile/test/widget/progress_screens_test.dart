@@ -11,6 +11,7 @@ import 'package:proyekkas/features/app_config/domain/app_config.dart';
 import 'package:proyekkas/features/approvals/application/inbox_providers.dart';
 import 'package:proyekkas/features/auth/application/auth_controller.dart';
 import 'package:proyekkas/features/auth/domain/user_profile.dart';
+import 'package:proyekkas/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:proyekkas/features/dashboard/presentation/kpi_home.dart';
 import 'package:proyekkas/features/home/presentation/home_screen.dart';
 import 'package:proyekkas/features/masters/domain/master_item.dart';
@@ -21,6 +22,7 @@ import 'package:proyekkas/features/progress/presentation/progress_conflict_scree
 import 'package:proyekkas/features/progress/presentation/progress_detail_screen.dart';
 import 'package:proyekkas/features/progress/presentation/progress_editor_screen.dart';
 import 'package:proyekkas/features/progress/presentation/progress_screen.dart';
+import 'package:proyekkas/shared/widgets/module_tile.dart';
 
 import '../support/e4_e6_fixtures.dart';
 import '../support/widget_harness.dart';
@@ -384,9 +386,9 @@ void main() {
   });
 
   group('home', () {
-    Future<void> pumpHome(WidgetTester tester, Set<Role> roles) => pumpScreen(
+    Future<void> pumpHome(WidgetTester tester, Set<Role> roles, {Widget screen = const HomeScreen()}) => pumpScreen(
       tester,
-      const HomeScreen(),
+      screen,
       auth: _as(roles),
       stubProgress: false,
       overrides: [
@@ -397,49 +399,46 @@ void main() {
         pmDashboardProvider.overrideWith((ref) async => throw const NetworkException()),
         financeDashboardProvider.overrideWith((ref) async => throw const NetworkException()),
         direkturDashboardProvider.overrideWith((ref) async => throw const NetworkException()),
+        staffDashboardProvider.overrideWith((ref) async => throw const NetworkException()),
         inboxProvider.overrideWith((ref) async => throw const NetworkException()),
         addendumInboxProvider.overrideWith((ref) async => const <Addendum>[]),
       ],
     );
 
-    testWidgets('Staff: no progress button; attendance stays open for the recap when the flag is off', (tester) async {
+    testWidgets('Staff: Absensi module, no progress summary on Beranda or Dashboard', (tester) async {
       await pumpHome(tester, {Role.staff});
-      expect(find.byKey(const Key('home-progress')), findsNothing);
+      expect(find.byKey(const Key('home-module-absensi')), findsOneWidget);
       expect(find.byKey(const Key('home-project-progress')), findsNothing);
-      expect(find.textContaining('Rekap bulanan (absen dari aplikasi belum diaktifkan Admin)'), findsOneWidget);
+      await pumpHome(tester, {Role.staff}, screen: const DashboardScreen());
+      expect(find.byKey(const Key('home-project-progress')), findsNothing);
     });
 
-    testWidgets('Operator/Anggota (owner decision 2026-10-09): only the attendance tile', (tester) async {
+    testWidgets('Operator/Anggota (owner decision 2026-10-09): Absensi, no Keuangan / Proyek / Persetujuan', (
+      tester,
+    ) async {
       await pumpHome(tester, {Role.operator});
-      expect(find.byKey(const Key('home-attendance')), findsOneWidget);
-      for (final k in [
-        'home-requests',
-        'home-new-advance',
-        'home-new-reimburse',
-        'home-progress',
-        'home-inbox',
-        'home-addenda',
-      ]) {
+      expect(find.byKey(const Key('home-module-absensi')), findsOneWidget);
+      for (final k in ['home-module-keuangan', 'home-module-proyek', 'home-module-persetujuan']) {
         expect(find.byKey(Key(k)), findsNothing, reason: k);
       }
     });
 
-    testWidgets('PM: progress button with the unsent count and the progress-vs-budget summary', (tester) async {
+    testWidgets('PM: Proyek module with the unsent count, progress-vs-budget summary on the Dashboard', (tester) async {
       await pumpHome(tester, {Role.pm});
-      expect(find.byKey(const Key('home-progress')), findsOneWidget);
-      expect(find.text('1 laporan belum terkirim'), findsOneWidget);
+      expect(tester.widget<ModuleTile>(find.byKey(const Key('home-module-proyek'))).badge, '1');
+      await pumpHome(tester, {Role.pm}, screen: const DashboardScreen());
       expect(find.byKey(const Key('home-project-progress')), findsOneWidget);
       expect(find.byKey(const Key('project-progress-7')), findsOneWidget);
     });
 
     testWidgets('Finance: US-12 "Progress fisik vs anggaran" card like the web Finance Beranda', (tester) async {
-      await pumpHome(tester, {Role.finance});
+      await pumpHome(tester, {Role.finance}, screen: const DashboardScreen());
       expect(find.byKey(const Key('home-project-progress')), findsOneWidget);
       expect(find.byKey(const Key('project-progress-7')), findsOneWidget);
     });
 
     testWidgets('Direktur keeps the card', (tester) async {
-      await pumpHome(tester, {Role.owner});
+      await pumpHome(tester, {Role.owner}, screen: const DashboardScreen());
       expect(find.byKey(const Key('home-project-progress')), findsOneWidget);
     });
   });

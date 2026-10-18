@@ -14,6 +14,7 @@ import 'package:proyekkas/features/auth/domain/user_profile.dart';
 import 'package:proyekkas/core/network/api_exception.dart';
 import 'package:proyekkas/features/addendum/domain/addendum.dart';
 import 'package:proyekkas/features/addendum/presentation/addendum_providers.dart';
+import 'package:proyekkas/features/home/application/menu_providers.dart';
 import 'package:proyekkas/features/progress/application/progress_providers.dart';
 import 'package:proyekkas/features/projects/application/projects_providers.dart';
 import 'package:proyekkas/features/progress/domain/progress.dart';
@@ -61,6 +62,7 @@ Future<void> pumpScreen(
   AuthController Function()? authController,
   bool stubProgress = true,
   bool stubRap = true,
+  bool stubMenu = true,
 }) async {
   await initializeDateFormatting('id');
   tester.view.physicalSize = const Size(1200, 3200);
@@ -90,6 +92,12 @@ Future<void> pumpScreen(
         // D4: the draft editor / line editor read the project's RAP (`GET /projects/{id}/rap`); offline-like
         // unless a test provides the items.
         if (stubRap) projectRapProvider.overrideWith((ref, id) async => throw const NetworkException()),
+        // User 2026-10-18: Beranda = `GET /me/modules`; widget tests use the offline menu of the profile.
+        if (stubMenu)
+          menuProvider.overrideWith((ref) async {
+            final p = ref.watch(currentProfileProvider);
+            return p == null ? const [] : fallbackMenu(p);
+          }),
         ...overrides,
       ],
       child: MaterialApp(

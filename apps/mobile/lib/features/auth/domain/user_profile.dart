@@ -54,6 +54,10 @@ enum Role {
 /// `direktur` = role `pk-owner` (ADR 0013 label).
 enum HomeKind { direktur, finance, pm, staff }
 
+/// Bottom bar variant (user 2026-10-18), from the roles of the selected PTs — the highest wins: Owner (`pk-principal`,
+/// whose roles also carry `pk-owner`), Direktur, Finance, PM, Admin, Staff, Operator.
+enum NavKind { owner, direktur, finance, pm, admin, staff, operator }
+
 /// `GET /api/v1/me` `capabilities` (E1, ADR 0013): UI hints only — the server guards stay authoritative.
 @freezed
 abstract class Capabilities with _$Capabilities {
@@ -320,6 +324,18 @@ abstract class UserProfile with _$UserProfile {
     if (has(Role.finance)) return HomeKind.finance;
     if (has(Role.pm)) return HomeKind.pm;
     return HomeKind.staff;
+  }
+
+  /// Bottom bar of the APK (user 2026-10-18); see [NavKind]. No role at all → the Operator bar (Beranda, Profil + the
+  /// attendance the server re-checks).
+  NavKind get navKind {
+    if (has(Role.principal)) return NavKind.owner;
+    if (has(Role.owner)) return NavKind.direktur;
+    if (has(Role.finance)) return NavKind.finance;
+    if (has(Role.pm)) return NavKind.pm;
+    if (has(Role.admin)) return NavKind.admin;
+    if (has(Role.staff)) return NavKind.staff;
+    return NavKind.operator;
   }
 
   /// Who sees the "Persetujuan" inbox: server capability (ADR 0013: Direktur + Finance; PM monitors only).

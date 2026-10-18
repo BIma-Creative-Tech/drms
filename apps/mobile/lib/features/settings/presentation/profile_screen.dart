@@ -136,6 +136,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('$privacyRoute?from=profile'),
           ),
+          // User 2026-10-18: the offline sync queue (formerly a bottom-bar tab) lives here.
+          if (p != null && (p.canCreateRequests || p.hasOwnAttendance)) const _QueueTile(),
           const Divider(),
           const _AppearanceSetting(),
           const Divider(),
@@ -214,6 +216,32 @@ class _AppearanceSetting extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// "Antrean sinkron": what this phone still has to send (drafts, attendance, reports) → `/queue`.
+class _QueueTile extends ConsumerWidget {
+  const _QueueTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppLocalizations.of(context);
+    final c = ref.watch(outboxCountsProvider).value;
+    final n = (c?.pending ?? 0) + (c?.attention ?? 0);
+    return ListTile(
+      key: const Key('profile-queue'),
+      leading: const Icon(Icons.cloud_sync_outlined),
+      title: Text(t.navQueue),
+      subtitle: Text(n == 0 ? t.profileQueueEmpty : t.profileQueueCount(n)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if ((c?.attention ?? 0) > 0) Badge(label: Text('${c!.attention}')),
+          const Icon(Icons.chevron_right),
+        ],
+      ),
+      onTap: () => context.push('/queue'),
     );
   }
 }

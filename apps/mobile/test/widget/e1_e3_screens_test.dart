@@ -14,6 +14,7 @@ import 'package:proyekkas/features/approvals/presentation/inbox_screen.dart';
 import 'package:proyekkas/features/auth/application/auth_controller.dart';
 import 'package:proyekkas/features/auth/domain/user_profile.dart';
 import 'package:proyekkas/features/dashboard/domain/dashboard.dart';
+import 'package:proyekkas/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:proyekkas/features/dashboard/presentation/kpi_home.dart';
 import 'package:proyekkas/features/expense/application/expense_providers.dart';
 import 'package:proyekkas/features/expense/data/expense_api.dart';
@@ -25,6 +26,7 @@ import 'package:proyekkas/features/expense/presentation/requests_screen.dart';
 import 'package:proyekkas/features/expense/presentation/widgets/receipt_thumb.dart';
 import 'package:proyekkas/features/home/presentation/home_screen.dart';
 import 'package:proyekkas/l10n/gen/app_localizations.dart';
+import 'package:proyekkas/shared/widgets/module_tile.dart';
 
 import '../support/fixtures.dart';
 import '../support/harness.dart';
@@ -86,17 +88,16 @@ AuthSignedIn signedIn(Set<Role> roles) => AuthSignedIn(profile: profile(roles), 
 
 void main() {
   group('E1 AC-10: inbox by capability, PM monitors only', () {
-    testWidgets('Direktur home: KPI summary with chart + inbox button', (tester) async {
+    testWidgets('Direktur dashboard: KPI summary with chart', (tester) async {
       await pumpScreen(
         tester,
-        const HomeScreen(),
+        const DashboardScreen(),
         auth: signedIn({Role.owner}),
         overrides: [
           inboxProvider.overrideWith((ref) async => inboxPage()),
           direkturDashboardProvider.overrideWith((ref) async => DirekturDashboard.fromJson(direkturDashboardJson())),
         ],
       );
-      expect(find.byKey(const Key('home-inbox')), findsOneWidget);
       expect(find.byKey(const Key('kpi-direktur')), findsOneWidget);
       expect(find.text('Rp 152.500.000'), findsOneWidget, reason: 'DRMS 13/10 #10: full Rupiah on cards');
       expect(find.text('2 menunggu saya · tertua 4 hari'), findsOneWidget);
@@ -111,21 +112,19 @@ void main() {
       expect(tester.widget<Text>(readout).data, 'Juli 2026: Masuk Rp 30.000.000 · Keluar Rp 20.000.000');
     });
 
-    testWidgets('Finance home: inbox (Approval) + Finance KPIs', (tester) async {
+    testWidgets('Finance dashboard: Finance KPIs', (tester) async {
       await pumpScreen(
         tester,
-        const HomeScreen(),
+        const DashboardScreen(),
         auth: signedIn({Role.finance}),
         overrides: [
           inboxProvider.overrideWith((ref) async => inboxPage()),
           financeDashboardProvider.overrideWith((ref) async => FinanceDashboard.fromJson(financeDashboardJson())),
         ],
       );
-      expect(find.byKey(const Key('home-inbox')), findsOneWidget);
       expect(find.byKey(const Key('kpi-finance')), findsOneWidget);
       expect(find.text('3 LPJ · 2 nota reimburse'), findsOneWidget);
       expect(find.text('1 lewat tanggal dibutuhkan'), findsOneWidget);
-      expect(find.byKey(const Key('home-new-advance')), findsNothing);
     });
 
     testWidgets('MC4: per-PT breakdown under the KPI totals when the dashboard spans two PTs', (tester) async {
@@ -167,27 +166,25 @@ void main() {
       expect(find.byKey(const Key('kpi-by-company')), findsNothing);
     });
 
-    testWidgets('PM home: approval inbox (ADR 0021: PM project approves first) + team monitor', (tester) async {
+    testWidgets('PM dashboard: team monitor', (tester) async {
       await pumpScreen(
         tester,
-        const HomeScreen(),
+        const DashboardScreen(),
         auth: signedIn({Role.pm}),
         overrides: [
           inboxProvider.overrideWith((ref) async => inboxPage()),
           pmDashboardProvider.overrideWith((ref) async => PmDashboard.fromJson(pmDashboardJson())),
         ],
       );
-      expect(find.byKey(const Key('home-inbox')), findsOneWidget);
       expect(find.byKey(const Key('kpi-pm')), findsOneWidget);
       expect(find.text('Pantauan tim'), findsOneWidget);
       expect(find.text('2 menunggu persetujuan'), findsOneWidget);
-      expect(find.byKey(const Key('home-new-reimburse')), findsOneWidget, reason: 'PM still creates own requests');
     });
 
-    testWidgets('dashboard failure does not break the home', (tester) async {
+    testWidgets('dashboard failure shows a message in the Dashboard tab', (tester) async {
       await pumpScreen(
         tester,
-        const HomeScreen(),
+        const DashboardScreen(),
         auth: signedIn({Role.owner}),
         overrides: [
           inboxProvider.overrideWith((ref) async => inboxPage()),
@@ -195,7 +192,24 @@ void main() {
         ],
       );
       expect(find.text('Ringkasan belum bisa dimuat'), findsOneWidget);
-      expect(find.byKey(const Key('home-inbox')), findsOneWidget);
+    });
+
+    testWidgets('Beranda: Persetujuan module with the inbox count (ADR 0021: PM approves first)', (tester) async {
+      for (final roles in [
+        {Role.owner},
+        {Role.finance},
+        {Role.pm},
+      ]) {
+        await pumpScreen(
+          tester,
+          const HomeScreen(),
+          auth: signedIn(roles),
+          overrides: [inboxProvider.overrideWith((ref) async => inboxPage())],
+        );
+        final tile = tester.widget<ModuleTile>(find.byKey(const Key('home-module-persetujuan')));
+        expect(tile.badge, '1', reason: '$roles');
+        expect(find.byKey(const Key('kpi-direktur')), findsNothing, reason: 'KPIs live in the Dashboard tab');
+      }
     });
 
     testWidgets('PM "Pengajuan": team tab (scope=team) is read-only monitoring', (tester) async {

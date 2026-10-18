@@ -11249,6 +11249,92 @@ export const openapiDocument = {
         ],
         "additionalProperties": false
       },
+      "MeModules": {
+        "type": "object",
+        "properties": {
+          "modules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Module id (dashboard, persetujuan, proyek, keuangan, absensi, laporan, pengguna, master, media, pengaturan, sistem)."
+                },
+                "label": {
+                  "type": "string"
+                },
+                "hint": {
+                  "type": "string"
+                },
+                "badge": {
+                  "type": "integer"
+                },
+                "sections": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "href": {
+                              "type": "string",
+                              "description": "Web route relative to /admin (e.g. /persetujuan, /collections/projects); the APK maps it to its own screen."
+                            },
+                            "label": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "collection",
+                                "global",
+                                "view"
+                              ]
+                            },
+                            "badge": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "href",
+                            "label",
+                            "kind",
+                            "badge"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "items"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "label",
+                "hint",
+                "badge",
+                "sections"
+              ]
+            }
+          }
+        },
+        "required": [
+          "modules"
+        ]
+      },
       "ShortfallApprovalRequestBody": {
         "type": "object",
         "properties": {
@@ -38410,6 +38496,61 @@ export const openapiDocument = {
             }
           },
           "413": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/modules": {
+      "get": {
+        "summary": "Web launcher modules of the caller for the selected PTs (X-Company-Ids): same visibility as /admin (Payload permissions, admin.hidden, view roles, PT features) with badges. APK menu 1:1 with the web; menu only, every route re-checks.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Visible modules (registry order)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeModules"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

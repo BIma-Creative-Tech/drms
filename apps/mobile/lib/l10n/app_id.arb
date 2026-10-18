@@ -85,8 +85,12 @@
   "navHome": "Beranda",
   "navRequests": "Pengajuan",
   "navInbox": "Persetujuan",
-  "navQueue": "Antrean",
+  "navQueue": "Antrean sinkron",
   "navProfile": "Profil",
+  "navDashboard": "Dashboard",
+  "navTransfer": "Antrian Transfer",
+  "navAttendance": "Absensi",
+  "navProjects": "Proyek",
   "greeting": "Halo, {name}",
   "@greeting": {
     "placeholders": {
@@ -3066,6 +3070,27 @@
   },
   "icLoanQueueTitle": "Pencairan pinjaman antar-PT ({count})",
   "@icLoanQueueTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeMenuTitle": "Menu",
+  "homeMenuEmpty": "Akun Anda belum punya akses ke modul mana pun. Hubungi Admin.",
+  "dashboardEmpty": "Belum ada dashboard untuk peran Anda.",
+  "menuComingSoon": "{label} segera hadir di APK. Sementara buka lewat web.",
+  "@menuComingSoon": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "menuComingSoonShort": "Segera hadir di APK",
+  "profileQueueEmpty": "Semua data sudah terkirim",
+  "profileQueueCount": "{count} item belum terkirim",
+  "@profileQueueCount": {
     "placeholders": {
       "count": {
         "type": "int"
