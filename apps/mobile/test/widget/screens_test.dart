@@ -19,6 +19,7 @@ import 'package:proyekkas/features/expense/presentation/request_detail_screen.da
 import 'package:proyekkas/features/expense/presentation/widgets/receipt_thumb.dart';
 import 'package:proyekkas/features/home/presentation/home_screen.dart';
 import 'package:proyekkas/features/masters/domain/master_item.dart';
+import 'package:proyekkas/shared/widgets/module_tile.dart';
 
 import '../support/fixtures.dart';
 import '../support/seed.dart';
@@ -169,11 +170,10 @@ void main() {
       expect(find.text('Login pertama kali butuh koneksi internet.'), findsWidgets);
     });
 
-    testWidgets('staff home: big create buttons, no approval inbox', (tester) async {
+    testWidgets('staff home: Keuangan module (requests), no approval inbox', (tester) async {
       await pumpScreen(tester, const HomeScreen());
-      expect(find.byKey(const Key('home-new-advance')), findsOneWidget);
-      expect(find.byKey(const Key('home-new-reimburse')), findsOneWidget);
-      expect(find.byKey(const Key('home-inbox')), findsNothing);
+      expect(find.byKey(const Key('home-module-keuangan')), findsOneWidget);
+      expect(find.byKey(const Key('home-module-persetujuan')), findsNothing);
     });
 
     testWidgets('rooted/emulator device: warning on home (Q-43: warn + flag, never block)', (tester) async {
@@ -188,10 +188,10 @@ void main() {
         ],
       );
       expect(find.byKey(const Key('integrity-warning')), findsOneWidget);
-      expect(find.byKey(const Key('home-new-advance')), findsOneWidget);
+      expect(find.byKey(const Key('home-module-keuangan')), findsOneWidget);
     });
 
-    testWidgets('Direktur home: approval inbox with count + own request buttons (ADR 0024)', (tester) async {
+    testWidgets('Direktur home: Persetujuan with the count + Keuangan for own requests (ADR 0024)', (tester) async {
       await pumpScreen(
         tester,
         const HomeScreen(),
@@ -203,10 +203,9 @@ void main() {
           ),
         ],
       );
-      expect(find.byKey(const Key('home-inbox')), findsOneWidget);
-      expect(find.text('1 menunggu'), findsOneWidget);
+      expect(tester.widget<ModuleTile>(find.byKey(const Key('home-module-persetujuan'))).badge, '1');
       // ADR 0024 (owner 2026-10-11): the Direktur files his own requests (straight to the Finance transfer queue)
-      expect(find.byKey(const Key('home-new-advance')), findsOneWidget);
+      expect(find.byKey(const Key('home-module-keuangan')), findsOneWidget);
     });
 
     testWidgets('network error is shown in Bahasa Indonesia with retry', (tester) async {

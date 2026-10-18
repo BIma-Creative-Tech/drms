@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **APK: menus 1:1 with the web — Beranda is the web launcher, Dashboard has its own tab, bottom bar per role**
+  (user 2026-10-18, phase 1 of the APK–web parity plan).
+  - **Beranda** shows only the menu: one tile per web module, with the same visibility and labels as `/admin`, from
+    the new `GET /api/v1/me/modules`. The last copy is stored for offline use; before the first load the APK builds
+    the menu from `/me`. A tile opens the module's sub-menu (web `/admin/modul/<id>`), or its only item directly.
+    Items the APK does not have yet (Buku kas, Laporan, Master Data, …) are greyed out with "Segera hadir di APK";
+    the next phases build them.
+  - **Dashboard**: the role KPIs that used to sit under the tiles, now in their own screen. Several roles → one tab
+    per role view, like the web `?peran=`.
+  - **Bottom bar** by the highest role of the selected PTs:
+    - Owner and Admin: Beranda, Dashboard, Proyek, Profil
+    - Direktur and PM: Beranda, Dashboard, Pengajuan, Persetujuan, Proyek, Profil
+    - Finance: Beranda, Dashboard, Pengajuan, Antrian Transfer, Profil
+    - Staff: Beranda, Pengajuan, Absensi, Proyek, Profil
+    - Operator: Beranda, Absensi, Profil
+  - The **Antrean sinkron** tab moved to Profil.
+  - Server: additive endpoint, no migration.
+
 - **Web: Finance can cancel an approved Pengajuan biaya (reason mandatory)** — "Batalkan pengajuan" in the request
   page's action bar and on every item of Antrian Transfer. Case: the request says Rp 5 jt and was approved (Owner /
   Direktur), but only Rp 3 jt was really approved in the field; Finance cancels instead of transferring, the requester

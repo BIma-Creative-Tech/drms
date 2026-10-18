@@ -63,14 +63,17 @@ void main() {
       expect(find.text('Halo, Doni Pratama'), findsOneWidget);
       expect(find.byKey(const Key('home-roles')), findsOneWidget);
       ModuleTile tile(String key) => tester.widget<ModuleTile>(find.byKey(Key(key)));
-      expect(tile('home-new-advance').module, PkModule.keuangan);
-      expect(tile('home-new-advance').icon, PkIcons.advance);
-      expect(tile('home-new-reimburse').module, PkModule.keuangan);
-      expect(tile('home-requests').module, PkModule.laporan);
-      expect(tile('home-attendance').module, PkModule.absensi);
-      // Two columns: advance and reimburse share a row.
-      final a = tester.getRect(find.byKey(const Key('home-new-advance')));
-      final r = tester.getRect(find.byKey(const Key('home-new-reimburse')));
+      // User 2026-10-18: one tile per web module (offline menu here), web gradients + glyphs.
+      expect(tile('home-module-dashboard').module, PkModule.dashboard);
+      expect(tile('home-module-proyek').module, PkModule.proyek);
+      expect(tile('home-module-proyek').icon, PkIcons.project);
+      expect(tile('home-module-keuangan').module, PkModule.keuangan);
+      expect(tile('home-module-absensi').module, PkModule.absensi);
+      expect(find.byKey(const Key('home-module-persetujuan')), findsNothing);
+      expect(find.byKey(const Key('kpi-staff')), findsNothing, reason: 'KPIs live in the Dashboard screen');
+      // Two columns: Keuangan and Absensi share a row.
+      final a = tester.getRect(find.byKey(const Key('home-module-keuangan')));
+      final r = tester.getRect(find.byKey(const Key('home-module-absensi')));
       expect(a.top, r.top);
       expect(a.height, r.height);
       expect(a.height, greaterThanOrEqualTo(48));
@@ -82,7 +85,7 @@ void main() {
         const HomeScreen(),
         auth: AuthSignedIn(profile: profile({Role.owner}), sub: 's'),
       );
-      final inbox = tester.widget<ModuleTile>(find.byKey(const Key('home-inbox')));
+      final inbox = tester.widget<ModuleTile>(find.byKey(const Key('home-module-persetujuan')));
       expect(inbox.module, PkModule.persetujuan);
       expect(inbox.icon, PkIcons.approval);
     });

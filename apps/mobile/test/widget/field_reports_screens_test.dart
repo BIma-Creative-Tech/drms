@@ -3,14 +3,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:proyekkas/app/providers.dart';
-import 'package:proyekkas/core/network/api_exception.dart';
-import 'package:proyekkas/features/app_config/application/app_config_providers.dart';
-import 'package:proyekkas/features/app_config/domain/app_config.dart';
-import 'package:proyekkas/features/approvals/application/inbox_providers.dart';
 import 'package:proyekkas/features/auth/application/auth_controller.dart';
 import 'package:proyekkas/features/auth/domain/user_profile.dart';
-import 'package:proyekkas/features/dashboard/presentation/kpi_home.dart';
 import 'package:proyekkas/features/field_reports/application/field_providers.dart';
 import 'package:proyekkas/features/field_reports/application/field_service.dart';
 import 'package:proyekkas/features/field_reports/domain/field_models.dart';
@@ -20,7 +14,7 @@ import 'package:proyekkas/features/field_reports/presentation/field_hub_screen.d
 import 'package:proyekkas/features/field_reports/presentation/service_report_screen.dart';
 import 'package:proyekkas/features/field_reports/presentation/timesheet_screen.dart';
 import 'package:proyekkas/features/field_reports/presentation/widgets/field_widgets.dart';
-import 'package:proyekkas/features/home/presentation/home_screen.dart';
+import 'package:proyekkas/features/home/application/menu_providers.dart';
 import 'package:proyekkas/features/progress/application/progress_providers.dart';
 
 import '../support/widget_harness.dart';
@@ -248,35 +242,24 @@ void main() {
     ],
   );
 
-  group('home tile "Laporan Lapangan"', () {
-    Future<void> pumpHome(WidgetTester tester, UserProfile p) => pump(
-      tester,
-      const HomeScreen(),
-      profile: p,
-      extra: [
-        appConfigProvider.overrideWith((ref) async => const AppConfig()),
-        integrityReportProvider.overrideWith((ref) async => null),
-        pmDashboardProvider.overrideWith((ref) async => throw const NetworkException()),
-        financeDashboardProvider.overrideWith((ref) async => throw const NetworkException()),
-        direkturDashboardProvider.overrideWith((ref) async => throw const NetworkException()),
-        inboxProvider.overrideWith((ref) async => throw const NetworkException()),
-      ],
-    );
+  // User 2026-10-18: "Laporan servis" etc. are items of the Proyek module (web registry); the offline menu follows
+  // the same rule as the former tile (capability + PT flag, never Operator-only).
+  group('menu item "Laporan servis"', () {
+    Iterable<String> hrefs(UserProfile p) => fallbackMenu(p).expand((m) => m.items).map((i) => i.href);
 
-    testWidgets('Staff with a field capability and the PT flag on: tile shown', (tester) async {
-      await pumpHome(tester, fieldProfile());
-      expect(find.byKey(const Key('home-field')), findsOneWidget);
-      expect(find.text('Laporan Lapangan'), findsOneWidget);
+    test('Staff with a field capability and the PT flag on: item shown', () {
+      expect(hrefs(fieldProfile()), contains('/laporan-servis'));
     });
 
-    testWidgets('flag off / no capability / Operator-only: no tile', (tester) async {
-      await pumpHome(tester, fieldProfile(flag: false));
-      expect(find.byKey(const Key('home-field')), findsNothing);
-      await pumpHome(tester, fieldProfile(service: false, timesheet: false, aftersales: false));
-      expect(find.byKey(const Key('home-field')), findsNothing);
-      await pumpHome(tester, fieldProfile(roles: const {Role.operator}));
-      expect(find.byKey(const Key('home-field')), findsNothing);
-      expect(find.byKey(const Key('home-attendance')), findsOneWidget);
+    test('flag off / no capability / Operator-only: no item', () {
+      expect(hrefs(fieldProfile(flag: false)), isNot(contains('/laporan-servis')));
+      expect(
+        hrefs(fieldProfile(service: false, timesheet: false, aftersales: false)),
+        isNot(contains('/laporan-servis')),
+      );
+      final op = hrefs(fieldProfile(roles: const {Role.operator}));
+      expect(op, isNot(contains('/laporan-servis')));
+      expect(op, contains('/absensi/absen'));
     });
   });
 

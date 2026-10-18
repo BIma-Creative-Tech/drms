@@ -376,7 +376,7 @@ abstract class AppLocalizations {
   /// No description provided for @navQueue.
   ///
   /// In id, this message translates to:
-  /// **'Antrean'**
+  /// **'Antrean sinkron'**
   String get navQueue;
 
   /// No description provided for @navProfile.
@@ -384,6 +384,30 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Profil'**
   String get navProfile;
+
+  /// No description provided for @navDashboard.
+  ///
+  /// In id, this message translates to:
+  /// **'Dashboard'**
+  String get navDashboard;
+
+  /// No description provided for @navTransfer.
+  ///
+  /// In id, this message translates to:
+  /// **'Antrian Transfer'**
+  String get navTransfer;
+
+  /// No description provided for @navAttendance.
+  ///
+  /// In id, this message translates to:
+  /// **'Absensi'**
+  String get navAttendance;
+
+  /// No description provided for @navProjects.
+  ///
+  /// In id, this message translates to:
+  /// **'Proyek'**
+  String get navProjects;
 
   /// No description provided for @greeting.
   ///
@@ -7500,6 +7524,48 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Pencairan pinjaman antar-PT ({count})'**
   String icLoanQueueTitle(int count);
+
+  /// No description provided for @homeMenuTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Menu'**
+  String get homeMenuTitle;
+
+  /// No description provided for @homeMenuEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun Anda belum punya akses ke modul mana pun. Hubungi Admin.'**
+  String get homeMenuEmpty;
+
+  /// No description provided for @dashboardEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada dashboard untuk peran Anda.'**
+  String get dashboardEmpty;
+
+  /// No description provided for @menuComingSoon.
+  ///
+  /// In id, this message translates to:
+  /// **'{label} segera hadir di APK. Sementara buka lewat web.'**
+  String menuComingSoon(String label);
+
+  /// No description provided for @menuComingSoonShort.
+  ///
+  /// In id, this message translates to:
+  /// **'Segera hadir di APK'**
+  String get menuComingSoonShort;
+
+  /// No description provided for @profileQueueEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua data sudah terkirim'**
+  String get profileQueueEmpty;
+
+  /// No description provided for @profileQueueCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} item belum terkirim'**
+  String profileQueueCount(int count);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -78,7 +78,11 @@ void main() {
     );
     expect(find.byKey(const Key('pt-switcher')), findsOneWidget);
     expect(find.text('Semua PT'), findsOneWidget);
-    expect(find.byKey(const Key('home-inbox')), findsOneWidget, reason: 'Finance in CS7 → union shows the inbox');
+    expect(
+      find.byKey(const Key('home-module-persetujuan')),
+      findsOneWidget,
+      reason: 'Finance in CS7 → union shows the inbox',
+    );
     expect(find.text('Staff, PM · CS6   Finance · CS7'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('pt-switcher')));
@@ -94,8 +98,8 @@ void main() {
     expect(c.read(companyHeaderProvider), '1');
     expect(find.text('CS6'), findsWidgets);
     // ADR 0021: the PM project approves the first step of his project's requests → PM in CS6 keeps the inbox.
-    expect(find.byKey(const Key('home-inbox')), findsOneWidget, reason: 'PM in CS6 approves (ADR 0021)');
-    expect(find.byKey(const Key('home-new-advance')), findsOneWidget);
+    expect(find.byKey(const Key('home-module-persetujuan')), findsOneWidget, reason: 'PM in CS6 approves (ADR 0021)');
+    expect(find.byKey(const Key('home-module-keuangan')), findsOneWidget);
     final stored = await c.read(databaseProvider).kvGetJson(CompanySelection.storageKey(_sub));
     expect(stored, {
       'ids': [1],

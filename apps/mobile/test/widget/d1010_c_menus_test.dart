@@ -230,29 +230,29 @@ void main() {
       },
     );
 
-    testWidgets('home: Staff has Proyek (owner 2026-10-11), no Finance', (tester) async {
+    testWidgets('home: Staff has Proyek (owner 2026-10-11), no Persetujuan', (tester) async {
       await home(tester, {Role.staff});
-      expect(find.byKey(const Key('home-projects')), findsOneWidget);
-      expect(find.byKey(const Key('home-finance')), findsNothing);
+      expect(find.byKey(const Key('home-module-proyek')), findsOneWidget);
+      expect(find.byKey(const Key('home-module-persetujuan')), findsNothing);
     });
 
-    testWidgets('home: Operator/Anggota has neither Proyek nor Finance', (tester) async {
+    testWidgets('home: Operator/Anggota has neither Proyek nor Persetujuan', (tester) async {
       await home(tester, {Role.operator});
-      expect(find.byKey(const Key('home-projects')), findsNothing);
-      expect(find.byKey(const Key('home-finance')), findsNothing);
+      expect(find.byKey(const Key('home-module-proyek')), findsNothing);
+      expect(find.byKey(const Key('home-module-persetujuan')), findsNothing);
+      expect(find.byKey(const Key('home-module-absensi')), findsOneWidget);
     });
 
-    testWidgets('home: PM has Proyek, no Finance', (tester) async {
+    testWidgets('home: PM has Proyek and Persetujuan (ADR 0021)', (tester) async {
       await home(tester, {Role.pm});
-      expect(find.byKey(const Key('home-projects')), findsOneWidget);
-      expect(find.byKey(const Key('home-finance')), findsNothing);
+      expect(find.byKey(const Key('home-module-proyek')), findsOneWidget);
+      expect(find.byKey(const Key('home-module-persetujuan')), findsOneWidget);
     });
 
-    testWidgets('home: Finance has Proyek and Finance with the queue count', (tester) async {
+    testWidgets('home: Finance has Proyek and Persetujuan (Antrian Transfer inside)', (tester) async {
       await home(tester, {Role.finance});
-      expect(find.byKey(const Key('home-projects')), findsOneWidget);
-      expect(find.byKey(const Key('home-finance')), findsOneWidget);
-      expect(find.text('2 siap ditransfer'), findsOneWidget);
+      expect(find.byKey(const Key('home-module-proyek')), findsOneWidget);
+      expect(find.byKey(const Key('home-module-persetujuan')), findsOneWidget);
     });
   });
 

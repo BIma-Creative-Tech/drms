@@ -16,6 +16,7 @@ import '../features/attendance/presentation/team_view.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
+import '../features/dashboard/presentation/dashboard_screen.dart';
 import '../features/expense/domain/request_status.dart';
 import '../features/expense/presentation/draft_editor_screen.dart';
 import '../features/expense/presentation/history_screen.dart';
@@ -32,6 +33,7 @@ import '../features/field_reports/presentation/service_report_screen.dart';
 import '../features/field_reports/presentation/timesheet_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/home/presentation/home_shell.dart';
+import '../features/home/presentation/module_landing_screen.dart';
 import '../features/notifications/presentation/notifications_screen.dart';
 import '../features/privacy/application/privacy_providers.dart';
 import '../features/privacy/presentation/privacy_notice_screen.dart';
@@ -100,9 +102,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       StatefulShellRoute.indexedStack(
         builder: (_, _, shell) => HomeShell(shell: shell),
+        // User 2026-10-18: one branch per bottom-bar tab of any role (home_shell.dart picks the tabs per NavKind).
+        // Transfer / Absensi / Proyek tabs use `/tab/…` so that `/finance`, `/attendance`, `/projects` stay pushed
+        // routes (with a back button) when opened from the Beranda menu or a notification.
         branches: [
           StatefulShellBranch(
             routes: [GoRoute(path: '/home', builder: (_, _) => const HomeScreen())],
+          ),
+          StatefulShellBranch(
+            routes: [GoRoute(path: '/dashboard', builder: (_, _) => const DashboardScreen())],
           ),
           StatefulShellBranch(
             routes: [
@@ -116,12 +124,25 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [GoRoute(path: '/inbox', builder: (_, _) => const InboxScreen())],
           ),
           StatefulShellBranch(
-            routes: [GoRoute(path: '/queue', builder: (_, _) => const QueueScreen())],
+            routes: [GoRoute(path: '/tab/transfer', builder: (_, _) => const FinanceScreen())],
+          ),
+          StatefulShellBranch(
+            routes: [GoRoute(path: '/tab/attendance', builder: (_, _) => const AttendanceScreen())],
+          ),
+          StatefulShellBranch(
+            routes: [GoRoute(path: '/tab/projects', builder: (_, _) => const ProjectsScreen())],
           ),
           StatefulShellBranch(
             routes: [GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen())],
           ),
         ],
+      ),
+      // User 2026-10-18: the offline sync queue moved from the bottom bar to Profil.
+      GoRoute(path: '/queue', builder: (_, _) => const QueueScreen()),
+      // Web `/admin/modul/<id>`: the sub-menu of one Beranda module.
+      GoRoute(
+        path: '/modul/:id',
+        builder: (_, s) => ModuleLandingScreen(id: s.pathParameters['id'] ?? ''),
       ),
       GoRoute(
         path: '/requests/:id',

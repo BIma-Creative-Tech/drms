@@ -4,8 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:proyekkas/features/auth/application/auth_controller.dart';
 import 'package:proyekkas/features/auth/domain/user_profile.dart';
 import 'package:proyekkas/features/dashboard/domain/dashboard.dart';
+import 'package:proyekkas/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:proyekkas/features/dashboard/presentation/kpi_home.dart';
-import 'package:proyekkas/features/home/presentation/home_screen.dart';
 
 import '../support/d1310_w3_fixtures.dart';
 import '../support/widget_harness.dart';
@@ -127,10 +127,12 @@ void main() {
     expect(tester.widget<Text>(find.byKey(const Key('trend-readout'))).data, contains('Rp 18.750.000'));
   });
 
-  testWidgets('Staff home: own requests with their amounts in full Rupiah — no project / cash money', (tester) async {
+  testWidgets('Staff dashboard: own requests with their amounts in full Rupiah — no project / cash money', (
+    tester,
+  ) async {
     await pumpScreen(
       tester,
-      const HomeScreen(),
+      const DashboardScreen(),
       auth: signedIn({Role.staff}),
       overrides: [staffDashboardProvider.overrideWith((ref) async => StaffDashboard.fromJson(staffW3Json()))],
     );
@@ -138,7 +140,12 @@ void main() {
     const own = {
       'Rp 18.750.000', // September Σ (KPI + trend)
       'Rp 10.000.000', // August Σ (trend)
-      'Rp 5.000.000', 'Rp 2.250.000', 'Rp 1.000.000', 'Rp 4.500.000', 'Rp 21.000.000', 'Rp 800.000', // stages
+      'Rp 5.000.000',
+      'Rp 2.250.000',
+      'Rp 1.000.000',
+      'Rp 4.500.000',
+      'Rp 21.000.000',
+      'Rp 800.000', // stages
       'Rp 1.447.500', // own draft (latest)
     };
     final amount = RegExp(r'Rp\s?[\d.]+');
@@ -198,10 +205,10 @@ void main() {
     onlyOwnMoney('trend');
   });
 
-  testWidgets('Admin home: master-data gaps from /dashboard/admin', (tester) async {
+  testWidgets('Admin dashboard: master-data gaps from /dashboard/admin', (tester) async {
     await pumpScreen(
       tester,
-      const HomeScreen(),
+      const DashboardScreen(),
       auth: signedIn({Role.admin}),
       overrides: [adminDashboardProvider.overrideWith((ref) async => AdminDashboard.fromJson(adminW3Json()))],
     );
