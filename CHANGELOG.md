@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- **Web Absensi › Absen: choosing "Di luar area" (Non-OnSite) disabled the camera and showed "Sudah selesai hari ini"**
+  although the card said "Belum absen". The radio key of that entry is `site:<ref>:luar`, but the form looked the selected
+  location up by `type:id`, found nothing and so had no action. It now matches by the same key (`selfCheckPick`). Web
+  only; no migration, no contract change.
 - **Web Absensi › Absen: clear message when the camera / GPS is blocked by the server's `Permissions-Policy`**, distinct
   from the user denying the browser prompt. Prod and staging send `camera=(), geolocation=()` from the platform Traefik
   middleware `security-headers` (it overrides the app's `camera=(self), geolocation=(self)` set since 0.10.0), so
