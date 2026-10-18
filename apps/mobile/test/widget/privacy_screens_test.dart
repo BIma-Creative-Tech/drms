@@ -26,6 +26,8 @@ import 'package:proyekkas/features/privacy/data/privacy_api.dart';
 import 'package:proyekkas/features/privacy/domain/privacy.dart';
 import 'package:proyekkas/features/privacy/presentation/privacy_notice_screen.dart';
 import 'package:proyekkas/features/settings/presentation/profile_screen.dart';
+import 'package:proyekkas/features/sync/application/sync_coordinator.dart';
+import 'package:proyekkas/features/sync/data/outbox_repository.dart';
 import 'package:proyekkas/l10n/gen/app_localizations.dart';
 
 import '../support/harness.dart';
@@ -299,6 +301,7 @@ void main() {
         tester,
         const ProfileScreen(),
         auth: AuthSignedIn(profile: _profile({Role.staff}, _required), sub: 'user-sub-1'),
+        overrides: [outboxCountsProvider.overrideWith((ref) => Stream.value(const OutboxCounts()))],
       );
       expect(find.byKey(const Key('profile-privacy')), findsOneWidget);
       expect(find.text('Belum Anda baca — absensi terkunci.'), findsOneWidget);
@@ -312,6 +315,7 @@ void main() {
           profile: _profile({Role.staff}, const PrivacyStatus(currentVersion: 2, ackVersion: 1, ackAt: 'x')),
           sub: 'user-sub-1',
         ),
+        overrides: [outboxCountsProvider.overrideWith((ref) => Stream.value(const OutboxCounts()))],
       );
       expect(find.textContaining('Ada versi baru (versi 2)'), findsOneWidget);
     });

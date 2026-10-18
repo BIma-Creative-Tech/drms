@@ -71,9 +71,9 @@ void main() {
       expect(tile('home-module-absensi').module, PkModule.absensi);
       expect(find.byKey(const Key('home-module-persetujuan')), findsNothing);
       expect(find.byKey(const Key('kpi-staff')), findsNothing, reason: 'KPIs live in the Dashboard screen');
-      // Two columns: Keuangan and Absensi share a row.
-      final a = tester.getRect(find.byKey(const Key('home-module-keuangan')));
-      final r = tester.getRect(find.byKey(const Key('home-module-absensi')));
+      // Tiles of a row share its height (first row: Dashboard, Proyek).
+      final a = tester.getRect(find.byKey(const Key('home-module-dashboard')));
+      final r = tester.getRect(find.byKey(const Key('home-module-proyek')));
       expect(a.top, r.top);
       expect(a.height, r.height);
       expect(a.height, greaterThanOrEqualTo(48));
