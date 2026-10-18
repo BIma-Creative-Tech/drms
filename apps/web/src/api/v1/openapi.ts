@@ -1,6 +1,7 @@
 import { extendZodWithOpenApi, OpenAPIRegistry, OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 
+import { registerAccountPaths } from './openapi-account'
 import { registerAddendumPaths } from './openapi-addendum'
 import { registerAttendancePaths } from './openapi-attendance'
 import { registerCompanyPaths } from './openapi-companies'
@@ -650,6 +651,8 @@ export function buildOpenApiDocument(version: string) {
   registerAddendumPaths(registry, { security, deviceHeader, idem, res })
   // MC2-4: web PT switcher
   registerCompanyPaths(registry, { security, res })
+  // User 2026-10-19: APK Profil & tanda tangan / Keamanan akun
+  registerAccountPaths(registry, { security, res })
   // ---- QA-06 / ADR 0019: LPJ shortfall re-approval (web) -------------------------------------
   registerShortfallPaths(registry, { security, idem, res, detail: F.ExpenseRequestDetail })
   // ---- FR1 field reports per project kind (ADR 0020) -----------------------------------------

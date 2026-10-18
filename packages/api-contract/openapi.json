@@ -11334,6 +11334,157 @@
           "modules"
         ]
       },
+      "MeAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "signature": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "width": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "height": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "width",
+              "height"
+            ],
+            "description": "Profile signature (media-signatures; image via GET /media/signatures/{id}/file). null = none: decisions then need a signature drawn on screen."
+          },
+          "editable": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "signature"
+              ]
+            },
+            "description": "Fields the caller may change on their own account (F2c self-service: signature only; Admin manages the rest)."
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "phone",
+          "displayName",
+          "signature",
+          "editable"
+        ]
+      },
+      "MeSignatureBody": {
+        "type": "object",
+        "properties": {
+          "signatureMediaId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "A media-signatures row the caller uploaded (POST /media/signatures); null removes the profile signature."
+          }
+        },
+        "required": [
+          "signatureMediaId"
+        ],
+        "additionalProperties": false
+      },
+      "MeSecurity": {
+        "type": "object",
+        "properties": {
+          "twoFactor": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "inactive",
+                  "unknown"
+                ],
+                "description": "unknown = Keycloak not reachable / not configured (enabling is still possible on the web, disabling is not)."
+              },
+              "authenticators": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label",
+                    "createdAt"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "state",
+              "authenticators"
+            ]
+          },
+          "manageUrl": {
+            "type": "string",
+            "description": "Web page \"Keamanan akun\" (ADR 0017): enabling/disabling 2FA runs there (Keycloak re-login, audited); the APK opens it in the browser."
+          }
+        },
+        "required": [
+          "twoFactor",
+          "manageUrl"
+        ]
+      },
       "ShortfallApprovalRequestBody": {
         "type": "object",
         "properties": {
@@ -38535,6 +38686,210 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MeModules"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/account": {
+      "get": {
+        "summary": "Own account (name, email, phone, display name, profile signature) — the web \"Profil & tanda tangan\" page. Only the signature is self-service.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Own account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeAccount"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/signature": {
+      "put": {
+        "summary": "Set or remove the own profile signature (F2c): the media must be a media-signatures row the caller uploaded, else 403. Same guard as the web form (users.selfProfileGuard); audited by the users collection.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeSignatureBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeAccount"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/security": {
+      "get": {
+        "summary": "Own 2FA status from Keycloak (ADR 0017, metadata only) + the web page that changes it. Read-only.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "2FA status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeSecurity"
                 }
               }
             }

@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **APK: "Profil & tanda tangan" and "Keamanan akun" in Profil** (user 2026-10-19, phase 2 of the APK–web parity
+  plan). These are the two entries of the web avatar menu.
+  - **Profil & tanda tangan**:
+    - Name, display name, email and phone are shown read-only. Only Admin changes them, as on the web.
+    - The profile signature can be drawn on screen, picked from the gallery (converted to PNG on the phone) or
+      removed.
+    - Same rule as the web form: the image must be one the user uploaded; the change is audited.
+  - **Keamanan akun**:
+    - Shows the 2FA status and the registered authenticators, with the same texts as the web page.
+    - "Aktifkan 2FA" / "Nonaktifkan / kelola di web" opens the web Keamanan akun page in the phone's browser. There
+      Keycloak asks for the login again and the change is audited.
+    - The status reloads when the user returns to the app.
+    - The web has no self-service password change, so the APK has none either.
+  - Server: additive endpoints `GET /api/v1/me/account`, `PUT /api/v1/me/signature` and `GET /api/v1/me/security`.
+    No migration.
+
 - **APK: menus 1:1 with the web — Beranda is the web launcher, Dashboard has its own tab, bottom bar per role**
   (user 2026-10-18, phase 1 of the APK–web parity plan).
   - **Beranda** shows only the menu: one tile per web module, with the same visibility and labels as `/admin`, from

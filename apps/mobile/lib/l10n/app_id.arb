@@ -3096,5 +3096,59 @@
         "type": "int"
       }
     }
+  },
+  "accountTitle": "Profil & tanda tangan",
+  "accountSubtitle": "Data akun dan tanda tangan untuk pengajuan",
+  "accountName": "Nama",
+  "accountEmail": "Email",
+  "accountPhone": "No. HP",
+  "accountDisplayName": "Nama tampilan",
+  "accountAdminManaged": "Nama, email, dan No. HP hanya dapat diubah oleh Admin.",
+  "accountSignature": "Tanda tangan",
+  "accountSignatureHint": "Dipakai otomatis saat mengirim atau menyetujui pengajuan. Gambar PNG berlatar putih/transparan.",
+  "accountSignatureNone": "Belum ada tanda tangan profil.",
+  "accountSignatureDraw": "Gambar",
+  "accountSignatureUpload": "Pilih gambar",
+  "accountSignatureRemove": "Hapus",
+  "accountSignatureRemoveConfirm": "Hapus tanda tangan profil? Saat memutuskan pengajuan, Anda perlu menggambar tanda tangan di layar.",
+  "accountSignatureSaved": "Tanda tangan disimpan.",
+  "accountSignatureRemoved": "Tanda tangan dihapus.",
+  "accountSignatureDrawTitle": "Gambar tanda tangan",
+  "accountSignatureNotPng": "Gambar tidak dapat dibaca. Pilih file PNG atau JPG lain.",
+  "securityTitle": "Keamanan akun",
+  "securityLead": "Pengaturan ini hanya untuk akun Anda sendiri. 2FA bersifat pilihan: Anda yang memutuskan untuk mengaktifkan atau menonaktifkannya.",
+  "security2faTitle": "Verifikasi dua langkah (2FA)",
+  "security2faActive": "2FA aktif",
+  "security2faInactive": "2FA nonaktif",
+  "security2faUnknown": "Status tidak diketahui",
+  "security2faActiveText": "Setiap login di web dan aplikasi Android meminta kode 6 digit dari aplikasi autentikator Anda setelah kata sandi.",
+  "security2faInactiveText": "Dengan 2FA, login juga meminta kode 6 digit dari aplikasi autentikator di HP Anda — kata sandi yang bocor saja tidak cukup untuk masuk.",
+  "security2faUnknownText": "Status 2FA tidak dapat diperiksa saat ini (server login tidak terjangkau). Anda tetap dapat mengaktifkan 2FA lewat web; menonaktifkan hanya bisa setelah status terbaca.",
+  "securityStep1": "Pasang aplikasi autentikator di HP (mis. Google Authenticator, Microsoft Authenticator, atau FreeOTP).",
+  "securityStep2": "Tekan Aktifkan 2FA. Halaman Keamanan akun di web terbuka di browser; login, lalu pindai kode QR.",
+  "securityStep3": "Masukkan kode 6 digit dari aplikasi dan beri nama perangkat, lalu kembali ke aplikasi ini.",
+  "securityEnable": "Aktifkan 2FA",
+  "securityManage": "Nonaktifkan / kelola di web",
+  "securityWebNote": "Perubahan 2FA dilakukan di halaman web Keamanan akun (Anda diminta login ulang di browser). Status di sini diperbarui saat Anda kembali ke aplikasi.",
+  "securityAuthenticatorDefault": "Aplikasi autentikator",
+  "securityTipsTitle": "Perlu diketahui",
+  "securityTip1": "Aplikasi Android: bila 2FA aktif, isi kolom \"Kode autentikator\" yang muncul setelah login pertama gagal.",
+  "securityTip2": "HP hilang atau aplikasi autentikator terhapus? Hubungi Admin untuk mereset 2FA akun Anda.",
+  "securityTip3": "Setiap perubahan 2FA dicatat di audit log.",
+  "securityRegisteredOn": "Didaftarkan {date}",
+  "@securityRegisteredOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "securityBrowserFailed": "Browser tidak dapat dibuka. Buka {url} di browser HP.",
+  "@securityBrowserFailed": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
   }
 }

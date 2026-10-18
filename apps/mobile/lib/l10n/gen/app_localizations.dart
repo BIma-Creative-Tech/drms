@@ -7566,6 +7566,246 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'{count} item belum terkirim'**
   String profileQueueCount(int count);
+
+  /// No description provided for @accountTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Profil & tanda tangan'**
+  String get accountTitle;
+
+  /// No description provided for @accountSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Data akun dan tanda tangan untuk pengajuan'**
+  String get accountSubtitle;
+
+  /// No description provided for @accountName.
+  ///
+  /// In id, this message translates to:
+  /// **'Nama'**
+  String get accountName;
+
+  /// No description provided for @accountEmail.
+  ///
+  /// In id, this message translates to:
+  /// **'Email'**
+  String get accountEmail;
+
+  /// No description provided for @accountPhone.
+  ///
+  /// In id, this message translates to:
+  /// **'No. HP'**
+  String get accountPhone;
+
+  /// No description provided for @accountDisplayName.
+  ///
+  /// In id, this message translates to:
+  /// **'Nama tampilan'**
+  String get accountDisplayName;
+
+  /// No description provided for @accountAdminManaged.
+  ///
+  /// In id, this message translates to:
+  /// **'Nama, email, dan No. HP hanya dapat diubah oleh Admin.'**
+  String get accountAdminManaged;
+
+  /// No description provided for @accountSignature.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanda tangan'**
+  String get accountSignature;
+
+  /// No description provided for @accountSignatureHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Dipakai otomatis saat mengirim atau menyetujui pengajuan. Gambar PNG berlatar putih/transparan.'**
+  String get accountSignatureHint;
+
+  /// No description provided for @accountSignatureNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada tanda tangan profil.'**
+  String get accountSignatureNone;
+
+  /// No description provided for @accountSignatureDraw.
+  ///
+  /// In id, this message translates to:
+  /// **'Gambar'**
+  String get accountSignatureDraw;
+
+  /// No description provided for @accountSignatureUpload.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih gambar'**
+  String get accountSignatureUpload;
+
+  /// No description provided for @accountSignatureRemove.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus'**
+  String get accountSignatureRemove;
+
+  /// No description provided for @accountSignatureRemoveConfirm.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus tanda tangan profil? Saat memutuskan pengajuan, Anda perlu menggambar tanda tangan di layar.'**
+  String get accountSignatureRemoveConfirm;
+
+  /// No description provided for @accountSignatureSaved.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanda tangan disimpan.'**
+  String get accountSignatureSaved;
+
+  /// No description provided for @accountSignatureRemoved.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanda tangan dihapus.'**
+  String get accountSignatureRemoved;
+
+  /// No description provided for @accountSignatureDrawTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Gambar tanda tangan'**
+  String get accountSignatureDrawTitle;
+
+  /// No description provided for @accountSignatureNotPng.
+  ///
+  /// In id, this message translates to:
+  /// **'Gambar tidak dapat dibaca. Pilih file PNG atau JPG lain.'**
+  String get accountSignatureNotPng;
+
+  /// No description provided for @securityTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Keamanan akun'**
+  String get securityTitle;
+
+  /// No description provided for @securityLead.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengaturan ini hanya untuk akun Anda sendiri. 2FA bersifat pilihan: Anda yang memutuskan untuk mengaktifkan atau menonaktifkannya.'**
+  String get securityLead;
+
+  /// No description provided for @security2faTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Verifikasi dua langkah (2FA)'**
+  String get security2faTitle;
+
+  /// No description provided for @security2faActive.
+  ///
+  /// In id, this message translates to:
+  /// **'2FA aktif'**
+  String get security2faActive;
+
+  /// No description provided for @security2faInactive.
+  ///
+  /// In id, this message translates to:
+  /// **'2FA nonaktif'**
+  String get security2faInactive;
+
+  /// No description provided for @security2faUnknown.
+  ///
+  /// In id, this message translates to:
+  /// **'Status tidak diketahui'**
+  String get security2faUnknown;
+
+  /// No description provided for @security2faActiveText.
+  ///
+  /// In id, this message translates to:
+  /// **'Setiap login di web dan aplikasi Android meminta kode 6 digit dari aplikasi autentikator Anda setelah kata sandi.'**
+  String get security2faActiveText;
+
+  /// No description provided for @security2faInactiveText.
+  ///
+  /// In id, this message translates to:
+  /// **'Dengan 2FA, login juga meminta kode 6 digit dari aplikasi autentikator di HP Anda — kata sandi yang bocor saja tidak cukup untuk masuk.'**
+  String get security2faInactiveText;
+
+  /// No description provided for @security2faUnknownText.
+  ///
+  /// In id, this message translates to:
+  /// **'Status 2FA tidak dapat diperiksa saat ini (server login tidak terjangkau). Anda tetap dapat mengaktifkan 2FA lewat web; menonaktifkan hanya bisa setelah status terbaca.'**
+  String get security2faUnknownText;
+
+  /// No description provided for @securityStep1.
+  ///
+  /// In id, this message translates to:
+  /// **'Pasang aplikasi autentikator di HP (mis. Google Authenticator, Microsoft Authenticator, atau FreeOTP).'**
+  String get securityStep1;
+
+  /// No description provided for @securityStep2.
+  ///
+  /// In id, this message translates to:
+  /// **'Tekan Aktifkan 2FA. Halaman Keamanan akun di web terbuka di browser; login, lalu pindai kode QR.'**
+  String get securityStep2;
+
+  /// No description provided for @securityStep3.
+  ///
+  /// In id, this message translates to:
+  /// **'Masukkan kode 6 digit dari aplikasi dan beri nama perangkat, lalu kembali ke aplikasi ini.'**
+  String get securityStep3;
+
+  /// No description provided for @securityEnable.
+  ///
+  /// In id, this message translates to:
+  /// **'Aktifkan 2FA'**
+  String get securityEnable;
+
+  /// No description provided for @securityManage.
+  ///
+  /// In id, this message translates to:
+  /// **'Nonaktifkan / kelola di web'**
+  String get securityManage;
+
+  /// No description provided for @securityWebNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Perubahan 2FA dilakukan di halaman web Keamanan akun (Anda diminta login ulang di browser). Status di sini diperbarui saat Anda kembali ke aplikasi.'**
+  String get securityWebNote;
+
+  /// No description provided for @securityAuthenticatorDefault.
+  ///
+  /// In id, this message translates to:
+  /// **'Aplikasi autentikator'**
+  String get securityAuthenticatorDefault;
+
+  /// No description provided for @securityTipsTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Perlu diketahui'**
+  String get securityTipsTitle;
+
+  /// No description provided for @securityTip1.
+  ///
+  /// In id, this message translates to:
+  /// **'Aplikasi Android: bila 2FA aktif, isi kolom \"Kode autentikator\" yang muncul setelah login pertama gagal.'**
+  String get securityTip1;
+
+  /// No description provided for @securityTip2.
+  ///
+  /// In id, this message translates to:
+  /// **'HP hilang atau aplikasi autentikator terhapus? Hubungi Admin untuk mereset 2FA akun Anda.'**
+  String get securityTip2;
+
+  /// No description provided for @securityTip3.
+  ///
+  /// In id, this message translates to:
+  /// **'Setiap perubahan 2FA dicatat di audit log.'**
+  String get securityTip3;
+
+  /// No description provided for @securityRegisteredOn.
+  ///
+  /// In id, this message translates to:
+  /// **'Didaftarkan {date}'**
+  String securityRegisteredOn(String date);
+
+  /// No description provided for @securityBrowserFailed.
+  ///
+  /// In id, this message translates to:
+  /// **'Browser tidak dapat dibuka. Buka {url} di browser HP.'**
+  String securityBrowserFailed(String url);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

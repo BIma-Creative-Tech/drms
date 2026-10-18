@@ -4275,4 +4275,140 @@ class AppLocalizationsId extends AppLocalizations {
   String profileQueueCount(int count) {
     return '$count item belum terkirim';
   }
+
+  @override
+  String get accountTitle => 'Profil & tanda tangan';
+
+  @override
+  String get accountSubtitle => 'Data akun dan tanda tangan untuk pengajuan';
+
+  @override
+  String get accountName => 'Nama';
+
+  @override
+  String get accountEmail => 'Email';
+
+  @override
+  String get accountPhone => 'No. HP';
+
+  @override
+  String get accountDisplayName => 'Nama tampilan';
+
+  @override
+  String get accountAdminManaged => 'Nama, email, dan No. HP hanya dapat diubah oleh Admin.';
+
+  @override
+  String get accountSignature => 'Tanda tangan';
+
+  @override
+  String get accountSignatureHint =>
+      'Dipakai otomatis saat mengirim atau menyetujui pengajuan. Gambar PNG berlatar putih/transparan.';
+
+  @override
+  String get accountSignatureNone => 'Belum ada tanda tangan profil.';
+
+  @override
+  String get accountSignatureDraw => 'Gambar';
+
+  @override
+  String get accountSignatureUpload => 'Pilih gambar';
+
+  @override
+  String get accountSignatureRemove => 'Hapus';
+
+  @override
+  String get accountSignatureRemoveConfirm =>
+      'Hapus tanda tangan profil? Saat memutuskan pengajuan, Anda perlu menggambar tanda tangan di layar.';
+
+  @override
+  String get accountSignatureSaved => 'Tanda tangan disimpan.';
+
+  @override
+  String get accountSignatureRemoved => 'Tanda tangan dihapus.';
+
+  @override
+  String get accountSignatureDrawTitle => 'Gambar tanda tangan';
+
+  @override
+  String get accountSignatureNotPng => 'Gambar tidak dapat dibaca. Pilih file PNG atau JPG lain.';
+
+  @override
+  String get securityTitle => 'Keamanan akun';
+
+  @override
+  String get securityLead =>
+      'Pengaturan ini hanya untuk akun Anda sendiri. 2FA bersifat pilihan: Anda yang memutuskan untuk mengaktifkan atau menonaktifkannya.';
+
+  @override
+  String get security2faTitle => 'Verifikasi dua langkah (2FA)';
+
+  @override
+  String get security2faActive => '2FA aktif';
+
+  @override
+  String get security2faInactive => '2FA nonaktif';
+
+  @override
+  String get security2faUnknown => 'Status tidak diketahui';
+
+  @override
+  String get security2faActiveText =>
+      'Setiap login di web dan aplikasi Android meminta kode 6 digit dari aplikasi autentikator Anda setelah kata sandi.';
+
+  @override
+  String get security2faInactiveText =>
+      'Dengan 2FA, login juga meminta kode 6 digit dari aplikasi autentikator di HP Anda — kata sandi yang bocor saja tidak cukup untuk masuk.';
+
+  @override
+  String get security2faUnknownText =>
+      'Status 2FA tidak dapat diperiksa saat ini (server login tidak terjangkau). Anda tetap dapat mengaktifkan 2FA lewat web; menonaktifkan hanya bisa setelah status terbaca.';
+
+  @override
+  String get securityStep1 =>
+      'Pasang aplikasi autentikator di HP (mis. Google Authenticator, Microsoft Authenticator, atau FreeOTP).';
+
+  @override
+  String get securityStep2 =>
+      'Tekan Aktifkan 2FA. Halaman Keamanan akun di web terbuka di browser; login, lalu pindai kode QR.';
+
+  @override
+  String get securityStep3 =>
+      'Masukkan kode 6 digit dari aplikasi dan beri nama perangkat, lalu kembali ke aplikasi ini.';
+
+  @override
+  String get securityEnable => 'Aktifkan 2FA';
+
+  @override
+  String get securityManage => 'Nonaktifkan / kelola di web';
+
+  @override
+  String get securityWebNote =>
+      'Perubahan 2FA dilakukan di halaman web Keamanan akun (Anda diminta login ulang di browser). Status di sini diperbarui saat Anda kembali ke aplikasi.';
+
+  @override
+  String get securityAuthenticatorDefault => 'Aplikasi autentikator';
+
+  @override
+  String get securityTipsTitle => 'Perlu diketahui';
+
+  @override
+  String get securityTip1 =>
+      'Aplikasi Android: bila 2FA aktif, isi kolom \"Kode autentikator\" yang muncul setelah login pertama gagal.';
+
+  @override
+  String get securityTip2 =>
+      'HP hilang atau aplikasi autentikator terhapus? Hubungi Admin untuk mereset 2FA akun Anda.';
+
+  @override
+  String get securityTip3 => 'Setiap perubahan 2FA dicatat di audit log.';
+
+  @override
+  String securityRegisteredOn(String date) {
+    return 'Didaftarkan $date';
+  }
+
+  @override
+  String securityBrowserFailed(String url) {
+    return 'Browser tidak dapat dibuka. Buka $url di browser HP.';
+  }
 }
