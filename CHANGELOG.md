@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-10-18
+
+**Web Absensi › Absen fixes** (PRs #108, #109). Web only: **no migration**, no API contract change; APK stays 0.8.0.
+The camera/GPS header itself was fixed in Traefik (`drms-security-headers`, live 2026-10-18).
+
 ### Fixed
 
 - **Web Absensi › Absen: choosing "Di luar area" (Non-OnSite) disabled the camera and showed "Sudah selesai hari ini"**
