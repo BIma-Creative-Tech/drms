@@ -4,7 +4,19 @@ import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 import { describe, expect, it } from 'vitest'
 
-import { CAMERA_BUSY, CAMERA_DENIED, cameraErrorMessage, cameraSupported, captureSize, NO_CAMERA } from '@/admin/components/absensi/camera'
+import {
+  CAMERA_BUSY,
+  CAMERA_DENIED,
+  CAMERA_POLICY,
+  cameraErrorMessage,
+  cameraSupported,
+  captureSize,
+  GPS_DENIED,
+  GPS_POLICY,
+  gpsErrorMessage,
+  NO_CAMERA,
+  policyBlocks,
+} from '@/admin/components/absensi/camera'
 import { bandGeometry, BRAND, fit, localStamp, renderBand, SELFIE_MAX_BYTES, stampImage, stampLines, tzLabel, type StampInfo } from '@/domain/attendance/stamp'
 import { formatHours, hoursBetween, measure, monthInTz, percentile, queueAge, summarize } from '@/domain/expense/sla'
 import { companyCodeError, DEFAULT_SEQUENCES, formatDocNo, LEGACY_DEFAULT_PATTERNS, parseBusinessDate, patternError, periodKey } from '@/domain/numbering'
@@ -209,6 +221,9 @@ describe('item 14: web check-in camera helpers', () => {
     expect(cameraErrorMessage({ name: 'NotReadableError' })).toBe(CAMERA_BUSY)
     expect(cameraErrorMessage({ name: 'NotFoundError' })).toBe(NO_CAMERA)
     expect(cameraErrorMessage(new Error('x'))).toBe(NO_CAMERA)
+    // DRMS 18/10: blocked by the server's Permissions-Policy, not by the user
+    expect(cameraErrorMessage({ name: 'NotAllowedError' }, true)).toBe(CAMERA_POLICY)
+    expect(cameraErrorMessage({ name: 'NotReadableError' }, true)).toBe(CAMERA_BUSY)
     expect(NO_CAMERA).toBe('Kamera tidak tersedia — gunakan aplikasi Android.')
   })
 
@@ -230,5 +245,30 @@ describe('item 14: web check-in camera helpers', () => {
     const form = src.slice(src.indexOf('export function SelfCheckForm'))
     expect(form).not.toMatch(/type="file"/)
     expect(form).toMatch(/<CameraCapture/)
+  })
+})
+
+describe('DRMS 18/10: Permissions-Policy vs user denial (web check-in)', () => {
+  it('policyBlocks reads document.permissionsPolicy / featurePolicy, unknown → false', () => {
+    const deny = { allowsFeature: () => false }
+    const allow = { allowsFeature: () => true }
+    expect(policyBlocks({ permissionsPolicy: deny }, 'camera')).toBe(true)
+    expect(policyBlocks({ featurePolicy: deny }, 'geolocation')).toBe(true)
+    expect(policyBlocks({ permissionsPolicy: allow }, 'camera')).toBe(false)
+    expect(policyBlocks({}, 'camera')).toBe(false)
+    expect(policyBlocks(undefined, 'camera')).toBe(false)
+    const boom = {
+      allowsFeature: () => {
+        throw new Error('x')
+      },
+    }
+    expect(policyBlocks({ permissionsPolicy: boom }, 'camera')).toBe(false)
+  })
+  it('gpsErrorMessage separates policy block, user denial, timeout', () => {
+    expect(gpsErrorMessage({ code: 1 }, true)).toBe(GPS_POLICY)
+    expect(gpsErrorMessage({ code: 1 })).toBe(GPS_DENIED)
+    expect(gpsErrorMessage({ code: 3 })).toMatch(/timeout/)
+    expect(gpsErrorMessage({ code: 2 })).toMatch(/Gagal mengambil lokasi GPS/)
+    expect(gpsErrorMessage(null)).toMatch(/Gagal mengambil lokasi GPS/)
   })
 })
