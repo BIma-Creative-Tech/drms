@@ -501,6 +501,15 @@ const LOC_FIELD: Record<SelfCheckLocation['type'], string> = { project: 'project
 const LOC_KIND: Record<SelfCheckLocation['type'], string> = { project: 'Project', cost_center: 'Pusat biaya', site: 'Site (kantor cabang)' }
 const locKeyOf = (l: Pick<SelfCheckLocation, 'type' | 'id' | 'outsideArea'>) => `${l.type}:${l.id}${l.outsideArea ? ':luar' : ''}`
 
+/**
+ * DRMS 18/10: the location + action of the selected radio. Match by locKeyOf (the "Di luar area" entry is
+ * `site:<ref>:luar`); matching by `type:id` never found it → camera and button disabled ("Sudah selesai hari ini").
+ */
+export function selfCheckPick(locations: readonly SelfCheckLocation[], key: string): { loc: SelfCheckLocation | undefined; action: 'check_in' | 'check_out' | null } {
+  const loc = locations.find((l) => locKeyOf(l) === key)
+  return { loc, action: loc ? (!loc.checkIn ? 'check_in' : !loc.checkOut ? 'check_out' : null) : null }
+}
+
 type AreaNote = { text: string; tone: 'ok' | 'warn'; inside: string[] }
 
 /**
@@ -561,7 +570,7 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
   // item 14 (DRMS 10/10): selfie from the live front camera only (CameraCapture), no file picker
   const [photo, setPhoto] = useState<Blob | null>(null)
   const [camKey, setCamKey] = useState(0)
-  const [locKey, setLocKey] = useState(locations[0] ? `${locations[0].type}:${locations[0].id}` : '')
+  const [locKey, setLocKey] = useState(locations[0] ? locKeyOf(locations[0]) : '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [area, setArea] = useState<AreaNote | null>(null)
@@ -598,8 +607,7 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
     // once per page load
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  const loc = locations.find((l) => `${l.type}:${l.id}` === locKey)
-  const action: 'check_in' | 'check_out' | null = loc ? (!loc.checkIn ? 'check_in' : !loc.checkOut ? 'check_out' : null) : null
+  const { loc, action } = selfCheckPick(locations, locKey)
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
