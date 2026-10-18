@@ -15,6 +15,7 @@ import 'package:proyekkas/features/auth/application/auth_controller.dart';
 import 'package:proyekkas/features/auth/domain/user_profile.dart';
 import 'package:proyekkas/features/home/domain/web_route_map.dart';
 import 'package:proyekkas/features/settings/presentation/profile_screen.dart';
+import 'package:proyekkas/features/sync/application/sync_coordinator.dart';
 import 'package:proyekkas/features/sync/data/outbox_repository.dart';
 
 import '../support/widget_harness.dart';
