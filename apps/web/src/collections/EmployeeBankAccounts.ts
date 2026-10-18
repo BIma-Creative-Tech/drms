@@ -20,7 +20,7 @@ export const maskForeignNumber: FieldHook = async ({ value, siblingData, overrid
   let row = (siblingData ?? {}) as { id?: unknown; company?: unknown; employee?: unknown }
   // a read with `select` may leave out the PT / owner — look them up (SYSTEM-READ, the row is already readable)
   if ((row.company === undefined || row.employee === undefined) && typeof row.id === 'number') {
-    row = ((await req.payload.findByID({ collection: 'employee-bank-accounts', id: row.id, depth: 0, select: { company: true, employee: true }, overrideAccess: true, req, disableErrors: true })) ?? {}) as typeof row
+    row = ((await req.payload.findByID({ collection: 'employee-bank-accounts', id: row.id, depth: 0, select: { company: true, employee: true }, overrideAccess: true /* SYSTEM-READ: PT + owner of a readable row */, req, disableErrors: true })) ?? {}) as typeof row
   }
   if (hasRole(req, ['pk-admin', 'pk-finance', 'pk-owner'], relId(row.company))) return value
   return ownEmployees(req).includes(relId(row.employee) ?? -1) ? value : `••••${value.slice(-4)}` // = dto.ts maskAccountNo
