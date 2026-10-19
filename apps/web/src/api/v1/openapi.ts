@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { registerAccountPaths } from './openapi-account'
 import { registerAddendumPaths } from './openapi-addendum'
 import { registerAttendancePaths } from './openapi-attendance'
+import { registerDataFormPaths } from './openapi-data'
 import { registerKeuanganPaths } from './openapi-keuangan'
 import { registerCompanyPaths } from './openapi-companies'
 import { registerDailyPaths } from './openapi-daily'
@@ -664,6 +665,8 @@ export function buildOpenApiDocument(version: string) {
   registerAccountPaths(registry, { security, res })
   // User 2026-10-19: APK Keuangan (Buku kas, Tutup buku, Transfer tercatat, Data lists)
   registerKeuanganPaths(registry, { security, deviceHeader, res })
+  // User 2026-10-19: APK Proyek (generic edit form, phase 5)
+  registerDataFormPaths(registry, { security, deviceHeader, idem, res })
   // ---- QA-06 / ADR 0019: LPJ shortfall re-approval (web) -------------------------------------
   registerShortfallPaths(registry, { security, idem, res, detail: F.ExpenseRequestDetail })
   // ---- FR1 field reports per project kind (ADR 0020) -----------------------------------------

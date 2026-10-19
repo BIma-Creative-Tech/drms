@@ -26,16 +26,35 @@ export const DATA_COLLECTIONS = [
   'cash-entries',
   'cash-accounts',
   'cash-in-sources',
+  // Proyek (phase 5, user 2026-10-19)
+  'clients',
+  'cost-centers',
+  'team-assignments',
+  'project-stages',
+  'stage-templates',
+  'resource-types',
+  'service-types',
+  'budget-lines',
+  'rap-templates',
+  'rap-items',
+  'contract-units',
+  'progress-reports',
+  'budget-addenda',
+  'service-reports',
+  'unit-timesheets',
+  'aftersales-activities',
+  'daily-reports',
+  'daily-report-lines',
 ] as const
 
 const READ_LIMIT: [number, number] = [60, 60_000]
 const SKIP = new Set(['ui', 'join', 'json', 'richText', 'blocks', 'point', 'code'])
 const BUSINESS_DATE = /^\d{4}-\d{2}-\d{2}$/
 
-type Doc = Record<string, unknown>
-type Leaf = { key: string; label: string; field: Field & { name: string } }
+export type Doc = Record<string, unknown>
+export type Leaf = { key: string; label: string; field: Field & { name: string } }
 
-function collectionOf(req: PayloadRequest, slug: string | undefined) {
+export function collectionOf(req: PayloadRequest, slug: string | undefined) {
   if (!slug || !(DATA_COLLECTIONS as readonly string[]).includes(slug)) throw new HttpError(404, 'Not Found', { detail: 'Data ini tidak tersedia di aplikasi.' })
   const c = req.payload.collections[slug as CollectionSlug]
   if (!c) throw new HttpError(404, 'Not Found')
@@ -43,7 +62,7 @@ function collectionOf(req: PayloadRequest, slug: string | undefined) {
 }
 
 /** Indonesian label of a config label (string or {id, en}); functions → fallback. */
-function labelText(label: unknown, fallback: string): string {
+export function labelText(label: unknown, fallback: string): string {
   if (typeof label === 'string') return label
   if (label && typeof label === 'object') {
     const l = label as Record<string, unknown>
@@ -56,7 +75,7 @@ function labelText(label: unknown, fallback: string): string {
 const humanize = (name: string) => name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase())
 
 /** Top-level data fields (rows / collapsibles / unnamed tabs flattened; groups + named tabs prefixed with their label). */
-function leaves(fields: readonly Field[], prefix = '', labelPrefix = ''): Leaf[] {
+export function leaves(fields: readonly Field[], prefix = '', labelPrefix = ''): Leaf[] {
   const out: Leaf[] = []
   for (const f of fields) {
     if (f.type === 'row' || f.type === 'collapsible') {
@@ -83,14 +102,14 @@ function leaves(fields: readonly Field[], prefix = '', labelPrefix = ''): Leaf[]
   return out
 }
 
-const pick = (doc: Doc, key: string): unknown => key.split('.').reduce<unknown>((v, k) => (v && typeof v === 'object' ? (v as Doc)[k] : undefined), doc)
-const has = (doc: Doc, key: string): boolean => {
+export const pick = (doc: Doc, key: string): unknown => key.split('.').reduce<unknown>((v, k) => (v && typeof v === 'object' ? (v as Doc)[k] : undefined), doc)
+export const has = (doc: Doc, key: string): boolean => {
   const parts = key.split('.')
   const parent = parts.slice(0, -1).reduce<unknown>((v, k) => (v && typeof v === 'object' ? (v as Doc)[k] : undefined), doc)
   return !!parent && typeof parent === 'object' && parts[parts.length - 1]! in (parent as Doc)
 }
 
-function titleOf(req: PayloadRequest, slug: string, doc: unknown): string {
+export function titleOf(req: PayloadRequest, slug: string, doc: unknown): string {
   if (doc === null || doc === undefined) return '—'
   if (typeof doc !== 'object') return `#${String(doc)}`
   const d = doc as Doc
@@ -99,7 +118,7 @@ function titleOf(req: PayloadRequest, slug: string, doc: unknown): string {
   return v !== undefined && v !== null && v !== '' ? String(v) : `#${String(d.id)}`
 }
 
-function display(req: PayloadRequest, f: Leaf['field'], v: unknown, tz: string): string | null {
+export function display(req: PayloadRequest, f: Leaf['field'], v: unknown, tz: string): string | null {
   if (v === null || v === undefined || v === '') return null
   switch (f.type) {
     case 'relationship':
@@ -144,7 +163,7 @@ function display(req: PayloadRequest, f: Leaf['field'], v: unknown, tz: string):
 
 const dmy = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`
 
-async function tzOf(req: PayloadRequest): Promise<string> {
+export async function tzOf(req: PayloadRequest): Promise<string> {
   return (await settings(req)).timezone || process.env.TZ || 'Asia/Makassar'
 }
 
@@ -218,21 +237,26 @@ export const dataDetailEndpoint = v1({
     const cfg = collectionOf(req, params.collection)
     const id = params.id ?? ''
     if (!/^\d{1,10}$/.test(id)) throw new HttpError(404, 'Not Found')
-    const doc = (await req.payload
-      .findByID({ collection: cfg.slug as CollectionSlug, id: Number(id), depth: 1, user: req.user, overrideAccess: false, req })
-      .catch(() => null)) as Doc | null
-    if (!doc) throw new HttpError(404, 'Not Found')
-    const tz = await tzOf(req)
-    return json({
-      collection: cfg.slug,
-      label: labelText(cfg.labels?.singular, cfg.slug),
-      id: doc.id as number | string,
-      title: titleOf(req, cfg.slug, doc),
-      fields: leaves(cfg.fields)
-        .filter((l) => has(doc, l.key))
-        .map((l) => ({ key: l.key, label: l.label, value: display(req, l.field, pick(doc, l.key), tz) })),
-    })
+    return json(await detailOf(req, cfg, Number(id)))
   },
 })
+
+/** The read-only detail of one document (also the answer of the phase-5 create / update, data-forms.ts). */
+export async function detailOf(req: PayloadRequest, cfg: ReturnType<typeof collectionOf>, id: number) {
+  const doc = (await req.payload
+    .findByID({ collection: cfg.slug as CollectionSlug, id, depth: 1, user: req.user, overrideAccess: false, req })
+    .catch(() => null)) as Doc | null
+  if (!doc) throw new HttpError(404, 'Not Found')
+  const tz = await tzOf(req)
+  return {
+    collection: cfg.slug,
+    label: labelText(cfg.labels?.singular, cfg.slug),
+    id: doc.id as number | string,
+    title: titleOf(req, cfg.slug, doc),
+    fields: leaves(cfg.fields)
+      .filter((l) => has(doc, l.key) && l.key !== 'changeReason')
+      .map((l) => ({ key: l.key, label: l.label, value: display(req, l.field, pick(doc, l.key), tz) })),
+  }
+}
 
 export const DATA_ENDPOINTS = [dataListEndpoint, dataDetailEndpoint]

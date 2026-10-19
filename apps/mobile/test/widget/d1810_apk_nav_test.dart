@@ -162,11 +162,17 @@ void main() {
         '/loans',
         '/intercompany-loans',
         '/reports',
+        '/clients/new',
+        '/contracts',
       };
       for (final e in webToApk.entries) {
         final path = Uri.parse(e.value).path;
-        // phase 3: the generic web collection lists `/data/<slug>`
-        expect(known.contains(path) || path.startsWith('/data/'), isTrue, reason: '${e.key} → $path');
+        // phase 3: the generic web collection lists `/data/<slug>`; phase 5b: one report `/reports/<code>`
+        expect(
+          known.contains(path) || path.startsWith('/data/') || path.startsWith('/reports/'),
+          isTrue,
+          reason: '${e.key} → $path',
+        );
       }
     });
 

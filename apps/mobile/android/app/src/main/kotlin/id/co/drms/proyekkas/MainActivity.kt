@@ -33,7 +33,8 @@ import java.util.concurrent.Executors
  * Files (user 2026-10-19, phase 4 Laporan): `save` writes a downloaded report export into cacheDir/reports (served
  * read-only by ReportFileProvider), `open` / `share` hand it to another app (ACTION_VIEW / ACTION_SEND chooser with a
  * read grant), `download` copies it into the public Download/ProyekKas folder (MediaStore, API 29+; no permission).
- * File work runs on the background executor (see Threading).
+ * File work runs on the background executor (see Threading). `picker.pick` (phase 5b, RAP Excel import) opens the
+ * system document picker (ACTION_OPEN_DOCUMENT, no storage permission) and returns the file's name and bytes.
  *
  * Threading: since Flutter 3.29 the Dart UI isolate runs on the Android main thread by default
  * (engine `Settings::merged_platform_ui_thread = kEnabled`, Flutter 3.47.5 common/settings.h), so a
@@ -81,6 +82,31 @@ class MainActivity : FlutterActivity() {
                                 null // best effort: "not measured"
                             }
                             mainHandler.post { result.success(report) }
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "id.co.drms.proyekkas/picker")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "pick" -> {
+                        if (pickResult != null) {
+                            result.success(null) // one picker at a time
+                            return@setMethodCallHandler
+                        }
+                        val types = call.argument<List<String>>("mimeTypes") ?: listOf("*/*")
+                        pickMaxBytes = (call.argument<Int>("maxBytes") ?: PICK_MAX_DEFAULT).toLong()
+                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+                            .addCategory(Intent.CATEGORY_OPENABLE)
+                            .setType(if (types.size == 1) types[0] else "*/*")
+                            .putExtra(Intent.EXTRA_MIME_TYPES, types.toTypedArray())
+                        try {
+                            pickResult = result
+                            startActivityForResult(intent, PICK_REQUEST)
+                        } catch (e: ActivityNotFoundException) {
+                            pickResult = null
+                            result.success(null)
                         }
                     }
                     else -> result.notImplemented()
@@ -155,6 +181,59 @@ class MainActivity : FlutterActivity() {
             }
     }
 
+    private var pickResult: MethodChannel.Result? = null
+    private var pickMaxBytes: Long = PICK_MAX_DEFAULT.toLong()
+
+    /** Phase 5b (RAP import): the picked document → {name, bytes}; null when cancelled, unreadable or too large. */
+    @Deprecated("FlutterActivity still routes results through onActivityResult")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != PICK_REQUEST) return
+        val result = pickResult ?: return
+        pickResult = null
+        val uri = data?.data
+        if (resultCode != RESULT_OK || uri == null) {
+            result.success(null)
+            return
+        }
+        val executor = integrityExecutor ?: Executors.newSingleThreadExecutor().also { integrityExecutor = it }
+        executor.execute {
+            val out: Map<String, Any>? = try {
+                var name = "file"
+                var size = -1L
+                contentResolver.query(uri, null, null, null, null)?.use { c ->
+                    if (c.moveToFirst()) {
+                        val n = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        val z = c.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                        if (n >= 0) name = c.getString(n) ?: name
+                        if (z >= 0 && !c.isNull(z)) size = c.getLong(z)
+                    }
+                }
+                if (size > pickMaxBytes) {
+                    mapOf("name" to name, "tooLarge" to true)
+                } else {
+                    val bytes = contentResolver.openInputStream(uri)?.use { input ->
+                        val buf = java.io.ByteArrayOutputStream()
+                        val chunk = ByteArray(16 * 1024)
+                        var total = 0L
+                        while (true) {
+                            val r = input.read(chunk)
+                            if (r < 0) break
+                            total += r
+                            if (total > pickMaxBytes) return@use null
+                            buf.write(chunk, 0, r)
+                        }
+                        buf.toByteArray()
+                    }
+                    if (bytes == null) mapOf("name" to name, "tooLarge" to true) else mapOf("name" to name, "bytes" to bytes)
+                }
+            } catch (e: Exception) {
+                null
+            }
+            mainHandler.post { result.success(out) }
+        }
+    }
+
     /** Runs [work] on the background executor and posts the result (false on any error) to the main thread. */
     private fun background(result: MethodChannel.Result, work: () -> Boolean) {
         val executor = integrityExecutor ?: Executors.newSingleThreadExecutor().also { integrityExecutor = it }
@@ -207,6 +286,8 @@ class MainActivity : FlutterActivity() {
 
     private companion object {
         const val DAY_MS = 24L * 60 * 60 * 1000
+        const val PICK_REQUEST = 4711
+        const val PICK_MAX_DEFAULT = 5 * 1024 * 1024
         val SU_PATHS = arrayOf(
             "/system/app/Superuser.apk",
             "/sbin/su",

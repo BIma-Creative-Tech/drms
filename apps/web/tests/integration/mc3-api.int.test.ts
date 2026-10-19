@@ -332,6 +332,12 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'GET /transfers/voidable': 'selection',
   'GET /data/:collection': 'selection',
   'GET /data/:collection/:id': 'document',
+  // user 2026-10-19 (APK phase 5): generic edit form of the Proyek collections (Payload access as the caller)
+  'GET /data/:collection/form': 'document',
+  'GET /data/:collection/options': 'selection',
+  'POST /data/:collection': 'named-pt',
+  'PATCH /data/:collection/:id': 'document',
+  'GET /field/contracts': 'selection',
   'GET /dashboard/owner': 'selection',
   'GET /dashboard/finance': 'selection',
   'GET /dashboard/pm': 'selection',

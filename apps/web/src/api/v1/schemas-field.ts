@@ -463,3 +463,54 @@ export const ContractUnit = z
   .meta({ id: 'ContractUnit' })
 
 export const ContractUnitList = z.object({ projectId: id, items: z.array(ContractUnit) }).meta({ id: 'ContractUnitList' })
+
+/** User 2026-10-19 (APK, phase 5b): GET /field/contracts — the web "Unit & kontrak" page (no rates). */
+export const FieldContracts = z
+  .object({
+    today: z.string(),
+    month: z.string(),
+    canCreateTimesheet: z.boolean().meta({ description: 'The caller may fill timesheets ("Isi timesheet").' }),
+    items: z.array(
+      z.object({
+        projectId: z.number().int(),
+        code: z.string(),
+        name: z.string(),
+        companyId: z.number().int(),
+        status: z.string().nullable(),
+        unitsActiveToday: z.number().int(),
+        filledToday: z.number().int(),
+        canCreateTimesheet: z.boolean(),
+        contracts: z.array(
+          z.object({
+            id: z.number().int(),
+            unitId: z.number().int(),
+            unitLabel: z.string(),
+            unitType: z.string().nullable(),
+            startDate: z.string(),
+            endDate: z.string().nullable(),
+            active: z.boolean(),
+            activeToday: z.boolean(),
+            filledToday: z.boolean(),
+          }),
+        ),
+        monthTotals: z.object({ work: z.number(), standby: z.number(), breakdown: z.number(), filled: z.number().int(), missing: z.number().int(), gaps: z.number().int() }).meta({ description: 'This month up to today: hours work / standby / breakdown, filled and missing unit-days, HM gaps.' }),
+      }),
+    ),
+    total: z.number().int(),
+    page: z.number().int(),
+    totalPages: z.number().int(),
+    units: z.array(
+      z.object({
+        id: z.number().int(),
+        companyId: z.number().int(),
+        label: z.string(),
+        type: z.string().nullable(),
+        brandModel: z.string().nullable(),
+        owner: z.enum(['sendiri', 'pelanggan']),
+        clientName: z.string().nullable(),
+        status: z.enum(['siap', 'rusak', 'menunggu_part']),
+        lastHourMeter: z.number().nullable(),
+      }),
+    ),
+  })
+  .meta({ id: 'FieldContracts' })
