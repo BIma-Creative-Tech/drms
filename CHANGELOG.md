@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-19
+
+**APK–web parity phases 3–4: Keuangan and Laporan; APK 0.9.0** (PRs #118, #119, #120). **No migration.** API
+contract: additive only (new read endpoints for kas, periods, voidable transfers, data lists and reports; optional new
+fields on loans and reports). **APK 0.9.0** (`mobile-v0.9.0`) brings phases 1–4 (the menus 1:1 with the web, Profil &
+tanda tangan, Keamanan akun, Keuangan, Laporan) and needs server 0.17.0. APK 0.8.0 keeps working against 0.17.0.
+
 ### Added
 
 - **APK: Laporan** (user 2026-10-19, phase 4 of the APK–web parity plan). Beranda → Laporan opens the web report
