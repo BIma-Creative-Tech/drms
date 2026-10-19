@@ -68,14 +68,17 @@ class _FakeApi implements ReportsApi {
   ApiClient get client => throw UnimplementedError();
 
   @override
-  Future<List<ReportSummary>> index() async => [
-    ReportSummary.fromJson({
-      'code': 'rekap-pengajuan',
-      'title': 'Rekap pengajuan',
-      'description': 'Pengajuan per status',
-      'formats': ['csv', 'pdf'],
-    }),
-  ];
+  Future<({List<ReportSummary> items, bool auditLog})> index() async => (
+    items: [
+      ReportSummary.fromJson({
+        'code': 'rekap-pengajuan',
+        'title': 'Rekap pengajuan',
+        'description': 'Pengajuan per status',
+        'formats': ['csv', 'pdf'],
+      }),
+    ],
+    auditLog: true,
+  );
 
   @override
   Future<ReportPage> page(ReportQuery q) async {
@@ -158,6 +161,7 @@ void main() {
     await pumpScreen(tester, const ReportListScreen(), overrides: [reportsApiProvider.overrideWithValue(_FakeApi())]);
     expect(find.byKey(const Key('report-rekap-pengajuan')), findsOneWidget);
     expect(find.textContaining('Export: CSV · PDF'), findsOneWidget);
+    expect(find.byKey(const Key('report-audit-log')), findsOneWidget, reason: 'phase 7: web index link');
   });
 
   testWidgets('report: letterhead, cards with totals, filter → new query, too many rows disables PDF', (tester) async {

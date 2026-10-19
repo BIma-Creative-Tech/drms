@@ -10134,6 +10134,36 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'{count} perubahan akses tersimpan.'**
   String matrixSaved(int count);
+
+  /// No description provided for @vendorNewTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Vendor baru'**
+  String get vendorNewTitle;
+
+  /// No description provided for @vendorReasonHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Wajib bila menonaktifkan vendor atau rekening, atau mengubah rekening.'**
+  String get vendorReasonHint;
+
+  /// No description provided for @recordFile.
+  ///
+  /// In id, this message translates to:
+  /// **'Buka file'**
+  String get recordFile;
+
+  /// No description provided for @settingsAppTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Setting aplikasi'**
+  String get settingsAppTitle;
+
+  /// No description provided for @reportsAuditLog.
+  ///
+  /// In id, this message translates to:
+  /// **'Audit Log'**
+  String get reportsAuditLog;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

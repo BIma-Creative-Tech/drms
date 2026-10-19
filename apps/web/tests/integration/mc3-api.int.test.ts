@@ -338,6 +338,10 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /data/:collection': 'named-pt',
   'PATCH /data/:collection/:id': 'document',
   'GET /field/contracts': 'selection',
+  // user 2026-10-19 (APK phase 7): app-wide Payload global (Setting aplikasi) — no PT data
+  'GET /data-globals/:slug': 'own',
+  'GET /data-globals/:slug/form': 'own',
+  'PATCH /data-globals/:slug': 'own',
   'GET /company-memberships/matrix': 'selection', // user 2026-10-19 (APK phase 6): Admin PTs ∩ selection
   'GET /dashboard/owner': 'selection',
   'GET /dashboard/finance': 'selection',

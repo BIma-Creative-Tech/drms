@@ -4292,5 +4292,10 @@
         "type": "int"
       }
     }
-  }
+  },
+  "vendorNewTitle": "Vendor baru",
+  "vendorReasonHint": "Wajib bila menonaktifkan vendor atau rekening, atau mengubah rekening.",
+  "recordFile": "Buka file",
+  "settingsAppTitle": "Setting aplikasi",
+  "reportsAuditLog": "Audit Log"
 }

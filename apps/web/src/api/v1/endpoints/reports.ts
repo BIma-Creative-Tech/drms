@@ -4,8 +4,9 @@ import { hasRoleAny } from '@/access/roles'
 import { adminDashboard, financeDashboard, ownerDashboard, pmDashboard, staffDashboard } from '@/domain/reports/dashboards'
 import { csvStream, downloadHeaders, ExportRefused, exportLetterhead, pdfBuffer, PDF_MAX_ROWS, prepareExport, xlsxBuffer } from '@/domain/reports/export'
 import { companyRefs } from '@/domain/companies'
-import { effectiveScope, PT_PARAM, ptParam, reportByCode, REPORTS, type Format, type ReportDef } from '@/domain/reports/registry'
+import { AUDIT_REPORT, effectiveScope, PT_PARAM, ptParam, reportByCode, REPORTS, type Format, type ReportDef } from '@/domain/reports/registry'
 import { officeScope, scopeCompanies, type ReportScope } from '@/domain/reports/scope'
+import { writeAudit } from '@/audit/writer'
 import { BusyError } from '@/lib/heavy-gate'
 import { withReqTransaction } from '@/lib/system-tx'
 import { XLSX_MAX_ROWS, xlsxEnabled } from '@/lib/xlsx'
@@ -78,6 +79,8 @@ export const reportIndexEndpoint = v1({
         paged: r.paged,
         formats: r.formats.filter((f) => f !== 'xlsx' || xlsxEnabled()),
       })),
+      // phase 7: the "Audit Log" link of the web index (Owner / Admin / Finance)
+      auditLog: hasRoleAny(req, ...AUDIT_REPORT.roles),
     }),
 })
 
@@ -88,6 +91,12 @@ export const reportJsonEndpoint = v1({
   handler: async ({ req, params }) => {
     const { def, scope } = await resolveReport(req, params.code)
     const sp = req.searchParams
+    // phase 7 (K-16, web AuditLogView): opening the global audit log is itself recorded (new row, never a change)
+    if (def.code === AUDIT_REPORT.code) {
+      await withReqTransaction(req, () =>
+        writeAudit(req, [{ action: 'export', docType: 'audit_log', docId: 'view', field: 'view', newValue: { filters: Object.fromEntries([...sp.entries()].slice(0, 20)) } }]),
+      )
+    }
     const cursor = sp.get('cursor') ?? undefined
     if (cursor !== undefined && !/^[A-Za-z0-9_-]{1,200}$/.test(cursor)) throw new HttpError(400, 'Bad Request', { detail: 'cursor tidak valid.' })
     // phase 4 (APK): the filter form, letterhead and export limits of the web page (filters without the cursor)

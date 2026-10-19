@@ -5782,4 +5782,19 @@ class AppLocalizationsId extends AppLocalizations {
   String matrixSaved(int count) {
     return '$count perubahan akses tersimpan.';
   }
+
+  @override
+  String get vendorNewTitle => 'Vendor baru';
+
+  @override
+  String get vendorReasonHint => 'Wajib bila menonaktifkan vendor atau rekening, atau mengubah rekening.';
+
+  @override
+  String get recordFile => 'Buka file';
+
+  @override
+  String get settingsAppTitle => 'Setting aplikasi';
+
+  @override
+  String get reportsAuditLog => 'Audit Log';
 }

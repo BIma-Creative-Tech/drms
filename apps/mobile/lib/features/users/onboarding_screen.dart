@@ -301,7 +301,7 @@ class _CompanyCard extends ConsumerWidget {
       isScrollControlled: true,
       showDragHandle: true,
       useSafeArea: true,
-      builder: (_) => const _BankSheet(),
+      builder: (_) => const BankAccountSheet(),
     );
     if (b == null) return;
     company.bankAccounts.add(b);
@@ -549,14 +549,14 @@ class _EmployeeSheetState extends State<_EmployeeSheet> {
   }
 }
 
-class _BankSheet extends ConsumerStatefulWidget {
-  const _BankSheet();
+class BankAccountSheet extends ConsumerStatefulWidget {
+  const BankAccountSheet({super.key});
 
   @override
-  ConsumerState<_BankSheet> createState() => _BankSheetState();
+  ConsumerState<BankAccountSheet> createState() => _BankAccountSheetState();
 }
 
-class _BankSheetState extends ConsumerState<_BankSheet> {
+class _BankAccountSheetState extends ConsumerState<BankAccountSheet> {
   int? _bank;
   final _no = TextEditingController();
   final _holder = TextEditingController();

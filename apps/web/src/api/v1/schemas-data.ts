@@ -44,4 +44,20 @@ export const DataForm = z
   })
   .meta({ id: 'DataForm' })
 
+/** Phase 7: a Payload global (Pengaturan › Setting aplikasi). */
+export const DataGlobalDetail = z
+  .object({ global: z.string(), label: z.string(), title: z.string(), fields: z.array(z.object({ key: z.string(), label: z.string(), value: z.string().nullable() })) })
+  .meta({ id: 'DataGlobalDetail' })
+
+export const DataGlobalForm = z
+  .object({
+    global: z.string(),
+    label: z.string(),
+    canUpdate: z.boolean(),
+    reason: z.object({ onUpdate: z.boolean() }),
+    fields: z.array(FormField),
+    skipped: z.array(z.string()),
+  })
+  .meta({ id: 'DataGlobalForm' })
+
 export const DataOptions = z.object({ items: z.array(z.object({ id: z.union([z.number(), z.string()]), label: z.string() })) }).meta({ id: 'DataOptions' })

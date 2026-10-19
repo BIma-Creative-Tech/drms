@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
@@ -94,5 +96,32 @@ class RecordsApi {
   Future<void> revokeDevice(String id, String reason, {required String idempotencyKey}) => client.run(
     (d) => d.post<dynamic>('/devices/$id/revoke', data: {'reason': reason.trim()}, options: _idem(idempotencyKey)),
     (_) {},
+  );
+
+  /// Bytes of a media file (`GET /media/{kind}/{id}/file`; the document's PT counts).
+  Future<Uint8List> fileBytes(String path) => client.run(
+    (d) => d.get<dynamic>(path, options: ApiClient.allCompanies(Options(responseType: ResponseType.bytes))),
+    (data) => Uint8List.fromList(data as List<int>),
+  );
+
+  /// Phase 7: the edit form of a Payload global (`GET /data-globals/{slug}/form`, e.g. company-settings).
+  Future<RecordFormDef> globalForm(String slug) => client.run(
+    (d) => d.get<dynamic>('/data-globals/$slug/form'),
+    (data) => RecordFormDef.fromJson(data as Map<String, dynamic>),
+  );
+
+  /// `PATCH /data-globals/{slug}` {data, reason?}.
+  Future<RecordDetail> updateGlobal(
+    String slug,
+    Map<String, Object?> data, {
+    String? reason,
+    required String idempotencyKey,
+  }) => client.run(
+    (d) => d.patch<dynamic>(
+      '/data-globals/$slug',
+      data: {'data': data, 'reason': ?reason},
+      options: _idem(idempotencyKey),
+    ),
+    (data) => RecordDetail.fromJson(data as Map<String, dynamic>),
   );
 }

@@ -66,7 +66,7 @@ class _ClientFormState extends ConsumerState<_ClientForm> {
       isScrollControlled: true,
       showDragHandle: true,
       useSafeArea: true,
-      builder: (_) => _ContactSheet(contact: index == null ? null : _contacts[index]),
+      builder: (_) => PartnerContactSheet(contact: index == null ? null : _contacts[index]),
     );
     if (c == null || !mounted) return;
     setState(() {
@@ -236,15 +236,15 @@ class _ClientFormState extends ConsumerState<_ClientForm> {
   }
 }
 
-class _ContactSheet extends StatefulWidget {
-  const _ContactSheet({this.contact});
+class PartnerContactSheet extends StatefulWidget {
+  const PartnerContactSheet({super.key, this.contact});
   final ClientContact? contact;
 
   @override
-  State<_ContactSheet> createState() => _ContactSheetState();
+  State<PartnerContactSheet> createState() => _PartnerContactSheetState();
 }
 
-class _ContactSheetState extends State<_ContactSheet> {
+class _PartnerContactSheetState extends State<PartnerContactSheet> {
   late final _name = TextEditingController(text: widget.contact?.name ?? '');
   late final _position = TextEditingController(text: widget.contact?.position ?? '');
   late final _phone = TextEditingController(text: widget.contact?.phone ?? '');

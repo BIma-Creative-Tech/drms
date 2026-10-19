@@ -167,6 +167,8 @@ void main() {
         '/attendance-schedule',
         '/access-matrix',
         '/users/new',
+        '/vendors/new',
+        '/settings/app',
       };
       for (final e in webToApk.entries) {
         final path = Uri.parse(e.value).path;

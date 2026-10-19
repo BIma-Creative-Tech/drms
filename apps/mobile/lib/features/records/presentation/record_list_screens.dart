@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/platform/report_files.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
+import '../../../shared/widgets/photo_viewer.dart';
 import '../../../shared/widgets/reason_dialog.dart';
 import '../../clients/client_form.dart';
+import '../../clients/vendor_form.dart';
 import '../data/records_providers.dart';
 import '../domain/record_list.dart';
 
@@ -53,19 +56,23 @@ class _RecordListScreenState extends ConsumerState<RecordListScreen> {
     final theme = Theme.of(context);
     final value = ref.watch(recordPageProvider(_query));
     // phase 5a: "Tambah" when the caller may create here through the APK (server form; read-only lists 404 → none)
-    // clients: the web's own Klien page (`/client-form`: detail + Kontak PIC), not the generic form
-    final clients = widget.collection == 'clients';
-    final form = clients ? null : ref.watch(recordFormProvider((widget.collection, null))).value;
-    final clientNew = clients ? ref.watch(clientFormProvider(null)).value : null;
+    // clients / vendors: the web's own Klien / Vendor pages (`/client-form`, `/vendor-form`), not the generic form
+    final partner = _partnerRoute[widget.collection];
+    final form = partner != null ? null : ref.watch(recordFormProvider((widget.collection, null))).value;
+    final partnerNew = switch (widget.collection) {
+      'clients' => ref.watch(clientFormProvider(null)).value?.let((c) => c.canEdit && c.companies.isNotEmpty),
+      'vendors' => ref.watch(vendorFormProvider(null)).value?.let((v) => v.canEdit && v.companies.isNotEmpty),
+      _ => null,
+    };
     return Scaffold(
       appBar: AppBar(title: Text(value.value?.label ?? t.recordsTitle)),
-      floatingActionButton:
-          (form != null && form.canCreate && form.supported) ||
-              (clientNew != null && clientNew.canEdit && clientNew.companies.isNotEmpty)
+      floatingActionButton: (form != null && form.canCreate && form.supported) || partnerNew == true
           ? FloatingActionButton.extended(
               key: const Key('records-new'),
               onPressed: () async {
-                final id = await context.push<String>(clients ? '/clients/new' : '/data/${widget.collection}/new');
+                final id = await context.push<String>(
+                  partner != null ? '$partner/new' : '/data/${widget.collection}/new',
+                );
                 if (id != null && context.mounted) await context.push('/data/${widget.collection}/$id');
               },
               icon: const Icon(Icons.add),
@@ -279,19 +286,23 @@ class RecordDetailScreen extends ConsumerWidget {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final value = ref.watch(recordDetailProvider((collection, id)));
-    final clients = collection == 'clients';
-    final form = clients ? null : ref.watch(recordFormProvider((collection, id))).value;
-    final client = clients ? ref.watch(clientFormProvider(int.tryParse(id))).value : null;
+    final partner = _partnerRoute[collection];
+    final form = partner != null ? null : ref.watch(recordFormProvider((collection, id))).value;
+    final partnerEdit = switch (collection) {
+      'clients' => ref.watch(clientFormProvider(int.tryParse(id))).value?.canEdit,
+      'vendors' => ref.watch(vendorFormProvider(int.tryParse(id))).value?.canEdit,
+      _ => null,
+    };
     return Scaffold(
       appBar: AppBar(
         title: Text(value.value?.title ?? t.recordsTitle),
         actions: [
-          if ((form != null && form.canUpdate && form.supported) || (client != null && client.canEdit))
+          if ((form != null && form.canUpdate && form.supported) || partnerEdit == true)
             IconButton(
               key: const Key('record-edit'),
               tooltip: t.recordEdit,
               icon: const Icon(Icons.edit_outlined),
-              onPressed: () => context.push(clients ? '/clients/$id' : '/data/$collection/$id/edit'),
+              onPressed: () => context.push(partner != null ? '$partner/$id' : '/data/$collection/$id/edit'),
             ),
           // phase 6: "Cabut perangkat" (web Perangkat & sesi; the server checks who may revoke)
           if (collection == 'devices')
@@ -322,6 +333,7 @@ class RecordDetailScreen extends ConsumerWidget {
               Text(d.label, style: theme.textTheme.labelMedium),
               Text(d.title, style: theme.textTheme.titleLarge),
               const SizedBox(height: 12),
+              if (d.file != null) _FilePreview(file: d.file!),
               for (final f in d.fields)
                 Padding(
                   key: Key('record-field-${f.key}'),
@@ -342,6 +354,68 @@ class RecordDetailScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Collections the web edits on their own tabbed page (DRMS 16/10) → the APK route of that page.
+const _partnerRoute = {'clients': '/clients', 'vendors': '/vendors'};
+
+extension<T> on T {
+  R let<R>(R Function(T) f) => f(this);
+}
+
+/// Phase 7 (Media): an image inline (tap = full screen), any other file → open / share through the report files
+/// channel.
+class _FilePreview extends ConsumerWidget {
+  const _FilePreview({required this.file});
+  final RecordFile file;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppLocalizations.of(context);
+    if (file.isImage) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: switch (ref.watch(recordFileProvider(file.path))) {
+          AsyncData(:final value) => GestureDetector(
+            key: const Key('record-file-image'),
+            onTap: () => showPhotoViewer(context, [
+              ViewerPhoto(
+                caption: file.filename ?? '',
+                builder: (_) => Image.memory(value, fit: BoxFit.contain),
+              ),
+            ]),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.memory(value, height: 220, fit: BoxFit.cover),
+            ),
+          ),
+          AsyncError(:final error) => Text(errorText(error)),
+          _ => const SizedBox(height: 220, child: Center(child: CircularProgressIndicator())),
+        },
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: OutlinedButton.icon(
+        key: const Key('record-file-open'),
+        icon: const Icon(Icons.attach_file),
+        label: Text(file.filename ?? t.recordFile),
+        onPressed: () async {
+          final files = ref.read(reportFilesProvider);
+          try {
+            final bytes = await ref.read(recordFileProvider(file.path).future);
+            final ext = (file.filename ?? '').contains('.') ? file.filename!.split('.').last : 'bin';
+            final name = reportFileName('filename="${file.filename ?? 'file'}"', fallback: 'file', format: ext);
+            if (await files.save(name, bytes) && !await files.open(name) && context.mounted) {
+              await files.share(name);
+            }
+          } on Object catch (e) {
+            if (context.mounted) showSnack(context, errorText(e));
+          }
+        },
       ),
     );
   }
