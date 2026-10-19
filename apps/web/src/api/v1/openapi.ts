@@ -6,6 +6,7 @@ import { registerAddendumPaths } from './openapi-addendum'
 import { registerAttendancePaths } from './openapi-attendance'
 import { registerDataFormPaths } from './openapi-data'
 import { registerKeuanganPaths } from './openapi-keuangan'
+import * as AK from './schemas-akses'
 import { registerCompanyPaths } from './openapi-companies'
 import { registerDailyPaths } from './openapi-daily'
 import { registerFieldPaths } from './openapi-field'
@@ -368,6 +369,15 @@ export function buildOpenApiDocument(version: string) {
       }),
     },
     responses: res(200, 'Balances', F.Balances, [400, 401, 403]),
+  })
+  // User 2026-10-19 (APK phase 6): the web "Akses PT (matriks)" as JSON
+  registry.registerPath({
+    method: 'get',
+    path: '/company-memberships/matrix',
+    summary: 'The web role matrix (Admin of a PT / group admin): PT columns, a users page, every membership + employee of the column PTs, active holders and coverage warnings. Save with POST /company-memberships/batch',
+    security,
+    request: { headers: deviceHeader, query: AK.MembershipMatrixQuery },
+    responses: res(200, 'Matrix', AK.MembershipMatrix, [401, 403, 429]),
   })
   post(
     '/company-memberships/batch',

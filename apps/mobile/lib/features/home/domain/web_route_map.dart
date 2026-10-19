@@ -73,8 +73,22 @@ const Map<String, String> webToApk = {
   '/absensi/absen': '/attendance',
   '/absensi': '/attendance?tab=team',
   '/absensi/rekap': '/attendance?tab=recap',
+  // phase 6 (user 2026-10-19): Jadwal & hari libur, the attendance collections
+  '/absensi/jadwal': '/attendance-schedule',
+  '/collections/attendances': '/data/attendances',
+  '/collections/attendance-corrections': '/data/attendance-corrections',
+  '/collections/work-schedules': '/data/work-schedules',
+  '/collections/holidays': '/data/holidays',
   // Pengguna & Akses / Sistem (personal)
   '/collections/users': '/profile',
+  // phase 6: Akses PT (matriks), Pengguna baru, the access / employee / device collections
+  '/akses-pt': '/access-matrix',
+  '/pengguna/baru': '/users/new',
+  '/collections/company-memberships': '/data/company-memberships',
+  '/collections/employees': '/data/employees',
+  '/collections/employee-bank-accounts': '/data/employee-bank-accounts',
+  '/collections/devices': '/data/devices',
+  '/collections/web-sessions': '/data/web-sessions',
   '/notifikasi': '/notifications',
   // Avatar menu (user 2026-10-19, phase 2)
   '/keamanan-akun': '/security',

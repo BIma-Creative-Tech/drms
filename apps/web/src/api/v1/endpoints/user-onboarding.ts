@@ -55,6 +55,16 @@ async function save(req: PayloadRequest, body: Parameters<typeof saveUserOnboard
   }
 }
 
+/** User 2026-10-19 (APK phase 6): the NEW-user form (the web view loads it server-side with `loadUserOnboarding(req, null)`). */
+export const userOnboardingNewEndpoint = v1({
+  path: '/user-onboarding',
+  method: 'get',
+  handler: async ({ req }) => {
+    if (!mayOnboard(req)) throw notOnboarder()
+    return json(await loadUserOnboarding(req, null).catch(toHttp))
+  },
+})
+
 export const userOnboardingGetEndpoint = v1({
   path: '/user-onboarding/:userId',
   method: 'get',
@@ -95,4 +105,4 @@ export const userOnboardingUpdateEndpoint = v1({
   },
 })
 
-export const USER_ONBOARDING_ENDPOINTS = [userOnboardingCreateEndpoint, userOnboardingGetEndpoint, userOnboardingUpdateEndpoint]
+export const USER_ONBOARDING_ENDPOINTS = [userOnboardingNewEndpoint, userOnboardingCreateEndpoint, userOnboardingGetEndpoint, userOnboardingUpdateEndpoint]

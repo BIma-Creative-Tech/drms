@@ -99,6 +99,9 @@ class _FakeRecords implements RecordsApi {
 
   @override
   Future<void> softDelete(String collection, String id, String reason, {required String idempotencyKey}) async {}
+
+  @override
+  Future<void> revokeDevice(String id, String reason, {required String idempotencyKey}) async {}
 }
 
 Map<String, dynamic> _rapJson({bool locked = false}) => {

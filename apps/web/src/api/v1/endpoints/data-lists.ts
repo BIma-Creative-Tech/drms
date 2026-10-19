@@ -45,6 +45,16 @@ export const DATA_COLLECTIONS = [
   'aftersales-activities',
   'daily-reports',
   'daily-report-lines',
+  // Absensi + Pengguna & Akses (phase 6, user 2026-10-19)
+  'attendances',
+  'attendance-corrections',
+  'work-schedules',
+  'holidays',
+  'company-memberships',
+  'employees',
+  'employee-bank-accounts',
+  'devices',
+  'web-sessions',
 ] as const
 
 const READ_LIMIT: [number, number] = [60, 60_000]

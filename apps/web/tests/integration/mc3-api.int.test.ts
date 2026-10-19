@@ -338,6 +338,7 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /data/:collection': 'named-pt',
   'PATCH /data/:collection/:id': 'document',
   'GET /field/contracts': 'selection',
+  'GET /company-memberships/matrix': 'selection', // user 2026-10-19 (APK phase 6): Admin PTs ∩ selection
   'GET /dashboard/owner': 'selection',
   'GET /dashboard/finance': 'selection',
   'GET /dashboard/pm': 'selection',
@@ -348,6 +349,8 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'GET /reports/:code/:format': 'selection',
   'GET /attendance/recap': 'document',
   'GET /attendance/team-today': 'selection',
+  'GET /attendance/schedule': 'selection', // user 2026-10-19 (APK phase 6): Jadwal & hari libur (context PT)
+  'PATCH /attendance/default-schedule': 'named-pt', // body companyId; companies update access in that PT
   // DRMS 13/10 A2: own eligible check-in locations (own employee per selected PT; `?company=` narrows)
   'GET /attendance/locations': 'selection',
   'GET /projects/progress': 'selection',
@@ -497,6 +500,7 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   // is read with the caller's Users access; the form lists the caller's Admin PTs ∩ selection
   'POST /user-onboarding': 'named-pt',
   'PATCH /user-onboarding/:userId': 'named-pt',
+  'GET /user-onboarding': 'selection', // user 2026-10-19 (APK): the new-user form (caller's Admin PTs ∩ selection)
   'GET /user-onboarding/:userId': 'document',
   // DRMS 16/10 Klien / Vendor pages: create = a PT of the caller's selection with the create role (named or the only
   // one); the record is read / written with the collections' own access (PT of the record)

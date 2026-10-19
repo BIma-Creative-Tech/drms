@@ -17,7 +17,10 @@ import { collectionOf, detailOf, labelText, pick, titleOf, type Doc } from './da
  * - POST  /data/{collection}, PATCH /data/{collection}/{id} — payload.create / update AS THE CALLER
  *   (overrideAccess: false): collection + field access, hooks (PT rules, guards), validation and audit as on the web.
  * Only DATA_WRITABLE: collections the web edits with the plain collection form. Excluded on purpose: rap-items (RAP
- * endpoints with lock + reason rules), clients (the tabbed Klien page / GET+PUT /client-form with the contacts).
+ * endpoints with lock + reason rules), clients (the tabbed Klien page / GET+PUT /client-form with the contacts),
+ * company-memberships (role matrix: POST /company-memberships/batch, or the Pengguna onboarding), users (onboarding),
+ * devices (POST /devices/{id}/revoke), web-sessions (no web write), attendances / attendance-corrections (check-in /
+ * correction endpoints).
  */
 export const DATA_WRITABLE = [
   'cost-centers',
@@ -29,6 +32,11 @@ export const DATA_WRITABLE = [
   'budget-lines',
   'rap-templates',
   'contract-units',
+  // phase 6 (user 2026-10-19): Jadwal & hari libur (+ the employee's schedule), Karyawan, Rekening karyawan
+  'work-schedules',
+  'holidays',
+  'employees',
+  'employee-bank-accounts',
 ] as const
 
 const READ_LIMIT: [number, number] = [60, 60_000]

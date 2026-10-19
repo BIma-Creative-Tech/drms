@@ -19,6 +19,7 @@ import '../features/approvals/presentation/inbox_screen.dart';
 import '../features/attendance/domain/attendance.dart';
 import '../features/attendance/presentation/attendance_screen.dart';
 import '../features/attendance/presentation/on_behalf_screen.dart';
+import '../features/attendance/presentation/schedule_screen.dart';
 import '../features/attendance/presentation/team_view.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/presentation/login_screen.dart';
@@ -59,6 +60,8 @@ import '../features/records/presentation/record_form_screen.dart';
 import '../features/records/presentation/record_list_screens.dart';
 import '../features/reports/presentation/report_screens.dart';
 import '../features/settings/presentation/profile_screen.dart';
+import '../features/users/access_matrix_screen.dart';
+import '../features/users/onboarding_screen.dart';
 import '../features/sync/presentation/queue_screen.dart';
 import 'route_error_screen.dart';
 
@@ -320,6 +323,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       // phase 5b: the web "Unit & kontrak" page
       GoRoute(path: '/contracts', builder: (_, _) => const ContractsScreen()),
+      // phase 6: Jadwal & hari libur, Akses PT (matriks)
+      GoRoute(path: '/attendance-schedule', builder: (_, _) => const AttendanceScheduleScreen()),
+      GoRoute(path: '/access-matrix', builder: (_, _) => const AccessMatrixScreen()),
+      // phase 6: the web "Pengguna" form (account, access per PT, employee, bank accounts, assignments)
+      GoRoute(path: '/users/new', builder: (_, _) => const OnboardingScreen()),
+      GoRoute(
+        path: '/users/:id',
+        builder: (_, s) => OnboardingScreen(id: int.tryParse(s.pathParameters['id'] ?? '')),
+      ),
       // phase 5a: the web "Klien" page (detail + Kontak PIC)
       GoRoute(path: '/clients/new', builder: (_, _) => const ClientFormScreen()),
       GoRoute(

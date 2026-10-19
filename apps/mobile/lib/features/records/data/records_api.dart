@@ -89,4 +89,10 @@ class RecordsApi {
     ),
     (_) {},
   );
+
+  /// `POST /devices/{id}/revoke` {reason} (web Perangkat & sesi; owner of the device, Admin, Direktur).
+  Future<void> revokeDevice(String id, String reason, {required String idempotencyKey}) => client.run(
+    (d) => d.post<dynamic>('/devices/$id/revoke', data: {'reason': reason.trim()}, options: _idem(idempotencyKey)),
+    (_) {},
+  );
 }

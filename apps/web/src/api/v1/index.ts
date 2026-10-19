@@ -3,6 +3,7 @@ import type { Endpoint } from 'payload'
 import { ADDENDUM_ENDPOINTS } from './endpoints/addenda'
 import { testEmailEndpoint } from './endpoints/admin'
 import { ATTENDANCE_ENDPOINTS } from './endpoints/attendance'
+import { ATTENDANCE_SCHEDULE_ENDPOINTS } from './endpoints/attendance-schedule'
 import { registerDeviceEndpoint, revokeDeviceEndpoint } from './endpoints/devices'
 import { healthEndpoint, healthHeadEndpoint, readyEndpoint, readyHeadEndpoint } from './endpoints/health'
 import { CASH_ENDPOINTS } from './endpoints/cash'
@@ -17,6 +18,7 @@ import { INTERCOMPANY_LOAN_ENDPOINTS } from './endpoints/intercompany-loans'
 import { KEUANGAN_ENDPOINTS } from './endpoints/keuangan'
 import { LOAN_ENDPOINTS } from './endpoints/loans'
 import { mastersEndpoint } from './endpoints/masters'
+import { membershipMatrixEndpoint } from './endpoints/membership-matrix'
 import { membershipBatchEndpoint } from './endpoints/memberships'
 import { mediaFileEndpoint, mediaSignedUrlEndpoint, uploadMediaEndpoint } from './endpoints/media'
 import { NOTIFICATION_ENDPOINTS } from './endpoints/notifications'
@@ -66,6 +68,7 @@ export const v1Endpoints: Endpoint[] = [
   // ADR 0029: inter-PT loans (Owner instructs, lender Finance disburses, borrower Finance repays) + fund availability
   ...INTERCOMPANY_LOAN_ENDPOINTS,
   // MC2: atomic role-matrix save
+  membershipMatrixEndpoint, // user 2026-10-19 (APK phase 6)
   membershipBatchEndpoint,
   uploadMediaEndpoint,
   // F2b: scoped file download (APK), in-app notifications
@@ -78,6 +81,7 @@ export const v1Endpoints: Endpoint[] = [
   // F3: role dashboards, reports + CSV/XLSX/PDF exports, global audit log (Q-F3-1…8)
   ...REPORT_ENDPOINTS,
   // E6: attendance recap (US-09), team today (US-13), T10 correction (US-15), selfie viewer (Q-33)
+  ...ATTENDANCE_SCHEDULE_ENDPOINTS, // user 2026-10-19 (APK phase 6): Jadwal & hari libur
   ...ATTENDANCE_ENDPOINTS,
   // E4: project stages (G11 editor), progress reports (T11), K-09 progress vs budget
   ...PROGRESS_ENDPOINTS,

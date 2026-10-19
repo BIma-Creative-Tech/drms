@@ -24,6 +24,13 @@ export function registerUserOnboardingPaths(registry: OpenAPIRegistry, h: Helper
   })
   registry.registerPath({
     method: 'get',
+    path: '/user-onboarding',
+    summary: 'User 2026-10-19 (APK): form data of a NEW account — the caller\'s Admin PTs (∩ PT selection) with their selectable employees, team-assignment locations and the active banks (the same shape as GET /user-onboarding/{userId} with `user` null)',
+    security: h.security,
+    responses: h.res(200, 'Detail', U.UserOnboardingDetail, [401, 403]),
+  })
+  registry.registerPath({
+    method: 'get',
     path: '/user-onboarding/{userId}',
     summary: 'Form data of one account: identity (+ whether the caller may change it), per PT of the caller (Admin PTs ∩ PT selection) the membership, linked employee, its bank accounts, selectable employees, team assignments and the selectable locations of a new assignment (active projects / cost centers / sites of the PT, caller\'s read access); active banks',
     security: h.security,

@@ -82,4 +82,21 @@ export function registerAttendancePaths(registry: OpenAPIRegistry, h: Helpers): 
       ...h.problemResponses(401, 404, 426, 429),
     },
   })
+  // User 2026-10-19 (APK phase 6): the web "Jadwal & hari libur" page + its default-schedule widget
+  registry.registerPath({
+    method: 'get',
+    path: '/attendance/schedule',
+    summary: 'The web "Jadwal & hari libur" page as JSON (attendance scope: Admin / Direktur / Finance / Owner / PM): work schedules (+ usage), holidays of `tahun`, cost-center geofences, active employees with their schedule, the context PT\'s default schedule and radius. Writes: POST/PATCH /data/{work-schedules|holidays|employees|cost-centers}',
+    security: h.security,
+    request: { headers: h.deviceHeader, query: A.AttendanceScheduleQuery },
+    responses: h.res(200, 'Schedule', A.AttendanceSchedule, [400, 401, 403, 426, 429]),
+  })
+  registry.registerPath({
+    method: 'patch',
+    path: '/attendance/default-schedule',
+    summary: 'Set companies.defaultWorkSchedule of a PT (Admin / Direktur of that PT or group admin; the schedule must belong to that PT). Audited by the companies collection',
+    security: h.security,
+    request: { headers: h.idem, body: { content: { 'application/json': { schema: A.AttendanceDefaultScheduleBody } } } },
+    responses: h.res(200, 'Saved', A.AttendanceDefaultScheduleResult, [400, 401, 403, 404, 409, 426, 429]),
+  })
 }

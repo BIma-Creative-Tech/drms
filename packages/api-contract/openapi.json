@@ -5241,6 +5241,246 @@
           "items"
         ]
       },
+      "MembershipMatrix": {
+        "type": "object",
+        "properties": {
+          "viewer": {
+            "type": "object",
+            "properties": {
+              "groupAdmin": {
+                "type": "boolean"
+              },
+              "adminOf": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "description": "PTs where the caller is Admin (any membership)."
+              }
+            },
+            "required": [
+              "groupAdmin",
+              "adminOf"
+            ]
+          },
+          "narrowed": {
+            "type": "boolean",
+            "description": "Columns narrowed to the PT switcher selection."
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "enum": [
+                    "pk-staff",
+                    "pk-pm",
+                    "pk-finance",
+                    "pk-owner",
+                    "pk-principal",
+                    "pk-admin",
+                    "pk-operator"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                },
+                "short": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value",
+                "label",
+                "short"
+              ]
+            },
+            "description": "Roles in display order. ADR 0026: pk-principal (Owner) only for a group admin; a PT admin sees it where held, locked."
+          },
+          "reasonMin": {
+            "type": "integer",
+            "description": "Minimum length of the batch reason."
+          },
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "shortCode": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "shortCode",
+                "name"
+              ]
+            },
+            "description": "Columns = PTs the caller may edit (Admin PTs / every PT for a group admin), ∩ selection."
+          },
+          "users": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "active": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "email",
+                    "active"
+                  ]
+                }
+              },
+              "page": {
+                "type": "integer"
+              },
+              "totalPages": {
+                "type": "integer"
+              },
+              "totalDocs": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "items",
+              "page",
+              "totalPages",
+              "totalDocs"
+            ]
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "user": {
+                  "type": "integer"
+                },
+                "company": {
+                  "type": "integer"
+                },
+                "roles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "pk-staff",
+                      "pk-pm",
+                      "pk-finance",
+                      "pk-owner",
+                      "pk-principal",
+                      "pk-admin",
+                      "pk-operator"
+                    ]
+                  }
+                },
+                "employee": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "user",
+                "company",
+                "roles",
+                "employee",
+                "active"
+              ]
+            },
+            "description": "EVERY membership of the column PTs (not only the page): unique employee per PT (\"already linked\"), coverage."
+          },
+          "employees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "company": {
+                  "type": "integer"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "company",
+                "code",
+                "name",
+                "active"
+              ]
+            },
+            "description": "Employees of the column PTs. A cell offers the active ones of its PT not linked to another account there, plus its current one."
+          },
+          "activeUserIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Active accounts among the holders (an inactive account does not count for coverage)."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Coverage of the stored state: a PT without an active Direktur or Finance (warn, never block)."
+          }
+        },
+        "required": [
+          "viewer",
+          "narrowed",
+          "roles",
+          "reasonMin",
+          "companies",
+          "users",
+          "cells",
+          "employees",
+          "activeUserIds",
+          "warnings"
+        ]
+      },
       "MembershipBatchResult": {
         "type": "object",
         "properties": {
@@ -10271,6 +10511,237 @@
         "required": [
           "new_time",
           "reason"
+        ],
+        "additionalProperties": false
+      },
+      "AttendanceSchedule": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "string"
+          },
+          "today": {
+            "type": "string"
+          },
+          "companyId": {
+            "type": "integer",
+            "description": "Context PT of the selection (its settings: default schedule, default radius)."
+          },
+          "canWrite": {
+            "type": "boolean",
+            "description": "Admin / Direktur: edit schedules, holidays, assignments, geofences, the default schedule."
+          },
+          "canCreate": {
+            "type": "boolean",
+            "description": "Admin: new schedule / holiday."
+          },
+          "defaultScheduleId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "defaultRadius": {
+            "type": "number"
+          },
+          "schedules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "start": {
+                  "type": "string"
+                },
+                "end": {
+                  "type": "string"
+                },
+                "tol": {
+                  "type": "number"
+                },
+                "days": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 7
+                  },
+                  "description": "1 = Monday … 7 = Sunday."
+                },
+                "active": {
+                  "type": "boolean"
+                },
+                "used": {
+                  "type": "integer",
+                  "description": "Active employees on it (own or via the default)."
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "start",
+                "end",
+                "tol",
+                "days",
+                "active",
+                "used"
+              ]
+            }
+          },
+          "holidays": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "date": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "date",
+                "name"
+              ]
+            }
+          },
+          "costCenters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "lat": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "lng": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "radiusM": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "name",
+                "lat",
+                "lng",
+                "radiusM",
+                "active"
+              ]
+            }
+          },
+          "employees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "scheduleId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "name",
+                "scheduleId"
+              ]
+            }
+          }
+        },
+        "required": [
+          "year",
+          "today",
+          "companyId",
+          "canWrite",
+          "canCreate",
+          "defaultScheduleId",
+          "defaultRadius",
+          "schedules",
+          "holidays",
+          "costCenters",
+          "employees"
+        ]
+      },
+      "AttendanceDefaultScheduleResult": {
+        "type": "object",
+        "properties": {
+          "companyId": {
+            "type": "integer"
+          },
+          "defaultScheduleId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "companyId",
+          "defaultScheduleId"
+        ]
+      },
+      "AttendanceDefaultScheduleBody": {
+        "type": "object",
+        "properties": {
+          "companyId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "scheduleId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": [
+          "companyId",
+          "scheduleId"
         ],
         "additionalProperties": false
       },
@@ -28443,6 +28914,122 @@
         }
       }
     },
+    "/company-memberships/matrix": {
+      "get": {
+        "summary": "The web role matrix (Admin of a PT / group admin): PT columns, a users page, every membership + employee of the column PTs, active holders and coverage warnings. Save with POST /company-memberships/batch",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 80,
+              "description": "Name / email (like)."
+            },
+            "required": false,
+            "description": "Name / email (like).",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ],
+              "description": "1 = include inactive accounts."
+            },
+            "required": false,
+            "description": "1 = include inactive accounts.",
+            "name": "nonaktif",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,6}$",
+              "description": "Users page (40 per page)."
+            },
+            "required": false,
+            "description": "Users page (40 per page).",
+            "name": "hal",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matrix",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipMatrix"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/company-memberships/batch": {
       "post": {
         "summary": "MC2 role matrix: save many memberships atomically (all-or-nothing); each item needs Admin of ITS PT or the group admin; reason → audit (role_change)",
@@ -39263,6 +39850,247 @@
             }
           },
           "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attendance/schedule": {
+      "get": {
+        "summary": "The web \"Jadwal & hari libur\" page as JSON (attendance scope: Admin / Direktur / Finance / Owner / PM): work schedules (+ usage), holidays of `tahun`, cost-center geofences, active employees with their schedule, the context PT's default schedule and radius. Writes: POST/PATCH /data/{work-schedules|holidays|employees|cost-centers}",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}$"
+            },
+            "required": false,
+            "name": "tahun",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schedule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceSchedule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attendance/default-schedule": {
+      "patch": {
+        "summary": "Set companies.defaultWorkSchedule of a PT (Admin / Direktur of that PT or group admin; the schedule must belong to that PT). Audited by the companies collection",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceDefaultScheduleBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceDefaultScheduleResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
             "description": "Problem",
             "content": {
               "application/problem+json": {
@@ -51258,6 +52086,49 @@
             }
           },
           "503": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "User 2026-10-19 (APK): form data of a NEW account — the caller's Admin PTs (∩ PT selection) with their selectable employees, team-assignment locations and the active banks (the same shape as GET /user-onboarding/{userId} with `user` null)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOnboardingDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
             "description": "Problem",
             "content": {
               "application/problem+json": {
