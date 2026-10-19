@@ -3150,5 +3150,753 @@
         "type": "String"
       }
     }
-  }
+  },
+  "reasonLabel": "Alasan",
+  "inactiveSuffix": "(nonaktif)",
+  "cashTitle": "Buku kas",
+  "closingTitle": "Tutup buku",
+  "cashIn": "Kas masuk",
+  "cashOut": "Kas keluar",
+  "cashInLower": "kas masuk",
+  "cashOutLower": "kas keluar",
+  "cashLockOne": "tutup buku {text}",
+  "@cashLockOne": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "cashLockNone": "belum ada",
+  "cashLockUntil": "s/d {date}",
+  "@cashLockUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "cashAsOf": "Buku kas per {date} (WITA)",
+  "@cashAsOf": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "cashIcReceiving": "Rekening penerimaan antar-PT: {text}",
+  "@cashIcReceiving": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "cashIcReceivingNone": "belum ditetapkan (Master Data › Akun kas/bank)",
+  "cashReadOnly": "Tampilan baca untuk Direktur. Pencatatan, edit dan void kas dilakukan oleh Finance.",
+  "cashReadOnlyMulti": "Tampilan baca untuk Direktur. Pencatatan, edit dan void kas dilakukan oleh Finance PT tersebut.",
+  "cashSearchHint": "Cari nomor atau keterangan",
+  "cashBookSub": "{count} transaksi{filtered} · terbaru dulu · baris void tetap tampil, jurnal baliknya tertaut",
+  "@cashBookSub": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "filtered": {
+        "type": "String"
+      }
+    }
+  },
+  "cashFiltered": " (terfilter)",
+  "cashEmpty": "Belum ada transaksi kas.",
+  "cashEmptyFiltered": "Tidak ada transaksi untuk filter ini.",
+  "cashClearFilter": "Hapus filter",
+  "cashShownOf": "{shown} dari {total} transaksi",
+  "@cashShownOf": {
+    "placeholders": {
+      "shown": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "cashTotal": "Saldo kas total",
+  "cashTotalSub": "{count} akun · saldo awal + masuk − keluar",
+  "@cashTotalSub": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cashFlows": "{period}: masuk {tin} · keluar {tout}",
+  "@cashFlows": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      },
+      "tin": {
+        "type": "String"
+      },
+      "tout": {
+        "type": "String"
+      }
+    }
+  },
+  "cashFilterPt": "PT",
+  "cashAllPts": "Semua PT",
+  "cashFilterAccount": "Akun",
+  "cashFilterAccounts": "{count} akun",
+  "@cashFilterAccounts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cashAllAccounts": "Semua akun",
+  "cashFilterPeriod": "Periode",
+  "cashAllPeriods": "Semua periode",
+  "cashFilterSource": "Sumber",
+  "cashAllSources": "Semua sumber",
+  "cashStatusVoid": "Void",
+  "cashStatusReversal": "Jurnal balik",
+  "cashStatusPosted": "Posted",
+  "cashVoidReason": "Void: {reason}",
+  "@cashVoidReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "cashReversedBy": "dibalik oleh {no}",
+  "@cashReversedBy": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "cashReversalOf": "Jurnal balik dari {no}",
+  "@cashReversalOf": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "cashRequestLink": "Pengajuan {no}",
+  "@cashRequestLink": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "cashVoidTitle": "Void {no}?",
+  "@cashVoidTitle": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "cashVoidBody": "Transaksi asli tetap tercatat dengan status Void, dan sistem membuat jurnal balik {dir} {amount} {dated}. Saldo akun kembali seperti sebelum transaksi ini.",
+  "@cashVoidBody": {
+    "placeholders": {
+      "dir": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      },
+      "dated": {
+        "type": "String"
+      }
+    }
+  },
+  "cashVoidDatedToday": "bertanggal hari ini (periode aslinya sudah ditutup)",
+  "cashVoidDatedOn": "bertanggal {date}",
+  "@cashVoidDatedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "cashVoidConfirm": "Void transaksi",
+  "cashVoided": "{no} di-void.",
+  "@cashVoided": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "cashVoidedWith": "{no} di-void · jurnal balik {reversal}.",
+  "@cashVoidedWith": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      },
+      "reversal": {
+        "type": "String"
+      }
+    }
+  },
+  "cashProofOf": "Bukti {no}",
+  "@cashProofOf": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "cashProofNotImage": "Bukti ini bukan gambar (PDF). Buka di web untuk melihatnya.",
+  "cashPt": "PT",
+  "cashDate": "Tanggal",
+  "cashKind": "Jenis transaksi",
+  "cashAmount": "Nominal",
+  "cashSourceIn": "Sumber kas masuk",
+  "cashCategory": "Kategori biaya",
+  "cashProject": "Project",
+  "cashCostCenter": "Pusat biaya",
+  "cashVehicle": "Kendaraan",
+  "cashDescription": "Keterangan",
+  "cashSource": "Sumber",
+  "cashProof": "Bukti",
+  "cashEdit": "Edit",
+  "cashVoid": "Void",
+  "cashNewTitle": "Catat kas masuk / keluar",
+  "cashNoWrite": "Pencatatan kas hanya oleh Finance PT ini.",
+  "cashPickPt": "Anda Finance di beberapa PT. Pilih PT transaksi ini — akun, project, pusat biaya dan kategori mengikuti PT tersebut.",
+  "cashEntryNotFound": "Transaksi tidak ditemukan. Buka Edit dari Buku kas.",
+  "cashEditTitle": "Edit {no}",
+  "@cashEditTitle": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "cashNotEditableVoid": "Transaksi sudah di-void.",
+  "cashNotEditableSource": "Hanya transaksi kas manual yang dapat diedit.",
+  "cashNotEditableClosed": "Periode transaksi sudah ditutup (tutup buku s/d {date}). Koreksi dengan Void — jurnal balik dicatat di periode berjalan.",
+  "@cashNotEditableClosed": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "cashCheckFields": "Periksa isian yang ditandai.",
+  "cashNoChanges": "Tidak ada perubahan untuk disimpan.",
+  "cashSaved": "{no} tersimpan · {dir} {amount}.",
+  "@cashSaved": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      },
+      "dir": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "cashUpdated": "{no} diperbarui.",
+  "@cashUpdated": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "cashOverdraftCancelled": "Belum disimpan — saldo akun akan minus. Periksa nominal atau akun, lalu simpan lagi.",
+  "cashEditNote": "Keterangan, sumber/kategori, pembebanan, kendaraan dan bukti. Tanggal, akun dan nominal terkunci. Alasan wajib.",
+  "cashNewNote": "Nomor KM/KK diberikan otomatis saat disimpan. Saldo akun langsung berubah.",
+  "cashDateNoLock": "Belum ada periode yang ditutup.",
+  "cashDateLock": "Tutup buku s/d {date}: tanggal sebelumnya ditolak.",
+  "@cashDateLock": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "cashDateOpening": "Saldo awal akun per {date}: tanggal sebelumnya ditolak.",
+  "@cashDateOpening": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "cashDateNoFuture": "Tidak boleh di masa depan.",
+  "cashLockedHelp": "Tanggal, akun dan nominal terkunci — koreksi dengan Void lalu catat ulang.",
+  "cashAmountHelp": "Rupiah tanpa desimal; titik sebagai pemisah ribuan",
+  "cashScope": "Dibebankan ke",
+  "cashScopeNone": "Tidak ada",
+  "cashScopeHelp": "Project ATAU pusat biaya — tidak keduanya.",
+  "cashVehicleOptional": "Kendaraan (opsional)",
+  "cashVehicleNone": "— tanpa kendaraan —",
+  "cashVehicleHint": "Kategori ini biasanya dicatat per kendaraan.",
+  "cashProofReplace": "Ganti bukti (opsional)",
+  "cashProofOptional": "Bukti (opsional)",
+  "cashProofCurrent": "Lihat bukti saat ini",
+  "cashProofHelp": "Foto bukti dari kamera atau galeri, diperkecil otomatis. Bukti PDF diunggah lewat web.",
+  "cashReason": "Alasan perubahan",
+  "cashReasonHelp": "Tercatat di audit log bersama nilai lama dan baru.",
+  "cashRulesTitle": "Aturan",
+  "cashRule1": "Kas masuk wajib sumber; kas keluar wajib kategori.",
+  "cashRule2": "Dibebankan ke project atau pusat biaya, tidak keduanya.",
+  "cashRule3": "Tanggal tidak boleh di masa depan atau di periode yang sudah ditutup.",
+  "cashRule3Lock": "Tanggal tidak boleh di masa depan atau di periode yang sudah ditutup (s/d {date}).",
+  "@cashRule3Lock": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "cashRule4": "Setelah tersimpan, nominal/tanggal/akun tidak bisa diedit — gunakan Void lalu catat ulang.",
+  "cashSaving": "Menyimpan…",
+  "cashSaveChanges": "Simpan perubahan",
+  "cashSaveIn": "Simpan kas masuk",
+  "cashSaveOut": "Simpan kas keluar",
+  "closingCloseTitle": "Tutup buku {period}{pt}?",
+  "@closingCloseTitle": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      },
+      "pt": {
+        "type": "String"
+      }
+    }
+  },
+  "closingCloseBody": "Semua transaksi kas dan transfer bertanggal s/d {date} dikunci: tidak dapat dicatat, diedit, atau di-void dengan tanggal itu. Koreksi setelahnya dicatat sebagai jurnal balik di periode berjalan. Membuka kembali hanya oleh Direktur.",
+  "@closingCloseBody": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "closingOnlyPt": "Hanya PT {name} yang dikunci.",
+  "@closingOnlyPt": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "closingNote": "Catatan (opsional)",
+  "closingClosed": "{period} ditutup.",
+  "@closingClosed": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      }
+    }
+  },
+  "closingReopenTitle": "Buka kembali {period}{pt}?",
+  "@closingReopenTitle": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      },
+      "pt": {
+        "type": "String"
+      }
+    }
+  },
+  "closingReopenBody": "Periode ini dapat diposting dan dikoreksi lagi sampai ditutup kembali. Alasan wajib dan tercatat di audit log.",
+  "closingReopen": "Buka kembali",
+  "closingReopened": "{period} dibuka kembali.",
+  "@closingReopened": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      }
+    }
+  },
+  "closingPickPt": "Tutup buku dilakukan per PT: menutup satu PT tidak mengunci PT lain. Pilih PT yang akan dikelola.",
+  "closingLockedUntil": "Terkunci s/d {date}",
+  "@closingLockedUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "closingNoLock": "belum ada",
+  "closingNoLockShort": "Belum ada",
+  "closingLead": "Tutup bulan yang sudah lewat. Buka kembali hanya oleh Direktur, untuk periode tertutup terakhir, dengan alasan.",
+  "closingKpiLock": "Terkunci s/d",
+  "closingKpiLockSub": "Posting bertanggal ≤ tanggal ini ditolak.",
+  "closingKpiLast": "Periode tertutup terakhir",
+  "closingKpiLastSub": "{count} kali tutup/buka tercatat",
+  "@closingKpiLastSub": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "closingKpiClosable": "Bulan siap ditutup",
+  "closingKpiClosableNone": "Tidak ada — bulan berjalan belum bisa ditutup.",
+  "closingPerMonth": "Per bulan",
+  "closingPerMonthSub1": "13 bulan terakhir",
+  "closingBooksStart": "sejak buku kas dimulai ({date}).",
+  "@closingBooksStart": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "closingPerMonthSub2": "Masuk/Keluar tanpa pasangan void; koreksi void terpisah.",
+  "closingNoData": "Belum ada data.",
+  "closingHistory": "Riwayat",
+  "closingHistorySub": "Tutup & buka kembali",
+  "closingHistoryEmpty": "Belum pernah tutup buku.",
+  "closingStateClosed": "Ditutup",
+  "closingStateReopened": "Dibuka kembali",
+  "closingStateLocked": "Terkunci",
+  "closingStateCurrent": "Berjalan",
+  "closingStateOpen": "Terbuka",
+  "closingNoteText": "Catatan: {note}",
+  "@closingNoteText": {
+    "placeholders": {
+      "note": {
+        "type": "String"
+      }
+    }
+  },
+  "closingReopenedBy": "Dibuka {name} · {at} — {reason}",
+  "@closingReopenedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "at": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "closingCount": "{count} transaksi{voids}",
+  "@closingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "voids": {
+        "type": "String"
+      }
+    }
+  },
+  "closingVoids": " ({count} void)",
+  "@closingVoids": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "closingFigures": "Masuk {tin} · Keluar {tout} · Bersih {net}",
+  "@closingFigures": {
+    "placeholders": {
+      "tin": {
+        "type": "String"
+      },
+      "tout": {
+        "type": "String"
+      },
+      "net": {
+        "type": "String"
+      }
+    }
+  },
+  "closingKoreksi": "Koreksi (void): {amount} ({count} baris)",
+  "@closingKoreksi": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "closingReopenDirektur": "Buka kembali: Direktur",
+  "voidTransferTab": "Transfer tercatat",
+  "voidTransferTitle": "Void transfer {no}?",
+  "@voidTransferTitle": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "voidTransferBody": "KK transfer ini dibalik dengan jurnal balik (saldo akun kembali), transfer ditandai Void, dan pengajuan {request} kembali ke {back} untuk ditransfer ulang.",
+  "@voidTransferBody": {
+    "placeholders": {
+      "request": {
+        "type": "String"
+      },
+      "back": {
+        "type": "String"
+      }
+    }
+  },
+  "voidTransferBackAdvance": "Disetujui (Antri Transfer)",
+  "voidTransferBackReimburse": "Nota Terverifikasi (Antri Transfer)",
+  "voidTransfer": "Void transfer",
+  "voidTransferDone": "Transfer {no} di-void. Pengajuan kembali ke Antrian Transfer.",
+  "@voidTransferDone": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "voidTransferSearchHint": "Cari nomor transfer atau pengajuan",
+  "voidTransferLead": "Transfer tercatat — dapat dibatalkan ({count})",
+  "@voidTransferLead": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "voidTransferNote": "Void transfer membuat jurnal balik untuk KK-nya (KK asli tetap tampil sebagai Void) dan mengembalikan pengajuan ke antrian: Pengajuan Baru → Disetujui, Reimburse → Nota Terverifikasi.",
+  "voidTransferEmpty": "Tidak ada transfer yang bisa dibatalkan.",
+  "voidTransferFinanceOnly": "Void: Finance PT ini",
+  "loanListTitle": "Pinjaman antar project",
+  "loanListNote": "Diajukan PM project peminjam · disetujui Direktur · tanpa transaksi kas (klaim tercatat antar project dalam satu PT)",
+  "loanKpiPending": "Menunggu persetujuan",
+  "loanKpiPendingNone": "Tidak ada yang menunggu Anda ✓",
+  "loanKpiPendingMine": "{count} menunggu keputusan Anda",
+  "@loanKpiPendingMine": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "loanKpiOutstandingSub": "Disetujui {amount} · kembali {repaid}",
+  "@loanKpiOutstandingSub": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "repaid": {
+        "type": "String"
+      }
+    }
+  },
+  "loanOverdueOnly": "Terlambat",
+  "loanKpiOverdueNone": "Tidak ada yang terlambat ✓",
+  "loanKpiOverdueSum": "Sisa terlambat {amount}",
+  "@loanKpiOverdueSum": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "loanWaitingMine": "Menunggu saya ({count})",
+  "@loanWaitingMine": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "loanListSearchHint": "Nomor atau alasan…",
+  "loanFilterBorrower": "Peminjam",
+  "loanFilterLender": "Pemberi",
+  "loanListEmpty": "Belum ada pinjaman antar project.",
+  "loanListEmptyFiltered": "Tidak ada pinjaman untuk filter ini.",
+  "icLoanListTitle": "Pinjaman antar-PT",
+  "icLoanListNote": "Diperintahkan Owner · dicairkan Finance PT pemberi · dikembalikan Finance PT peminjam · uang nyata antar PT grup (KK + KM otomatis), tanpa bunga",
+  "icLoanKpiReceivable": "Piutang antar-PT (sisa)",
+  "icLoanKpiPayable": "Hutang antar-PT (sisa)",
+  "icLoanKpiOverdueSub": "Sisa yang lewat jatuh tempo",
+  "icLoanQueueWaiting": "Menunggu pencairan Anda ({count})",
+  "@icLoanQueueWaiting": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "icLoanListSearchHint": "Nomor, alasan, kode PT…",
+  "icLoanListEmpty": "Belum ada pinjaman antar-PT.",
+  "icLoanListEmptyFiltered": "Tidak ada pinjaman untuk filter ini.",
+  "icLoanCardFigures": "{amount} · sisa {outstanding}",
+  "@icLoanCardFigures": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "outstanding": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepay": "Catat pengembalian",
+  "loanRepayTitle": "Catat pengembalian {title}",
+  "@loanRepayTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepayOutstanding": "Sisa pinjaman {amount}",
+  "@loanRepayOutstanding": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepayDate": "Tanggal pengembalian",
+  "loanRepayNote": "Catatan",
+  "loanRepaySave": "Simpan pengembalian",
+  "loanRepayDone": "Pengembalian {amount} tercatat.",
+  "@loanRepayDone": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepaymentVoidTitle": "Void pengembalian ke-{seq}?",
+  "@loanRepaymentVoidTitle": {
+    "placeholders": {
+      "seq": {
+        "type": "int"
+      }
+    }
+  },
+  "loanRepaymentVoidBody": "Pengembalian {amount} dibatalkan (tidak dihapus); sisa pinjaman bertambah lagi. Alasan wajib.",
+  "@loanRepaymentVoidBody": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepaymentVoidConfirm": "Void pengembalian",
+  "loanRepaymentVoided": "Pengembalian di-void.",
+  "icLoanCancelWebHint": "Pembatalan perintah pinjaman dilakukan di web (Keuangan → Pinjaman antar-PT).",
+  "icLoanVoidDisbursementTitle": "Void pencairan {no}?",
+  "@icLoanVoidDisbursementTitle": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanVoidDisbursementBody": "KK di PT {lender} dan KM di PT {borrower} dibalik (jurnal balik), pinjaman kembali menunggu pencairan. Pengajuan yang sudah disetujui tetap disetujui. Untuk pengembalian dana pakai Catat pengembalian, bukan void.",
+  "@icLoanVoidDisbursementBody": {
+    "placeholders": {
+      "lender": {
+        "type": "String"
+      },
+      "borrower": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanVoidDisbursement": "Void pencairan",
+  "icLoanVoidRepaymentTitle": "Void {label}?",
+  "@icLoanVoidRepaymentTitle": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanVoidRepaymentBody": "KK di PT {borrower} dan KM di PT {lender} dibalik; sisa pinjaman bertambah lagi.",
+  "@icLoanVoidRepaymentBody": {
+    "placeholders": {
+      "borrower": {
+        "type": "String"
+      },
+      "lender": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanVoidShortfallConfirm": "Saya mengerti dana tersedia PT {borrower} bisa menjadi minus (dana sudah terpakai / dijanjikan).",
+  "@icLoanVoidShortfallConfirm": {
+    "placeholders": {
+      "borrower": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanVoidedDisbursement": "Pencairan di-void. Pinjaman kembali menunggu pencairan.",
+  "icLoanRepayTitle": "Catat pengembalian",
+  "icLoanNotRepayable": "Pengembalian pinjaman ini dicatat oleh Finance PT peminjam.",
+  "icLoanRepayAmount": "Sisa {amount} · PT {borrower} → PT {lender}",
+  "@icLoanRepayAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "borrower": {
+        "type": "String"
+      },
+      "lender": {
+        "type": "String"
+      }
+    }
+  },
+  "icLoanRepayHelp": "Dibayar dari akun PT peminjam ke rekening penerimaan antar-PT PT pemberi; KK dan KM dicatat otomatis.",
+  "icLoanRepayDone": "{no}: pengembalian {amount} tercatat.",
+  "@icLoanRepayDone": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "recordsTitle": "Data",
+  "recordsCount": "{count} data · terbaru dulu",
+  "@recordsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recordsEmpty": "Belum ada data.",
+  "recordsEmptySearch": "Tidak ada data untuk pencarian ini.",
+  "recordsShownOf": "{shown} dari {total} data",
+  "@recordsShownOf": {
+    "placeholders": {
+      "shown": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "recordsReadOnly": "Tampilan baca. Data ini diubah lewat alurnya masing-masing (atau di web)."
 }

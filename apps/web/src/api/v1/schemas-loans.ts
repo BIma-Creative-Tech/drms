@@ -69,6 +69,7 @@ export const LoanListQuery = z
     q: z.string().trim().max(100).optional().meta({ description: 'Search in number and reason (D8).' }),
     page: z.coerce.number().int().min(1).max(10_000).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(25),
+    summary: z.enum(['1', 'true']).optional().meta({ description: 'User 2026-10-19 (APK Pinjaman list): add `summary` (the web list\'s tiles) to the response.' }),
     company: companyFilterParam,
   })
   .meta({ id: 'ProjectLoanListQuery' })
@@ -114,6 +115,7 @@ export const LoanSummary = z
 export const LoanDetail = LoanSummary.extend({
   allowedActions: z.array(z.enum(LOAN_ACTIONS)).meta({ description: 'edit/submit: creator PM (Draft); cancel: creator (Draft/Menunggu) or Direktur (Disetujui, no repayment); approve/reject: Direktur pool (G1); repay: borrower PM / Finance.' }),
   mayVoidRepayment: z.boolean(),
+  today: date.meta({ description: 'Business date of the loan\'s PT (max date of a repayment).' }),
   g1Note: z.string().nullable(),
   repayments: z.array(
     z.object({
@@ -135,7 +137,21 @@ export const LoanDetail = LoanSummary.extend({
 }).meta({ id: 'ProjectLoanDetail' })
 
 export const LoanList = z
-  .object({ items: z.array(LoanSummary), page: z.number().int(), totalPages: z.number().int(), totalDocs: z.number().int(), limit: z.number().int() })
+  .object({
+    items: z.array(LoanSummary),
+    page: z.number().int(),
+    totalPages: z.number().int(),
+    totalDocs: z.number().int(),
+    limit: z.number().int(),
+    summary: z
+      .object({
+        totals: z.object({ pending: z.number().int(), amount: rupiah, repaid: rupiah, outstanding: rupiah, overdueCount: z.number().int(), overdue: rupiah }),
+        inboxCount: z.number().int().meta({ description: 'Loans waiting for the caller\'s decision (Direktur).' }),
+        canCreate: z.boolean().meta({ description: 'The caller is PM of a borrower project ("Ajukan pinjaman").' }),
+      })
+      .optional()
+      .meta({ description: 'Only with `summary=1`: the web list tiles (whole loan scope of the caller, not the filters).' }),
+  })
   .meta({ id: 'ProjectLoanList' })
 
 export const LoanInbox = z.object({ items: z.array(LoanSummary) }).meta({ id: 'ProjectLoanInbox' })

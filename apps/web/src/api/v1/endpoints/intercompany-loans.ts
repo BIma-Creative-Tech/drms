@@ -1,7 +1,9 @@
 import type { Endpoint } from 'payload'
 
-import { hasRole } from '@/access/roles'
+import { hasRole, membershipsOf } from '@/access/roles'
+import { today } from '@/domain/expense/common'
 import { FUND_VIEW_ROLES, fundAvailability } from '@/domain/fundcheck/service'
+import { icLoanPositions, icLoanReportScope } from '@/domain/intercompany/loan-report'
 import { IC_LOAN_STATUSES, type IcLoanStatus } from '@/domain/intercompany/loan-rules'
 import {
   cancelIcLoan,
@@ -41,7 +43,17 @@ function bad(issues: Array<{ path: PropertyKey[]; message: string }>): never {
 }
 
 type Req = Parameters<typeof icLoanDetail>[0]
-const detail = async (req: Req, id: number, status = 200) => json(await icLoanDetail(req, await loadVisibleIcLoan(req, id)), status)
+// user 2026-10-19 (APK phase 3): business dates of both PTs (disbursement / repayment date max)
+const detail = async (req: Req, id: number, status = 200) => {
+  const d = await icLoanDetail(req, await loadVisibleIcLoan(req, id))
+  return json({ ...d, lenderToday: await today(req, d.lender?.id), borrowerToday: await today(req, d.borrower?.id) }, status)
+}
+
+/** PTs where the caller is Owner (STORED pk-principal) — as admin/views/IntercompanyLoans.tsx ownerPts. */
+const ownerPts = (req: Req): number[] =>
+  membershipsOf(req.user, { all: true })
+    .filter((m) => (m.exactRoles ?? m.roles).includes('pk-principal'))
+    .map((m) => m.company)
 
 export const listIcLoansEndpoint = v1({
   path: '/intercompany-loans',
@@ -51,7 +63,16 @@ export const listIcLoansEndpoint = v1({
     if (!q.success) bad(q.error.issues)
     const status = (q.data!.status ?? '').split(',').filter((s): s is IcLoanStatus => (IC_LOAN_STATUSES as readonly string[]).includes(s))
     const companyIds = await companyQuery(req)
-    return json(await withReqTransaction(req, () => listIcLoans(req, { companyIds, role: q.data!.role, status, overdue: q.data!.overdue !== undefined, q: q.data!.q, page: q.data!.page, limit: q.data!.limit })))
+    return json(
+      await withReqTransaction(req, async () => {
+        const page = await listIcLoans(req, { companyIds, role: q.data!.role, status, overdue: q.data!.overdue !== undefined, q: q.data!.q, page: q.data!.page, limit: q.data!.limit })
+        if (q.data!.summary === undefined) return page
+        // user 2026-10-19 (APK Pinjaman antar-PT list): the web IcLoanList tiles
+        const positions = await icLoanPositions(req, await icLoanReportScope(req))
+        const sum = (k: 'receivable' | 'payable' | 'overdue') => positions.reduce((s, x) => s + x[k], 0)
+        return { ...page, summary: { receivable: sum('receivable'), payable: sum('payable'), overdue: sum('overdue'), queueCount: (await icLoanQueue(req)).count, canInstruct: ownerPts(req).length > 1 } }
+      }),
+    )
   },
 })
 

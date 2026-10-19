@@ -38,7 +38,7 @@ enum IcLoanStatus {
   bool get active => this == disbursed || this == partiallyRepaid || this == repaid;
 }
 
-/// `allowedActions` of the loan detail. Only [disburse] is an APK action in this phase; the others are web-only.
+/// `allowedActions` of the loan detail. Phase 3 (user 2026-10-19): every action but [cancel] is on the APK.
 enum IcLoanAction {
   cancel('cancel'),
   disburse('disburse'),
@@ -528,6 +528,66 @@ Map<String, dynamic> icLoanDisburseBody({
   'proofMediaId': proofMediaId,
   if (confirmOverdraft) 'confirmOverdraft': true,
 };
+
+/// Body of `POST /intercompany-loans/{id}/repayments` (Finance of the borrower): the disbursement body + `amount`.
+Map<String, dynamic> icLoanRepayBody({
+  required int amount,
+  required int cashAccountId,
+  required String transferAt,
+  required String bankRef,
+  required int proofMediaId,
+  bool confirmOverdraft = false,
+}) => {
+  'amount': amount,
+  ...icLoanDisburseBody(
+    cashAccountId: cashAccountId,
+    transferAt: transferAt,
+    bankRef: bankRef,
+    proofMediaId: proofMediaId,
+    confirmOverdraft: confirmOverdraft,
+  ),
+};
+
+/// `GET /intercompany-loans` page (+ `summary` with `?summary=1`: the web tiles Piutang / Hutang / Terlambat).
+class IcLoanPage {
+  const IcLoanPage({this.items = const [], this.page = 1, this.totalPages = 0, this.totalDocs = 0, this.summary});
+  final List<IcLoan> items;
+  final int page;
+  final int totalPages;
+  final int totalDocs;
+  final IcLoanSummary? summary;
+
+  factory IcLoanPage.fromJson(Map<String, dynamic> j) => IcLoanPage(
+    items: [for (final i in _list(j['items'])) IcLoan.fromJson(_map(i))],
+    page: _intN(j['page']) ?? 1,
+    totalPages: _intN(j['totalPages']) ?? 0,
+    totalDocs: _intN(j['totalDocs']) ?? 0,
+    summary: _mapN(j['summary']) == null ? null : IcLoanSummary.fromJson(_map(j['summary'])),
+  );
+}
+
+class IcLoanSummary {
+  const IcLoanSummary({
+    this.receivable = 0,
+    this.payable = 0,
+    this.overdue = 0,
+    this.queueCount = 0,
+    this.canInstruct = false,
+  });
+  final int receivable;
+  final int payable;
+  final int overdue;
+  final int queueCount;
+  final bool canInstruct;
+
+  factory IcLoanSummary.fromJson(Map<String, dynamic> j) => IcLoanSummary(
+    receivable: _intN(j['receivable']) ?? 0,
+    payable: _intN(j['payable']) ?? 0,
+    overdue: _intN(j['overdue']) ?? 0,
+    queueCount: _intN(j['queueCount']) ?? 0,
+    canInstruct: j['canInstruct'] == true,
+  );
+}
 
 /// Machine codes of the loan refusals (openapi; `loan-rules.ts`).
 const loanLenderInsufficientCode = 'LOAN_LENDER_INSUFFICIENT';

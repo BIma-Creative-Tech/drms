@@ -15,6 +15,7 @@ import '../../../shared/widgets/doc_no_chip.dart';
 import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/online_only_button.dart';
 import '../../../shared/widgets/pick_hint.dart';
+import '../../../shared/widgets/reason_dialog.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../domain/loan.dart';
@@ -22,7 +23,8 @@ import 'loan_providers.dart';
 import 'loan_widgets.dart';
 
 /// ADR 0022 on the APK (online only): the "Pinjaman" tab of a project, the Draft form of the borrower PM and the
-/// detail with the Direktur decision bar. Repayments are shown read-only (recorded on the web in v1).
+/// detail with the Direktur decision bar. Phase 3 (user 2026-10-19): "Catat pengembalian" (borrower PM / Finance) and
+/// the void of a repayment (Direktur / Finance) as on the web.
 
 String _today() => toYmd(DateTime.now());
 
@@ -478,6 +480,10 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
 
   Future<void> _run(Loan l, LoanAction action) async {
     final t = AppLocalizations.of(context);
+    if (action == LoanAction.repay) {
+      await _repay(l);
+      return;
+    }
     if (action == LoanAction.edit) {
       await GoRouter.maybeOf(context)?.push('/loans/${l.id}/edit');
       ref.invalidate(loanDetailProvider(l.id));
@@ -526,7 +532,7 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
         LoanAction.reject => api.reject(l.id, reason: reason!, idempotencyKey: key),
         LoanAction.cancel => api.cancel(l.id, reason: reason!, idempotencyKey: key),
         LoanAction.submit => api.submit(l.id, idempotencyKey: key),
-        LoanAction.edit || LoanAction.repay => throw StateError('not an APK action'),
+        LoanAction.edit || LoanAction.repay => throw StateError('handled above'),
       };
       if (mounted) showSnack(context, action == LoanAction.submit ? t.loanSubmitted : t.loanDone);
     } on ApiException catch (e) {
@@ -542,6 +548,60 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
     }
   }
 
+  void _refreshAll(Loan l) {
+    ref.invalidate(loanDetailProvider(l.id));
+    ref.invalidate(projectLoansProvider(l.borrower.id));
+    ref.invalidate(projectLoansProvider(l.lender.id));
+  }
+
+  /// "Catat pengembalian" (web RepaymentAction): nominal (≤ sisa), tanggal (loan date … today), catatan.
+  Future<void> _repay(Loan l) async {
+    final t = AppLocalizations.of(context);
+    final input = await showModalBottomSheet<({int amount, String date, String note})>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _RepaymentSheet(loan: l),
+    );
+    if (input == null || !mounted) return;
+    final key = _keys.putIfAbsent(LoanAction.repay, () => const Uuid().v7());
+    setState(() => _busy = true);
+    try {
+      await ref
+          .read(loansApiProvider)
+          .addRepayment(l.id, amount: input.amount, repayDate: input.date, note: input.note, idempotencyKey: key);
+      _keys.remove(LoanAction.repay); // the next repayment is a new one
+      if (mounted) showSnack(context, t.loanRepayDone(formatRupiah(input.amount)));
+    } on ApiException catch (e) {
+      if (mounted) showSnack(context, e.message);
+    } finally {
+      _refreshAll(l);
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _voidRepayment(Loan l, LoanRepayment r) async {
+    final t = AppLocalizations.of(context);
+    final reason = await showReasonDialog(
+      context,
+      title: t.loanRepaymentVoidTitle(r.seq ?? 0),
+      description: t.loanRepaymentVoidBody(formatRupiah(r.amount)),
+      confirm: t.loanRepaymentVoidConfirm,
+      keyPrefix: 'loan-repayment-void',
+    );
+    if (reason == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(loansApiProvider).voidRepayment(l.id, r.id, reason: reason, idempotencyKey: const Uuid().v7());
+      if (mounted) showSnack(context, t.loanRepaymentVoided);
+    } on ApiException catch (e) {
+      if (mounted) showSnack(context, e.message);
+    } finally {
+      _refreshAll(l);
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -553,7 +613,12 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
         child: AsyncBody<Loan>(
           value: value,
           onRetry: () => ref.invalidate(loanDetailProvider(widget.id)),
-          data: (l) => _LoanBody(loan: l, busy: _busy, onAction: (a) => _run(l, a)),
+          data: (l) => _LoanBody(
+            loan: l,
+            busy: _busy,
+            onAction: (a) => _run(l, a),
+            onVoidRepayment: (r) => _voidRepayment(l, r),
+          ),
         ),
       ),
       bottomNavigationBar: switch (value) {
@@ -565,10 +630,11 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
 }
 
 class _LoanBody extends ConsumerWidget {
-  const _LoanBody({required this.loan, required this.busy, required this.onAction});
+  const _LoanBody({required this.loan, required this.busy, required this.onAction, required this.onVoidRepayment});
   final Loan loan;
   final bool busy;
   final void Function(LoanAction) onAction;
+  final void Function(LoanRepayment) onVoidRepayment;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -685,10 +751,11 @@ class _LoanBody extends ConsumerWidget {
           if (l.repayments.isEmpty)
             Text(t.loanRepaymentsEmpty, style: theme.textTheme.bodySmall)
           else
-            for (final r in l.repayments) _RepaymentTile(r: r),
-          note(t.loanRepaymentsWebHint, key: const Key('loan-repay-web-hint')),
+            for (final r in l.repayments)
+              _RepaymentTile(r: r, onVoid: l.mayVoidRepayment && r.posted && !busy ? () => onVoidRepayment(r) : null),
         ],
         const SizedBox(height: 16),
+        if (acts.contains(LoanAction.repay)) _action(LoanAction.repay, t.loanRepay, Icons.payments_outlined),
         if (acts.contains(LoanAction.submit)) _action(LoanAction.submit, t.loanSubmit, Icons.send),
         if (acts.contains(LoanAction.edit)) _action(LoanAction.edit, t.loanEdit, Icons.edit_outlined, outlined: true),
         if (acts.contains(LoanAction.cancel)) _action(LoanAction.cancel, t.loanCancel, Icons.block, outlined: true),
@@ -765,8 +832,11 @@ class _Step extends StatelessWidget {
 }
 
 class _RepaymentTile extends StatelessWidget {
-  const _RepaymentTile({required this.r});
+  const _RepaymentTile({required this.r, this.onVoid});
   final LoanRepayment r;
+
+  /// "Void" (Direktur / Finance, posted repayments only).
+  final VoidCallback? onVoid;
 
   @override
   Widget build(BuildContext context) {
@@ -808,6 +878,16 @@ class _RepaymentTile extends StatelessWidget {
                 r.voidReason == null ? t.loanRepaymentVoid : t.loanRepaymentVoidReason(r.voidReason!),
                 key: Key('loan-repayment-void-${r.id}'),
                 style: theme.textTheme.bodySmall?.copyWith(color: context.pk.badText),
+              ),
+            if (onVoid != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  key: Key('loan-repayment-${r.id}-void'),
+                  onPressed: onVoid,
+                  icon: const Icon(Icons.block, size: 18),
+                  label: Text(t.cashVoid),
+                ),
               ),
           ],
         ),
@@ -916,6 +996,102 @@ class _ReasonDialogState extends State<_ReasonDialog> {
           child: Text(widget.confirm),
         ),
       ],
+    );
+  }
+}
+
+/// The web RepaymentAction dialog as a sheet: Nominal (default = sisa), Tanggal (loan date … today), Catatan.
+class _RepaymentSheet extends StatefulWidget {
+  const _RepaymentSheet({required this.loan});
+  final Loan loan;
+
+  @override
+  State<_RepaymentSheet> createState() => _RepaymentSheetState();
+}
+
+class _RepaymentSheetState extends State<_RepaymentSheet> {
+  late final _amount = TextEditingController(text: groupRupiah(widget.loan.outstanding));
+  final _note = TextEditingController();
+  late final String _today = widget.loan.today ?? toYmd(DateTime.now());
+  late String _date = _today;
+  Map<String, String> _errors = const {};
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    _note.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final last = DateTime.parse(_today);
+    final first = DateTime.tryParse(widget.loan.loanDate) ?? DateTime(last.year - 1);
+    final d = await showDatePicker(
+      context: context,
+      initialDate: DateTime.parse(_date),
+      firstDate: first.isAfter(last) ? last : first,
+      lastDate: last,
+    );
+    if (d != null && mounted) setState(() => _date = toYmd(d));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final l = widget.loan;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(t.loanRepayTitle(l.title), style: Theme.of(context).textTheme.titleMedium),
+          Text(t.loanRepayOutstanding(formatRupiah(l.outstanding)), style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('loan-repay-amount'),
+            controller: _amount,
+            keyboardType: TextInputType.number,
+            inputFormatters: const [RupiahInputFormatter()],
+            decoration: InputDecoration(labelText: t.cashAmount, prefixText: 'Rp ', errorText: _errors['amount']),
+          ),
+          const SizedBox(height: 8),
+          InkWell(
+            key: const Key('loan-repay-date'),
+            onTap: _pickDate,
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: t.loanRepayDate,
+                errorText: _errors['repayDate'],
+                suffixIcon: const Icon(Icons.event),
+              ),
+              child: Text(formatDateOnly(_date)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            key: const Key('loan-repay-note'),
+            controller: _note,
+            maxLength: 500,
+            decoration: InputDecoration(labelText: t.loanRepayNote),
+          ),
+          const SizedBox(height: 8),
+          FilledButton(
+            key: const Key('loan-repay-save'),
+            onPressed: () {
+              final amount = parseRupiah(_amount.text);
+              final errors = validateRepayment(amount: amount, outstanding: l.outstanding, repayDate: _date);
+              if (errors.isNotEmpty) {
+                setState(() => _errors = errors);
+                return;
+              }
+              Navigator.pop(context, (amount: amount!, date: _date, note: _note.text));
+            },
+            child: Text(t.loanRepaySave),
+          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
+        ],
+      ),
     );
   }
 }

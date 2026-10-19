@@ -4,8 +4,9 @@ import '../../../core/network/api_client.dart';
 import '../domain/intercompany_loan.dart';
 
 /// `/api/v1/intercompany-loans` (ADR 0029 "Pinjaman antar-PT"). Online only; every write carries an Idempotency-Key
-/// (one per opened form / distinct body). The APK instructs (Owner) and disburses (Finance of the lender); cancel,
-/// repayments and both voids are web-only in this phase.
+/// (one per opened form / distinct body). The APK instructs (Owner), disburses (Finance of the lender) and — phase 3,
+/// user 2026-10-19 — lists, records repayments (Finance of the borrower) and voids them / the disbursement; cancel stays
+/// on the web.
 class IntercompanyLoansApi {
   IntercompanyLoansApi(this.client);
   final ApiClient client;
@@ -44,4 +45,62 @@ class IntercompanyLoansApi {
     (d) => d.post<dynamic>('/intercompany-loans/$id/disburse', data: body, options: _idem(idempotencyKey)),
     _one,
   );
+
+  /// `GET /intercompany-loans` of the PT switcher selection (`role` lender / borrower, `status` comma list).
+  Future<IcLoanPage> list({
+    String? role,
+    String? status,
+    bool overdue = false,
+    String? q,
+    int page = 1,
+    int limit = 25,
+    bool summary = false,
+  }) => client.run(
+    (d) => d.get<dynamic>(
+      '/intercompany-loans',
+      queryParameters: {
+        'role': ?role,
+        'status': ?status,
+        if (overdue) 'overdue': '1',
+        if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
+        'page': page,
+        'limit': limit,
+        if (summary) 'summary': '1',
+      },
+    ),
+    (data) => IcLoanPage.fromJson(data as Map<String, dynamic>),
+  );
+
+  /// `POST /intercompany-loans/{id}/repayments` ([icLoanRepayBody]) — Finance of the BORROWER pays back.
+  Future<IcLoan> repay(int id, Map<String, dynamic> body, {required String idempotencyKey}) => client.run(
+    (d) => d.post<dynamic>('/intercompany-loans/$id/repayments', data: body, options: _idem(idempotencyKey)),
+    _one,
+  );
+
+  /// `POST /intercompany-loans/{id}/disbursement/void` {reason, confirmBorrowerShortfall?}. A 409
+  /// `LOAN_VOID_BORROWER_SHORTFALL_CONFIRM_REQUIRED` asks for the confirmation.
+  Future<IcLoan> voidDisbursement(
+    int id, {
+    required String reason,
+    bool confirmBorrowerShortfall = false,
+    required String idempotencyKey,
+  }) => client.run(
+    (d) => d.post<dynamic>(
+      '/intercompany-loans/$id/disbursement/void',
+      data: {'reason': reason.trim(), if (confirmBorrowerShortfall) 'confirmBorrowerShortfall': true},
+      options: _idem(idempotencyKey),
+    ),
+    _one,
+  );
+
+  /// `POST /intercompany-loans/{id}/repayments/{mid}/void` {reason}.
+  Future<IcLoan> voidRepayment(int id, int movementId, {required String reason, required String idempotencyKey}) =>
+      client.run(
+        (d) => d.post<dynamic>(
+          '/intercompany-loans/$id/repayments/$movementId/void',
+          data: {'reason': reason.trim()},
+          options: _idem(idempotencyKey),
+        ),
+        _one,
+      );
 }

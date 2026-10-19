@@ -7806,6 +7806,1296 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Browser tidak dapat dibuka. Buka {url} di browser HP.'**
   String securityBrowserFailed(String url);
+
+  /// No description provided for @reasonLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Alasan'**
+  String get reasonLabel;
+
+  /// No description provided for @inactiveSuffix.
+  ///
+  /// In id, this message translates to:
+  /// **'(nonaktif)'**
+  String get inactiveSuffix;
+
+  /// No description provided for @cashTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Buku kas'**
+  String get cashTitle;
+
+  /// No description provided for @closingTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tutup buku'**
+  String get closingTitle;
+
+  /// No description provided for @cashIn.
+  ///
+  /// In id, this message translates to:
+  /// **'Kas masuk'**
+  String get cashIn;
+
+  /// No description provided for @cashOut.
+  ///
+  /// In id, this message translates to:
+  /// **'Kas keluar'**
+  String get cashOut;
+
+  /// No description provided for @cashInLower.
+  ///
+  /// In id, this message translates to:
+  /// **'kas masuk'**
+  String get cashInLower;
+
+  /// No description provided for @cashOutLower.
+  ///
+  /// In id, this message translates to:
+  /// **'kas keluar'**
+  String get cashOutLower;
+
+  /// No description provided for @cashLockOne.
+  ///
+  /// In id, this message translates to:
+  /// **'tutup buku {text}'**
+  String cashLockOne(String text);
+
+  /// No description provided for @cashLockNone.
+  ///
+  /// In id, this message translates to:
+  /// **'belum ada'**
+  String get cashLockNone;
+
+  /// No description provided for @cashLockUntil.
+  ///
+  /// In id, this message translates to:
+  /// **'s/d {date}'**
+  String cashLockUntil(String date);
+
+  /// No description provided for @cashAsOf.
+  ///
+  /// In id, this message translates to:
+  /// **'Buku kas per {date} (WITA)'**
+  String cashAsOf(String date);
+
+  /// No description provided for @cashIcReceiving.
+  ///
+  /// In id, this message translates to:
+  /// **'Rekening penerimaan antar-PT: {text}'**
+  String cashIcReceiving(String text);
+
+  /// No description provided for @cashIcReceivingNone.
+  ///
+  /// In id, this message translates to:
+  /// **'belum ditetapkan (Master Data › Akun kas/bank)'**
+  String get cashIcReceivingNone;
+
+  /// No description provided for @cashReadOnly.
+  ///
+  /// In id, this message translates to:
+  /// **'Tampilan baca untuk Direktur. Pencatatan, edit dan void kas dilakukan oleh Finance.'**
+  String get cashReadOnly;
+
+  /// No description provided for @cashReadOnlyMulti.
+  ///
+  /// In id, this message translates to:
+  /// **'Tampilan baca untuk Direktur. Pencatatan, edit dan void kas dilakukan oleh Finance PT tersebut.'**
+  String get cashReadOnlyMulti;
+
+  /// No description provided for @cashSearchHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Cari nomor atau keterangan'**
+  String get cashSearchHint;
+
+  /// No description provided for @cashBookSub.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} transaksi{filtered} · terbaru dulu · baris void tetap tampil, jurnal baliknya tertaut'**
+  String cashBookSub(int count, String filtered);
+
+  /// No description provided for @cashFiltered.
+  ///
+  /// In id, this message translates to:
+  /// **' (terfilter)'**
+  String get cashFiltered;
+
+  /// No description provided for @cashEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada transaksi kas.'**
+  String get cashEmpty;
+
+  /// No description provided for @cashEmptyFiltered.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada transaksi untuk filter ini.'**
+  String get cashEmptyFiltered;
+
+  /// No description provided for @cashClearFilter.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus filter'**
+  String get cashClearFilter;
+
+  /// No description provided for @cashShownOf.
+  ///
+  /// In id, this message translates to:
+  /// **'{shown} dari {total} transaksi'**
+  String cashShownOf(int shown, int total);
+
+  /// No description provided for @cashTotal.
+  ///
+  /// In id, this message translates to:
+  /// **'Saldo kas total'**
+  String get cashTotal;
+
+  /// No description provided for @cashTotalSub.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} akun · saldo awal + masuk − keluar'**
+  String cashTotalSub(int count);
+
+  /// No description provided for @cashFlows.
+  ///
+  /// In id, this message translates to:
+  /// **'{period}: masuk {tin} · keluar {tout}'**
+  String cashFlows(String period, String tin, String tout);
+
+  /// No description provided for @cashFilterPt.
+  ///
+  /// In id, this message translates to:
+  /// **'PT'**
+  String get cashFilterPt;
+
+  /// No description provided for @cashAllPts.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua PT'**
+  String get cashAllPts;
+
+  /// No description provided for @cashFilterAccount.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun'**
+  String get cashFilterAccount;
+
+  /// No description provided for @cashFilterAccounts.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} akun'**
+  String cashFilterAccounts(int count);
+
+  /// No description provided for @cashAllAccounts.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua akun'**
+  String get cashAllAccounts;
+
+  /// No description provided for @cashFilterPeriod.
+  ///
+  /// In id, this message translates to:
+  /// **'Periode'**
+  String get cashFilterPeriod;
+
+  /// No description provided for @cashAllPeriods.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua periode'**
+  String get cashAllPeriods;
+
+  /// No description provided for @cashFilterSource.
+  ///
+  /// In id, this message translates to:
+  /// **'Sumber'**
+  String get cashFilterSource;
+
+  /// No description provided for @cashAllSources.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua sumber'**
+  String get cashAllSources;
+
+  /// No description provided for @cashStatusVoid.
+  ///
+  /// In id, this message translates to:
+  /// **'Void'**
+  String get cashStatusVoid;
+
+  /// No description provided for @cashStatusReversal.
+  ///
+  /// In id, this message translates to:
+  /// **'Jurnal balik'**
+  String get cashStatusReversal;
+
+  /// No description provided for @cashStatusPosted.
+  ///
+  /// In id, this message translates to:
+  /// **'Posted'**
+  String get cashStatusPosted;
+
+  /// No description provided for @cashVoidReason.
+  ///
+  /// In id, this message translates to:
+  /// **'Void: {reason}'**
+  String cashVoidReason(String reason);
+
+  /// No description provided for @cashReversedBy.
+  ///
+  /// In id, this message translates to:
+  /// **'dibalik oleh {no}'**
+  String cashReversedBy(String no);
+
+  /// No description provided for @cashReversalOf.
+  ///
+  /// In id, this message translates to:
+  /// **'Jurnal balik dari {no}'**
+  String cashReversalOf(String no);
+
+  /// No description provided for @cashRequestLink.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan {no}'**
+  String cashRequestLink(String no);
+
+  /// No description provided for @cashVoidTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Void {no}?'**
+  String cashVoidTitle(String no);
+
+  /// No description provided for @cashVoidBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Transaksi asli tetap tercatat dengan status Void, dan sistem membuat jurnal balik {dir} {amount} {dated}. Saldo akun kembali seperti sebelum transaksi ini.'**
+  String cashVoidBody(String dir, String amount, String dated);
+
+  /// No description provided for @cashVoidDatedToday.
+  ///
+  /// In id, this message translates to:
+  /// **'bertanggal hari ini (periode aslinya sudah ditutup)'**
+  String get cashVoidDatedToday;
+
+  /// No description provided for @cashVoidDatedOn.
+  ///
+  /// In id, this message translates to:
+  /// **'bertanggal {date}'**
+  String cashVoidDatedOn(String date);
+
+  /// No description provided for @cashVoidConfirm.
+  ///
+  /// In id, this message translates to:
+  /// **'Void transaksi'**
+  String get cashVoidConfirm;
+
+  /// No description provided for @cashVoided.
+  ///
+  /// In id, this message translates to:
+  /// **'{no} di-void.'**
+  String cashVoided(String no);
+
+  /// No description provided for @cashVoidedWith.
+  ///
+  /// In id, this message translates to:
+  /// **'{no} di-void · jurnal balik {reversal}.'**
+  String cashVoidedWith(String no, String reversal);
+
+  /// No description provided for @cashProofOf.
+  ///
+  /// In id, this message translates to:
+  /// **'Bukti {no}'**
+  String cashProofOf(String no);
+
+  /// No description provided for @cashProofNotImage.
+  ///
+  /// In id, this message translates to:
+  /// **'Bukti ini bukan gambar (PDF). Buka di web untuk melihatnya.'**
+  String get cashProofNotImage;
+
+  /// No description provided for @cashPt.
+  ///
+  /// In id, this message translates to:
+  /// **'PT'**
+  String get cashPt;
+
+  /// No description provided for @cashDate.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanggal'**
+  String get cashDate;
+
+  /// No description provided for @cashKind.
+  ///
+  /// In id, this message translates to:
+  /// **'Jenis transaksi'**
+  String get cashKind;
+
+  /// No description provided for @cashAmount.
+  ///
+  /// In id, this message translates to:
+  /// **'Nominal'**
+  String get cashAmount;
+
+  /// No description provided for @cashSourceIn.
+  ///
+  /// In id, this message translates to:
+  /// **'Sumber kas masuk'**
+  String get cashSourceIn;
+
+  /// No description provided for @cashCategory.
+  ///
+  /// In id, this message translates to:
+  /// **'Kategori biaya'**
+  String get cashCategory;
+
+  /// No description provided for @cashProject.
+  ///
+  /// In id, this message translates to:
+  /// **'Project'**
+  String get cashProject;
+
+  /// No description provided for @cashCostCenter.
+  ///
+  /// In id, this message translates to:
+  /// **'Pusat biaya'**
+  String get cashCostCenter;
+
+  /// No description provided for @cashVehicle.
+  ///
+  /// In id, this message translates to:
+  /// **'Kendaraan'**
+  String get cashVehicle;
+
+  /// No description provided for @cashDescription.
+  ///
+  /// In id, this message translates to:
+  /// **'Keterangan'**
+  String get cashDescription;
+
+  /// No description provided for @cashSource.
+  ///
+  /// In id, this message translates to:
+  /// **'Sumber'**
+  String get cashSource;
+
+  /// No description provided for @cashProof.
+  ///
+  /// In id, this message translates to:
+  /// **'Bukti'**
+  String get cashProof;
+
+  /// No description provided for @cashEdit.
+  ///
+  /// In id, this message translates to:
+  /// **'Edit'**
+  String get cashEdit;
+
+  /// No description provided for @cashVoid.
+  ///
+  /// In id, this message translates to:
+  /// **'Void'**
+  String get cashVoid;
+
+  /// No description provided for @cashNewTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Catat kas masuk / keluar'**
+  String get cashNewTitle;
+
+  /// No description provided for @cashNoWrite.
+  ///
+  /// In id, this message translates to:
+  /// **'Pencatatan kas hanya oleh Finance PT ini.'**
+  String get cashNoWrite;
+
+  /// No description provided for @cashPickPt.
+  ///
+  /// In id, this message translates to:
+  /// **'Anda Finance di beberapa PT. Pilih PT transaksi ini — akun, project, pusat biaya dan kategori mengikuti PT tersebut.'**
+  String get cashPickPt;
+
+  /// No description provided for @cashEntryNotFound.
+  ///
+  /// In id, this message translates to:
+  /// **'Transaksi tidak ditemukan. Buka Edit dari Buku kas.'**
+  String get cashEntryNotFound;
+
+  /// No description provided for @cashEditTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Edit {no}'**
+  String cashEditTitle(String no);
+
+  /// No description provided for @cashNotEditableVoid.
+  ///
+  /// In id, this message translates to:
+  /// **'Transaksi sudah di-void.'**
+  String get cashNotEditableVoid;
+
+  /// No description provided for @cashNotEditableSource.
+  ///
+  /// In id, this message translates to:
+  /// **'Hanya transaksi kas manual yang dapat diedit.'**
+  String get cashNotEditableSource;
+
+  /// No description provided for @cashNotEditableClosed.
+  ///
+  /// In id, this message translates to:
+  /// **'Periode transaksi sudah ditutup (tutup buku s/d {date}). Koreksi dengan Void — jurnal balik dicatat di periode berjalan.'**
+  String cashNotEditableClosed(String date);
+
+  /// No description provided for @cashCheckFields.
+  ///
+  /// In id, this message translates to:
+  /// **'Periksa isian yang ditandai.'**
+  String get cashCheckFields;
+
+  /// No description provided for @cashNoChanges.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada perubahan untuk disimpan.'**
+  String get cashNoChanges;
+
+  /// No description provided for @cashSaved.
+  ///
+  /// In id, this message translates to:
+  /// **'{no} tersimpan · {dir} {amount}.'**
+  String cashSaved(String no, String dir, String amount);
+
+  /// No description provided for @cashUpdated.
+  ///
+  /// In id, this message translates to:
+  /// **'{no} diperbarui.'**
+  String cashUpdated(String no);
+
+  /// No description provided for @cashOverdraftCancelled.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum disimpan — saldo akun akan minus. Periksa nominal atau akun, lalu simpan lagi.'**
+  String get cashOverdraftCancelled;
+
+  /// No description provided for @cashEditNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Keterangan, sumber/kategori, pembebanan, kendaraan dan bukti. Tanggal, akun dan nominal terkunci. Alasan wajib.'**
+  String get cashEditNote;
+
+  /// No description provided for @cashNewNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Nomor KM/KK diberikan otomatis saat disimpan. Saldo akun langsung berubah.'**
+  String get cashNewNote;
+
+  /// No description provided for @cashDateNoLock.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada periode yang ditutup.'**
+  String get cashDateNoLock;
+
+  /// No description provided for @cashDateLock.
+  ///
+  /// In id, this message translates to:
+  /// **'Tutup buku s/d {date}: tanggal sebelumnya ditolak.'**
+  String cashDateLock(String date);
+
+  /// No description provided for @cashDateOpening.
+  ///
+  /// In id, this message translates to:
+  /// **'Saldo awal akun per {date}: tanggal sebelumnya ditolak.'**
+  String cashDateOpening(String date);
+
+  /// No description provided for @cashDateNoFuture.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak boleh di masa depan.'**
+  String get cashDateNoFuture;
+
+  /// No description provided for @cashLockedHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanggal, akun dan nominal terkunci — koreksi dengan Void lalu catat ulang.'**
+  String get cashLockedHelp;
+
+  /// No description provided for @cashAmountHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Rupiah tanpa desimal; titik sebagai pemisah ribuan'**
+  String get cashAmountHelp;
+
+  /// No description provided for @cashScope.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibebankan ke'**
+  String get cashScope;
+
+  /// No description provided for @cashScopeNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada'**
+  String get cashScopeNone;
+
+  /// No description provided for @cashScopeHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Project ATAU pusat biaya — tidak keduanya.'**
+  String get cashScopeHelp;
+
+  /// No description provided for @cashVehicleOptional.
+  ///
+  /// In id, this message translates to:
+  /// **'Kendaraan (opsional)'**
+  String get cashVehicleOptional;
+
+  /// No description provided for @cashVehicleNone.
+  ///
+  /// In id, this message translates to:
+  /// **'— tanpa kendaraan —'**
+  String get cashVehicleNone;
+
+  /// No description provided for @cashVehicleHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Kategori ini biasanya dicatat per kendaraan.'**
+  String get cashVehicleHint;
+
+  /// No description provided for @cashProofReplace.
+  ///
+  /// In id, this message translates to:
+  /// **'Ganti bukti (opsional)'**
+  String get cashProofReplace;
+
+  /// No description provided for @cashProofOptional.
+  ///
+  /// In id, this message translates to:
+  /// **'Bukti (opsional)'**
+  String get cashProofOptional;
+
+  /// No description provided for @cashProofCurrent.
+  ///
+  /// In id, this message translates to:
+  /// **'Lihat bukti saat ini'**
+  String get cashProofCurrent;
+
+  /// No description provided for @cashProofHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto bukti dari kamera atau galeri, diperkecil otomatis. Bukti PDF diunggah lewat web.'**
+  String get cashProofHelp;
+
+  /// No description provided for @cashReason.
+  ///
+  /// In id, this message translates to:
+  /// **'Alasan perubahan'**
+  String get cashReason;
+
+  /// No description provided for @cashReasonHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Tercatat di audit log bersama nilai lama dan baru.'**
+  String get cashReasonHelp;
+
+  /// No description provided for @cashRulesTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Aturan'**
+  String get cashRulesTitle;
+
+  /// No description provided for @cashRule1.
+  ///
+  /// In id, this message translates to:
+  /// **'Kas masuk wajib sumber; kas keluar wajib kategori.'**
+  String get cashRule1;
+
+  /// No description provided for @cashRule2.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibebankan ke project atau pusat biaya, tidak keduanya.'**
+  String get cashRule2;
+
+  /// No description provided for @cashRule3.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanggal tidak boleh di masa depan atau di periode yang sudah ditutup.'**
+  String get cashRule3;
+
+  /// No description provided for @cashRule3Lock.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanggal tidak boleh di masa depan atau di periode yang sudah ditutup (s/d {date}).'**
+  String cashRule3Lock(String date);
+
+  /// No description provided for @cashRule4.
+  ///
+  /// In id, this message translates to:
+  /// **'Setelah tersimpan, nominal/tanggal/akun tidak bisa diedit — gunakan Void lalu catat ulang.'**
+  String get cashRule4;
+
+  /// No description provided for @cashSaving.
+  ///
+  /// In id, this message translates to:
+  /// **'Menyimpan…'**
+  String get cashSaving;
+
+  /// No description provided for @cashSaveChanges.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan perubahan'**
+  String get cashSaveChanges;
+
+  /// No description provided for @cashSaveIn.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan kas masuk'**
+  String get cashSaveIn;
+
+  /// No description provided for @cashSaveOut.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan kas keluar'**
+  String get cashSaveOut;
+
+  /// No description provided for @closingCloseTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tutup buku {period}{pt}?'**
+  String closingCloseTitle(String period, String pt);
+
+  /// No description provided for @closingCloseBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua transaksi kas dan transfer bertanggal s/d {date} dikunci: tidak dapat dicatat, diedit, atau di-void dengan tanggal itu. Koreksi setelahnya dicatat sebagai jurnal balik di periode berjalan. Membuka kembali hanya oleh Direktur.'**
+  String closingCloseBody(String date);
+
+  /// No description provided for @closingOnlyPt.
+  ///
+  /// In id, this message translates to:
+  /// **'Hanya PT {name} yang dikunci.'**
+  String closingOnlyPt(String name);
+
+  /// No description provided for @closingNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Catatan (opsional)'**
+  String get closingNote;
+
+  /// No description provided for @closingClosed.
+  ///
+  /// In id, this message translates to:
+  /// **'{period} ditutup.'**
+  String closingClosed(String period);
+
+  /// No description provided for @closingReopenTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Buka kembali {period}{pt}?'**
+  String closingReopenTitle(String period, String pt);
+
+  /// No description provided for @closingReopenBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Periode ini dapat diposting dan dikoreksi lagi sampai ditutup kembali. Alasan wajib dan tercatat di audit log.'**
+  String get closingReopenBody;
+
+  /// No description provided for @closingReopen.
+  ///
+  /// In id, this message translates to:
+  /// **'Buka kembali'**
+  String get closingReopen;
+
+  /// No description provided for @closingReopened.
+  ///
+  /// In id, this message translates to:
+  /// **'{period} dibuka kembali.'**
+  String closingReopened(String period);
+
+  /// No description provided for @closingPickPt.
+  ///
+  /// In id, this message translates to:
+  /// **'Tutup buku dilakukan per PT: menutup satu PT tidak mengunci PT lain. Pilih PT yang akan dikelola.'**
+  String get closingPickPt;
+
+  /// No description provided for @closingLockedUntil.
+  ///
+  /// In id, this message translates to:
+  /// **'Terkunci s/d {date}'**
+  String closingLockedUntil(String date);
+
+  /// No description provided for @closingNoLock.
+  ///
+  /// In id, this message translates to:
+  /// **'belum ada'**
+  String get closingNoLock;
+
+  /// No description provided for @closingNoLockShort.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada'**
+  String get closingNoLockShort;
+
+  /// No description provided for @closingLead.
+  ///
+  /// In id, this message translates to:
+  /// **'Tutup bulan yang sudah lewat. Buka kembali hanya oleh Direktur, untuk periode tertutup terakhir, dengan alasan.'**
+  String get closingLead;
+
+  /// No description provided for @closingKpiLock.
+  ///
+  /// In id, this message translates to:
+  /// **'Terkunci s/d'**
+  String get closingKpiLock;
+
+  /// No description provided for @closingKpiLockSub.
+  ///
+  /// In id, this message translates to:
+  /// **'Posting bertanggal ≤ tanggal ini ditolak.'**
+  String get closingKpiLockSub;
+
+  /// No description provided for @closingKpiLast.
+  ///
+  /// In id, this message translates to:
+  /// **'Periode tertutup terakhir'**
+  String get closingKpiLast;
+
+  /// No description provided for @closingKpiLastSub.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} kali tutup/buka tercatat'**
+  String closingKpiLastSub(int count);
+
+  /// No description provided for @closingKpiClosable.
+  ///
+  /// In id, this message translates to:
+  /// **'Bulan siap ditutup'**
+  String get closingKpiClosable;
+
+  /// No description provided for @closingKpiClosableNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada — bulan berjalan belum bisa ditutup.'**
+  String get closingKpiClosableNone;
+
+  /// No description provided for @closingPerMonth.
+  ///
+  /// In id, this message translates to:
+  /// **'Per bulan'**
+  String get closingPerMonth;
+
+  /// No description provided for @closingPerMonthSub1.
+  ///
+  /// In id, this message translates to:
+  /// **'13 bulan terakhir'**
+  String get closingPerMonthSub1;
+
+  /// No description provided for @closingBooksStart.
+  ///
+  /// In id, this message translates to:
+  /// **'sejak buku kas dimulai ({date}).'**
+  String closingBooksStart(String date);
+
+  /// No description provided for @closingPerMonthSub2.
+  ///
+  /// In id, this message translates to:
+  /// **'Masuk/Keluar tanpa pasangan void; koreksi void terpisah.'**
+  String get closingPerMonthSub2;
+
+  /// No description provided for @closingNoData.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada data.'**
+  String get closingNoData;
+
+  /// No description provided for @closingHistory.
+  ///
+  /// In id, this message translates to:
+  /// **'Riwayat'**
+  String get closingHistory;
+
+  /// No description provided for @closingHistorySub.
+  ///
+  /// In id, this message translates to:
+  /// **'Tutup & buka kembali'**
+  String get closingHistorySub;
+
+  /// No description provided for @closingHistoryEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum pernah tutup buku.'**
+  String get closingHistoryEmpty;
+
+  /// No description provided for @closingStateClosed.
+  ///
+  /// In id, this message translates to:
+  /// **'Ditutup'**
+  String get closingStateClosed;
+
+  /// No description provided for @closingStateReopened.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibuka kembali'**
+  String get closingStateReopened;
+
+  /// No description provided for @closingStateLocked.
+  ///
+  /// In id, this message translates to:
+  /// **'Terkunci'**
+  String get closingStateLocked;
+
+  /// No description provided for @closingStateCurrent.
+  ///
+  /// In id, this message translates to:
+  /// **'Berjalan'**
+  String get closingStateCurrent;
+
+  /// No description provided for @closingStateOpen.
+  ///
+  /// In id, this message translates to:
+  /// **'Terbuka'**
+  String get closingStateOpen;
+
+  /// No description provided for @closingNoteText.
+  ///
+  /// In id, this message translates to:
+  /// **'Catatan: {note}'**
+  String closingNoteText(String note);
+
+  /// No description provided for @closingReopenedBy.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibuka {name} · {at} — {reason}'**
+  String closingReopenedBy(String name, String at, String reason);
+
+  /// No description provided for @closingCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} transaksi{voids}'**
+  String closingCount(int count, String voids);
+
+  /// No description provided for @closingVoids.
+  ///
+  /// In id, this message translates to:
+  /// **' ({count} void)'**
+  String closingVoids(int count);
+
+  /// No description provided for @closingFigures.
+  ///
+  /// In id, this message translates to:
+  /// **'Masuk {tin} · Keluar {tout} · Bersih {net}'**
+  String closingFigures(String tin, String tout, String net);
+
+  /// No description provided for @closingKoreksi.
+  ///
+  /// In id, this message translates to:
+  /// **'Koreksi (void): {amount} ({count} baris)'**
+  String closingKoreksi(String amount, int count);
+
+  /// No description provided for @closingReopenDirektur.
+  ///
+  /// In id, this message translates to:
+  /// **'Buka kembali: Direktur'**
+  String get closingReopenDirektur;
+
+  /// No description provided for @voidTransferTab.
+  ///
+  /// In id, this message translates to:
+  /// **'Transfer tercatat'**
+  String get voidTransferTab;
+
+  /// No description provided for @voidTransferTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Void transfer {no}?'**
+  String voidTransferTitle(String no);
+
+  /// No description provided for @voidTransferBody.
+  ///
+  /// In id, this message translates to:
+  /// **'KK transfer ini dibalik dengan jurnal balik (saldo akun kembali), transfer ditandai Void, dan pengajuan {request} kembali ke {back} untuk ditransfer ulang.'**
+  String voidTransferBody(String request, String back);
+
+  /// No description provided for @voidTransferBackAdvance.
+  ///
+  /// In id, this message translates to:
+  /// **'Disetujui (Antri Transfer)'**
+  String get voidTransferBackAdvance;
+
+  /// No description provided for @voidTransferBackReimburse.
+  ///
+  /// In id, this message translates to:
+  /// **'Nota Terverifikasi (Antri Transfer)'**
+  String get voidTransferBackReimburse;
+
+  /// No description provided for @voidTransfer.
+  ///
+  /// In id, this message translates to:
+  /// **'Void transfer'**
+  String get voidTransfer;
+
+  /// No description provided for @voidTransferDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Transfer {no} di-void. Pengajuan kembali ke Antrian Transfer.'**
+  String voidTransferDone(String no);
+
+  /// No description provided for @voidTransferSearchHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Cari nomor transfer atau pengajuan'**
+  String get voidTransferSearchHint;
+
+  /// No description provided for @voidTransferLead.
+  ///
+  /// In id, this message translates to:
+  /// **'Transfer tercatat — dapat dibatalkan ({count})'**
+  String voidTransferLead(int count);
+
+  /// No description provided for @voidTransferNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Void transfer membuat jurnal balik untuk KK-nya (KK asli tetap tampil sebagai Void) dan mengembalikan pengajuan ke antrian: Pengajuan Baru → Disetujui, Reimburse → Nota Terverifikasi.'**
+  String get voidTransferNote;
+
+  /// No description provided for @voidTransferEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada transfer yang bisa dibatalkan.'**
+  String get voidTransferEmpty;
+
+  /// No description provided for @voidTransferFinanceOnly.
+  ///
+  /// In id, this message translates to:
+  /// **'Void: Finance PT ini'**
+  String get voidTransferFinanceOnly;
+
+  /// No description provided for @loanListTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman antar project'**
+  String get loanListTitle;
+
+  /// No description provided for @loanListNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Diajukan PM project peminjam · disetujui Direktur · tanpa transaksi kas (klaim tercatat antar project dalam satu PT)'**
+  String get loanListNote;
+
+  /// No description provided for @loanKpiPending.
+  ///
+  /// In id, this message translates to:
+  /// **'Menunggu persetujuan'**
+  String get loanKpiPending;
+
+  /// No description provided for @loanKpiPendingNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada yang menunggu Anda ✓'**
+  String get loanKpiPendingNone;
+
+  /// No description provided for @loanKpiPendingMine.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} menunggu keputusan Anda'**
+  String loanKpiPendingMine(int count);
+
+  /// No description provided for @loanKpiOutstandingSub.
+  ///
+  /// In id, this message translates to:
+  /// **'Disetujui {amount} · kembali {repaid}'**
+  String loanKpiOutstandingSub(String amount, String repaid);
+
+  /// No description provided for @loanOverdueOnly.
+  ///
+  /// In id, this message translates to:
+  /// **'Terlambat'**
+  String get loanOverdueOnly;
+
+  /// No description provided for @loanKpiOverdueNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada yang terlambat ✓'**
+  String get loanKpiOverdueNone;
+
+  /// No description provided for @loanKpiOverdueSum.
+  ///
+  /// In id, this message translates to:
+  /// **'Sisa terlambat {amount}'**
+  String loanKpiOverdueSum(String amount);
+
+  /// No description provided for @loanWaitingMine.
+  ///
+  /// In id, this message translates to:
+  /// **'Menunggu saya ({count})'**
+  String loanWaitingMine(int count);
+
+  /// No description provided for @loanListSearchHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Nomor atau alasan…'**
+  String get loanListSearchHint;
+
+  /// No description provided for @loanFilterBorrower.
+  ///
+  /// In id, this message translates to:
+  /// **'Peminjam'**
+  String get loanFilterBorrower;
+
+  /// No description provided for @loanFilterLender.
+  ///
+  /// In id, this message translates to:
+  /// **'Pemberi'**
+  String get loanFilterLender;
+
+  /// No description provided for @loanListEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada pinjaman antar project.'**
+  String get loanListEmpty;
+
+  /// No description provided for @loanListEmptyFiltered.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada pinjaman untuk filter ini.'**
+  String get loanListEmptyFiltered;
+
+  /// No description provided for @icLoanListTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman antar-PT'**
+  String get icLoanListTitle;
+
+  /// No description provided for @icLoanListNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Diperintahkan Owner · dicairkan Finance PT pemberi · dikembalikan Finance PT peminjam · uang nyata antar PT grup (KK + KM otomatis), tanpa bunga'**
+  String get icLoanListNote;
+
+  /// No description provided for @icLoanKpiReceivable.
+  ///
+  /// In id, this message translates to:
+  /// **'Piutang antar-PT (sisa)'**
+  String get icLoanKpiReceivable;
+
+  /// No description provided for @icLoanKpiPayable.
+  ///
+  /// In id, this message translates to:
+  /// **'Hutang antar-PT (sisa)'**
+  String get icLoanKpiPayable;
+
+  /// No description provided for @icLoanKpiOverdueSub.
+  ///
+  /// In id, this message translates to:
+  /// **'Sisa yang lewat jatuh tempo'**
+  String get icLoanKpiOverdueSub;
+
+  /// No description provided for @icLoanQueueWaiting.
+  ///
+  /// In id, this message translates to:
+  /// **'Menunggu pencairan Anda ({count})'**
+  String icLoanQueueWaiting(int count);
+
+  /// No description provided for @icLoanListSearchHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Nomor, alasan, kode PT…'**
+  String get icLoanListSearchHint;
+
+  /// No description provided for @icLoanListEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada pinjaman antar-PT.'**
+  String get icLoanListEmpty;
+
+  /// No description provided for @icLoanListEmptyFiltered.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada pinjaman untuk filter ini.'**
+  String get icLoanListEmptyFiltered;
+
+  /// No description provided for @icLoanCardFigures.
+  ///
+  /// In id, this message translates to:
+  /// **'{amount} · sisa {outstanding}'**
+  String icLoanCardFigures(String amount, String outstanding);
+
+  /// No description provided for @loanRepay.
+  ///
+  /// In id, this message translates to:
+  /// **'Catat pengembalian'**
+  String get loanRepay;
+
+  /// No description provided for @loanRepayTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Catat pengembalian {title}'**
+  String loanRepayTitle(String title);
+
+  /// No description provided for @loanRepayOutstanding.
+  ///
+  /// In id, this message translates to:
+  /// **'Sisa pinjaman {amount}'**
+  String loanRepayOutstanding(String amount);
+
+  /// No description provided for @loanRepayDate.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanggal pengembalian'**
+  String get loanRepayDate;
+
+  /// No description provided for @loanRepayNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Catatan'**
+  String get loanRepayNote;
+
+  /// No description provided for @loanRepaySave.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan pengembalian'**
+  String get loanRepaySave;
+
+  /// No description provided for @loanRepayDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengembalian {amount} tercatat.'**
+  String loanRepayDone(String amount);
+
+  /// No description provided for @loanRepaymentVoidTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Void pengembalian ke-{seq}?'**
+  String loanRepaymentVoidTitle(int seq);
+
+  /// No description provided for @loanRepaymentVoidBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengembalian {amount} dibatalkan (tidak dihapus); sisa pinjaman bertambah lagi. Alasan wajib.'**
+  String loanRepaymentVoidBody(String amount);
+
+  /// No description provided for @loanRepaymentVoidConfirm.
+  ///
+  /// In id, this message translates to:
+  /// **'Void pengembalian'**
+  String get loanRepaymentVoidConfirm;
+
+  /// No description provided for @loanRepaymentVoided.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengembalian di-void.'**
+  String get loanRepaymentVoided;
+
+  /// No description provided for @icLoanCancelWebHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Pembatalan perintah pinjaman dilakukan di web (Keuangan → Pinjaman antar-PT).'**
+  String get icLoanCancelWebHint;
+
+  /// No description provided for @icLoanVoidDisbursementTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Void pencairan {no}?'**
+  String icLoanVoidDisbursementTitle(String no);
+
+  /// No description provided for @icLoanVoidDisbursementBody.
+  ///
+  /// In id, this message translates to:
+  /// **'KK di PT {lender} dan KM di PT {borrower} dibalik (jurnal balik), pinjaman kembali menunggu pencairan. Pengajuan yang sudah disetujui tetap disetujui. Untuk pengembalian dana pakai Catat pengembalian, bukan void.'**
+  String icLoanVoidDisbursementBody(String lender, String borrower);
+
+  /// No description provided for @icLoanVoidDisbursement.
+  ///
+  /// In id, this message translates to:
+  /// **'Void pencairan'**
+  String get icLoanVoidDisbursement;
+
+  /// No description provided for @icLoanVoidRepaymentTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Void {label}?'**
+  String icLoanVoidRepaymentTitle(String label);
+
+  /// No description provided for @icLoanVoidRepaymentBody.
+  ///
+  /// In id, this message translates to:
+  /// **'KK di PT {borrower} dan KM di PT {lender} dibalik; sisa pinjaman bertambah lagi.'**
+  String icLoanVoidRepaymentBody(String borrower, String lender);
+
+  /// No description provided for @icLoanVoidShortfallConfirm.
+  ///
+  /// In id, this message translates to:
+  /// **'Saya mengerti dana tersedia PT {borrower} bisa menjadi minus (dana sudah terpakai / dijanjikan).'**
+  String icLoanVoidShortfallConfirm(String borrower);
+
+  /// No description provided for @icLoanVoidedDisbursement.
+  ///
+  /// In id, this message translates to:
+  /// **'Pencairan di-void. Pinjaman kembali menunggu pencairan.'**
+  String get icLoanVoidedDisbursement;
+
+  /// No description provided for @icLoanRepayTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Catat pengembalian'**
+  String get icLoanRepayTitle;
+
+  /// No description provided for @icLoanNotRepayable.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengembalian pinjaman ini dicatat oleh Finance PT peminjam.'**
+  String get icLoanNotRepayable;
+
+  /// No description provided for @icLoanRepayAmount.
+  ///
+  /// In id, this message translates to:
+  /// **'Sisa {amount} · PT {borrower} → PT {lender}'**
+  String icLoanRepayAmount(String amount, String borrower, String lender);
+
+  /// No description provided for @icLoanRepayHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibayar dari akun PT peminjam ke rekening penerimaan antar-PT PT pemberi; KK dan KM dicatat otomatis.'**
+  String get icLoanRepayHelp;
+
+  /// No description provided for @icLoanRepayDone.
+  ///
+  /// In id, this message translates to:
+  /// **'{no}: pengembalian {amount} tercatat.'**
+  String icLoanRepayDone(String no, String amount);
+
+  /// No description provided for @recordsTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Data'**
+  String get recordsTitle;
+
+  /// No description provided for @recordsCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} data · terbaru dulu'**
+  String recordsCount(int count);
+
+  /// No description provided for @recordsEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada data.'**
+  String get recordsEmpty;
+
+  /// No description provided for @recordsEmptySearch.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada data untuk pencarian ini.'**
+  String get recordsEmptySearch;
+
+  /// No description provided for @recordsShownOf.
+  ///
+  /// In id, this message translates to:
+  /// **'{shown} dari {total} data'**
+  String recordsShownOf(int shown, int total);
+
+  /// No description provided for @recordsReadOnly.
+  ///
+  /// In id, this message translates to:
+  /// **'Tampilan baca. Data ini diubah lewat alurnya masing-masing (atau di web).'**
+  String get recordsReadOnly;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

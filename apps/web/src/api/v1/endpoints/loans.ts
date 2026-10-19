@@ -1,5 +1,9 @@
 import type { Endpoint } from 'payload'
 
+import { relId } from '@/access/roles'
+import { today } from '@/domain/expense/common'
+import { loanScope, loanTotals } from '@/domain/loans/report'
+
 import { addRepayment, approveLoan, cancelLoan, createLoan, editLoan, listLoans, loadVisibleLoan, loanDetail, loanInbox, loanProjectOptions, rejectLoan, submitLoan, voidRepayment, type LoanDoc } from '@/domain/loans/service'
 import { withReqTransaction } from '@/lib/system-tx'
 
@@ -22,7 +26,8 @@ function idParam(params: Record<string, string>, key = 'id'): number {
 }
 
 type Req = Parameters<typeof loanDetail>[0]
-const detail = async (req: Req, doc: LoanDoc, status = 200) => json(await loanDetail(req, doc), status)
+// user 2026-10-19 (APK phase 3): `today` = business date of the loan's PT (repayment date max)
+const detail = async (req: Req, doc: LoanDoc, status = 200) => json({ ...(await loanDetail(req, doc)), today: await today(req, relId(doc.company)) }, status)
 
 export const listLoansEndpoint = v1({
   path: '/project-loans',
@@ -32,9 +37,14 @@ export const listLoansEndpoint = v1({
     if (!q.success) throw new HttpError(400, 'Bad Request', { errors: q.error.issues.map((i) => ({ path: i.path.map(String).join('.'), message: i.message })) })
     const companyIds = await companyQuery(req)
     return json(
-      await withReqTransaction(req, () =>
-        listLoans(req, { projectId: q.data.project, role: q.data.role, status: q.data.status, overdue: q.data.overdue !== undefined, q: q.data.q, page: q.data.page, limit: q.data.limit, companyIds }),
-      ),
+      await withReqTransaction(req, async () => {
+        const page = await listLoans(req, { projectId: q.data.project, role: q.data.role, status: q.data.status, overdue: q.data.overdue !== undefined, q: q.data.q, page: q.data.page, limit: q.data.limit, companyIds })
+        if (q.data.summary === undefined) return page
+        // user 2026-10-19 (APK Pinjaman list): the web LoanList tiles
+        const t = await loanTotals(req, await loanScope(req))
+        const totals = { pending: t.pending, amount: t.amount, repaid: t.repaid, outstanding: t.outstanding, overdueCount: t.overdueCount, overdue: t.overdue }
+        return { ...page, summary: { totals, inboxCount: (await loanInbox(req)).items.length, canCreate: (await loanProjectOptions(req)).borrowers.length > 0 } }
+      }),
     )
   },
 })

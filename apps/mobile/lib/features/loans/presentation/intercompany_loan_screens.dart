@@ -18,6 +18,7 @@ import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/doc_no_chip.dart';
 import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/online_only_button.dart';
+import '../../../shared/widgets/reason_dialog.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/user_profile.dart';
@@ -32,9 +33,10 @@ import '../domain/intercompany_loan.dart';
 import 'intercompany_loan_providers.dart';
 
 /// ADR 0029 "Pinjaman antar-PT" on the APK (online only): the Owner's instruction form (opened from the fund panel of
-/// a short request), the read-only loan detail (notifications `icloan.*` deep-link here; repayments and voids are shown,
-/// recorded on the web) and Finance's disbursement form (reusing the transfer form: source account without site, date +
-/// time of the bank proof, bank reference, proof photo, overdraft confirmation).
+/// a short request), the loan detail (notifications `icloan.*` deep-link here) and Finance's disbursement form (reusing
+/// the transfer form: source account without site, date + time of the bank proof, bank reference, proof photo, overdraft
+/// confirmation). Phase 3 (user 2026-10-19): the repayment by Finance of the borrower (same form + amount) and the voids
+/// of a disbursement / repayment; only "Batalkan perintah" stays on the web.
 
 String _today() => toYmd(DateTime.now());
 
@@ -476,6 +478,20 @@ class IcLoanDetailScreen extends ConsumerWidget {
         ),
       ),
       bottomNavigationBar: switch (value) {
+        AsyncData(:final value) when value.allowedActions.contains(IcLoanAction.repay) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: OnlineOnlyButton(
+              key: const Key('icloan-action-repay'),
+              label: t.loanRepay,
+              icon: Icons.payments_outlined,
+              onPressed: () async {
+                await GoRouter.maybeOf(context)?.push('${icLoanPath(id)}/repay');
+                ref.invalidate(icLoanDetailProvider(id));
+              },
+            ),
+          ),
+        ),
         AsyncData(:final value) when value.allowedActions.contains(IcLoanAction.disburse) => SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -639,18 +655,92 @@ class _IcLoanBody extends ConsumerWidget {
         if (l.movements.isEmpty)
           Text(t.icLoanMovementsEmpty, key: const Key('icloan-movements-empty'), style: theme.textTheme.bodySmall)
         else
-          for (final m in l.movements) _MovementTile(m: m, zone: zone),
-        note(t.icLoanWebOnlyHint, key: const Key('icloan-web-hint')),
+          for (final m in l.movements)
+            _MovementTile(
+              m: m,
+              zone: zone,
+              onVoid: !m.posted
+                  ? null
+                  : m.isDisbursement && l.allowedActions.contains(IcLoanAction.voidDisbursement)
+                  ? () => _voidMovement(context, ref, l, m)
+                  : !m.isDisbursement && l.allowedActions.contains(IcLoanAction.voidRepayment)
+                  ? () => _voidMovement(context, ref, l, m)
+                  : null,
+            ),
+        if (l.allowedActions.contains(IcLoanAction.cancel))
+          note(t.icLoanCancelWebHint, key: const Key('icloan-web-hint')),
         const SizedBox(height: 80),
       ],
     );
   }
 }
 
+/// Web "Void pencairan" / "Void" of a repayment (reason; a disbursement void that would take the borrower's "Dana
+/// tersedia" below 0 asks for the confirmation of the 409 `LOAN_VOID_BORROWER_SHORTFALL_CONFIRM_REQUIRED`).
+Future<void> _voidMovement(BuildContext context, WidgetRef ref, IcLoan l, IcLoanMovement m) async {
+  final t = AppLocalizations.of(context);
+  final reason = await showReasonDialog(
+    context,
+    title: m.isDisbursement
+        ? t.icLoanVoidDisbursementTitle(l.docNo)
+        : t.icLoanVoidRepaymentTitle(m.label.toLowerCase()),
+    description: m.isDisbursement
+        ? t.icLoanVoidDisbursementBody(l.lenderCode, l.borrowerCode)
+        : t.icLoanVoidRepaymentBody(l.borrowerCode, l.lenderCode),
+    confirm: m.isDisbursement ? t.icLoanVoidDisbursement : t.loanRepaymentVoidConfirm,
+    keyPrefix: 'icloan-void',
+  );
+  if (reason == null || !context.mounted) return;
+  final api = ref.read(intercompanyLoansApiProvider);
+  final key = const Uuid().v7();
+  Future<void> send({bool confirm = false}) => m.isDisbursement
+      ? api.voidDisbursement(
+          l.id,
+          reason: reason,
+          confirmBorrowerShortfall: confirm,
+          idempotencyKey: confirm ? '$key-c' : key,
+        )
+      : api.voidRepayment(l.id, m.id, reason: reason, idempotencyKey: key);
+  try {
+    try {
+      await send();
+    } on ProblemException catch (e) {
+      if (e.code != loanVoidBorrowerShortfallCode || !context.mounted) rethrow;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Text(t.icLoanVoidDisbursementTitle(l.docNo)),
+          content: Text(t.icLoanVoidShortfallConfirm(l.borrowerCode)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
+            FilledButton(
+              key: const Key('icloan-void-shortfall-confirm'),
+              onPressed: () => Navigator.pop(c, true),
+              child: Text(t.overrideConfirm),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      await send(confirm: true);
+    }
+    if (context.mounted) showSnack(context, m.isDisbursement ? t.icLoanVoidedDisbursement : t.loanRepaymentVoided);
+  } on ApiException catch (e) {
+    if (context.mounted) showSnack(context, icLoanAwareError(e, errorText));
+  } finally {
+    ref.invalidate(icLoanDetailProvider(l.id));
+    ref.invalidate(icLoanQueueProvider);
+    ref.invalidate(cashAccountsProvider);
+  }
+}
+
 class _MovementTile extends StatelessWidget {
-  const _MovementTile({required this.m, this.zone});
+  const _MovementTile({required this.m, this.zone, this.onVoid});
   final IcLoanMovement m;
   final String? zone;
+
+  /// "Void pencairan" / "Void" when the server allows it.
+  final VoidCallback? onVoid;
 
   @override
   Widget build(BuildContext context) {
@@ -698,6 +788,16 @@ class _MovementTile extends StatelessWidget {
                 m.voidReason == null ? t.icLoanMovementVoid : t.icLoanMovementVoidReason(m.voidReason!),
                 key: Key('icloan-movement-void-${m.id}'),
                 style: theme.textTheme.bodySmall?.copyWith(color: context.pk.badText),
+              ),
+            if (onVoid != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  key: Key('icloan-movement-${m.id}-void'),
+                  onPressed: onVoid,
+                  icon: const Icon(Icons.block, size: 18),
+                  label: Text(m.isDisbursement ? t.icLoanVoidDisbursement : t.cashVoid),
+                ),
               ),
           ],
         ),
@@ -749,13 +849,48 @@ class IcLoanDisburseRoute extends ConsumerWidget {
   }
 }
 
-/// "Catat pencairan" (Finance of the LENDER): the transfer form without a cost center — source account of the lender
+/// `/intercompany-loans/:id/repay`: "Catat pengembalian" while the server offers `repay` to the caller (Finance of the
+/// borrower).
+class IcLoanRepayRoute extends ConsumerWidget {
+  const IcLoanRepayRoute({super.key, required this.id});
+  final int id;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppLocalizations.of(context);
+    return AsyncBody<IcLoan>(
+      value: ref.watch(icLoanDetailProvider(id)),
+      onRetry: () => ref.invalidate(icLoanDetailProvider(id)),
+      data: (loan) => loan.allowedActions.contains(IcLoanAction.repay)
+          ? IcLoanDisburseScreen(loan: loan, repay: true, destinationKnown: false)
+          : Scaffold(
+              appBar: AppBar(title: Text(t.icLoanRepayTitle)),
+              body: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(t.icLoanNotRepayable, key: const Key('icloan-not-repayable')),
+              ),
+            ),
+    );
+  }
+}
+
+/// "Catat pencairan" (Finance of the LENDER) or, with [repay], "Catat pengembalian" (Finance of the BORROWER, amount
+/// ≤ sisa, destination = the lender's receiving account): the transfer form without a cost center — source account of the lender
 /// WITHOUT a site (the fund pool), date + time of the bank proof (lender zone), bank reference, proof photo; a
 /// confirmable 409 (overdraft, QA-04) asks "Tetap simpan". The amount is the loan amount (server-set).
 class IcLoanDisburseScreen extends ConsumerStatefulWidget {
-  const IcLoanDisburseScreen({super.key, required this.loan, this.destination, this.destinationKnown = true});
+  const IcLoanDisburseScreen({
+    super.key,
+    required this.loan,
+    this.destination,
+    this.destinationKnown = true,
+    this.repay = false,
+  });
   final IcLoan loan;
   final IcLoanDestination? destination;
+
+  /// Phase 3: the repayment (paying PT = the borrower) instead of the disbursement.
+  final bool repay;
 
   /// The detail carried `destination` (or, from an older server, the queue was loaded): a null [destination] then means
   /// "none designated" (the disbursement will be refused).
@@ -776,26 +911,39 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
   String? _error;
   final _keys = <String, String>{};
 
-  int? get _lenderId => widget.loan.lender?.id;
+  /// The paying PT: the lender disburses, the borrower repays.
+  int? get _payerId => widget.repay ? widget.loan.borrower?.id : widget.loan.lender?.id;
 
-  Duration get _zoneOffset => offsetForZone(ref.read(accountProfileProvider)?.forCompany(_lenderId).timezone);
+  /// Repayment amount (default = the outstanding balance).
+  late final _amount = TextEditingController(text: groupRupiah(widget.loan.outstanding));
+
+  Duration get _zoneOffset => offsetForZone(ref.read(accountProfileProvider)?.forCompany(_payerId).timezone);
 
   @override
   void dispose() {
     _bankRef.dispose();
+    _amount.dispose();
     super.dispose();
   }
 
-  Map<String, String> _issues() => validateTransferForm(
-    cashAccountId: _cashAccountId,
-    costCenterId: null,
-    requireCostCenter: false,
-    transferAt: _at,
-    zoneOffset: _zoneOffset,
-    bankRef: _bankRef.text,
-    hasProof: _proof != null,
-    nowUtc: DateTime.now().toUtc(),
-  );
+  Map<String, String> _issues() {
+    final amount = parseRupiah(_amount.text);
+    return {
+      if (widget.repay && (amount == null || amount <= 0)) 'amount': 'Nominal pengembalian wajib diisi (> 0).',
+      if (widget.repay && amount != null && amount > widget.loan.outstanding)
+        'amount': 'Nominal melebihi sisa pinjaman.',
+      ...validateTransferForm(
+        cashAccountId: _cashAccountId,
+        costCenterId: null,
+        requireCostCenter: false,
+        transferAt: _at,
+        zoneOffset: _zoneOffset,
+        bankRef: _bankRef.text,
+        hasProof: _proof != null,
+        nowUtc: DateTime.now().toUtc(),
+      ),
+    };
+  }
 
   Future<void> _addProof({required bool fromCamera}) async {
     final t = AppLocalizations.of(context);
@@ -831,25 +979,41 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
     try {
       _proofMediaId ??= await ref
           .read(financeApiProvider)
-          .uploadProof(_proof!, filename: 'bukti-pencairan-${loan.id}.jpg');
-      final body = icLoanDisburseBody(
-        cashAccountId: _cashAccountId!,
-        transferAt: transferAtString(_at!, _zoneOffset),
-        bankRef: _bankRef.text,
-        proofMediaId: _proofMediaId!,
-        confirmOverdraft: confirmOverdraft,
-      );
+          .uploadProof(_proof!, filename: '${widget.repay ? 'bukti-pengembalian' : 'bukti-pencairan'}-${loan.id}.jpg');
+      final body = widget.repay
+          ? icLoanRepayBody(
+              amount: parseRupiah(_amount.text)!,
+              cashAccountId: _cashAccountId!,
+              transferAt: transferAtString(_at!, _zoneOffset),
+              bankRef: _bankRef.text,
+              proofMediaId: _proofMediaId!,
+              confirmOverdraft: confirmOverdraft,
+            )
+          : icLoanDisburseBody(
+              cashAccountId: _cashAccountId!,
+              transferAt: transferAtString(_at!, _zoneOffset),
+              bankRef: _bankRef.text,
+              proofMediaId: _proofMediaId!,
+              confirmOverdraft: confirmOverdraft,
+            );
       final key = _keys.putIfAbsent(jsonEncode(body), () => const Uuid().v7());
-      final out = await ref.read(intercompanyLoansApiProvider).disburse(loan.id, body, idempotencyKey: key);
+      final api = ref.read(intercompanyLoansApiProvider);
+      final out = widget.repay
+          ? await api.repay(loan.id, body, idempotencyKey: key)
+          : await api.disburse(loan.id, body, idempotencyKey: key);
       ref.invalidate(icLoanQueueProvider);
       ref.invalidate(icLoanDetailProvider(loan.id));
-      if (_lenderId != null) ref.invalidate(cashAccountsProvider(_lenderId));
+      if (_payerId != null) ref.invalidate(cashAccountsProvider(_payerId));
       if (!mounted) return;
       final kk = out.disbursement?.kkNo;
       final km = out.disbursement?.kmNo;
       showSnack(
         context,
-        kk != null && km != null ? t.icLoanDisbursed(out.docNo, kk, km) : t.icLoanDisbursedShort(out.docNo),
+        widget.repay
+            ? t.icLoanRepayDone(out.docNo, formatRupiah(parseRupiah(_amount.text) ?? 0))
+            : kk != null && km != null
+            ? t.icLoanDisbursed(out.docNo, kk, km)
+            : t.icLoanDisbursedShort(out.docNo),
       );
       final router = GoRouter.maybeOf(context);
       if (router != null && router.canPop()) {
@@ -900,14 +1064,14 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
     final theme = Theme.of(context);
     final loan = widget.loan;
     final issues = _tried ? _issues() : const <String, String>{};
-    final accounts = ref.watch(cashAccountsProvider(_lenderId));
+    final accounts = ref.watch(cashAccountsProvider(_payerId));
     // ADR 0029 §3.5: only active accounts WITHOUT a site (the PT's fund pool) pay an inter-PT loan
     final pool = (accounts.value ?? const <CashAccountOption>[]).where((a) => a.active && a.siteId == null).toList();
     if (_cashAccountId == null && pool.isNotEmpty) _cashAccountId = pool.first.id;
-    final zone = zoneAbbrev(ref.watch(accountProfileProvider)?.forCompany(_lenderId).timezone);
+    final zone = zoneAbbrev(ref.watch(accountProfileProvider)?.forCompany(_payerId).timezone);
     final destination = widget.destination;
     return Scaffold(
-      appBar: AppBar(title: Text(t.icLoanDisburseTitle)),
+      appBar: AppBar(title: Text(widget.repay ? t.icLoanRepayTitle : t.icLoanDisburseTitle)),
       body: AbsorbPointer(
         absorbing: _busy,
         child: ListView(
@@ -922,14 +1086,16 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      t.icLoanDisburseAmount(formatRupiah(loan.amount), loan.lenderCode, loan.borrowerCode),
+                      widget.repay
+                          ? t.icLoanRepayAmount(formatRupiah(loan.outstanding), loan.borrowerCode, loan.lenderCode)
+                          : t.icLoanDisburseAmount(formatRupiah(loan.amount), loan.lenderCode, loan.borrowerCode),
                       key: const Key('icloan-disburse-amount'),
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
-                    Text(t.icLoanDisburseHelp, style: theme.textTheme.bodySmall),
+                    Text(widget.repay ? t.icLoanRepayHelp : t.icLoanDisburseHelp, style: theme.textTheme.bodySmall),
                     const Divider(height: 20),
                     Text(
                       '${loan.docNo} · ${t.loanDueOn(formatDateOnly(loan.dueDate))}',
@@ -940,6 +1106,12 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
                         '${t.bankDestination}: ${destination.text}',
                         key: const Key('icloan-destination'),
                         style: theme.textTheme.bodySmall,
+                      )
+                    else if (widget.repay && !loan.lenderHasReceivingAccount)
+                      Text(
+                        t.icLoanNoLenderAccount(loan.lenderCode),
+                        key: const Key('icloan-lender-no-account'),
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
                       )
                     else if (widget.destinationKnown)
                       Text(
@@ -954,6 +1126,22 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
             const SizedBox(height: 16),
             FormGrid(
               children: [
+                if (widget.repay)
+                  FormGridCell(
+                    label: t.cashAmount,
+                    builder: (label) => TextField(
+                      key: const Key('icloan-repay-amount'),
+                      controller: _amount,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: const [RupiahInputFormatter()],
+                      decoration: InputDecoration(
+                        labelText: label,
+                        prefixText: 'Rp ',
+                        errorText: issues['amount'],
+                        helperText: t.loanRepayOutstanding(formatRupiah(loan.outstanding)),
+                      ),
+                    ),
+                  ),
                 FormGridCell(
                   label: t.cashAccountLabel,
                   child: switch (accounts) {
@@ -1039,7 +1227,7 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
             const SizedBox(height: 20),
             OnlineOnlyButton(
               key: const Key('icloan-disburse-submit'),
-              label: _busy ? t.processing : t.icLoanDisburse,
+              label: _busy ? t.processing : (widget.repay ? t.loanRepaySave : t.icLoanDisburse),
               icon: Icons.account_balance,
               onPressed: _busy ? null : _submit,
             ),
