@@ -15,6 +15,9 @@ import { HttpError, json, v1 } from '../http'
  * through the collection access). Only whitelisted collections (later phases extend the list).
  */
 export const DATA_COLLECTIONS = [
+  // Persetujuan › "Data persetujuan" (the decision rows; read-only — create/update denyAll). Missed in phase 1, found
+  // by the APK menu coverage test (user 2026-10-19).
+  'approvals',
   // Keuangan (phase 3)
   'receipts',
   'transfers',

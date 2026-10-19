@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     other menu item answered "Segera hadir di APK. Sementara buka lewat web."
   - The server now strips the prefix; the installed APKs work again without an update.
   - The APK (next release) also accepts both forms, and module badges look the items up by the relative href too.
+  - New coverage tests: every one of the 93 web menu items (the web registry, synced as an APK fixture) opens an APK
+    screen in both href forms; a new web item without an APK screen now fails CI.
+- **Persetujuan › "Data persetujuan" (`/collections/approvals`) had no APK screen** (found by that test): the
+  approvals list is now a read-only data list (`/data/approvals`).
 
 ## [0.18.0] - 2026-10-19
 

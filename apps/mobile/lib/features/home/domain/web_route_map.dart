@@ -16,6 +16,7 @@ const Map<String, String> webToApk = {
   '/dashboard': '/dashboard',
   // Persetujuan
   '/persetujuan': '/inbox',
+  '/collections/approvals': '/data/approvals',
   '/antrian-transfer': '/finance',
   '/verifikasi-lpj': '/finance?tab=lpj',
   // Proyek

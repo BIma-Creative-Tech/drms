@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -179,6 +182,19 @@ void main() {
           reason: '${e.key} → $path',
         );
       }
+    });
+
+    // user 2026-10-19 ("pastikan untuk semua, bukan hanya absen"): EVERY web menu item opens an APK screen — the
+    // fixture is the web registry (kept in sync by apps/web/tests/unit/d1910-apk-menu-coverage.test.ts), in both
+    // forms the server ever sent (relative to /admin, and the /admin href of servers ≤ 0.18.0).
+    test('every web menu item has an APK screen (all 93+, not only Absen)', () {
+      final hrefs = (jsonDecode(File('test/fixtures/web_menu_hrefs.json').readAsStringSync()) as List).cast<String>();
+      expect(hrefs.length, greaterThan(80));
+      final missing = [
+        for (final h in hrefs)
+          if (apkTargetFor(h) == null || apkTargetFor('/admin$h') == null) h,
+      ];
+      expect(missing, isEmpty, reason: 'web menu items without an APK screen');
     });
 
     test('bottom-bar branches open with go, the rest is pushed', () {
