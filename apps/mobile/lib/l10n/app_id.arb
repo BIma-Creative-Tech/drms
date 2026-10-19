@@ -3948,5 +3948,224 @@
   "reportsSavedDownloads": "Tersimpan di Unduhan/ProyekKas.",
   "reportsSaveDownloadsFailed": "Tidak dapat menyimpan ke Unduhan (Android 10 ke atas). Pakai Bagikan.",
   "reportsSaveFailed": "File tidak dapat disimpan di HP.",
-  "reportsNoApp": "Tidak ada aplikasi di HP yang dapat membuka file ini."
+  "reportsNoApp": "Tidak ada aplikasi di HP yang dapat membuka file ini.",
+  "recordAdd": "Tambah",
+  "recordEdit": "Ubah",
+  "recordDelete": "Hapus",
+  "recordNewTitle": "{label} baru",
+  "@recordNewTitle": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "recordEditTitle": "Ubah {label}",
+  "@recordEditTitle": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "recordNoRight": "Anda tidak berhak mengubah data ini.",
+  "recordWebOnly": "Data ini memiliki isian yang hanya dapat diubah di web.",
+  "recordCheckFields": "Periksa isian yang ditandai.",
+  "recordNoChanges": "Tidak ada perubahan untuk disimpan.",
+  "recordSaved": "{title} tersimpan.",
+  "@recordSaved": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "recordNone": "— tidak ada —",
+  "recordPick": "Pilih…",
+  "recordPickDone": "Pilih ({count})",
+  "@recordPickDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recordDeleteTitle": "Hapus data ini?",
+  "recordDeleteBody": "Data dihapus (soft delete) dan tidak tampil lagi di daftar; Admin dapat memulihkannya. Alasan wajib dan tercatat di audit log.",
+  "recordDeleted": "Data dihapus.",
+  "recordDeactivateTitle": "Data masih dipakai — nonaktifkan?",
+  "recordDeactivate": "Nonaktifkan",
+  "recordDeactivated": "Data dinonaktifkan.",
+  "rapManageTitle": "Kelola RAP",
+  "rapImport": "Impor Excel",
+  "rapImportTooLarge": "File RAP maksimal 2 MB (.xlsx).",
+  "rapImported": "RAP diperbarui dari file Excel.",
+  "rapImportCommit": "Terapkan file",
+  "rapDownloadTemplate": "Unduh template (.xlsx)",
+  "rapDownloadRap": "Unduh RAP (.xlsx)",
+  "rapApplyTemplate": "Terapkan template RAP",
+  "rapApplyTemplateHint": "Item template disalin ke RAP proyek ini (hanya untuk RAP yang masih kosong).",
+  "rapNoTemplates": "Belum ada template RAP.",
+  "rapTemplateApplied": "Template diterapkan.",
+  "rapSaveTemplate": "Simpan sebagai template",
+  "rapSaveTemplateHint": "Item RAP proyek ini disimpan sebagai template baru (tanpa realisasi).",
+  "rapTemplateName": "Nama template",
+  "rapTemplateSaved": "Template {name} tersimpan.",
+  "@rapTemplateSaved": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "rapAddItem": "Tambah item",
+  "rapEditItem": "Ubah item {code}",
+  "@rapEditItem": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "rapItemSaved": "Item {code} tersimpan.",
+  "@rapItemSaved": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "rapLockedDirektur": "RAP terkunci (sudah ada realisasi laporan harian). Perubahan oleh Direktur/Admin wajib dengan alasan.",
+  "rapLockedPm": "RAP terkunci (sudah ada realisasi laporan harian). Perubahan hanya oleh Direktur/Admin.",
+  "rapReadOnly": "Tampilan baca. RAP diubah oleh PM proyek atau Direktur.",
+  "rapValueLine": "Nilai RAP {value}",
+  "@rapValueLine": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "rapValueVsBudget": "Nilai RAP {value} · RAB {budget}",
+  "@rapValueVsBudget": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      },
+      "budget": {
+        "type": "String"
+      }
+    }
+  },
+  "rapKindWork": "Pekerjaan",
+  "rapKindMaterial": "Material",
+  "rapWeight": "bobot {pct}%",
+  "@rapWeight": {
+    "placeholders": {
+      "pct": {
+        "type": "String"
+      }
+    }
+  },
+  "rapInUse": "Sudah terpakai — perubahan wajib alasan",
+  "rapCode": "Kode",
+  "rapDescription": "Uraian",
+  "rapStage": "Tahapan",
+  "rapUom": "Satuan",
+  "rapVolume": "Volume",
+  "rapUnitPrice": "Harga satuan",
+  "rapWeightLabel": "Bobot",
+  "rapActive": "Aktif",
+  "rapActiveHint": "Item tidak pernah dihapus — nonaktifkan bila tidak dipakai lagi.",
+  "rapReason": "Alasan perubahan",
+  "rapReasonLocked": "Wajib: RAP terkunci. Tercatat di audit log.",
+  "rapReasonUsed": "Wajib: item sudah terpakai. Tercatat di audit log.",
+  "rapPreviewTitle": "Pratinjau {file}",
+  "@rapPreviewTitle": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "rapPreviewCounts": "Baru {n}, berubah {c}, tetap {u}, dinonaktifkan {d}.",
+  "@rapPreviewCounts": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      },
+      "c": {
+        "type": "int"
+      },
+      "u": {
+        "type": "int"
+      },
+      "d": {
+        "type": "int"
+      }
+    }
+  },
+  "rapPreviewNewStages": "Tahapan baru: {names}",
+  "@rapPreviewNewStages": {
+    "placeholders": {
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "rapPreviewUsed": "Item terpakai yang berubah: {codes} (alasan wajib).",
+  "@rapPreviewUsed": {
+    "placeholders": {
+      "codes": {
+        "type": "String"
+      }
+    }
+  },
+  "rapPreviewIssues": "File belum dapat diterapkan — perbaiki baris berikut:",
+  "clientNewTitle": "Klien baru",
+  "clientName": "Nama",
+  "clientAddress": "Alamat",
+  "clientNameRequired": "Nama wajib diisi.",
+  "clientPtRequired": "PT wajib dipilih.",
+  "clientContacts": "Kontak PIC",
+  "clientContact": "Kontak PIC",
+  "clientNoContacts": "Belum ada kontak PIC.",
+  "clientPrimary": "Utama",
+  "clientPosition": "Jabatan",
+  "clientNotes": "Catatan",
+  "clientProjects": "Proyek klien ini",
+  "contractsTitle": "Unit & kontrak",
+  "contractsEmpty": "Belum ada proyek kontrak unit.",
+  "contractsToday": "Hari ini: {filled} dari {active} unit sudah diisi",
+  "@contractsToday": {
+    "placeholders": {
+      "filled": {
+        "type": "int"
+      },
+      "active": {
+        "type": "int"
+      }
+    }
+  },
+  "contractsMonth": "Bulan ini: jam kerja {work} · belum diisi {missing}",
+  "@contractsMonth": {
+    "placeholders": {
+      "work": {
+        "type": "String"
+      },
+      "missing": {
+        "type": "int"
+      }
+    }
+  },
+  "contractsGaps": "Selisih HM: {count}",
+  "@contractsGaps": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contractsFillTimesheet": "Isi timesheet",
+  "contractsUnits": "Unit alat berat"
 }

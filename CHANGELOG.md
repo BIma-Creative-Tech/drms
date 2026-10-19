@@ -8,6 +8,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **APK: Proyek menu built natively** (user 2026-10-19, phases 5a + 5b of the APK–web parity plan).
+  - **Generic web edit form**: the Proyek collections open their web list in the APK. Where the caller may write
+    (Pusat biaya, Penugasan tim, Tahapan, Template tahapan / RAP, Jenis tenaga & alat, Jenis servis, RAB, Kontrak
+    unit), there are "Tambah", "Ubah", "Hapus" (soft delete) and "Nonaktifkan" (a used master).
+    - Fields, required / read-only and field-level access come from the server, with a picker for relations.
+    - Saved through Payload like the web (hooks, validation, audit); the audit reason is asked where the collection
+      requires it.
+    - Arrays (e.g. the items of a template) stay web-only.
+  - **Klien** (and "+ Klien baru"): the web Klien page with detail, Kontak PIC (one "Utama"), deactivation with a
+    reason, and the client's projects.
+  - **Kelola RAP** (project → RAP tab), for the Direktur and for the PM while the RAP is unlocked:
+    - items: add / edit / deactivate; a reason when the RAP is locked or the item is used;
+    - Excel import through the Android file picker (preview → commit);
+    - download template / RAP (.xlsx);
+    - apply a RAP template, save as a template.
+  - **Unit & kontrak**: kontrak-unit projects with today's timesheet status, this month's totals, the unit contracts
+    and the units; "Isi timesheet". No rates on the phone.
+  - **Rekap aftersales** opens the "Rekap aftersales" report; **RAP proyek** opens the project list.
+  - Server (additive, no migration):
+    - `GET /api/v1/data/{collection}/form`, `GET /api/v1/data/{collection}/options`, `POST /api/v1/data/{collection}`,
+      `PATCH /api/v1/data/{collection}/{id}`;
+    - `GET /api/v1/field/contracts`;
+    - the Proyek collections in `/data` lists;
+    - `withAudit` exposes its reason rules (`custom.pkAudit.reasonRules`).
+
 - **APK: Laporan** (user 2026-10-19, phase 4 of the APK–web parity plan). Beranda → Laporan opens the web report
   list in the APK.
   - The reports of the caller's roles, with what they contain and their formats.

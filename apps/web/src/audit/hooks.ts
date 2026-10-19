@@ -212,7 +212,8 @@ export function withAudit(collection: CollectionConfig, opts: AuditOptions): Col
       beforeChange: [...(collection.hooks?.beforeChange ?? []), before],
       afterChange: [...(collection.hooks?.afterChange ?? []), after],
     },
-    custom: { ...collection.custom, pkAudit: { docType: opts.docType, tracked } },
+    // reasonRules: read by the APK form (api/v1/endpoints/data-forms.ts) to show when a reason is required
+    custom: { ...collection.custom, pkAudit: { docType: opts.docType, tracked, reasonRules: rules } },
   }
 }
 

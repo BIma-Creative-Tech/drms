@@ -7,9 +7,11 @@ import { registerDeviceEndpoint, revokeDeviceEndpoint } from './endpoints/device
 import { healthEndpoint, healthHeadEndpoint, readyEndpoint, readyHeadEndpoint } from './endpoints/health'
 import { CASH_ENDPOINTS } from './endpoints/cash'
 import { DAILY_ENDPOINTS } from './endpoints/daily'
+import { DATA_FORM_ENDPOINTS } from './endpoints/data-forms'
 import { DATA_ENDPOINTS } from './endpoints/data-lists'
 import { EXPENSE_ENDPOINTS } from './endpoints/expense-requests'
 import { FIELD_ENDPOINTS } from './endpoints/field'
+import { fieldContractsEndpoint } from './endpoints/field-contracts'
 import { INTERCOMPANY_ENDPOINTS } from './endpoints/intercompany'
 import { INTERCOMPANY_LOAN_ENDPOINTS } from './endpoints/intercompany-loans'
 import { KEUANGAN_ENDPOINTS } from './endpoints/keuangan'
@@ -57,6 +59,7 @@ export const v1Endpoints: Endpoint[] = [
   ...CASH_ENDPOINTS,
   // User 2026-10-19 (APK phase 3): web Keuangan pages as JSON + read-only data lists
   ...KEUANGAN_ENDPOINTS,
+  ...DATA_FORM_ENDPOINTS, // before DATA_ENDPOINTS: /data/:collection/form|options vs /data/:collection/:id
   ...DATA_ENDPOINTS,
   // ADR 0028: payee directory of a "PT grup" payment
   ...INTERCOMPANY_ENDPOINTS,
@@ -87,6 +90,7 @@ export const v1Endpoints: Endpoint[] = [
   ...SHORTFALL_ENDPOINTS,
   // FR1 (ADR 0020): field reports per project kind — service reports, unit timesheets, aftersales log, units
   ...FIELD_ENDPOINTS,
+  fieldContractsEndpoint, // user 2026-10-19: APK "Unit & kontrak"
   // P3: konstruksi RAP (Excel import, templates) + Laporan Harian (ledger, corrections, weekly recap)
   ...DAILY_ENDPOINTS,
   // DRMS 10/10 Phase C: project list / detail (APK Proyek) + cost-center picker (D2) — after /projects/progress

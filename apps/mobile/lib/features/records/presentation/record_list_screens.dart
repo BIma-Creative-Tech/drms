@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
+import '../../../shared/widgets/reason_dialog.dart';
+import '../../clients/client_form.dart';
 import '../data/records_providers.dart';
 import '../domain/record_list.dart';
 
@@ -49,8 +52,26 @@ class _RecordListScreenState extends ConsumerState<RecordListScreen> {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final value = ref.watch(recordPageProvider(_query));
+    // phase 5a: "Tambah" when the caller may create here through the APK (server form; read-only lists 404 → none)
+    // clients: the web's own Klien page (`/client-form`: detail + Kontak PIC), not the generic form
+    final clients = widget.collection == 'clients';
+    final form = clients ? null : ref.watch(recordFormProvider((widget.collection, null))).value;
+    final clientNew = clients ? ref.watch(clientFormProvider(null)).value : null;
     return Scaffold(
       appBar: AppBar(title: Text(value.value?.label ?? t.recordsTitle)),
+      floatingActionButton:
+          (form != null && form.canCreate && form.supported) ||
+              (clientNew != null && clientNew.canEdit && clientNew.companies.isNotEmpty)
+          ? FloatingActionButton.extended(
+              key: const Key('records-new'),
+              onPressed: () async {
+                final id = await context.push<String>(clients ? '/clients/new' : '/data/${widget.collection}/new');
+                if (id != null && context.mounted) await context.push('/data/${widget.collection}/$id');
+              },
+              icon: const Icon(Icons.add),
+              label: Text(t.recordAdd),
+            )
+          : null,
       body: Column(
         children: [
           Padding(
@@ -168,13 +189,99 @@ class RecordDetailScreen extends ConsumerWidget {
   final String collection;
   final String id;
 
+  /// The web row action (D1610): delete-check first — "Hapus" (reason, soft delete), "Nonaktifkan" when the row is
+  /// used (sets `active` false), or why nothing is possible.
+  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+    final t = AppLocalizations.of(context);
+    final api = ref.read(recordsApiProvider);
+    try {
+      final c = await api.deleteCheck(collection, id);
+      if (!context.mounted) return;
+      if (c.action == 'hapus' && c.canDelete) {
+        final reason = await showReasonDialog(
+          context,
+          title: t.recordDeleteTitle,
+          description: t.recordDeleteBody,
+          confirm: t.recordDelete,
+          keyPrefix: 'record-delete',
+        );
+        if (reason == null) return;
+        await api.softDelete(collection, id, reason, idempotencyKey: const Uuid().v4());
+        ref.invalidate(recordPageProvider);
+        if (context.mounted) {
+          showSnack(context, t.recordDeleted);
+          context.pop();
+        }
+      } else if (c.action == 'nonaktifkan') {
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (d) => AlertDialog(
+            title: Text(t.recordDeactivateTitle),
+            content: Text([c.blockedReason ?? '', ...c.usage].where((x) => x.isNotEmpty).join('\n')),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(d, false), child: Text(t.cancel)),
+              FilledButton(
+                key: const Key('record-deactivate-ok'),
+                onPressed: () => Navigator.pop(d, true),
+                child: Text(t.recordDeactivate),
+              ),
+            ],
+          ),
+        );
+        if (ok != true || !context.mounted) return;
+        final form = await api.form(collection, id: id);
+        String? reason;
+        if (form.reasonOnDeactivate || form.reasonOnUpdate) {
+          if (!context.mounted) return;
+          reason = await showReasonDialog(
+            context,
+            title: t.recordDeactivateTitle,
+            description: t.cashReasonHelp,
+            confirm: t.recordDeactivate,
+            keyPrefix: 'record-deactivate',
+          );
+          if (reason == null) return;
+        }
+        await api.update(collection, id, {'active': false}, reason: reason, idempotencyKey: const Uuid().v4());
+        ref.invalidate(recordDetailProvider((collection, id)));
+        ref.invalidate(recordPageProvider);
+        if (context.mounted) showSnack(context, t.recordDeactivated);
+      } else {
+        showSnack(context, c.blockedReason ?? t.recordNoRight);
+      }
+    } on Object catch (e) {
+      if (context.mounted) showSnack(context, errorText(e));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final value = ref.watch(recordDetailProvider((collection, id)));
+    final clients = collection == 'clients';
+    final form = clients ? null : ref.watch(recordFormProvider((collection, id))).value;
+    final client = clients ? ref.watch(clientFormProvider(int.tryParse(id))).value : null;
     return Scaffold(
-      appBar: AppBar(title: Text(value.value?.title ?? t.recordsTitle)),
+      appBar: AppBar(
+        title: Text(value.value?.title ?? t.recordsTitle),
+        actions: [
+          if ((form != null && form.canUpdate && form.supported) || (client != null && client.canEdit))
+            IconButton(
+              key: const Key('record-edit'),
+              tooltip: t.recordEdit,
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () => context.push(clients ? '/clients/$id' : '/data/$collection/$id/edit'),
+            ),
+          if (form != null && form.canDelete)
+            IconButton(
+              key: const Key('record-delete'),
+              tooltip: t.recordDelete,
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () => _delete(context, ref),
+            ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(recordDetailProvider((collection, id)).future),
         child: AsyncBody<RecordDetail>(

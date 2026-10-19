@@ -12,6 +12,14 @@ type Helpers = {
 
 /** FR1 "Laporan lapangan per jenis project" paths (ADR 0020, requirements v1.3). Pure (bundled by scripts/gen-openapi.mjs). */
 export function registerFieldPaths(registry: OpenAPIRegistry, h: Helpers): void {
+  registry.registerPath({
+    method: 'get',
+    path: '/field/contracts',
+    summary: 'The web "Unit & kontrak" page: kontrak_unit projects of the selection (field reports on) with their contract units, today\'s fill state and this month\'s timesheet totals, plus the heavy-equipment units. No rates.',
+    security: h.security,
+    request: { headers: h.deviceHeader, query: z.object({ q: z.string().max(100).optional(), page: z.string().regex(/^\d+$/).optional(), per: z.enum(['20', '50', '100']).optional() }) },
+    responses: h.res(200, 'Contracts', F.FieldContracts, [401, 403, 426, 429]),
+  })
   const idParam = z.object({ id: z.string().regex(/^\d+$/) })
   const write = [400, 401, 403, 404, 409, 422, 426, 429]
   const json = (schema: z.ZodType) => ({ content: { 'application/json': { schema } } })

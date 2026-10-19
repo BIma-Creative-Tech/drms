@@ -240,6 +240,21 @@ class _RapTabState extends ConsumerState<_RapTab> {
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
             children: [
               ListSearchField(key: const Key('rap-tab-search'), onChanged: (v) => setState(() => _q = v)),
+              // phase 5b (user 2026-10-19): the web "RAP proyek" page — editing where the server allows it
+              if (ref.watch(currentProfileProvider) case final p?
+                  when [Role.pm, Role.owner, Role.admin, Role.finance].any(p.has))
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    key: const Key('rap-tab-manage'),
+                    onPressed: () async {
+                      await context.push('/projects/${widget.id}/rap');
+                      ref.invalidate(provider);
+                    },
+                    icon: const Icon(Icons.edit_note),
+                    label: Text(t.rapManageTitle),
+                  ),
+                ),
               if (load.offline || noMoney)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),

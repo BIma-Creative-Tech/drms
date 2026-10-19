@@ -57,3 +57,33 @@ String reportFileName(String? contentDisposition, {required String fallback, req
   }
   return name.length > 140 ? '${name.substring(0, 130)}.$format' : name;
 }
+
+/// A document picked with the Android picker (`id.co.drms.proyekkas/picker`).
+typedef PickedFile = ({String name, Uint8List? bytes, bool tooLarge});
+
+/// System document picker (ACTION_OPEN_DOCUMENT, no permission) — phase 5b RAP Excel import. null = cancelled.
+abstract interface class FilePicker {
+  Future<PickedFile?> pick({required List<String> mimeTypes, int maxBytes});
+}
+
+class AndroidFilePicker implements FilePicker {
+  static const _channel = MethodChannel('id.co.drms.proyekkas/picker');
+
+  @override
+  Future<PickedFile?> pick({required List<String> mimeTypes, int maxBytes = 2 * 1024 * 1024}) async {
+    try {
+      final r = await _channel.invokeMapMethod<String, Object?>('pick', {'mimeTypes': mimeTypes, 'maxBytes': maxBytes});
+      if (r == null) return null;
+      final bytes = r['bytes'];
+      return (
+        name: '${r['name'] ?? 'file'}',
+        bytes: bytes is Uint8List ? bytes : null,
+        tooLarge: r['tooLarge'] == true,
+      );
+    } on Object {
+      return null;
+    }
+  }
+}
+
+final filePickerProvider = Provider<FilePicker>((ref) => AndroidFilePicker());

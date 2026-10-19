@@ -7,6 +7,7 @@ import '../features/cash/domain/cash_book.dart';
 import '../features/cash/presentation/cash_book_screen.dart';
 import '../features/cash/presentation/cash_entry_form_screen.dart';
 import '../features/cash/presentation/period_closing_screen.dart';
+import '../features/clients/client_form_screen.dart';
 import '../features/companies/presentation/unassigned_screen.dart';
 import '../features/account/presentation/account_screen.dart';
 import '../features/account/presentation/security_screen.dart';
@@ -32,6 +33,7 @@ import '../features/field_reports/domain/field_models.dart';
 import '../features/finance/presentation/finance_screen.dart';
 import '../features/finance/presentation/transfer_form_screen.dart';
 import '../features/field_reports/presentation/aftersales_screen.dart';
+import '../features/field_reports/presentation/contracts_screen.dart';
 import '../features/field_reports/presentation/daily_report_screen.dart';
 import '../features/field_reports/presentation/field_conflict_screen.dart';
 import '../features/field_reports/presentation/field_hub_screen.dart';
@@ -52,6 +54,8 @@ import '../features/projects/presentation/projects_screen.dart';
 import '../features/progress/presentation/progress_detail_screen.dart';
 import '../features/progress/presentation/progress_editor_screen.dart';
 import '../features/progress/presentation/progress_screen.dart';
+import '../features/rap/presentation/rap_manage_screen.dart';
+import '../features/records/presentation/record_form_screen.dart';
 import '../features/records/presentation/record_list_screens.dart';
 import '../features/reports/presentation/report_screens.dart';
 import '../features/settings/presentation/profile_screen.dart';
@@ -200,6 +204,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                 _ => 0,
               },
             ),
+            // phase 5b: the web "RAP proyek" page (edit, Excel import, templates)
+            routes: [
+              GoRoute(
+                path: 'rap',
+                builder: (_, s) => RapManageScreen(projectId: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),
+              ),
+            ],
           ),
         ],
       ),
@@ -277,10 +288,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/data/:collection',
         builder: (_, s) => RecordListScreen(collection: s.pathParameters['collection'] ?? ''),
         routes: [
+          // phase 5a: the web edit form (create / edit) — `new` before `:id`
+          GoRoute(
+            path: 'new',
+            builder: (_, s) => RecordFormScreen(collection: s.pathParameters['collection'] ?? ''),
+          ),
           GoRoute(
             path: ':id',
             builder: (_, s) =>
                 RecordDetailScreen(collection: s.pathParameters['collection'] ?? '', id: s.pathParameters['id'] ?? ''),
+            routes: [
+              GoRoute(
+                path: 'edit',
+                builder: (_, s) =>
+                    RecordFormScreen(collection: s.pathParameters['collection'] ?? '', id: s.pathParameters['id']),
+              ),
+            ],
           ),
         ],
       ),
@@ -294,6 +317,14 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, s) => ReportScreen(code: s.pathParameters['code'] ?? ''),
           ),
         ],
+      ),
+      // phase 5b: the web "Unit & kontrak" page
+      GoRoute(path: '/contracts', builder: (_, _) => const ContractsScreen()),
+      // phase 5a: the web "Klien" page (detail + Kontak PIC)
+      GoRoute(path: '/clients/new', builder: (_, _) => const ClientFormScreen()),
+      GoRoute(
+        path: '/clients/:id',
+        builder: (_, s) => ClientFormScreen(id: int.tryParse(s.pathParameters['id'] ?? '')),
       ),
       GoRoute(path: '/loans', builder: (_, _) => const LoanListScreen()),
       GoRoute(path: '/intercompany-loans', builder: (_, _) => const IcLoanListScreen()),

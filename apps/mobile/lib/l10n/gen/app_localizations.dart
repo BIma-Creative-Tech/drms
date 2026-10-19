@@ -9228,6 +9228,498 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Tidak ada aplikasi di HP yang dapat membuka file ini.'**
   String get reportsNoApp;
+
+  /// No description provided for @recordAdd.
+  ///
+  /// In id, this message translates to:
+  /// **'Tambah'**
+  String get recordAdd;
+
+  /// No description provided for @recordEdit.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah'**
+  String get recordEdit;
+
+  /// No description provided for @recordDelete.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus'**
+  String get recordDelete;
+
+  /// No description provided for @recordNewTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'{label} baru'**
+  String recordNewTitle(String label);
+
+  /// No description provided for @recordEditTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah {label}'**
+  String recordEditTitle(String label);
+
+  /// No description provided for @recordNoRight.
+  ///
+  /// In id, this message translates to:
+  /// **'Anda tidak berhak mengubah data ini.'**
+  String get recordNoRight;
+
+  /// No description provided for @recordWebOnly.
+  ///
+  /// In id, this message translates to:
+  /// **'Data ini memiliki isian yang hanya dapat diubah di web.'**
+  String get recordWebOnly;
+
+  /// No description provided for @recordCheckFields.
+  ///
+  /// In id, this message translates to:
+  /// **'Periksa isian yang ditandai.'**
+  String get recordCheckFields;
+
+  /// No description provided for @recordNoChanges.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada perubahan untuk disimpan.'**
+  String get recordNoChanges;
+
+  /// No description provided for @recordSaved.
+  ///
+  /// In id, this message translates to:
+  /// **'{title} tersimpan.'**
+  String recordSaved(String title);
+
+  /// No description provided for @recordNone.
+  ///
+  /// In id, this message translates to:
+  /// **'— tidak ada —'**
+  String get recordNone;
+
+  /// No description provided for @recordPick.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih…'**
+  String get recordPick;
+
+  /// No description provided for @recordPickDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih ({count})'**
+  String recordPickDone(int count);
+
+  /// No description provided for @recordDeleteTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus data ini?'**
+  String get recordDeleteTitle;
+
+  /// No description provided for @recordDeleteBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Data dihapus (soft delete) dan tidak tampil lagi di daftar; Admin dapat memulihkannya. Alasan wajib dan tercatat di audit log.'**
+  String get recordDeleteBody;
+
+  /// No description provided for @recordDeleted.
+  ///
+  /// In id, this message translates to:
+  /// **'Data dihapus.'**
+  String get recordDeleted;
+
+  /// No description provided for @recordDeactivateTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Data masih dipakai — nonaktifkan?'**
+  String get recordDeactivateTitle;
+
+  /// No description provided for @recordDeactivate.
+  ///
+  /// In id, this message translates to:
+  /// **'Nonaktifkan'**
+  String get recordDeactivate;
+
+  /// No description provided for @recordDeactivated.
+  ///
+  /// In id, this message translates to:
+  /// **'Data dinonaktifkan.'**
+  String get recordDeactivated;
+
+  /// No description provided for @rapManageTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Kelola RAP'**
+  String get rapManageTitle;
+
+  /// No description provided for @rapImport.
+  ///
+  /// In id, this message translates to:
+  /// **'Impor Excel'**
+  String get rapImport;
+
+  /// No description provided for @rapImportTooLarge.
+  ///
+  /// In id, this message translates to:
+  /// **'File RAP maksimal 2 MB (.xlsx).'**
+  String get rapImportTooLarge;
+
+  /// No description provided for @rapImported.
+  ///
+  /// In id, this message translates to:
+  /// **'RAP diperbarui dari file Excel.'**
+  String get rapImported;
+
+  /// No description provided for @rapImportCommit.
+  ///
+  /// In id, this message translates to:
+  /// **'Terapkan file'**
+  String get rapImportCommit;
+
+  /// No description provided for @rapDownloadTemplate.
+  ///
+  /// In id, this message translates to:
+  /// **'Unduh template (.xlsx)'**
+  String get rapDownloadTemplate;
+
+  /// No description provided for @rapDownloadRap.
+  ///
+  /// In id, this message translates to:
+  /// **'Unduh RAP (.xlsx)'**
+  String get rapDownloadRap;
+
+  /// No description provided for @rapApplyTemplate.
+  ///
+  /// In id, this message translates to:
+  /// **'Terapkan template RAP'**
+  String get rapApplyTemplate;
+
+  /// No description provided for @rapApplyTemplateHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Item template disalin ke RAP proyek ini (hanya untuk RAP yang masih kosong).'**
+  String get rapApplyTemplateHint;
+
+  /// No description provided for @rapNoTemplates.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada template RAP.'**
+  String get rapNoTemplates;
+
+  /// No description provided for @rapTemplateApplied.
+  ///
+  /// In id, this message translates to:
+  /// **'Template diterapkan.'**
+  String get rapTemplateApplied;
+
+  /// No description provided for @rapSaveTemplate.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan sebagai template'**
+  String get rapSaveTemplate;
+
+  /// No description provided for @rapSaveTemplateHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Item RAP proyek ini disimpan sebagai template baru (tanpa realisasi).'**
+  String get rapSaveTemplateHint;
+
+  /// No description provided for @rapTemplateName.
+  ///
+  /// In id, this message translates to:
+  /// **'Nama template'**
+  String get rapTemplateName;
+
+  /// No description provided for @rapTemplateSaved.
+  ///
+  /// In id, this message translates to:
+  /// **'Template {name} tersimpan.'**
+  String rapTemplateSaved(String name);
+
+  /// No description provided for @rapAddItem.
+  ///
+  /// In id, this message translates to:
+  /// **'Tambah item'**
+  String get rapAddItem;
+
+  /// No description provided for @rapEditItem.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah item {code}'**
+  String rapEditItem(String code);
+
+  /// No description provided for @rapItemSaved.
+  ///
+  /// In id, this message translates to:
+  /// **'Item {code} tersimpan.'**
+  String rapItemSaved(String code);
+
+  /// No description provided for @rapLockedDirektur.
+  ///
+  /// In id, this message translates to:
+  /// **'RAP terkunci (sudah ada realisasi laporan harian). Perubahan oleh Direktur/Admin wajib dengan alasan.'**
+  String get rapLockedDirektur;
+
+  /// No description provided for @rapLockedPm.
+  ///
+  /// In id, this message translates to:
+  /// **'RAP terkunci (sudah ada realisasi laporan harian). Perubahan hanya oleh Direktur/Admin.'**
+  String get rapLockedPm;
+
+  /// No description provided for @rapReadOnly.
+  ///
+  /// In id, this message translates to:
+  /// **'Tampilan baca. RAP diubah oleh PM proyek atau Direktur.'**
+  String get rapReadOnly;
+
+  /// No description provided for @rapValueLine.
+  ///
+  /// In id, this message translates to:
+  /// **'Nilai RAP {value}'**
+  String rapValueLine(String value);
+
+  /// No description provided for @rapValueVsBudget.
+  ///
+  /// In id, this message translates to:
+  /// **'Nilai RAP {value} · RAB {budget}'**
+  String rapValueVsBudget(String value, String budget);
+
+  /// No description provided for @rapKindWork.
+  ///
+  /// In id, this message translates to:
+  /// **'Pekerjaan'**
+  String get rapKindWork;
+
+  /// No description provided for @rapKindMaterial.
+  ///
+  /// In id, this message translates to:
+  /// **'Material'**
+  String get rapKindMaterial;
+
+  /// No description provided for @rapWeight.
+  ///
+  /// In id, this message translates to:
+  /// **'bobot {pct}%'**
+  String rapWeight(String pct);
+
+  /// No description provided for @rapInUse.
+  ///
+  /// In id, this message translates to:
+  /// **'Sudah terpakai — perubahan wajib alasan'**
+  String get rapInUse;
+
+  /// No description provided for @rapCode.
+  ///
+  /// In id, this message translates to:
+  /// **'Kode'**
+  String get rapCode;
+
+  /// No description provided for @rapDescription.
+  ///
+  /// In id, this message translates to:
+  /// **'Uraian'**
+  String get rapDescription;
+
+  /// No description provided for @rapStage.
+  ///
+  /// In id, this message translates to:
+  /// **'Tahapan'**
+  String get rapStage;
+
+  /// No description provided for @rapUom.
+  ///
+  /// In id, this message translates to:
+  /// **'Satuan'**
+  String get rapUom;
+
+  /// No description provided for @rapVolume.
+  ///
+  /// In id, this message translates to:
+  /// **'Volume'**
+  String get rapVolume;
+
+  /// No description provided for @rapUnitPrice.
+  ///
+  /// In id, this message translates to:
+  /// **'Harga satuan'**
+  String get rapUnitPrice;
+
+  /// No description provided for @rapWeightLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Bobot'**
+  String get rapWeightLabel;
+
+  /// No description provided for @rapActive.
+  ///
+  /// In id, this message translates to:
+  /// **'Aktif'**
+  String get rapActive;
+
+  /// No description provided for @rapActiveHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Item tidak pernah dihapus — nonaktifkan bila tidak dipakai lagi.'**
+  String get rapActiveHint;
+
+  /// No description provided for @rapReason.
+  ///
+  /// In id, this message translates to:
+  /// **'Alasan perubahan'**
+  String get rapReason;
+
+  /// No description provided for @rapReasonLocked.
+  ///
+  /// In id, this message translates to:
+  /// **'Wajib: RAP terkunci. Tercatat di audit log.'**
+  String get rapReasonLocked;
+
+  /// No description provided for @rapReasonUsed.
+  ///
+  /// In id, this message translates to:
+  /// **'Wajib: item sudah terpakai. Tercatat di audit log.'**
+  String get rapReasonUsed;
+
+  /// No description provided for @rapPreviewTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pratinjau {file}'**
+  String rapPreviewTitle(String file);
+
+  /// No description provided for @rapPreviewCounts.
+  ///
+  /// In id, this message translates to:
+  /// **'Baru {n}, berubah {c}, tetap {u}, dinonaktifkan {d}.'**
+  String rapPreviewCounts(int n, int c, int u, int d);
+
+  /// No description provided for @rapPreviewNewStages.
+  ///
+  /// In id, this message translates to:
+  /// **'Tahapan baru: {names}'**
+  String rapPreviewNewStages(String names);
+
+  /// No description provided for @rapPreviewUsed.
+  ///
+  /// In id, this message translates to:
+  /// **'Item terpakai yang berubah: {codes} (alasan wajib).'**
+  String rapPreviewUsed(String codes);
+
+  /// No description provided for @rapPreviewIssues.
+  ///
+  /// In id, this message translates to:
+  /// **'File belum dapat diterapkan — perbaiki baris berikut:'**
+  String get rapPreviewIssues;
+
+  /// No description provided for @clientNewTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Klien baru'**
+  String get clientNewTitle;
+
+  /// No description provided for @clientName.
+  ///
+  /// In id, this message translates to:
+  /// **'Nama'**
+  String get clientName;
+
+  /// No description provided for @clientAddress.
+  ///
+  /// In id, this message translates to:
+  /// **'Alamat'**
+  String get clientAddress;
+
+  /// No description provided for @clientNameRequired.
+  ///
+  /// In id, this message translates to:
+  /// **'Nama wajib diisi.'**
+  String get clientNameRequired;
+
+  /// No description provided for @clientPtRequired.
+  ///
+  /// In id, this message translates to:
+  /// **'PT wajib dipilih.'**
+  String get clientPtRequired;
+
+  /// No description provided for @clientContacts.
+  ///
+  /// In id, this message translates to:
+  /// **'Kontak PIC'**
+  String get clientContacts;
+
+  /// No description provided for @clientContact.
+  ///
+  /// In id, this message translates to:
+  /// **'Kontak PIC'**
+  String get clientContact;
+
+  /// No description provided for @clientNoContacts.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada kontak PIC.'**
+  String get clientNoContacts;
+
+  /// No description provided for @clientPrimary.
+  ///
+  /// In id, this message translates to:
+  /// **'Utama'**
+  String get clientPrimary;
+
+  /// No description provided for @clientPosition.
+  ///
+  /// In id, this message translates to:
+  /// **'Jabatan'**
+  String get clientPosition;
+
+  /// No description provided for @clientNotes.
+  ///
+  /// In id, this message translates to:
+  /// **'Catatan'**
+  String get clientNotes;
+
+  /// No description provided for @clientProjects.
+  ///
+  /// In id, this message translates to:
+  /// **'Proyek klien ini'**
+  String get clientProjects;
+
+  /// No description provided for @contractsTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Unit & kontrak'**
+  String get contractsTitle;
+
+  /// No description provided for @contractsEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada proyek kontrak unit.'**
+  String get contractsEmpty;
+
+  /// No description provided for @contractsToday.
+  ///
+  /// In id, this message translates to:
+  /// **'Hari ini: {filled} dari {active} unit sudah diisi'**
+  String contractsToday(int filled, int active);
+
+  /// No description provided for @contractsMonth.
+  ///
+  /// In id, this message translates to:
+  /// **'Bulan ini: jam kerja {work} · belum diisi {missing}'**
+  String contractsMonth(String work, int missing);
+
+  /// No description provided for @contractsGaps.
+  ///
+  /// In id, this message translates to:
+  /// **'Selisih HM: {count}'**
+  String contractsGaps(int count);
+
+  /// No description provided for @contractsFillTimesheet.
+  ///
+  /// In id, this message translates to:
+  /// **'Isi timesheet'**
+  String get contractsFillTimesheet;
+
+  /// No description provided for @contractsUnits.
+  ///
+  /// In id, this message translates to:
+  /// **'Unit alat berat'**
+  String get contractsUnits;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

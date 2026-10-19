@@ -12739,6 +12739,230 @@ export const openapiDocument = {
         ],
         "description": "Every readable field of one document, as display text (read-only)."
       },
+      "DataForm": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "canCreate": {
+            "type": "boolean"
+          },
+          "canUpdate": {
+            "type": "boolean"
+          },
+          "canDelete": {
+            "type": "boolean",
+            "description": "Soft delete exists for the collection — check GET /records/{collection}/{id}/delete-check first."
+          },
+          "supported": {
+            "type": "boolean",
+            "description": "false = a required field the APK cannot edit (create only) — use the web."
+          },
+          "reason": {
+            "type": "object",
+            "properties": {
+              "onUpdate": {
+                "type": "boolean"
+              },
+              "onDeactivate": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "onUpdate",
+              "onDeactivate"
+            ],
+            "description": "When the audit hooks require `reason`; other rules (changing protected fields) answer 400 at path changeReason."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "textarea",
+                    "email",
+                    "number",
+                    "money",
+                    "date",
+                    "datetime",
+                    "checkbox",
+                    "select",
+                    "multiselect",
+                    "relationship",
+                    "relationships"
+                  ],
+                  "description": "date = YYYY-MM-DD; datetime = ISO; money = integer rupiah."
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "readOnly": {
+                  "type": "boolean",
+                  "description": "admin.readOnly or no field-level create / update access for the caller."
+                },
+                "maxLength": {
+                  "type": "integer"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "help": {
+                  "type": "string"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "label"
+                    ]
+                  }
+                },
+                "relationTo": {
+                  "type": "string",
+                  "description": "Picker: GET /data/{collection}/options?field=<key>."
+                },
+                "value": {
+                  "description": "Current value (relationships: id / ids); create: the default."
+                },
+                "valueLabel": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "type",
+                "required",
+                "readOnly"
+              ]
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Field keys edited on the web only (arrays, uploads, conditional fields, …)."
+          }
+        },
+        "required": [
+          "collection",
+          "label",
+          "id",
+          "title",
+          "canCreate",
+          "canUpdate",
+          "canDelete",
+          "supported",
+          "reason",
+          "fields",
+          "skipped"
+        ]
+      },
+      "DataOptions": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "label"
+              ]
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "DataWriteBody": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Field key (dot path for groups) → value; only the editable keys of GET /data/{collection}/form."
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Audit reason (required by the collection rules — see `reason` of the form)."
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
       "ShortfallApprovalRequestBody": {
         "type": "object",
         "properties": {
@@ -12884,6 +13108,238 @@ export const openapiDocument = {
         },
         "required": [
           "items"
+        ]
+      },
+      "FieldContracts": {
+        "type": "object",
+        "properties": {
+          "today": {
+            "type": "string"
+          },
+          "month": {
+            "type": "string"
+          },
+          "canCreateTimesheet": {
+            "type": "boolean",
+            "description": "The caller may fill timesheets (\"Isi timesheet\")."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "projectId": {
+                  "type": "integer"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "companyId": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "unitsActiveToday": {
+                  "type": "integer"
+                },
+                "filledToday": {
+                  "type": "integer"
+                },
+                "canCreateTimesheet": {
+                  "type": "boolean"
+                },
+                "contracts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "unitId": {
+                        "type": "integer"
+                      },
+                      "unitLabel": {
+                        "type": "string"
+                      },
+                      "unitType": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "startDate": {
+                        "type": "string"
+                      },
+                      "endDate": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "active": {
+                        "type": "boolean"
+                      },
+                      "activeToday": {
+                        "type": "boolean"
+                      },
+                      "filledToday": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "unitId",
+                      "unitLabel",
+                      "unitType",
+                      "startDate",
+                      "endDate",
+                      "active",
+                      "activeToday",
+                      "filledToday"
+                    ]
+                  }
+                },
+                "monthTotals": {
+                  "type": "object",
+                  "properties": {
+                    "work": {
+                      "type": "number"
+                    },
+                    "standby": {
+                      "type": "number"
+                    },
+                    "breakdown": {
+                      "type": "number"
+                    },
+                    "filled": {
+                      "type": "integer"
+                    },
+                    "missing": {
+                      "type": "integer"
+                    },
+                    "gaps": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "work",
+                    "standby",
+                    "breakdown",
+                    "filled",
+                    "missing",
+                    "gaps"
+                  ],
+                  "description": "This month up to today: hours work / standby / breakdown, filled and missing unit-days, HM gaps."
+                }
+              },
+              "required": [
+                "projectId",
+                "code",
+                "name",
+                "companyId",
+                "status",
+                "unitsActiveToday",
+                "filledToday",
+                "canCreateTimesheet",
+                "contracts",
+                "monthTotals"
+              ]
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "companyId": {
+                  "type": "integer"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "brandModel": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "owner": {
+                  "type": "string",
+                  "enum": [
+                    "sendiri",
+                    "pelanggan"
+                  ]
+                },
+                "clientName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "siap",
+                    "rusak",
+                    "menunggu_part"
+                  ]
+                },
+                "lastHourMeter": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "companyId",
+                "label",
+                "type",
+                "brandModel",
+                "owner",
+                "clientName",
+                "status",
+                "lastHourMeter"
+              ]
+            }
+          }
+        },
+        "required": [
+          "today",
+          "month",
+          "canCreateTimesheet",
+          "items",
+          "total",
+          "page",
+          "totalPages",
+          "units"
         ]
       },
       "ServiceReportList": {
@@ -41131,6 +41587,155 @@ export const openapiDocument = {
             }
           }
         }
+      },
+      "post": {
+        "summary": "Create through the collection (payload.create as the caller: access, hooks, validation, audit as the web form). Unknown / read-only keys → 400.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404."
+            },
+            "required": true,
+            "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404.",
+            "name": "collection",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataWriteBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created (the detail)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/data/{collection}/{id}": {
@@ -41196,6 +41801,401 @@ export const openapiDocument = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DataDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update through the collection (payload.update as the caller). A required audit reason missing → 400 at path changeReason.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404."
+            },
+            "required": true,
+            "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404.",
+            "name": "collection",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataWriteBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated (the detail)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data/{collection}/form": {
+      "get": {
+        "summary": "The web admin edit form of a writable collection: editable fields with the caller's field-level access (Payload docAccess), current values (with `id`) or defaults, and the audit reason rules.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404."
+            },
+            "required": true,
+            "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404.",
+            "name": "collection",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": false,
+            "name": "id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Form",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataForm"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data/{collection}/options": {
+      "get": {
+        "summary": "Picker of one relationship field of the form: the target collection with the caller's access and the field's filterOptions (form state = the stored doc of `id`, overlaid by `data[<key>]=` parameters), search on its title, 30 rows.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404."
+            },
+            "required": true,
+            "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404.",
+            "name": "collection",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "field",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": false,
+            "name": "id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataOptions"
                 }
               }
             }
@@ -41859,6 +42859,128 @@ export const openapiDocument = {
             }
           },
           "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/field/contracts": {
+      "get": {
+        "summary": "The web \"Unit & kontrak\" page: kontrak_unit projects of the selection (field reports on) with their contract units, today's fill state and this month's timesheet totals, plus the heavy-equipment units. No rates.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "20",
+                "50",
+                "100"
+              ]
+            },
+            "required": false,
+            "name": "per",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contracts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldContracts"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

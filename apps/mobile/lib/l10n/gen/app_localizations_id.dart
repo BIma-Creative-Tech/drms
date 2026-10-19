@@ -5271,4 +5271,286 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get reportsNoApp => 'Tidak ada aplikasi di HP yang dapat membuka file ini.';
+
+  @override
+  String get recordAdd => 'Tambah';
+
+  @override
+  String get recordEdit => 'Ubah';
+
+  @override
+  String get recordDelete => 'Hapus';
+
+  @override
+  String recordNewTitle(String label) {
+    return '$label baru';
+  }
+
+  @override
+  String recordEditTitle(String label) {
+    return 'Ubah $label';
+  }
+
+  @override
+  String get recordNoRight => 'Anda tidak berhak mengubah data ini.';
+
+  @override
+  String get recordWebOnly => 'Data ini memiliki isian yang hanya dapat diubah di web.';
+
+  @override
+  String get recordCheckFields => 'Periksa isian yang ditandai.';
+
+  @override
+  String get recordNoChanges => 'Tidak ada perubahan untuk disimpan.';
+
+  @override
+  String recordSaved(String title) {
+    return '$title tersimpan.';
+  }
+
+  @override
+  String get recordNone => '— tidak ada —';
+
+  @override
+  String get recordPick => 'Pilih…';
+
+  @override
+  String recordPickDone(int count) {
+    return 'Pilih ($count)';
+  }
+
+  @override
+  String get recordDeleteTitle => 'Hapus data ini?';
+
+  @override
+  String get recordDeleteBody =>
+      'Data dihapus (soft delete) dan tidak tampil lagi di daftar; Admin dapat memulihkannya. Alasan wajib dan tercatat di audit log.';
+
+  @override
+  String get recordDeleted => 'Data dihapus.';
+
+  @override
+  String get recordDeactivateTitle => 'Data masih dipakai — nonaktifkan?';
+
+  @override
+  String get recordDeactivate => 'Nonaktifkan';
+
+  @override
+  String get recordDeactivated => 'Data dinonaktifkan.';
+
+  @override
+  String get rapManageTitle => 'Kelola RAP';
+
+  @override
+  String get rapImport => 'Impor Excel';
+
+  @override
+  String get rapImportTooLarge => 'File RAP maksimal 2 MB (.xlsx).';
+
+  @override
+  String get rapImported => 'RAP diperbarui dari file Excel.';
+
+  @override
+  String get rapImportCommit => 'Terapkan file';
+
+  @override
+  String get rapDownloadTemplate => 'Unduh template (.xlsx)';
+
+  @override
+  String get rapDownloadRap => 'Unduh RAP (.xlsx)';
+
+  @override
+  String get rapApplyTemplate => 'Terapkan template RAP';
+
+  @override
+  String get rapApplyTemplateHint => 'Item template disalin ke RAP proyek ini (hanya untuk RAP yang masih kosong).';
+
+  @override
+  String get rapNoTemplates => 'Belum ada template RAP.';
+
+  @override
+  String get rapTemplateApplied => 'Template diterapkan.';
+
+  @override
+  String get rapSaveTemplate => 'Simpan sebagai template';
+
+  @override
+  String get rapSaveTemplateHint => 'Item RAP proyek ini disimpan sebagai template baru (tanpa realisasi).';
+
+  @override
+  String get rapTemplateName => 'Nama template';
+
+  @override
+  String rapTemplateSaved(String name) {
+    return 'Template $name tersimpan.';
+  }
+
+  @override
+  String get rapAddItem => 'Tambah item';
+
+  @override
+  String rapEditItem(String code) {
+    return 'Ubah item $code';
+  }
+
+  @override
+  String rapItemSaved(String code) {
+    return 'Item $code tersimpan.';
+  }
+
+  @override
+  String get rapLockedDirektur =>
+      'RAP terkunci (sudah ada realisasi laporan harian). Perubahan oleh Direktur/Admin wajib dengan alasan.';
+
+  @override
+  String get rapLockedPm => 'RAP terkunci (sudah ada realisasi laporan harian). Perubahan hanya oleh Direktur/Admin.';
+
+  @override
+  String get rapReadOnly => 'Tampilan baca. RAP diubah oleh PM proyek atau Direktur.';
+
+  @override
+  String rapValueLine(String value) {
+    return 'Nilai RAP $value';
+  }
+
+  @override
+  String rapValueVsBudget(String value, String budget) {
+    return 'Nilai RAP $value · RAB $budget';
+  }
+
+  @override
+  String get rapKindWork => 'Pekerjaan';
+
+  @override
+  String get rapKindMaterial => 'Material';
+
+  @override
+  String rapWeight(String pct) {
+    return 'bobot $pct%';
+  }
+
+  @override
+  String get rapInUse => 'Sudah terpakai — perubahan wajib alasan';
+
+  @override
+  String get rapCode => 'Kode';
+
+  @override
+  String get rapDescription => 'Uraian';
+
+  @override
+  String get rapStage => 'Tahapan';
+
+  @override
+  String get rapUom => 'Satuan';
+
+  @override
+  String get rapVolume => 'Volume';
+
+  @override
+  String get rapUnitPrice => 'Harga satuan';
+
+  @override
+  String get rapWeightLabel => 'Bobot';
+
+  @override
+  String get rapActive => 'Aktif';
+
+  @override
+  String get rapActiveHint => 'Item tidak pernah dihapus — nonaktifkan bila tidak dipakai lagi.';
+
+  @override
+  String get rapReason => 'Alasan perubahan';
+
+  @override
+  String get rapReasonLocked => 'Wajib: RAP terkunci. Tercatat di audit log.';
+
+  @override
+  String get rapReasonUsed => 'Wajib: item sudah terpakai. Tercatat di audit log.';
+
+  @override
+  String rapPreviewTitle(String file) {
+    return 'Pratinjau $file';
+  }
+
+  @override
+  String rapPreviewCounts(int n, int c, int u, int d) {
+    return 'Baru $n, berubah $c, tetap $u, dinonaktifkan $d.';
+  }
+
+  @override
+  String rapPreviewNewStages(String names) {
+    return 'Tahapan baru: $names';
+  }
+
+  @override
+  String rapPreviewUsed(String codes) {
+    return 'Item terpakai yang berubah: $codes (alasan wajib).';
+  }
+
+  @override
+  String get rapPreviewIssues => 'File belum dapat diterapkan — perbaiki baris berikut:';
+
+  @override
+  String get clientNewTitle => 'Klien baru';
+
+  @override
+  String get clientName => 'Nama';
+
+  @override
+  String get clientAddress => 'Alamat';
+
+  @override
+  String get clientNameRequired => 'Nama wajib diisi.';
+
+  @override
+  String get clientPtRequired => 'PT wajib dipilih.';
+
+  @override
+  String get clientContacts => 'Kontak PIC';
+
+  @override
+  String get clientContact => 'Kontak PIC';
+
+  @override
+  String get clientNoContacts => 'Belum ada kontak PIC.';
+
+  @override
+  String get clientPrimary => 'Utama';
+
+  @override
+  String get clientPosition => 'Jabatan';
+
+  @override
+  String get clientNotes => 'Catatan';
+
+  @override
+  String get clientProjects => 'Proyek klien ini';
+
+  @override
+  String get contractsTitle => 'Unit & kontrak';
+
+  @override
+  String get contractsEmpty => 'Belum ada proyek kontrak unit.';
+
+  @override
+  String contractsToday(int filled, int active) {
+    return 'Hari ini: $filled dari $active unit sudah diisi';
+  }
+
+  @override
+  String contractsMonth(String work, int missing) {
+    return 'Bulan ini: jam kerja $work · belum diisi $missing';
+  }
+
+  @override
+  String contractsGaps(int count) {
+    return 'Selisih HM: $count';
+  }
+
+  @override
+  String get contractsFillTimesheet => 'Isi timesheet';
+
+  @override
+  String get contractsUnits => 'Unit alat berat';
 }
