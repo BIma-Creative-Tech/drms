@@ -1,9 +1,13 @@
 import { getTranslation } from '@payloadcms/translations'
-import type { Payload, SanitizedPermissions, TypedUser, VisibleEntities } from 'payload'
+import { createLocalReq, type Payload, type SanitizedPermissions, type TypedUser, type VisibleEntities } from 'payload'
 
 import { companyContextOf, exactRolesOf, isOperatorOnly, isStaffOnly, membershipsOf, ROLE_LABELS, rolesOf, type Role } from '@/access/roles'
 import { resolveModules, type BadgeKey, type FeatureKey, type ResolvedModule } from '@/admin/modules/registry'
+import { addendumInboxCount } from '@/domain/addendum/service'
+import { approvalInboxCount } from '@/domain/expense/queues'
+import { shortfallInboxCount } from '@/domain/expense/shortfall-approval'
 import { TRANSFER_QUEUE_WHERE } from '@/domain/expense/types'
+import { loanInboxCount } from '@/domain/loans/service'
 import { pickDisplayName, resolveDisplayName } from '@/domain/user-display-name'
 
 import { normalizeSelection, type SwitcherState } from './company-switcher'
@@ -18,11 +22,27 @@ import { canCreateFrom, quickCreateGroups, type QuickCreateGroup } from './quick
 
 type I18nLike = Parameters<typeof getTranslation>[1]
 
+/**
+ * DRMS 20/10: badge of "Persetujuan" = the rows of the approval page waiting for the CALLER (requests, addenda RAB,
+ * LPJ shortfalls, loans) — the inbox steps without their figures, read with the caller's access (local req, no transaction).
+ */
+export async function approvalBadge(payload: Payload, user: TypedUser): Promise<number> {
+  const req = await createLocalReq({ user }, payload)
+  const counts = await Promise.all([approvalInboxCount(req), addendumInboxCount(req), shortfallInboxCount(req), loanInboxCount(req)])
+  return counts.reduce((a, b) => a + b, 0)
+}
+
 /** Moved from F2NavLinks (US-19 "badge jumlah antrian"): Direktur/Finance only (ADR 0026: the Owner too — effective
- * roles carry pk-owner). S3e (S-07): the transfer badge counts exactly the transfer queue of the page title (TRANSFER_QUEUE_WHERE). */
-export async function loadBadges(payload: Pick<Payload, 'count'>, user: TypedUser): Promise<Partial<Record<BadgeKey, number>>> {
+ * roles carry pk-owner). S3e (S-07): the transfer badge counts exactly the transfer queue of the page title (TRANSFER_QUEUE_WHERE).
+ * DRMS 20/10: + `approvals` (approvalBadge) for the roles of the "Persetujuan" item (Direktur/Finance/PM). */
+export async function loadBadges(
+  payload: Pick<Payload, 'count'>,
+  user: TypedUser,
+  approvals: (payload: Payload, user: TypedUser) => Promise<number> = approvalBadge,
+): Promise<Partial<Record<BadgeKey, number>>> {
   const roles = rolesOf(user)
-  if (!roles.includes('pk-finance') && !roles.includes('pk-owner')) return {}
+  const office = roles.includes('pk-finance') || roles.includes('pk-owner')
+  if (!office && !roles.includes('pk-pm')) return {}
   const count = async (where: Parameters<Payload['count']>[0]['where']) => {
     try {
       return (await payload.count({ collection: 'expense-requests', where, user, overrideAccess: false })).totalDocs
@@ -30,8 +50,10 @@ export async function loadBadges(payload: Pick<Payload, 'count'>, user: TypedUse
       return 0
     }
   }
-  const [transfers, lpj] = await Promise.all([count(TRANSFER_QUEUE_WHERE), count({ status: { in: ['lpj_submitted', 'lpj_verified'] } })])
-  return { transfers, lpj }
+  const mine = approvals(payload as Payload, user).catch(() => 0)
+  if (!office) return { approvals: await mine }
+  const [transfers, lpj, pending] = await Promise.all([count(TRANSFER_QUEUE_WHERE), count({ status: { in: ['lpj_submitted', 'lpj_verified'] } }), mine])
+  return { transfers, lpj, approvals: pending }
 }
 
 /** S3e (US-05): unread in-app notifications of the caller (bell in the top bar). */

@@ -32,7 +32,7 @@ export type ModuleId =
   | 'pengaturan'
   | 'sistem'
 
-export type BadgeKey = 'transfers' | 'lpj'
+export type BadgeKey = 'transfers' | 'lpj' | 'approvals'
 
 /** Per-PT feature switches that gate custom views (any selected PT with the flag on). */
 export type FeatureKey = 'fieldReports'
@@ -116,7 +116,7 @@ export const MODULES: readonly ModuleDef[] = [
       {
         items: [
           // ADR 0021: the PM project approves its requests first ("Persetujuan PM")
-          { view: '/persetujuan', label: 'Persetujuan', roles: OFFICE_PM, navKey: 'persetujuan' },
+          { view: '/persetujuan', label: 'Persetujuan', roles: OFFICE_PM, badge: 'approvals', navKey: 'persetujuan' },
           // DRMS 15/10 #3: the queues' home is Keuangan › Transfer & LPJ (Finance's work); kept here as shortcuts
           { view: '/antrian-transfer', label: 'Antrian Transfer', roles: OFFICE, badge: 'transfers', navKey: 'antrian-transfer', alias: true },
           { view: '/verifikasi-lpj', label: 'Verifikasi LPJ', roles: OFFICE, badge: 'lpj', navKey: 'verifikasi-lpj', alias: true },

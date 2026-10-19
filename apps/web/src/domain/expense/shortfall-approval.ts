@@ -428,20 +428,38 @@ export async function shortfallSummary(req: PayloadRequest, raw: RequestDoc, s: 
 
 export type ShortfallSummary = NonNullable<Awaited<ReturnType<typeof shortfallSummary>>>
 
+async function shortfallStep(req: PayloadRequest, raw: RequestDoc, d: SettlementDoc): Promise<'approve' | 'acknowledge' | null> {
+  const acts = shortfallAllowedActions(await ctxOf(req, raw, d))
+  return acts.includes('approve') ? 'approve' : acts.includes('acknowledge') ? 'acknowledge' : null
+}
+
+const shortfallPending = (pts: number[]): Where => ({ and: [{ shortfallApprovalStatus: { in: ['pending_ack', 'pending_approval'] } }, { status: { equals: 'verified' } }, { company: { in: pts } }] })
+
+/** DRMS 20/10: nav badge of "Persetujuan" — shortfallInbox() without the figures. */
+export async function shortfallInboxCount(req: PayloadRequest): Promise<number> {
+  const pts = companiesWithRole(req, [...ROLES])
+  if (pts.length === 0) return 0
+  const res = await req.payload.find({ collection: 'settlements', where: shortfallPending(pts), limit: 200, depth: 0, user: req.user, overrideAccess: false, req })
+  let n = 0
+  for (const d of res.docs as unknown as SettlementDoc[]) {
+    const rid = relId(d.request)
+    if (rid !== undefined && (await shortfallStep(req, await loadRaw(req, rid), d))) n++
+  }
+  return n
+}
+
 /** LPJ shortfall approvals waiting for the CALLER (Direktur "Diketahui" / Finance level), oldest first. */
 export async function shortfallInbox(req: PayloadRequest, f: { companyIds?: readonly number[] } = {}) {
   // ADR 0021: the PM project (or a cost-center manager) decides the "Diketahui" of its requests too
   const pts = companiesWithRole(req, [...ROLES]).filter((c) => !f.companyIds?.length || f.companyIds.includes(c))
   if (pts.length === 0) return { items: [] }
-  const where: Where = { and: [{ shortfallApprovalStatus: { in: ['pending_ack', 'pending_approval'] } }, { status: { equals: 'verified' } }, { company: { in: pts } }] }
-  const res = await req.payload.find({ collection: 'settlements', where, sort: 'updatedAt', limit: 200, depth: 0, user: req.user, overrideAccess: false, req })
+  const res = await req.payload.find({ collection: 'settlements', where: shortfallPending(pts), sort: 'updatedAt', limit: 200, depth: 0, user: req.user, overrideAccess: false, req })
   const items = []
   for (const d of res.docs as unknown as SettlementDoc[]) {
     const rid = relId(d.request)
     if (rid === undefined) continue
     const raw = await loadRaw(req, rid)
-    const acts = shortfallAllowedActions(await ctxOf(req, raw, d))
-    const step = acts.includes('approve') ? ('approve' as const) : acts.includes('acknowledge') ? ('acknowledge' as const) : null
+    const step = await shortfallStep(req, raw, d)
     if (!step) continue
     const sf = await shortfallStateOf(req, raw, d)
     items.push({
