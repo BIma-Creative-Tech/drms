@@ -5569,10 +5569,11 @@ export const openapiDocument = {
                       "pk-finance",
                       "pk-owner",
                       "pk-principal",
-                      "pk-admin"
+                      "pk-admin",
+                      "pk-operator"
                     ]
                   },
-                  "maxItems": 6
+                  "maxItems": 7
                 },
                 "employee": {
                   "type": [
