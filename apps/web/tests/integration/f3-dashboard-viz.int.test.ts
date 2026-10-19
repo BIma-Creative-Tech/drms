@@ -4,13 +4,18 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { F3_ADMIN_VIEWS } from '@/admin/config'
 import { loadModules } from '@/admin/shell/modules-server'
+import { addendumInbox } from '@/domain/addendum/service'
+import { approvalInbox } from '@/domain/expense/queues'
+import { shortfallInbox } from '@/domain/expense/shortfall-approval'
 import { TRANSFER_QUEUE_WHERE } from '@/domain/expense/types'
+import { loanInbox } from '@/domain/loans/service'
 
 import { financeDashboard, ownerDashboard, pmDashboard, staffDashboard } from '@/domain/reports/dashboards'
 import { disbursedMonthly, recentCashEntries, requestStatusCounts, requestTrendMonthly, transferQueueTop } from '@/domain/reports/kpi'
 import { addMonths } from '@/domain/reports/rules'
 import { officeScope, ownScope, teamScope } from '@/domain/reports/scope'
 import { resetRateLimits } from '@/lib/rate-limit'
+import { withReqTransaction } from '@/lib/system-tx'
 
 import { getTestPayload, sqlAs } from './helpers'
 import { api, asUser, draftBody, makeWorld, png, sysCreate, upload, type FlowUser, type Res, type World } from './flow-world'
@@ -209,7 +214,15 @@ describe('module launcher + /admin/dashboard', () => {
     expect(F3_ADMIN_VIEWS.dashboard.Component).toBe('@/admin/views/Launcher#Launcher')
   })
 
-  it('finance: Persetujuan badges = transfer queue / LPJ counts under finance access', async () => {
+  /** DRMS 20/10: the "Persetujuan" badge = every row of the approval page (the four inbox sections) of the caller. */
+  async function inboxRows(req: Parameters<typeof approvalInbox>[0]) {
+    return withReqTransaction(req, async () => {
+      const lists = await Promise.all([approvalInbox(req), addendumInbox(req), shortfallInbox(req), loanInbox(req)])
+      return lists.reduce((n, l) => n + l.items.length, 0)
+    })
+  }
+
+  it('finance: Persetujuan badges = transfer queue / LPJ counts / own inbox under finance access', async () => {
     const { mods, req, p } = await modulesOf(w.users.finance)
     const per = mods.find((m) => m.id === 'persetujuan')!
     const item = (k: string) => per.sections.flatMap((s) => s.items).find((i) => i.navKey === k)
@@ -218,7 +231,9 @@ describe('module launcher + /admin/dashboard', () => {
     expect(tq.totalDocs).toBeGreaterThan(0) // this world queued one approved advance
     expect(item('antrian-transfer')!.badge ?? 0).toBe(tq.totalDocs)
     expect(item('verifikasi-lpj')!.badge ?? 0).toBe(lpj.totalDocs)
-    expect(per.badge).toBe(tq.totalDocs + lpj.totalDocs)
+    const inbox = await inboxRows(req)
+    expect(item('persetujuan')!.badge ?? 0).toBe(inbox)
+    expect(per.badge).toBe(tq.totalDocs + lpj.totalDocs + inbox)
     expect(mods.map((m) => m.id)).toEqual(expect.arrayContaining(['dashboard', 'keuangan', 'laporan', 'sistem']))
   })
 
@@ -231,12 +246,12 @@ describe('module launcher + /admin/dashboard', () => {
   })
 
   it('PM: Proyek with progress/addendum; Persetujuan = the inbox (ADR 0021: Persetujuan PM) + the read-only approvals list', async () => {
-    const { mods } = await modulesOf(w.users.pm)
+    const { mods, req } = await modulesOf(w.users.pm)
     const proyek = mods.find((m) => m.id === 'proyek')!
     expect(proyek.sections.flatMap((s) => s.items.map((i) => i.navKey))).toEqual(expect.arrayContaining(['progress', 'addendum']))
     const per = mods.find((m) => m.id === 'persetujuan')
     // Antrian Transfer / Verifikasi LPJ stay Direktur/Finance only; the inbox lists only the PM's own steps
     expect(per?.sections.flatMap((s) => s.items.map((i) => i.href)) ?? []).toEqual(['/admin/persetujuan', '/admin/collections/approvals'])
-    expect(per?.badge ?? 0).toBe(0)
+    expect(per?.badge ?? 0).toBe(await inboxRows(req))
   })
 })
