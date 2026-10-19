@@ -670,12 +670,28 @@ export async function listAddenda(req: PayloadRequest, f: AddendumFilter): Promi
   return { items: page.map((d) => summary(d, n)), nextCursor: docs.length > f.limit ? page[page.length - 1]!.id : null }
 }
 
+async function addendumStep(req: PayloadRequest, d: AddendumDoc): Promise<'approve' | 'acknowledge' | null> {
+  const acts = addendumAllowedActions(await actorContext(req, d))
+  return acts.includes('approve') ? 'approve' : acts.includes('acknowledge') ? 'acknowledge' : null
+}
+
+const ADDENDUM_PENDING: Where = { status: { in: ['pending_ack', 'pending_approval'] } }
+
+/** DRMS 20/10: nav badge of "Persetujuan" — addendumInbox() without the budget figures (no transaction). */
+export async function addendumInboxCount(req: PayloadRequest): Promise<number> {
+  if (!hasRoleAny(req, 'pk-owner', 'pk-finance')) return 0
+  const res = await req.payload.find({ collection: 'budget-addenda', where: ADDENDUM_PENDING, limit: 200, depth: 0, user: req.user, overrideAccess: false, req })
+  let n = 0
+  for (const d of res.docs as unknown as AddendumDoc[]) if (await addendumStep(req, d)) n++
+  return n
+}
+
 /** Addenda waiting for the CALLER's decision (Direktur "Diketahui" / Finance level), oldest first. */
 export async function addendumInbox(req: PayloadRequest, f: { companyIds?: readonly number[] } = {}) {
   if (!hasRoleAny(req, 'pk-owner', 'pk-finance')) return { items: [] as Array<AddendumSummary & { step: 'acknowledge' | 'approve'; budget: { current: number; afterAddition: number; committedPctBefore: number | null; committedPctAfter: number | null } }> }
   const res = await req.payload.find({
     collection: 'budget-addenda',
-    where: f.companyIds?.length ? { and: [{ status: { in: ['pending_ack', 'pending_approval'] } }, { company: { in: [...f.companyIds] } }] } : { status: { in: ['pending_ack', 'pending_approval'] } },
+    where: f.companyIds?.length ? { and: [ADDENDUM_PENDING, { company: { in: [...f.companyIds] } }] } : ADDENDUM_PENDING,
     sort: 'submittedAt',
     limit: 200,
     depth: 0,
@@ -687,8 +703,7 @@ export async function addendumInbox(req: PayloadRequest, f: { companyIds?: reado
   const n = await names(req, docs)
   const items = []
   for (const d of docs) {
-    const acts = addendumAllowedActions(await actorContext(req, d))
-    const step = acts.includes('approve') ? ('approve' as const) : acts.includes('acknowledge') ? ('acknowledge' as const) : null
+    const step = await addendumStep(req, d)
     if (!step) continue
     const p = n.projects.get(relId(d.project)!)!
     const impact = await budgetImpact(req, p, d.addition)

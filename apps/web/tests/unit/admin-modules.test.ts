@@ -312,7 +312,17 @@ describe('server helpers', () => {
 
   it('loadBadges: a failing count never breaks the nav', async () => {
     const payload = { count: async () => Promise.reject(new Error('db down')) } as unknown as Payload
-    expect(await loadBadges(payload, { id: 1, roles: ['pk-owner'] } as unknown as TypedUser)).toEqual({ transfers: 0, lpj: 0 })
+    const failing = async () => Promise.reject(new Error('db down'))
+    expect(await loadBadges(payload, { id: 1, roles: ['pk-owner'] } as unknown as TypedUser, failing)).toEqual({ transfers: 0, lpj: 0, approvals: 0 })
+  })
+
+  it('DRMS 20/10: the "Persetujuan" tile carries the inbox badge; the module badge sums it with the queues', () => {
+    const m = resolveModules({ roles: ['pk-owner'], staffOnly: false, canSee: () => true, labelOf: (_, s) => s, badges: { transfers: 3, lpj: 1, approvals: 4 } })
+    const p = m.find((x) => x.id === 'persetujuan')!
+    expect(p.sections[0]!.items.find((i) => i.navKey === 'persetujuan')!.badge).toBe(4)
+    expect(p.badge).toBe(8)
+    const pm = resolveModules({ roles: ['pk-pm'], staffOnly: false, canSee: () => true, labelOf: (_, s) => s, badges: { approvals: 2 } })
+    expect(pm.find((x) => x.id === 'persetujuan')!.badge).toBe(2)
   })
 })
 

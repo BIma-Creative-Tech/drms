@@ -119,6 +119,19 @@ const base = (d: Populated, refs: Map<number, CompanyRef>) => ({
   requestDate: d.requestDate ?? null,
 })
 
+/** The CALLER's step on a pending request ("Diketahui" / approval, G1/G2 applied), or null. */
+async function callerStep(req: PayloadRequest, d: Populated): Promise<'approve' | 'acknowledge' | null> {
+  const acts = allowedActions(await actorContext(req, { ...d, createdBy: relId(d.createdBy), requesters: ids(d.requesters as unknown[]) } as unknown as RequestDoc))
+  return acts.includes('approve') ? 'approve' : acts.includes('acknowledge') ? 'acknowledge' : null
+}
+
+/** DRMS 20/10: nav badge of "Persetujuan" — the inbox rows without their figures (no budget/fund/flags, no transaction). */
+export async function approvalInboxCount(req: PayloadRequest): Promise<number> {
+  let n = 0
+  for (const d of await findVisible(req, { status: { in: ['pending_ack', 'pending_approval'] } }, 'submittedAt')) if (await callerStep(req, d)) n++
+  return n
+}
+
 /** Approval inbox: requests waiting for the CALLER's "Diketahui" or approval (G1/G2 applied). */
 export async function approvalInbox(req: PayloadRequest, f?: QueueFilter) {
   const docs = await findVisible(req, narrow({ status: { in: ['pending_ack', 'pending_approval'] } }, f), 'submittedAt')
@@ -133,9 +146,7 @@ export async function approvalInbox(req: PayloadRequest, f?: QueueFilter) {
     const cid = relId((d as { company?: unknown }).company)
     if (cid !== undefined && !warnOf.has(cid)) warnOf.set(cid, (await settings(req, cid)).budgetWarnPct ?? 85)
     const itemWarn = cid !== undefined ? warnOf.get(cid)! : warnPct
-    const ctx = await actorContext(req, { ...d, createdBy: relId(d.createdBy), requesters: ids(d.requesters as unknown[]) } as unknown as RequestDoc)
-    const acts = allowedActions(ctx)
-    const step: 'approve' | 'acknowledge' | null = acts.includes('approve') ? 'approve' : acts.includes('acknowledge') ? 'acknowledge' : null
+    const step = await callerStep(req, d)
     if (!step) continue
     // owner 2026-10-11: RAB % only for the money roles of the request's PT (e.g. not a Staff acknowledger)
     const p = d.project && typeof d.project === 'object' && seesMoney(req, cid) ? d.project : null

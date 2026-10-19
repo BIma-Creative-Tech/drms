@@ -153,7 +153,7 @@ describe('S-07 transfer badge = transfer queue; S-23 Admin reaches Laporan', () 
         return { totalDocs: 3 }
       },
     } as unknown as Payload
-    const b = await loadBadges(payload, { id: 1, roles, collection: 'users' } as unknown as TypedUser)
+    const b = await loadBadges(payload, { id: 1, roles, collection: 'users' } as unknown as TypedUser, async () => 2)
     return { b, wheres }
   }
   const navKeys = (roles: Role[]) =>
@@ -163,8 +163,15 @@ describe('S-07 transfer badge = transfer queue; S-23 Admin reaches Laporan', () 
     const { wheres, b } = await badges(['pk-finance'])
     expect(wheres[0]).toBe(TRANSFER_QUEUE_WHERE)
     expect(JSON.stringify(TRANSFER_QUEUE_WHERE)).not.toContain('"in"')
-    expect(b).toEqual({ transfers: 3, lpj: 3 })
-    expect((await badges(['pk-pm'])).wheres).toEqual([]) // no count for non-office roles
+    expect(b).toEqual({ transfers: 3, lpj: 3, approvals: 2 })
+    expect((await badges(['pk-pm'])).wheres).toEqual([]) // no queue count for non-office roles
+  })
+
+  it('DRMS 20/10: "Persetujuan" badge for Direktur/Finance/PM (own inbox), none for Staff/Admin', async () => {
+    expect((await badges(['pk-pm'])).b).toEqual({ approvals: 2 })
+    expect((await badges(['pk-owner'])).b.approvals).toBe(2)
+    expect((await badges(['pk-staff'])).b).toEqual({})
+    expect((await badges(['pk-admin'])).b).toEqual({})
   })
 
   it('Admin gets the Laporan link (attendance report export)', () => {

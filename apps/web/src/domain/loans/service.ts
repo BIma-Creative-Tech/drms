@@ -802,14 +802,22 @@ export async function listLoans(req: PayloadRequest, f: LoanFilter) {
   return { items: docs.map((d) => summary(d, n, todayStr)), page: res.page ?? f.page, totalPages: res.totalPages, totalDocs: res.totalDocs, limit: f.limit }
 }
 
+async function pendingLoansForCaller(req: PayloadRequest, f: { companyIds?: readonly number[] }): Promise<LoanDoc[]> {
+  const where: Where = f.companyIds?.length ? { and: [{ status: { equals: 'pending_approval' } }, { company: { in: [...f.companyIds] } }] } : { status: { equals: 'pending_approval' } }
+  const res = await req.payload.find({ collection: 'project-loans', where, sort: 'submittedAt', limit: 200, depth: 0, user: req.user, overrideAccess: false, req })
+  const uid = userId(req) ?? -1
+  return (res.docs as unknown as LoanDoc[]).filter((d) => mayDecide({ callerId: uid, creatorId: relId(d.createdBy) ?? -2, callerIsDirektur: hasExactRole(req, 'pk-owner', relId(d.company)), g1Exception: d.g1Exception ?? null }))
+}
+
+/** DRMS 20/10: nav badge of "Persetujuan" — loanInbox() without the summaries. */
+export async function loanInboxCount(req: PayloadRequest): Promise<number> {
+  return hasRoleAny(req, 'pk-owner') ? (await pendingLoansForCaller(req, {})).length : 0
+}
+
 /** Loans waiting for the CALLER's decision (Direktur pool, G1), oldest first. */
 export async function loanInbox(req: PayloadRequest, f: { companyIds?: readonly number[] } = {}) {
   if (!hasRoleAny(req, 'pk-owner')) return { items: [] as LoanSummary[] }
-  const where: Where = f.companyIds?.length ? { and: [{ status: { equals: 'pending_approval' } }, { company: { in: [...f.companyIds] } }] } : { status: { equals: 'pending_approval' } }
-  const res = await req.payload.find({ collection: 'project-loans', where, sort: 'submittedAt', limit: 200, depth: 0, user: req.user, overrideAccess: false, req })
-  const docs = res.docs as unknown as LoanDoc[]
-  const uid = userId(req) ?? -1
-  const mine = docs.filter((d) => mayDecide({ callerId: uid, creatorId: relId(d.createdBy) ?? -2, callerIsDirektur: hasExactRole(req, 'pk-owner', relId(d.company)), g1Exception: d.g1Exception ?? null }))
+  const mine = await pendingLoansForCaller(req, f)
   const n = await names(req, mine)
   const todayStr = await today(req)
   return { items: mine.map((d) => summary(d, n, todayStr)) }
