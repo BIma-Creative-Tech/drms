@@ -2,7 +2,7 @@ import type { SanitizedConfig } from 'payload'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import { withCompanyContext, type Role } from '@/access/roles'
-import { visibleEntitiesOf } from '@/api/v1/endpoints/me-modules'
+import { menuHref, visibleEntitiesOf } from '@/api/v1/endpoints/me-modules'
 
 /**
  * User 2026-10-18: GET /api/v1/me/modules gives the APK the web launcher's modules. The endpoint feeds loadModules()
@@ -55,5 +55,17 @@ describe('/me/modules visibleEntitiesOf', () => {
     expect(v.collections).toContain('expense-requests')
     expect(v.collections).not.toContain('banks')
     expect(v.globals).toEqual([])
+  })
+})
+
+/** User 2026-10-19: the APK showed every item as "Segera hadir" — hrefs went out with the /admin prefix. */
+describe('menuHref (MeModules.href = relative to /admin)', () => {
+  it('strips the admin route, keeps everything else', () => {
+    expect(menuHref('/admin/absensi/absen')).toBe('/absensi/absen')
+    expect(menuHref('/admin/collections/projects')).toBe('/collections/projects')
+    expect(menuHref('/admin/globals/company-settings')).toBe('/globals/company-settings')
+    expect(menuHref('/admin')).toBe('/')
+    expect(menuHref('/administrasi')).toBe('/administrasi')
+    expect(menuHref('/absensi/rekap')).toBe('/absensi/rekap')
   })
 })

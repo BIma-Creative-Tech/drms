@@ -1,5 +1,6 @@
 import { getAccessResults, type PayloadRequest, type TypedUser, type VisibleEntities } from 'payload'
 
+import { ADMIN_ROUTE } from '@/admin/modules/registry'
 import { loadModules } from '@/admin/shell/modules-server'
 
 import { json, v1 } from '../http'
@@ -25,6 +26,13 @@ export function visibleEntitiesOf(req: Pick<PayloadRequest, 'payload' | 'user'>)
  * Same resolveModules() input as /admin (Payload permissions ∧ admin.hidden ∧ view roles, badges, PT features) for
  * the PTs of `X-Company-Ids`; the APK maps each item `href` to its own screen. Menu only — every route re-checks.
  */
+/**
+ * The contract (MeModules.href): the web route RELATIVE to /admin. loadModules() gives the admin href
+ * (`/admin/absensi/absen`) — sent as is since 2026-10-18, so the APK found no screen for any item and showed
+ * "Segera hadir di APK" everywhere once the server menu had loaded (user 2026-10-19).
+ */
+export const menuHref = (href: string): string => (href === ADMIN_ROUTE ? '/' : href.startsWith(`${ADMIN_ROUTE}/`) ? href.slice(ADMIN_ROUTE.length) : href)
+
 export const meModulesEndpoint = v1({
   path: '/me/modules',
   method: 'get',
@@ -38,7 +46,7 @@ export const meModulesEndpoint = v1({
         label: m.label,
         hint: m.hint,
         badge: m.badge,
-        sections: m.sections.map((s) => ({ label: s.label ?? null, items: s.items.map((i) => ({ href: i.href, label: i.label, kind: i.kind, badge: i.badge ?? 0 })) })),
+        sections: m.sections.map((s) => ({ label: s.label ?? null, items: s.items.map((i) => ({ href: menuHref(i.href), label: i.label, kind: i.kind, badge: i.badge ?? 0 })) })),
       })),
     })
   },

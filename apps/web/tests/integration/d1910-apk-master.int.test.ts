@@ -46,6 +46,15 @@ describe('Master Data through /data', () => {
   })
 })
 
+describe('Persetujuan › Data persetujuan', () => {
+  it('approvals list is readable through /data (read-only: form 404)', async () => {
+    const l = await api('GET', '/api/v1/data/approvals', admin)
+    expect(l.status, JSON.stringify(l.body)).toBe(200)
+    expect(l.body.collection).toBe('approvals')
+    expect((await api('GET', '/api/v1/data/approvals/form', admin)).status).toBe(404)
+  })
+})
+
 describe('Media lists', () => {
   it('own upload: list thumb + detail file (v1 file endpoint)', async () => {
     const id = await uploadMedia('media-attachments', admin, await png())
