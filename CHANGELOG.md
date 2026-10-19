@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-19
+
+**Finance cancel, PM on behalf, APK–web parity API** (PRs #111–#116). **No migration.** API contract: additive only
+(`GET /api/v1/me/modules`, `GET /api/v1/me/account`, `PUT /api/v1/me/signature`, `GET /api/v1/me/security`); the
+installed APK 0.8.0 keeps working. The new APK screens (phases 1–2) need this web release first and ship in the next
+APK release.
+
 ### Added
 
 - **APK: "Profil & tanda tangan" and "Keamanan akun" in Profil** (user 2026-10-19, phase 2 of the APK–web parity
@@ -55,7 +62,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **PM files a Pengajuan biaya on behalf of his project team** (owner decision 2026-10-18, revises the Q-09 default)
   — so the money goes to the requester's account, not the creator's. The PM of the request's project may set
   "Diajukan Oleh" to employees with an active team assignment to that project (himself optional) and pick their
-  account as Rekening tujuan; an empty Rekening tujuan still takes the first requester's default account. Not for an
+  account as Rekening tujuan; on the web form an empty Rekening tujuan still takes the first requester's default
+  account (the APK and `/api/v1` need it picked). Not for an
   employee of another project, a Direktur / Owner (ADR 0024 / 0026) or a cost-center request (403 with a clear
   message); Staff stay self-only (QA-15). The PM now reads his team's `employee-bank-accounts` with the number
   **masked** (`••••1234`, web picker, APK masters, account preview); system reads — the submit snapshot = the
