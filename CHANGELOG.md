@@ -6,14 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-## [0.16.0] - 2026-10-19
-
-**Finance cancel, PM on behalf, APK–web parity API** (PRs #111–#116). **No migration.** API contract: additive only
-(`GET /api/v1/me/modules`, `GET /api/v1/me/account`, `PUT /api/v1/me/signature`, `GET /api/v1/me/security`); the
-installed APK 0.8.0 keeps working. The new APK screens (phases 1–2) need this web release first and ship in the next
-APK release.
-
 ### Added
+
+- **APK: Laporan** (user 2026-10-19, phase 4 of the APK–web parity plan). Beranda → Laporan opens the web report
+  list in the APK.
+  - The reports of the caller's roles, with what they contain and their formats.
+  - One report: the web filter form (Terapkan / Reset), letterhead, the tables as cards (long text wraps), totals,
+    notes and the keyset pages. A document number opens its APK screen where there is one.
+  - Export CSV / Excel / PDF with the same filters (audited like on the web; XLSX above 10 000 and PDF above 500
+    rows disabled). The file can be opened, shared (WhatsApp, email, Drive, …) or saved to Download/ProyekKas
+    (Android 10+). No new plugin: a read-only ContentProvider and the app's own channel.
+  - Server: additive `GET /api/v1/reports` (the list) and, on `GET /api/v1/reports/{code}`, `filters`,
+    `letterhead`, `rowCount`, `limits`, `description` and per-row `rowLinks`. No migration.
 
 - **APK: Keuangan menu built natively — Buku kas, Tutup buku, void transfer, pinjaman, the "Data …" lists** (user
   2026-10-19, phase 3 of the APK–web parity plan). The Keuangan module items open APK screens instead of
@@ -44,6 +48,15 @@ APK release.
     `GET /api/v1/transfers/voidable`, `GET /api/v1/data/{collection}` and `GET /api/v1/data/{collection}/{id}`, built on
     the web pages' own helpers. `GET /project-loans` and `GET /intercompany-loans` gain `?summary=1`; the loan details
     gain `today` / `lenderToday` / `borrowerToday`. Writes use the existing endpoints. No migration.
+
+## [0.16.0] - 2026-10-19
+
+**Finance cancel, PM on behalf, APK–web parity API** (PRs #111–#116). **No migration.** API contract: additive only
+(`GET /api/v1/me/modules`, `GET /api/v1/me/account`, `PUT /api/v1/me/signature`, `GET /api/v1/me/security`); the
+installed APK 0.8.0 keeps working. The new APK screens (phases 1–2) need this web release first and ship in the next
+APK release.
+
+### Added
 
 - **APK: "Profil & tanda tangan" and "Keamanan akun" in Profil** (user 2026-10-19, phase 2 of the APK–web parity
   plan). These are the two entries of the web avatar menu.
