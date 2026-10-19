@@ -157,9 +157,15 @@ void main() {
         '/profile',
         '/notifications',
         '/security',
+        '/cash',
+        '/closings',
+        '/loans',
+        '/intercompany-loans',
       };
       for (final e in webToApk.entries) {
-        expect(known, contains(Uri.parse(e.value).path), reason: e.key);
+        final path = Uri.parse(e.value).path;
+        // phase 3: the generic web collection lists `/data/<slug>`
+        expect(known.contains(path) || path.startsWith('/data/'), isTrue, reason: '${e.key} → $path');
       }
     });
 
@@ -172,7 +178,7 @@ void main() {
 
     test('"+ Buat pengajuan" asks Kasbon / Reimburse; web-only items have no target yet', () {
       expect(apkTargetFor('/collections/expense-requests/create')!.pickRequestType, isTrue);
-      expect(apkTargetFor('/kas'), isNull);
+      expect(apkTargetFor('/kas')!.route, '/cash');
       expect(apkTargetFor('/laporan'), isNull);
       expect(apkTargetFor('/persetujuan')!.route, '/inbox');
     });

@@ -15,6 +15,36 @@ APK release.
 
 ### Added
 
+- **APK: Keuangan menu built natively — Buku kas, Tutup buku, void transfer, pinjaman, the "Data …" lists** (user
+  2026-10-19, phase 3 of the APK–web parity plan). The Keuangan module items open APK screens instead of
+  "Segera hadir di APK".
+  - **Buku kas** (Finance / Direktur), like the web Kas page:
+    - Balance per account plus total (per PT when several are selected).
+    - Filters: akun, periode, masuk/keluar, void, sumber, PT, search.
+    - The ledger newest first, with void rows, reversal links, request and Antar PT links.
+    - Finance of the row's PT can view the proof, edit a manual entry of an open period (reason required) and void
+      it (reason; a reversal is posted).
+    - "Kas masuk / Kas keluar" form with the web field order and rules: PT chooser for multi-PT Finance, date not
+      before the lock date or the account's opening date, project OR cost center, optional vehicle, proof photo,
+      overdraft confirmation.
+    - Direktur reads only.
+  - **Tutup buku**, per PT: lock date, last closed month, months ready to close, the 13-month overview (Masuk /
+    Keluar without void pairs, Koreksi separately), "Tutup buku" with an optional note, "Buka kembali" (Direktur,
+    latest closed month, reason) and the history.
+  - **Transfer tercatat** (third tab of Antrian Transfer): transfers whose request is still "Sudah Ditransfer";
+    "Void transfer" with a reason for Finance of the request's PT.
+  - **Pinjaman**:
+    - Lists for "Pinjaman antar project" and "Pinjaman antar-PT", with the web tiles, filters and search.
+    - Project loans: "Catat pengembalian" (borrower PM / Finance) and void of a repayment (Direktur / Finance).
+    - Inter-PT loans: "Catat pengembalian" by Finance of the borrower (transfer form + amount), "Void pencairan"
+      (with the borrower-shortfall confirmation) and void of a repayment. Cancelling an instruction stays on the web.
+  - **Data lists** (Nota, Flag nota, Snapshot baris, Transfer, LPJ, Transaksi kas, Akun kas, Sumber kas masuk,
+    Pengembalian pinjaman, Riwayat tutup buku): the web list's columns and values, search, and a read-only detail.
+  - Server: additive read endpoints `GET /api/v1/kas/book`, `GET /api/v1/kas/periods`,
+    `GET /api/v1/transfers/voidable`, `GET /api/v1/data/{collection}` and `GET /api/v1/data/{collection}/{id}`, built on
+    the web pages' own helpers. `GET /project-loans` and `GET /intercompany-loans` gain `?summary=1`; the loan details
+    gain `today` / `lenderToday` / `borrowerToday`. Writes use the existing endpoints. No migration.
+
 - **APK: "Profil & tanda tangan" and "Keamanan akun" in Profil** (user 2026-10-19, phase 2 of the APK–web parity
   plan). These are the two entries of the web avatar menu.
   - **Profil & tanda tangan**:

@@ -326,6 +326,12 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'GET /cash-entries': 'selection',
   'GET /cash-accounts/balances': 'selection',
   'GET /period-closings': 'selection',
+  // user 2026-10-19 (APK phase 3): web Keuangan pages as JSON (Kas PTs of the selection) + read-only data lists
+  'GET /kas/book': 'selection',
+  'GET /kas/periods': 'selection',
+  'GET /transfers/voidable': 'selection',
+  'GET /data/:collection': 'selection',
+  'GET /data/:collection/:id': 'document',
   'GET /dashboard/owner': 'selection',
   'GET /dashboard/finance': 'selection',
   'GET /dashboard/pm': 'selection',

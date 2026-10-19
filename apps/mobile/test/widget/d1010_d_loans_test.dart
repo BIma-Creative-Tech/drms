@@ -229,7 +229,9 @@ void main() {
     expect(api.calls.last, 'reject:41:Pakai kas umum');
   });
 
-  testWidgets('detail approved: repayments read-only (void struck), overdue, same PM note, web hint', (tester) async {
+  testWidgets('detail approved: repayments (void struck), overdue, same PM note; no repay / void without the rights', (
+    tester,
+  ) async {
     await pumpScreen(
       tester,
       const LoanDetailScreen(id: 42),
@@ -241,7 +243,10 @@ void main() {
     expect(find.text('PM peminjam = PM pemberi'), findsOneWidget);
     expect(find.text('Pengembalian ke-1'), findsOneWidget);
     expect(find.text('Dibatalkan (void): Salah nominal'), findsOneWidget);
-    expect(find.text('Pengembalian dicatat di web oleh PM peminjam atau Finance.'), findsOneWidget);
+    // phase 3 (user 2026-10-19): recorded on the APK — only when the server allows it (`repay`, `mayVoidRepayment`)
+    expect(find.text('Pengembalian dicatat di web oleh PM peminjam atau Finance.'), findsNothing);
+    expect(find.byKey(const Key('loan-action-repay')), findsNothing);
+    expect(find.widgetWithText(TextButton, 'Void'), findsNothing);
     expect(find.textContaining('Dedi Direktur'), findsOneWidget);
     expect(find.byKey(const Key('loan-action-approve')), findsNothing);
   });

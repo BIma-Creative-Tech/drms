@@ -3,6 +3,10 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/cash/domain/cash_book.dart';
+import '../features/cash/presentation/cash_book_screen.dart';
+import '../features/cash/presentation/cash_entry_form_screen.dart';
+import '../features/cash/presentation/period_closing_screen.dart';
 import '../features/companies/presentation/unassigned_screen.dart';
 import '../features/account/presentation/account_screen.dart';
 import '../features/account/presentation/security_screen.dart';
@@ -41,12 +45,14 @@ import '../features/privacy/application/privacy_providers.dart';
 import '../features/privacy/presentation/privacy_notice_screen.dart';
 import '../features/progress/presentation/progress_conflict_screen.dart';
 import '../features/loans/presentation/intercompany_loan_screens.dart';
+import '../features/loans/presentation/loan_list_screens.dart';
 import '../features/loans/presentation/loan_screens.dart';
 import '../features/projects/presentation/project_detail_screen.dart';
 import '../features/projects/presentation/projects_screen.dart';
 import '../features/progress/presentation/progress_detail_screen.dart';
 import '../features/progress/presentation/progress_editor_screen.dart';
 import '../features/progress/presentation/progress_screen.dart';
+import '../features/records/presentation/record_list_screens.dart';
 import '../features/settings/presentation/profile_screen.dart';
 import '../features/sync/presentation/queue_screen.dart';
 import 'route_error_screen.dart';
@@ -163,7 +169,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       // DRMS 10/10 point 10: "Finance" — Antrian Transfer (`?tab=lpj` = Verifikasi LPJ) and "Catat transfer".
       GoRoute(
         path: '/finance',
-        builder: (_, s) => FinanceScreen(initialTab: s.uri.queryParameters['tab'] == 'lpj' ? 1 : 0),
+        builder: (_, s) => FinanceScreen(
+          initialTab: switch (s.uri.queryParameters['tab']) {
+            'lpj' => 1,
+            'void' => 2,
+            _ => 0,
+          },
+        ),
         routes: [
           GoRoute(
             path: 'transfer/:id',
@@ -227,7 +239,53 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      // ADR 0022: inter-project loans (online only; repayments on the web in v1)
+      // User 2026-10-19 (phase 3 Keuangan): Buku kas (`?periode=&pt=&akun=`), Catat kas, Edit (row as `extra`), Tutup
+      // buku (`?pt=`), the generic web collection lists (`/data/<slug>`) and the loan lists.
+      GoRoute(
+        path: '/cash',
+        builder: (_, s) {
+          final q = s.uri.queryParameters;
+          final akun = int.tryParse(q['akun'] ?? '');
+          return CashBookScreen(
+            initial: CashFilter(
+              period: RegExp(r'^\d{4}-\d{2}$').hasMatch(q['periode'] ?? '') ? q['periode'] : null,
+              pt: int.tryParse(q['pt'] ?? ''),
+              accounts: {?akun},
+            ),
+          );
+        },
+        routes: [
+          GoRoute(
+            path: 'new',
+            builder: (_, s) => CashEntryCreateRoute(
+              inbound: s.uri.queryParameters['arah'] != 'keluar',
+              pt: int.tryParse(s.uri.queryParameters['pt'] ?? ''),
+            ),
+          ),
+          GoRoute(
+            path: ':id/edit',
+            builder: (_, s) => CashEntryEditRoute(row: s.extra is CashRow ? s.extra as CashRow : null),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/closings',
+        builder: (_, s) => PeriodClosingScreen(pt: int.tryParse(s.uri.queryParameters['pt'] ?? '')),
+      ),
+      GoRoute(
+        path: '/data/:collection',
+        builder: (_, s) => RecordListScreen(collection: s.pathParameters['collection'] ?? ''),
+        routes: [
+          GoRoute(
+            path: ':id',
+            builder: (_, s) =>
+                RecordDetailScreen(collection: s.pathParameters['collection'] ?? '', id: s.pathParameters['id'] ?? ''),
+          ),
+        ],
+      ),
+      GoRoute(path: '/loans', builder: (_, _) => const LoanListScreen()),
+      GoRoute(path: '/intercompany-loans', builder: (_, _) => const IcLoanListScreen()),
+      // ADR 0022: inter-project loans (online only; phase 3: repayments too)
       GoRoute(
         path: '/loans/new',
         builder: (_, s) => LoanFormScreen(projectId: int.tryParse(s.uri.queryParameters['project'] ?? '')),
@@ -261,6 +319,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/intercompany-loans/:id',
         builder: (_, s) => IcLoanDetailScreen(id: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),
         routes: [
+          GoRoute(
+            path: 'repay',
+            builder: (_, s) => IcLoanRepayRoute(id: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),
+          ),
           GoRoute(
             path: 'disburse',
             builder: (_, s) => IcLoanDisburseRoute(id: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),

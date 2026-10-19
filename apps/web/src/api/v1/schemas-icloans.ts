@@ -68,6 +68,7 @@ export const IcLoanVoidDisbursement = z
 
 export const IcLoanListQuery = z
   .object({
+    summary: z.enum(['1', 'true']).optional().meta({ description: 'User 2026-10-19 (APK Pinjaman antar-PT list): add `summary` (the web list\'s tiles) to the response.' }),
     company: companyFilterParam,
     role: z.enum(['lender', 'borrower']).optional().meta({ description: 'Only loans where a PT of the filter / selection is the lender (piutang) or the borrower (hutang).' }),
     status: z.string().regex(/^[a-z_]+(,[a-z_]+)*$/).optional().meta({ description: `Comma separated: ${IC_LOAN_STATUSES.join(', ')}.` }),
@@ -110,7 +111,23 @@ export const IcLoanSummary = z
   .meta({ id: 'IntercompanyLoanSummary' })
 
 export const IcLoanList = z
-  .object({ items: z.array(IcLoanSummary), page: z.number().int(), totalPages: z.number().int(), totalDocs: z.number().int(), limit: z.number().int() })
+  .object({
+    items: z.array(IcLoanSummary),
+    page: z.number().int(),
+    totalPages: z.number().int(),
+    totalDocs: z.number().int(),
+    limit: z.number().int(),
+    summary: z
+      .object({
+        receivable: rupiah,
+        payable: rupiah,
+        overdue: rupiah,
+        queueCount: z.number().int().meta({ description: 'Instructed loans waiting for disbursement by the caller\'s (lender) Finance PTs.' }),
+        canInstruct: z.boolean().meta({ description: 'Owner (stored pk-principal) in more than one PT.' }),
+      })
+      .optional()
+      .meta({ description: 'Only with `summary=1`: the web list tiles (Σ over the caller\'s report scope, not the filters).' }),
+  })
   .meta({ id: 'IntercompanyLoanList' })
 
 export const IcLoanQueue = z
@@ -127,6 +144,8 @@ export const IcLoanQueue = z
   .meta({ id: 'IntercompanyLoanQueue' })
 
 export const IcLoanDetail = IcLoanSummary.extend({
+  lenderToday: date.meta({ description: 'Business date of the lender PT (disbursement date max).' }),
+  borrowerToday: date.meta({ description: 'Business date of the borrower PT (repayment date max).' }),
   snapshot: z.record(z.string(), z.unknown()).nullable().meta({ description: 'Evidence at the instruction: borrowerAvailable, borrowerGap, lenderAvailable (+ balances / commitments).' }),
   cancelReason: z.string().nullable(),
   cancelledAt: z.string().nullable(),

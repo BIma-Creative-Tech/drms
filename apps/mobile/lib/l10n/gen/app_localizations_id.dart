@@ -4411,4 +4411,790 @@ class AppLocalizationsId extends AppLocalizations {
   String securityBrowserFailed(String url) {
     return 'Browser tidak dapat dibuka. Buka $url di browser HP.';
   }
+
+  @override
+  String get reasonLabel => 'Alasan';
+
+  @override
+  String get inactiveSuffix => '(nonaktif)';
+
+  @override
+  String get cashTitle => 'Buku kas';
+
+  @override
+  String get closingTitle => 'Tutup buku';
+
+  @override
+  String get cashIn => 'Kas masuk';
+
+  @override
+  String get cashOut => 'Kas keluar';
+
+  @override
+  String get cashInLower => 'kas masuk';
+
+  @override
+  String get cashOutLower => 'kas keluar';
+
+  @override
+  String cashLockOne(String text) {
+    return 'tutup buku $text';
+  }
+
+  @override
+  String get cashLockNone => 'belum ada';
+
+  @override
+  String cashLockUntil(String date) {
+    return 's/d $date';
+  }
+
+  @override
+  String cashAsOf(String date) {
+    return 'Buku kas per $date (WITA)';
+  }
+
+  @override
+  String cashIcReceiving(String text) {
+    return 'Rekening penerimaan antar-PT: $text';
+  }
+
+  @override
+  String get cashIcReceivingNone => 'belum ditetapkan (Master Data › Akun kas/bank)';
+
+  @override
+  String get cashReadOnly => 'Tampilan baca untuk Direktur. Pencatatan, edit dan void kas dilakukan oleh Finance.';
+
+  @override
+  String get cashReadOnlyMulti =>
+      'Tampilan baca untuk Direktur. Pencatatan, edit dan void kas dilakukan oleh Finance PT tersebut.';
+
+  @override
+  String get cashSearchHint => 'Cari nomor atau keterangan';
+
+  @override
+  String cashBookSub(int count, String filtered) {
+    return '$count transaksi$filtered · terbaru dulu · baris void tetap tampil, jurnal baliknya tertaut';
+  }
+
+  @override
+  String get cashFiltered => ' (terfilter)';
+
+  @override
+  String get cashEmpty => 'Belum ada transaksi kas.';
+
+  @override
+  String get cashEmptyFiltered => 'Tidak ada transaksi untuk filter ini.';
+
+  @override
+  String get cashClearFilter => 'Hapus filter';
+
+  @override
+  String cashShownOf(int shown, int total) {
+    return '$shown dari $total transaksi';
+  }
+
+  @override
+  String get cashTotal => 'Saldo kas total';
+
+  @override
+  String cashTotalSub(int count) {
+    return '$count akun · saldo awal + masuk − keluar';
+  }
+
+  @override
+  String cashFlows(String period, String tin, String tout) {
+    return '$period: masuk $tin · keluar $tout';
+  }
+
+  @override
+  String get cashFilterPt => 'PT';
+
+  @override
+  String get cashAllPts => 'Semua PT';
+
+  @override
+  String get cashFilterAccount => 'Akun';
+
+  @override
+  String cashFilterAccounts(int count) {
+    return '$count akun';
+  }
+
+  @override
+  String get cashAllAccounts => 'Semua akun';
+
+  @override
+  String get cashFilterPeriod => 'Periode';
+
+  @override
+  String get cashAllPeriods => 'Semua periode';
+
+  @override
+  String get cashFilterSource => 'Sumber';
+
+  @override
+  String get cashAllSources => 'Semua sumber';
+
+  @override
+  String get cashStatusVoid => 'Void';
+
+  @override
+  String get cashStatusReversal => 'Jurnal balik';
+
+  @override
+  String get cashStatusPosted => 'Posted';
+
+  @override
+  String cashVoidReason(String reason) {
+    return 'Void: $reason';
+  }
+
+  @override
+  String cashReversedBy(String no) {
+    return 'dibalik oleh $no';
+  }
+
+  @override
+  String cashReversalOf(String no) {
+    return 'Jurnal balik dari $no';
+  }
+
+  @override
+  String cashRequestLink(String no) {
+    return 'Pengajuan $no';
+  }
+
+  @override
+  String cashVoidTitle(String no) {
+    return 'Void $no?';
+  }
+
+  @override
+  String cashVoidBody(String dir, String amount, String dated) {
+    return 'Transaksi asli tetap tercatat dengan status Void, dan sistem membuat jurnal balik $dir $amount $dated. Saldo akun kembali seperti sebelum transaksi ini.';
+  }
+
+  @override
+  String get cashVoidDatedToday => 'bertanggal hari ini (periode aslinya sudah ditutup)';
+
+  @override
+  String cashVoidDatedOn(String date) {
+    return 'bertanggal $date';
+  }
+
+  @override
+  String get cashVoidConfirm => 'Void transaksi';
+
+  @override
+  String cashVoided(String no) {
+    return '$no di-void.';
+  }
+
+  @override
+  String cashVoidedWith(String no, String reversal) {
+    return '$no di-void · jurnal balik $reversal.';
+  }
+
+  @override
+  String cashProofOf(String no) {
+    return 'Bukti $no';
+  }
+
+  @override
+  String get cashProofNotImage => 'Bukti ini bukan gambar (PDF). Buka di web untuk melihatnya.';
+
+  @override
+  String get cashPt => 'PT';
+
+  @override
+  String get cashDate => 'Tanggal';
+
+  @override
+  String get cashKind => 'Jenis transaksi';
+
+  @override
+  String get cashAmount => 'Nominal';
+
+  @override
+  String get cashSourceIn => 'Sumber kas masuk';
+
+  @override
+  String get cashCategory => 'Kategori biaya';
+
+  @override
+  String get cashProject => 'Project';
+
+  @override
+  String get cashCostCenter => 'Pusat biaya';
+
+  @override
+  String get cashVehicle => 'Kendaraan';
+
+  @override
+  String get cashDescription => 'Keterangan';
+
+  @override
+  String get cashSource => 'Sumber';
+
+  @override
+  String get cashProof => 'Bukti';
+
+  @override
+  String get cashEdit => 'Edit';
+
+  @override
+  String get cashVoid => 'Void';
+
+  @override
+  String get cashNewTitle => 'Catat kas masuk / keluar';
+
+  @override
+  String get cashNoWrite => 'Pencatatan kas hanya oleh Finance PT ini.';
+
+  @override
+  String get cashPickPt =>
+      'Anda Finance di beberapa PT. Pilih PT transaksi ini — akun, project, pusat biaya dan kategori mengikuti PT tersebut.';
+
+  @override
+  String get cashEntryNotFound => 'Transaksi tidak ditemukan. Buka Edit dari Buku kas.';
+
+  @override
+  String cashEditTitle(String no) {
+    return 'Edit $no';
+  }
+
+  @override
+  String get cashNotEditableVoid => 'Transaksi sudah di-void.';
+
+  @override
+  String get cashNotEditableSource => 'Hanya transaksi kas manual yang dapat diedit.';
+
+  @override
+  String cashNotEditableClosed(String date) {
+    return 'Periode transaksi sudah ditutup (tutup buku s/d $date). Koreksi dengan Void — jurnal balik dicatat di periode berjalan.';
+  }
+
+  @override
+  String get cashCheckFields => 'Periksa isian yang ditandai.';
+
+  @override
+  String get cashNoChanges => 'Tidak ada perubahan untuk disimpan.';
+
+  @override
+  String cashSaved(String no, String dir, String amount) {
+    return '$no tersimpan · $dir $amount.';
+  }
+
+  @override
+  String cashUpdated(String no) {
+    return '$no diperbarui.';
+  }
+
+  @override
+  String get cashOverdraftCancelled =>
+      'Belum disimpan — saldo akun akan minus. Periksa nominal atau akun, lalu simpan lagi.';
+
+  @override
+  String get cashEditNote =>
+      'Keterangan, sumber/kategori, pembebanan, kendaraan dan bukti. Tanggal, akun dan nominal terkunci. Alasan wajib.';
+
+  @override
+  String get cashNewNote => 'Nomor KM/KK diberikan otomatis saat disimpan. Saldo akun langsung berubah.';
+
+  @override
+  String get cashDateNoLock => 'Belum ada periode yang ditutup.';
+
+  @override
+  String cashDateLock(String date) {
+    return 'Tutup buku s/d $date: tanggal sebelumnya ditolak.';
+  }
+
+  @override
+  String cashDateOpening(String date) {
+    return 'Saldo awal akun per $date: tanggal sebelumnya ditolak.';
+  }
+
+  @override
+  String get cashDateNoFuture => 'Tidak boleh di masa depan.';
+
+  @override
+  String get cashLockedHelp => 'Tanggal, akun dan nominal terkunci — koreksi dengan Void lalu catat ulang.';
+
+  @override
+  String get cashAmountHelp => 'Rupiah tanpa desimal; titik sebagai pemisah ribuan';
+
+  @override
+  String get cashScope => 'Dibebankan ke';
+
+  @override
+  String get cashScopeNone => 'Tidak ada';
+
+  @override
+  String get cashScopeHelp => 'Project ATAU pusat biaya — tidak keduanya.';
+
+  @override
+  String get cashVehicleOptional => 'Kendaraan (opsional)';
+
+  @override
+  String get cashVehicleNone => '— tanpa kendaraan —';
+
+  @override
+  String get cashVehicleHint => 'Kategori ini biasanya dicatat per kendaraan.';
+
+  @override
+  String get cashProofReplace => 'Ganti bukti (opsional)';
+
+  @override
+  String get cashProofOptional => 'Bukti (opsional)';
+
+  @override
+  String get cashProofCurrent => 'Lihat bukti saat ini';
+
+  @override
+  String get cashProofHelp => 'Foto bukti dari kamera atau galeri, diperkecil otomatis. Bukti PDF diunggah lewat web.';
+
+  @override
+  String get cashReason => 'Alasan perubahan';
+
+  @override
+  String get cashReasonHelp => 'Tercatat di audit log bersama nilai lama dan baru.';
+
+  @override
+  String get cashRulesTitle => 'Aturan';
+
+  @override
+  String get cashRule1 => 'Kas masuk wajib sumber; kas keluar wajib kategori.';
+
+  @override
+  String get cashRule2 => 'Dibebankan ke project atau pusat biaya, tidak keduanya.';
+
+  @override
+  String get cashRule3 => 'Tanggal tidak boleh di masa depan atau di periode yang sudah ditutup.';
+
+  @override
+  String cashRule3Lock(String date) {
+    return 'Tanggal tidak boleh di masa depan atau di periode yang sudah ditutup (s/d $date).';
+  }
+
+  @override
+  String get cashRule4 => 'Setelah tersimpan, nominal/tanggal/akun tidak bisa diedit — gunakan Void lalu catat ulang.';
+
+  @override
+  String get cashSaving => 'Menyimpan…';
+
+  @override
+  String get cashSaveChanges => 'Simpan perubahan';
+
+  @override
+  String get cashSaveIn => 'Simpan kas masuk';
+
+  @override
+  String get cashSaveOut => 'Simpan kas keluar';
+
+  @override
+  String closingCloseTitle(String period, String pt) {
+    return 'Tutup buku $period$pt?';
+  }
+
+  @override
+  String closingCloseBody(String date) {
+    return 'Semua transaksi kas dan transfer bertanggal s/d $date dikunci: tidak dapat dicatat, diedit, atau di-void dengan tanggal itu. Koreksi setelahnya dicatat sebagai jurnal balik di periode berjalan. Membuka kembali hanya oleh Direktur.';
+  }
+
+  @override
+  String closingOnlyPt(String name) {
+    return 'Hanya PT $name yang dikunci.';
+  }
+
+  @override
+  String get closingNote => 'Catatan (opsional)';
+
+  @override
+  String closingClosed(String period) {
+    return '$period ditutup.';
+  }
+
+  @override
+  String closingReopenTitle(String period, String pt) {
+    return 'Buka kembali $period$pt?';
+  }
+
+  @override
+  String get closingReopenBody =>
+      'Periode ini dapat diposting dan dikoreksi lagi sampai ditutup kembali. Alasan wajib dan tercatat di audit log.';
+
+  @override
+  String get closingReopen => 'Buka kembali';
+
+  @override
+  String closingReopened(String period) {
+    return '$period dibuka kembali.';
+  }
+
+  @override
+  String get closingPickPt =>
+      'Tutup buku dilakukan per PT: menutup satu PT tidak mengunci PT lain. Pilih PT yang akan dikelola.';
+
+  @override
+  String closingLockedUntil(String date) {
+    return 'Terkunci s/d $date';
+  }
+
+  @override
+  String get closingNoLock => 'belum ada';
+
+  @override
+  String get closingNoLockShort => 'Belum ada';
+
+  @override
+  String get closingLead =>
+      'Tutup bulan yang sudah lewat. Buka kembali hanya oleh Direktur, untuk periode tertutup terakhir, dengan alasan.';
+
+  @override
+  String get closingKpiLock => 'Terkunci s/d';
+
+  @override
+  String get closingKpiLockSub => 'Posting bertanggal ≤ tanggal ini ditolak.';
+
+  @override
+  String get closingKpiLast => 'Periode tertutup terakhir';
+
+  @override
+  String closingKpiLastSub(int count) {
+    return '$count kali tutup/buka tercatat';
+  }
+
+  @override
+  String get closingKpiClosable => 'Bulan siap ditutup';
+
+  @override
+  String get closingKpiClosableNone => 'Tidak ada — bulan berjalan belum bisa ditutup.';
+
+  @override
+  String get closingPerMonth => 'Per bulan';
+
+  @override
+  String get closingPerMonthSub1 => '13 bulan terakhir';
+
+  @override
+  String closingBooksStart(String date) {
+    return 'sejak buku kas dimulai ($date).';
+  }
+
+  @override
+  String get closingPerMonthSub2 => 'Masuk/Keluar tanpa pasangan void; koreksi void terpisah.';
+
+  @override
+  String get closingNoData => 'Belum ada data.';
+
+  @override
+  String get closingHistory => 'Riwayat';
+
+  @override
+  String get closingHistorySub => 'Tutup & buka kembali';
+
+  @override
+  String get closingHistoryEmpty => 'Belum pernah tutup buku.';
+
+  @override
+  String get closingStateClosed => 'Ditutup';
+
+  @override
+  String get closingStateReopened => 'Dibuka kembali';
+
+  @override
+  String get closingStateLocked => 'Terkunci';
+
+  @override
+  String get closingStateCurrent => 'Berjalan';
+
+  @override
+  String get closingStateOpen => 'Terbuka';
+
+  @override
+  String closingNoteText(String note) {
+    return 'Catatan: $note';
+  }
+
+  @override
+  String closingReopenedBy(String name, String at, String reason) {
+    return 'Dibuka $name · $at — $reason';
+  }
+
+  @override
+  String closingCount(int count, String voids) {
+    return '$count transaksi$voids';
+  }
+
+  @override
+  String closingVoids(int count) {
+    return ' ($count void)';
+  }
+
+  @override
+  String closingFigures(String tin, String tout, String net) {
+    return 'Masuk $tin · Keluar $tout · Bersih $net';
+  }
+
+  @override
+  String closingKoreksi(String amount, int count) {
+    return 'Koreksi (void): $amount ($count baris)';
+  }
+
+  @override
+  String get closingReopenDirektur => 'Buka kembali: Direktur';
+
+  @override
+  String get voidTransferTab => 'Transfer tercatat';
+
+  @override
+  String voidTransferTitle(String no) {
+    return 'Void transfer $no?';
+  }
+
+  @override
+  String voidTransferBody(String request, String back) {
+    return 'KK transfer ini dibalik dengan jurnal balik (saldo akun kembali), transfer ditandai Void, dan pengajuan $request kembali ke $back untuk ditransfer ulang.';
+  }
+
+  @override
+  String get voidTransferBackAdvance => 'Disetujui (Antri Transfer)';
+
+  @override
+  String get voidTransferBackReimburse => 'Nota Terverifikasi (Antri Transfer)';
+
+  @override
+  String get voidTransfer => 'Void transfer';
+
+  @override
+  String voidTransferDone(String no) {
+    return 'Transfer $no di-void. Pengajuan kembali ke Antrian Transfer.';
+  }
+
+  @override
+  String get voidTransferSearchHint => 'Cari nomor transfer atau pengajuan';
+
+  @override
+  String voidTransferLead(int count) {
+    return 'Transfer tercatat — dapat dibatalkan ($count)';
+  }
+
+  @override
+  String get voidTransferNote =>
+      'Void transfer membuat jurnal balik untuk KK-nya (KK asli tetap tampil sebagai Void) dan mengembalikan pengajuan ke antrian: Pengajuan Baru → Disetujui, Reimburse → Nota Terverifikasi.';
+
+  @override
+  String get voidTransferEmpty => 'Tidak ada transfer yang bisa dibatalkan.';
+
+  @override
+  String get voidTransferFinanceOnly => 'Void: Finance PT ini';
+
+  @override
+  String get loanListTitle => 'Pinjaman antar project';
+
+  @override
+  String get loanListNote =>
+      'Diajukan PM project peminjam · disetujui Direktur · tanpa transaksi kas (klaim tercatat antar project dalam satu PT)';
+
+  @override
+  String get loanKpiPending => 'Menunggu persetujuan';
+
+  @override
+  String get loanKpiPendingNone => 'Tidak ada yang menunggu Anda ✓';
+
+  @override
+  String loanKpiPendingMine(int count) {
+    return '$count menunggu keputusan Anda';
+  }
+
+  @override
+  String loanKpiOutstandingSub(String amount, String repaid) {
+    return 'Disetujui $amount · kembali $repaid';
+  }
+
+  @override
+  String get loanOverdueOnly => 'Terlambat';
+
+  @override
+  String get loanKpiOverdueNone => 'Tidak ada yang terlambat ✓';
+
+  @override
+  String loanKpiOverdueSum(String amount) {
+    return 'Sisa terlambat $amount';
+  }
+
+  @override
+  String loanWaitingMine(int count) {
+    return 'Menunggu saya ($count)';
+  }
+
+  @override
+  String get loanListSearchHint => 'Nomor atau alasan…';
+
+  @override
+  String get loanFilterBorrower => 'Peminjam';
+
+  @override
+  String get loanFilterLender => 'Pemberi';
+
+  @override
+  String get loanListEmpty => 'Belum ada pinjaman antar project.';
+
+  @override
+  String get loanListEmptyFiltered => 'Tidak ada pinjaman untuk filter ini.';
+
+  @override
+  String get icLoanListTitle => 'Pinjaman antar-PT';
+
+  @override
+  String get icLoanListNote =>
+      'Diperintahkan Owner · dicairkan Finance PT pemberi · dikembalikan Finance PT peminjam · uang nyata antar PT grup (KK + KM otomatis), tanpa bunga';
+
+  @override
+  String get icLoanKpiReceivable => 'Piutang antar-PT (sisa)';
+
+  @override
+  String get icLoanKpiPayable => 'Hutang antar-PT (sisa)';
+
+  @override
+  String get icLoanKpiOverdueSub => 'Sisa yang lewat jatuh tempo';
+
+  @override
+  String icLoanQueueWaiting(int count) {
+    return 'Menunggu pencairan Anda ($count)';
+  }
+
+  @override
+  String get icLoanListSearchHint => 'Nomor, alasan, kode PT…';
+
+  @override
+  String get icLoanListEmpty => 'Belum ada pinjaman antar-PT.';
+
+  @override
+  String get icLoanListEmptyFiltered => 'Tidak ada pinjaman untuk filter ini.';
+
+  @override
+  String icLoanCardFigures(String amount, String outstanding) {
+    return '$amount · sisa $outstanding';
+  }
+
+  @override
+  String get loanRepay => 'Catat pengembalian';
+
+  @override
+  String loanRepayTitle(String title) {
+    return 'Catat pengembalian $title';
+  }
+
+  @override
+  String loanRepayOutstanding(String amount) {
+    return 'Sisa pinjaman $amount';
+  }
+
+  @override
+  String get loanRepayDate => 'Tanggal pengembalian';
+
+  @override
+  String get loanRepayNote => 'Catatan';
+
+  @override
+  String get loanRepaySave => 'Simpan pengembalian';
+
+  @override
+  String loanRepayDone(String amount) {
+    return 'Pengembalian $amount tercatat.';
+  }
+
+  @override
+  String loanRepaymentVoidTitle(int seq) {
+    return 'Void pengembalian ke-$seq?';
+  }
+
+  @override
+  String loanRepaymentVoidBody(String amount) {
+    return 'Pengembalian $amount dibatalkan (tidak dihapus); sisa pinjaman bertambah lagi. Alasan wajib.';
+  }
+
+  @override
+  String get loanRepaymentVoidConfirm => 'Void pengembalian';
+
+  @override
+  String get loanRepaymentVoided => 'Pengembalian di-void.';
+
+  @override
+  String get icLoanCancelWebHint => 'Pembatalan perintah pinjaman dilakukan di web (Keuangan → Pinjaman antar-PT).';
+
+  @override
+  String icLoanVoidDisbursementTitle(String no) {
+    return 'Void pencairan $no?';
+  }
+
+  @override
+  String icLoanVoidDisbursementBody(String lender, String borrower) {
+    return 'KK di PT $lender dan KM di PT $borrower dibalik (jurnal balik), pinjaman kembali menunggu pencairan. Pengajuan yang sudah disetujui tetap disetujui. Untuk pengembalian dana pakai Catat pengembalian, bukan void.';
+  }
+
+  @override
+  String get icLoanVoidDisbursement => 'Void pencairan';
+
+  @override
+  String icLoanVoidRepaymentTitle(String label) {
+    return 'Void $label?';
+  }
+
+  @override
+  String icLoanVoidRepaymentBody(String borrower, String lender) {
+    return 'KK di PT $borrower dan KM di PT $lender dibalik; sisa pinjaman bertambah lagi.';
+  }
+
+  @override
+  String icLoanVoidShortfallConfirm(String borrower) {
+    return 'Saya mengerti dana tersedia PT $borrower bisa menjadi minus (dana sudah terpakai / dijanjikan).';
+  }
+
+  @override
+  String get icLoanVoidedDisbursement => 'Pencairan di-void. Pinjaman kembali menunggu pencairan.';
+
+  @override
+  String get icLoanRepayTitle => 'Catat pengembalian';
+
+  @override
+  String get icLoanNotRepayable => 'Pengembalian pinjaman ini dicatat oleh Finance PT peminjam.';
+
+  @override
+  String icLoanRepayAmount(String amount, String borrower, String lender) {
+    return 'Sisa $amount · PT $borrower → PT $lender';
+  }
+
+  @override
+  String get icLoanRepayHelp =>
+      'Dibayar dari akun PT peminjam ke rekening penerimaan antar-PT PT pemberi; KK dan KM dicatat otomatis.';
+
+  @override
+  String icLoanRepayDone(String no, String amount) {
+    return '$no: pengembalian $amount tercatat.';
+  }
+
+  @override
+  String get recordsTitle => 'Data';
+
+  @override
+  String recordsCount(int count) {
+    return '$count data · terbaru dulu';
+  }
+
+  @override
+  String get recordsEmpty => 'Belum ada data.';
+
+  @override
+  String get recordsEmptySearch => 'Tidak ada data untuk pencarian ini.';
+
+  @override
+  String recordsShownOf(int shown, int total) {
+    return '$shown dari $total data';
+  }
+
+  @override
+  String get recordsReadOnly => 'Tampilan baca. Data ini diubah lewat alurnya masing-masing (atau di web).';
 }

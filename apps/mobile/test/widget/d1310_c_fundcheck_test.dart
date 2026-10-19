@@ -406,7 +406,7 @@ void main() {
   });
 
   group('loan detail (read-only)', () {
-    testWidgets('disbursed: figures, linked request, movement with KK / KM, web-only hint, no APK action', (
+    testWidgets('disbursed: figures, linked request, movement with KK / KM, "Void pencairan" (server action)', (
       tester,
     ) async {
       await pumpScreen(
@@ -423,8 +423,12 @@ void main() {
       expect(find.byKey(const Key('icloan-own-request')), findsOneWidget);
       expect(find.byKey(const Key('icloan-request-42')), findsOneWidget);
       expect(_text(tester, 'icloan-movement-301-entries'), 'KK KK/LAS/2610/0004 · KM KM/DRMS/2610/0011');
-      expect(find.byKey(const Key('icloan-web-hint')), findsOneWidget);
+      // phase 3: the web-only hint is shown only for "Batalkan perintah" (the other actions are on the APK)
+      expect(find.byKey(const Key('icloan-web-hint')), findsNothing);
       expect(find.byKey(const Key('icloan-action-disburse')), findsNothing);
+      expect(find.byKey(const Key('icloan-action-repay')), findsNothing);
+      // phase 3: `void_disbursement` of the server → the movement's "Void pencairan"
+      expect(find.byKey(const Key('icloan-movement-301-void')), findsOneWidget);
     });
 
     testWidgets('instructed, Finance of the lender: "Catat pencairan"', (tester) async {

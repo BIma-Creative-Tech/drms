@@ -166,4 +166,22 @@ class FakeLoansApi extends Fake implements LoansApi {
     calls.add('reject:$id:$reason');
     return Loan.fromJson(loanJson(id: id, status: 'rejected'));
   }
+
+  @override
+  Future<Loan> addRepayment(
+    int id, {
+    required int amount,
+    required String repayDate,
+    String? note,
+    required String idempotencyKey,
+  }) async {
+    calls.add('repay:$id:$amount:$repayDate:${note ?? ''}');
+    return Loan.fromJson(loanApprovedJson());
+  }
+
+  @override
+  Future<Loan> voidRepayment(int id, int repaymentId, {required String reason, required String idempotencyKey}) async {
+    calls.add('void-repayment:$id:$repaymentId:$reason');
+    return Loan.fromJson(loanApprovedJson());
+  }
 }

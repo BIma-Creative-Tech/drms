@@ -11486,6 +11486,1209 @@ export const openapiDocument = {
           "manageUrl"
         ]
       },
+      "KasBook": {
+        "type": "object",
+        "properties": {
+          "today": {
+            "type": "string",
+            "description": "Business date YYYY-MM-DD (PT time zone)."
+          },
+          "canWrite": {
+            "type": "boolean",
+            "description": "The caller is Finance in one of the shown PTs (\"Kas masuk\" / \"Kas keluar\")."
+          },
+          "pts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "companyId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "lockDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Tutup buku s/d (end of the latest closed month), null = none."
+                },
+                "today": {
+                  "type": "string",
+                  "description": "Business date YYYY-MM-DD (PT time zone)."
+                },
+                "minDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Earliest date of a new posting (day after the lock date)."
+                },
+                "write": {
+                  "type": "boolean",
+                  "description": "Finance of this PT (record / edit / void)."
+                },
+                "reopen": {
+                  "type": "boolean",
+                  "description": "Direktur (pk-owner) of this PT (re-open a closed period)."
+                },
+                "intercompanyReceiving": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "ADR 0028: label of the PT's \"Rekening penerimaan antar-PT\", null = not set."
+                }
+              },
+              "required": [
+                "companyId",
+                "lockDate",
+                "today",
+                "minDate",
+                "write",
+                "reopen",
+                "intercompanyReceiving"
+              ]
+            }
+          },
+          "lookups": {
+            "type": "object",
+            "properties": {
+              "accounts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "companyId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "openingDate": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "siteId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "intercompanyReceiving": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label",
+                    "active",
+                    "companyId",
+                    "openingDate",
+                    "siteId",
+                    "intercompanyReceiving"
+                  ]
+                }
+              },
+              "sites": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "companyId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label",
+                    "active",
+                    "companyId"
+                  ]
+                }
+              },
+              "projects": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "companyId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label",
+                    "active",
+                    "companyId"
+                  ]
+                }
+              },
+              "costCenters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "companyId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label",
+                    "active",
+                    "companyId"
+                  ]
+                }
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "companyId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "requiresVehicle": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label",
+                    "active",
+                    "companyId",
+                    "requiresVehicle"
+                  ]
+                }
+              },
+              "sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "companyId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label",
+                    "active",
+                    "companyId"
+                  ]
+                }
+              },
+              "vehicles": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "companyId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label",
+                    "active",
+                    "companyId"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "accounts",
+              "sites",
+              "projects",
+              "costCenters",
+              "categories",
+              "sources",
+              "vehicles"
+            ]
+          },
+          "total": {
+            "type": "integer"
+          },
+          "byPt": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "companyId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "total": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "companyId",
+                "total"
+              ]
+            }
+          },
+          "flowPeriod": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cashAccountId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "companyId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "name": {
+                  "type": "string"
+                },
+                "balance": {
+                  "type": "integer"
+                },
+                "flowIn": {
+                  "type": "integer"
+                },
+                "flowOut": {
+                  "type": "integer"
+                },
+                "n": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "cashAccountId",
+                "companyId",
+                "name",
+                "balance",
+                "flowIn",
+                "flowOut",
+                "n"
+              ]
+            },
+            "description": "Balance tiles (active or non-zero accounts; site filter) + Σ in / out of flowPeriod."
+          },
+          "page": {
+            "type": "object",
+            "properties": {
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "companyId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "entryNo": {
+                      "type": "string"
+                    },
+                    "entryDate": {
+                      "type": "string",
+                      "description": "Business date YYYY-MM-DD (PT time zone)."
+                    },
+                    "period": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "direction": {
+                      "type": "string",
+                      "enum": [
+                        "in",
+                        "out"
+                      ]
+                    },
+                    "amount": {
+                      "type": "integer"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "posted",
+                        "void"
+                      ]
+                    },
+                    "sourceType": {
+                      "$ref": "#/components/schemas/CashSourceType"
+                    },
+                    "description": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "cashAccountId": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "projectId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "costCenterId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "categoryId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "cashInSourceId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "vehicleId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "proofId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "voidReason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "reversalOf": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
+                        "entryNo": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "entryNo"
+                      ]
+                    },
+                    "reversedBy": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
+                        "entryNo": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "entryNo"
+                      ]
+                    },
+                    "request": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
+                        "docNo": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "docNo"
+                      ]
+                    },
+                    "intercompany": {
+                      "$ref": "#/components/schemas/CashEntryIntercompany"
+                    },
+                    "canEdit": {
+                      "type": "boolean"
+                    },
+                    "canVoid": {
+                      "type": "boolean"
+                    },
+                    "voidHint": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Why Finance has no Void button on this row (shown as a hint)."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "companyId",
+                    "entryNo",
+                    "entryDate",
+                    "period",
+                    "direction",
+                    "amount",
+                    "status",
+                    "sourceType",
+                    "description",
+                    "cashAccountId",
+                    "projectId",
+                    "costCenterId",
+                    "categoryId",
+                    "cashInSourceId",
+                    "vehicleId",
+                    "proofId",
+                    "voidReason",
+                    "reversalOf",
+                    "reversedBy",
+                    "request",
+                    "intercompany",
+                    "canEdit",
+                    "canVoid",
+                    "voidHint"
+                  ]
+                }
+              },
+              "totalDocs": {
+                "type": "integer"
+              },
+              "page": {
+                "type": "integer"
+              },
+              "totalPages": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "rows",
+              "totalDocs",
+              "page",
+              "totalPages"
+            ]
+          }
+        },
+        "required": [
+          "today",
+          "canWrite",
+          "pts",
+          "lookups",
+          "total",
+          "byPt",
+          "flowPeriod",
+          "accounts",
+          "page"
+        ],
+        "description": "The web \"Buku kas\" page (/admin/kas): tiles, filters lookups, one page of the ledger."
+      },
+      "CashEntryIntercompany": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "direction": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out"
+            ],
+            "description": "in = this entry is the Kas Masuk of the receiving PT; out = the transfer KK of the paying PT."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "posted",
+              "void"
+            ],
+            "description": "Link status (void after the paying PT voided its transfer)."
+          },
+          "counterpartCompany": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "shortCode": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "shortCode",
+              "name"
+            ]
+          },
+          "sourceDocType": {
+            "type": "string",
+            "enum": [
+              "expense_request",
+              "intercompany_loan"
+            ],
+            "description": "ADR 0029: the document of the pair — a PT grup payment (request of the paying PT) or an inter-PT loan (PJA, belongs to both PTs)."
+          },
+          "loanLeg": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "given",
+              "received",
+              "repaid_in",
+              "repaid_out",
+              null
+            ],
+            "description": "ADR 0029: Pinjaman antar-PT diberikan / diterima, Pengembalian pinjaman antar-PT diterima, Pembayaran hutang antar-PT; null for a PT grup payment."
+          },
+          "sourceDocNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Number of the paying PT's request (PB/…) or the loan (PJA/…)."
+          },
+          "sourceDocId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "The request id, or (sourceDocType intercompany_loan) the loan id."
+          },
+          "transferDocNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Number of the paying PT's transfer (TRF/…)."
+          },
+          "counterpartEntryNo": {
+            "type": "string",
+            "description": "The other leg: KM of the receiving PT (direction out) or KK of the paying PT (direction in)."
+          },
+          "counterpartEntryId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "canOpenCounterpart": {
+            "type": "boolean",
+            "description": "The caller holds Finance / Direktur / Admin in the other PT (else show the numbers as plain text)."
+          },
+          "canOpenSourceDoc": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "direction",
+          "status",
+          "counterpartCompany",
+          "sourceDocType",
+          "loanLeg",
+          "sourceDocNo",
+          "sourceDocId",
+          "transferDocNo",
+          "counterpartEntryNo",
+          "counterpartEntryId",
+          "canOpenCounterpart",
+          "canOpenSourceDoc"
+        ],
+        "description": "ADR 0028: counterpart of an intercompany pair — numbers and PT only."
+      },
+      "KasPeriods": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "The PT shown; null = several Kas PTs and none chosen (pick one from `pts`)."
+          },
+          "pts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "companyId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "lockDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "companyId",
+                "lockDate"
+              ]
+            }
+          },
+          "today": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Business date YYYY-MM-DD (PT time zone)."
+          },
+          "lockDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "booksStart": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latestClosed": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+          },
+          "canReopen": {
+            "type": "boolean"
+          },
+          "closable": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "period": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "closed",
+                    "open",
+                    "current"
+                  ]
+                },
+                "explicit": {
+                  "type": "boolean",
+                  "description": "A \"closed\" closing row exists for this month (else it is locked by a later close: \"Terkunci\")."
+                },
+                "n": {
+                  "type": "integer"
+                },
+                "tin": {
+                  "type": "integer"
+                },
+                "tout": {
+                  "type": "integer"
+                },
+                "voids": {
+                  "type": "integer"
+                },
+                "nKoreksi": {
+                  "type": "integer"
+                },
+                "koreksi": {
+                  "type": "integer"
+                },
+                "canClose": {
+                  "type": "boolean"
+                },
+                "canReopen": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "period",
+                "state",
+                "explicit",
+                "n",
+                "tin",
+                "tout",
+                "voids",
+                "nKoreksi",
+                "koreksi",
+                "canClose",
+                "canReopen"
+              ]
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "period": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "closed",
+                    "reopened"
+                  ]
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "closedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "closedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reopenedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reopenedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reopenReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "period",
+                "status",
+                "note",
+                "closedBy",
+                "closedAt",
+                "reopenedBy",
+                "reopenedAt",
+                "reopenReason"
+              ]
+            }
+          }
+        },
+        "required": [
+          "company",
+          "pts",
+          "today",
+          "lockDate",
+          "booksStart",
+          "latestClosed",
+          "canReopen",
+          "closable",
+          "rows",
+          "history"
+        ],
+        "description": "The web \"Tutup buku\" page (/admin/tutup-buku) of one PT."
+      },
+      "VoidableTransferList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "transferId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "companyId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
+                },
+                "transferNo": {
+                  "type": "string"
+                },
+                "transferDate": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "integer"
+                },
+                "cashAccountId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
+                },
+                "cashEntryId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
+                },
+                "requestId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "requestNo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "requestTitle": {
+                  "type": "string"
+                },
+                "requestType": {
+                  "$ref": "#/components/schemas/RequestType"
+                },
+                "canVoid": {
+                  "type": "boolean",
+                  "description": "Finance of the request PT (POST /expense-requests/{id}/transfers/{tid}/void)."
+                }
+              },
+              "required": [
+                "transferId",
+                "companyId",
+                "transferNo",
+                "transferDate",
+                "amount",
+                "cashAccountId",
+                "cashEntryId",
+                "requestId",
+                "requestNo",
+                "requestTitle",
+                "requestType",
+                "canVoid"
+              ]
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "totalPages"
+        ],
+        "description": "Posted transfers whose request is still \"Sudah Ditransfer\" (web Antrian Transfer › Transfer tercatat)."
+      },
+      "DataList": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "label"
+              ]
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "cells": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "cells"
+              ]
+            }
+          },
+          "totalDocs": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "collection",
+          "label",
+          "columns",
+          "items",
+          "totalDocs",
+          "page",
+          "totalPages"
+        ],
+        "description": "A web collection list (columns = the list's default columns), values as display text."
+      },
+      "DataDetail": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "value"
+              ]
+            }
+          }
+        },
+        "required": [
+          "collection",
+          "label",
+          "id",
+          "title",
+          "fields"
+        ],
+        "description": "Every readable field of one document, as display text (read-only)."
+      },
       "ShortfallApprovalRequestBody": {
         "type": "object",
         "properties": {
@@ -16503,6 +17706,56 @@ export const openapiDocument = {
           },
           "limit": {
             "type": "integer"
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "totals": {
+                "type": "object",
+                "properties": {
+                  "pending": {
+                    "type": "integer"
+                  },
+                  "amount": {
+                    "type": "integer"
+                  },
+                  "repaid": {
+                    "type": "integer"
+                  },
+                  "outstanding": {
+                    "type": "integer"
+                  },
+                  "overdueCount": {
+                    "type": "integer"
+                  },
+                  "overdue": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "pending",
+                  "amount",
+                  "repaid",
+                  "outstanding",
+                  "overdueCount",
+                  "overdue"
+                ]
+              },
+              "inboxCount": {
+                "type": "integer",
+                "description": "Loans waiting for the caller's decision (Direktur)."
+              },
+              "canCreate": {
+                "type": "boolean",
+                "description": "The caller is PM of a borrower project (\"Ajukan pinjaman\")."
+              }
+            },
+            "required": [
+              "totals",
+              "inboxCount",
+              "canCreate"
+            ],
+            "description": "Only with `summary=1`: the web list tiles (whole loan scope of the caller, not the filters)."
           }
         },
         "required": [
@@ -17214,6 +18467,11 @@ export const openapiDocument = {
           "mayVoidRepayment": {
             "type": "boolean"
           },
+          "today": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Business date of the loan's PT (max date of a repayment)."
+          },
           "g1Note": {
             "type": [
               "string",
@@ -17438,6 +18696,7 @@ export const openapiDocument = {
           "createdAt",
           "allowedActions",
           "mayVoidRepayment",
+          "today",
           "g1Note",
           "repayments",
           "decisions"
@@ -17770,6 +19029,36 @@ export const openapiDocument = {
           },
           "limit": {
             "type": "integer"
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "receivable": {
+                "type": "integer"
+              },
+              "payable": {
+                "type": "integer"
+              },
+              "overdue": {
+                "type": "integer"
+              },
+              "queueCount": {
+                "type": "integer",
+                "description": "Instructed loans waiting for disbursement by the caller's (lender) Finance PTs."
+              },
+              "canInstruct": {
+                "type": "boolean",
+                "description": "Owner (stored pk-principal) in more than one PT."
+              }
+            },
+            "required": [
+              "receivable",
+              "payable",
+              "overdue",
+              "queueCount",
+              "canInstruct"
+            ],
+            "description": "Only with `summary=1`: the web list tiles (Σ over the caller's report scope, not the filters)."
           }
         },
         "required": [
@@ -18470,6 +19759,16 @@ export const openapiDocument = {
             ],
             "description": "The caller's side: lender (piutang antar-PT), borrower (hutang antar-PT), both."
           },
+          "lenderToday": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Business date of the lender PT (disbursement date max)."
+          },
+          "borrowerToday": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Business date of the borrower PT (repayment date max)."
+          },
           "snapshot": {
             "type": [
               "object",
@@ -18898,6 +20197,8 @@ export const openapiDocument = {
           "createdBy",
           "createdAt",
           "side",
+          "lenderToday",
+          "borrowerToday",
           "snapshot",
           "cancelReason",
           "cancelledAt",
@@ -38928,6 +40229,705 @@ export const openapiDocument = {
         }
       }
     },
+    "/kas/book": {
+      "get": {
+        "summary": "Finance / Direktur (pk-owner): the web \"Buku kas\" page — balance tiles, lookups of the shown PTs, lock date per PT and one page of the ledger (newest business date first) with the edit / void rights of the caller per row. Query = the web query string; invalid values are dropped. Actions: POST /cash-entries, PATCH /cash-entries/{id}, POST /cash-entries/{id}/void.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+(,\\d+)*$"
+            },
+            "required": false,
+            "name": "akun",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}$"
+            },
+            "required": false,
+            "name": "periode",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+(,\\d+)*$"
+            },
+            "required": false,
+            "name": "project",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+(,\\d+)*$"
+            },
+            "required": false,
+            "name": "pusat",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "masuk,keluar"
+            },
+            "required": false,
+            "description": "masuk,keluar",
+            "name": "arah",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "posted,void"
+            },
+            "required": false,
+            "description": "posted,void",
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "transfer,settlement_refund,manual,reversal,opening,intercompany"
+            },
+            "required": false,
+            "description": "transfer,settlement_refund,manual,reversal,opening,intercompany",
+            "name": "sumber",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$",
+              "description": "One Kas PT (a PT without Kas rights is ignored)."
+            },
+            "required": false,
+            "description": "One Kas PT (a PT without Kas rights is ignored).",
+            "name": "pt",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": false,
+            "name": "site",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "20",
+                "50",
+                "100"
+              ]
+            },
+            "required": false,
+            "name": "per",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": false,
+            "name": "hal",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Buku kas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KasBook"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/kas/periods": {
+      "get": {
+        "summary": "Finance / Direktur (pk-owner): the web \"Tutup buku\" page of ONE PT — 13 recent months with their sums and close / re-open rights, and the history. Without `company` and several Kas PTs: `company` null + `pts` (pick one). Actions: POST /period-closings, POST /period-closings/{period}/reopen?company=.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": false,
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tutup buku",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KasPeriods"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transfers/voidable": {
+      "get": {
+        "summary": "Finance / Direktur (pk-owner): recorded transfers that can still be voided (request \"Sudah Ditransfer\"), web Antrian Transfer › Transfer tercatat. Void: POST /expense-requests/{id}/transfers/{tid}/void (Finance of the request PT).",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+(,\\d+)*$"
+            },
+            "required": false,
+            "name": "pt",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "advance,reimburse"
+            },
+            "required": false,
+            "description": "advance,reimburse",
+            "name": "jenis",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "20",
+                "50",
+                "100"
+              ]
+            },
+            "required": false,
+            "name": "per",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transfers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoidableTransferList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data/{collection}": {
+      "get": {
+        "summary": "Read-only web collection list (\"Data …\" menu items): the default columns of the web list as display text, with the web list's access (collection + field level, PT selection).",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Whitelisted collection slug (receipts, transfers, settlements, expense-line-snapshots, receipt-flags, period-closings, project-loan-repayments, cash-entries, cash-accounts, cash-in-sources); other → 404."
+            },
+            "required": true,
+            "description": "Whitelisted collection slug (receipts, transfers, settlements, expense-line-snapshots, receipt-flags, period-closings, project-loan-repayments, cash-entries, cash-accounts, cash-in-sources); other → 404.",
+            "name": "collection",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$",
+              "description": "1–50, default 20"
+            },
+            "required": false,
+            "description": "1–50, default 20",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data/{collection}/{id}": {
+      "get": {
+        "summary": "Read-only detail of one document of a whitelisted collection: every readable field as display text.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Whitelisted collection slug (receipts, transfers, settlements, expense-line-snapshots, receipt-flags, period-closings, project-loan-repayments, cash-entries, cash-accounts, cash-in-sources); other → 404."
+            },
+            "required": true,
+            "description": "Whitelisted collection slug (receipts, transfers, settlements, expense-line-snapshots, receipt-flags, period-closings, project-loan-repayments, cash-entries, cash-accounts, cash-in-sources); other → 404.",
+            "name": "collection",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/expense-requests/{id}/lpj/shortfall-approval": {
       "post": {
         "summary": "Finance (not requester/creator): ask the re-approval of the NEW total of a verified LPJ whose shortfall exceeds approved + tolerance — approval rule of the request for that total (ADR 0013: Direktur \"Diketahui\" → Finance); within tolerance / running / already approved → 409",
@@ -44675,6 +46675,20 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ],
+              "description": "User 2026-10-19 (APK Pinjaman list): add `summary` (the web list's tiles) to the response."
+            },
+            "required": false,
+            "description": "User 2026-10-19 (APK Pinjaman list): add `summary` (the web list's tiles) to the response.",
+            "name": "summary",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
               "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
             },
@@ -46306,6 +48320,20 @@ export const openapiDocument = {
           }
         ],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ],
+              "description": "User 2026-10-19 (APK Pinjaman antar-PT list): add `summary` (the web list's tiles) to the response."
+            },
+            "required": false,
+            "description": "User 2026-10-19 (APK Pinjaman antar-PT list): add `summary` (the web list's tiles) to the response.",
+            "name": "summary",
+            "in": "query"
+          },
           {
             "schema": {
               "type": "string",

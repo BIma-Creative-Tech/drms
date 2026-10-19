@@ -9,6 +9,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
 import '../../approvals/application/inbox_providers.dart';
+import '../../cash/presentation/voidable_transfers_view.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/user_profile.dart';
 import '../../companies/presentation/company_chip.dart';
@@ -22,7 +23,8 @@ import '../domain/transfer_queue.dart';
 
 /// DRMS 10/10 point 10 (WA-13): "Finance" on the APK — the web "Antrian Transfer" (search, jenis filter, SLA badge,
 /// "Selisih nota (n)", pages) with "Catat transfer" per request for Finance of its PT, and the LPJ verification
-/// list (read-only; the verification itself stays on the request detail / web). Online reads.
+/// list (read-only; the verification itself stays on the request detail / web) and (phase 3) the recorded transfers that
+/// can still be voided. Online reads.
 class FinanceScreen extends ConsumerWidget {
   const FinanceScreen({super.key, this.initialTab = 0});
   final int initialTab;
@@ -33,22 +35,26 @@ class FinanceScreen extends ConsumerWidget {
     final n = ref.watch(transferQueueProvider).value?.length;
     final lpj = ref.watch(lpjQueueProvider).value?.length;
     return DefaultTabController(
-      length: 2,
-      initialIndex: initialTab.clamp(0, 1),
+      length: 3,
+      initialIndex: initialTab.clamp(0, 2),
       child: Scaffold(
         appBar: AppBar(
           title: Text(t.financeTitle),
           bottom: TabBar(
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
             tabs: [
               Tab(
                 key: const Key('tab-transfer-queue'),
                 text: n == null ? t.transferQueueTitle : '${t.transferQueueTitle} ($n)',
               ),
               Tab(key: const Key('tab-lpj-queue'), text: lpj == null ? t.lpjVerifyTitle : '${t.lpjVerifyTitle} ($lpj)'),
+              // phase 3 (user 2026-10-19): the web "Transfer tercatat — dapat dibatalkan" below the queue
+              Tab(key: const Key('tab-voidable-transfers'), text: t.voidTransferTab),
             ],
           ),
         ),
-        body: const TabBarView(children: [TransferQueueView(), _LpjQueueView()]),
+        body: const TabBarView(children: [TransferQueueView(), _LpjQueueView(), VoidableTransfersView()]),
       ),
     );
   }

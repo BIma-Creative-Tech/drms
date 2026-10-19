@@ -4,7 +4,7 @@ import '../../../core/network/api_client.dart';
 import '../domain/loan.dart';
 
 /// `/api/v1/project-loans` (ADR 0022). Online only; every write carries an Idempotency-Key (one per opened form /
-/// action). Repayments and their void are web-only in v1 (ADR 0022 §11).
+/// action). Phase 3 (user 2026-10-19): repayments and their void too.
 class LoansApi {
   LoansApi(this.client);
   final ApiClient client;
@@ -21,6 +21,7 @@ class LoansApi {
     String? q,
     int page = 1,
     int limit = 50,
+    bool summary = false,
   }) => client.run(
     (d) => d.get<dynamic>(
       '/project-loans',
@@ -32,6 +33,7 @@ class LoansApi {
         if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
         'page': page,
         'limit': limit,
+        if (summary) 'summary': '1',
       },
     ),
     (data) => LoanPage.fromJson(data as Map<String, dynamic>),
@@ -124,4 +126,31 @@ class LoansApi {
         d.post<dynamic>('/project-loans/$id/reject', data: {'reason': reason.trim()}, options: _idem(idempotencyKey)),
     _one,
   );
+
+  /// `POST /project-loans/{id}/repayments` {amount, repayDate, note?} — borrower PM / Finance ("Catat pengembalian").
+  Future<Loan> addRepayment(
+    int id, {
+    required int amount,
+    required String repayDate,
+    String? note,
+    required String idempotencyKey,
+  }) => client.run(
+    (d) => d.post<dynamic>(
+      '/project-loans/$id/repayments',
+      data: {'amount': amount, 'repayDate': repayDate, if (note != null && note.trim().isNotEmpty) 'note': note.trim()},
+      options: _idem(idempotencyKey),
+    ),
+    _one,
+  );
+
+  /// `POST /project-loans/{id}/repayments/{rid}/void` {reason} — Direktur / Finance.
+  Future<Loan> voidRepayment(int id, int repaymentId, {required String reason, required String idempotencyKey}) =>
+      client.run(
+        (d) => d.post<dynamic>(
+          '/project-loans/$id/repayments/$repaymentId/void',
+          data: {'reason': reason.trim()},
+          options: _idem(idempotencyKey),
+        ),
+        _one,
+      );
 }

@@ -23,9 +23,21 @@ enum LoanStatus {
   final String code;
 
   static LoanStatus fromCode(String? c) => LoanStatus.values.where((s) => s.code == c).firstOrNull ?? draft;
+
+  /// Web `LOAN_STATUS_LABELS` (list filter; a loan carries the server's `statusLabel`).
+  String get label => switch (this) {
+    draft => 'Draft',
+    pendingApproval => 'Menunggu persetujuan Direktur',
+    approved => 'Disetujui',
+    partiallyRepaid => 'Sebagian kembali',
+    repaid => 'Lunas',
+    rejected => 'Ditolak',
+    cancelled => 'Dibatalkan',
+  };
 }
 
-/// Actions of `allowedActions` (the server decides; the APK only shows the buttons). `repay` is web-only in v1.
+/// Actions of `allowedActions` (the server decides; the APK only shows the buttons). `repay` = "Catat pengembalian"
+/// (phase 3, user 2026-10-19).
 enum LoanAction {
   edit,
   submit,
@@ -158,6 +170,8 @@ class Loan {
     this.rejectReason,
     this.cancelReason,
     this.allowedActions = const {},
+    this.mayVoidRepayment = false,
+    this.today,
     this.repayments = const [],
     this.decisions = const [],
   });
@@ -193,6 +207,12 @@ class Loan {
   final String? rejectReason;
   final String? cancelReason;
   final Set<LoanAction> allowedActions;
+
+  /// Direktur / Finance may void a posted repayment (ADR 0022 §7).
+  final bool mayVoidRepayment;
+
+  /// Business date of the loan's PT (the repayment date picker's last day); null from an older server.
+  final String? today;
   final List<LoanRepayment> repayments;
   final List<LoanDecision> decisions;
 
@@ -232,25 +252,74 @@ class Loan {
     rejectReason: _strN(j['rejectReason']),
     cancelReason: _strN(j['cancelReason']),
     allowedActions: {for (final a in _list(j['allowedActions'])) ?LoanAction.fromCode('$a')},
+    mayVoidRepayment: j['mayVoidRepayment'] == true,
+    today: _strN(j['today']),
     repayments: [for (final r in _list(j['repayments'])) LoanRepayment.fromJson(_map(r))],
     decisions: [for (final d in _list(j['decisions'])) LoanDecision.fromJson(_map(d))],
   );
 }
 
 class LoanPage {
-  const LoanPage({required this.items, this.page = 1, this.totalPages = 0, this.totalDocs = 0});
+  const LoanPage({required this.items, this.page = 1, this.totalPages = 0, this.totalDocs = 0, this.summary});
   final List<Loan> items;
   final int page;
   final int totalPages;
   final int totalDocs;
+
+  /// `?summary=1`: the web list's KPI tiles and buttons.
+  final LoanSummary? summary;
 
   factory LoanPage.fromJson(Map<String, dynamic> j) => LoanPage(
     items: [for (final i in _list(j['items'])) Loan.fromJson(_map(i))],
     page: _int(j['page'], 1),
     totalPages: _int(j['totalPages']),
     totalDocs: _int(j['totalDocs']),
+    summary: j['summary'] is Map<String, dynamic> ? LoanSummary.fromJson(j['summary'] as Map<String, dynamic>) : null,
   );
 }
+
+/// Web "Pinjaman antar project" tiles: Menunggu persetujuan, Sisa pinjaman (disetujui · kembali), Terlambat.
+class LoanSummary {
+  const LoanSummary({
+    this.pending = 0,
+    this.amount = 0,
+    this.repaid = 0,
+    this.outstanding = 0,
+    this.overdueCount = 0,
+    this.overdue = 0,
+    this.inboxCount = 0,
+    this.canCreate = false,
+  });
+  final int pending;
+  final int amount;
+  final int repaid;
+  final int outstanding;
+  final int overdueCount;
+  final int overdue;
+  final int inboxCount;
+  final bool canCreate;
+
+  factory LoanSummary.fromJson(Map<String, dynamic> j) {
+    final t = _map(j['totals']);
+    return LoanSummary(
+      pending: _int(t['pending']),
+      amount: _int(t['amount']),
+      repaid: _int(t['repaid']),
+      outstanding: _int(t['outstanding']),
+      overdueCount: _int(t['overdueCount']),
+      overdue: _int(t['overdue']),
+      inboxCount: _int(j['inboxCount']),
+      canCreate: j['canCreate'] == true,
+    );
+  }
+}
+
+/// "Catat pengembalian" checks (web RepaymentAction messages; the server re-checks).
+Map<String, String> validateRepayment({required int? amount, required int outstanding, required String? repayDate}) => {
+  if (amount == null || amount <= 0) 'amount': 'Nominal pengembalian wajib diisi (> 0).',
+  if (amount != null && amount > outstanding) 'amount': 'Nominal melebihi sisa pinjaman.',
+  if (repayDate == null || repayDate.isEmpty) 'repayDate': 'Tanggal pengembalian wajib diisi.',
+};
 
 class LoanProjectOption {
   const LoanProjectOption({required this.id, required this.code, required this.name, required this.companyId});
