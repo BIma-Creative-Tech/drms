@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-19
+
+**APK–web parity phases 5–7: Proyek, Absensi & Pengguna, Master Data / Media / Pengaturan / Sistem; APK 0.10.0**
+(PRs #122–#125). **No migration.** API contract: additive only (generic data forms and writes `/data/{collection}`,
+`/data-globals/{slug}`, `/field/contracts`, `/attendance/schedule`, `/attendance/default-schedule`,
+`/company-memberships/matrix`, `GET /user-onboarding`; new optional fields on data lists and reports). **APK 0.10.0**
+(`mobile-v0.10.0`) completes the plan: every web menu item opens an APK screen. It needs server 0.18.0; APK 0.9.0 keeps
+working against 0.18.0.
+
 ### Added
 
 - **APK: Master Data, Media, Pengaturan and Sistem menus built natively** (user 2026-10-19, phase 7, the last
