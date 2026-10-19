@@ -148,8 +148,20 @@ function formType(f: FormLeaf['field']): FormType {
   }
 }
 
+/**
+ * Caller's permissions as docAccessOperation returns them. NB: Payload's sanitizePermissions collapses an object whose
+ * operations AND fields are all allowed into the bare `true` (whole collection / field group) — e.g. an Admin on a
+ * document of their PT — and keeps `{ permission: true, where }` when a Where is left (no `id`).
+ */
+type Perms = SanitizedCollectionPermission | true
+
+/** Operation allowed: `true`, or `{ permission: true }` (a Where without `id` = allowed for some documents). */
+const opAllowed = (entry: unknown): boolean =>
+  entry === true || (!!entry && typeof entry === 'object' && (entry as { permission?: unknown }).permission === true)
+
 /** Field-level permission of the caller (sanitized: `true` = every operation; missing = none). */
-function fieldAllowed(perms: SanitizedCollectionPermission, path: string[], op: 'create' | 'update'): boolean {
+export function fieldAllowed(perms: Perms, path: string[], op: 'create' | 'update'): boolean {
+  if (perms === true) return true
   let level: unknown = perms.fields
   for (let i = 0; i < path.length; i++) {
     if (level === true) return true
@@ -157,13 +169,13 @@ function fieldAllowed(perms: SanitizedCollectionPermission, path: string[], op: 
     const entry = (level as Record<string, unknown>)[path[i]!]
     if (entry === true) return true
     if (!entry || typeof entry !== 'object') return false
-    if (i === path.length - 1) return (entry as Record<string, unknown>)[op] === true
+    if (i === path.length - 1) return opAllowed((entry as Record<string, unknown>)[op])
     level = (entry as { fields?: unknown }).fields
   }
   return false
 }
 
-const collectionAllowed = (perms: SanitizedCollectionPermission, op: 'create' | 'update' | 'delete') => (perms as Record<string, unknown>)[op] === true
+export const collectionAllowed = (perms: Perms, op: 'create' | 'update' | 'delete') => perms === true || opAllowed((perms as Record<string, unknown>)[op])
 
 const relId = (v: unknown): number | string | null => (v && typeof v === 'object' ? ((v as { id?: number | string }).id ?? null) : (v as number | string | null) ?? null)
 
@@ -206,7 +218,7 @@ export const dataFormEndpoint = v1({
     const collection = req.payload.collections[cfg.slug as CollectionSlug]!
     const doc = id === null ? null : ((await req.payload.findByID({ collection: cfg.slug as CollectionSlug, id, depth: 0, user: req.user, overrideAccess: false, req }).catch(() => null)) as Doc | null)
     if (id !== null && !doc) throw new HttpError(404, 'Not Found')
-    const perms = await docAccessOperation({ collection, req, ...(id !== null ? { id } : {}) })
+    const perms = (await docAccessOperation({ collection, req, ...(id !== null ? { id } : {}) })) as Perms
     const op = id === null ? 'create' : 'update'
     const skipped: string[] = []
     const leaves = formLeaves(cfg.fields, skipped)
@@ -313,7 +325,7 @@ export const dataOptionsEndpoint = v1({
 /** `data` keys → the nested Payload shape (groups); unknown / read-only keys → 400. */
 async function writeData(req: PayloadRequest, cfg: ReturnType<typeof collectionOf>, data: Record<string, unknown>, op: 'create' | 'update', id?: number) {
   const collection = req.payload.collections[cfg.slug as CollectionSlug]!
-  const perms = await docAccessOperation({ collection, req, ...(id !== undefined ? { id } : {}) })
+  const perms = (await docAccessOperation({ collection, req, ...(id !== undefined ? { id } : {}) })) as Perms
   if (!collectionAllowed(perms, op)) throw new HttpError(403, 'Forbidden', { detail: op === 'create' ? 'Anda tidak dapat menambah data ini.' : 'Anda tidak dapat mengubah data ini.' })
   const leaves = new Map(formLeaves(cfg.fields, []).map((l) => [l.key, l]))
   const errors: Array<{ path: string; message: string }> = []
