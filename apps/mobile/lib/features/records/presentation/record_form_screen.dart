@@ -18,18 +18,22 @@ import '../domain/record_form.dart';
 /// the collection — fields, labels, required / read-only and field-level access from the server; saved through
 /// Payload like the web (hooks, validation, audit). Online only.
 class RecordFormScreen extends ConsumerWidget {
-  const RecordFormScreen({super.key, required this.collection, this.id});
+  const RecordFormScreen({super.key, required this.collection, this.id, this.global = false});
   final String collection;
   final String? id;
+
+  /// Phase 7: [collection] is a Payload global slug (one document, update only).
+  final bool global;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
+    final provider = global ? recordGlobalFormProvider(collection) : recordFormProvider((collection, id));
     return AsyncBody<RecordFormDef>(
-      value: ref.watch(recordFormProvider((collection, id))),
-      onRetry: () => ref.invalidate(recordFormProvider((collection, id))),
+      value: ref.watch(provider),
+      onRetry: () => ref.invalidate(provider),
       data: (def) {
-        final allowed = id == null ? def.canCreate : def.canUpdate;
+        final allowed = global || id != null ? def.canUpdate : def.canCreate;
         if (!allowed || !def.supported) {
           return Scaffold(
             appBar: AppBar(title: Text(def.label)),
@@ -39,17 +43,19 @@ class RecordFormScreen extends ConsumerWidget {
             ),
           );
         }
-        return _RecordForm(def: def, collection: collection, id: id);
+        // a reloaded definition (global saved in place) = fresh initial values
+        return _RecordForm(key: ObjectKey(def), def: def, collection: collection, id: global ? '' : id, global: global);
       },
     );
   }
 }
 
 class _RecordForm extends ConsumerStatefulWidget {
-  const _RecordForm({required this.def, required this.collection, this.id});
+  const _RecordForm({super.key, required this.def, required this.collection, this.id, this.global = false});
   final RecordFormDef def;
   final String collection;
   final String? id;
+  final bool global;
 
   @override
   ConsumerState<_RecordForm> createState() => _RecordFormState();
@@ -151,14 +157,21 @@ class _RecordFormState extends ConsumerState<_RecordForm> {
     try {
       final key = _keys.putIfAbsent(jsonEncode(data), () => const Uuid().v4());
       final reason = _reason.text.trim().isEmpty ? null : _reason.text.trim();
-      final saved = edit
+      final saved = widget.global
+          ? await api.updateGlobal(widget.collection, data, reason: reason, idempotencyKey: key)
+          : edit
           ? await api.update(widget.collection, widget.id!, data, reason: reason, idempotencyKey: key)
           : await api.create(widget.collection, data, reason: reason, idempotencyKey: key);
       ref.invalidate(recordPageProvider);
       ref.invalidate(recordDetailProvider);
       ref.invalidate(recordFormProvider);
+      ref.invalidate(recordGlobalFormProvider);
       if (!mounted) return;
-      showSnack(context, t.recordSaved(saved.title));
+      showSnack(context, t.recordSaved(saved.title.isEmpty ? widget.def.label : saved.title));
+      if (widget.global) {
+        // one document: stay on the form, its values reload
+        return;
+      }
       context.pop(saved.id);
     } on ProblemException catch (e) {
       if (mounted) {
@@ -348,7 +361,15 @@ class _RecordFormState extends ConsumerState<_RecordForm> {
     final theme = Theme.of(context);
     final edit = widget.id != null;
     return Scaffold(
-      appBar: AppBar(title: Text(edit ? t.recordEditTitle(widget.def.label) : t.recordNewTitle(widget.def.label))),
+      appBar: AppBar(
+        title: Text(
+          widget.global
+              ? widget.def.label
+              : edit
+              ? t.recordEditTitle(widget.def.label)
+              : t.recordNewTitle(widget.def.label),
+        ),
+      ),
       body: AbsorbPointer(
         absorbing: _busy,
         child: ListView(

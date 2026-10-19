@@ -93,6 +93,30 @@ const Map<String, String> webToApk = {
   // Avatar menu (user 2026-10-19, phase 2)
   '/keamanan-akun': '/security',
   '/collections/notifications': '/notifications',
+  // phase 7 (user 2026-10-19): Master Data, Media, Pengaturan, Sistem
+  '/vendor/baru': '/vendors/new',
+  '/globals/company-settings': '/settings/app',
+  '/audit-log': '/reports/audit-log',
+  '/collections/banks': '/data/banks',
+  '/collections/uoms': '/data/uoms',
+  '/collections/expense-categories': '/data/expense-categories',
+  '/collections/urgency-levels': '/data/urgency-levels',
+  '/collections/vehicles': '/data/vehicles',
+  '/collections/vendors': '/data/vendors',
+  '/collections/vendor-bank-accounts': '/data/vendor-bank-accounts',
+  '/collections/sites': '/data/sites',
+  '/collections/media-receipts': '/data/media-receipts',
+  '/collections/media-transfer-proofs': '/data/media-transfer-proofs',
+  '/collections/media-selfies': '/data/media-selfies',
+  '/collections/media-progress-photos': '/data/media-progress-photos',
+  '/collections/media-signatures': '/data/media-signatures',
+  '/collections/media-company': '/data/media-company',
+  '/collections/media-attachments': '/data/media-attachments',
+  '/collections/companies': '/data/companies',
+  '/collections/approval-rules': '/data/approval-rules',
+  '/collections/notification-templates': '/data/notification-templates',
+  '/collections/document-sequences': '/data/document-sequences',
+  '/collections/audit-logs': '/data/audit-logs',
 };
 
 ApkTarget? apkTargetFor(String href) {

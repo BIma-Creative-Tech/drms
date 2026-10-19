@@ -249,6 +249,7 @@ export function withGlobalAudit(global: GlobalConfig, opts: Omit<AuditOptions, '
       beforeChange: [...(global.hooks?.beforeChange ?? []), before],
       afterChange: [...(global.hooks?.afterChange ?? []), after],
     },
-    custom: { ...global.custom, pkAudit: { docType: opts.docType, tracked } },
+    // phase 7: the reason rules readable by the APK edit form (GET /data-globals/{slug}/form), like withAudit
+    custom: { ...global.custom, pkAudit: { docType: opts.docType, tracked, reasonRules: rules } },
   }
 }

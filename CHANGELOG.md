@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **APK: Master Data, Media, Pengaturan and Sistem menus built natively** (user 2026-10-19, phase 7, the last
+  phase of the APK–web parity plan: every web menu item now opens an APK screen).
+  - **Master Data** (Bank, Satuan, Kategori biaya, Urgensi, Kendaraan, Rekening vendor, Site): the web list and edit
+    form.
+  - **Vendor / + Vendor baru**: the web Vendor page (detail, NPWP, Kontak PIC, bank accounts).
+  - **Media**: the media lists with an image preview (full screen on tap) and "Buka file" for other files.
+  - **Pengaturan**:
+    - PT, Aturan approval, Template notifikasi and Penomoran: list and edit (reasons where the audit rules ask).
+      The steps of an approval rule stay on the web.
+    - **Setting aplikasi**: the global settings form (group admin edits).
+  - **Sistem**: Audit Log (the "Audit Log" report, linked from Laporan for Owner / Admin / Finance; opening it is
+    audited like on the web) and the audit-log / notification lists.
+  - Server (additive, no migration):
+    - `GET|PATCH /api/v1/data-globals/{slug}` and `GET /api/v1/data-globals/{slug}/form` (company-settings);
+    - media `file` / `thumb` on the data detail / list;
+    - `auditLog` on `GET /reports`;
+    - the phase-7 collections in `/data`.
+
 - **APK: Absensi and Pengguna & Akses menus built natively** (user 2026-10-19, phase 6 of the APK–web parity
   plan).
   - **Jadwal & hari libur**, like the web page:

@@ -102,6 +102,20 @@ class _FakeRecords implements RecordsApi {
 
   @override
   Future<void> revokeDevice(String id, String reason, {required String idempotencyKey}) async {}
+
+  @override
+  Future<Uint8List> fileBytes(String path) async => Uint8List(0);
+
+  @override
+  Future<RecordFormDef> globalForm(String slug) async => RecordFormDef.fromJson(_formJson);
+
+  @override
+  Future<RecordDetail> updateGlobal(
+    String slug,
+    Map<String, Object?> data, {
+    String? reason,
+    required String idempotencyKey,
+  }) async => throw const ProblemException(status: 403);
 }
 
 Map<String, dynamic> _rapJson({bool locked = false}) => {

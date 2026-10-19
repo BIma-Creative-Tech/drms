@@ -9,6 +9,7 @@ import { healthEndpoint, healthHeadEndpoint, readyEndpoint, readyHeadEndpoint } 
 import { CASH_ENDPOINTS } from './endpoints/cash'
 import { DAILY_ENDPOINTS } from './endpoints/daily'
 import { DATA_FORM_ENDPOINTS } from './endpoints/data-forms'
+import { DATA_GLOBAL_ENDPOINTS } from './endpoints/data-globals'
 import { DATA_ENDPOINTS } from './endpoints/data-lists'
 import { EXPENSE_ENDPOINTS } from './endpoints/expense-requests'
 import { FIELD_ENDPOINTS } from './endpoints/field'
@@ -63,6 +64,7 @@ export const v1Endpoints: Endpoint[] = [
   ...KEUANGAN_ENDPOINTS,
   ...DATA_FORM_ENDPOINTS, // before DATA_ENDPOINTS: /data/:collection/form|options vs /data/:collection/:id
   ...DATA_ENDPOINTS,
+  ...DATA_GLOBAL_ENDPOINTS, // phase 7: Pengaturan › Setting aplikasi (company-settings)
   // ADR 0028: payee directory of a "PT grup" payment
   ...INTERCOMPANY_ENDPOINTS,
   // ADR 0029: inter-PT loans (Owner instructs, lender Finance disburses, borrower Finance repays) + fund availability

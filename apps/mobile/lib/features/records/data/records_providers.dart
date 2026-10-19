@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
@@ -18,4 +20,14 @@ final recordDetailProvider = FutureProvider.autoDispose.family<RecordDetail, (St
 /// The edit form of a collection (id null = "Tambah").
 final recordFormProvider = FutureProvider.autoDispose.family<RecordFormDef, (String, String?)>(
   (ref, k) => ref.watch(recordsApiProvider).form(k.$1, id: k.$2),
+);
+
+/// Bytes of a media document's file (phase 7, Media browser).
+final recordFileProvider = FutureProvider.autoDispose.family<Uint8List, String>(
+  (ref, path) => ref.watch(recordsApiProvider).fileBytes(path),
+);
+
+/// Phase 7: the edit form of a Payload global (Pengaturan › Setting aplikasi).
+final recordGlobalFormProvider = FutureProvider.autoDispose.family<RecordFormDef, String>(
+  (ref, slug) => ref.watch(recordsApiProvider).globalForm(slug),
 );

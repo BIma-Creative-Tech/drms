@@ -16,7 +16,7 @@ const jsonBody = (schema: z.ZodType) => ({ content: { 'application/json': { sche
 /** User 2026-10-19 (APK ↔ web parity, phase 5): the generic edit form of the Proyek collections. Pure (gen-openapi). */
 export function registerDataFormPaths(registry: OpenAPIRegistry, h: Helpers): void {
   const collection = z.object({
-    collection: z.string().meta({ description: 'Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404.' }),
+    collection: z.string().meta({ description: 'Writable slug (DATA_WRITABLE in endpoints/data-forms.ts: the Proyek, Absensi, Master Data and Pengaturan collections the web edits with the plain form); other → 404.' }),
   })
   registry.registerPath({
     method: 'get',
@@ -41,6 +41,31 @@ export function registerDataFormPaths(registry: OpenAPIRegistry, h: Helpers): vo
     security: h.security,
     request: { headers: h.idem, params: collection, body: jsonBody(D.DataWriteBody) },
     responses: h.res(201, 'Created (the detail)', K.DataDetail, [400, 401, 403, 404, 409, 422, 426, 429]),
+  })
+  const global = z.object({ slug: z.enum(['company-settings']).meta({ description: 'Whitelisted Payload global (phase 7).' }) })
+  registry.registerPath({
+    method: 'get',
+    path: '/data-globals/{slug}',
+    summary: 'Phase 7: a Payload global (Pengaturan › Setting aplikasi) as display text; the global\'s read access.',
+    security: h.security,
+    request: { headers: h.deviceHeader, params: global },
+    responses: h.res(200, 'Global', D.DataGlobalDetail, [401, 403, 404, 426, 429]),
+  })
+  registry.registerPath({
+    method: 'get',
+    path: '/data-globals/{slug}/form',
+    summary: 'Phase 7: the web edit form of a global (docAccessOperationGlobal field access, current values, audit reason rule).',
+    security: h.security,
+    request: { headers: h.deviceHeader, params: global },
+    responses: h.res(200, 'Form', D.DataGlobalForm, [401, 403, 404, 426, 429]),
+  })
+  registry.registerPath({
+    method: 'patch',
+    path: '/data-globals/{slug}',
+    summary: 'Phase 7: update a global (payload.updateGlobal as the caller: access, validation, global audit). company-settings: group admin only.',
+    security: h.security,
+    request: { headers: h.idem, params: global, body: jsonBody(D.DataWriteBody) },
+    responses: h.res(200, 'Updated', D.DataGlobalDetail, [400, 401, 403, 404, 426, 429]),
   })
   registry.registerPath({
     method: 'patch',

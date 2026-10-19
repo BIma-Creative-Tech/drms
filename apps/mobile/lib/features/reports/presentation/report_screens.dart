@@ -17,49 +17,67 @@ class ReportListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(t.reportsTitle)),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(reportIndexProvider.future),
-        child: AsyncBody<List<ReportSummary>>(
+        child: AsyncBody<({List<ReportSummary> items, bool auditLog})>(
           value: ref.watch(reportIndexProvider),
           onRetry: () => ref.invalidate(reportIndexProvider),
-          data: (items) => items.isEmpty
-              ? ListView(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Text(t.reportsNone, key: const Key('reports-none'), textAlign: TextAlign.center),
-                    ),
-                  ],
-                )
-              : ListView.separated(
-                  key: const Key('reports-list'),
-                  padding: const EdgeInsets.only(bottom: 24),
-                  itemCount: items.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
-                  itemBuilder: (_, i) {
-                    final r = items[i];
-                    return ListTile(
-                      key: Key('report-${r.code}'),
-                      leading: const Icon(Icons.assessment_outlined),
-                      title: Text(r.title),
-                      subtitle: Text(
-                        [
-                          if (r.description.isNotEmpty) r.description,
-                          t.reportsExportLine(r.formats.map((f) => reportFormatLabels[f] ?? f).join(' · ')),
-                        ].join('\n'),
-                        style: theme.textTheme.bodySmall,
-                      ),
-                      isThreeLine: r.description.isNotEmpty,
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => context.push('/reports/${r.code}'),
-                    );
-                  },
-                ),
+          data: (index) => _list(context, index.items, index.auditLog),
         ),
       ),
+    );
+  }
+
+  Widget _list(BuildContext context, List<ReportSummary> items, bool auditLog) {
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    // phase 7: the web index links the global Audit Log for its roles
+    final audit = auditLog
+        ? ListTile(
+            key: const Key('report-audit-log'),
+            leading: const Icon(Icons.history_edu_outlined),
+            title: Text(t.reportsAuditLog),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/reports/audit-log'),
+          )
+        : null;
+    if (items.isEmpty) {
+      return ListView(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(32),
+            child: Text(t.reportsNone, key: const Key('reports-none'), textAlign: TextAlign.center),
+          ),
+          ?audit,
+        ],
+      );
+    }
+    return ListView.separated(
+      key: const Key('reports-list'),
+      padding: const EdgeInsets.only(bottom: 24),
+      itemCount: items.length + (audit == null ? 0 : 1),
+      separatorBuilder: (_, _) => const Divider(height: 1),
+      itemBuilder: (_, i) {
+        if (i == items.length) return audit!;
+        final r = items[i];
+        return ListTile(
+          key: Key('report-${r.code}'),
+          leading: const Icon(Icons.assessment_outlined),
+          title: Text(r.title),
+          subtitle: Text(
+            [
+              if (r.description.isNotEmpty) r.description,
+              t.reportsExportLine(r.formats.map((f) => reportFormatLabels[f] ?? f).join(' · ')),
+            ].join('\n'),
+            style: theme.textTheme.bodySmall,
+          ),
+          isThreeLine: r.description.isNotEmpty,
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push('/reports/${r.code}'),
+        );
+      },
     );
   }
 }

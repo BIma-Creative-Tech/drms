@@ -1,4 +1,4 @@
-import { docAccessOperation, type CollectionSlug, type Field, type PayloadRequest, type SanitizedCollectionPermission, type Where } from 'payload'
+import { docAccessOperation, type CollectionSlug, type Field, type PayloadRequest, type SanitizedCollectionPermission, type SanitizedGlobalPermission, type Where } from 'payload'
 
 import { isRupiahField } from '@/admin/display-cells'
 import { BUSINESS_DATE_FIELD } from '@/collections/fields-f2'
@@ -20,7 +20,8 @@ import { collectionOf, detailOf, labelText, pick, titleOf, type Doc } from './da
  * endpoints with lock + reason rules), clients (the tabbed Klien page / GET+PUT /client-form with the contacts),
  * company-memberships (role matrix: POST /company-memberships/batch, or the Pengguna onboarding), users (onboarding),
  * devices (POST /devices/{id}/revoke), web-sessions (no web write), attendances / attendance-corrections (check-in /
- * correction endpoints).
+ * correction endpoints), vendors (the tabbed Vendor page / /vendor-form: detail + bank accounts + contacts), media /
+ * audit-logs / notifications (no web form write).
  */
 export const DATA_WRITABLE = [
   'cost-centers',
@@ -37,6 +38,18 @@ export const DATA_WRITABLE = [
   'holidays',
   'employees',
   'employee-bank-accounts',
+  // phase 7 (user 2026-10-19): Master Data + Pengaturan (vendors: the tabbed Vendor page /vendor-form, like clients)
+  'banks',
+  'uoms',
+  'expense-categories',
+  'urgency-levels',
+  'vehicles',
+  'vendor-bank-accounts',
+  'sites',
+  'companies',
+  'approval-rules',
+  'notification-templates',
+  'document-sequences',
 ] as const
 
 const READ_LIMIT: [number, number] = [60, 60_000]
@@ -50,7 +63,7 @@ const SYSTEM = new Set(['id', 'createdAt', 'updatedAt', 'deletedAt', 'isDeleted'
 const LAYOUT_SKIP = new Set(['ui', 'join', 'json', 'richText', 'blocks', 'point', 'code', 'array', 'upload'])
 
 type FormLeaf = { key: string; label: string; field: Field & { name: string }; path: string[] }
-type FieldOut = {
+export type FieldOut = {
   key: string
   label: string
   type: FormType
@@ -161,7 +174,7 @@ function formType(f: FormLeaf['field']): FormType {
  * operations AND fields are all allowed into the bare `true` (whole collection / field group) — e.g. an Admin on a
  * document of their PT — and keeps `{ permission: true, where }` when a Where is left (no `id`).
  */
-type Perms = SanitizedCollectionPermission | true
+export type Perms = SanitizedCollectionPermission | SanitizedGlobalPermission | true
 
 /** Operation allowed: `true`, or `{ permission: true }` (a Where without `id` = allowed for some documents). */
 const opAllowed = (entry: unknown): boolean =>
@@ -206,7 +219,8 @@ async function labelsOf(req: PayloadRequest, relationTo: string, ids: Array<numb
   return new Map((r.docs as Doc[]).map((d) => [String(d.id), titleOf(req, relationTo, d)]))
 }
 
-const reasonRulesOf = (cfg: ReturnType<typeof collectionOf>) =>
+/** The audit reason rules (withAudit / withGlobalAudit keep them under `custom.pkAudit.reasonRules`). */
+export const reasonRulesOf = (cfg: { custom?: unknown }) =>
   ((cfg.custom as { pkAudit?: { reasonRules?: Array<(a: { operation: 'create' | 'update'; data: Record<string, unknown>; original: Record<string, unknown> | undefined }) => string | false> } } | undefined)?.pkAudit?.reasonRules) ?? []
 
 function idParam(v: string | null | undefined): number {
@@ -214,22 +228,10 @@ function idParam(v: string | null | undefined): number {
   return Number(v)
 }
 
-/** GET /api/v1/data/{collection}/form[?id=] — the edit form of a writable collection. */
-export const dataFormEndpoint = v1({
-  path: '/data/:collection/form',
-  method: 'get',
-  rateLimit: READ_LIMIT,
-  handler: async ({ req, params }) => {
-    const cfg = writableOf(req, params.collection)
-    const rawId = req.searchParams.get('id')
-    const id = rawId === null || rawId === '' ? null : idParam(rawId)
-    const collection = req.payload.collections[cfg.slug as CollectionSlug]!
-    const doc = id === null ? null : ((await req.payload.findByID({ collection: cfg.slug as CollectionSlug, id, depth: 0, user: req.user, overrideAccess: false, req }).catch(() => null)) as Doc | null)
-    if (id !== null && !doc) throw new HttpError(404, 'Not Found')
-    const perms = (await docAccessOperation({ collection, req, ...(id !== null ? { id } : {}) })) as Perms
-    const op = id === null ? 'create' : 'update'
-    const skipped: string[] = []
-    const leaves = formLeaves(cfg.fields, skipped)
+/** The form fields of a collection / global (phase 7: shared with data-globals.ts): values, access, options. */
+export async function formFieldsOf(req: PayloadRequest, configFields: readonly Field[], doc: Doc | null, perms: Perms, op: 'create' | 'update'): Promise<{ fields: FieldOut[]; skipped: string[] }> {
+  const skipped: string[] = []
+  const leaves = formLeaves(configFields, skipped)
     const fields: FieldOut[] = []
     for (const l of leaves) {
       const f = l.field
@@ -266,6 +268,24 @@ export const dataFormEndpoint = v1({
       }
       fields.push(out)
     }
+  return { fields, skipped }
+}
+
+/** GET /api/v1/data/{collection}/form[?id=] — the edit form of a writable collection. */
+export const dataFormEndpoint = v1({
+  path: '/data/:collection/form',
+  method: 'get',
+  rateLimit: READ_LIMIT,
+  handler: async ({ req, params }) => {
+    const cfg = writableOf(req, params.collection)
+    const rawId = req.searchParams.get('id')
+    const id = rawId === null || rawId === '' ? null : idParam(rawId)
+    const collection = req.payload.collections[cfg.slug as CollectionSlug]!
+    const doc = id === null ? null : ((await req.payload.findByID({ collection: cfg.slug as CollectionSlug, id, depth: 0, user: req.user, overrideAccess: false, req }).catch(() => null)) as Doc | null)
+    if (id !== null && !doc) throw new HttpError(404, 'Not Found')
+    const perms = (await docAccessOperation({ collection, req, ...(id !== null ? { id } : {}) })) as Perms
+    const op = id === null ? 'create' : 'update'
+    const { fields, skipped } = await formFieldsOf(req, cfg.fields, doc, perms, op)
     const rules = reasonRulesOf(cfg)
     const probe = (data: Record<string, unknown>, original: Record<string, unknown>) => rules.some((r) => Boolean(r({ operation: 'update', data, original })))
     return json({
@@ -335,7 +355,12 @@ async function writeData(req: PayloadRequest, cfg: ReturnType<typeof collectionO
   const collection = req.payload.collections[cfg.slug as CollectionSlug]!
   const perms = (await docAccessOperation({ collection, req, ...(id !== undefined ? { id } : {}) })) as Perms
   if (!collectionAllowed(perms, op)) throw new HttpError(403, 'Forbidden', { detail: op === 'create' ? 'Anda tidak dapat menambah data ini.' : 'Anda tidak dapat mengubah data ini.' })
-  const leaves = new Map(formLeaves(cfg.fields, []).map((l) => [l.key, l]))
+  return dataOfFields(cfg.fields, perms, data, op)
+}
+
+/** Phase 7 (shared with data-globals.ts): the body `data` checked against the editable fields → the Payload shape. */
+export function dataOfFields(configFields: readonly Field[], perms: Perms, data: Record<string, unknown>, op: 'create' | 'update'): Doc {
+  const leaves = new Map(formLeaves(configFields, []).map((l) => [l.key, l]))
   const errors: Array<{ path: string; message: string }> = []
   const out: Doc = {}
   for (const [k, v] of Object.entries(data)) {

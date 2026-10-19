@@ -55,7 +55,66 @@ export const DATA_COLLECTIONS = [
   'employee-bank-accounts',
   'devices',
   'web-sessions',
+  // Master Data, Media, Pengaturan, Sistem (phase 7, user 2026-10-19)
+  'banks',
+  'uoms',
+  'expense-categories',
+  'urgency-levels',
+  'vehicles',
+  'vendors',
+  'vendor-bank-accounts',
+  'sites',
+  'media-receipts',
+  'media-transfer-proofs',
+  'media-selfies',
+  'media-progress-photos',
+  'media-signatures',
+  'media-company',
+  'media-attachments',
+  'companies',
+  'approval-rules',
+  'notification-templates',
+  'document-sequences',
+  'audit-logs',
+  'notifications',
 ] as const
+
+/**
+ * Phase 7: media collection → the `{kind}` of the v1 file endpoint (endpoints/media.ts FILE_COLLECTION). The list /
+ * detail read the document as the caller (Payload access) — the file endpoint applies the same check, so a document
+ * the caller sees here is a file it may open (the file endpoint's extra fallbacks only ever widen).
+ */
+const MEDIA_KIND: Record<string, string> = {
+  'media-receipts': 'receipts',
+  'media-transfer-proofs': 'transfer-proofs',
+  'media-signatures': 'signatures',
+  'media-attachments': 'attachments',
+  'media-company': 'company',
+  'media-progress-photos': 'progress-photos',
+  'media-selfies': 'selfies',
+}
+
+type MediaFields = { filename?: string | null; mimeType?: string | null; filesize?: number | null; width?: number | null; height?: number | null; removedAt?: string | null; sizes?: { thumb?: { filename?: string | null } | null } | null }
+
+/** File of a media document: v1 URL + metadata; null when the file is gone (retention / removed). */
+export function mediaFileOf(slug: string, doc: Doc): { url: string; thumb: string | null; mimeType: string | null; filename: string | null; filesize: number | null; width: number | null; height: number | null } | null {
+  const kind = MEDIA_KIND[slug]
+  const d = doc as Doc & MediaFields
+  if (!kind || d.removedAt || !d.filename) return null
+  const url = `/api/v1/media/${kind}/${String(doc.id)}/file`
+  const image = typeof d.mimeType === 'string' && d.mimeType.startsWith('image/')
+  return {
+    url,
+    thumb: d.sizes?.thumb?.filename ? `${url}?variant=thumb` : image ? url : null,
+    mimeType: d.mimeType ?? null,
+    filename: d.filename ?? null,
+    filesize: typeof d.filesize === 'number' ? d.filesize : null,
+    width: typeof d.width === 'number' ? d.width : null,
+    height: typeof d.height === 'number' ? d.height : null,
+  }
+}
+
+export const isMediaCollection = (slug: string) => slug in MEDIA_KIND
 
 const READ_LIMIT: [number, number] = [60, 60_000]
 const SKIP = new Set(['ui', 'join', 'json', 'richText', 'blocks', 'point', 'code'])
@@ -230,6 +289,8 @@ export const dataListEndpoint = v1({
         id: d.id as number | string,
         title: titleOf(req, cfg.slug, d),
         cells: Object.fromEntries(columns.map((c) => [c.key, display(req, c.field, pick(d, c.key), tz)])),
+        // phase 7: media lists carry a thumbnail URL (images only)
+        ...(isMediaCollection(cfg.slug) ? { thumb: mediaFileOf(cfg.slug, d)?.thumb ?? null } : {}),
       })),
       totalDocs: res.totalDocs,
       page: res.page ?? page,
@@ -266,6 +327,8 @@ export async function detailOf(req: PayloadRequest, cfg: ReturnType<typeof colle
     fields: leaves(cfg.fields)
       .filter((l) => has(doc, l.key) && l.key !== 'changeReason')
       .map((l) => ({ key: l.key, label: l.label, value: display(req, l.field, pick(doc, l.key), tz) })),
+    // phase 7: the file of a media document (v1 file endpoint)
+    ...(isMediaCollection(cfg.slug) ? { file: mediaFileOf(cfg.slug, doc) } : {}),
   }
 }
 

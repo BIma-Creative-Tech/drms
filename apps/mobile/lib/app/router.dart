@@ -8,6 +8,7 @@ import '../features/cash/presentation/cash_book_screen.dart';
 import '../features/cash/presentation/cash_entry_form_screen.dart';
 import '../features/cash/presentation/period_closing_screen.dart';
 import '../features/clients/client_form_screen.dart';
+import '../features/clients/vendor_form_screen.dart';
 import '../features/companies/presentation/unassigned_screen.dart';
 import '../features/account/presentation/account_screen.dart';
 import '../features/account/presentation/security_screen.dart';
@@ -333,6 +334,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, s) => OnboardingScreen(id: int.tryParse(s.pathParameters['id'] ?? '')),
       ),
       // phase 5a: the web "Klien" page (detail + Kontak PIC)
+      // phase 7: Pengaturan › Setting aplikasi (Payload global company-settings)
+      GoRoute(
+        path: '/settings/app',
+        builder: (_, _) => const RecordFormScreen(collection: 'company-settings', global: true),
+      ),
+      // phase 7: the web "Vendor" page (detail + Kontak PIC + rekening)
+      GoRoute(path: '/vendors/new', builder: (_, _) => const VendorFormScreen()),
+      GoRoute(
+        path: '/vendors/:id',
+        builder: (_, s) => VendorFormScreen(id: int.tryParse(s.pathParameters['id'] ?? '')),
+      ),
       GoRoute(path: '/clients/new', builder: (_, _) => const ClientFormScreen()),
       GoRoute(
         path: '/clients/:id',

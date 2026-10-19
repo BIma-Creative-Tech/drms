@@ -11,12 +11,16 @@ class ReportsApi {
   ReportsApi(this.client);
   final ApiClient client;
 
-  Future<List<ReportSummary>> index() => client.run(
+  /// The report list + (phase 7) whether the caller may open the global Audit Log (web index link).
+  Future<({List<ReportSummary> items, bool auditLog})> index() => client.run(
     (d) => d.get<dynamic>('/reports'),
-    (data) => [
-      for (final i in ((data as Map<String, dynamic>)['items'] as List? ?? const []))
-        ReportSummary.fromJson(i as Map<String, dynamic>),
-    ],
+    (data) => (
+      items: [
+        for (final i in ((data as Map<String, dynamic>)['items'] as List? ?? const []))
+          ReportSummary.fromJson(i as Map<String, dynamic>),
+      ],
+      auditLog: data['auditLog'] == true,
+    ),
   );
 
   Future<ReportPage> page(ReportQuery q) => client.run(

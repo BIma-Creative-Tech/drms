@@ -9621,10 +9621,15 @@
                 "formats"
               ]
             }
+          },
+          "auditLog": {
+            "type": "boolean",
+            "description": "Phase 7: the caller may open the global audit log (GET /reports/audit-log; each open is audited, K-16)."
           }
         },
         "required": [
-          "items"
+          "items",
+          "auditLog"
         ]
       },
       "AttendanceRecap": {
@@ -13123,6 +13128,13 @@
                       "null"
                     ]
                   }
+                },
+                "thumb": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Phase 7, media collections: thumbnail URL (v1 file endpoint, images only)."
                 }
               },
               "required": [
@@ -13199,6 +13211,64 @@
                 "value"
               ]
             }
+          },
+          "file": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "/api/v1/media/{kind}/{id}/file (same access as this detail)."
+              },
+              "thumb": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "mimeType": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "filename": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "filesize": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "width": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "height": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "url",
+              "thumb",
+              "mimeType",
+              "filename",
+              "filesize",
+              "width",
+              "height"
+            ],
+            "description": "Phase 7, media collections only: the file (null = removed, e.g. selfie retention)."
           }
         },
         "required": [
@@ -13433,6 +13503,189 @@
           "data"
         ],
         "additionalProperties": false
+      },
+      "DataGlobalDetail": {
+        "type": "object",
+        "properties": {
+          "global": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "value"
+              ]
+            }
+          }
+        },
+        "required": [
+          "global",
+          "label",
+          "title",
+          "fields"
+        ]
+      },
+      "DataGlobalForm": {
+        "type": "object",
+        "properties": {
+          "global": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "canUpdate": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "object",
+            "properties": {
+              "onUpdate": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "onUpdate"
+            ]
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "textarea",
+                    "email",
+                    "number",
+                    "money",
+                    "date",
+                    "datetime",
+                    "checkbox",
+                    "select",
+                    "multiselect",
+                    "relationship",
+                    "relationships"
+                  ],
+                  "description": "date = YYYY-MM-DD; datetime = ISO; money = integer rupiah."
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "readOnly": {
+                  "type": "boolean",
+                  "description": "admin.readOnly or no field-level create / update access for the caller."
+                },
+                "maxLength": {
+                  "type": "integer"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "help": {
+                  "type": "string"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "label"
+                    ]
+                  }
+                },
+                "relationTo": {
+                  "type": "string",
+                  "description": "Picker: GET /data/{collection}/options?field=<key>."
+                },
+                "value": {
+                  "description": "Current value (relationships: id / ids); create: the default."
+                },
+                "valueLabel": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "type",
+                "required",
+                "readOnly"
+              ]
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "global",
+          "label",
+          "canUpdate",
+          "reason",
+          "fields",
+          "skipped"
+        ]
       },
       "ShortfallApprovalRequestBody": {
         "type": "object",
@@ -42430,10 +42683,10 @@
           {
             "schema": {
               "type": "string",
-              "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404."
+              "description": "Writable slug (DATA_WRITABLE in endpoints/data-forms.ts: the Proyek, Absensi, Master Data and Pengaturan collections the web edits with the plain form); other → 404."
             },
             "required": true,
-            "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404.",
+            "description": "Writable slug (DATA_WRITABLE in endpoints/data-forms.ts: the Proyek, Absensi, Master Data and Pengaturan collections the web edits with the plain form); other → 404.",
             "name": "collection",
             "in": "path"
           },
@@ -42689,10 +42942,10 @@
           {
             "schema": {
               "type": "string",
-              "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404."
+              "description": "Writable slug (DATA_WRITABLE in endpoints/data-forms.ts: the Proyek, Absensi, Master Data and Pengaturan collections the web edits with the plain form); other → 404."
             },
             "required": true,
-            "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404.",
+            "description": "Writable slug (DATA_WRITABLE in endpoints/data-forms.ts: the Proyek, Absensi, Master Data and Pengaturan collections the web edits with the plain form); other → 404.",
             "name": "collection",
             "in": "path"
           },
@@ -42849,10 +43102,10 @@
           {
             "schema": {
               "type": "string",
-              "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404."
+              "description": "Writable slug (DATA_WRITABLE in endpoints/data-forms.ts: the Proyek, Absensi, Master Data and Pengaturan collections the web edits with the plain form); other → 404."
             },
             "required": true,
-            "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404.",
+            "description": "Writable slug (DATA_WRITABLE in endpoints/data-forms.ts: the Proyek, Absensi, Master Data and Pengaturan collections the web edits with the plain form); other → 404.",
             "name": "collection",
             "in": "path"
           },
@@ -42959,10 +43212,10 @@
           {
             "schema": {
               "type": "string",
-              "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404."
+              "description": "Writable slug (DATA_WRITABLE in endpoints/data-forms.ts: the Proyek, Absensi, Master Data and Pengaturan collections the web edits with the plain form); other → 404."
             },
             "required": true,
-            "description": "Writable slug (cost-centers, team-assignments, project-stages, stage-templates, resource-types, service-types, budget-lines, rap-templates, contract-units); other → 404.",
+            "description": "Writable slug (DATA_WRITABLE in endpoints/data-forms.ts: the Proyek, Absensi, Master Data and Pengaturan collections the web edits with the plain form); other → 404.",
             "name": "collection",
             "in": "path"
           },
@@ -43029,6 +43282,366 @@
             }
           },
           "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data-globals/{slug}": {
+      "get": {
+        "summary": "Phase 7: a Payload global (Pengaturan › Setting aplikasi) as display text; the global's read access.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "company-settings"
+              ],
+              "description": "Whitelisted Payload global (phase 7)."
+            },
+            "required": true,
+            "description": "Whitelisted Payload global (phase 7).",
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Global",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataGlobalDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Phase 7: update a global (payload.updateGlobal as the caller: access, validation, global audit). company-settings: group admin only.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "company-settings"
+              ],
+              "description": "Whitelisted Payload global (phase 7)."
+            },
+            "required": true,
+            "description": "Whitelisted Payload global (phase 7).",
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataWriteBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataGlobalDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data-globals/{slug}/form": {
+      "get": {
+        "summary": "Phase 7: the web edit form of a global (docAccessOperationGlobal field access, current values, audit reason rule).",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "company-settings"
+              ],
+              "description": "Whitelisted Payload global (phase 7)."
+            },
+            "required": true,
+            "description": "Whitelisted Payload global (phase 7).",
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Form",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataGlobalForm"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

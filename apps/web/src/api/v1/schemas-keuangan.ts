@@ -151,7 +151,14 @@ export const DataList = z
     collection: z.string(),
     label: z.string(),
     columns: z.array(z.object({ key: z.string(), label: z.string() })),
-    items: z.array(z.object({ id: z.union([z.number(), z.string()]), title: z.string(), cells: z.record(z.string(), z.string().nullable()) })),
+    items: z.array(
+      z.object({
+        id: z.union([z.number(), z.string()]),
+        title: z.string(),
+        cells: z.record(z.string(), z.string().nullable()),
+        thumb: z.string().nullable().optional().meta({ description: 'Phase 7, media collections: thumbnail URL (v1 file endpoint, images only).' }),
+      }),
+    ),
     totalDocs: z.number().int(),
     page: z.number().int(),
     totalPages: z.number().int(),
@@ -165,5 +172,18 @@ export const DataDetail = z
     id: z.union([z.number(), z.string()]),
     title: z.string(),
     fields: z.array(z.object({ key: z.string(), label: z.string(), value: z.string().nullable() })),
+    file: z
+      .object({
+        url: z.string().meta({ description: '/api/v1/media/{kind}/{id}/file (same access as this detail).' }),
+        thumb: z.string().nullable(),
+        mimeType: z.string().nullable(),
+        filename: z.string().nullable(),
+        filesize: z.number().nullable(),
+        width: z.number().nullable(),
+        height: z.number().nullable(),
+      })
+      .nullable()
+      .optional()
+      .meta({ description: 'Phase 7, media collections only: the file (null = removed, e.g. selfie retention).' }),
   })
   .meta({ id: 'DataDetail', description: 'Every readable field of one document, as display text (read-only).' })

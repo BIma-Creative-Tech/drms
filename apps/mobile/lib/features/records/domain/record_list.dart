@@ -65,6 +65,29 @@ class RecordField {
   final String? value;
 }
 
+/// Phase 7: the file of a media document (`file` of the detail; served by `GET /media/{kind}/{id}/file`).
+class RecordFile {
+  const RecordFile({required this.path, this.mimeType, this.filename});
+
+  /// Path under `/api/v1` (the ApiClient base), e.g. `/media/receipts/12/file`.
+  final String path;
+  final String? mimeType;
+  final String? filename;
+
+  bool get isImage => (mimeType ?? '').startsWith('image/');
+
+  static RecordFile? fromJson(Object? v) {
+    final j = _map(v);
+    final url = j['url'];
+    if (url is! String || url.isEmpty) return null;
+    return RecordFile(
+      path: url.replaceFirst(RegExp(r'^/api/v1'), ''),
+      mimeType: j['mimeType'] is String ? j['mimeType'] as String : null,
+      filename: j['filename'] is String ? j['filename'] as String : null,
+    );
+  }
+}
+
 class RecordDetail {
   const RecordDetail({
     required this.collection,
@@ -72,12 +95,14 @@ class RecordDetail {
     required this.id,
     required this.title,
     this.fields = const [],
+    this.file,
   });
   final String collection;
   final String label;
   final String id;
   final String title;
   final List<RecordField> fields;
+  final RecordFile? file;
 
   factory RecordDetail.fromJson(Map<String, dynamic> j) => RecordDetail(
     collection: '${j['collection'] ?? ''}',
@@ -88,6 +113,7 @@ class RecordDetail {
       for (final f in _list(j['fields']))
         RecordField('${_map(f)['key'] ?? ''}', '${_map(f)['label'] ?? ''}', _map(f)['value']?.toString()),
     ],
+    file: RecordFile.fromJson(j['file']),
   );
 }
 

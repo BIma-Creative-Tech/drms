@@ -7,7 +7,7 @@ import 'reports_api.dart';
 final reportsApiProvider = Provider((ref) => ReportsApi(ref.watch(apiClientProvider)));
 
 /// The caller's report list (PT switcher selection).
-final reportIndexProvider = FutureProvider.autoDispose<List<ReportSummary>>(
+final reportIndexProvider = FutureProvider.autoDispose<({List<ReportSummary> items, bool auditLog})>(
   (ref) => ref.watch(reportsApiProvider).index(),
 );
 

@@ -450,6 +450,7 @@ const FilterField = z.object({
 export const ReportIndex = z
   .object({
     items: z.array(z.object({ code: z.string(), title: z.string(), description: z.string(), kpi: z.string(), paged: z.boolean(), formats: z.array(ReportFormat) })),
+    auditLog: z.boolean().meta({ description: 'Phase 7: the caller may open the global audit log (GET /reports/audit-log; each open is audited, K-16).' }),
   })
   .meta({ id: 'ReportIndex' })
 
