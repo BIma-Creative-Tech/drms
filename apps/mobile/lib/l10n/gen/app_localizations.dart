@@ -9096,6 +9096,138 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Tampilan baca. Data ini diubah lewat alurnya masing-masing (atau di web).'**
   String get recordsReadOnly;
+
+  /// No description provided for @reportsTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Laporan'**
+  String get reportsTitle;
+
+  /// No description provided for @reportsNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Laporan kantor tidak tersedia untuk peran Anda.'**
+  String get reportsNone;
+
+  /// No description provided for @reportsExportLine.
+  ///
+  /// In id, this message translates to:
+  /// **'Export: {formats}'**
+  String reportsExportLine(String formats);
+
+  /// No description provided for @reportsFilter.
+  ///
+  /// In id, this message translates to:
+  /// **'Filter'**
+  String get reportsFilter;
+
+  /// No description provided for @reportsApply.
+  ///
+  /// In id, this message translates to:
+  /// **'Terapkan'**
+  String get reportsApply;
+
+  /// No description provided for @reportsReset.
+  ///
+  /// In id, this message translates to:
+  /// **'Reset'**
+  String get reportsReset;
+
+  /// No description provided for @reportsAll.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua'**
+  String get reportsAll;
+
+  /// No description provided for @reportsTooBig.
+  ///
+  /// In id, this message translates to:
+  /// **'{format} (terlalu banyak baris)'**
+  String reportsTooBig(String format);
+
+  /// No description provided for @reportsRowCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} baris'**
+  String reportsRowCount(int count);
+
+  /// No description provided for @reportsTeamScope.
+  ///
+  /// In id, this message translates to:
+  /// **'cakupan tim saya'**
+  String get reportsTeamScope;
+
+  /// No description provided for @reportsFirstPage.
+  ///
+  /// In id, this message translates to:
+  /// **'« Halaman pertama'**
+  String get reportsFirstPage;
+
+  /// No description provided for @reportsNextPage.
+  ///
+  /// In id, this message translates to:
+  /// **'Berikutnya ›'**
+  String get reportsNextPage;
+
+  /// No description provided for @reportsEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada data untuk filter ini.'**
+  String get reportsEmpty;
+
+  /// No description provided for @reportsTotal.
+  ///
+  /// In id, this message translates to:
+  /// **'Total'**
+  String get reportsTotal;
+
+  /// No description provided for @reportsDownloaded.
+  ///
+  /// In id, this message translates to:
+  /// **'{name} sudah diunduh.'**
+  String reportsDownloaded(String name);
+
+  /// No description provided for @reportsOpen.
+  ///
+  /// In id, this message translates to:
+  /// **'Buka'**
+  String get reportsOpen;
+
+  /// No description provided for @reportsShare.
+  ///
+  /// In id, this message translates to:
+  /// **'Bagikan'**
+  String get reportsShare;
+
+  /// No description provided for @reportsSaveDownloads.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan ke folder Unduhan'**
+  String get reportsSaveDownloads;
+
+  /// No description provided for @reportsSavedDownloads.
+  ///
+  /// In id, this message translates to:
+  /// **'Tersimpan di Unduhan/ProyekKas.'**
+  String get reportsSavedDownloads;
+
+  /// No description provided for @reportsSaveDownloadsFailed.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak dapat menyimpan ke Unduhan (Android 10 ke atas). Pakai Bagikan.'**
+  String get reportsSaveDownloadsFailed;
+
+  /// No description provided for @reportsSaveFailed.
+  ///
+  /// In id, this message translates to:
+  /// **'File tidak dapat disimpan di HP.'**
+  String get reportsSaveFailed;
+
+  /// No description provided for @reportsNoApp.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada aplikasi di HP yang dapat membuka file ini.'**
+  String get reportsNoApp;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

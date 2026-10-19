@@ -9337,6 +9337,56 @@ export const openapiDocument = {
         ],
         "additionalProperties": false
       },
+      "ReportIndex": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "kpi": {
+                  "type": "string"
+                },
+                "paged": {
+                  "type": "boolean"
+                },
+                "formats": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "csv",
+                      "xlsx",
+                      "pdf"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "code",
+                "title",
+                "description",
+                "kpi",
+                "paged",
+                "formats"
+              ]
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
       "AttendanceRecap": {
         "type": "object",
         "properties": {
@@ -36567,6 +36617,87 @@ export const openapiDocument = {
         }
       }
     },
+    "/reports": {
+      "get": {
+        "summary": "The caller's report list (web /admin/laporan; the audit log is separate)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportIndex"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/reports/{code}": {
       "get": {
         "summary": "One report page as JSON (same filters/scope as /admin/laporan/{code}); audit-log: Owner/Admin/Finance",
@@ -36589,10 +36720,13 @@ export const openapiDocument = {
                 "anggaran-project",
                 "rekap-pengajuan",
                 "kelengkapan",
+                "sla-transfer",
                 "biaya-kendaraan",
                 "absensi",
                 "rekap-timesheet-kontrak",
                 "rekap-aftersales",
+                "pinjaman-antar-project",
+                "pinjaman-antar-pt",
                 "audit-log"
               ]
             },
@@ -36824,10 +36958,13 @@ export const openapiDocument = {
                         "anggaran-project",
                         "rekap-pengajuan",
                         "kelengkapan",
+                        "sla-transfer",
                         "biaya-kendaraan",
                         "absensi",
                         "rekap-timesheet-kontrak",
                         "rekap-aftersales",
+                        "pinjaman-antar-project",
+                        "pinjaman-antar-pt",
                         "audit-log"
                       ]
                     },
@@ -36935,6 +37072,26 @@ export const openapiDocument = {
                               }
                             ]
                           }
+                        },
+                        "rowLinks": {
+                          "type": "array",
+                          "items": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          "description": "Per row (same order): web admin hrefs of the row (`_row`) and of cells (cell key → href); null = none."
+                        },
+                        "empty": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Empty-state text of the table."
                         }
                       },
                       "required": [
@@ -36942,7 +37099,9 @@ export const openapiDocument = {
                         "title",
                         "columns",
                         "rows",
-                        "totals"
+                        "totals",
+                        "rowLinks",
+                        "empty"
                       ]
                     },
                     "extra": {
@@ -37029,6 +37188,26 @@ export const openapiDocument = {
                                 }
                               ]
                             }
+                          },
+                          "rowLinks": {
+                            "type": "array",
+                            "items": {
+                              "type": [
+                                "object",
+                                "null"
+                              ],
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            },
+                            "description": "Per row (same order): web admin hrefs of the row (`_row`) and of cells (cell key → href); null = none."
+                          },
+                          "empty": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Empty-state text of the table."
                           }
                         },
                         "required": [
@@ -37036,7 +37215,9 @@ export const openapiDocument = {
                           "title",
                           "columns",
                           "rows",
-                          "totals"
+                          "totals",
+                          "rowLinks",
+                          "empty"
                         ]
                       }
                     },
@@ -37056,6 +37237,132 @@ export const openapiDocument = {
                           "pdf"
                         ]
                       }
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "filters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "date",
+                              "month",
+                              "select",
+                              "multiselect",
+                              "text"
+                            ]
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "value": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "value",
+                                "label"
+                              ]
+                            }
+                          },
+                          "value": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "label",
+                          "kind",
+                          "value"
+                        ]
+                      },
+                      "description": "The web filter form (current values + option lists in scope); multiselect = repeated query parameter."
+                    },
+                    "letterhead": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "company",
+                            "group"
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "companies": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "shortCode": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "shortCode",
+                              "name"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "name",
+                        "companies"
+                      ]
+                    },
+                    "rowCount": {
+                      "type": "integer",
+                      "description": "Rows of the whole report (paged: all pages) — XLSX / PDF are refused above `limits`."
+                    },
+                    "limits": {
+                      "type": "object",
+                      "properties": {
+                        "xlsx": {
+                          "type": "integer"
+                        },
+                        "pdf": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "xlsx",
+                        "pdf"
+                      ]
                     }
                   },
                   "required": [
@@ -37068,7 +37375,12 @@ export const openapiDocument = {
                     "main",
                     "extra",
                     "notes",
-                    "formats"
+                    "formats",
+                    "description",
+                    "filters",
+                    "letterhead",
+                    "rowCount",
+                    "limits"
                   ]
                 }
               }
@@ -37159,10 +37471,13 @@ export const openapiDocument = {
                 "anggaran-project",
                 "rekap-pengajuan",
                 "kelengkapan",
+                "sla-transfer",
                 "biaya-kendaraan",
                 "absensi",
                 "rekap-timesheet-kontrak",
                 "rekap-aftersales",
+                "pinjaman-antar-project",
+                "pinjaman-antar-pt",
                 "audit-log"
               ]
             },

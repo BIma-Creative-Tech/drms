@@ -621,6 +621,14 @@ export function buildOpenApiDocument(version: string) {
   dash('me', 'Own requests: "Perlu tindakan saya" and latest (any role)', R.StaffDashboard)
   registry.registerPath({
     method: 'get',
+    path: '/reports',
+    summary: 'The caller\'s report list (web /admin/laporan; the audit log is separate)',
+    security,
+    request: { headers: deviceHeader },
+    responses: res(200, 'Reports', R.ReportIndex, [401, 426, 429]),
+  })
+  registry.registerPath({
+    method: 'get',
     path: '/reports/{code}',
     summary: 'One report page as JSON (same filters/scope as /admin/laporan/{code}); audit-log: Owner/Admin/Finance',
     security,

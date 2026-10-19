@@ -28,7 +28,22 @@ const CompletenessRow = z.object({
   openWarnings: z.number().int(),
 })
 
-export const ReportCode = z.enum(['rekap-kas', 'buku-kas', 'pengeluaran-kategori', 'anggaran-project', 'rekap-pengajuan', 'kelengkapan', 'biaya-kendaraan', 'absensi', 'rekap-timesheet-kontrak', 'rekap-aftersales', 'audit-log'])
+export const ReportCode = z.enum([
+  'rekap-kas',
+  'buku-kas',
+  'pengeluaran-kategori',
+  'anggaran-project',
+  'rekap-pengajuan',
+  'kelengkapan',
+  'sla-transfer',
+  'biaya-kendaraan',
+  'absensi',
+  'rekap-timesheet-kontrak',
+  'rekap-aftersales',
+  'pinjaman-antar-project',
+  'pinjaman-antar-pt',
+  'audit-log',
+])
 export const ReportFormat = z.enum(['csv', 'xlsx', 'pdf'])
 
 export const ProjectBudget = z.object({
@@ -419,7 +434,24 @@ const ReportTable = z.object({
   columns: z.array(z.object({ key: z.string(), label: z.string(), type: z.enum(['text', 'money', 'int', 'date', 'datetime', 'pct']), primary: z.boolean().optional(), width: z.number().optional() })),
   rows: z.array(z.record(z.string(), Cell)),
   totals: z.record(z.string(), Cell).nullable(),
+  rowLinks: z.array(z.record(z.string(), z.string()).nullable()).meta({ description: 'Per row (same order): web admin hrefs of the row (`_row`) and of cells (cell key → href); null = none.' }),
+  empty: z.string().nullable().meta({ description: 'Empty-state text of the table.' }),
 })
+
+const FilterField = z.object({
+  name: z.string(),
+  label: z.string(),
+  kind: z.enum(['date', 'month', 'select', 'multiselect', 'text']),
+  options: z.array(z.object({ value: z.string(), label: z.string() })).optional(),
+  value: z.union([z.string(), z.array(z.string())]),
+})
+
+/** User 2026-10-19 (APK, phase 4): GET /reports — the caller's report list (web /admin/laporan). */
+export const ReportIndex = z
+  .object({
+    items: z.array(z.object({ code: z.string(), title: z.string(), description: z.string(), kpi: z.string(), paged: z.boolean(), formats: z.array(ReportFormat) })),
+  })
+  .meta({ id: 'ReportIndex' })
 
 export const ReportResponse = z.object({
   code: ReportCode,
@@ -432,6 +464,11 @@ export const ReportResponse = z.object({
   extra: z.array(ReportTable),
   notes: z.array(z.string()),
   formats: z.array(ReportFormat),
+  description: z.string(),
+  filters: z.array(FilterField).meta({ description: 'The web filter form (current values + option lists in scope); multiselect = repeated query parameter.' }),
+  letterhead: z.object({ kind: z.enum(['company', 'group']), name: z.string(), companies: z.array(z.object({ id: z.number().int(), shortCode: z.string(), name: z.string() })) }),
+  rowCount: z.number().int().meta({ description: 'Rows of the whole report (paged: all pages) — XLSX / PDF are refused above `limits`.' }),
+  limits: z.object({ xlsx: z.number().int(), pdf: z.number().int() }),
 })
 
 export const ReportQuery = z

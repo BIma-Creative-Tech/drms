@@ -337,6 +337,7 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'GET /dashboard/pm': 'selection',
   'GET /dashboard/admin': 'selection',
   'GET /dashboard/me': 'selection',
+  'GET /reports': 'own',
   'GET /reports/:code': 'selection',
   'GET /reports/:code/:format': 'selection',
   'GET /attendance/recap': 'document',

@@ -53,6 +53,7 @@ import '../features/progress/presentation/progress_detail_screen.dart';
 import '../features/progress/presentation/progress_editor_screen.dart';
 import '../features/progress/presentation/progress_screen.dart';
 import '../features/records/presentation/record_list_screens.dart';
+import '../features/reports/presentation/report_screens.dart';
 import '../features/settings/presentation/profile_screen.dart';
 import '../features/sync/presentation/queue_screen.dart';
 import 'route_error_screen.dart';
@@ -280,6 +281,17 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: ':id',
             builder: (_, s) =>
                 RecordDetailScreen(collection: s.pathParameters['collection'] ?? '', id: s.pathParameters['id'] ?? ''),
+          ),
+        ],
+      ),
+      // User 2026-10-19 (phase 4): Laporan — the list and one report (filters, tables, CSV / Excel / PDF)
+      GoRoute(
+        path: '/reports',
+        builder: (_, _) => const ReportListScreen(),
+        routes: [
+          GoRoute(
+            path: ':code',
+            builder: (_, s) => ReportScreen(code: s.pathParameters['code'] ?? ''),
           ),
         ],
       ),

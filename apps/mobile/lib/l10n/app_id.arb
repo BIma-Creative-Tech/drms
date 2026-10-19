@@ -3898,5 +3898,55 @@
       }
     }
   },
-  "recordsReadOnly": "Tampilan baca. Data ini diubah lewat alurnya masing-masing (atau di web)."
+  "recordsReadOnly": "Tampilan baca. Data ini diubah lewat alurnya masing-masing (atau di web).",
+  "reportsTitle": "Laporan",
+  "reportsNone": "Laporan kantor tidak tersedia untuk peran Anda.",
+  "reportsExportLine": "Export: {formats}",
+  "@reportsExportLine": {
+    "placeholders": {
+      "formats": {
+        "type": "String"
+      }
+    }
+  },
+  "reportsFilter": "Filter",
+  "reportsApply": "Terapkan",
+  "reportsReset": "Reset",
+  "reportsAll": "Semua",
+  "reportsTooBig": "{format} (terlalu banyak baris)",
+  "@reportsTooBig": {
+    "placeholders": {
+      "format": {
+        "type": "String"
+      }
+    }
+  },
+  "reportsRowCount": "{count} baris",
+  "@reportsRowCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reportsTeamScope": "cakupan tim saya",
+  "reportsFirstPage": "« Halaman pertama",
+  "reportsNextPage": "Berikutnya ›",
+  "reportsEmpty": "Tidak ada data untuk filter ini.",
+  "reportsTotal": "Total",
+  "reportsDownloaded": "{name} sudah diunduh.",
+  "@reportsDownloaded": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "reportsOpen": "Buka",
+  "reportsShare": "Bagikan",
+  "reportsSaveDownloads": "Simpan ke folder Unduhan",
+  "reportsSavedDownloads": "Tersimpan di Unduhan/ProyekKas.",
+  "reportsSaveDownloadsFailed": "Tidak dapat menyimpan ke Unduhan (Android 10 ke atas). Pakai Bagikan.",
+  "reportsSaveFailed": "File tidak dapat disimpan di HP.",
+  "reportsNoApp": "Tidak ada aplikasi di HP yang dapat membuka file ini."
 }

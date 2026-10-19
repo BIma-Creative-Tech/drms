@@ -5197,4 +5197,78 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get recordsReadOnly => 'Tampilan baca. Data ini diubah lewat alurnya masing-masing (atau di web).';
+
+  @override
+  String get reportsTitle => 'Laporan';
+
+  @override
+  String get reportsNone => 'Laporan kantor tidak tersedia untuk peran Anda.';
+
+  @override
+  String reportsExportLine(String formats) {
+    return 'Export: $formats';
+  }
+
+  @override
+  String get reportsFilter => 'Filter';
+
+  @override
+  String get reportsApply => 'Terapkan';
+
+  @override
+  String get reportsReset => 'Reset';
+
+  @override
+  String get reportsAll => 'Semua';
+
+  @override
+  String reportsTooBig(String format) {
+    return '$format (terlalu banyak baris)';
+  }
+
+  @override
+  String reportsRowCount(int count) {
+    return '$count baris';
+  }
+
+  @override
+  String get reportsTeamScope => 'cakupan tim saya';
+
+  @override
+  String get reportsFirstPage => '« Halaman pertama';
+
+  @override
+  String get reportsNextPage => 'Berikutnya ›';
+
+  @override
+  String get reportsEmpty => 'Tidak ada data untuk filter ini.';
+
+  @override
+  String get reportsTotal => 'Total';
+
+  @override
+  String reportsDownloaded(String name) {
+    return '$name sudah diunduh.';
+  }
+
+  @override
+  String get reportsOpen => 'Buka';
+
+  @override
+  String get reportsShare => 'Bagikan';
+
+  @override
+  String get reportsSaveDownloads => 'Simpan ke folder Unduhan';
+
+  @override
+  String get reportsSavedDownloads => 'Tersimpan di Unduhan/ProyekKas.';
+
+  @override
+  String get reportsSaveDownloadsFailed => 'Tidak dapat menyimpan ke Unduhan (Android 10 ke atas). Pakai Bagikan.';
+
+  @override
+  String get reportsSaveFailed => 'File tidak dapat disimpan di HP.';
+
+  @override
+  String get reportsNoApp => 'Tidak ada aplikasi di HP yang dapat membuka file ini.';
 }
