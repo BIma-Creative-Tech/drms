@@ -159,7 +159,8 @@ describe('GET /api/v1/data/{collection}', () => {
   it('transfers: the web list columns as display text; detail with every readable field', async () => {
     const l = await must(api('GET', `/api/v1/data/transfers?q=${encodeURIComponent(transfer.transferDocNo)}`, w.users.finance))
     expect(l).toMatchObject({ collection: 'transfers', label: 'Transfer' })
-    expect(l.columns.map((c: { key: string }) => c.key)).toEqual(['docNo', 'request', 'kind', 'amount', 'costCenter', 'transferAt', 'status'])
+    // MC2: the PT column (`company`) is prepended at runtime, as on the web list
+    expect(l.columns.map((c: { key: string }) => c.key)).toEqual(['company', 'docNo', 'request', 'kind', 'amount', 'costCenter', 'transferAt', 'status'])
     const item = l.items.find((i: { id: number }) => i.id === transfer.transferId)
     expect(item).toMatchObject({ title: transfer.transferDocNo, cells: { docNo: transfer.transferDocNo, status: 'Posted' } })
     expect(item.cells.amount).toMatch(/^Rp \d{1,3}(\.\d{3})*$/)
