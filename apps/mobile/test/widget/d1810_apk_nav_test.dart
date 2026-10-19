@@ -161,6 +161,7 @@ void main() {
         '/closings',
         '/loans',
         '/intercompany-loans',
+        '/reports',
       };
       for (final e in webToApk.entries) {
         final path = Uri.parse(e.value).path;
@@ -179,7 +180,7 @@ void main() {
     test('"+ Buat pengajuan" asks Kasbon / Reimburse; web-only items have no target yet', () {
       expect(apkTargetFor('/collections/expense-requests/create')!.pickRequestType, isTrue);
       expect(apkTargetFor('/kas')!.route, '/cash');
-      expect(apkTargetFor('/laporan'), isNull);
+      expect(apkTargetFor('/laporan')!.route, '/reports');
       expect(apkTargetFor('/persetujuan')!.route, '/inbox');
     });
 

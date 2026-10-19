@@ -1,12 +1,14 @@
 package id.co.drms.proyekkas
 
 import android.content.ActivityNotFoundException
+import android.content.ContentValues
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.provider.MediaStore
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -27,6 +29,11 @@ import java.util.concurrent.Executors
  *
  * Browser (user 2026-10-19): `open` hands an https URL to the default browser (ACTION_VIEW) — the APK "Keamanan
  * akun" opens the web 2FA page this way. Anything but https is refused; no browser installed → false.
+ *
+ * Files (user 2026-10-19, phase 4 Laporan): `save` writes a downloaded report export into cacheDir/reports (served
+ * read-only by ReportFileProvider), `open` / `share` hand it to another app (ACTION_VIEW / ACTION_SEND chooser with a
+ * read grant), `download` copies it into the public Download/ProyekKas folder (MediaStore, API 29+; no permission).
+ * File work runs on the background executor (see Threading).
  *
  * Threading: since Flutter 3.29 the Dart UI isolate runs on the Android main thread by default
  * (engine `Settings::merged_platform_ui_thread = kEnabled`, Flutter 3.47.5 common/settings.h), so a
@@ -79,6 +86,54 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "id.co.drms.proyekkas/files")
+            .setMethodCallHandler { call, result ->
+                val name = call.argument<String>("name") ?: ""
+                if (!ReportFileProvider.NAME.matches(name)) {
+                    result.success(false)
+                    return@setMethodCallHandler
+                }
+                when (call.method) {
+                    "save" -> background(result) {
+                        val bytes = call.argument<ByteArray>("bytes") ?: return@background false
+                        val dir = ReportFileProvider.dir(this)
+                        // keep the cache small: exports older than a day go
+                        dir.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > DAY_MS }?.forEach { it.delete() }
+                        File(dir, name).writeBytes(bytes)
+                        true
+                    }
+                    "open", "share" -> {
+                        val uri = ReportFileProvider.uriFor(this, name)
+                        val mime = ReportFileProvider.mimeOf(name)
+                        val intent = if (call.method == "open") {
+                            Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime)
+                        } else {
+                            Intent.createChooser(Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uri), null)
+                        }
+                        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        try {
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (e: ActivityNotFoundException) {
+                            result.success(false)
+                        }
+                    }
+                    "download" -> background(result) {
+                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return@background false
+                        val src = File(ReportFileProvider.dir(this), name)
+                        if (!src.isFile) return@background false
+                        val values = ContentValues().apply {
+                            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                            put(MediaStore.MediaColumns.MIME_TYPE, ReportFileProvider.mimeOf(name))
+                            put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/ProyekKas")
+                        }
+                        val target = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return@background false
+                        contentResolver.openOutputStream(target)?.use { out -> src.inputStream().use { it.copyTo(out) } } ?: return@background false
+                        true
+                    }
+                    else -> result.notImplemented()
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "id.co.drms.proyekkas/browser")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -98,6 +153,19 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    /** Runs [work] on the background executor and posts the result (false on any error) to the main thread. */
+    private fun background(result: MethodChannel.Result, work: () -> Boolean) {
+        val executor = integrityExecutor ?: Executors.newSingleThreadExecutor().also { integrityExecutor = it }
+        executor.execute {
+            val ok = try {
+                work()
+            } catch (e: Exception) {
+                false
+            }
+            mainHandler.post { result.success(ok) }
+        }
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
@@ -138,6 +206,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private companion object {
+        const val DAY_MS = 24L * 60 * 60 * 1000
         val SU_PATHS = arrayOf(
             "/system/app/Superuser.apk",
             "/sbin/su",

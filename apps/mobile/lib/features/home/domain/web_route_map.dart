@@ -43,6 +43,8 @@ const Map<String, String> webToApk = {
   '/collections/project-loan-repayments': '/data/project-loan-repayments',
   '/tutup-buku': '/closings',
   '/collections/period-closings': '/data/period-closings',
+  // Laporan (phase 4, user 2026-10-19)
+  '/laporan': '/reports',
   // Absensi
   '/absensi/absen': '/attendance',
   '/absensi': '/attendance?tab=team',

@@ -2,13 +2,13 @@ import type { PayloadRequest } from 'payload'
 
 import { hasRoleAny } from '@/access/roles'
 import { adminDashboard, financeDashboard, ownerDashboard, pmDashboard, staffDashboard } from '@/domain/reports/dashboards'
-import { csvStream, downloadHeaders, ExportRefused, pdfBuffer, prepareExport, xlsxBuffer } from '@/domain/reports/export'
+import { csvStream, downloadHeaders, ExportRefused, exportLetterhead, pdfBuffer, PDF_MAX_ROWS, prepareExport, xlsxBuffer } from '@/domain/reports/export'
 import { companyRefs } from '@/domain/companies'
-import { effectiveScope, PT_PARAM, ptParam, reportByCode, type Format, type ReportDef } from '@/domain/reports/registry'
+import { effectiveScope, PT_PARAM, ptParam, reportByCode, REPORTS, type Format, type ReportDef } from '@/domain/reports/registry'
 import { officeScope, scopeCompanies, type ReportScope } from '@/domain/reports/scope'
 import { BusyError } from '@/lib/heavy-gate'
 import { withReqTransaction } from '@/lib/system-tx'
-import { xlsxEnabled } from '@/lib/xlsx'
+import { XLSX_MAX_ROWS, xlsxEnabled } from '@/lib/xlsx'
 
 import { assertSelectedCompanies } from '../company-query'
 import { HttpError, json, problem, v1 } from '../http'
@@ -16,6 +16,7 @@ import { HttpError, json, problem, v1 } from '../http'
 /**
  * F3 dashboards & reports (wireframes §0 "Data"): the admin views and the APK read the same data.
  * - GET /dashboard/{owner,finance,pm,admin,me} — role layouts (me = Staff home: own requests).
+ * - GET /reports                                — the caller's report list (web /admin/laporan; user 2026-10-19, APK).
  * - GET /reports/{code}                         — one report page as JSON (same filters as the web).
  * - GET /reports/{code}/{csv|xlsx|pdf}          — download; audited `export`; 10/min per user.
  * Scope: Finance/Owner all, PM team (filters intersected), Staff/Admin no office reports; the
@@ -62,6 +63,24 @@ export async function resolveReport(req: PayloadRequest, code: string | undefine
   return { def, scope }
 }
 
+/** User 2026-10-19 (APK ↔ web parity, phase 4): the web "Laporan" index — reports of the caller's roles. */
+export const reportIndexEndpoint = v1({
+  path: '/reports',
+  method: 'get',
+  rateLimit: READ_LIMIT,
+  handler: async ({ req }) =>
+    json({
+      items: REPORTS.filter((r) => hasRoleAny(req, ...r.roles)).map((r) => ({
+        code: r.code,
+        title: r.title,
+        description: r.description,
+        kpi: r.kpi,
+        paged: r.paged,
+        formats: r.formats.filter((f) => f !== 'xlsx' || xlsxEnabled()),
+      })),
+    }),
+})
+
 export const reportJsonEndpoint = v1({
   path: '/reports/:code',
   method: 'get',
@@ -71,8 +90,23 @@ export const reportJsonEndpoint = v1({
     const sp = req.searchParams
     const cursor = sp.get('cursor') ?? undefined
     if (cursor !== undefined && !/^[A-Za-z0-9_-]{1,200}$/.test(cursor)) throw new HttpError(400, 'Bad Request', { detail: 'cursor tidak valid.' })
-    const res = await withReqTransaction(req, () => def.run(req, scope, sp, { cursor, limit: def.pageSize }))
-    const table = (t: typeof res.main) => ({ key: t.key, title: t.title, columns: t.columns, rows: t.rows.map((r) => r.cells), totals: t.totals ?? null })
+    // phase 4 (APK): the filter form, letterhead and export limits of the web page (filters without the cursor)
+    const filterSp = new URLSearchParams([...sp.entries()].filter(([k]) => k !== 'cursor'))
+    const { res, filters, letterhead } = await withReqTransaction(req, async () => ({
+      res: await def.run(req, scope, sp, { cursor, limit: def.pageSize }),
+      filters: await def.filters(req, scope, filterSp),
+      letterhead: await exportLetterhead(req, def, scope, filterSp),
+    }))
+    // `rowLinks` (phase 4): the web row / cell links (admin hrefs) — the APK opens its own screen where it has one
+    const table = (t: typeof res.main) => ({
+      key: t.key,
+      title: t.title,
+      columns: t.columns,
+      rows: t.rows.map((r) => r.cells),
+      totals: t.totals ?? null,
+      rowLinks: t.rows.map((r) => (r.href || r.links ? { ...(r.href ? { _row: r.href } : {}), ...(r.links ?? {}) } : null)),
+      empty: t.empty ?? null,
+    })
     return json({
       code: def.code,
       title: def.title,
@@ -85,6 +119,11 @@ export const reportJsonEndpoint = v1({
       extra: res.extra.map(table),
       notes: res.notes,
       formats: def.formats.filter((f) => f !== 'xlsx' || xlsxEnabled()),
+      description: def.description,
+      filters,
+      letterhead: { kind: letterhead.kind, name: letterhead.name, companies: letterhead.companies },
+      rowCount: def.paged ? res.count : res.main.rows.length,
+      limits: { xlsx: XLSX_MAX_ROWS, pdf: PDF_MAX_ROWS },
     })
   },
 })
@@ -127,6 +166,7 @@ export const REPORT_ENDPOINTS = [
   pmDashboardEndpoint,
   adminDashboardEndpoint,
   meDashboardEndpoint,
+  reportIndexEndpoint,
   reportJsonEndpoint,
   reportExportEndpoint,
 ]
