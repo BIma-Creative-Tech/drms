@@ -164,6 +164,9 @@ void main() {
         '/reports',
         '/clients/new',
         '/contracts',
+        '/attendance-schedule',
+        '/access-matrix',
+        '/users/new',
       };
       for (final e in webToApk.entries) {
         final path = Uri.parse(e.value).path;

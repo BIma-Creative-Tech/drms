@@ -6,14 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-## [0.17.0] - 2026-10-19
-
-**APK–web parity phases 3–4: Keuangan and Laporan; APK 0.9.0** (PRs #118, #119, #120). **No migration.** API
-contract: additive only (new read endpoints for kas, periods, voidable transfers, data lists and reports; optional new
-fields on loans and reports). **APK 0.9.0** (`mobile-v0.9.0`) brings phases 1–4 (the menus 1:1 with the web, Profil &
-tanda tangan, Keamanan akun, Keuangan, Laporan) and needs server 0.17.0. APK 0.8.0 keeps working against 0.17.0.
-
 ### Added
+
+- **APK: Absensi and Pengguna & Akses menus built natively** (user 2026-10-19, phase 6 of the APK–web parity
+  plan).
+  - **Jadwal & hari libur**, like the web page:
+    - work schedules: default PT, days, tolerance, employees using each; add / edit; "Jadikan default";
+    - holidays per year (add / edit, reason on change);
+    - attendance locations (geofence point + radius per cost center, "Buka di peta");
+    - the schedule of each employee.
+  - **Akses PT (matriks)** (Admin of a PT / group admin), with the web rules:
+    - roles per user × PT and the linked employee;
+    - the Owner only for a group admin; no role left = inactive; one employee per account and PT;
+    - coverage warnings, one atomic save with a reason.
+  - **Pengguna baru / Pengguna**: account (email, name, phone, active), access per PT, employee (link or new),
+    bank accounts and team assignments in one save; a new account's temporary password is shown once.
+  - **Data lists**: attendances, corrections, work schedules, holidays, memberships, employees, bank accounts,
+    devices, web sessions. Employees and bank accounts are editable through the generic web form.
+  - **"Cabut perangkat"** (reason) on a device.
+  - Server (additive, no migration):
+    - `GET /api/v1/attendance/schedule`, `PATCH /api/v1/attendance/default-schedule`;
+    - `GET /api/v1/company-memberships/matrix`;
+    - `GET /api/v1/user-onboarding` (new-user form);
+    - the phase-6 collections in `/data`.
 
 - **APK: Proyek menu built natively** (user 2026-10-19, phases 5a + 5b of the APK–web parity plan).
   - **Generic web edit form**: the Proyek collections open their web list in the APK. Where the caller may write
@@ -39,6 +54,22 @@ tanda tangan, Keamanan akun, Keuangan, Laporan) and needs server 0.17.0. APK 0.8
     - `GET /api/v1/field/contracts`;
     - the Proyek collections in `/data` lists;
     - `withAudit` exposes its reason rules (`custom.pkAudit.reasonRules`).
+
+### Fixed
+
+- **Akses PT matrix: saving the Operator role ("Opr") was refused with 400.** The batch schema missed `pk-operator`,
+  which the matrix offers and the memberships collection accepts.
+- **APK generic form (phase 5): no "Ubah" and 403 on save for callers with full access** (#123). Payload collapses
+  all-allowed permissions to `true`.
+
+## [0.17.0] - 2026-10-19
+
+**APK–web parity phases 3–4: Keuangan and Laporan; APK 0.9.0** (PRs #118, #119, #120). **No migration.** API
+contract: additive only (new read endpoints for kas, periods, voidable transfers, data lists and reports; optional new
+fields on loans and reports). **APK 0.9.0** (`mobile-v0.9.0`) brings phases 1–4 (the menus 1:1 with the web, Profil &
+tanda tangan, Keamanan akun, Keuangan, Laporan) and needs server 0.17.0. APK 0.8.0 keeps working against 0.17.0.
+
+### Added
 
 - **APK: Laporan** (user 2026-10-19, phase 4 of the APK–web parity plan). Beranda → Laporan opens the web report
   list in the APK.

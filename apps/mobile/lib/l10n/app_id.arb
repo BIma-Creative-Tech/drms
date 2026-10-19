@@ -4167,5 +4167,130 @@
     }
   },
   "contractsFillTimesheet": "Isi timesheet",
-  "contractsUnits": "Unit alat berat"
+  "contractsUnits": "Unit alat berat",
+  "onbTitle": "Pengguna",
+  "onbNewTitle": "Pengguna baru",
+  "onbLead": "Akun login, akses per PT, data karyawan dan rekening — disimpan sekaligus.",
+  "onbAccount": "Akun",
+  "onbAccess": "Akses per PT",
+  "onbEmailInvalid": "Email tidak valid.",
+  "onbPickPt": "Pilih minimal satu PT dan peran.",
+  "onbIdentityReadOnly": "Akun ini juga milik PT yang tidak Anda kelola — nama, email dan No. HP hanya dapat diubah oleh Admin PT tersebut.",
+  "onbActiveHint": "Nonaktif = login diblokir, sesi dan perangkat dicabut (alasan wajib).",
+  "onbReasonHint": "Wajib bila menonaktifkan akun / karyawan / rekening, mengubah rekening, atau peran / tanggal akhir penugasan.",
+  "onbMembershipInactive": "Tanpa peran: akses PT ini dinonaktifkan (riwayat tetap).",
+  "onbNoEmployee": "Belum terhubung ke karyawan.",
+  "onbEmployee": "Karyawan",
+  "onbEmployeeExisting": "Karyawan yang ada",
+  "onbEmployeeNew": "— karyawan baru —",
+  "onbEmployeeCode": "Kode karyawan",
+  "onbEmployeeRequired": "Kode dan nama karyawan baru wajib diisi.",
+  "onbOnsite": "Onsite",
+  "onbNonOnsite": "Non-onsite",
+  "onbBankAccounts": "Rekening",
+  "onbAddBank": "Tambah rekening",
+  "onbBank": "Bank",
+  "onbAccountNo": "Nomor rekening",
+  "onbAccountHolder": "Atas nama",
+  "onbBankInvalid": "Bank, nomor rekening (5–34 digit) dan atas nama wajib diisi.",
+  "onbDefault": "Utama",
+  "onbVerified": "Terverifikasi",
+  "onbAssignments": "Penugasan tim",
+  "onbAddAssignment": "Tambah penugasan",
+  "onbSite": "Site",
+  "onbLocation": "Lokasi",
+  "onbLocationRequired": "Lokasi wajib dipilih.",
+  "onbTempPasswordTitle": "Kata sandi sementara",
+  "onbTempPasswordBody": "Berikan kepada pengguna. Kata sandi ini hanya ditampilkan sekali; saat login pertama pengguna wajib menggantinya.",
+  "onbCopy": "Salin",
+  "onbDone": "Selesai",
+  "onbLinked": "Akun login dengan email ini sudah ada dan dihubungkan (kata sandinya tidak berubah).",
+  "recordRevokeDevice": "Cabut perangkat",
+  "recordRevokeBody": "Perangkat ini keluar dari akun dan harus login ulang; antrian yang belum terkirim di HP tersebut tidak dapat dikirim lagi. Alasan wajib dan tercatat di audit log.",
+  "recordRevoke": "Cabut",
+  "recordRevoked": "Perangkat dicabut.",
+  "scheduleTitle": "Jadwal & hari libur",
+  "scheduleLeadWrite": "Jadwal kerja, hari libur, lokasi absen (geofence) dan jadwal per karyawan. Ketuk untuk mengubah.",
+  "scheduleLeadRead": "Tampilan baca. Perubahan oleh Admin atau Direktur.",
+  "scheduleWork": "Jadwal kerja",
+  "scheduleDefault": "default PT",
+  "scheduleMakeDefault": "Jadikan default",
+  "scheduleDefaultSet": "Jadwal default PT diperbarui.",
+  "scheduleTolerance": "toleransi {min} mnt",
+  "@scheduleTolerance": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      }
+    }
+  },
+  "scheduleUsed": "{count} karyawan",
+  "@scheduleUsed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scheduleNone": "—",
+  "scheduleHolidays": "Hari libur {year}",
+  "@scheduleHolidays": {
+    "placeholders": {
+      "year": {
+        "type": "int"
+      }
+    }
+  },
+  "scheduleNoHolidays": "Belum ada hari libur tahun ini.",
+  "scheduleGeofence": "Lokasi absen (geofence)",
+  "scheduleGeofenceHint": "Titik dan radius per pusat biaya; tanpa radius dipakai default {m} m.",
+  "@scheduleGeofenceHint": {
+    "placeholders": {
+      "m": {
+        "type": "int"
+      }
+    }
+  },
+  "scheduleNoLocation": "Lokasi belum diatur",
+  "scheduleRadius": "radius {m} m",
+  "@scheduleRadius": {
+    "placeholders": {
+      "m": {
+        "type": "int"
+      }
+    }
+  },
+  "scheduleOpenMap": "Buka di peta",
+  "scheduleEmployees": "Jadwal per karyawan",
+  "scheduleUseDefault": "Pakai jadwal default PT",
+  "scheduleAssigned": "Jadwal karyawan diperbarui.",
+  "matrixTitle": "Akses PT (matriks)",
+  "matrixShowInactive": "Tampilkan akun nonaktif",
+  "matrixNoEmployee": "— tanpa karyawan —",
+  "matrixDuplicateEmployee": "Satu karyawan terhubung ke dua akun di PT yang sama. Pilih karyawan lain.",
+  "matrixSaveN": "Simpan ({count})",
+  "@matrixSaveN": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "matrixSaveTitle": "Simpan {count} perubahan akses?",
+  "@matrixSaveTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "matrixSaveBody": "Semua perubahan disimpan sekaligus (gagal satu = tidak ada yang tersimpan). Alasan tercatat di audit log.",
+  "matrixSaved": "{count} perubahan akses tersimpan.",
+  "@matrixSaved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

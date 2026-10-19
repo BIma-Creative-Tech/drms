@@ -5553,4 +5553,233 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get contractsUnits => 'Unit alat berat';
+
+  @override
+  String get onbTitle => 'Pengguna';
+
+  @override
+  String get onbNewTitle => 'Pengguna baru';
+
+  @override
+  String get onbLead => 'Akun login, akses per PT, data karyawan dan rekening — disimpan sekaligus.';
+
+  @override
+  String get onbAccount => 'Akun';
+
+  @override
+  String get onbAccess => 'Akses per PT';
+
+  @override
+  String get onbEmailInvalid => 'Email tidak valid.';
+
+  @override
+  String get onbPickPt => 'Pilih minimal satu PT dan peran.';
+
+  @override
+  String get onbIdentityReadOnly =>
+      'Akun ini juga milik PT yang tidak Anda kelola — nama, email dan No. HP hanya dapat diubah oleh Admin PT tersebut.';
+
+  @override
+  String get onbActiveHint => 'Nonaktif = login diblokir, sesi dan perangkat dicabut (alasan wajib).';
+
+  @override
+  String get onbReasonHint =>
+      'Wajib bila menonaktifkan akun / karyawan / rekening, mengubah rekening, atau peran / tanggal akhir penugasan.';
+
+  @override
+  String get onbMembershipInactive => 'Tanpa peran: akses PT ini dinonaktifkan (riwayat tetap).';
+
+  @override
+  String get onbNoEmployee => 'Belum terhubung ke karyawan.';
+
+  @override
+  String get onbEmployee => 'Karyawan';
+
+  @override
+  String get onbEmployeeExisting => 'Karyawan yang ada';
+
+  @override
+  String get onbEmployeeNew => '— karyawan baru —';
+
+  @override
+  String get onbEmployeeCode => 'Kode karyawan';
+
+  @override
+  String get onbEmployeeRequired => 'Kode dan nama karyawan baru wajib diisi.';
+
+  @override
+  String get onbOnsite => 'Onsite';
+
+  @override
+  String get onbNonOnsite => 'Non-onsite';
+
+  @override
+  String get onbBankAccounts => 'Rekening';
+
+  @override
+  String get onbAddBank => 'Tambah rekening';
+
+  @override
+  String get onbBank => 'Bank';
+
+  @override
+  String get onbAccountNo => 'Nomor rekening';
+
+  @override
+  String get onbAccountHolder => 'Atas nama';
+
+  @override
+  String get onbBankInvalid => 'Bank, nomor rekening (5–34 digit) dan atas nama wajib diisi.';
+
+  @override
+  String get onbDefault => 'Utama';
+
+  @override
+  String get onbVerified => 'Terverifikasi';
+
+  @override
+  String get onbAssignments => 'Penugasan tim';
+
+  @override
+  String get onbAddAssignment => 'Tambah penugasan';
+
+  @override
+  String get onbSite => 'Site';
+
+  @override
+  String get onbLocation => 'Lokasi';
+
+  @override
+  String get onbLocationRequired => 'Lokasi wajib dipilih.';
+
+  @override
+  String get onbTempPasswordTitle => 'Kata sandi sementara';
+
+  @override
+  String get onbTempPasswordBody =>
+      'Berikan kepada pengguna. Kata sandi ini hanya ditampilkan sekali; saat login pertama pengguna wajib menggantinya.';
+
+  @override
+  String get onbCopy => 'Salin';
+
+  @override
+  String get onbDone => 'Selesai';
+
+  @override
+  String get onbLinked => 'Akun login dengan email ini sudah ada dan dihubungkan (kata sandinya tidak berubah).';
+
+  @override
+  String get recordRevokeDevice => 'Cabut perangkat';
+
+  @override
+  String get recordRevokeBody =>
+      'Perangkat ini keluar dari akun dan harus login ulang; antrian yang belum terkirim di HP tersebut tidak dapat dikirim lagi. Alasan wajib dan tercatat di audit log.';
+
+  @override
+  String get recordRevoke => 'Cabut';
+
+  @override
+  String get recordRevoked => 'Perangkat dicabut.';
+
+  @override
+  String get scheduleTitle => 'Jadwal & hari libur';
+
+  @override
+  String get scheduleLeadWrite =>
+      'Jadwal kerja, hari libur, lokasi absen (geofence) dan jadwal per karyawan. Ketuk untuk mengubah.';
+
+  @override
+  String get scheduleLeadRead => 'Tampilan baca. Perubahan oleh Admin atau Direktur.';
+
+  @override
+  String get scheduleWork => 'Jadwal kerja';
+
+  @override
+  String get scheduleDefault => 'default PT';
+
+  @override
+  String get scheduleMakeDefault => 'Jadikan default';
+
+  @override
+  String get scheduleDefaultSet => 'Jadwal default PT diperbarui.';
+
+  @override
+  String scheduleTolerance(int min) {
+    return 'toleransi $min mnt';
+  }
+
+  @override
+  String scheduleUsed(int count) {
+    return '$count karyawan';
+  }
+
+  @override
+  String get scheduleNone => '—';
+
+  @override
+  String scheduleHolidays(int year) {
+    return 'Hari libur $year';
+  }
+
+  @override
+  String get scheduleNoHolidays => 'Belum ada hari libur tahun ini.';
+
+  @override
+  String get scheduleGeofence => 'Lokasi absen (geofence)';
+
+  @override
+  String scheduleGeofenceHint(int m) {
+    return 'Titik dan radius per pusat biaya; tanpa radius dipakai default $m m.';
+  }
+
+  @override
+  String get scheduleNoLocation => 'Lokasi belum diatur';
+
+  @override
+  String scheduleRadius(int m) {
+    return 'radius $m m';
+  }
+
+  @override
+  String get scheduleOpenMap => 'Buka di peta';
+
+  @override
+  String get scheduleEmployees => 'Jadwal per karyawan';
+
+  @override
+  String get scheduleUseDefault => 'Pakai jadwal default PT';
+
+  @override
+  String get scheduleAssigned => 'Jadwal karyawan diperbarui.';
+
+  @override
+  String get matrixTitle => 'Akses PT (matriks)';
+
+  @override
+  String get matrixShowInactive => 'Tampilkan akun nonaktif';
+
+  @override
+  String get matrixNoEmployee => '— tanpa karyawan —';
+
+  @override
+  String get matrixDuplicateEmployee => 'Satu karyawan terhubung ke dua akun di PT yang sama. Pilih karyawan lain.';
+
+  @override
+  String matrixSaveN(int count) {
+    return 'Simpan ($count)';
+  }
+
+  @override
+  String matrixSaveTitle(int count) {
+    return 'Simpan $count perubahan akses?';
+  }
+
+  @override
+  String get matrixSaveBody =>
+      'Semua perubahan disimpan sekaligus (gagal satu = tidak ada yang tersimpan). Alasan tercatat di audit log.';
+
+  @override
+  String matrixSaved(int count) {
+    return '$count perubahan akses tersimpan.';
+  }
 }

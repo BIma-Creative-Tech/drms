@@ -760,7 +760,8 @@ export const MembershipBatchBody = z
           .object({
             user: id,
             company: id,
-            roles: z.array(z.enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin'])).max(6),
+            // pk-operator (owner 2026-10-09) is offered by the web matrix ('Opr') — it was missing here (400 on save)
+            roles: z.array(z.enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator'])).max(7),
             employee: id.nullable().optional().meta({ description: 'Employee of THIS PT (null = unlink; omitted = unchanged).' }),
             active: z.boolean().optional(),
           })

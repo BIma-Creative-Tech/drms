@@ -189,6 +189,26 @@ class RecordDetailScreen extends ConsumerWidget {
   final String collection;
   final String id;
 
+  Future<void> _revoke(BuildContext context, WidgetRef ref) async {
+    final t = AppLocalizations.of(context);
+    final reason = await showReasonDialog(
+      context,
+      title: t.recordRevokeDevice,
+      description: t.recordRevokeBody,
+      confirm: t.recordRevoke,
+      keyPrefix: 'record-revoke',
+    );
+    if (reason == null) return;
+    try {
+      await ref.read(recordsApiProvider).revokeDevice(id, reason, idempotencyKey: const Uuid().v4());
+      ref.invalidate(recordDetailProvider((collection, id)));
+      ref.invalidate(recordPageProvider);
+      if (context.mounted) showSnack(context, t.recordRevoked);
+    } on Object catch (e) {
+      if (context.mounted) showSnack(context, errorText(e));
+    }
+  }
+
   /// The web row action (D1610): delete-check first — "Hapus" (reason, soft delete), "Nonaktifkan" when the row is
   /// used (sets `active` false), or why nothing is possible.
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
@@ -272,6 +292,14 @@ class RecordDetailScreen extends ConsumerWidget {
               tooltip: t.recordEdit,
               icon: const Icon(Icons.edit_outlined),
               onPressed: () => context.push(clients ? '/clients/$id' : '/data/$collection/$id/edit'),
+            ),
+          // phase 6: "Cabut perangkat" (web Perangkat & sesi; the server checks who may revoke)
+          if (collection == 'devices')
+            IconButton(
+              key: const Key('record-revoke'),
+              tooltip: t.recordRevokeDevice,
+              icon: const Icon(Icons.phonelink_erase),
+              onPressed: () => _revoke(context, ref),
             ),
           if (form != null && form.canDelete)
             IconButton(

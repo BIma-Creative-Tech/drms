@@ -230,3 +230,46 @@ export const AttendanceLocations = z
       .meta({ description: 'Eligible locations with a point: home site first, then head office, sites, projects, cost centers (by code). Locations without a point are never listed.' }),
   })
   .meta({ id: 'AttendanceLocations' })
+
+// ---------------------------------------------------------------- phase 6 (APK): Jadwal & hari libur
+
+/** User 2026-10-19 (APK): the web "Jadwal & hari libur" page (GET /attendance/schedule). */
+export const AttendanceSchedule = z
+  .object({
+    year: z.string(),
+    today: z.string(),
+    companyId: z.number().int().meta({ description: 'Context PT of the selection (its settings: default schedule, default radius).' }),
+    canWrite: z.boolean().meta({ description: 'Admin / Direktur: edit schedules, holidays, assignments, geofences, the default schedule.' }),
+    canCreate: z.boolean().meta({ description: 'Admin: new schedule / holiday.' }),
+    defaultScheduleId: z.number().int().nullable(),
+    defaultRadius: z.number(),
+    schedules: z.array(
+      z.object({
+        id: z.number().int(),
+        name: z.string(),
+        start: z.string(),
+        end: z.string(),
+        tol: z.number(),
+        days: z.array(z.number().int().min(1).max(7)).meta({ description: '1 = Monday … 7 = Sunday.' }),
+        active: z.boolean(),
+        used: z.number().int().meta({ description: 'Active employees on it (own or via the default).' }),
+      }),
+    ),
+    holidays: z.array(z.object({ id: z.number().int(), date: z.string(), name: z.string() })),
+    costCenters: z.array(
+      z.object({ id: z.number().int(), code: z.string(), name: z.string(), lat: z.number().nullable(), lng: z.number().nullable(), radiusM: z.number().nullable(), active: z.boolean() }),
+    ),
+    employees: z.array(z.object({ id: z.number().int(), code: z.string(), name: z.string(), scheduleId: z.number().int().nullable() })),
+  })
+  .meta({ id: 'AttendanceSchedule' })
+
+export const AttendanceScheduleQuery = z.object({ tahun: z.string().regex(/^\d{4}$/).optional() }).meta({ id: 'AttendanceScheduleQuery' })
+
+export const AttendanceDefaultScheduleBody = z
+  .object({ companyId: z.number().int().positive(), scheduleId: z.number().int().positive().nullable() })
+  .strict()
+  .meta({ id: 'AttendanceDefaultScheduleBody' })
+
+export const AttendanceDefaultScheduleResult = z
+  .object({ companyId: z.number().int(), defaultScheduleId: z.number().int().nullable() })
+  .meta({ id: 'AttendanceDefaultScheduleResult' })

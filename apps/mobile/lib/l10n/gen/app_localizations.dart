@@ -9720,6 +9720,420 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Unit alat berat'**
   String get contractsUnits;
+
+  /// No description provided for @onbTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengguna'**
+  String get onbTitle;
+
+  /// No description provided for @onbNewTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengguna baru'**
+  String get onbNewTitle;
+
+  /// No description provided for @onbLead.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun login, akses per PT, data karyawan dan rekening — disimpan sekaligus.'**
+  String get onbLead;
+
+  /// No description provided for @onbAccount.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun'**
+  String get onbAccount;
+
+  /// No description provided for @onbAccess.
+  ///
+  /// In id, this message translates to:
+  /// **'Akses per PT'**
+  String get onbAccess;
+
+  /// No description provided for @onbEmailInvalid.
+  ///
+  /// In id, this message translates to:
+  /// **'Email tidak valid.'**
+  String get onbEmailInvalid;
+
+  /// No description provided for @onbPickPt.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih minimal satu PT dan peran.'**
+  String get onbPickPt;
+
+  /// No description provided for @onbIdentityReadOnly.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun ini juga milik PT yang tidak Anda kelola — nama, email dan No. HP hanya dapat diubah oleh Admin PT tersebut.'**
+  String get onbIdentityReadOnly;
+
+  /// No description provided for @onbActiveHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Nonaktif = login diblokir, sesi dan perangkat dicabut (alasan wajib).'**
+  String get onbActiveHint;
+
+  /// No description provided for @onbReasonHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Wajib bila menonaktifkan akun / karyawan / rekening, mengubah rekening, atau peran / tanggal akhir penugasan.'**
+  String get onbReasonHint;
+
+  /// No description provided for @onbMembershipInactive.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanpa peran: akses PT ini dinonaktifkan (riwayat tetap).'**
+  String get onbMembershipInactive;
+
+  /// No description provided for @onbNoEmployee.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum terhubung ke karyawan.'**
+  String get onbNoEmployee;
+
+  /// No description provided for @onbEmployee.
+  ///
+  /// In id, this message translates to:
+  /// **'Karyawan'**
+  String get onbEmployee;
+
+  /// No description provided for @onbEmployeeExisting.
+  ///
+  /// In id, this message translates to:
+  /// **'Karyawan yang ada'**
+  String get onbEmployeeExisting;
+
+  /// No description provided for @onbEmployeeNew.
+  ///
+  /// In id, this message translates to:
+  /// **'— karyawan baru —'**
+  String get onbEmployeeNew;
+
+  /// No description provided for @onbEmployeeCode.
+  ///
+  /// In id, this message translates to:
+  /// **'Kode karyawan'**
+  String get onbEmployeeCode;
+
+  /// No description provided for @onbEmployeeRequired.
+  ///
+  /// In id, this message translates to:
+  /// **'Kode dan nama karyawan baru wajib diisi.'**
+  String get onbEmployeeRequired;
+
+  /// No description provided for @onbOnsite.
+  ///
+  /// In id, this message translates to:
+  /// **'Onsite'**
+  String get onbOnsite;
+
+  /// No description provided for @onbNonOnsite.
+  ///
+  /// In id, this message translates to:
+  /// **'Non-onsite'**
+  String get onbNonOnsite;
+
+  /// No description provided for @onbBankAccounts.
+  ///
+  /// In id, this message translates to:
+  /// **'Rekening'**
+  String get onbBankAccounts;
+
+  /// No description provided for @onbAddBank.
+  ///
+  /// In id, this message translates to:
+  /// **'Tambah rekening'**
+  String get onbAddBank;
+
+  /// No description provided for @onbBank.
+  ///
+  /// In id, this message translates to:
+  /// **'Bank'**
+  String get onbBank;
+
+  /// No description provided for @onbAccountNo.
+  ///
+  /// In id, this message translates to:
+  /// **'Nomor rekening'**
+  String get onbAccountNo;
+
+  /// No description provided for @onbAccountHolder.
+  ///
+  /// In id, this message translates to:
+  /// **'Atas nama'**
+  String get onbAccountHolder;
+
+  /// No description provided for @onbBankInvalid.
+  ///
+  /// In id, this message translates to:
+  /// **'Bank, nomor rekening (5–34 digit) dan atas nama wajib diisi.'**
+  String get onbBankInvalid;
+
+  /// No description provided for @onbDefault.
+  ///
+  /// In id, this message translates to:
+  /// **'Utama'**
+  String get onbDefault;
+
+  /// No description provided for @onbVerified.
+  ///
+  /// In id, this message translates to:
+  /// **'Terverifikasi'**
+  String get onbVerified;
+
+  /// No description provided for @onbAssignments.
+  ///
+  /// In id, this message translates to:
+  /// **'Penugasan tim'**
+  String get onbAssignments;
+
+  /// No description provided for @onbAddAssignment.
+  ///
+  /// In id, this message translates to:
+  /// **'Tambah penugasan'**
+  String get onbAddAssignment;
+
+  /// No description provided for @onbSite.
+  ///
+  /// In id, this message translates to:
+  /// **'Site'**
+  String get onbSite;
+
+  /// No description provided for @onbLocation.
+  ///
+  /// In id, this message translates to:
+  /// **'Lokasi'**
+  String get onbLocation;
+
+  /// No description provided for @onbLocationRequired.
+  ///
+  /// In id, this message translates to:
+  /// **'Lokasi wajib dipilih.'**
+  String get onbLocationRequired;
+
+  /// No description provided for @onbTempPasswordTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Kata sandi sementara'**
+  String get onbTempPasswordTitle;
+
+  /// No description provided for @onbTempPasswordBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Berikan kepada pengguna. Kata sandi ini hanya ditampilkan sekali; saat login pertama pengguna wajib menggantinya.'**
+  String get onbTempPasswordBody;
+
+  /// No description provided for @onbCopy.
+  ///
+  /// In id, this message translates to:
+  /// **'Salin'**
+  String get onbCopy;
+
+  /// No description provided for @onbDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Selesai'**
+  String get onbDone;
+
+  /// No description provided for @onbLinked.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun login dengan email ini sudah ada dan dihubungkan (kata sandinya tidak berubah).'**
+  String get onbLinked;
+
+  /// No description provided for @recordRevokeDevice.
+  ///
+  /// In id, this message translates to:
+  /// **'Cabut perangkat'**
+  String get recordRevokeDevice;
+
+  /// No description provided for @recordRevokeBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Perangkat ini keluar dari akun dan harus login ulang; antrian yang belum terkirim di HP tersebut tidak dapat dikirim lagi. Alasan wajib dan tercatat di audit log.'**
+  String get recordRevokeBody;
+
+  /// No description provided for @recordRevoke.
+  ///
+  /// In id, this message translates to:
+  /// **'Cabut'**
+  String get recordRevoke;
+
+  /// No description provided for @recordRevoked.
+  ///
+  /// In id, this message translates to:
+  /// **'Perangkat dicabut.'**
+  String get recordRevoked;
+
+  /// No description provided for @scheduleTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Jadwal & hari libur'**
+  String get scheduleTitle;
+
+  /// No description provided for @scheduleLeadWrite.
+  ///
+  /// In id, this message translates to:
+  /// **'Jadwal kerja, hari libur, lokasi absen (geofence) dan jadwal per karyawan. Ketuk untuk mengubah.'**
+  String get scheduleLeadWrite;
+
+  /// No description provided for @scheduleLeadRead.
+  ///
+  /// In id, this message translates to:
+  /// **'Tampilan baca. Perubahan oleh Admin atau Direktur.'**
+  String get scheduleLeadRead;
+
+  /// No description provided for @scheduleWork.
+  ///
+  /// In id, this message translates to:
+  /// **'Jadwal kerja'**
+  String get scheduleWork;
+
+  /// No description provided for @scheduleDefault.
+  ///
+  /// In id, this message translates to:
+  /// **'default PT'**
+  String get scheduleDefault;
+
+  /// No description provided for @scheduleMakeDefault.
+  ///
+  /// In id, this message translates to:
+  /// **'Jadikan default'**
+  String get scheduleMakeDefault;
+
+  /// No description provided for @scheduleDefaultSet.
+  ///
+  /// In id, this message translates to:
+  /// **'Jadwal default PT diperbarui.'**
+  String get scheduleDefaultSet;
+
+  /// No description provided for @scheduleTolerance.
+  ///
+  /// In id, this message translates to:
+  /// **'toleransi {min} mnt'**
+  String scheduleTolerance(int min);
+
+  /// No description provided for @scheduleUsed.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} karyawan'**
+  String scheduleUsed(int count);
+
+  /// No description provided for @scheduleNone.
+  ///
+  /// In id, this message translates to:
+  /// **'—'**
+  String get scheduleNone;
+
+  /// No description provided for @scheduleHolidays.
+  ///
+  /// In id, this message translates to:
+  /// **'Hari libur {year}'**
+  String scheduleHolidays(int year);
+
+  /// No description provided for @scheduleNoHolidays.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada hari libur tahun ini.'**
+  String get scheduleNoHolidays;
+
+  /// No description provided for @scheduleGeofence.
+  ///
+  /// In id, this message translates to:
+  /// **'Lokasi absen (geofence)'**
+  String get scheduleGeofence;
+
+  /// No description provided for @scheduleGeofenceHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Titik dan radius per pusat biaya; tanpa radius dipakai default {m} m.'**
+  String scheduleGeofenceHint(int m);
+
+  /// No description provided for @scheduleNoLocation.
+  ///
+  /// In id, this message translates to:
+  /// **'Lokasi belum diatur'**
+  String get scheduleNoLocation;
+
+  /// No description provided for @scheduleRadius.
+  ///
+  /// In id, this message translates to:
+  /// **'radius {m} m'**
+  String scheduleRadius(int m);
+
+  /// No description provided for @scheduleOpenMap.
+  ///
+  /// In id, this message translates to:
+  /// **'Buka di peta'**
+  String get scheduleOpenMap;
+
+  /// No description provided for @scheduleEmployees.
+  ///
+  /// In id, this message translates to:
+  /// **'Jadwal per karyawan'**
+  String get scheduleEmployees;
+
+  /// No description provided for @scheduleUseDefault.
+  ///
+  /// In id, this message translates to:
+  /// **'Pakai jadwal default PT'**
+  String get scheduleUseDefault;
+
+  /// No description provided for @scheduleAssigned.
+  ///
+  /// In id, this message translates to:
+  /// **'Jadwal karyawan diperbarui.'**
+  String get scheduleAssigned;
+
+  /// No description provided for @matrixTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Akses PT (matriks)'**
+  String get matrixTitle;
+
+  /// No description provided for @matrixShowInactive.
+  ///
+  /// In id, this message translates to:
+  /// **'Tampilkan akun nonaktif'**
+  String get matrixShowInactive;
+
+  /// No description provided for @matrixNoEmployee.
+  ///
+  /// In id, this message translates to:
+  /// **'— tanpa karyawan —'**
+  String get matrixNoEmployee;
+
+  /// No description provided for @matrixDuplicateEmployee.
+  ///
+  /// In id, this message translates to:
+  /// **'Satu karyawan terhubung ke dua akun di PT yang sama. Pilih karyawan lain.'**
+  String get matrixDuplicateEmployee;
+
+  /// No description provided for @matrixSaveN.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan ({count})'**
+  String matrixSaveN(int count);
+
+  /// No description provided for @matrixSaveTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan {count} perubahan akses?'**
+  String matrixSaveTitle(int count);
+
+  /// No description provided for @matrixSaveBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua perubahan disimpan sekaligus (gagal satu = tidak ada yang tersimpan). Alasan tercatat di audit log.'**
+  String get matrixSaveBody;
+
+  /// No description provided for @matrixSaved.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} perubahan akses tersimpan.'**
+  String matrixSaved(int count);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
