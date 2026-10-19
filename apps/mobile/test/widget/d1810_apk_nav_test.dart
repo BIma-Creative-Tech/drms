@@ -193,6 +193,11 @@ void main() {
       expect(apkTargetFor('/kas')!.route, '/cash');
       expect(apkTargetFor('/laporan')!.route, '/reports');
       expect(apkTargetFor('/persetujuan')!.route, '/inbox');
+      // user 2026-10-19: servers ≤ 0.18.0 sent `/admin/…` hrefs → every item looked "Segera hadir"
+      expect(apkTargetFor('/admin/absensi/absen')!.route, '/attendance');
+      expect(apkTargetFor('/admin/absensi/rekap')!.route, '/attendance?tab=recap');
+      expect(apkTargetFor('/admin/collections/expense-requests/create')!.pickRequestType, isTrue);
+      expect(relativeWebHref('/administrasi'), '/administrasi');
     });
 
     test('/me/modules JSON round-trip', () {

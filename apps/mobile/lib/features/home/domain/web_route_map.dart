@@ -119,7 +119,16 @@ const Map<String, String> webToApk = {
   '/collections/audit-logs': '/data/audit-logs',
 };
 
-ApkTarget? apkTargetFor(String href) {
+/// Web href relative to `/admin` (the MeModules contract); servers ≤ 0.18.0 sent the admin href itself
+/// (`/admin/absensi/absen`) — every item then looked "Segera hadir" (user 2026-10-19), so both forms are accepted.
+String relativeWebHref(String href) => href == '/admin'
+    ? '/'
+    : href.startsWith('/admin/')
+    ? href.substring('/admin'.length)
+    : href;
+
+ApkTarget? apkTargetFor(String raw) {
+  final href = relativeWebHref(raw);
   if (href == '/collections/expense-requests/create') return const ApkTarget.pickRequestType();
   final r = webToApk[href];
   return r == null ? null : ApkTarget(r);

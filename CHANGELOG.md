@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-10-19
+
+**Hotfix: the APK menu showed every item as "Segera hadir di APK".** **No migration**, no APK update needed.
+
+### Fixed
+
+- **`GET /api/v1/me/modules` sent the admin href (`/admin/absensi/absen`) instead of the route relative to `/admin`
+  that its contract (MeModules.href) promises** (since 0.16.0, user 2026-10-19).
+  - Effect: once the server menu had loaded, APK 0.9.0 / 0.10.0 found no screen for any item. Absen, Rekap and every
+    other menu item answered "Segera hadir di APK. Sementara buka lewat web."
+  - The server now strips the prefix; the installed APKs work again without an update.
+  - The APK (next release) also accepts both forms, and module badges look the items up by the relative href too.
+
 ## [0.18.0] - 2026-10-19
 
 **APK–web parity phases 5–7: Proyek, Absensi & Pengguna, Master Data / Media / Pengaturan / Sistem; APK 0.10.0**

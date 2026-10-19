@@ -37,7 +37,8 @@ final localMenuBadgesProvider = Provider.autoDispose<Map<String, int>>((ref) {
   return out;
 });
 
-int localModuleBadge(WebModule m, Map<String, int> local) => m.items.fold(0, (n, i) => n + (local[i.href] ?? 0));
+int localModuleBadge(WebModule m, Map<String, int> local) =>
+    m.items.fold(0, (n, i) => n + (local[relativeWebHref(i.href)] ?? 0));
 
 /// A module tile: its landing page, or its only item directly (web `ResolvedModule.landing`: ≥ 2 items).
 void openWebModule(BuildContext context, WebModule m) {
@@ -129,7 +130,10 @@ class ModuleLandingScreen extends ConsumerWidget {
                   child: Text(s.label!, style: Theme.of(context).textTheme.titleMedium),
                 ),
               ModuleGrid(
-                children: [for (final i in s.items) _ItemTile(module: m, item: i, localBadge: local[i.href] ?? 0)],
+                children: [
+                  for (final i in s.items)
+                    _ItemTile(module: m, item: i, localBadge: local[relativeWebHref(i.href)] ?? 0),
+                ],
               ),
               const SizedBox(height: 16),
             ],
