@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.18.2] - 2026-10-20
+
+**The "Persetujuan" tile now shows how many items wait for the caller's decision.** **No migration**, no APK update
+needed (the APK reads the badge from `/api/v1/me/modules`).
+
+### Added
+
+- **Badge on "Persetujuan"** (`/admin/modul/persetujuan`, top bar, APK menu): the rows of the approval page waiting for
+  the caller — expense requests, addenda RAB, LPJ shortfalls and loans (same step rules as the inbox, counted without
+  the budget/fund figures). Shown to Direktur/Finance/PM; the module badge = transfer queue + LPJ + this (user
+  2026-10-20, PR #128).
+
 ## [0.18.1] - 2026-10-19
 
 **Hotfix: the APK menu showed every item as "Segera hadir di APK".** **No migration**, no APK update needed.
