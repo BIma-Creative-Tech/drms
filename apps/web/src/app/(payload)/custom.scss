@@ -1361,8 +1361,11 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 
   .pk-pt__opt {
     display: grid;
+    // a row of the scrolling flex list: never shrink below its content (name + roles), or the rows overlap
+    flex: none;
     grid-template-columns: 20px 56px 1fr;
     column-gap: 10px;
+    row-gap: 2px;
     align-items: center;
     min-height: 44px;
     padding: 6px 8px;
