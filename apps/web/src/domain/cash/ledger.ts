@@ -31,10 +31,13 @@ export type CashEntryDoc = {
   vehicle?: unknown
   description?: string | null
   proof?: unknown
-  /** ADR 0028: `intercompany` = the automatic Kas Masuk of a payment from another PT of the group (domain/intercompany). */
-  sourceType: 'transfer' | 'settlement_refund' | 'manual' | 'reversal' | 'opening' | 'intercompany'
+  /** ADR 0028: `intercompany` = the automatic Kas Masuk of a payment from another PT of the group (domain/intercompany).
+   * ADR 0031: `project_loan` = a cash leg of an inter-project loan (domain/loans/cash.ts). */
+  sourceType: 'transfer' | 'settlement_refund' | 'manual' | 'reversal' | 'opening' | 'intercompany' | 'project_loan'
   expenseRequest?: unknown
   transfer?: unknown
+  projectLoan?: unknown
+  projectLoanRepayment?: unknown
   status: 'posted' | 'void'
   reversalOf?: unknown
   reversedBy?: unknown
@@ -56,6 +59,9 @@ export type PostInput = {
   sourceType: CashEntryDoc['sourceType']
   expenseRequestId?: number | null
   transferId?: number | null
+  /** ADR 0031: the inter-project loan (repayment) of a `project_loan` leg — copied onto its reversal. */
+  projectLoanId?: number | null
+  projectLoanRepaymentId?: number | null
   reversalOfId?: number | null
   /** QA-04: the caller confirmed that this cash-out may make the account balance negative (audited). */
   confirmOverdraft?: boolean
@@ -219,6 +225,8 @@ export async function postEntry(req: PayloadRequest, input: PostInput, opts: Pos
       sourceType: input.sourceType,
       expenseRequest: input.expenseRequestId ?? null,
       transfer: input.transferId ?? null,
+      projectLoan: input.projectLoanId ?? null,
+      projectLoanRepayment: input.projectLoanRepaymentId ?? null,
       reversalOf: input.reversalOfId ?? null,
       status: 'posted',
       postedBy: userId(req) ?? null,
@@ -385,7 +393,7 @@ export async function voidEntry(
   req: PayloadRequest,
   id: number,
   reason: string,
-  opts: { viaTransfer?: boolean; viaSettlement?: boolean; viaIntercompany?: boolean } = {},
+  opts: { viaTransfer?: boolean; viaSettlement?: boolean; viaIntercompany?: boolean; viaProjectLoan?: boolean } = {},
 ): Promise<{ original: CashEntryDoc; reversal: CashEntryDoc }> {
   const e = await loadEntry(req, id, { system: opts.viaIntercompany === true })
   if (e.status === 'void') fail(409, 'Transaksi sudah di-void.')
@@ -401,6 +409,10 @@ export async function voidEntry(
     const loan = await intercompanyLoanOf(req, e.id)
     if (loan) fail(409, `Kas antar-PT di-void lewat pinjaman ${loan.docNo} di PT ${loan.payerCode ?? 'pembayar'}.`)
     fail(409, `Kas masuk antar-PT di-void lewat pembatalan transfer di PT ${(await intercompanySourceCode(req, e.id)) ?? 'pengirim'}.`)
+  }
+  if (e.sourceType === 'project_loan' && !opts.viaProjectLoan) {
+    // ADR 0031: the KK / KM of an inter-project loan go with the loan (transfer void, repayment void)
+    fail(409, `Kas pinjaman antar project di-void lewat pinjaman${(await projectLoanNo(req, relId(e.projectLoan))) ?? ''} (pembatalan transfer atau void pengembalian).`)
   }
   const lock = await currentLockDate(req, relId((e as { company?: unknown }).company))
   const reversalDate = lock && e.entryDate <= lock ? await today(req) : e.entryDate
@@ -418,6 +430,8 @@ export async function voidEntry(
     sourceType: 'reversal',
     expenseRequestId: relId(e.expenseRequest) ?? null,
     transferId: relId(e.transfer) ?? null,
+    projectLoanId: relId(e.projectLoan) ?? null,
+    projectLoanRepaymentId: relId(e.projectLoanRepayment) ?? null,
     reversalOfId: e.id,
   }, { systemCompany: opts.viaIntercompany === true })
   req.context.auditReason = reason
@@ -430,6 +444,13 @@ export async function voidEntry(
     req,
   })) as unknown as CashEntryDoc
   return { original, reversal }
+}
+
+/** ADR 0031: " PJ/…" of an inter-project loan cash leg (message of a refused direct void), '' when unknown. */
+async function projectLoanNo(req: PayloadRequest, loanId: number | undefined): Promise<string | null> {
+  if (loanId === undefined) return null
+  const l = (await req.payload.findByID({ collection: 'project-loans', id: loanId, depth: 0, select: { docNo: true }, overrideAccess: true /* SYSTEM-READ: number in a refusal message */, req, disableErrors: true })) as { docNo?: string | null } | null
+  return l?.docNo ? ` ${l.docNo}` : null
 }
 
 /** ADR 0029: the PJA number and the paying PT of a loan movement's KK / KM (message of a refused direct void). */

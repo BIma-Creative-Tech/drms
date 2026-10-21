@@ -421,8 +421,9 @@ export const AdminDashboard = z.object({
   gaps: z.object({
     usersIncomplete: z.number().int(),
     projectsWithoutPm: z.number().int(),
-    costCentersWithoutManager: z.number().int(),
-    byCompany: z.array(z.object({ companyId: ptId, usersIncomplete: z.number().int(), projectsWithoutPm: z.number().int(), costCentersWithoutManager: z.number().int() })),
+    projectsWithoutPusatBiaya: z.number().int().meta({ description: 'ADR 0031: open projects without Pusat Biaya (cash account) — their transfers are refused until mapped.' }),
+    costCentersWithoutManager: z.number().int().meta({ description: 'DEPRECATED (ADR 0031: the cost-center master is retired) — always 0.' }),
+    byCompany: z.array(z.object({ companyId: ptId, usersIncomplete: z.number().int(), projectsWithoutPm: z.number().int(), projectsWithoutPusatBiaya: z.number().int(), costCentersWithoutManager: z.number().int() })),
   }),
   latestAudit: z.array(z.record(z.string(), z.unknown())),
 })

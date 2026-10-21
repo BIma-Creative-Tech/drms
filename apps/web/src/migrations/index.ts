@@ -58,8 +58,8 @@ import * as migration_20261013_100100_d1010_project_loans_guard from './20261013
 import * as migration_20261013_200000_d1010_sites from './20261013_200000_d1010_sites';
 import * as migration_20261013_200100_d1010_sites_guard from './20261013_200100_d1010_sites_guard';
 import * as migration_20261013_300000_d1010_approval_config from './20261013_300000_d1010_approval_config';
-import * as migration_20261013_300000_d1010_approval_config_guard from './20261013_300000_d1010_approval_config_guard';
 import * as migration_20261013_300000_d1010_approval_config_data from './20261013_300000_d1010_approval_config_data';
+import * as migration_20261013_300000_d1010_approval_config_guard from './20261013_300000_d1010_approval_config_guard';
 import * as migration_20261013_400000_d1010_rap_all from './20261013_400000_d1010_rap_all';
 import * as migration_20261013_400100_d1010_rap_all_guard from './20261013_400100_d1010_rap_all_guard';
 import * as migration_20261013_500000_attachments_owner_link from './20261013_500000_attachments_owner_link';
@@ -90,6 +90,9 @@ import * as migration_20261016_200000_d1610_soft_delete_enums from './20261016_2
 import * as migration_20261016_200100_d1610_soft_delete from './20261016_200100_d1610_soft_delete';
 import * as migration_20261016_220000_d1610_wakil_pm_direktur from './20261016_220000_d1610_wakil_pm_direktur';
 import * as migration_20261017_100000_d1710_service_types from './20261017_100000_d1710_service_types';
+import * as migration_20261021_100000_d2110_pb_enums from './20261021_100000_d2110_pb_enums';
+import * as migration_20261021_100100_d2110_pb_schema from './20261021_100100_d2110_pb_schema';
+import * as migration_20261021_100200_d2110_pb_guard from './20261021_100200_d2110_pb_guard';
 
 export const migrations = [
   {
@@ -215,17 +218,17 @@ export const migrations = [
   {
     up: migration_20260927_234849_mc1_company_columns.up,
     down: migration_20260927_234849_mc1_company_columns.down,
-    name: '20260927_234849_mc1_company_columns'
+    name: '20260927_234849_mc1_company_columns',
   },
   {
     up: migration_20260928_000100_mc1_security.up,
     down: migration_20260928_000100_mc1_security.down,
-    name: '20260928_000100_mc1_security'
+    name: '20260928_000100_mc1_security',
   },
   {
     up: migration_20260928_000200_mc1_numbering.up,
     down: migration_20260928_000200_mc1_numbering.down,
-    name: '20260928_000200_mc1_numbering'
+    name: '20260928_000200_mc1_numbering',
   },
   {
     up: migration_20260928_090000_two_factor_audit.up,
@@ -393,14 +396,14 @@ export const migrations = [
     name: '20261013_300000_d1010_approval_config',
   },
   {
-    up: migration_20261013_300000_d1010_approval_config_guard.up,
-    down: migration_20261013_300000_d1010_approval_config_guard.down,
-    name: '20261013_300000_d1010_approval_config_guard',
-  },
-  {
     up: migration_20261013_300000_d1010_approval_config_data.up,
     down: migration_20261013_300000_d1010_approval_config_data.down,
     name: '20261013_300000_d1010_approval_config_data',
+  },
+  {
+    up: migration_20261013_300000_d1010_approval_config_guard.up,
+    down: migration_20261013_300000_d1010_approval_config_guard.down,
+    name: '20261013_300000_d1010_approval_config_guard',
   },
   {
     up: migration_20261013_400000_d1010_rap_all.up,
@@ -518,7 +521,7 @@ export const migrations = [
     name: '20261015_150000_d1510_finance_rule_data',
   },
   {
-    up:migration_20261015_200000_d1510_approval_reroute.up,
+    up: migration_20261015_200000_d1510_approval_reroute.up,
     down: migration_20261015_200000_d1510_approval_reroute.down,
     name: '20261015_200000_d1510_approval_reroute',
   },
@@ -551,5 +554,30 @@ export const migrations = [
     up: migration_20261017_100000_d1710_service_types.up,
     down: migration_20261017_100000_d1710_service_types.down,
     name: '20261017_100000_d1710_service_types',
+  },
+  {
+    up: migration_20261021_100000_d2110_pb_enums.up,
+    down: migration_20261021_100000_d2110_pb_enums.down,
+    name: '20261021_100000_d2110_pb_enums',
+  },
+  {
+    up: migration_20261021_100200_d2110_pb_guard.up,
+    down: migration_20261021_100200_d2110_pb_guard.down,
+    name: '20261021_100200_d2110_pb_guard',
+  },
+  {
+    up: migration_20261021_100000_d2110_pb_enums.up,
+    down: migration_20261021_100000_d2110_pb_enums.down,
+    name: '20261021_100000_d2110_pb_enums',
+  },
+  {
+    up: migration_20261021_100100_d2110_pb_schema.up,
+    down: migration_20261021_100100_d2110_pb_schema.down,
+    name: '20261021_100100_d2110_pb_schema',
+  },
+  {
+    up: migration_20261021_100200_d2110_pb_guard.up,
+    down: migration_20261021_100200_d2110_pb_guard.down,
+    name: '20261021_100200_d2110_pb_guard',
   },
 ];

@@ -63,7 +63,9 @@ function StatusCell({ l }: { l: Pick<LoanSummary, 'status' | 'statusLabel' | 'ov
   )
 }
 
-const projectText = (p: LoanSummary['lenderProject']) => `${p.code ?? ''} ${p.name ?? ''}`.trim()
+const projectText = (p: LoanSummary['borrowerProject']) => `${p.code ?? ''} ${p.name ?? ''}`.trim()
+/** ADR 0031: an automatic loan's lender is a Pusat Biaya account (no lender project). */
+const lenderText = (l: Pick<LoanSummary, 'lenderProject' | 'lenderCashAccount'>) => (l.lenderProject ? projectText(l.lenderProject) : `Akun ${l.lenderCashAccount?.name ?? '—'}`)
 
 /** Columns of a loan table (list, project tab). `focus` = the project of the tab (shows the direction). */
 function loanCols(pt: PtView, focus?: number): Col<LoanSummary>[] {
@@ -90,12 +92,12 @@ function loanCols(pt: PtView, focus?: number): Col<LoanSummary>[] {
       cell: (l) =>
         focus ? (
           <>
-            {l.borrowerProject.id === focus ? projectText(l.lenderProject) : projectText(l.borrowerProject)}
+            {l.borrowerProject.id === focus ? lenderText(l) : projectText(l.borrowerProject)}
             <span className="sub">{l.borrowerProject.id === focus ? 'Pinjaman diterima' : 'Pinjaman diberikan'}</span>
           </>
         ) : (
           <>
-            {projectText(l.lenderProject)}
+            {lenderText(l)}
             <span className="sub">→ {projectText(l.borrowerProject)}</span>
           </>
         ),
@@ -120,7 +122,7 @@ function LoanCards({ items, focus, empty }: { items: LoanSummary[]; focus?: numb
             <span className="pk-lcard__total">{rp(l.amount)}</span>
           </div>
           <div className="pk-lcard__meta">
-            {focus ? (l.borrowerProject.id === focus ? `Dari ${projectText(l.lenderProject)}` : `Ke ${projectText(l.borrowerProject)}`) : `${projectText(l.lenderProject)} → ${projectText(l.borrowerProject)}`}
+            {focus ? (l.borrowerProject.id === focus ? `Dari ${lenderText(l)}` : `Ke ${projectText(l.borrowerProject)}`) : `${lenderText(l)} → ${projectText(l.borrowerProject)}`}
           </div>
           <div className="pk-lcard__meta">
             Sisa <b style={{ color: 'var(--pk-fg)' }}>{rp(l.outstanding)}</b> · jatuh tempo {dateId(l.dueDate)}
@@ -173,7 +175,7 @@ export async function LoanList(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="pinjaman">
       <style>{STYLE}</style>
-      <DashHead title="Pinjaman antar project" note="Diajukan PM project peminjam · disetujui Direktur · tanpa transaksi kas (klaim tercatat antar project dalam satu PT)">
+      <DashHead title="Pinjaman antar project" note="Diajukan PM project peminjam · disetujui Direktur · dana antar pusat biaya berbeda dicairkan Finance (kas keluar/masuk) · otomatis bila transfer dibayar dari akun lain">
         <div className="pk-kact">
           {d.canCreate ? (
             <Link className="pk-kbtn primary" href="/admin/pinjaman/baru" data-pk-link="pinjaman-baru">
@@ -238,7 +240,9 @@ function LoanFlowHelp() {
       <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.7 }}>
         <li>PM project peminjam mengajukan nilai, jatuh tempo dan alasan.</li>
         <li>Direktur menyetujui atau menolak dengan alasan. PM project pemberi diberi tahu.</li>
-        <li>Tidak ada transaksi kas: pinjaman tercatat sebagai klaim antar project (sisa dipantau).</li>
+        <li>Dana antar pusat biaya (akun kas) berbeda: setelah disetujui, Finance mencairkan — kas keluar dari pusat biaya pemberi, kas masuk ke pusat biaya peminjam. Pengembalian membalikkan arahnya.</li>
+        <li>Barang/material, atau kedua project memakai pusat biaya yang sama: tanpa transaksi kas (klaim tercatat, sisa dipantau).</li>
+        <li>Transfer pengajuan yang dibayar dari akun selain pusat biaya project tercatat otomatis sebagai pinjaman (pemberi = akun pembayar).</li>
         <li>Pengembalian dicatat PM peminjam atau Finance sampai Lunas; lewat jatuh tempo = Terlambat.</li>
       </ol>
     </Card>
@@ -326,17 +330,26 @@ export async function LoanDetail(props: AdminViewServerProps) {
   const decision = l.decisions.at(-1)
   const pending = l.status === 'pending_approval'
   const active = l.status === 'approved' || l.status === 'partially_repaid' || l.status === 'repaid'
-  const steps = [
-    { key: 'submit', label: 'Diajukan PM peminjam', when: l.submittedAt, who: l.createdBy.name, tone: (l.submittedAt ? 'ok' : 'none') as PillTone, state: l.submittedAt ? 'Selesai' : 'Belum' },
-    decision
-      ? { key: 'direktur', label: 'Persetujuan Direktur', when: decision.decidedAt, who: decision.actor.name, tone: (decision.decision === 'approved' ? 'ok' : 'bad') as PillTone, state: decision.decision === 'approved' ? 'Disetujui' : 'Ditolak', reason: decision.reason }
-      : { key: 'direktur', label: 'Persetujuan Direktur', when: null, who: null, tone: (pending ? 'wait' : 'none') as PillTone, state: pending ? 'Menunggu' : l.status === 'cancelled' ? 'Dibatalkan' : 'Belum' },
-  ]
-  const amountText = `${projectText(l.borrowerProject)} meminjam ${rp(l.amount)} dari ${projectText(l.lenderProject)}.`
+  // ADR 0031: an automatic loan has one step (the transfer); a cash-backed manual loan adds Finance's disbursement
+  const steps =
+    l.origin === 'transfer'
+      ? [{ key: 'transfer', label: `Otomatis dari transfer ${l.transfer?.docNo ?? ''}`.trim(), when: l.submittedAt, who: l.createdBy.name, tone: (l.status === 'cancelled' ? 'none' : 'ok') as PillTone, state: l.status === 'cancelled' ? 'Dibatalkan' : 'Dicatat & dicairkan' }]
+      : [
+          { key: 'submit', label: 'Diajukan PM peminjam', when: l.submittedAt, who: l.createdBy.name, tone: (l.submittedAt ? 'ok' : 'none') as PillTone, state: l.submittedAt ? 'Selesai' : 'Belum' },
+          decision
+            ? { key: 'direktur', label: 'Persetujuan Direktur', when: decision.decidedAt, who: decision.actor.name, tone: (decision.decision === 'approved' ? 'ok' : 'bad') as PillTone, state: decision.decision === 'approved' ? 'Disetujui' : 'Ditolak', reason: decision.reason }
+            : { key: 'direktur', label: 'Persetujuan Direktur', when: null, who: null, tone: (pending ? 'wait' : 'none') as PillTone, state: pending ? 'Menunggu' : l.status === 'cancelled' ? 'Dibatalkan' : 'Belum' },
+          ...(l.cashBacked
+            ? [{ key: 'cair', label: 'Pencairan Finance', when: l.disbursedAt, who: l.disbursedBy?.name ?? null, tone: (l.disbursedAt ? 'ok' : l.awaitingDisbursement ? 'wait' : 'none') as PillTone, state: l.disbursedAt ? 'Dicairkan' : l.awaitingDisbursement ? 'Menunggu' : 'Belum' }]
+            : []),
+        ]
+  const amountText = `${projectText(l.borrowerProject)} meminjam ${rp(l.amount)} dari ${lenderText(l)}.`
   const repayCols: Col<Detail['repayments'][number]>[] = [
     { key: 'n', label: 'Pengembalian', cell: (r) => (r.seq ? `Pengembalian ke-${r.seq}` : <StatusPill tone="none" label={r.statusLabel} />) },
     { key: 'd', label: 'Tanggal', cell: (r) => <span className="nw">{dateId(r.repayDate)}</span> },
     { key: 'a', label: 'Nominal', num: true, cell: (r) => rp(r.amount) },
+    // ADR 0031: the repayment's KK (borrower account) / KM (lender account) when the loan moves cash
+    ...(l.cashBacked ? [{ key: 'kas', label: 'Kas', sec: true, cell: (r: Detail['repayments'][number]) => (r.cash ? <span className="sub">KK {r.cash.kk ?? '—'} · KM {r.cash.km ?? '—'}</span> : '—') }] : []),
     {
       key: 'by',
       label: 'Dicatat oleh',
@@ -358,7 +371,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
             url={`/api/v1/project-loans/${l.id}/repayments/${r.id}/void`}
             label="Void"
             title={`Void pengembalian ke-${r.seq}?`}
-            description={<>Pengembalian {rp(r.amount)} dibatalkan (tidak dihapus); sisa pinjaman bertambah lagi. Alasan wajib.</>}
+            description={<>Pengembalian {rp(r.amount)} dibatalkan (tidak dihapus); sisa pinjaman bertambah lagi.{l.cashBacked ? ' Kas keluar/masuknya dibuatkan jurnal balik.' : ''} Alasan wajib.</>}
             confirmLabel="Void pengembalian"
             testId={`loan-void-${r.id}`}
           />
@@ -372,7 +385,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="pinjaman-detail">
       <style>{STYLE}</style>
-      <DashHead title={title} note={`${l.kindLabel} · ${projectText(l.lenderProject)} → ${projectText(l.borrowerProject)} · diajukan ${l.createdBy.name ?? '—'}`}>
+      <DashHead title={title} note={`${l.kindLabel} · ${l.originLabel} · ${lenderText(l)} → ${projectText(l.borrowerProject)} · ${l.origin === 'transfer' ? 'dicatat' : 'diajukan'} ${l.createdBy.name ?? '—'}`}>
         <div className="pk-kact">
           {back}
           <Link className="pk-kbtn" href={`/admin/collections/projects/${l.borrowerProject.id}/pinjaman`}>
@@ -413,10 +426,33 @@ export async function LoanDetail(props: AdminViewServerProps) {
         </Alert>
       ) : null}
 
-      {acts.has('submit') || acts.has('cancel') || acts.has('repay') ? (
+      {l.awaitingDisbursement ? (
+        <Alert tone="info" attr="awaiting-disbursement">
+          <p>
+            Disetujui — menunggu Finance mencairkan dana dari <b>{l.lenderCashAccount?.name ?? '—'}</b> ke <b>{l.borrowerCashAccount?.name ?? '—'}</b>.
+          </p>
+        </Alert>
+      ) : null}
+      {acts.has('submit') || acts.has('cancel') || acts.has('repay') || acts.has('disburse') ? (
         <div className="pk-actions" data-pk-actions={[...acts].join(',')} style={{ gap: 8 }}>
           {acts.has('submit') ? (
             <ConfirmAction url={`/api/v1/project-loans/${l.id}/submit`} label="Ajukan ke Direktur" size="md" title="Ajukan pinjaman?" description={<>Nomor PJ diberikan dan Direktur diberi tahu. Isi pinjaman tidak dapat diubah lagi.</>} confirmLabel="Ajukan" testId="loan-submit" />
+          ) : null}
+          {acts.has('disburse') ? (
+            // ADR 0031 "Cairkan": KK on the lender's Pusat Biaya + KM on the borrower's, dated today
+            <ConfirmAction
+              url={`/api/v1/project-loans/${l.id}/disburse`}
+              label="Cairkan"
+              size="md"
+              title={`Cairkan ${title}?`}
+              description={
+                <>
+                  Dicatat hari ini: kas keluar {rp(l.amount)} dari <b>{l.lenderCashAccount?.name ?? '—'}</b> dan kas masuk ke <b>{l.borrowerCashAccount?.name ?? '—'}</b>. Pastikan dana sudah dipindahkan di bank.
+                </>
+              }
+              confirmLabel="Cairkan"
+              testId="loan-disburse"
+            />
           ) : null}
           {acts.has('repay') ? <RepaymentAction loanId={l.id} outstanding={l.outstanding} loanDate={l.loanDate} today={d.today} /> : null}
           {acts.has('cancel') ? (
@@ -460,9 +496,10 @@ export async function LoanDetail(props: AdminViewServerProps) {
         <Card id="loan-detail" title="Rincian" span={7} i={4}>
           <div className="pk-loan-flow" data-pk-loan-flow>
             <div>
-              <span className="who">Project pemberi pinjaman</span>
-              <b>{projectText(l.lenderProject)}</b>
-              <span className="who">PM {l.lenderProject.pm?.name ?? '—'}</span>
+              <span className="who">{l.lenderProject ? 'Project pemberi pinjaman' : 'Akun pemberi pinjaman'}</span>
+              <b>{lenderText(l)}</b>
+              {l.lenderProject ? <span className="who">PM {l.lenderProject.pm?.name ?? '—'}</span> : null}
+              {l.lenderProject && l.lenderCashAccount ? <span className="who">Pusat biaya {l.lenderCashAccount.name}</span> : null}
             </div>
             <span className="arrow" aria-hidden>
               →
@@ -471,11 +508,30 @@ export async function LoanDetail(props: AdminViewServerProps) {
               <span className="who">Project peminjam</span>
               <b>{projectText(l.borrowerProject)}</b>
               <span className="who">PM {l.borrowerProject.pm?.name ?? '—'}</span>
+              {l.borrowerCashAccount ? <span className="who">Pusat biaya {l.borrowerCashAccount.name}</span> : null}
             </div>
           </div>
           <dl className="pk-loan-dl" style={{ marginTop: 16 }}>
             <dt>Jenis</dt>
             <dd>{l.kindLabel}</dd>
+            <dt>Asal</dt>
+            <dd>
+              {l.originLabel}
+              {l.transfer ? <> · transfer {l.transfer.docNo ?? `#${l.transfer.id}`}</> : null}
+            </dd>
+            {/* ADR 0031: cash moved (two different Pusat Biaya) — the disbursement's KK / KM */}
+            <dt>Kas</dt>
+            <dd data-pk-field="loan-cash">
+              {l.cashBacked
+                ? l.disbursement
+                  ? `Dicairkan ${l.disbursedAt ? dateTimeId(l.disbursedAt, tz) : ''} · KK ${l.disbursement.kk ?? '—'} · KM ${l.disbursement.km ?? '—'}`
+                  : l.status === 'cancelled'
+                    ? 'Dibatalkan (jurnal balik)'
+                    : 'Menunggu pencairan Finance'
+                : l.status === 'draft' || l.status === 'pending_approval'
+                  ? 'Ditentukan saat disetujui (dana antar pusat biaya berbeda → dicairkan Finance)'
+                  : 'Tanpa transaksi kas (barang, atau pusat biaya sama)'}
+            </dd>
             <dt>Alasan</dt>
             <dd className="pk-pre" data-pk-field="reason">
               {l.reason}
@@ -483,7 +539,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
           </dl>
           <Notes l={l} />
         </Card>
-        <Card id="loan-flow" title="Alur persetujuan" sub="PM peminjam mengajukan · Direktur memutuskan" span={5} i={5}>
+        <Card id="loan-flow" title="Alur persetujuan" sub={l.origin === 'transfer' ? 'Finance membayar dari akun lain · tercatat otomatis' : 'PM peminjam mengajukan · Direktur memutuskan · Finance mencairkan bila pusat biaya berbeda'} span={5} i={5}>
           <ol className="pk-tl" data-pk-flow>
             {steps.map((s) => (
               <li key={s.key} data-pk-step={s.key} data-pk-done={s.when ? 'yes' : 'no'}>
@@ -499,7 +555,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
             ))}
           </ol>
         </Card>
-        <Card id="loan-repayments" title="Pengembalian" sub={active ? `Sisa ${rp(l.outstanding)} · dicatat PM peminjam atau Finance tanpa persetujuan Direktur` : 'Dicatat setelah pinjaman disetujui'} i={6}>
+        <Card id="loan-repayments" title="Pengembalian" sub={active ? `Sisa ${rp(l.outstanding)} · ${l.cashBacked ? 'dicatat Finance (kas keluar dari pusat biaya peminjam, kas masuk ke pemberi)' : 'dicatat PM peminjam atau Finance tanpa persetujuan Direktur'}` : 'Dicatat setelah pinjaman disetujui'} i={6}>
           <DataTable
             id="loan-repayments"
             caption="Pengembalian pinjaman"
@@ -518,7 +574,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
           regionLabel="Keputusan pinjaman"
           step={acts.has('approve') ? 'approve' : null}
           label="Setujui"
-          confirm={`Setujui ${title}? ${amountText} Tidak ada transaksi kas yang dibuat; pinjaman tercatat sebagai piutang antar project.`}
+          confirm={`Setujui ${title}? ${amountText} Bila pusat biaya kedua project berbeda (dana), Finance mencairkan dana: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat biaya peminjam.`}
           canReject={acts.has('reject')}
           stepLabel={`Persetujuan Direktur — ${title}`}
           rejectPrompt={{ field: 'reason', message: 'Alasan penolakan dikirim ke PM peminjam (wajib, minimal 3 karakter):', minLength: 3 }}
@@ -640,7 +696,7 @@ export async function LoanInboxSection({ req }: { req: PayloadRequest }) {
                 label: 'Pemberi → peminjam',
                 cell: (r) => (
                   <>
-                    {projectText(r.lenderProject)}
+                    {lenderText(r)}
                     <span className="sub">→ {projectText(r.borrowerProject)}</span>
                   </>
                 ),
@@ -659,7 +715,7 @@ export async function LoanInboxSection({ req }: { req: PayloadRequest }) {
                       title={`Setujui ${r.docNo}?`}
                       description={
                         <>
-                          {projectText(r.borrowerProject)} meminjam {rp(r.amount)} dari {projectText(r.lenderProject)}. Tidak ada transaksi kas yang dibuat; pinjaman tercatat sebagai piutang antar project.
+                          {projectText(r.borrowerProject)} meminjam {rp(r.amount)} dari {lenderText(r)}. Bila pusat biaya kedua project berbeda (dana), Finance mencairkan dana setelah disetujui: kas keluar dari pusat biaya pemberi, kas masuk ke pusat biaya peminjam.
                           {r.samePmNote ? ` ${r.samePmNote}.` : ''}
                         </>
                       }
@@ -735,7 +791,7 @@ export async function LoanEdit(props: AdminViewServerProps) {
             borrowers={d.options.borrowers}
             lenders={d.options.lenders}
             today={d.today}
-            edit={{ id: l.id, borrowerProjectId: l.borrowerProject.id, lenderProjectId: l.lenderProject.id, kind: l.kind, amount: l.amount, reason: l.reason, loanDate: l.loanDate, dueDate: l.dueDate }}
+            edit={{ id: l.id, borrowerProjectId: l.borrowerProject.id, lenderProjectId: l.lenderProject?.id ?? 0, kind: l.kind, amount: l.amount, reason: l.reason, loanDate: l.loanDate, dueDate: l.dueDate }}
           />
         </Card>
         <LoanFlowHelp />

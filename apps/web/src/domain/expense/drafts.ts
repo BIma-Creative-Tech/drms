@@ -14,7 +14,7 @@ import { RAP_MISSING_MESSAGE } from '@/domain/rap/rules'
 import { normalizeLines, validateLines } from './lines'
 import { pmMayFileFor, PM_ON_BEHALF_MESSAGE } from './on-behalf'
 import { copyReceiptsForResubmit } from './receipts'
-import { INACTIVE_FOR_DUPLICATES, isBusinessDate, isDirectPayment, normalizeInvoiceNo, payeeOf, STATUS_LABELS, type PayeeType, type RequestStatus, type RequestType } from './types'
+import { INACTIVE_FOR_DUPLICATES, isBusinessDate, normalizeInvoiceNo, payeeOf, STATUS_LABELS, type PayeeType, type RequestStatus, type RequestType } from './types'
 import { assertDocumentUnused, INTERCOMPANY_NO_ACCOUNT, payeeCompanyErrors } from '@/domain/intercompany/service'
 import { failCoded } from '@/domain/coded-error'
 import { isClosedProjectStatus } from '@/domain/projects/status'
@@ -223,11 +223,10 @@ export async function validateContent(
   // ADR 0028: the same for a payment to a PT of the group
   const payee = payeeOf(c.payeeType)
   const direct = payee !== 'karyawan'
-  if (opts.forSubmit && !c.projectId && !(c.costCenterId && (opts.legacyCostCenter || direct))) {
-    errors.push({
-      path: 'projectId',
-      message: payee === 'vendor' ? 'Pilih project atau pusat biaya (pembayaran vendor).' : payee === 'pt_grup' ? 'Pilih project atau pusat biaya (pembayaran antar-PT).' : 'Project wajib diisi (pengajuan tanpa project tidak dapat dikirim).',
-    })
+  // ADR 0031 (DRMS 21/10): the Pusat Biaya comes from the project (its cash account) — a vendor / PT grup payment may go
+  // without project (office bills: no Pusat Biaya, Finance picks the paying account, the Direktur decides)
+  if (opts.forSubmit && !c.projectId && !direct && !(c.costCenterId && opts.legacyCostCenter)) {
+    errors.push({ path: 'projectId', message: 'Project wajib diisi (pengajuan tanpa project tidak dapat dikirim).' })
   }
   if (opts.forSubmit && !(c.title ?? '').trim()) errors.push({ path: 'title', message: 'Judul wajib diisi.' })
   if (c.neededDate && !isBusinessDate(c.neededDate)) errors.push({ path: 'neededDate', message: 'Tanggal harus YYYY-MM-DD.' })
@@ -629,24 +628,22 @@ export async function createDraft(req: PayloadRequest, input: DraftInput & { typ
       return { doc: existing, created: false }
     }
   }
-  // D2: a cost center sent by an old client is ignored (the requester no longer picks one) — ADR 0027: except on a
-  // vendor payment without a project (ADR 0028: or a PT grup payment)
+  // D2 / ADR 0031 (DRMS 21/10): a cost center sent by an old client is ignored — the requester never picks a Pusat
+  // Biaya (it is the project's cash account); a vendor / PT grup payment without project has none
   const payee = payeeOf(input.payeeType)
   const direct = payee !== 'karyawan'
-  const vendorCc = direct && !input.projectId ? (input.costCenterId ?? null) : null
-  const company = await draftCompany(req, { projectId: input.projectId, costCenterId: vendorCc })
+  const company = await draftCompany(req, { projectId: input.projectId })
   const emp = company !== undefined ? employeeIn(req, company) : relId((req.user as { employee?: unknown } | null)?.employee)
   const requesterIds = input.requesterIds && input.requesterIds.length > 0 ? input.requesterIds : emp !== undefined ? [emp] : []
   const lines = input.lines ?? []
   // ADR 0027 / 0028: a vendor / PT grup payment is always a Pengajuan Baru (type advance), without an employee account
   const type: RequestType = direct ? 'advance' : input.type
-  await validateContent(req, { ...input, type, costCenterId: vendorCc, requesterIds, lines, ...vendorInput(input, payee) }, { forSubmit: false, creatorId: uid })
+  await validateContent(req, { ...input, type, costCenterId: null, requesterIds, lines, ...vendorInput(input, payee) }, { forSubmit: false, creatorId: uid })
   const doc = await validated(req, () => req.payload.create({
     collection: 'expense-requests',
     data: {
       type,
       ...vendorData(input, payee),
-      ...(vendorCc ? { costCenter: vendorCc } : {}),
       title: input.title.trim(),
       project: input.projectId ?? null,
       neededDate: input.neededDate ?? null,
@@ -706,8 +703,8 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
     type: direct ? ('advance' as const) : ((input.type ?? doc.type) as RequestType),
     title: input.title ?? doc.title,
     projectId,
-    // ADR 0027 / 0028: a vendor / PT grup payment without a project may change its cost center
-    costCenterId: projectId ? null : direct && input.costCenterId !== undefined ? input.costCenterId : (relId(doc.costCenter) ?? null),
+    // ADR 0031: only a legacy draft keeps its old cost center (dropped once it gets a project); never set anew
+    costCenterId: projectId ? null : (relId(doc.costCenter) ?? null),
     requesterIds: input.requesterIds ?? ids(doc.requesters),
     bankAccountId: direct ? null : input.bankAccountId !== undefined ? input.bankAccountId : (relId(doc.bankAccount) ?? null),
     lines: lines ?? fromDocLines(doc),
@@ -717,7 +714,7 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
   await validateContent(req, current, { forSubmit: false, creatorId: relId(doc.createdBy) ?? -1, requestId: id, callerSetsRequesters: input.requesterIds !== undefined && input.requesterIds.join(',') !== ids(doc.requesters).join(',') })
   const data: Record<string, unknown> = {}
   if (input.type !== undefined) data.type = input.type
-  if (doc.status === 'draft' && direct && input.costCenterId !== undefined) data.costCenter = projectId ? null : input.costCenterId
+  if (doc.status === 'draft' && projectId && relId(doc.costCenter) !== undefined) data.costCenter = null
   if (doc.status === 'draft' && (input.payeeType !== undefined || direct)) {
     // ADR 0027 / 0028: payee type + its fields (karyawan clears them; vendor / PT grup clear the employee account)
     Object.assign(data, vendorData(direct ? { ...input, ...vendorNow } : {}, payee), { type: current.type })
@@ -768,9 +765,8 @@ export async function resubmitAsDraft(req: PayloadRequest, id: number): Promise<
       requesters: ids(src.requesters),
       bankAccount: relId(src.bankAccount) ?? null,
       // ADR 0027: a rejected vendor payment comes back with its vendor + invoice (the rejected one no longer counts as a duplicate)
-      // and — without a project — its cost center. ADR 0028: a PT grup payment with its receiving PT + document.
+      // ADR 0028: a PT grup payment with its receiving PT + document. ADR 0031: no cost center is carried over.
       ...vendorData(vendorOfDoc(src), payeeOf(src.payeeType)),
-      ...(isDirectPayment(src.payeeType) && !relId(src.project) && relId(src.costCenter) ? { costCenter: relId(src.costCenter) } : {}),
       lines: toDocLines(fromDocLines(src).map(({ id: _id, ...l }) => l)),
       attachments: ids(src.attachments),
     } as never,

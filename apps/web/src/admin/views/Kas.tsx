@@ -96,7 +96,7 @@ const PAGE_STYLE = `
 }
 `
 
-const SOURCE: Record<CashEntryDoc['sourceType'], string> = { transfer: 'Transfer', settlement_refund: 'Pengembalian LPJ', manual: 'Manual', reversal: 'Jurnal balik', opening: 'Saldo awal', intercompany: 'Antar PT' }
+const SOURCE: Record<CashEntryDoc['sourceType'], string> = { transfer: 'Transfer', settlement_refund: 'Pengembalian LPJ', manual: 'Manual', reversal: 'Jurnal balik', opening: 'Saldo awal', intercompany: 'Antar PT', project_loan: 'Pinjaman antar project' }
 const dayMonth = (date: string) => `${Number(date.slice(8, 10))} ${MONTHS_SHORT[Number(date.slice(5, 7)) - 1] ?? ''} ${date.slice(0, 4)}`
 const SR: React.CSSProperties = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }
 
@@ -365,13 +365,14 @@ function FilterBar({ q, lk, filtered, pt, pts }: { q: BookQuery; lk: Lookups; fi
       </label>
       {pts.length > 1 ? sel('pt', 'PT', pts.map((c) => ({ id: c, label: `${ptCode(pt, c)} — ${pt.ref(c)?.name ?? ''}` })), q.pt, 'Semua PT') : null}
       {lk.sites.length ? sel('site', 'Site', lk.sites, q.site, 'Semua site') : null}
-      {multi('akun', 'Akun', ids(lk.accounts), q.akun, 'Semua akun')}
+      {multi('akun', 'Akun / pusat biaya', ids(lk.accounts), q.akun, 'Semua akun')}
       <label>
         Periode
         <input type="month" name="periode" defaultValue={q.periode ?? ''} />
       </label>
       {multi('project', 'Project', ids(lk.projects), q.project, 'Semua project')}
-      {multi('pusat', 'Pusat biaya', ids(lk.costCenters), q.pusat, 'Semua pusat biaya')}
+      {/* ADR 0031: the account filter IS the Pusat Biaya; the old cost-center filter only while a link still carries it */}
+      {q.pusat?.length ? multi('pusat', 'Pusat biaya lama', ids(lk.costCenters), q.pusat, 'Semua pusat biaya lama') : null}
       {multi('arah', 'Arah', [{ value: 'masuk', label: 'Masuk' }, { value: 'keluar', label: 'Keluar' }], q.arah, 'Masuk & keluar')}
       {multi('status', 'Status', [{ value: 'posted', label: 'Posted' }, { value: 'void', label: 'Void' }], q.status, 'Semua')}
       {/* ADR 0028: "Sumber" — e.g. only the automatic Kas Masuk of payments from another PT (Antar PT) */}
@@ -655,7 +656,7 @@ function KasRules({ lockDate }: { lockDate: string | null }) {
     <Card id="kas-help" title="Aturan" span={4}>
       <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
         <li>Kas masuk wajib sumber; kas keluar wajib kategori.</li>
-        <li>Dibebankan ke project <em>atau</em> pusat biaya, tidak keduanya.</li>
+        <li>Pusat biaya = akun kas transaksi; pilih project bila biayanya milik project tertentu.</li>
         <li>Tanggal tidak boleh di masa depan atau di periode yang sudah ditutup{lockDate ? ` (s/d ${dayMonth(lockDate)})` : ''}.</li>
         <li>Setelah tersimpan, nominal/tanggal/akun tidak bisa diedit — gunakan Void lalu catat ulang.</li>
       </ul>

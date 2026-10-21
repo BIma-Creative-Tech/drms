@@ -43,10 +43,12 @@ export function RequestSummary({ d, ptName, attachments, canRevealBank, draftBan
   if (icPay) add('Jenis penerima', 'PT grup (pembayaran antar-PT)', 'payeeType')
   add('Judul', d.title, 'title')
   add('PT', ptName, 'company')
-  add(d.project ? 'Project' : 'Pusat biaya', scope, 'scope')
-  // D2 (DRMS 10/10): cost center chosen by Finance on the (latest posted) transfer
-  const cc = [...d.transfers].reverse().find((t) => t.status === 'posted' && t.costCenter)?.costCenter
-  if (d.project && cc) add('Pusat biaya', named(cc), 'costCenter')
+  add(d.project ? 'Project' : 'Pusat biaya lama', scope, 'scope')
+  // ADR 0031 (DRMS 21/10): the Pusat Biaya = the project's cash account (read-only; the requester never picks it)
+  if (d.project) add('Pusat biaya', d.pusatBiaya?.name ?? 'Project belum dipetakan ke pusat biaya (akun kas)', 'pusatBiaya')
+  // ADR 0031: a transfer paid from another account → the automatic inter-project loan
+  const paidFrom = [...d.transfers].reverse().find((t) => t.status === 'posted' && t.paidFromCashAccount)
+  if (paidFrom?.paidFromCashAccount) add('Dibayar dari akun', `${paidFrom.paidFromCashAccount.name ?? '—'}${paidFrom.projectLoan ? ` (pinjaman ${paidFrom.projectLoan.docNo ?? ''})` : ''}`, 'paidFrom')
   add('Tingkat urgensi', d.urgencyLevel && 'name' in d.urgencyLevel ? String(d.urgencyLevel.name ?? '') : '', 'urgency')
   add('Tanggal pengajuan', d.requestDate ? formatDateLong(d.requestDate) : '', 'requestDate')
   add('Tanggal dibutuhkan', d.neededDate ? formatDateLong(d.neededDate) : '', 'neededDate')

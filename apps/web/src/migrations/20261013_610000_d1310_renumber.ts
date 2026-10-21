@@ -69,6 +69,11 @@ export const RENUMBER_NEUTRAL_FUNCTIONS = [
   // — PJA numbers are issued in the D5 shape from day one; if they ever are, pk_icl_guard (it freezes doc_no) must move
   // to RENUMBER_GUARDED_FUNCTIONS with the prelude.
   'pk_expense_fund_guard',
+  // ADR 0031 (20261021_100200, Pusat Biaya = akun kas): deferred cash-leg check of an inter-project loan — it re-reads the
+  // loan's `project_loan` cash rows (amount / account / status), so a number-only update of the loan or of a cash row
+  // passes unchanged; the transfer "paid from" check fires on INSERT only
+  'pk_project_loan_cash_consistency',
+  'pk_transfers_paid_from_loan',
 ] as const
 
 const PRELUDE = `

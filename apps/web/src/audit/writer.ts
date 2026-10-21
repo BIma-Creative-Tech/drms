@@ -79,6 +79,10 @@ export const AUDIT_ACTIONS = [
   // D1610 (ADR 0030): the row action "Hapus" (soft delete: isDeleted = true, reason) and the Admin's "Pulihkan".
   'soft_delete',
   'restore',
+  // ADR 0031: Finance posted the cash of an inter-project loan ("Cairkan"); a document created automatically as the
+  // consequence of another one (the inter-project loan of a transfer paid from another account).
+  'disburse',
+  'auto_create',
 ] as const
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 

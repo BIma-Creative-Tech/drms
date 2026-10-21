@@ -291,6 +291,22 @@ export function costCenterScopeSql(s: ReportScope, alias = 'cc'): SQL {
   )
 }
 
+/**
+ * ADR 0031: Pusat Biaya (cash accounts `cash_accounts a`) visible in the scope — every account of a PT the caller sees
+ * whole ("all"); a team / site scope: the accounts its projects are mapped to (`projects.cash_account_id`) + the
+ * site's own accounts. Names and spending only — balances stay behind the Kas roles (ledgerScopeSql).
+ */
+export function pusatBiayaScopeSql(s: ReportScope, alias = 'a'): SQL {
+  const mapped = (where: SQL) => sql`${aliasCol(alias, 'id')} IN (SELECT pp.cash_account_id FROM projects pp WHERE pp.cash_account_id IS NOT NULL AND pp.is_deleted IS NOT TRUE AND ${where})`
+  return orCompanies(
+    s,
+    aliasCol(alias, 'company_id'),
+    (p) => (p.kind === 'all' ? sql`TRUE` : p.kind === 'team' ? mapped(inList(sql`pp.id`, p.projects)) : null),
+    (sites) => sql`(${inList(aliasCol(alias, 'site_id'), sites)} OR ${mapped(inList(sql`pp.site_id`, sites))})`,
+    notDeleted(alias),
+  )
+}
+
 /** Sites of the scope's PTs (`sites s`, filter option lists): every site of a PT in the scope. */
 export function siteScopeSql(s: ReportScope, alias = 's'): SQL {
   return sql`(${companyScopeSql(aliasCol(alias, 'company_id'), scopeCompanies(s))} AND ${notDeleted(alias)})`

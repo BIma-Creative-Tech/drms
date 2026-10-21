@@ -25,7 +25,7 @@ import { hasRole, hasRoleAny } from '@/access/roles'
 import { select as selectValidation } from 'payload/shared'
 import { validationError } from '@/lib/validation'
 
-import { directPayee, draftOnly, editableInput, employeePayee, intercompanyPayee, linesCondition, linesEditable, notOnRequestPage, PLACEHOLDERS, revisionOnly, shownInHeader, vendorPayee, whenSet } from './expense-request-form'
+import { directPayee, draftOnly, editableInput, employeePayee, intercompanyPayee, linesCondition, notOnRequestPage, PLACEHOLDERS, revisionOnly, shownInHeader, vendorPayee, whenSet } from './expense-request-form'
 import { businessDateField } from './fields-f2'
 import { USER_NAME_VIEW } from '@/fields/users'
 
@@ -457,26 +457,18 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       { name: 'title', type: 'text', label: 'Judul', required: true, maxLength: 200, admin: { components: { Field: '@/admin/components/EditableOnlyFields#RequestTitleField' } } },
       // D2: the project is mandatory to send the request (validateContent forSubmit); its RAP items feed the line picker (D4)
       { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany({ createRoles: REQUEST_CREATE_ROLES }), admin: { placeholder: PLACEHOLDERS.project, description: 'Wajib diisi sebelum dikirim. Item RAP baris diambil dari project ini.', condition: editableInput('project'), components: { Field: COMPANY_SCOPED_FIELD } } },
-      // D2 (DRMS 10/10, owner 2026-10-11): no non-project requests — the requester never sets a cost center (create /
-      // update access false → a value sent by an old client is ignored); Finance sets it on the transfer
-      // (transfers.costCenter). Legacy requests keep theirs (shown read-only, never on a new form).
-      // ADR 0027 (client 2026-10-14): a VENDOR payment may name a cost center instead of a project (e.g. office bills) —
-      // writable only for the vendor payee (field access), the DB rule expense_requests_project_rules agrees.
+      // D2 / ADR 0031 (DRMS 21/10): the requester never sets a Pusat Biaya — it is the project's cash account
+      // (projects.cashAccount), shown read-only on the detail. This column is the LEGACY cost center of old requests
+      // (shown read-only only when set; create / update closed, a value sent by an old client is ignored).
       {
         name: 'costCenter',
         type: 'relationship',
         relationTo: 'cost-centers',
-        label: 'Pusat biaya',
+        label: 'Pusat biaya lama',
         index: true,
-        access: { create: vendorCostCenterAccess, update: vendorCostCenterAccess },
+        access: { create: () => false, update: () => false },
         ...pickerSameCompany({ createRoles: REQUEST_CREATE_ROLES }),
-        admin: {
-          placeholder: PLACEHOLDERS.costCenter,
-          description: 'Pembayaran vendor / antar-PT tanpa project: pilih pusat biaya (mis. tagihan kantor). Pengajuan lama tanpa project menampilkan pusat biayanya di sini.',
-          condition: (d, s, c) =>
-            (directPayee(editableInput())(d, s, c) && !whenSet('project')(d, s, c)) || (linesEditable(d as Parameters<typeof linesEditable>[0]) && whenSet('costCenter')(d, s, c)),
-          components: { Field: COMPANY_SCOPED_FIELD },
-        },
+        admin: { readOnly: true, condition: whenSet('costCenter'), components: { Field: COMPANY_SCOPED_FIELD } },
       },
       businessDateField('neededDate', 'Tanggal dibutuhkan', { admin: { condition: editableInput() } }),
       // Owner decision 2026-10-09: replaces "Periode kegiatan" (periodFrom/periodTo, Q-04).

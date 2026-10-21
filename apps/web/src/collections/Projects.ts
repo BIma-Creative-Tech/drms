@@ -13,6 +13,7 @@ import { projectFromClientDefault } from '@/domain/partners/project-prefill'
 import { progressWriteGuard } from '@/domain/progress/guards'
 import { codeField, odooRefField, percentField, rupiahField, uuidField } from '@/fields/common'
 import { companyField, companyHook, lockedUntilCompany, pickerSameCompany, siteOptions } from '@/fields/company'
+import { pusatBiayaField } from '@/fields/pusat-biaya'
 import { USER_NAME_VIEW, userPicker } from '@/fields/users'
 
 export const PROJECT_STATUSES = [
@@ -50,6 +51,20 @@ const projectEditors = fieldRoles(...PROJECT_EDITOR_ROLES)
 const kindEditors = fieldRoles('pk-owner', 'pk-admin')
 
 export const PROJECT_PM_REQUIRED = 'Project Manager wajib diisi'
+export const PROJECT_PB_REQUIRED = 'Pusat biaya (akun kas) wajib dipilih'
+
+/**
+ * ADR 0031 (DRMS 21/10 #2): the Pusat Biaya (a cash account of the PT) is mapped when the project is created, so the
+ * requester never picks one. Required on a USER create (admin form, REST) and whenever a user write SENDS it empty
+ * (clearing is refused). System writes (seed, import, jobs — no user) and updates that do not send the field stay
+ * valid: a legacy project without a mapping is listed on the dashboard and its transfers are refused until mapped.
+ */
+export function projectCashAccountValidate(value: unknown, { operation, req }: { operation?: string; req?: { user?: unknown } }): true | string {
+  if (value !== null && value !== undefined && value !== '') return true
+  if (!req?.user) return true
+  if (value === undefined && operation === 'update') return true
+  return PROJECT_PB_REQUIRED
+}
 
 /**
  * DRMS 10/10 #5: the PM of a project is mandatory — on create (admin form, REST, Local API: seed,
@@ -93,7 +108,7 @@ export const Projects: CollectionConfig = withAudit(
     slug: 'projects',
     labels: { singular: 'Project', plural: 'Project' },
     // DRMS 10/10 point 7: tabs Proyek (form) / RAP / Pengajuan (admin/config.ts PROJECT_TABS)
-    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['code', 'name', 'client', 'site', 'pm', 'status'], components: { views: { edit: PROJECT_TABS } } },
+    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['code', 'name', 'client', 'site', 'pm', 'cashAccount', 'status'], components: { views: { edit: PROJECT_TABS } } },
     access: {
       read: byRole({
         'pk-admin': true,
@@ -113,7 +128,7 @@ export const Projects: CollectionConfig = withAudit(
       delete: denyAll,
     },
     hooks: {
-      beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'site', collection: 'sites' }] }), kindChangeGuard, cancelStatusGuard],
+      beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'cashAccount', collection: 'cash-accounts' }, { field: 'site', collection: 'sites' }] }), kindChangeGuard, cancelStatusGuard],
       beforeOperation: [progressWriteGuard('projects'), readOnlyFieldsGuard('projects', (req, company) => hasRole(req, PROJECT_EDITOR_ROLES, company), 'Direktur, Admin, atau PM')],
     },
     fields: [
@@ -174,9 +189,16 @@ export const Projects: CollectionConfig = withAudit(
         ...userPicker({ roles: ['pk-pm'] }),
         validate: projectPmValidate,
       },
-      // D2 (DRMS 10/10): default cost center of the project's money — Finance gets it pre-selected when recording a
-      // transfer (transfers.costCenter, mandatory there). Optional; same PT (companyHook check).
-      lockedUntilCompany({ name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya (default transfer)', index: true, access: { update: projectEditors }, ...pickerSameCompany(), admin: { placeholder: 'Pilih pusat biaya…', description: 'Diusulkan ke Finance saat mencatat transfer pengajuan project ini.' } }),
+      // ADR 0031 (DRMS 21/10): the project's Pusat Biaya = a cash account of its PT. Finance pays from it by default; a
+      // payment from another account creates an inter-project loan with its KK / KM (domain/loans/cash.ts).
+      pusatBiayaField({
+        name: 'cashAccount',
+        access: { update: projectEditors },
+        validate: projectCashAccountValidate,
+        admin: { description: 'Akun kas/bank PT yang membiayai project ini. Pengajuan project memakai pusat biaya ini; bila Finance membayar dari akun lain, tercatat pinjaman antar project otomatis.' },
+      }),
+      // D2 (DRMS 10/10) legacy: the former cost-center master (ADR 0031 retired it) — kept read-only for old projects
+      lockedUntilCompany({ name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya lama', index: true, access: { create: () => false, update: () => false }, ...pickerSameCompany(), admin: { readOnly: true, condition: (d) => Boolean(d?.costCenter), description: 'Master pusat biaya lama (sebelum 21/10/2026); tidak dipakai lagi.' } }),
       // RAB = contract value: money roles of the project's PT only (owner 2026-10-11: hidden from Staff on web, API and
       // APK; Operator/Anggota reads its assigned project for the attendance location only) — access/money.ts
       { ...rupiahField('budget', 'RAB (Rp)'), access: { read: moneyRead('projects'), update: projectEditors } },

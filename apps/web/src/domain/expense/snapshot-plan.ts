@@ -199,12 +199,16 @@ export async function resolveRequesterUsersAllRole(src: SnapshotSource, employee
  * (with `scope`) and budget addenda (E5, no scope: Direktur → Finance only). Position holders = members
  * of the document's PT (`companyId`, ADR 0016 §5; the G1-2 skip rule counts holders of that PT only).
  */
-export async function resolveSnapshotForRule(src: SnapshotSource, rule: RuleInput, excluded: ReadonlySet<number>, companyId: number, scope?: SnapshotScope): Promise<ApprovalSnapshot> {
+export async function resolveSnapshotForRule(src: SnapshotSource, ruleIn: RuleInput, excluded: ReadonlySet<number>, companyId: number, scope?: SnapshotScope): Promise<ApprovalSnapshot> {
+  // ADR 0031 (DRMS 21/10): a payment without project (vendor / PT grup) has no "PM project" any more — the cost-center
+  // manager went with the cost-center master — so a "PM project → Direktur" rule decides at the Direktur level only
+  const unscoped = scope !== undefined && !scope.projectId && !scope.costCenterId && ruleIn.acknowledge === 'required' && ruleIn.acknowledgeBy === 'scope_manager'
+  const rule: RuleInput = unscoped ? { ...ruleIn, acknowledge: 'none' } : ruleIn
   // Only rules of the current models may be used for NEW submissions. A rule saved before E1 (e.g.
   // "Diketahui" by a Staff role) is refused here instead of being silently reinterpreted.
   const named = [...new Set([rule.acknowledgeUser, ...rule.steps.map((s) => s.approverUser)].filter((x): x is number => typeof x === 'number'))]
   const namedUsers = await src.rolesOfUsersIn(named, companyId)
-  const ruleErr = ruleDecisionError(rule, (id) => namedUsers.get(id)?.roles, scope ? rule.docType : 'budget_addendum')
+  const ruleErr = ruleDecisionError(ruleIn, (id) => namedUsers.get(id)?.roles, scope ? ruleIn.docType : 'budget_addendum')
   if (ruleErr) refuse(`Aturan approval "${rule.name}" tidak sesuai alur persetujuan (Direktur → Finance / PM project → Direktur): ${ruleErr} Hubungi Admin.`)
 
   const scopeManager = rule.acknowledge === 'required' && rule.acknowledgeBy === 'scope_manager'

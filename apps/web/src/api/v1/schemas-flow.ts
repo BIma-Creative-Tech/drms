@@ -198,7 +198,7 @@ const confirmUnverifiedAccount = z
 
 export const TransferCreate = z
   .object({
-    cashAccountId: id,
+    cashAccountId: id.meta({ description: 'ADR 0031: the account Finance PAYS from (active, of the request PT). Default in the UI = the project\'s Pusat Biaya (GET /transfer-queue pusatBiaya); another account → automatic inter-project loan (loanReason required).' }),
     bankRef: z.string().trim().min(1).max(64),
     proofMediaId: id.meta({ description: 'media-transfer-proofs id (POST /media/transfer-proofs).' }),
     transferDate: businessDate.optional().meta({ description: 'Legacy: date only (time unknown). With transferAt it must equal the date of transferAt in the PT zone.' }),
@@ -210,7 +210,15 @@ export const TransferCreate = z
     costCenterId: id
       .nullable()
       .optional()
-      .meta({ description: 'D2 (DRMS 10/10): cost center of the money, chosen by Finance — active, of the request PT. Omitted/null → the project default (GET /transfer-queue costCenter), else 400 (path costCenterId).' }),
+      .meta({ description: 'DEPRECATED (ADR 0031, DRMS 21/10): ignored — the Pusat Biaya is the project\'s cash account. Still accepted so older apps keep working.' }),
+    loanReason: z
+      .string()
+      .trim()
+      .max(1000)
+      .nullable()
+      .optional()
+      .meta({ description: 'ADR 0031: required (min 3) when cashAccountId is not the project\'s Pusat Biaya — the reason of the automatic inter-project loan (400 path loanReason).' }),
+    loanDueDate: businessDate.nullable().optional().meta({ description: 'ADR 0031: due date of the automatic loan (default transfer date + 30 days; not before the transfer date).' }),
     amount: rupiahPos.optional().meta({ description: 'Optional echo; must equal the approved amount (Finance cannot change it, G3).' }),
     confirmOverdraft: confirmOverdraft,
     confirmUnverifiedAccount: confirmUnverifiedAccount,
@@ -273,7 +281,12 @@ const CostCenterRef = z.object({ id, code: z.string().nullish(), name: z.string(
 /** DRMS 10/10: GET /transfer-queue items = list items + what the Finance transfer screen needs. */
 export const TransferQueueItem = ExpenseRequestListItem.extend({
   project: Ref.nullable(),
-  costCenter: CostCenterRef.nullable().meta({ description: 'D2: suggested cost center of the transfer (the project default, else a legacy request\'s own); null = Finance must pick one.' }),
+  costCenter: CostCenterRef.nullable().meta({ description: 'DEPRECATED (ADR 0031): always null — see pusatBiaya.' }),
+  pusatBiaya: z
+    .object({ id, name: z.string() })
+    .nullable()
+    .meta({ description: 'ADR 0031: the project\'s Pusat Biaya (cash account) — default source account; paying from another one records an automatic inter-project loan. Null without project / unmapped project.' }),
+  pusatBiayaMissing: z.boolean().meta({ description: 'ADR 0031: project request whose project has no Pusat Biaya yet → the transfer is refused (409) until it is mapped.' }),
   bank: z.object({ bankName: z.string().nullable(), accountNo: z.string().nullable(), accountHolder: z.string().nullable() }).nullable(),
   bankVerification: z.enum(['verified', 'unverified']).meta({ description: 'QA-17: unverified → the transfer needs confirmUnverifiedAccount.' }),
   flags: z.object({ warning: z.number().int(), info: z.number().int(), receiptMismatch: z.number().int() }),
@@ -329,7 +342,11 @@ export const FundCheck = z
 export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
   uuid: z.string().nullable(),
   project: Ref.nullable(),
-  costCenter: Ref.nullable(),
+  costCenter: Ref.nullable().meta({ description: 'D2 legacy: the cost center of an old non-project request (none since ADR 0031).' }),
+  pusatBiaya: z
+    .object({ id, name: z.string() })
+    .nullable()
+    .meta({ description: 'ADR 0031 (DRMS 21/10): the Pusat Biaya = the project\'s cash account (read-only; null without project or while the project is not mapped).' }),
   urgencyLevel: Ref.extend({ rank: z.number().int().nullish() }).nullable().meta({ description: '"Tingkat urgensi" (owner decision 2026-10-09; replaces periodFrom/periodTo).' }),
   notes: z.string().nullable(),
   requesters: z.array(Ref.nullable()),
@@ -478,7 +495,10 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       amount: rupiah,
       transferDate: z.string(),
       transferAt: z.string().nullable().meta({ description: 'Item 11: date + time of the proof (UTC ISO); null = recorded without a time.' }),
-      costCenter: CostCenterRef.nullable().meta({ description: 'D2: cost center chosen by Finance (null on transfers recorded before DRMS 10/10).' }),
+      costCenter: CostCenterRef.nullable().meta({ description: 'D2 legacy: cost center chosen by Finance (transfers of 10/10–21/10/2026 only).' }),
+      cashAccount: z.object({ id, name: z.string().nullable() }).nullable().optional().meta({ description: 'ADR 0031: account the transfer is charged to (the project\'s Pusat Biaya).' }),
+      paidFromCashAccount: z.object({ id, name: z.string().nullable() }).nullable().optional().meta({ description: 'ADR 0031: account actually paid from when not the Pusat Biaya (null = paid from it).' }),
+      projectLoan: z.object({ id, docNo: z.string().nullable(), status: z.string() }).nullable().optional().meta({ description: 'ADR 0031: the automatic inter-project loan of a transfer paid from another account.' }),
       bankRef: z.string(),
       status: z.string(),
       cashEntryId: id.nullable(),
@@ -813,6 +833,11 @@ export const TransferResult = z
       .object({ cashEntryId: id, cashEntryNo: z.string(), company: z.object({ id, shortCode: z.string(), name: z.string() }) })
       .nullable()
       .meta({ description: 'ADR 0028: the Kas Masuk posted in the receiving PT (PT grup payment); null otherwise.' }),
+    projectLoan: z
+      .object({ id, docNo: z.string().nullable(), kk: z.string(), km: z.string() })
+      .nullable()
+      .optional()
+      .meta({ description: 'ADR 0031: the automatic inter-project loan when paid from an account other than the project\'s Pusat Biaya (its KK on the paying account, KM on the Pusat Biaya); null otherwise.' }),
   })
   .meta({ id: 'TransferResult' })
 

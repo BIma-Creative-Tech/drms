@@ -34,7 +34,7 @@ const PER_PT_TABLES = [
   'service_types',
 ]
 /** Company helpers (they build `company_id IN (<bound ids>)` from the caller's scope) — a CALL, not a mention. */
-const HELPER_CALL = /\b(?:requestScopeSql|cashScopeSql|ledgerScopeSql|projectScopeSql|costCenterScopeSql|masterScopeSql|companyScopeSql|locationScopeSql|employeeCompanySql|candidateWhere|ptSql|siteScopeSql|homeSiteScopeSql)\(/
+const HELPER_CALL = /\b(?:requestScopeSql|cashScopeSql|ledgerScopeSql|projectScopeSql|costCenterScopeSql|pusatBiayaScopeSql|masterScopeSql|companyScopeSql|locationScopeSql|employeeCompanySql|candidateWhere|ptSql|siteScopeSql|homeSiteScopeSql)\(/
 /** An explicit company predicate against a bound parameter. */
 const BOUND_COMPANY = /\bcompany_id\s*(?:=\s*ANY\s*\(|=|IN\b)\s*\(?\s*\$\{/i
 const hasCompanyPredicate = (body: string) => HELPER_CALL.test(body) || BOUND_COMPANY.test(body)
@@ -65,7 +65,9 @@ const ALLOWED: Record<string, string> = {
   // DRMS 10/10 Phase C (D4 RAP realisation, D2 cost center filter)
   'domain/rap/budget.ts#rapUsage': 'requests of project ids the caller already passed the project read check for (loadRap, listProjects / rapMonitoring read scope, one request\'s project); a request shares its project\'s PT (DB trigger)',
   'domain/rap/budget.ts#rapItemRows': 'RAP items of checked project ids, or of ONE request\'s lines (same PT as the request, DB trigger)',
-  'domain/reports/kpi.ts#requestCostCenterSql': 'fragment used only inside requestScopeSql-scoped queries (requestFilterSql, spending)',
+  // ADR 0031 (Pusat Biaya = cash account)
+  'domain/reports/kpi.ts#requestPusatBiayaSql': 'fragment used only inside requestScopeSql-scoped queries (requestFilterSql, spending)',
+  'domain/reports/registry.ts#narrowToPusatBiaya': 'project ids of ONE account, intersected per PT with an already company-bound scope (it only narrows)',
   // ADR 0023 site filter: AND-ed fragments of orCompanies (each part is `company_id = <PT> AND …` already)
   'domain/reports/scope.ts#projectOfSitesSql': 'site narrowing fragment, used only inside the company-bound parts of orCompanies (requestScopeSql, cashScopeSql) — it only narrows',
   'domain/reports/scope.ts#accountOfSitesSql': 'site narrowing fragment, used only inside the company-bound parts of orCompanies (cashScopeSql, ledgerScopeSql) — it only narrows',

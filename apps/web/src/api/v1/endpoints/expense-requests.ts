@@ -450,7 +450,7 @@ export const transferEndpoint = v1({
     const id = idParam(params)
     const r = await recordTransfer(req, id, body)
     const t = r.transfer as { id: number; docNo: string }
-    return json({ request: await detail(req, id), transferId: t.id, transferDocNo: t.docNo, cashEntryId: r.cashEntry.id, cashEntryNo: r.cashEntry.entryNo, intercompany: r.intercompany }, 201)
+    return json({ request: await detail(req, id), transferId: t.id, transferDocNo: t.docNo, cashEntryId: r.cashEntry.id, cashEntryNo: r.cashEntry.entryNo, intercompany: r.intercompany, projectLoan: r.projectLoan }, 201)
   },
 })
 

@@ -12,12 +12,14 @@ import { userPicker } from '@/fields/users'
  * Pusat biaya / lokasi operasional (form item 9: "Ops Palangka Banjar" is not a project).
  * Staff R assigned, PM R team, Finance R all, Owner/Admin C/R/U (requirements v1.1 §4).
  * E6 (Q-40): optional lat/lng/radius → attendance geofence of the location.
+ * ADR 0031 (DRMS 21/10): RETIRED as the money dimension — a project's "Pusat biaya" is now a cash account
+ * (`projects.cashAccount`). Hidden from the menu; rows stay for history (old transfers / cash entries / vehicles).
  */
 export const CostCenters: CollectionConfig = withAudit(
   {
     slug: 'cost-centers',
-    labels: { singular: 'Pusat biaya', plural: 'Pusat biaya' },
-    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['code', 'name', 'type', 'manager', 'active'] },
+    labels: { singular: 'Pusat biaya lama', plural: 'Pusat biaya lama' },
+    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['code', 'name', 'type', 'manager', 'active'], hidden: true },
     access: {
       read: byRole({
         'pk-admin': true,

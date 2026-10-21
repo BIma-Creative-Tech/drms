@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { resetAppConfigCache } from '@/api/v1/endpoints/app'
 import { scheduleOfEmployee } from '@/domain/attendance/record'
 import { SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
-import { suggestedCostCenter } from '@/domain/expense/transfers'
+import { requestPusatBiaya } from '@/domain/expense/transfers'
 import { requestScopeSql, projectScopeSql, narrowToSite, officeScope, teamScope } from '@/domain/reports/scope'
 import { rows } from '@/domain/reports/kpi'
 import { resetRateLimits } from '@/lib/rate-limit'
@@ -363,15 +363,11 @@ describe('site filter only narrows (ADR 0023 §5)', () => {
   })
 })
 
-describe('transfer default cost center (ADR 0023 §1)', () => {
-  it('a project without own cost center proposes the site\'s default cost center', async () => {
-    const p = await getTestPayload()
-    const proj = await sysCreate('projects', { code: 'sit-P4', name: 'sit Cabang tanpa PB', pm: w.users.pm.id, status: 'berjalan', site: siteA })
-    expect((await asUser(null, (req) => suggestedCostCenter(req, { project: proj })))?.id).toBe(siteCc)
-    // own default wins
-    expect((await asUser(null, (req) => suggestedCostCenter(req, { project: w.project })))?.id).toBe(w.projectCostCenter)
-    // a project of a site that has no default cost center → none proposed (Finance chooses)
-    await p.update({ collection: 'projects', id: proj, data: { site: siteB }, overrideAccess: true })
-    expect(await asUser(null, (req) => suggestedCostCenter(req, { project: proj }))).toBeNull()
+describe('transfer Pusat Biaya (ADR 0031 replaces the ADR 0023 §1 cost-center default)', () => {
+  it('the Pusat Biaya of a request is its project\'s cash account; none without a mapping', async () => {
+    const proj = await sysCreate('projects', { code: 'sit-P4', name: 'sit Cabang tanpa PB', pm: w.users.pm.id, status: 'berjalan', site: siteA, cashAccount: null })
+    expect((await asUser(null, (req) => requestPusatBiaya(req, { project: w.project })))?.id).toBe(w.cashAccount)
+    expect(await asUser(null, (req) => requestPusatBiaya(req, { project: proj }))).toBeNull()
+    expect(await asUser(null, (req) => requestPusatBiaya(req, {}))).toBeNull()
   })
 })

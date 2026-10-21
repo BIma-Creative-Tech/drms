@@ -4,18 +4,19 @@ import { relId } from '@/access/roles'
 import { today } from '@/domain/expense/common'
 import { loanScope, loanTotals } from '@/domain/loans/report'
 
-import { addRepayment, approveLoan, cancelLoan, createLoan, editLoan, listLoans, loadVisibleLoan, loanDetail, loanInbox, loanProjectOptions, rejectLoan, submitLoan, voidRepayment, type LoanDoc } from '@/domain/loans/service'
+import { addRepayment, approveLoan, cancelLoan, createLoan, disburseLoan, editLoan, listLoans, loadVisibleLoan, loanDetail, loanInbox, loanProjectOptions, rejectLoan, submitLoan, voidRepayment, type LoanDoc } from '@/domain/loans/service'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { companyQuery } from '../company-query'
 import { HttpError, json, v1 } from '../http'
 import { withNamedCompany } from '../named-company'
-import { LoanCreate, LoanDecision, LoanListQuery, LoanReason, LoanReject, LoanUpdate, RepaymentCreate } from '../schemas-loans'
+import { LoanCreate, LoanDecision, LoanDisburse, LoanListQuery, LoanReason, LoanReject, LoanUpdate, RepaymentCreate } from '../schemas-loans'
 
 /**
  * ADR 0022 Pinjaman antar project. Mutations: transactional + Idempotency-Key (mandatory for the APK), 30/min per
  * user like the addendum. Role checks live in the domain service (borrower PM creates; Direktur decides, G1;
- * borrower PM / Finance repay; Direktur / Finance void).
+ * ADR 0031: Finance disburses a cash-backed loan; borrower PM / Finance repay — Finance only when cash moves;
+ * Direktur / Finance void).
  */
 const WRITE_LIMIT: [number, number] = [30, 60_000]
 
@@ -157,7 +158,19 @@ export const addRepaymentEndpoint = v1({
   rateLimit: WRITE_LIMIT,
   transactional: true,
   idempotent: true,
-  handler: async ({ req, body, params }) => detail(req, await addRepayment(req, idParam(params), { amount: body.amount, repayDate: body.repayDate, note: body.note ?? null }), 201),
+  handler: async ({ req, body, params }) => detail(req, await addRepayment(req, idParam(params), { amount: body.amount, repayDate: body.repayDate, note: body.note ?? null, confirmOverdraft: body.confirmOverdraft === true }), 201),
+})
+
+/** ADR 0031 "Cairkan": Finance posts the KK / KM of an approved cash-backed loan (once). */
+export const disburseLoanEndpoint = v1({
+  path: '/project-loans/:id/disburse',
+  method: 'post',
+  body: LoanDisburse,
+  rateLimit: WRITE_LIMIT,
+  transactional: true,
+  idempotent: true,
+  handler: async ({ req, body, params }) =>
+    detail(req, await disburseLoan(req, idParam(params), { disburseDate: body.disburseDate, note: body.note ?? null, proofMediaId: body.proofMediaId ?? null, confirmOverdraft: body.confirmOverdraft === true })),
 })
 
 export const voidRepaymentEndpoint = v1({
@@ -182,6 +195,7 @@ export const LOAN_ENDPOINTS: Endpoint[] = [
   cancelLoanEndpoint,
   approveLoanEndpoint,
   rejectLoanEndpoint,
+  disburseLoanEndpoint,
   addRepaymentEndpoint,
   voidRepaymentEndpoint,
 ]

@@ -28,10 +28,12 @@ export type MoneyFormProps = {
    */
   precheckUrl?: string
   /**
-   * D2 (DRMS 10/10): transfer only — Finance picks the cost center of the money (required); `defaultId` = the
-   * project's default cost center (pre-selected, may be changed).
+   * ADR 0031 (DRMS 21/10): transfer only — the project's Pusat Biaya (cash account). It is the default "Dibayar dari
+   * akun"; picking another account shows the automatic inter-project loan panel (reason required, due date optional).
+   * `missing`: a project request whose project is not mapped yet — the transfer is refused until it is.
    */
-  costCenter?: { options: Array<{ id: number; label: string }>; defaultId: number | null }
+  pusatBiaya?: { id: number; name: string } | null
+  pusatBiayaMissing?: boolean
 }
 
 /** B-2 integration: the money form in the admin field look (KAS_STYLE .pk-fld), one row on desktop, stacked on a phone. */
@@ -51,7 +53,7 @@ async function uploadProof(kind: string, file: File): Promise<number> {
   return (data as { id: number }).id
 }
 
-export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amountText, precheckUrl, costCenter }: MoneyFormProps) {
+export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amountText, precheckUrl, pusatBiaya, pusatBiayaMissing }: MoneyFormProps) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -60,6 +62,10 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
   // Item 11 (DRMS 10/10): the T3 transfer records the date AND time of the bank proof (transfer SLA).
   const isTransfer = url.endsWith('/transfer')
   const uid = useId()
+  // ADR 0031: default source = the project's Pusat Biaya; another account → automatic loan panel
+  const defaultAccount = isTransfer && pusatBiaya && cashAccounts.some((a) => a.id === pusatBiaya.id) ? pusatBiaya.id : cashAccounts[0]?.id
+  const [account, setAccount] = useState<number | undefined>(defaultAccount)
+  const loan = isTransfer && pusatBiaya != null && account !== undefined && account !== pusatBiaya.id
   const send = async (body: Record<string, unknown>) => {
     const r = await postJson(url, body)
     if (r.ok) {
@@ -86,11 +92,14 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
       const at = String(f.get('transferAt') ?? '')
       if (!at) return setError('Isi tanggal & jam transfer sesuai bukti.')
       body.transferAt = at
-      if (costCenter) {
-        // D2: cost center chosen by Finance (mandatory)
-        const cc = Number(f.get('costCenterId') ?? '')
-        if (!cc) return setError('Pilih pusat biaya.')
-        body.costCenterId = cc
+      if (pusatBiayaMissing) return setError('Project belum dipetakan ke pusat biaya (akun kas). Petakan dulu di data project.')
+      if (loan) {
+        // ADR 0031 #4: paid from another account → automatic inter-project loan (reason required)
+        const reason = String(f.get('loanReason') ?? '').trim()
+        if (reason.length < 3) return setError('Isi alasan membayar dari akun lain (tercatat sebagai pinjaman antar project).')
+        body.loanReason = reason
+        const due = String(f.get('loanDueDate') ?? '')
+        if (due) body.loanDueDate = due
       }
     } else {
       const date = String(f.get('date') ?? '')
@@ -138,15 +147,23 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
       <div className="pk-mform__grid">
         <div className="pk-fld">
           <label htmlFor={`${uid}-acc`}>
-            Akun kas<span className="req" aria-hidden>*</span>
+            {isTransfer ? 'Dibayar dari akun' : 'Akun kas'}
+            <span className="req" aria-hidden>*</span>
           </label>
-          <WrapSelect id={`${uid}-acc`} name="cashAccountId" required defaultValue={cashAccounts[0]?.id}>
+          <WrapSelect id={`${uid}-acc`} name="cashAccountId" required defaultValue={defaultAccount} onChange={(e) => setAccount(Number(e.currentTarget.value))} data-pk-field="transfer-account">
             {cashAccounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
+                {isTransfer && pusatBiaya?.id === a.id ? ' (pusat biaya project)' : ''}
               </option>
             ))}
           </WrapSelect>
+          {isTransfer && pusatBiaya ? <p className="help">Pusat biaya project: {pusatBiaya.name}.</p> : null}
+          {isTransfer && pusatBiayaMissing ? (
+            <p className="help" role="alert" data-pk-transfer-pb-missing>
+              Project belum punya pusat biaya (akun kas) — transfer ditolak sampai dipetakan di data project.
+            </p>
+          ) : null}
         </div>
         {isTransfer ? (
           <div className="pk-fld">
@@ -163,20 +180,20 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
             <p className="help">Kosong = hari ini.</p>
           </div>
         )}
-        {isTransfer && costCenter ? (
-          <div className="pk-fld">
-            <label htmlFor={`${uid}-cc`}>
-              Pusat biaya<span className="req" aria-hidden>*</span>
+        {loan ? (
+          // ADR 0031 #4–#5: the payment from another account is recorded as an inter-project loan (KK on that account,
+          // KM on the project's Pusat Biaya) — automatic and approved; PM project and Direktur are notified
+          <div className="pk-fld full" role="note" data-pk-transfer-loan style={{ gridColumn: '1 / -1', borderLeft: '3px solid var(--pk-tone-warn)', paddingLeft: 10 }}>
+            <label htmlFor={`${uid}-loan`}>
+              Alasan membayar dari akun lain<span className="req" aria-hidden>*</span>
             </label>
-            <WrapSelect id={`${uid}-cc`} name="costCenterId" required defaultValue={costCenter.defaultId ?? ''} data-pk-field="transfer-cost-center">
-              <option value="">Pilih pusat biaya…</option>
-              {costCenter.options.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </WrapSelect>
-            <p className="help">{costCenter.defaultId ? 'Usulan: pusat biaya default project. Ubah bila perlu.' : 'Project belum punya pusat biaya default — pilih.'}</p>
+            <input id={`${uid}-loan`} type="text" name="loanReason" required minLength={3} maxLength={1000} placeholder="mis. saldo pusat biaya project belum cukup" data-pk-field="loan-reason" />
+            <p className="help">
+              Akun ini bukan pusat biaya project ({pusatBiaya?.name}). Akan tercatat otomatis <strong>pinjaman antar project</strong>: kas keluar dari akun pembayar dan kas masuk ke pusat biaya project.
+            </p>
+            <label htmlFor={`${uid}-due`}>Jatuh tempo pinjaman</label>
+            <DateInput id={`${uid}-due`} type="date" name="loanDueDate" hintClassName="help" data-pk-field="loan-due" />
+            <p className="help">Kosong = 30 hari setelah tanggal transfer.</p>
           </div>
         ) : null}
         {bankRef === 'required' ? (
