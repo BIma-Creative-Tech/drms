@@ -150,7 +150,9 @@ async function drive(target: string, type: 'advance' | 'reimburse', s: Scope, op
     await must(call('POST', `${E}/${id}/verify-receipts`, w.users.finance, {}))
     if (target === 'receipts_verified') return bump('receipts_verified')
   }
-  const transfer = async () => must(call('POST', `${E}/${id}/transfer`, w.users.finance, { cashAccountId: pick([w.cashAccount, cash2]), bankRef: `F3-${id}-${Math.floor(rnd() * 1e6)}`, proofMediaId: await proof(), transferDate: opts.transferDate }), 201)
+  // ADR 0031: paid from cash2 (not the project's Pusat Biaya) → automatic inter-project loan (reason required)
+  const transfer = async () =>
+    must(call('POST', `${E}/${id}/transfer`, w.users.finance, { cashAccountId: pick([w.cashAccount, cash2]), bankRef: `F3-${id}-${Math.floor(rnd() * 1e6)}`, proofMediaId: await proof(), transferDate: opts.transferDate, loanReason: 'uji rekonsiliasi: dibayar dari kas kecil' }), 201)
   const t = await transfer()
   if (target === 'void_retransfer') {
     void t
@@ -415,7 +417,7 @@ describe('K-02 kas masuk/keluar per bulan', () => {
     const doc = await sqlAs(
       'app',
       `SELECT period, sum(amount) FILTER (WHERE direction='in')::text AS masuk, sum(amount) FILTER (WHERE direction='out')::text AS keluar
-       FROM cash_entries WHERE company_id = $3 AND period BETWEEN $1 AND $2 AND status='posted' AND source_type<>'reversal' GROUP BY period`,
+       FROM cash_entries WHERE company_id = $3 AND period BETWEEN $1 AND $2 AND status='posted' AND source_type NOT IN ('reversal', 'project_loan') GROUP BY period`,
       [range().from, range().to, await companyId()], // MC4: Finance/Direktur of this world see PT #1 only; other suites (e.g. mc3-api) add rows in other PTs
     )
     const exp = new Map(doc.rows.map((x) => [x.period, x]))
@@ -640,16 +642,16 @@ describe('K-14 biaya per kendaraan / K-15 pusat biaya / K-17 per kategori', () =
     expect(form.vehicles[0]!.fromRequests).toBeGreaterThanOrEqual(600_000)
   })
 
-  it('K-15 per cost center and month = Σ out − Σ in of posted non-reversal ledger rows (every month with data)', async () => {
+  it('K-15 per Pusat Biaya (ADR 0031: a cash account) and month = Σ out − Σ in of its posted transfer / LPJ refund / manual rows (every month with data)', async () => {
     for (const period of periodRange(addMonths(month, -3), month)) {
       const list = await asFinance(async (req) => costCenterMonth(req, await officeScope(req), period))
       const doc = await sqlAs(
         'app',
-        "SELECT cost_center_id, sum(CASE direction WHEN 'out' THEN amount ELSE -amount END)::text AS s FROM cash_entries WHERE cost_center_id IS NOT NULL AND period=$1 AND status='posted' AND source_type<>'reversal' GROUP BY cost_center_id",
-        [period],
+        "SELECT cash_account_id, sum(CASE direction WHEN 'out' THEN amount ELSE -amount END)::text AS s FROM cash_entries WHERE company_id = $2 AND period=$1 AND status='posted' AND source_type::text IN ('transfer', 'settlement_refund', 'manual') GROUP BY cash_account_id",
+        [period, await companyId()],
       )
-      const exp = new Map(doc.rows.map((x) => [x.cost_center_id, n(x.s)]))
-      for (const c of list) expect(c.total, `${c.code} ${period}`).toBe(exp.get(c.id) ?? 0)
+      const exp = new Map(doc.rows.map((x) => [x.cash_account_id, n(x.s)]))
+      for (const c of list) expect(c.total, `${c.name} ${period}`).toBe(exp.get(c.id) ?? 0)
     }
   })
 

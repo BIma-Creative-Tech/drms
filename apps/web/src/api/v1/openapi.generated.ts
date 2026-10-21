@@ -18552,7 +18552,27 @@ export const openapiDocument = {
               "code",
               "name"
             ],
-            "description": "D2: default cost center proposed to Finance at the transfer."
+            "description": "D2 legacy cost center (retired by ADR 0031)."
+          },
+          "pusatBiaya": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "ADR 0031: the project's Pusat Biaya = a cash account of its PT (name only); null = not mapped yet (transfers refused)."
           },
           "site": {
             "type": [
@@ -18631,6 +18651,7 @@ export const openapiDocument = {
           "contractValue",
           "progressPct",
           "costCenter",
+          "pusatBiaya",
           "site",
           "rapPlanned",
           "rapRealised",
@@ -18728,7 +18749,27 @@ export const openapiDocument = {
               "code",
               "name"
             ],
-            "description": "D2: default cost center proposed to Finance at the transfer."
+            "description": "D2 legacy cost center (retired by ADR 0031)."
+          },
+          "pusatBiaya": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "ADR 0031: the project's Pusat Biaya = a cash account of its PT (name only); null = not mapped yet (transfers refused)."
           },
           "site": {
             "type": [
@@ -18847,6 +18888,7 @@ export const openapiDocument = {
           "contractValue",
           "progressPct",
           "costCenter",
+          "pusatBiaya",
           "site",
           "rapPlanned",
           "rapRealised",

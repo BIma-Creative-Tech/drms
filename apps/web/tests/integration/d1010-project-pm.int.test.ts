@@ -31,7 +31,7 @@ describe('validation (every write path)', () => {
     const bad = await api('POST', '/api/projects', w.users.owner, { code: 'D10-NOPM', name: 'Tanpa PM', status: 'berjalan' })
     expect(bad.status, JSON.stringify(bad.body)).toBe(400)
     expect(JSON.stringify(bad.body)).toContain(MSG)
-    const ok = await api('POST', '/api/projects', w.users.owner, { code: 'D10-PM', name: 'Dengan PM', status: 'berjalan', pm: w.users.pm.id })
+    const ok = await api('POST', '/api/projects', w.users.owner, { code: 'D10-PM', name: 'Dengan PM', status: 'berjalan', pm: w.users.pm.id, cashAccount: w.cashAccount })
     expect(ok.status, JSON.stringify(ok.body)).toBe(201)
   })
 

@@ -30,6 +30,7 @@ type ProjectDoc = {
   budget?: number | null
   progressPct?: number | null
   costCenter?: unknown
+  cashAccount?: unknown
   site?: unknown
   client?: unknown
   address?: string | null
@@ -56,6 +57,14 @@ async function refsOf(req: PayloadRequest, collection: 'cost-centers' | 'sites',
   return new Map(res.docs.map((c) => [c.id as number, { id: c.id as number, code: String((c as { code?: string }).code ?? ''), name: String((c as { name?: string }).name ?? '') }]))
 }
 
+/** ADR 0031: names of the projects' Pusat Biaya (cash accounts) — the name only (no bank data, no balance). */
+async function accountNamesOf(req: PayloadRequest, ids: Array<number | undefined>): Promise<Map<number, { id: number; name: string }>> {
+  const list = [...new Set(ids.filter((x): x is number => x !== undefined))]
+  if (list.length === 0) return new Map()
+  const res = await req.payload.find({ collection: 'cash-accounts', where: { id: { in: list } }, depth: 0, pagination: false, select: { name: true }, overrideAccess: true /* SYSTEM-READ: Pusat Biaya names of the visible projects */, req })
+  return new Map(res.docs.map((a) => [a.id as number, { id: a.id as number, name: String((a as { name?: string }).name ?? '') }]))
+}
+
 /** RAB of the projects regardless of the caller's field access (D4 rule input; the amount itself is not returned). */
 async function budgetsOf(req: PayloadRequest, docs: ProjectDoc[]): Promise<Map<number, number | null>> {
   if (docs.length === 0) return new Map()
@@ -65,9 +74,10 @@ async function budgetsOf(req: PayloadRequest, docs: ProjectDoc[]): Promise<Map<n
 
 async function items(req: PayloadRequest, docs: ProjectDoc[]) {
   const pmIds = docs.map((d) => relId(d.pm)).filter((x): x is number => x !== undefined)
-  const [names, ccs, sites, rap, budgets] = [
+  const [names, ccs, pbs, sites, rap, budgets] = [
     await displayNames(req, pmIds),
     await refsOf(req, 'cost-centers', docs.map((d) => relId(d.costCenter))),
+    await accountNamesOf(req, docs.map((d) => relId(d.cashAccount))),
     await refsOf(req, 'sites', docs.map((d) => relId(d.site))),
     await projectRapSummaries(req, docs.map((d) => d.id)),
     await budgetsOf(req, docs),
@@ -91,6 +101,8 @@ async function items(req: PayloadRequest, docs: ProjectDoc[]) {
       contractValue: typeof d.budget === 'number' ? d.budget : null,
       progressPct: typeof d.progressPct === 'number' ? d.progressPct : null,
       costCenter: ccs.get(relId(d.costCenter) ?? -1) ?? null,
+      // ADR 0031: the project's Pusat Biaya (cash account), name only
+      pusatBiaya: pbs.get(relId(d.cashAccount) ?? -1) ?? null,
       // ADR 0023: the branch office (kantor cabang) that handles the project
       site: sites.get(relId(d.site) ?? -1) ?? null,
       rapPlanned: prices ? (s?.planned ?? null) : null,

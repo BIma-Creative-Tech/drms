@@ -159,8 +159,15 @@ describe('read scopes (own / team / assigned / all)', () => {
     const p = await getTestPayload()
     for (const slug of ['cash-accounts', 'cash-in-sources', 'approval-rules', 'audit-logs', 'web-sessions', 'document-sequences'] as CollectionSlug[]) {
       for (const role of ['pk-staff', 'pk-pm'] as Role[]) {
+        // ADR 0031: the PM reads the ACTIVE cash accounts of his PT as the project's Pusat Biaya picker (names only)
+        if (slug === 'cash-accounts' && role === 'pk-pm') continue
         await expect(p.find({ collection: slug, user: users[role], overrideAccess: false, depth: 0 }), `${role} ${slug}`).rejects.toMatchObject({ status: 403 })
       }
+    }
+    const pmAccounts = await p.find({ collection: 'cash-accounts', user: users['pk-pm'], overrideAccess: false, depth: 0, limit: 200 })
+    for (const a of pmAccounts.docs as unknown as Array<Record<string, unknown>>) {
+      expect(a.active, `account ${a.id}`).not.toBe(false)
+      for (const f of ['accountNo', 'accountHolder', 'bank', 'openingBalance', 'openingBalanceDate', 'odooJournalCode']) expect(a, `account ${a.id}`).not.toHaveProperty(f)
     }
   })
 

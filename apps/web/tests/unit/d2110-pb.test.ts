@@ -66,9 +66,10 @@ describe('loanAllowedActions with cash (ADR 0031)', () => {
 
 describe('project Pusat Biaya validation', () => {
   const user = { user: { id: 1 } }
-  it('required on a user create and when a user clears it; system writes / untouched updates pass', () => {
+  it('required on a user create and when a user clears a stored one; legacy unmapped rows stay editable; system writes pass', () => {
     expect(projectCashAccountValidate(undefined, { operation: 'create', req: user })).toBe(PROJECT_PB_REQUIRED)
-    expect(projectCashAccountValidate(null, { operation: 'update', req: user })).toBe(PROJECT_PB_REQUIRED)
+    expect(projectCashAccountValidate(null, { operation: 'update', req: user, previousValue: 3 })).toBe(PROJECT_PB_REQUIRED)
+    expect(projectCashAccountValidate(null, { operation: 'update', req: user, previousValue: null })).toBe(true)
     expect(projectCashAccountValidate(undefined, { operation: 'update', req: user })).toBe(true)
     expect(projectCashAccountValidate(undefined, { operation: 'create', req: {} })).toBe(true)
     expect(projectCashAccountValidate(7, { operation: 'create', req: user })).toBe(true)

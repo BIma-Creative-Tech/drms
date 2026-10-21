@@ -173,15 +173,18 @@ describe('QA-04 — cash-out below 0: 409 CASH_OVERDRAFT_CONFIRM_REQUIRED, confi
 
   it('transfer from an account without enough balance: 409, then confirmed transfer + audit row with the transfer', async () => {
     const id = await approvedAdvance()
-    const body = { cashAccountId: small, bankRef: `QF4-${id}`, proofMediaId: await proof() }
+    // ADR 0031: `small` is not the project's Pusat Biaya → automatic loan; the overdraft is asked on its KK (paying account)
+    const body = { cashAccountId: small, bankRef: `QF4-${id}`, proofMediaId: await proof(), loanReason: 'uji saldo minus' }
     const r = await api('POST', `${E}/${id}/transfer`, w.users.finance, body)
     expect(r.status, JSON.stringify(r.body)).toBe(409)
     expect(r.body).toMatchObject({ code: 'CASH_OVERDRAFT_CONFIRM_REQUIRED', balance: 0, after: -750_000 })
     expect(Number((await sqlAs('app', 'SELECT count(*)::int AS n FROM transfers WHERE request_id = $1', [id])).rows[0].n)).toBe(0)
     const ok = await api('POST', `${E}/${id}/transfer`, w.users.finance, { ...body, confirmOverdraft: true })
     expect(ok.status, JSON.stringify(ok.body)).toBe(201)
-    const row = (await auditRows('cash_entry', ok.body.cashEntryId)).find((x) => x.action === 'overdraft_confirmed')!
-    expect(row.new_value).toMatchObject({ v: { balance: -750_000, sourceType: 'transfer', transferId: ok.body.transferId, expenseRequestId: id } })
+    expect(ok.body.projectLoan).toMatchObject({ kk: expect.any(String) })
+    const kk = (await sqlAs('app', "SELECT id FROM cash_entries WHERE project_loan_id = $1 AND direction = 'out'", [ok.body.projectLoan.id])).rows[0].id as number
+    const row = (await auditRows('cash_entry', kk)).find((x) => x.action === 'overdraft_confirmed')!
+    expect(row.new_value).toMatchObject({ v: { balance: -750_000, sourceType: 'project_loan' } })
   })
 
   it('a void (reversal) is a correction and never asks', async () => {

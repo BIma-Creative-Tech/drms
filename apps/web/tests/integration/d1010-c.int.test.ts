@@ -149,34 +149,33 @@ describe('D4: RAP item per line, plan vs realisation, "Melebihi RAP"', () => {
     expect((await sqlError('app', 'UPDATE expense_requests_lines SET rap_item_id = $1 WHERE _parent_id = $2', [item['A.2'], a]))?.code).toBe('42501')
   })
 
-  it('D2 transfer: cost center required (default = the project\'s); KK carries project + cost center; K-15 by the chosen cost center', async () => {
+  it('ADR 0031 transfer: charged to the project\'s Pusat Biaya (a cost center from an old client is ignored); KK carries the project; K-15 by the account', async () => {
     const q = (await api('GET', '/api/v1/transfer-queue', w.users.finance)).body.items.find((x: { id: number }) => x.id === a)
-    expect(q).toMatchObject({ project: { id: kon }, costCenter: { id: w.projectCostCenter }, bankVerification: 'verified', sla: expect.objectContaining({ slaHours: expect.any(Number) }) })
+    expect(q).toMatchObject({ project: { id: kon }, costCenter: null, pusatBiaya: { id: w.cashAccount }, pusatBiayaMissing: false, bankVerification: 'verified', sla: expect.objectContaining({ slaHours: expect.any(Number) }) })
     const t = await api('POST', `${E}/${a}/transfer`, w.users.finance, { cashAccountId: w.cashAccount, bankRef: `DC-${a}`, proofMediaId: await proof(), costCenterId: w.costCenter })
     expect(t.status, JSON.stringify(t.body)).toBe(201)
-    expect(t.body.request.transfers[0].costCenter).toMatchObject({ id: w.costCenter })
-    const kk = (await sqlAs('app', 'SELECT project_id, cost_center_id FROM cash_entries WHERE id = $1', [t.body.cashEntryId])).rows[0]
-    expect(kk).toEqual({ project_id: kon, cost_center_id: w.costCenter })
+    expect(t.body.request.transfers[0]).toMatchObject({ costCenter: null, cashAccount: { id: w.cashAccount }, paidFromCashAccount: null, projectLoan: null })
+    const kk = (await sqlAs('app', 'SELECT project_id, cost_center_id, cash_account_id FROM cash_entries WHERE id = $1', [t.body.cashEntryId])).rows[0]
+    expect(kk).toEqual({ project_id: kon, cost_center_id: null, cash_account_id: w.cashAccount })
     const rap = (await api('GET', `/api/v1/projects/${kon}/rap`, w.users.finance)).body
     expect(rap.items.find((i: { code: string }) => i.code === 'A.1').transferredAmount).toBe(600_000)
     const month = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Makassar' }).slice(0, 7)
     const k15 = await asUser(w.users.finance, async (req) => costCenterMonth(req, await officeScope(req), month))
-    expect(k15.find((c) => c.id === w.costCenter)!.fromRequests).toBeGreaterThanOrEqual(850_000)
+    expect(k15.find((c) => c.id === w.cashAccount)!.fromRequests).toBeGreaterThanOrEqual(600_000)
   })
 
-  it('no default cost center and none chosen → 400 costCenterId; a cost center of another PT → 400', async () => {
+  it('a project without Pusat Biaya → the queue flags it and the transfer is refused (409)', async () => {
     const c = await api('POST', E, w.users.staffA, draftBody(w, { projectId: bare, lines: [rapLine(null, 50_000)] }))
-    // `bare` has no RAP → a legacy-free path: make it a plain (umum) project WITHOUT RAB for this check (D4 2026-10-11:
-    // a project with a RAB needs a RAP whatever its kind)
-    await sqlAs('owner', 'UPDATE projects SET kind = $1, budget = NULL WHERE id = $2', ['umum', bare])
+    // `bare` has no RAP → make it a plain (umum) project WITHOUT RAB for this check (D4 2026-10-11: a project with a RAB
+    // needs a RAP whatever its kind); and unmapped (ADR 0031)
+    await sqlAs('owner', 'UPDATE projects SET kind = $1, budget = NULL, cash_account_id = NULL WHERE id = $2', ['umum', bare])
     expect((await api('POST', `${E}/${c.body.id}/submit`, w.users.staffA, {})).status).toBe(200)
     expect((await api('POST', `${E}/${c.body.id}/acknowledge`, w.users.owner, {})).status).toBe(200)
     expect((await api('POST', `${E}/${c.body.id}/approve`, w.users.finance, {})).status).toBe(200)
     const q = (await api('GET', '/api/v1/transfer-queue', w.users.finance)).body.items.find((x: { id: number }) => x.id === c.body.id)
-    expect(q.costCenter).toBeNull()
+    expect(q).toMatchObject({ costCenter: null, pusatBiaya: null, pusatBiayaMissing: true })
     const none = await api('POST', `${E}/${c.body.id}/transfer`, w.users.finance, { cashAccountId: w.cashAccount, bankRef: `DC-N-${c.body.id}`, proofMediaId: await proof() })
-    expect(none.status).toBe(400)
-    expect(none.body.errors).toEqual([expect.objectContaining({ path: 'costCenterId' })])
+    expect(none.status).toBe(409)
   })
 })
 
@@ -185,7 +184,7 @@ describe('APK: projects, cost centers, request list filters', () => {
     const staff = await api('GET', '/api/v1/projects?limit=100', w.users.staffA)
     expect(staff.status).toBe(200)
     const sk = staff.body.docs.find((p: { id: number }) => p.id === kon)
-    expect(sk).toMatchObject({ code: expect.any(String), kind: 'konstruksi', pm: { id: w.users.pm.id }, costCenter: { id: w.projectCostCenter }, rapPlanned: null, rapRealised: null, rapItems: 2 })
+    expect(sk).toMatchObject({ code: expect.any(String), kind: 'konstruksi', pm: { id: w.users.pm.id }, costCenter: { id: w.projectCostCenter }, pusatBiaya: { id: w.cashAccount }, rapPlanned: null, rapRealised: null, rapItems: 2 })
     expect(staff.body.docs.some((p: { id: number }) => p.id === w.otherProject)).toBe(false)
     const own = await api('GET', `/api/v1/projects?q=${encodeURIComponent('Gedung uji RAP')}&limit=1&page=1`, w.users.owner)
     expect(own.body).toMatchObject({ page: 1, limit: 1 })

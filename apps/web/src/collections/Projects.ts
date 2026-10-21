@@ -55,14 +55,15 @@ export const PROJECT_PB_REQUIRED = 'Pusat biaya (akun kas) wajib dipilih'
 
 /**
  * ADR 0031 (DRMS 21/10 #2): the Pusat Biaya (a cash account of the PT) is mapped when the project is created, so the
- * requester never picks one. Required on a USER create (admin form, REST) and whenever a user write SENDS it empty
- * (clearing is refused). System writes (seed, import, jobs — no user) and updates that do not send the field stay
- * valid: a legacy project without a mapping is listed on the dashboard and its transfers are refused until mapped.
+ * requester never picks one. Required on a USER create (admin form, REST); on an update only CLEARING a stored one is
+ * refused — Payload validates the merged row, so a legacy project without a mapping stays editable (progress
+ * recalculation, address …); it is listed on the dashboard and its transfers are refused until mapped. System writes
+ * (seed, import, jobs — no user) are never refused here.
  */
-export function projectCashAccountValidate(value: unknown, { operation, req }: { operation?: string; req?: { user?: unknown } }): true | string {
-  if (value !== null && value !== undefined && value !== '') return true
-  if (!req?.user) return true
-  if (value === undefined && operation === 'update') return true
+export function projectCashAccountValidate(value: unknown, { operation, req, previousValue }: { operation?: string; req?: { user?: unknown }; previousValue?: unknown }): true | string {
+  const empty = (v: unknown) => v === null || v === undefined || v === ''
+  if (!empty(value) || !req?.user) return true
+  if (operation === 'update' && empty(previousValue)) return true
   return PROJECT_PB_REQUIRED
 }
 

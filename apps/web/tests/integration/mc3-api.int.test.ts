@@ -476,6 +476,7 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'PATCH /project-loans/:id': 'document',
   'POST /project-loans/:id/submit': 'document',
   'POST /project-loans/:id/cancel': 'document',
+  'POST /project-loans/:id/disburse': 'document',
   'POST /project-loans/:id/approve': 'document',
   'POST /project-loans/:id/reject': 'document',
   'POST /project-loans/:id/repayments': 'document',
