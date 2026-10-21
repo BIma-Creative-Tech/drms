@@ -154,12 +154,12 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     super.dispose();
   }
 
-  /// D2: the requester never chooses a cost center (Finance does at transfer); a pre-D2 draft drops it here.
+  /// D2 / ADR 0031: the requester never chooses a cost center (the Pusat Biaya is the project's cash account); a legacy
+  /// draft keeps its old one locally (shown read-only, never sent) until it gets a project.
   DraftRequest _collect() => _d.copyWith(
     title: _title.text,
     notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-    // ADR 0027 (client 2026-10-14) / 0028: only a vendor / PT grup payment without a project keeps a cost center
-    costCenterId: _d.isDirectPayment && _d.projectId == null ? _d.costCenterId : null,
+    costCenterId: _d.projectId == null ? _d.costCenterId : null,
     invoiceNo: _d.isDirectPayment ? (_invoiceNo.text.trim().isEmpty ? null : _invoiceNo.text.trim()) : null,
   );
 
@@ -338,9 +338,11 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     return p.employee?.id ?? -1;
   }
 
-  /// D4: the RAP rule of the chosen project as far as the phone knows it (offline / not loaded → strict).
+  /// D4: the RAP rule of the chosen project as far as the phone knows it (offline / not loaded → strict). ADR 0031: a
+  /// vendor / PT grup payment without project has no RAP (the server asks a RAP item only of a project with a RAP).
   RapCheck _rapCheck() {
     final pid = _d.projectId;
+    if (pid == null && _d.isDirectPayment) return RapCheck.optional;
     final rap = pid == null ? null : ref.read(projectRapProvider(pid)).value;
     if (rap == null || rap.offline) return RapCheck.strict;
     if (rap.missing) return RapCheck.missing;
@@ -529,6 +531,9 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
         .where((a) => _d.requesterIds.isEmpty || _d.requesterIds.contains((a.extra['employee'] as num?)?.toInt()))
         .toList();
     final urgencies = _byRank(m[MasterTypes.urgencyLevels] ?? const <MasterItem>[]);
+    // ADR 0031: a legacy draft's old cost center (read-only, never sent)
+    final legacyCc = widget.initial.costCenterId;
+    final legacyCcName = m[MasterTypes.costCenters]?.where((c) => c.id == legacyCc).firstOrNull?.label ?? '#$legacyCc';
     // ADR 0027: Staff / Finance / PM may switch to "Vendor"; the chosen vendor's active accounts. ADR 0028: Finance /
     // PM / Direktur may switch to "PT grup".
     final mayVendor = _mayFileVendorPayment();
@@ -669,7 +674,8 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                     decoration: InputDecoration(labelText: label, errorText: issueFor('title')),
                   ),
                 ),
-                // D2 (DRMS 10/10): project required, no cost center choice (Finance sets it at transfer).
+                // D2 (DRMS 10/10) / ADR 0031: project required, no cost center choice (Pusat Biaya = the project's cash
+                // account).
                 FormGridCell(
                   label: t.fieldProject,
                   child: Column(
@@ -680,29 +686,29 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                         label: t.fieldProject,
                         items: m[MasterTypes.projects] ?? const [],
                         value: _d.projectId,
-                        // ADR 0027 / 0028: a vendor / PT grup payment may go without a project (then a cost center)
+                        // ADR 0027 / 0028 / 0031: a vendor / PT grup payment may go without a project (no Pusat Biaya;
+                        // Finance picks the paying account)
                         allowNone: _d.isDirectPayment,
                         errorText: issueFor('projectId'),
                         onChanged: _setProject,
                       ),
-                      if (_d.isDirectPayment && _d.projectId == null) ...[
-                        const SizedBox(height: 8),
-                        MasterPickerField(
-                          key: const Key('draft-cost-center'),
-                          label: t.fieldCostCenter,
-                          hint: t.vendorCostCenterHint,
-                          items: m[MasterTypes.costCenters] ?? const [],
-                          value: _d.costCenterId,
-                          onChanged: (v) => setState(() => _d = _d.copyWith(costCenterId: v)),
+                      if (_d.isDirectPayment && _d.projectId == null)
+                        Padding(
+                          key: const Key('draft-no-project-hint'),
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(t.directPaymentNoProjectHint, style: Theme.of(context).textTheme.bodySmall),
                         ),
-                      ],
                       // D4 (owner 2026-10-11): project with a RAB but no RAP → submit refused; same text as the web
                       if (rap != null && rap.missing) const _RapMissingCard(),
-                      if (!_d.isDirectPayment && _d.projectId == null && widget.initial.costCenterId != null)
+                      // ADR 0031: a legacy draft's old cost center, read-only (never sent; dropped with a project)
+                      if (_d.projectId == null && legacyCc != null)
                         Padding(
                           key: const Key('draft-cost-center-legacy'),
                           padding: const EdgeInsets.only(top: 4),
-                          child: Text(t.draftCostCenterLegacy, style: TextStyle(color: context.pk.warnText)),
+                          child: Text(
+                            '${t.costCenterLegacyValue(legacyCcName)}\n${t.draftCostCenterLegacy}',
+                            style: TextStyle(color: context.pk.warnText),
+                          ),
                         ),
                     ],
                   ),

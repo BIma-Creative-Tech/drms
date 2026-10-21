@@ -447,7 +447,7 @@ class PmTeamKpis extends ConsumerWidget {
           TrendCard(rows: d.trend, title: t.kpiTrendTeamTitle, subtitle: t.kpiTrendTeamSubtitle),
           CategoryCard(mix: d.categories, subtitle: t.kpiCategoriesSubtitleTeam),
           if (d.loans case final l?) LoanCard(data: l),
-          CostCentersCard(rows: d.costCenters, title: t.kpiCostCentersTeamTitle),
+          CostCentersCard(rows: d.costCenters, title: t.kpiCostCentersTeamTitle, empty: t.kpiCostCentersTeamEmpty),
         ],
       );
     });
@@ -546,12 +546,8 @@ class AdminKpis extends ConsumerWidget {
             children: [
               gap(const Key('kpi-admin-users'), Icons.people_outline, t.kpiAdminUsers, d.usersIncomplete),
               gap(const Key('kpi-admin-projects'), Icons.track_changes, t.kpiAdminProjects, d.projectsWithoutPm),
-              gap(
-                const Key('kpi-admin-cost-centers'),
-                Icons.balance,
-                t.kpiAdminCostCenters,
-                d.costCentersWithoutManager,
-              ),
+              // ADR 0031: a project without Pusat Biaya (cash account) cannot be paid — Finance's transfer is refused
+              gap(const Key('kpi-admin-pusat-biaya'), Icons.balance, t.kpiAdminPusatBiaya, d.projectsWithoutPusatBiaya),
             ],
           ),
           Padding(

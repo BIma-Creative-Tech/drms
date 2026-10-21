@@ -316,6 +316,13 @@ Map<String, dynamic> adminW3Json() => {
   'companies': [
     {'id': 1, 'shortCode': 'DRMS', 'name': 'PT DRMS Contoh'},
   ],
-  'gaps': {'usersIncomplete': 2, 'projectsWithoutPm': 0, 'costCentersWithoutManager': 1, 'byCompany': <Object>[]},
+  // ADR 0031: `projectsWithoutPusatBiaya` replaces `costCentersWithoutManager` (deprecated, always 0)
+  'gaps': {
+    'usersIncomplete': 2,
+    'projectsWithoutPm': 0,
+    'projectsWithoutPusatBiaya': 1,
+    'costCentersWithoutManager': 0,
+    'byCompany': <Object>[],
+  },
   'latestAudit': <Object>[],
 };

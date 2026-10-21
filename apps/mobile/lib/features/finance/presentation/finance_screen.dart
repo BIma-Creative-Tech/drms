@@ -235,7 +235,8 @@ class TransferQueueCard extends ConsumerWidget {
     // MC3: "Catat transfer" only for Finance of the request's PT (the server checks it again).
     final canTransfer = ref.watch(accountProfileProvider)?.forCompany(it.companyId).has(Role.finance) ?? false;
     final flags = it.warningFlags + it.infoFlags;
-    final cc = it.costCenter;
+    // ADR 0031: the project's Pusat Biaya (cash account) — the default paying account of the transfer
+    final pb = it.pusatBiaya?.label ?? (it.pusatBiayaMissing ? t.pusatBiayaQueueMissing : t.costCenterByFinance);
     return Card(
       key: Key('tq-${it.id}'),
       margin: const EdgeInsets.only(bottom: 10),
@@ -290,9 +291,9 @@ class TransferQueueCard extends ConsumerWidget {
               if (it.project != null)
                 Text([?it.project!.code, ?it.project!.name].join(' '), style: theme.textTheme.bodySmall),
               Text(
-                '${t.fieldCostCenter}: ${cc == null ? t.costCenterByFinance : '${cc.code ?? ''} ${cc.name ?? ''}'.trim()}',
+                '${t.fieldCostCenter}: $pb',
                 key: Key('tq-${it.id}-cc'),
-                style: theme.textTheme.bodySmall,
+                style: theme.textTheme.bodySmall?.copyWith(color: it.pusatBiayaMissing ? context.pk.warnText : null),
               ),
               Text(it.statusLabel, style: theme.textTheme.bodySmall),
               const SizedBox(height: 6),

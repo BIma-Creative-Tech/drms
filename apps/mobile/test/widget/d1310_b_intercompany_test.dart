@@ -14,7 +14,6 @@ import 'package:proyekkas/features/dashboard/presentation/charts.dart';
 import 'package:proyekkas/features/dashboard/presentation/kpi_home.dart';
 import 'package:proyekkas/features/expense/application/expense_providers.dart';
 import 'package:proyekkas/features/expense/data/expense_mappers.dart';
-import 'package:proyekkas/features/expense/domain/expense_request.dart';
 import 'package:proyekkas/features/expense/domain/intercompany.dart';
 import 'package:proyekkas/features/expense/presentation/draft_editor_screen.dart';
 import 'package:proyekkas/features/expense/presentation/request_detail_screen.dart';
@@ -105,7 +104,7 @@ TransferQueueItem _icQueueItem() => transferQueueItemFromJson({
 /// Finance API whose transfer is refused because the receiving PT closed the period (as the server answers).
 class _ClosedPeriodFinanceApi extends FakeFinanceApi {
   @override
-  Future<ExpenseDetail> recordTransfer(
+  Future<TransferOutcome> recordTransfer(
     int requestId,
     Map<String, dynamic> body, {
     required String idempotencyKey,

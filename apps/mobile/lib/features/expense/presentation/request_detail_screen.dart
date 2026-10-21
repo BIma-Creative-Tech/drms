@@ -94,6 +94,10 @@ class _DetailBody extends ConsumerWidget {
       child: Text(title, style: theme.textTheme.titleMedium),
     );
     String refText(RefItem r) => '${r.code ?? ''} ${r.name ?? ''}'.trim();
+    // ADR 0031: the latest posted transfer paid from an account other than the Pusat Biaya (→ its automatic loan)
+    final paidFrom = d.transfers.where((x) => !x.isVoid && x.paidFromCashAccount != null).lastOrNull;
+    final paidFromAccount = paidFrom?.paidFromCashAccount?.label;
+    final paidFromLoan = paidFrom?.projectLoan?.docNo;
     final over = (d.budget.pctAfter ?? 0) > 85;
     // d1010 (WA-08): PT as "shortCode — name" (the membership's name; the code alone for a PT the user is no longer
     // a member of) — a badge in the header since DRMS 13/10 Persetujuan #8.
@@ -178,9 +182,20 @@ class _DetailBody extends ConsumerWidget {
     final summary = <Widget>[
       section(t.sectionRequestDetails, key: const Key('section-details')),
       if (d.approvedAmount != null) row(t.approvedAmount, formatRupiah(d.approvedAmount!)),
-      // D2: project of the request; the cost center is Finance's (set at transfer) — shown once known.
       row(t.fieldProject, d.project == null ? '-' : refText(d.project!), key: const Key('detail-project')),
-      if (d.costCenter != null) row(t.fieldCostCenter, refText(d.costCenter!), key: const Key('detail-cost-center')),
+      // ADR 0031 (DRMS 21/10): the Pusat Biaya = the project's cash account (read-only; the requester never picks it)
+      if (d.project != null)
+        row(t.fieldCostCenter, d.pusatBiaya?.label ?? t.pusatBiayaUnmapped, key: const Key('detail-pusat-biaya')),
+      // D2 legacy: the own cost center of an old non-project request
+      if (d.project == null && d.costCenter != null)
+        row(t.costCenterLegacyLabel, refText(d.costCenter!), key: const Key('detail-cost-center')),
+      // ADR 0031: a transfer paid from another account → the automatic inter-project loan
+      if (paidFromAccount != null)
+        row(
+          t.paidFromAccountLabel,
+          paidFromLoan == null ? paidFromAccount : t.paidFromAccountLoan(paidFromAccount, paidFromLoan),
+          key: const Key('detail-paid-from'),
+        ),
       if (d.urgencyLevel != null) row(t.fieldUrgency, d.urgencyLevel!.name ?? '-'),
       if (d.requestDate != null) row(t.requestDate, formatDateOnly(d.requestDate)),
       row(t.neededDate, formatDateOnly(d.neededDate)),

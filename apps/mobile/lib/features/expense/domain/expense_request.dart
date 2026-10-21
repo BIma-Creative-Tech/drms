@@ -138,11 +138,20 @@ abstract class TransferInfo with _$TransferInfo {
     /// Item 11: date + time of the bank proof (UTC ISO); null = recorded without a time.
     String? transferAt,
 
-    /// D2: cost center chosen by Finance at the transfer (null before DRMS 10/10).
+    /// D2 legacy: cost center chosen by Finance at the transfer (transfers of 10/10–21/10/2026 only).
     RefItem? costCenter,
     String? bankRef,
     required String status, // posted | void
     String? voidReason,
+
+    /// ADR 0031: the account the transfer is charged to (the project's Pusat Biaya).
+    AccountRef? cashAccount,
+
+    /// ADR 0031: the account actually paid from when it is not the Pusat Biaya (null = paid from it).
+    AccountRef? paidFromCashAccount,
+
+    /// ADR 0031: the automatic inter-project loan of a transfer paid from another account.
+    TransferLoanRef? projectLoan,
   }) = _TransferInfo;
 
   bool get isVoid => status == 'void';
@@ -368,6 +377,10 @@ abstract class ExpenseDetail with _$ExpenseDetail {
     /// ADR 0029 "Ketersediaan dana PT" (`fundCheck`): Finance / Direktur / Owner of the PT while the request waits for a
     /// decision (or the Owner's own Draft); null otherwise and from a server before ADR 0029.
     FundCheck? fundCheck,
+
+    /// ADR 0031 (DRMS 21/10): the Pusat Biaya = the project's cash account (read-only; null without project or while
+    /// the project is not mapped). [costCenter] is a legacy non-project request's own cost center only.
+    AccountRef? pusatBiaya,
   }) = _ExpenseDetail;
 }
 
@@ -404,6 +417,38 @@ class RequestIntercompany {
 
   @override
   int get hashCode => Object.hash(targetEntryNo, voided, targetCompany, transferId);
+}
+
+/// ADR 0031 `{id, name}` of a cash account (Pusat Biaya, the account a transfer was paid from).
+class AccountRef {
+  const AccountRef({required this.id, this.name});
+  final int id;
+  final String? name;
+
+  /// The name, else "#id".
+  String get label => name == null || name!.isEmpty ? '#$id' : name!;
+
+  @override
+  bool operator ==(Object other) => other is AccountRef && other.id == id && other.name == name;
+
+  @override
+  int get hashCode => Object.hash(id, name);
+}
+
+/// ADR 0031 `transfers[].projectLoan {id, docNo, status}`: the automatic inter-project loan of a transfer paid from an
+/// account other than the project's Pusat Biaya.
+class TransferLoanRef {
+  const TransferLoanRef({required this.id, this.docNo, this.status});
+  final int id;
+  final String? docNo;
+  final String? status;
+
+  @override
+  bool operator ==(Object other) =>
+      other is TransferLoanRef && other.id == id && other.docNo == docNo && other.status == status;
+
+  @override
+  int get hashCode => Object.hash(id, docNo, status);
 }
 
 /// ADR 0025 `ExpenseRequestDetail.direkturSignature`: the caller is a designated representative deciding a Direktur

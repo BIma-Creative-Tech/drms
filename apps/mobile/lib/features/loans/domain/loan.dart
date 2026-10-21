@@ -1,7 +1,10 @@
 // ADR 0022 Pinjaman antar project (openapi `ProjectLoanSummary` / `ProjectLoanDetail` / `ProjectLoanOptions`).
 // A recorded claim of the lender project on the borrower project of the same PT: the PM of the borrower submits,
-// one Direktur decides (G1), repayments are recorded on the web (borrower PM / Finance). No cash entry exists for a
-// loan. Parsing is tolerant (unknown fields ignored, missing ones defaulted).
+// one Direktur decides (G1), repayments by the borrower PM / Finance. ADR 0031 (DRMS 21/10): money between two
+// different Pusat Biaya (cash accounts) is "cash-backed" — Finance disburses it ("Cairkan": KK lender, KM borrower)
+// and records its repayments (KK borrower, KM lender); a transfer paid from another account than the project's Pusat
+// Biaya records an automatic loan (origin `transfer`, lender = the paying account, no lender project). Goods or the
+// same account stay a claim without cash. Parsing is tolerant (unknown fields ignored, missing ones defaulted).
 
 int _int(Object? v, [int fallback = 0]) =>
     v is num ? v.toInt() : (v is String ? int.tryParse(v) ?? fallback : fallback);
@@ -37,13 +40,14 @@ enum LoanStatus {
 }
 
 /// Actions of `allowedActions` (the server decides; the APK only shows the buttons). `repay` = "Catat pengembalian"
-/// (phase 3, user 2026-10-19).
+/// (phase 3, user 2026-10-19); `disburse` = "Cairkan" (ADR 0031, Finance, approved cash-backed loan, once).
 enum LoanAction {
   edit,
   submit,
   cancel,
   approve,
   reject,
+  disburse,
   repay;
 
   static LoanAction? fromCode(String c) => LoanAction.values.where((a) => a.name == c).firstOrNull;
@@ -84,6 +88,32 @@ class LoanProjectRef {
   }
 }
 
+/// ADR 0031 `{id, name}` of a Pusat Biaya (cash account) of a loan side.
+class LoanAccountRef {
+  const LoanAccountRef({required this.id, this.name});
+  final int id;
+  final String? name;
+
+  String get label => name == null || name!.isEmpty ? '#$id' : name!;
+
+  static LoanAccountRef? fromJson(Object? v) {
+    final j = _map(v);
+    final id = _intN(j['id']);
+    return id == null ? null : LoanAccountRef(id: id, name: _strN(j['name']));
+  }
+}
+
+/// ADR 0031 entry numbers of a loan's cash pair: `disbursement {kk, km}` (KK lender, KM borrower) or a repayment's
+/// `cash {kk, km}` (KK borrower, KM lender); null when no cash moved.
+class LoanCash {
+  const LoanCash({this.kk, this.km});
+  final String? kk;
+  final String? km;
+
+  static LoanCash? fromJson(Object? v) =>
+      v is Map<String, dynamic> ? LoanCash(kk: _strN(v['kk']), km: _strN(v['km'])) : null;
+}
+
 class LoanRepayment {
   const LoanRepayment({
     required this.id,
@@ -96,6 +126,7 @@ class LoanRepayment {
     this.voidReason,
     this.recordedByName,
     this.voidedByName,
+    this.cash,
   });
   final int id;
 
@@ -110,6 +141,9 @@ class LoanRepayment {
   final String? recordedByName;
   final String? voidedByName;
 
+  /// ADR 0031: KK (borrower) / KM (lender) numbers of a cash-backed loan's repayment; null for a claim or a void.
+  final LoanCash? cash;
+
   factory LoanRepayment.fromJson(Map<String, dynamic> j) => LoanRepayment(
     id: _int(j['id']),
     seq: _intN(j['seq']),
@@ -121,6 +155,7 @@ class LoanRepayment {
     voidReason: _strN(j['voidReason']),
     recordedByName: _strN(_map(j['recordedBy'])['name']),
     voidedByName: _strN(_map(j['voidedBy'])['name']),
+    cash: LoanCash.fromJson(j['cash']),
   );
 }
 
@@ -151,8 +186,18 @@ class Loan {
     this.daysOverdue = 0,
     required this.kind,
     required this.kindLabel,
-    required this.lender,
+    this.origin = 'manual',
+    this.originLabel = '',
+    this.lender,
     required this.borrower,
+    this.lenderCashAccount,
+    this.borrowerCashAccount,
+    this.cashBacked = false,
+    this.disbursedAt,
+    this.disbursedBy,
+    this.awaitingDisbursement = false,
+    this.transfer,
+    this.disbursement,
     required this.amount,
     this.repaidTotal = 0,
     this.outstanding = 0,
@@ -188,8 +233,32 @@ class Loan {
   final int daysOverdue;
   final String kind; // dana | barang
   final String kindLabel;
-  final LoanProjectRef lender;
+
+  /// ADR 0031: `manual` (PM → Direktur) | `transfer` (automatic: Finance paid a project request from another account).
+  final String origin;
+  final String originLabel;
+
+  /// Null for an automatic loan — its lender is [lenderCashAccount] (ADR 0031).
+  final LoanProjectRef? lender;
   final LoanProjectRef borrower;
+
+  /// ADR 0031: Pusat Biaya of each side (frozen at the approval / the transfer).
+  final LoanAccountRef? lenderCashAccount;
+  final LoanAccountRef? borrowerCashAccount;
+
+  /// ADR 0031: money between two different accounts — the disbursement and the repayments post KK / KM.
+  final bool cashBacked;
+  final String? disbursedAt;
+  final LoanUserRef? disbursedBy;
+
+  /// Approved, cash-backed, not yet disbursed by Finance ("Disetujui – menunggu pencairan").
+  final bool awaitingDisbursement;
+
+  /// ADR 0031: the transfer of an automatic loan (`{id, docNo}`; [LoanTransferRef]).
+  final LoanTransferRef? transfer;
+
+  /// ADR 0031 (detail): KK (lender) / KM (borrower) numbers of the disbursement; null when no cash moved.
+  final LoanCash? disbursement;
   final int amount;
   final int repaidTotal;
   final int outstanding;
@@ -219,6 +288,12 @@ class Loan {
   /// `PJ/…` or "Draft #id" before submit (same text as the web).
   String get title => docNo ?? 'Draft #$id';
 
+  /// Automatic loan of a transfer (ADR 0031).
+  bool get automatic => origin == 'transfer';
+
+  /// Web `lenderText`: the lender project, else "Akun <name>" (an automatic loan's paying account).
+  String get lenderLabel => lender?.label ?? 'Akun ${lenderCashAccount?.label ?? '—'}';
+
   /// Whether [projectId] borrows (true) or lends (false) in this loan.
   bool borrowedBy(int projectId) => borrower.id == projectId;
 
@@ -233,8 +308,18 @@ class Loan {
     daysOverdue: _int(j['daysOverdue']),
     kind: '${j['kind'] ?? 'dana'}',
     kindLabel: '${j['kindLabel'] ?? ''}',
-    lender: LoanProjectRef.fromJson(j['lenderProject']),
+    origin: '${j['origin'] ?? 'manual'}',
+    originLabel: '${j['originLabel'] ?? ''}',
+    lender: j['lenderProject'] is Map<String, dynamic> ? LoanProjectRef.fromJson(j['lenderProject']) : null,
     borrower: LoanProjectRef.fromJson(j['borrowerProject']),
+    lenderCashAccount: LoanAccountRef.fromJson(j['lenderCashAccount']),
+    borrowerCashAccount: LoanAccountRef.fromJson(j['borrowerCashAccount']),
+    cashBacked: j['cashBacked'] == true,
+    disbursedAt: _strN(j['disbursedAt']),
+    disbursedBy: LoanUserRef.fromJson(j['disbursedBy']),
+    awaitingDisbursement: j['awaitingDisbursement'] == true,
+    transfer: LoanTransferRef.fromJson(j['transfer']),
+    disbursement: LoanCash.fromJson(j['disbursement']),
     amount: _int(j['amount']),
     repaidTotal: _int(j['repaidTotal']),
     outstanding: _int(j['outstanding']),
@@ -257,6 +342,21 @@ class Loan {
     repayments: [for (final r in _list(j['repayments'])) LoanRepayment.fromJson(_map(r))],
     decisions: [for (final d in _list(j['decisions'])) LoanDecision.fromJson(_map(d))],
   );
+}
+
+/// ADR 0031 `transfer {id, docNo}` of an automatic loan.
+class LoanTransferRef {
+  const LoanTransferRef({required this.id, this.docNo});
+  final int id;
+  final String? docNo;
+
+  String get label => docNo ?? '#$id';
+
+  static LoanTransferRef? fromJson(Object? v) {
+    final j = _map(v);
+    final id = _intN(j['id']);
+    return id == null ? null : LoanTransferRef(id: id, docNo: _strN(j['docNo']));
+  }
 }
 
 class LoanPage {

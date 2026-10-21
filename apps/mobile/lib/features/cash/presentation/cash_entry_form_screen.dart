@@ -124,8 +124,9 @@ class CashEntryEditRoute extends ConsumerWidget {
 }
 
 /// The web CashEntryForm in its field order: Jenis transaksi, Tanggal, Akun kas, Nominal, Sumber / Kategori, Dibebankan
-/// ke (Project · Pusat biaya · Tidak ada), Kendaraan (keluar), Keterangan, Bukti, Alasan perubahan (edit). A confirmable
-/// 409 (overdraft, QA-04) asks "Tetap simpan" and re-sends with `confirmOverdraft` (new body → new key).
+/// ke (Project · Tidak ada; ADR 0031: the account IS the Pusat Biaya — "Pusat biaya lama" only on a legacy entry that
+/// has one), Kendaraan (keluar), Keterangan, Bukti, Alasan perubahan (edit). A confirmable 409 (overdraft, QA-04) asks
+/// "Tetap simpan" and re-sends with `confirmOverdraft` (new body → new key).
 class CashEntryFormScreen extends ConsumerStatefulWidget {
   const CashEntryFormScreen({super.key, required this.book, required this.pt, required this.inbound, this.entry});
   final CashBook book;
@@ -491,7 +492,9 @@ class _CashEntryFormScreenState extends ConsumerState<CashEntryFormScreen> {
                         key: const Key('cash-scope'),
                         segments: [
                           ButtonSegment(value: CashScope.project, label: Text(t.cashProject)),
-                          ButtonSegment(value: CashScope.costCenter, label: Text(t.cashCostCenter)),
+                          // ADR 0031: the old cost-center option stays only on a legacy entry
+                          if (e?.costCenterId != null)
+                            ButtonSegment(value: CashScope.costCenter, label: Text(t.costCenterLegacyLabel)),
                           ButtonSegment(value: CashScope.none, label: Text(t.cashScopeNone)),
                         ],
                         selected: {_scope},
@@ -517,10 +520,10 @@ class _CashEntryFormScreenState extends ConsumerState<CashEntryFormScreen> {
                   ),
                 if (_scope == CashScope.costCenter)
                   FormGridCell(
-                    label: t.cashCostCenter,
+                    label: t.costCenterLegacyLabel,
                     child: MasterPickerField(
                       key: const Key('cash-cost-center'),
-                      label: t.cashCostCenter,
+                      label: t.costCenterLegacyLabel,
                       items: _items(lk.costCenters, keep: [e?.costCenterId]),
                       value: _costCenterId,
                       allowNone: false,

@@ -33,6 +33,21 @@ RefItem? companyRefFromJson(Object? v) {
   return RefItem(id: _int(m['id']), code: _strN(m['shortCode'] ?? m['code']), name: _strN(m['name']));
 }
 
+/// ADR 0031 `{id, name}` of a cash account (`pusatBiaya`, `transfers[].cashAccount` / `paidFromCashAccount`); null when
+/// absent or malformed.
+AccountRef? accountRefFromJson(Object? v) {
+  final m = _map(v);
+  if (m == null || _intN(m['id']) == null) return null;
+  return AccountRef(id: _int(m['id']), name: _strN(m['name']));
+}
+
+/// ADR 0031 `transfers[].projectLoan {id, docNo, status}` (null when the transfer was paid from the Pusat Biaya).
+TransferLoanRef? transferLoanFromJson(Object? v) {
+  final m = _map(v);
+  if (m == null || _intN(m['id']) == null) return null;
+  return TransferLoanRef(id: _int(m['id']), docNo: _strN(m['docNo']), status: _strN(m['status']));
+}
+
 /// ADR 0028 `intercompany {status, targetEntryNo, targetCompany, transferId}` (null before the transfer / otherwise).
 RequestIntercompany? requestIntercompanyFromJson(Object? v) {
   final m = _map(v);
@@ -367,6 +382,9 @@ ExpenseDetail detailFromJson(Json j) {
             bankRef: _strN(m['bankRef']),
             status: '${m['status'] ?? 'posted'}',
             voidReason: _strN(m['voidReason']),
+            cashAccount: accountRefFromJson(m['cashAccount']),
+            paidFromCashAccount: accountRefFromJson(m['paidFromCashAccount']),
+            projectLoan: transferLoanFromJson(m['projectLoan']),
           ),
     ],
     transferredTotal: _int(j['transferredTotal']),
@@ -374,6 +392,7 @@ ExpenseDetail detailFromJson(Json j) {
     allowedActions: {for (final a in _list(j['allowedActions'])) '$a'},
     direkturSignature: direkturSignatureFromJson(j['direkturSignature']),
     fundCheck: fundCheckFromJson(j['fundCheck']),
+    pusatBiaya: accountRefFromJson(j['pusatBiaya']),
     companyId: companyIdOf(j),
     rejectReason: _strN(j['rejectReason']),
     cancelReason: _strN(j['cancelReason']),
@@ -510,10 +529,9 @@ Json draftToCreateBody(DraftRequest d) => {
   // ADR 0027 / 0028: a vendor / PT grup payment is always Pengajuan Baru (the server sets it too)
   'type': d.isDirectPayment ? RequestType.advance.code : d.type.code,
   'title': d.title.trim(),
-  // D2: project only — the requester no longer sends a cost center (Finance sets it at transfer). ADR 0027 / 0028: a
-  // vendor / PT grup payment without a project sends its cost center.
+  // D2 / ADR 0031 (DRMS 21/10): project only — the requester never sends a cost center (the Pusat Biaya is the
+  // project's cash account); a vendor / PT grup payment without a project has none.
   'projectId': d.projectId,
-  if (d.isDirectPayment && d.projectId == null && d.costCenterId != null) 'costCenterId': d.costCenterId,
   'neededDate': d.neededDate,
   'urgencyLevelId': d.urgencyLevelId,
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),
@@ -552,7 +570,6 @@ Json draftToSyncPayload(DraftRequest d, {bool includeDraftId = false}) => {
   'kind': d.isDirectPayment ? RequestType.advance.code : d.type.code,
   'title': d.title.trim(),
   'project_id': d.projectId,
-  if (d.isDirectPayment && d.projectId == null && d.costCenterId != null) 'cost_center_id': d.costCenterId,
   'needed_date': d.neededDate,
   'urgency_level_id': d.urgencyLevelId,
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),

@@ -55,9 +55,10 @@ class TransferFormRoute extends ConsumerWidget {
 }
 
 /// DRMS 10/10 point 10: "Catat transfer" on the APK, the web money form in the same field order — amount (the
-/// approved amount, server-set, G3), Akun kas, Tanggal & jam transfer (item 11 / D11), Pusat biaya (D2, project
-/// default pre-selected), No. referensi bank, Bukti (camera / gallery, compressed like receipts). Online only;
-/// a confirmable 409 (overdraft QA-04, unverified account QA-17) asks "Tetap simpan".
+/// approved amount, server-set, G3), Dibayar dari akun (ADR 0031: the project's Pusat Biaya pre-selected; another
+/// account opens the automatic inter-project loan panel — reason required, due date optional), Tanggal & jam transfer
+/// (item 11 / D11), No. referensi bank, Bukti (camera / gallery, compressed like receipts). Online only; a confirmable
+/// 409 (overdraft QA-04, unverified account QA-17) asks "Tetap simpan".
 class TransferFormScreen extends ConsumerStatefulWidget {
   const TransferFormScreen({super.key, required this.item});
   final TransferQueueItem item;
@@ -68,9 +69,12 @@ class TransferFormScreen extends ConsumerStatefulWidget {
 
 class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
   final _bankRef = TextEditingController();
+  final _loanReason = TextEditingController();
   int? _cashAccountId;
-  late int? _costCenterId = widget.item.costCenter?.id;
   DateTime? _at;
+
+  /// ADR 0031: due date of the automatic loan (YYYY-MM-DD); null = server default (transfer date + 30 days).
+  String? _loanDue;
   Uint8List? _proof;
   int? _proofMediaId;
   bool _busy = false;
@@ -83,15 +87,22 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
   @override
   void dispose() {
     _bankRef.dispose();
+    _loanReason.dispose();
     super.dispose();
   }
 
   Duration get _zoneOffset =>
       offsetForZone(ref.read(accountProfileProvider)?.forCompany(widget.item.companyId).timezone);
 
+  /// ADR 0031: paid from another account than the project's Pusat Biaya → automatic inter-project loan.
+  bool get _loan => transferNeedsLoan(pusatBiayaId: widget.item.pusatBiaya?.id, cashAccountId: _cashAccountId);
+
   Map<String, String> _issues() => validateTransferForm(
     cashAccountId: _cashAccountId,
-    costCenterId: _costCenterId,
+    pusatBiayaId: widget.item.pusatBiaya?.id,
+    pusatBiayaMissing: widget.item.pusatBiayaMissing,
+    loanReason: _loanReason.text,
+    loanDueDate: _loanDue,
     transferAt: _at,
     zoneOffset: _zoneOffset,
     bankRef: _bankRef.text,
@@ -102,6 +113,22 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
   Future<void> _pickAt() async {
     final at = await pickTransferAt(context, zoneOffset: _zoneOffset, current: _at);
     if (at != null && mounted) setState(() => _at = at);
+  }
+
+  /// ADR 0031: "Jatuh tempo pinjaman" — from the transfer date (or today) on; empty = 30 days after the transfer.
+  Future<void> _pickLoanDue() async {
+    final now = DateTime.now().toUtc().add(_zoneOffset);
+    final first = _at ?? DateTime(now.year, now.month, now.day);
+    final from = DateTime(first.year, first.month, first.day);
+    final current = _loanDue == null ? null : DateTime.tryParse(_loanDue!);
+    final d = await showDatePicker(
+      context: context,
+      initialDate: current != null && !current.isBefore(from) ? current : from.add(const Duration(days: 30)),
+      firstDate: from,
+      lastDate: from.add(const Duration(days: 3650)),
+      helpText: AppLocalizations.of(context).transferLoanDueLabel,
+    );
+    if (d != null && mounted) setState(() => _loanDue = toYmd(d));
   }
 
   Future<void> _addProof({required bool fromCamera}) async {
@@ -140,22 +167,26 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
       _proofMediaId ??= await api.uploadProof(_proof!, filename: 'bukti-transfer-${widget.item.id}.jpg');
       final body = transferBody(
         cashAccountId: _cashAccountId!,
-        costCenterId: _costCenterId!,
         transferAt: transferAtString(_at!, _zoneOffset),
+        loanReason: _loan ? _loanReason.text : null,
+        loanDueDate: _loan ? _loanDue : null,
         bankRef: _bankRef.text,
         proofMediaId: _proofMediaId!,
         confirmOverdraft: confirmOverdraft,
         confirmUnverifiedAccount: confirmUnverified,
       );
       final key = _keys.putIfAbsent(jsonEncode(body), () => const Uuid().v4());
-      final detail = await api.recordTransfer(widget.item.id, body, idempotencyKey: key);
+      final out = await api.recordTransfer(widget.item.id, body, idempotencyKey: key);
       ref.invalidate(transferQueueProvider);
       ref.invalidate(requestDetailProvider(widget.item.id));
       ref.invalidate(inboxProvider);
       if (!mounted) return;
+      final detail = out.request;
       final trf = detail.transfers.where((x) => !x.isVoid).lastOrNull?.docNo;
       // ADR 0028: a PT grup transfer also posted the receiving PT's Kas Masuk (number + PT from the request)
       final km = detail.intercompany;
+      // ADR 0031: paid from another account → the automatic inter-project loan (its number)
+      final loanNo = out.loanNo;
       showSnack(
         context,
         km != null && !km.voided
@@ -164,6 +195,8 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
                 km.targetEntryNo,
                 km.companyCode ?? widget.item.payeeCompanyCode ?? '-',
               )
+            : loanNo != null
+            ? t.transferRecordedLoan(trf ?? '-', loanNo)
             : trf == null
             ? t.transferRecorded
             : t.transferRecordedNo(trf),
@@ -216,23 +249,21 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
     final it = widget.item;
     final issues = _tried ? _issues() : const <String, String>{};
     final accounts = ref.watch(cashAccountsProvider(it.companyId));
-    final centers = ref.watch(costCentersProvider(it.companyId));
-    // Default: the PT's first cash account (web: first option selected).
+    // ADR 0031: default = the project's Pusat Biaya when it is an active account of the PT, else the PT's first account
+    // (web: first option selected).
     final accountList = accounts.value ?? const <CashAccountOption>[];
-    if (_cashAccountId == null && accountList.isNotEmpty) _cashAccountId = accountList.first.id;
+    final pb = it.pusatBiaya;
+    if (_cashAccountId == null && accountList.isNotEmpty) {
+      _cashAccountId = pb != null && accountList.any((a) => a.id == pb.id) ? pb.id : accountList.first.id;
+    }
     final zone = zoneAbbrev(ref.watch(accountProfileProvider)?.forCompany(it.companyId).timezone);
-    final accountItems = [
-      for (final a in accountList)
-        MasterItem(a.id, a.balance == null ? a.name : '${a.name} · ${formatRupiah(a.balance!)}'),
-    ];
-    final centerList = centers.value ?? const <CostCenterOption>[];
-    final suggested = it.costCenter;
-    final centerItems = [
-      for (final c in centerList) MasterItem(c.id, c.label),
-      // the suggestion may be missing from the list (deactivated): keep it visible
-      if (suggested != null && !centerList.any((c) => c.id == suggested.id))
-        MasterItem(suggested.id, '${suggested.code ?? ''} ${suggested.name ?? ''}'.trim()),
-    ];
+    String accountLabel(CashAccountOption a) {
+      final name = a.balance == null ? a.name : '${a.name} · ${formatRupiah(a.balance!)}';
+      return a.id == pb?.id ? '$name${t.transferPusatBiayaSuffix}' : name;
+    }
+
+    final accountItems = [for (final a in accountList) MasterItem(a.id, accountLabel(a))];
+    final loan = _loan;
     Widget loadError(Object error) => Text(errorText(error), style: TextStyle(color: theme.colorScheme.error));
     return Scaffold(
       appBar: AppBar(title: Text(t.transferRecord)),
@@ -300,22 +331,41 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
             // DRMS 13/10 Umum #2 / D4: label left of the field, two columns on wide screens (web field order).
             FormGrid(
               children: [
-                // 1. Akun kas
+                // 1. Dibayar dari akun (ADR 0031: default = the project's Pusat Biaya)
                 FormGridCell(
-                  label: t.cashAccountLabel,
+                  label: t.paidFromAccountLabel,
                   child: switch (accounts) {
                     AsyncError(:final error) => loadError(error),
                     _ => MasterPickerField(
                       key: const Key('transfer-cash-account'),
-                      label: t.cashAccountLabel,
+                      label: t.paidFromAccountLabel,
                       items: accountItems,
                       value: _cashAccountId,
                       allowNone: false,
-                      errorText: issues['cashAccountId'],
+                      errorText: issues['cashAccountId'] ?? issues['pusatBiaya'],
+                      helperText: it.pusatBiayaMissing
+                          ? t.transferPusatBiayaMissingHelp
+                          : (pb == null ? null : t.transferPusatBiayaHelp(pb.label)),
                       onChanged: (v) => setState(() => _cashAccountId = v),
                     ),
                   },
                 ),
+                // ADR 0031 #4–#5: paid from another account → the automatic inter-project loan (KK on that account,
+                // KM on the project's Pusat Biaya) — reason required, due date optional (server default +30 days)
+                if (loan)
+                  FormGridCell(
+                    full: true,
+                    child: _LoanPanel(
+                      pusatBiaya: pb?.label ?? '-',
+                      reason: _loanReason,
+                      reasonError: issues['loanReason'],
+                      due: _loanDue,
+                      dueError: issues['loanDueDate'],
+                      onPickDue: _pickLoanDue,
+                      onClearDue: () => setState(() => _loanDue = null),
+                      onChanged: () => _tried ? setState(() {}) : null,
+                    ),
+                  ),
                 // 2. Tanggal & jam transfer (item 11 / D11)
                 FormGridCell(
                   label: t.transferAtLabel,
@@ -337,25 +387,7 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
                     ),
                   ),
                 ),
-                // 3. Pusat biaya (D2)
-                FormGridCell(
-                  label: t.fieldCostCenter,
-                  child: switch (centers) {
-                    AsyncError(:final error) => loadError(error),
-                    _ => MasterPickerField(
-                      key: const Key('transfer-cost-center'),
-                      label: t.fieldCostCenter,
-                      hint: t.costCenterPickHint,
-                      items: centerItems,
-                      value: _costCenterId,
-                      allowNone: false,
-                      errorText: issues['costCenterId'],
-                      helperText: it.costCenter != null ? t.costCenterSuggested : t.costCenterNoDefault,
-                      onChanged: (v) => setState(() => _costCenterId = v),
-                    ),
-                  },
-                ),
-                // 4. No. referensi bank
+                // 3. No. referensi bank
                 FormGridCell(
                   label: t.bankRefLabel,
                   builder: (label) => TextField(
@@ -370,7 +402,7 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
                     onChanged: (_) => _tried ? setState(() {}) : null,
                   ),
                 ),
-                // 5. Bukti
+                // 4. Bukti
                 FormGridCell(
                   label: t.transferProofLabel,
                   full: true,
@@ -400,6 +432,83 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
             const SizedBox(height: 32),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// ADR 0031: the automatic inter-project loan panel of "Catat transfer" (web MoneyForm `data-pk-transfer-loan`): the
+/// required reason, the note, the optional due date.
+class _LoanPanel extends StatelessWidget {
+  const _LoanPanel({
+    required this.pusatBiaya,
+    required this.reason,
+    required this.reasonError,
+    required this.due,
+    required this.dueError,
+    required this.onPickDue,
+    required this.onClearDue,
+    required this.onChanged,
+  });
+  final String pusatBiaya;
+  final TextEditingController reason;
+  final String? reasonError;
+  final String? due;
+  final String? dueError;
+  final VoidCallback onPickDue;
+  final VoidCallback onClearDue;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final warn = context.pk.warnText;
+    return Container(
+      key: const Key('transfer-loan-panel'),
+      padding: const EdgeInsets.only(left: 10),
+      decoration: BoxDecoration(border: Border(left: BorderSide(color: warn, width: 3))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            key: const Key('transfer-loan-reason'),
+            controller: reason,
+            maxLength: 1000,
+            decoration: InputDecoration(
+              labelText: t.transferLoanReasonLabel,
+              hintText: t.transferLoanReasonHint,
+              errorText: reasonError,
+            ),
+            onChanged: (_) => onChanged(),
+          ),
+          Text(
+            t.transferLoanNote(pusatBiaya),
+            key: const Key('transfer-loan-note'),
+            style: theme.textTheme.bodySmall?.copyWith(color: warn),
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            key: const Key('transfer-loan-due'),
+            onTap: onPickDue,
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: t.transferLoanDueLabel,
+                helperText: t.transferLoanDueHelp,
+                errorText: dueError,
+                suffixIcon: due == null
+                    ? const Icon(Icons.event)
+                    : IconButton(
+                        key: const Key('transfer-loan-due-clear'),
+                        icon: const Icon(Icons.clear),
+                        tooltip: t.delete,
+                        onPressed: onClearDue,
+                      ),
+              ),
+              child: Text(due == null ? t.transferLoanDueDefault : formatDateOnly(due)),
+            ),
+          ),
+        ],
       ),
     );
   }

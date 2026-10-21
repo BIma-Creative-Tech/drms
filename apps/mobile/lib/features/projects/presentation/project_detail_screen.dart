@@ -101,7 +101,7 @@ class _InfoTab extends ConsumerWidget {
           final ptText = p.companyId == null
               ? '-'
               : (pt == null ? account?.companyCode(p.companyId) ?? '-' : '${pt.code} — ${pt.name}');
-          final cc = d.costCenter;
+          final pb = d.pusatBiaya;
           final rap = d.rap;
           return ListView(
             key: const Key('project-info'),
@@ -133,12 +133,8 @@ class _InfoTab extends ConsumerWidget {
               // owner 2026-10-11: no contract value (RAB) for Staff — the server sends null, the row is left out
               if (p.contractValue != null || (pt?.seesProjectMoney ?? account?.seesProjectMoney ?? false))
                 _row(context, t.projectContractValue, _money(p.contractValue), key: const Key('project-contract')),
-              _row(
-                context,
-                t.fieldCostCenter,
-                cc == null ? t.projectNoCostCenter : '${cc.code ?? ''} ${cc.name ?? ''}'.trim(),
-                key: const Key('project-cost-center'),
-              ),
+              // ADR 0031: the Pusat Biaya = the project's cash account (mapped in the project data on the web)
+              _row(context, t.fieldCostCenter, pb?.name ?? t.pusatBiayaUnmapped, key: const Key('project-cost-center')),
               if (d.client != null) _row(context, t.projectClient, d.client!.name ?? '-'),
               if (d.startDate != null || d.targetDate != null)
                 _row(context, t.projectPeriod, '${formatDateOnly(d.startDate)} – ${formatDateOnly(d.targetDate)}'),

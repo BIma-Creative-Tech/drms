@@ -139,10 +139,10 @@ void main() {
     expect(p[invoicePlaceholderKey], 'doc-photo-1');
     expect(resolveMediaIds(p, const {}), isNull, reason: 'the photo is not on the server yet');
     expect(resolveMediaIds(p, const {'doc-photo-1': 78})!['invoice_file_id'], 78);
-    // no project: the cost center goes along (ADR 0028: project OR cost center, as vendor payments)
+    // ADR 0031: no project → no Pusat Biaya; a legacy cost center is never sent
     final onCc = icDraft().copyWith(projectId: null, costCenterId: 7);
-    expect(draftToSyncPayload(onCc)['cost_center_id'], 7);
-    expect(draftToCreateBody(onCc)['costCenterId'], 7);
+    expect(draftToSyncPayload(onCc).containsKey('cost_center_id'), isFalse);
+    expect(draftToCreateBody(onCc).containsKey('costCenterId'), isFalse);
   });
 
   test('create body (online "Ajukan"): payeeType pt_grup, payeeCompanyId, the uploaded document id', () {
@@ -173,15 +173,9 @@ void main() {
       validateForSubmit(icDraft().copyWith(invoiceDueDate: '2026-10-01')).single.message,
       'Jatuh tempo tidak boleh sebelum tanggal dokumen.',
     );
-    // no employee account, no receipts needed; project or cost center
-    expect(
-      validateForSubmit(icDraft().copyWith(projectId: null, costCenterId: 7, lines: const [])).map((i) => i.field),
-      ['lines'],
-    );
-    expect(
-      validateForSubmit(icDraft().copyWith(projectId: null)).single.message,
-      'Pilih project atau pusat biaya (pembayaran antar-PT).',
-    );
+    // no employee account, no receipts needed; ADR 0031: the project is optional (no Pusat Biaya without one)
+    expect(validateForSubmit(icDraft().copyWith(projectId: null, lines: const [])).map((i) => i.field), ['lines']);
+    expect(validateForSubmit(icDraft().copyWith(projectId: null)), isEmpty);
     // the vendor wording is unchanged
     final vendor = icDraft().copyWith(
       payeeType: PayeeType.vendor,

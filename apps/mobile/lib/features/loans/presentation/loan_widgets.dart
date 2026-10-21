@@ -22,6 +22,8 @@ class LoanStatusChip extends StatelessWidget {
     final (IconData icon, Color? color) = switch (loan.status) {
       LoanStatus.draft => (Icons.edit_note, null),
       LoanStatus.pendingApproval => (Icons.hourglass_top, context.pk.warnText),
+      // ADR 0031: "Disetujui – menunggu pencairan" (Finance has not disbursed the cash-backed loan yet)
+      LoanStatus.approved when loan.awaitingDisbursement => (Icons.hourglass_top, context.pk.warnText),
       LoanStatus.approved || LoanStatus.partiallyRepaid => (Icons.check_circle_outline, context.pk.okText),
       LoanStatus.repaid => (Icons.check_circle, context.pk.okText),
       LoanStatus.rejected => (Icons.cancel, context.pk.badText),
@@ -91,7 +93,7 @@ class LoanCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                t.loanFlow(l.lender.label, l.borrower.label),
+                t.loanFlow(l.lenderLabel, l.borrower.label),
                 key: Key('loan-flow-${l.id}'),
                 style: theme.textTheme.bodyMedium,
               ),

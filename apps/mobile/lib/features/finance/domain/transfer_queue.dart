@@ -3,7 +3,9 @@ import '../../expense/domain/expense_request.dart';
 import '../../expense/domain/request_status.dart';
 
 /// DRMS 10/10 point 10: Finance menu on the APK — "Antrian Transfer" like the web (`GET /transfer-queue`) and the
-/// transfer form (cash account, transfer date + time of the bank proof, cost center D2, bank reference, proof).
+/// transfer form (paying cash account, transfer date + time of the bank proof, bank reference, proof). ADR 0031
+/// (DRMS 21/10): the Pusat Biaya is the project's cash account — the default paying account; paying from another one
+/// records an automatic inter-project loan (reason required).
 
 int? _intN(Object? v) => v is num ? v.toInt() : (v is String ? int.tryParse(v) : null);
 double? _dblN(Object? v) => v is num ? v.toDouble() : (v is String ? double.tryParse(v) : null);
@@ -46,7 +48,8 @@ class TransferQueueItem {
     this.neededDate,
     this.companyId,
     this.project,
-    this.costCenter,
+    this.pusatBiaya,
+    this.pusatBiayaMissing = false,
     this.bankName,
     this.bankAccountNo,
     this.bankAccountHolder,
@@ -74,8 +77,12 @@ class TransferQueueItem {
   final int? companyId;
   final RefItem? project;
 
-  /// D2: suggested cost center (project default); null = Finance must pick one.
-  final RefItem? costCenter;
+  /// ADR 0031: the project's Pusat Biaya (cash account) — the default paying account; null without project or while
+  /// the project is not mapped (`costCenter` is deprecated, always null).
+  final AccountRef? pusatBiaya;
+
+  /// ADR 0031: a project request whose project has no Pusat Biaya yet — the server refuses the transfer (409).
+  final bool pusatBiayaMissing;
   final String? bankName;
   final String? bankAccountNo;
   final String? bankAccountHolder;
@@ -141,7 +148,8 @@ TransferQueueItem transferQueueItemFromJson(Map<String, dynamic> j) {
     neededDate: s.neededDate,
     companyId: s.companyId,
     project: refFromJson(j['project']),
-    costCenter: refFromJson(j['costCenter']),
+    pusatBiaya: accountRefFromJson(j['pusatBiaya']),
+    pusatBiayaMissing: j['pusatBiayaMissing'] == true,
     bankName: _strN(bank?['bankName']),
     bankAccountNo: _strN(bank?['accountNo']),
     bankAccountHolder: _strN(bank?['accountHolder']),
@@ -196,43 +204,65 @@ CashAccountOption cashAccountFromJson(Map<String, dynamic> j) => CashAccountOpti
   siteId: _intN(j['siteId']),
 );
 
-/// `GET /cost-centers` `docs[]`.
-class CostCenterOption {
-  const CostCenterOption({required this.id, required this.code, required this.name, this.companyId});
-  final int id;
-  final String code;
-  final String name;
-  final int? companyId;
-
-  String get label => '$code $name'.trim();
-}
-
-CostCenterOption costCenterFromJson(Map<String, dynamic> j) => CostCenterOption(
-  id: _intN(j['id']) ?? 0,
-  code: '${j['code'] ?? ''}',
-  name: '${j['name'] ?? ''}',
-  companyId: _intN(j['companyId']),
-);
+/// ADR 0031: paying from [cashAccountId] instead of the project's Pusat Biaya ([pusatBiayaId]) records an automatic
+/// inter-project loan — Finance gives a reason (and may set its due date).
+bool transferNeedsLoan({required int? pusatBiayaId, required int? cashAccountId}) =>
+    pusatBiayaId != null && cashAccountId != null && cashAccountId != pusatBiayaId;
 
 /// Body of `POST /expense-requests/{id}/transfer` (openapi `TransferCreate`). The amount is never sent: the
-/// server copies the approved amount (G3).
+/// server copies the approved amount (G3). ADR 0031: `cashAccountId` = the account Finance PAYS from; no cost center
+/// (deprecated, ignored); [loanReason] / [loanDueDate] only when it is not the project's Pusat Biaya (automatic loan).
 Map<String, dynamic> transferBody({
   required int cashAccountId,
-  required int costCenterId,
   required String transferAt,
   required String bankRef,
   required int proofMediaId,
+  String? loanReason,
+  String? loanDueDate,
   bool confirmOverdraft = false,
   bool confirmUnverifiedAccount = false,
 }) => {
   'cashAccountId': cashAccountId,
-  'costCenterId': costCenterId,
   'transferAt': transferAt,
   'bankRef': bankRef.trim(),
   'proofMediaId': proofMediaId,
+  if (loanReason != null && loanReason.trim().isNotEmpty) 'loanReason': loanReason.trim(),
+  if (loanReason != null && loanReason.trim().isNotEmpty && loanDueDate != null) 'loanDueDate': loanDueDate,
   if (confirmOverdraft) 'confirmOverdraft': true,
   if (confirmUnverifiedAccount) 'confirmUnverifiedAccount': true,
 };
+
+/// ADR 0031 `TransferResult.projectLoan {id, docNo, kk, km}`: the automatic inter-project loan (KK on the paying
+/// account, KM on the project's Pusat Biaya).
+class TransferProjectLoan {
+  const TransferProjectLoan({required this.id, this.docNo, this.kk, this.km});
+  final int id;
+  final String? docNo;
+  final String? kk;
+  final String? km;
+}
+
+/// `POST /expense-requests/{id}/transfer` result (openapi `TransferResult`): the updated request and, when paid from
+/// another account than the Pusat Biaya, the automatic loan.
+class TransferOutcome {
+  const TransferOutcome({required this.request, this.projectLoan});
+  final ExpenseDetail request;
+  final TransferProjectLoan? projectLoan;
+
+  /// Number of the automatic loan: from the result, else from the request's latest posted transfer.
+  String? get loanNo => projectLoan?.docNo ?? request.transfers.where((x) => !x.isVoid).lastOrNull?.projectLoan?.docNo;
+}
+
+TransferOutcome transferOutcomeFromJson(Map<String, dynamic> j) {
+  final loan = _map(j['projectLoan']);
+  final loanId = _intN(loan?['id']);
+  return TransferOutcome(
+    request: detailFromJson(_map(j['request']) ?? j),
+    projectLoan: loan == null || loanId == null
+        ? null
+        : TransferProjectLoan(id: loanId, docNo: _strN(loan['docNo']), kk: _strN(loan['kk']), km: _strN(loan['km'])),
+  );
+}
 
 /// Wall clock in the PT zone, `YYYY-MM-DDTHH:MM` + the zone offset (`+08:00` WITA) — the server reads it in the PT
 /// zone (item 11: date + time of the bank proof).
@@ -248,29 +278,45 @@ String transferAtString(DateTime wall, Duration zoneOffset) {
 DateTime wallToUtc(DateTime wall, Duration zoneOffset) =>
     DateTime.utc(wall.year, wall.month, wall.day, wall.hour, wall.minute).subtract(zoneOffset);
 
-/// Client checks of the transfer form (the server re-checks everything): field → message.
+/// Message of a project request whose project has no Pusat Biaya (web MoneyForm; the server answers 409).
+const pusatBiayaMissingMessage = 'Project belum dipetakan ke pusat biaya (akun kas). Petakan dulu di data project.';
+
+/// Client checks of the transfer form (the server re-checks everything): field → message. ADR 0031: no cost center;
+/// [pusatBiayaMissing] blocks the transfer; paying from another account than [pusatBiayaId] needs [loanReason]
+/// (min 3), and [loanDueDate] (optional) is not before the transfer date. The inter-PT loan disbursement (ADR 0029)
+/// reuses the checks without a Pusat Biaya.
 Map<String, String> validateTransferForm({
   required int? cashAccountId,
-  required int? costCenterId,
-
-  /// ADR 0029: the inter-PT loan disbursement reuses the form without a cost center (a loan is never a cost).
-  bool requireCostCenter = true,
+  int? pusatBiayaId,
+  bool pusatBiayaMissing = false,
+  String loanReason = '',
+  String? loanDueDate,
   required DateTime? transferAt,
   required Duration zoneOffset,
   required String bankRef,
   required bool hasProof,
   required DateTime nowUtc,
-}) => {
-  if (cashAccountId == null) 'cashAccountId': 'Pilih akun kas.',
-  if (transferAt == null)
-    'transferAt': 'Isi tanggal & jam transfer sesuai bukti.'
-  // server: "not in the future" with 2 minutes of clock skew
-  else if (wallToUtc(transferAt, zoneOffset).isAfter(nowUtc.add(const Duration(minutes: 2))))
-    'transferAt': 'Tanggal & jam transfer tidak boleh di masa depan.',
-  if (requireCostCenter && costCenterId == null) 'costCenterId': 'Pilih pusat biaya.',
-  if (bankRef.trim().isEmpty)
-    'bankRef': 'No. referensi bank wajib diisi.'
-  else if (bankRef.trim().length > 64)
-    'bankRef': 'No. referensi bank maksimal 64 karakter.',
-  if (!hasProof) 'proof': 'Bukti wajib diunggah.',
-};
+}) {
+  final loan = transferNeedsLoan(pusatBiayaId: pusatBiayaId, cashAccountId: cashAccountId);
+  final day = transferAt == null ? null : transferAtString(transferAt, Duration.zero).substring(0, 10);
+  return {
+    if (pusatBiayaMissing) 'pusatBiaya': pusatBiayaMissingMessage,
+    if (cashAccountId == null) 'cashAccountId': 'Pilih akun kas.',
+    if (transferAt == null)
+      'transferAt': 'Isi tanggal & jam transfer sesuai bukti.'
+    // server: "not in the future" with 2 minutes of clock skew
+    else if (wallToUtc(transferAt, zoneOffset).isAfter(nowUtc.add(const Duration(minutes: 2))))
+      'transferAt': 'Tanggal & jam transfer tidak boleh di masa depan.',
+    if (loan && loanReason.trim().length < 3)
+      'loanReason': 'Isi alasan membayar dari akun lain (tercatat sebagai pinjaman antar project).'
+    else if (loan && loanReason.trim().length > 1000)
+      'loanReason': 'Alasan maks. 1000 karakter.',
+    if (loan && loanDueDate != null && day != null && loanDueDate.compareTo(day) < 0)
+      'loanDueDate': 'Jatuh tempo pinjaman tidak boleh sebelum tanggal transfer.',
+    if (bankRef.trim().isEmpty)
+      'bankRef': 'No. referensi bank wajib diisi.'
+    else if (bankRef.trim().length > 64)
+      'bankRef': 'No. referensi bank maksimal 64 karakter.',
+    if (!hasProof) 'proof': 'Bukti wajib diunggah.',
+  };
+}

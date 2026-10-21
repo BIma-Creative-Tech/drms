@@ -1,6 +1,7 @@
 // ADR 0022 Pinjaman antar project: server JSON as `/api/v1/project-loans*` answers (openapi ProjectLoanSummary /
 // ProjectLoanDetail / ProjectLoanOptions) and a fake LoansApi recording the calls.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:proyekkas/core/network/api_exception.dart';
 import 'package:proyekkas/features/loans/data/loans_api.dart';
 import 'package:proyekkas/features/loans/domain/loan.dart';
 
@@ -113,6 +114,60 @@ Map<String, dynamic> loanApprovedJson() => loanJson(
   repayments: [repaymentJson(1, seq: 1), repaymentJson(2, amount: 20000000, void_: true)],
 );
 
+/// ADR 0031: a cash-backed manual loan approved by the Direktur, waiting for Finance's "Cairkan".
+Map<String, dynamic> loanAwaitingJson({List<String> actions = const ['disburse']}) => {
+  ...loanJson(id: 43, status: 'approved', docNo: 'PJ/DRMS/2610/0004', actions: actions, decisions: [decisionJson()]),
+  'statusLabel': 'Disetujui – menunggu pencairan',
+  'origin': 'manual',
+  'originLabel': 'Diajukan PM',
+  'lenderCashAccount': {'id': 3, 'name': 'Bank Mandiri Operasional'},
+  'borrowerCashAccount': {'id': 4, 'name': 'Bank BRI Blok B'},
+  'cashBacked': true,
+  'disbursedAt': null,
+  'disbursedBy': null,
+  'awaitingDisbursement': true,
+  'transfer': null,
+  'disbursement': null,
+};
+
+/// ADR 0031: the automatic loan of a transfer paid from another account — no lender project, the paying account lends;
+/// disbursed with the transfer (KK on the paying account, KM on the borrower's Pusat Biaya), one repayment with cash.
+Map<String, dynamic> loanAutoJson({List<String> actions = const []}) => {
+  ...loanJson(
+    id: 44,
+    status: 'partially_repaid',
+    docNo: 'PJ/DRMS/2610/0007',
+    actions: actions,
+    repaid: 50000000,
+    repayments: [
+      {
+        ...repaymentJson(1, seq: 1),
+        'cash': {'kk': 'KK/DRMS/2610/0031', 'km': 'KM/DRMS/2610/0032'},
+      },
+    ],
+  ),
+  'lenderProject': null,
+  'origin': 'transfer',
+  'originLabel': 'Otomatis (transfer)',
+  'lenderCashAccount': {'id': 4, 'name': 'Kas Kecil'},
+  'borrowerCashAccount': {'id': 3, 'name': 'Bank Mandiri Operasional'},
+  'cashBacked': true,
+  'disbursedAt': '2026-10-05T02:10:00.000Z',
+  'disbursedBy': {'id': 3, 'name': 'Fina Keuangan'},
+  'awaitingDisbursement': false,
+  'transfer': {'id': 77, 'docNo': 'TRF/DRMS/2610/0012'},
+  'disbursement': {'kk': 'KK/DRMS/2610/0021', 'km': 'KM/DRMS/2610/0022'},
+  'today': '2026-10-21',
+};
+
+/// The server's 409 when a loan's cash move would take the paying account below 0 (QA-04).
+ProblemException loanOverdraft409() => ProblemException.fromJson(409, {
+  'title': 'Conflict',
+  'code': 'CASH_OVERDRAFT_CONFIRM_REQUIRED',
+  'balance': 1000000,
+  'after': -149000000,
+});
+
 LoanOptions loanOptionsFixture() => LoanOptions.fromJson({
   'borrowers': [
     {'id': 10, 'code': 'PRJ-B', 'name': 'Jalan Tambang Blok B', 'companyId': 1},
@@ -126,6 +181,12 @@ LoanOptions loanOptionsFixture() => LoanOptions.fromJson({
 
 class FakeLoansApi extends Fake implements LoansApi {
   final calls = <String>[];
+
+  /// Idempotency keys of the "Cairkan" / repayment calls (a confirmed retry is another body → another key).
+  final keys = <String>[];
+
+  /// ADR 0031: answer the next "Cairkan" / repayment with a 409 overdraft (then succeed).
+  bool overdraftFirst = false;
 
   @override
   Future<Loan> create({
@@ -173,10 +234,40 @@ class FakeLoansApi extends Fake implements LoansApi {
     required int amount,
     required String repayDate,
     String? note,
+    bool confirmOverdraft = false,
     required String idempotencyKey,
   }) async {
-    calls.add('repay:$id:$amount:$repayDate:${note ?? ''}');
+    calls.add('repay:$id:$amount:$repayDate:${note ?? ''}${confirmOverdraft ? ':confirm' : ''}');
+    keys.add(idempotencyKey);
+    if (overdraftFirst) {
+      overdraftFirst = false;
+      throw loanOverdraft409();
+    }
     return Loan.fromJson(loanApprovedJson());
+  }
+
+  @override
+  Future<Loan> disburse(
+    int id, {
+    String? disburseDate,
+    String? note,
+    bool confirmOverdraft = false,
+    required String idempotencyKey,
+  }) async {
+    calls.add('disburse:$id${confirmOverdraft ? ':confirm' : ''}');
+    keys.add(idempotencyKey);
+    if (overdraftFirst) {
+      overdraftFirst = false;
+      throw loanOverdraft409();
+    }
+    return Loan.fromJson({
+      ...loanAwaitingJson(actions: const []),
+      'statusLabel': 'Disetujui',
+      'awaitingDisbursement': false,
+      'disbursedAt': '2026-10-21T03:00:00.000Z',
+      'disbursedBy': {'id': 3, 'name': 'Fina Keuangan'},
+      'disbursement': {'kk': 'KK/DRMS/2610/0041', 'km': 'KM/DRMS/2610/0042'},
+    });
   }
 
   @override
