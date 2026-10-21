@@ -98,8 +98,16 @@ export function registerLoanPaths(registry: OpenAPIRegistry, h: Helpers): void {
   })
   registry.registerPath({
     method: 'post',
+    path: '/project-loans/{id}/disburse',
+    summary: 'ADR 0031 "Cairkan" (Finance): an approved cash-backed loan (money between two different Pusat Biaya) → KK on the lender account + KM on the borrower account, once',
+    security: h.security,
+    request: { headers: h.idem, params: idParam, body: body(L.LoanDisburse) },
+    responses: h.res(200, 'Loan', L.LoanDetail, write),
+  })
+  registry.registerPath({
+    method: 'post',
     path: '/project-loans/{id}/repayments',
-    summary: 'Record a repayment (borrower PM or Finance; no approval; amount ≤ outstanding) → Sebagian kembali / Lunas',
+    summary: 'Record a repayment (borrower PM or Finance; Finance only — after the disbursement — when the loan moves cash; no approval; amount ≤ outstanding) → Sebagian kembali / Lunas',
     security: h.security,
     request: { headers: h.idem, params: idParam, body: body(L.RepaymentCreate) },
     responses: h.res(201, 'Loan', L.LoanDetail, write),

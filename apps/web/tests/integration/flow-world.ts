@@ -37,7 +37,32 @@ export async function sysCreate(collection: CollectionSlug, data: Record<string,
   if (collection === 'projects' && rap !== false && typeof data.budget === 'number' && data.budget > 0 && data.kind !== 'konstruksi') {
     fixtureRap.set(id, await sysRapItem(id))
   }
+  await fixturePusatBiaya(collection, data, doc as { id: number; company?: unknown; active?: boolean | null })
   return id
+}
+
+/**
+ * ADR 0031: a transfer of a project request needs the project's Pusat Biaya (a cash account). Fixture default: a project
+ * created WITHOUT a `cashAccount` key is mapped to the first active cash account of its PT created by sysCreate (now,
+ * or as soon as one is created). `cashAccount: null` keeps a project unmapped on purpose.
+ */
+const pbDefault = new Map<number, number>()
+const pbUnmapped = new Map<number, number[]>()
+async function fixturePusatBiaya(collection: CollectionSlug, data: Record<string, unknown>, doc: { id: number; company?: unknown; active?: boolean | null }): Promise<void> {
+  const company = typeof doc.company === 'object' && doc.company !== null ? (doc.company as { id: number }).id : (doc.company as number | undefined)
+  if (company === undefined) return
+  const p = await getTestPayload()
+  const map = (project: number, account: number) => p.update({ collection: 'projects', id: project, data: { cashAccount: account } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: test fixture */ })
+  if (collection === 'projects' && !('cashAccount' in data)) {
+    const acc = pbDefault.get(company)
+    if (acc !== undefined) await map(doc.id, acc)
+    else pbUnmapped.set(company, [...(pbUnmapped.get(company) ?? []), doc.id])
+  }
+  if (collection === 'cash-accounts' && doc.active !== false && !pbDefault.has(company)) {
+    pbDefault.set(company, doc.id)
+    for (const project of pbUnmapped.get(company) ?? []) await map(project, doc.id)
+    pbUnmapped.delete(company)
+  }
 }
 
 
@@ -171,8 +196,10 @@ export async function makeWorld(tag: string, opts: { rule?: 'direktur_finance' |
   // DRMS 10/10 D2: Finance books a transfer on a cost center (default = the project's) — a dedicated one, so the
   // legacy cost-center requests of the world (`costCenter`) and the project money stay apart in the reports
   const projectCostCenter = await sysCreate('cost-centers', { code: code('PCC'), name: `${tag} Proyek` })
-  const project = await sysCreate('projects', { code: code('P1'), name: `${tag} Project`, pm: users.pm.id, budget: 100_000_000, status: 'berjalan', costCenter: projectCostCenter })
-  const otherProject = await sysCreate('projects', { code: code('P2'), name: `${tag} Other`, pm: users.otherPm.id, budget: 50_000_000, status: 'berjalan', costCenter: projectCostCenter })
+  // ADR 0031: the Pusat Biaya of both projects = the world's cash account (transfers of project requests are charged to it)
+  const cashAccount = await sysCreate('cash-accounts', { name: `${tag} Kas`, kind: 'bank', openingBalance: 50_000_000 })
+  const project = await sysCreate('projects', { code: code('P1'), name: `${tag} Project`, pm: users.pm.id, budget: 100_000_000, status: 'berjalan', costCenter: projectCostCenter, cashAccount })
+  const otherProject = await sysCreate('projects', { code: code('P2'), name: `${tag} Other`, pm: users.otherPm.id, budget: 50_000_000, status: 'berjalan', costCenter: projectCostCenter, cashAccount })
   // D4: both projects have a RAB → each got a fixture RAP item (request bodies charge their lines to it)
   const rap = { project: fixtureRapItem(project)!, otherProject: fixtureRapItem(otherProject)! }
   const costCenter = await sysCreate('cost-centers', { code: code('CC'), name: `${tag} Ops`, manager: users.pm.id })
@@ -184,7 +211,6 @@ export async function makeWorld(tag: string, opts: { rule?: 'direktur_finance' |
   // QA-17: world accounts are verified (a transfer to an unverified account asks for a confirmation)
   const accA = await sysCreate('employee-bank-accounts', { employee: emp.a, bank, accountNo: `9${Date.now() % 1e9}1`, accountHolder: `${tag} Staff A`, isDefault: true, verificationStatus: 'verified' })
   const accB = await sysCreate('employee-bank-accounts', { employee: emp.b, bank, accountNo: `9${Date.now() % 1e9}2`, accountHolder: `${tag} Staff B`, isDefault: true, verificationStatus: 'verified' })
-  const cashAccount = await sysCreate('cash-accounts', { name: `${tag} Kas`, kind: 'bank', openingBalance: 50_000_000 })
   const cat = {
     bbm: await ids('expense-categories', 'code', 'BBM'),
     inap: await ids('expense-categories', 'code', 'INAP'),

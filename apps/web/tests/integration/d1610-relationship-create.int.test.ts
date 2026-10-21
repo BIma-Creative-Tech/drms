@@ -5,7 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { resetRateLimits } from '@/lib/rate-limit'
 
-import { api, makeFlowUser, type FlowUser } from './flow-world'
+import { api, makeFlowUser, sysCreate, type FlowUser } from './flow-world'
 import { companyId, getTestPayload } from './helpers'
 
 /**
@@ -45,7 +45,9 @@ describe('"+ Klien baru" on the project form', () => {
     const r = await api('POST', '/api/v1/client-form', direkturA, { client: { company: A, name: `Klien Drawer ${tag}` }, contacts: [{ name: 'PIC Drawer' }] })
     expect(r.status, JSON.stringify(r.body)).toBe(201)
     const clientId = (r.body as Body).id as number
-    const project = await api('POST', '/api/projects', direkturA, { code: `RC-${tag}`, name: `Proyek Drawer ${tag}`, status: 'berjalan', pm: pmA.id, client: clientId })
+    // ADR 0031: a project is created with its Pusat Biaya (a cash account of the PT)
+    const cashAccount = await sysCreate('cash-accounts', { company: A, name: `Kas Drawer ${tag}`, kind: 'bank' })
+    const project = await api('POST', '/api/projects', direkturA, { code: `RC-${tag}`, name: `Proyek Drawer ${tag}`, status: 'berjalan', pm: pmA.id, client: clientId, cashAccount })
     expect(project.status, JSON.stringify(project.body)).toBe(201)
     expect((project.body as Body).doc).toMatchObject({ client: expect.anything(), company: expect.anything() })
     const saved = (await p.findByID({ collection: 'projects', id: (project.body as Body).doc.id, depth: 0, overrideAccess: true /* SYSTEM-READ: assertion */ })) as unknown as Body

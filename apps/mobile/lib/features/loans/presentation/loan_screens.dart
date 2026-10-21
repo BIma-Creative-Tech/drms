@@ -18,13 +18,16 @@ import '../../../shared/widgets/pick_hint.dart';
 import '../../../shared/widgets/reason_dialog.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../finance/application/finance_providers.dart';
+import '../../finance/presentation/transfer_form_screen.dart' show transferOverridePrompt;
 import '../domain/loan.dart';
 import 'loan_providers.dart';
 import 'loan_widgets.dart';
 
 /// ADR 0022 on the APK (online only): the "Pinjaman" tab of a project, the Draft form of the borrower PM and the
 /// detail with the Direktur decision bar. Phase 3 (user 2026-10-19): "Catat pengembalian" (borrower PM / Finance) and
-/// the void of a repayment (Direktur / Finance) as on the web.
+/// the void of a repayment (Direktur / Finance) as on the web. ADR 0031: Finance "Cairkan" of a cash-backed loan, the
+/// KK / KM numbers, automatic loans of a transfer (lender = the paying account).
 
 String _today() => toYmd(DateTime.now());
 
@@ -131,7 +134,7 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
   late final _amount = TextEditingController(text: widget.initial == null ? '' : groupRupiah(widget.initial!.amount));
   late final _reason = TextEditingController(text: widget.initial?.reason ?? '');
   late int? _borrowerId = widget.initial?.borrower.id ?? widget.projectId;
-  late int? _lenderId = widget.initial?.lender.id;
+  late int? _lenderId = widget.initial?.lender?.id;
   late String _kind = widget.initial?.kind ?? 'dana';
   late String? _loanDate = widget.initial?.loanDate ?? _today();
   late String? _dueDate = widget.initial?.dueDate;
@@ -301,14 +304,15 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
           final borrowerLabel =
               initial?.borrower.label ?? o.borrowers.where((b) => b.id == _borrowerId).firstOrNull?.label ?? '-';
           // An edited Draft keeps its lender even when the option list no longer has it (archived meanwhile).
+          final kept = initial?.lender;
           final lenderItems = [
             ...lenders,
-            if (initial != null && !lenders.any((l) => l.id == initial.lender.id))
+            if (kept != null && !lenders.any((l) => l.id == kept.id))
               LoanProjectOption(
-                id: initial.lender.id,
-                code: initial.lender.code ?? '',
-                name: initial.lender.name ?? '',
-                companyId: initial.companyId ?? 0,
+                id: kept.id,
+                code: kept.code ?? '',
+                name: kept.name ?? '',
+                companyId: initial?.companyId ?? 0,
               ),
           ];
           return ListView(
@@ -465,7 +469,8 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
 }
 
 /// Loan detail: figures, notes, approval timeline, repayments (read-only) and the actions the server allows —
-/// PM: Ubah draft / Ajukan ke Direktur / Batalkan; Direktur: the decision bar (Tolak · Setujui).
+/// PM: Ubah draft / Ajukan ke Direktur / Batalkan; Direktur: the decision bar (Tolak · Setujui); Finance: Cairkan
+/// (ADR 0031).
 class LoanDetailScreen extends ConsumerStatefulWidget {
   const LoanDetailScreen({super.key, required this.id});
   final int id;
@@ -482,6 +487,10 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
     final t = AppLocalizations.of(context);
     if (action == LoanAction.repay) {
       await _repay(l);
+      return;
+    }
+    if (action == LoanAction.disburse) {
+      await _disburse(l);
       return;
     }
     if (action == LoanAction.edit) {
@@ -508,7 +517,7 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
           title: Text(approve ? t.loanApproveTitle(l.title) : t.loanSubmitConfirmTitle),
           content: Text(
             approve
-                ? t.loanApproveBody(l.borrower.label, formatRupiah(l.amount), l.lender.label)
+                ? t.loanApproveBody(l.borrower.label, formatRupiah(l.amount), l.lenderLabel)
                 : t.loanSubmitConfirmBody,
           ),
           actions: [
@@ -532,7 +541,7 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
         LoanAction.reject => api.reject(l.id, reason: reason!, idempotencyKey: key),
         LoanAction.cancel => api.cancel(l.id, reason: reason!, idempotencyKey: key),
         LoanAction.submit => api.submit(l.id, idempotencyKey: key),
-        LoanAction.edit || LoanAction.repay => throw StateError('handled above'),
+        LoanAction.edit || LoanAction.repay || LoanAction.disburse => throw StateError('handled above'),
       };
       if (mounted) showSnack(context, action == LoanAction.submit ? t.loanSubmitted : t.loanDone);
     } on ApiException catch (e) {
@@ -542,7 +551,7 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
       ref.invalidate(loanDetailProvider(l.id));
       ref.invalidate(loanInboxProvider);
       ref.invalidate(projectLoansProvider(l.borrower.id));
-      ref.invalidate(projectLoansProvider(l.lender.id));
+      if (l.lender case final lender?) ref.invalidate(projectLoansProvider(lender.id));
       ref.invalidate(inboxProvider);
       if (mounted) setState(() => _busy = false);
     }
@@ -551,10 +560,44 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
   void _refreshAll(Loan l) {
     ref.invalidate(loanDetailProvider(l.id));
     ref.invalidate(projectLoansProvider(l.borrower.id));
-    ref.invalidate(projectLoansProvider(l.lender.id));
+    if (l.lender case final lender?) ref.invalidate(projectLoansProvider(lender.id));
+    // ADR 0031: a cash-backed loan moved money between two accounts (balances of the transfer form)
+    if (l.cashBacked) ref.invalidate(cashAccountsProvider);
   }
 
-  /// "Catat pengembalian" (web RepaymentAction): nominal (≤ sisa), tanggal (loan date … today), catatan.
+  /// ADR 0031: a cash move that takes the paying account below 0 (409 `CASH_OVERDRAFT_CONFIRM_REQUIRED`) asks
+  /// "Tetap simpan" (same dialog as the transfer, QA-04) and is re-sent with `confirmOverdraft` (another body →
+  /// another key, see [send]); null when the user keeps the refusal.
+  Future<Loan?> _withOverdraftConfirm(Future<Loan> Function({bool confirm}) send) async {
+    try {
+      return await send();
+    } on ProblemException catch (e) {
+      if (!mounted) rethrow;
+      final t = AppLocalizations.of(context);
+      final prompt = transferOverridePrompt(t, e);
+      if (prompt == null || prompt.flag != 'confirmOverdraft') rethrow;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Text(prompt.title),
+          content: Text(prompt.lines.join('\n\n')),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
+            FilledButton(
+              key: const Key('loan-override-confirm'),
+              onPressed: () => Navigator.pop(c, true),
+              child: Text(t.overrideConfirm),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return null;
+      return send(confirm: true);
+    }
+  }
+
+  /// "Catat pengembalian" (web RepaymentAction): nominal (≤ sisa), tanggal (loan date … today), catatan. ADR 0031: a
+  /// cash-backed loan's repayment posts KK / KM (Finance) — an overdraft asks for the confirmation.
   Future<void> _repay(Loan l) async {
     final t = AppLocalizations.of(context);
     final input = await showModalBottomSheet<({int amount, String date, String note})>(
@@ -565,17 +608,76 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
     );
     if (input == null || !mounted) return;
     final key = _keys.putIfAbsent(LoanAction.repay, () => const Uuid().v7());
+    final api = ref.read(loansApiProvider);
+    Future<Loan> send({bool confirm = false}) => api.addRepayment(
+      l.id,
+      amount: input.amount,
+      repayDate: input.date,
+      note: input.note,
+      confirmOverdraft: confirm,
+      idempotencyKey: confirm ? '$key-c' : key,
+    );
     setState(() => _busy = true);
     try {
-      await ref
-          .read(loansApiProvider)
-          .addRepayment(l.id, amount: input.amount, repayDate: input.date, note: input.note, idempotencyKey: key);
+      if (await _withOverdraftConfirm(send) == null) {
+        if (mounted) showSnack(context, t.overrideCancelled);
+        return;
+      }
       _keys.remove(LoanAction.repay); // the next repayment is a new one
       if (mounted) showSnack(context, t.loanRepayDone(formatRupiah(input.amount)));
     } on ApiException catch (e) {
       if (mounted) showSnack(context, e.message);
     } finally {
       _refreshAll(l);
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// ADR 0031 "Cairkan" (Finance, web ConfirmAction): KK on the lender's Pusat Biaya + KM on the borrower's for the
+  /// loan amount, dated today (PT zone), once.
+  Future<void> _disburse(Loan l) async {
+    final t = AppLocalizations.of(context);
+    final lenderAccount = l.lenderCashAccount?.label ?? '—';
+    final borrowerAccount = l.borrowerCashAccount?.label ?? '—';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.loanDisburseTitle(l.title)),
+        content: Text(t.loanDisburseBody(formatRupiah(l.amount), lenderAccount, borrowerAccount)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+          FilledButton(
+            key: const Key('loan-disburse-confirm'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(t.loanDisburse),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final key = _keys.putIfAbsent(LoanAction.disburse, () => const Uuid().v7());
+    final api = ref.read(loansApiProvider);
+    Future<Loan> send({bool confirm = false}) =>
+        api.disburse(l.id, confirmOverdraft: confirm, idempotencyKey: confirm ? '$key-c' : key);
+    setState(() => _busy = true);
+    try {
+      final out = await _withOverdraftConfirm(send);
+      if (!mounted) return;
+      if (out == null) {
+        showSnack(context, t.overrideCancelled);
+        return;
+      }
+      final kk = out.disbursement?.kk;
+      final km = out.disbursement?.km;
+      showSnack(
+        context,
+        kk != null && km != null ? t.loanDisbursed(out.title, kk, km) : t.loanDisbursedShort(out.title),
+      );
+    } on ApiException catch (e) {
+      if (mounted) showSnack(context, e.message);
+    } finally {
+      _refreshAll(l);
+      ref.invalidate(cashAccountsProvider);
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -681,6 +783,16 @@ class _LoanBody extends ConsumerWidget {
     final decision = l.decisions.lastOrNull;
     final waiting = l.status == LoanStatus.pendingApproval;
     final active = const {LoanStatus.approved, LoanStatus.partiallyRepaid, LoanStatus.repaid}.contains(l.status);
+    final cancelled = l.status == LoanStatus.cancelled;
+    // ADR 0031 (web "Kas"): the disbursement's KK / KM when the loan moves cash between two different Pusat Biaya
+    String cashText() {
+      final d = l.disbursement;
+      if (!l.cashBacked) return l.status == LoanStatus.draft || waiting ? t.loanCashTbd : t.loanCashNone;
+      if (d == null) return cancelled ? t.loanCashCancelled : t.loanCashWaiting;
+      final at = l.disbursedAt == null ? '-' : formatServerDateTime(l.disbursedAt, zone: zone);
+      return t.loanCashDisbursed(at, d.kk ?? '—', d.km ?? '—');
+    }
+
     return ListView(
       key: const Key('loan-detail'),
       padding: const EdgeInsets.all(16),
@@ -696,11 +808,23 @@ class _LoanBody extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 8),
-        Text(t.loanFlow(l.lender.label, l.borrower.label), style: theme.textTheme.titleMedium),
+        Text(t.loanFlow(l.lenderLabel, l.borrower.label), style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
         row(t.loanKind, l.kindLabel, key: const Key('loan-kind-value')),
-        row(t.loanLender, l.lender.label, key: const Key('loan-lender-value')),
+        // ADR 0031: origin (manual / automatic of a transfer)
+        if (l.originLabel.isNotEmpty)
+          row(
+            t.loanOrigin,
+            l.transfer == null ? l.originLabel : t.loanOriginTransfer(l.originLabel, l.transfer!.label),
+            key: const Key('loan-origin-value'),
+          ),
+        // ADR 0031: an automatic loan's lender is the paying account (no lender project)
+        row(l.lender == null ? t.loanLenderAccount : t.loanLender, l.lenderLabel, key: const Key('loan-lender-value')),
+        if (l.lender != null && l.lenderCashAccount != null)
+          row(t.loanLenderPusatBiaya, l.lenderCashAccount!.label, key: const Key('loan-lender-pb-value')),
         row(t.loanBorrower, l.borrower.label, key: const Key('loan-borrower-value')),
+        if (l.borrowerCashAccount != null)
+          row(t.loanBorrowerPusatBiaya, l.borrowerCashAccount!.label, key: const Key('loan-borrower-pb-value')),
         row(t.loanAmount, formatRupiah(l.amount), key: const Key('loan-amount-value'), style: money),
         // Repaid / outstanding count from the Direktur's approval on (Draft / Menunggu: nothing is owed yet).
         if (active) ...[
@@ -714,6 +838,12 @@ class _LoanBody extends ConsumerWidget {
         ],
         row(t.loanDate, formatDateOnly(l.loanDate)),
         row(t.loanDueDate, formatDateOnly(l.dueDate), key: const Key('loan-due-value')),
+        row(t.loanCash, cashText(), key: const Key('loan-cash-value')),
+        if (l.awaitingDisbursement)
+          note(
+            t.loanAwaitingDisbursement(l.lenderCashAccount?.label ?? '—', l.borrowerCashAccount?.label ?? '—'),
+            key: const Key('loan-awaiting-disbursement'),
+          ),
         section(t.loanReason),
         Text(l.reason),
         if (l.samePm) note(l.samePmNote ?? 'PM peminjam = PM pemberi', key: const Key('loan-same-pm')),
@@ -722,30 +852,60 @@ class _LoanBody extends ConsumerWidget {
           note(t.addendumRejectedBecause(l.rejectReason!), key: const Key('loan-rejected'), color: context.pk.badText),
         if (l.cancelReason != null) note(t.addendumCancelledBecause(l.cancelReason!), key: const Key('loan-cancelled')),
         section(t.loanTimeline),
-        _Step(
-          key: const Key('loan-step-submit'),
-          done: submitted,
-          title: t.loanStepSubmitted,
-          subtitle: [
-            if (l.createdBy?.name != null) l.createdBy!.name!,
-            if (submitted) formatServerDateTime(l.submittedAt, zone: zone) else t.loanStepNotYet,
-          ].join(' · '),
-        ),
-        _Step(
-          key: const Key('loan-step-direktur'),
-          done: decision != null,
-          bad: decision != null && !decision.approved,
-          waiting: waiting,
-          title: t.loanStepDirektur,
-          subtitle: decision != null
-              ? [
-                  decision.approved ? t.loanDecApproved : t.loanDecRejected,
-                  if (decision.actorName != null) decision.actorName!,
-                  formatServerDateTime(decision.decidedAt, zone: zone),
-                ].join(' · ')
-              : (waiting ? t.loanStepWaiting : t.loanStepNotYet),
-          last: true,
-        ),
+        // ADR 0031: an automatic loan has one step (the transfer); a cash-backed manual loan adds the disbursement
+        if (l.automatic)
+          _Step(
+            key: const Key('loan-step-transfer'),
+            done: !cancelled,
+            title: t.loanStepAutomatic(l.transfer?.label ?? '-'),
+            subtitle: [
+              cancelled ? t.loanStepCancelled : t.loanStepRecorded,
+              if (l.createdBy?.name != null) l.createdBy!.name!,
+              if (submitted) formatServerDateTime(l.submittedAt, zone: zone),
+            ].join(' · '),
+            last: true,
+          ),
+        if (!l.automatic) ...[
+          _Step(
+            key: const Key('loan-step-submit'),
+            done: submitted,
+            title: t.loanStepSubmitted,
+            subtitle: [
+              if (l.createdBy?.name != null) l.createdBy!.name!,
+              if (submitted) formatServerDateTime(l.submittedAt, zone: zone) else t.loanStepNotYet,
+            ].join(' · '),
+          ),
+          _Step(
+            key: const Key('loan-step-direktur'),
+            done: decision != null,
+            bad: decision != null && !decision.approved,
+            waiting: waiting,
+            title: t.loanStepDirektur,
+            subtitle: decision != null
+                ? [
+                    decision.approved ? t.loanDecApproved : t.loanDecRejected,
+                    if (decision.actorName != null) decision.actorName!,
+                    formatServerDateTime(decision.decidedAt, zone: zone),
+                  ].join(' · ')
+                : (waiting ? t.loanStepWaiting : t.loanStepNotYet),
+            last: !l.cashBacked,
+          ),
+          if (l.cashBacked)
+            _Step(
+              key: const Key('loan-step-disburse'),
+              done: l.disbursedAt != null,
+              waiting: l.awaitingDisbursement,
+              title: t.loanStepDisburse,
+              subtitle: l.disbursedAt != null
+                  ? [
+                      t.loanStepDisbursed,
+                      if (l.disbursedBy?.name != null) l.disbursedBy!.name!,
+                      formatServerDateTime(l.disbursedAt, zone: zone),
+                    ].join(' · ')
+                  : (l.awaitingDisbursement ? t.loanStepWaiting : t.loanStepNotYet),
+              last: true,
+            ),
+        ],
         if (active || l.repayments.isNotEmpty) ...[
           section(t.loanRepayments),
           if (l.repayments.isEmpty)
@@ -755,6 +915,7 @@ class _LoanBody extends ConsumerWidget {
               _RepaymentTile(r: r, onVoid: l.mayVoidRepayment && r.posted && !busy ? () => onVoidRepayment(r) : null),
         ],
         const SizedBox(height: 16),
+        if (acts.contains(LoanAction.disburse)) _action(LoanAction.disburse, t.loanDisburse, Icons.account_balance),
         if (acts.contains(LoanAction.repay)) _action(LoanAction.repay, t.loanRepay, Icons.payments_outlined),
         if (acts.contains(LoanAction.submit)) _action(LoanAction.submit, t.loanSubmit, Icons.send),
         if (acts.contains(LoanAction.edit)) _action(LoanAction.edit, t.loanEdit, Icons.edit_outlined, outlined: true),
@@ -873,6 +1034,13 @@ class _RepaymentTile extends StatelessWidget {
               style: theme.textTheme.bodySmall?.merge(strike),
             ),
             if ((r.note ?? '').isNotEmpty) Text(r.note!, style: theme.textTheme.bodySmall?.merge(strike)),
+            // ADR 0031: KK (borrower) / KM (lender) of a cash-backed loan's repayment
+            if (r.cash case final c?)
+              Text(
+                t.loanRepaymentCash(c.kk ?? '—', c.km ?? '—'),
+                key: Key('loan-repayment-cash-${r.id}'),
+                style: theme.textTheme.bodySmall?.merge(strike),
+              ),
             if (!r.posted)
               Text(
                 r.voidReason == null ? t.loanRepaymentVoid : t.loanRepaymentVoidReason(r.voidReason!),

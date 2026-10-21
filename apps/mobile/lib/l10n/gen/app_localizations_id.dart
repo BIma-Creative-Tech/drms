@@ -1433,7 +1433,7 @@ class AppLocalizationsId extends AppLocalizations {
   String get kpiCostCentersTitle => 'Pusat biaya bulan ini';
 
   @override
-  String get kpiCostCentersTeamTitle => 'Pusat biaya saya bulan ini';
+  String get kpiCostCentersTeamTitle => 'Pusat biaya project saya bulan ini';
 
   @override
   String get kpiCostCentersEmpty => 'Belum ada biaya pusat biaya bulan ini.';
@@ -1524,9 +1524,6 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get kpiAdminProjects => 'Project tanpa PM';
-
-  @override
-  String get kpiAdminCostCenters => 'Pusat biaya tanpa penanggung jawab';
 
   @override
   String get kpiAdminComplete => 'Lengkap';
@@ -3359,7 +3356,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get draftCostCenterLegacy =>
-      'Draft ini dibuat dengan pusat biaya. Pengajuan sekarang wajib memakai project — pilih project; pusat biaya diisi Finance saat transfer.';
+      'Pusat biaya lama tidak dipakai lagi: pusat biaya kini akun kas project. Pilih project (pembayaran vendor / antar-PT boleh tanpa project).';
 
   @override
   String draftLinesNeedRap(int count) {
@@ -3421,9 +3418,6 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get projectContractValue => 'Nilai kontrak (RAB)';
-
-  @override
-  String get projectNoCostCenter => 'Belum ada — dipilih Finance saat transfer';
 
   @override
   String get projectClient => 'Klien';
@@ -3526,7 +3520,7 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
-  String get costCenterByFinance => 'dipilih Finance saat transfer';
+  String get costCenterByFinance => 'dipilih Finance (tanpa project)';
 
   @override
   String get bankVerified => 'Terverifikasi';
@@ -3588,15 +3582,6 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get cashAccountLabel => 'Akun kas';
-
-  @override
-  String get costCenterPickHint => 'Pilih pusat biaya…';
-
-  @override
-  String get costCenterSuggested => 'Usulan: pusat biaya default project. Ubah bila perlu.';
-
-  @override
-  String get costCenterNoDefault => 'Project belum punya pusat biaya default — pilih.';
 
   @override
   String get bankRefLabel => 'No. referensi bank';
@@ -3767,7 +3752,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String loanApproveBody(String borrower, String amount, String lender) {
-    return '$borrower meminjam $amount dari $lender. Tidak ada transaksi kas yang dibuat; pinjaman tercatat sebagai piutang antar project.';
+    return '$borrower meminjam $amount dari $lender. Bila pusat biaya kedua project berbeda (dana), Finance mencairkan dana: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat biaya peminjam.';
   }
 
   @override
@@ -3906,9 +3891,6 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get vendorAccountsNone => 'Vendor ini belum punya rekening aktif — minta Finance / Admin menambahkannya.';
-
-  @override
-  String get vendorCostCenterHint => 'Tanpa project: pilih pusat biaya (mis. tagihan kantor).';
 
   @override
   String get payeePtGrup => 'PT grup';
@@ -4731,7 +4713,8 @@ class AppLocalizationsId extends AppLocalizations {
   String get cashScopeNone => 'Tidak ada';
 
   @override
-  String get cashScopeHelp => 'Project ATAU pusat biaya — tidak keduanya.';
+  String get cashScopeHelp =>
+      'Pusat biaya = akun kas yang dipilih. Pilih project bila biaya ini milik project tertentu.';
 
   @override
   String get cashVehicleOptional => 'Kendaraan (opsional)';
@@ -4767,7 +4750,7 @@ class AppLocalizationsId extends AppLocalizations {
   String get cashRule1 => 'Kas masuk wajib sumber; kas keluar wajib kategori.';
 
   @override
-  String get cashRule2 => 'Dibebankan ke project atau pusat biaya, tidak keduanya.';
+  String get cashRule2 => 'Pusat biaya = akun kas transaksi; pilih project bila biayanya milik project tertentu.';
 
   @override
   String get cashRule3 => 'Tanggal tidak boleh di masa depan atau di periode yang sudah ditutup.';
@@ -4995,7 +4978,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get loanListNote =>
-      'Diajukan PM project peminjam · disetujui Direktur · tanpa transaksi kas (klaim tercatat antar project dalam satu PT)';
+      'Diajukan PM project peminjam · disetujui Direktur · dana antar pusat biaya berbeda dicairkan Finance (kas keluar/masuk) · otomatis bila transfer dibayar dari akun lain';
 
   @override
   String get loanKpiPending => 'Menunggu persetujuan';
@@ -5797,4 +5780,170 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get reportsAuditLog => 'Audit Log';
+
+  @override
+  String get directPaymentNoProjectHint =>
+      'Tanpa project: tanpa pusat biaya — Finance memilih akun pembayar saat transfer.';
+
+  @override
+  String get costCenterLegacyLabel => 'Pusat biaya lama';
+
+  @override
+  String costCenterLegacyValue(String name) {
+    return 'Pusat biaya lama: $name';
+  }
+
+  @override
+  String get pusatBiayaUnmapped => 'Project belum dipetakan ke pusat biaya (akun kas)';
+
+  @override
+  String get pusatBiayaQueueMissing => 'project belum dipetakan';
+
+  @override
+  String get paidFromAccountLabel => 'Dibayar dari akun';
+
+  @override
+  String paidFromAccountLoan(String account, String loan) {
+    return '$account (pinjaman $loan)';
+  }
+
+  @override
+  String transferPaidFrom(String account) {
+    return 'Dibayar dari $account';
+  }
+
+  @override
+  String transferProjectLoan(String no) {
+    return 'Pinjaman antar project $no';
+  }
+
+  @override
+  String get transferPusatBiayaSuffix => ' (pusat biaya project)';
+
+  @override
+  String transferPusatBiayaHelp(String name) {
+    return 'Pusat biaya project: $name.';
+  }
+
+  @override
+  String get transferPusatBiayaMissingHelp =>
+      'Project belum punya pusat biaya (akun kas) — transfer ditolak sampai dipetakan di data project.';
+
+  @override
+  String get transferLoanReasonLabel => 'Alasan membayar dari akun lain';
+
+  @override
+  String get transferLoanReasonHint => 'mis. saldo pusat biaya project belum cukup';
+
+  @override
+  String transferLoanNote(String pusatBiaya) {
+    return 'Akun ini bukan pusat biaya project ($pusatBiaya). Akan tercatat otomatis pinjaman antar project: kas keluar dari akun pembayar dan kas masuk ke pusat biaya project.';
+  }
+
+  @override
+  String get transferLoanDueLabel => 'Jatuh tempo pinjaman';
+
+  @override
+  String get transferLoanDueHelp => 'Kosong = 30 hari setelah tanggal transfer.';
+
+  @override
+  String get transferLoanDueDefault => '30 hari setelah tanggal transfer';
+
+  @override
+  String transferRecordedLoan(String trf, String loan) {
+    return 'Transfer $trf tercatat. Dibayar dari akun lain: pinjaman antar project $loan tercatat otomatis.';
+  }
+
+  @override
+  String get loanDisburse => 'Cairkan';
+
+  @override
+  String loanDisburseTitle(String title) {
+    return 'Cairkan $title?';
+  }
+
+  @override
+  String loanDisburseBody(String amount, String lender, String borrower) {
+    return 'Dicatat hari ini: kas keluar $amount dari $lender dan kas masuk ke $borrower. Pastikan dana sudah dipindahkan di bank.';
+  }
+
+  @override
+  String loanDisbursed(String title, String kk, String km) {
+    return '$title dicairkan: kas keluar $kk, kas masuk $km.';
+  }
+
+  @override
+  String loanDisbursedShort(String title) {
+    return '$title dicairkan.';
+  }
+
+  @override
+  String get loanLenderAccount => 'Akun pemberi pinjaman';
+
+  @override
+  String get loanLenderPusatBiaya => 'Pusat biaya pemberi';
+
+  @override
+  String get loanBorrowerPusatBiaya => 'Pusat biaya peminjam';
+
+  @override
+  String get loanOrigin => 'Asal';
+
+  @override
+  String loanOriginTransfer(String origin, String no) {
+    return '$origin · transfer $no';
+  }
+
+  @override
+  String get loanCash => 'Kas';
+
+  @override
+  String loanCashDisbursed(String when, String kk, String km) {
+    return 'Dicairkan $when · KK $kk · KM $km';
+  }
+
+  @override
+  String get loanCashWaiting => 'Menunggu pencairan Finance';
+
+  @override
+  String get loanCashCancelled => 'Dibatalkan (jurnal balik)';
+
+  @override
+  String get loanCashTbd => 'Ditentukan saat disetujui (dana antar pusat biaya berbeda → dicairkan Finance)';
+
+  @override
+  String get loanCashNone => 'Tanpa transaksi kas (barang, atau pusat biaya sama)';
+
+  @override
+  String loanAwaitingDisbursement(String lender, String borrower) {
+    return 'Disetujui — menunggu Finance mencairkan dana dari $lender ke $borrower.';
+  }
+
+  @override
+  String get loanStepDisburse => 'Pencairan Finance';
+
+  @override
+  String get loanStepDisbursed => 'Dicairkan';
+
+  @override
+  String loanStepAutomatic(String no) {
+    return 'Otomatis dari transfer $no';
+  }
+
+  @override
+  String get loanStepRecorded => 'Dicatat & dicairkan';
+
+  @override
+  String get loanStepCancelled => 'Dibatalkan';
+
+  @override
+  String loanRepaymentCash(String kk, String km) {
+    return 'KK $kk · KM $km';
+  }
+
+  @override
+  String get kpiAdminPusatBiaya => 'Project tanpa pusat biaya';
+
+  @override
+  String get kpiCostCentersTeamEmpty => 'Project Anda belum dipetakan ke pusat biaya (akun kas).';
 }

@@ -49,9 +49,14 @@ class TransferSection extends StatelessWidget {
                 [
                   // item 11: date + time of the proof when recorded with a time
                   '${tr.docNo ?? '-'} · ${tr.transferAt != null ? formatServerDateTime(tr.transferAt, zone: zone) : formatDateOnly(tr.transferDate)}',
-                  // D2: cost center chosen by Finance
-                  if (tr.costCenter != null)
+                  // ADR 0031: the Pusat Biaya the transfer is charged to (D2 legacy: the cost center chosen by Finance)
+                  if (tr.cashAccount != null)
+                    '${t.fieldCostCenter}: ${tr.cashAccount!.label}'
+                  else if (tr.costCenter != null)
                     '${t.fieldCostCenter}: ${'${tr.costCenter!.code ?? ''} ${tr.costCenter!.name ?? ''}'.trim()}',
+                  // ADR 0031: paid from another account → the automatic inter-project loan
+                  if (tr.paidFromCashAccount != null) t.transferPaidFrom(tr.paidFromCashAccount!.label),
+                  if (tr.projectLoan != null) t.transferProjectLoan(tr.projectLoan!.docNo ?? '#${tr.projectLoan!.id}'),
                   if (tr.bankRef != null) '${t.transferRef}: ${tr.bankRef}',
                   if (tr.isVoid && tr.voidReason != null) t.transferVoidReason(tr.voidReason!),
                 ].join('\n'),

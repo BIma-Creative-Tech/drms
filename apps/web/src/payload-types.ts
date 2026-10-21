@@ -753,7 +753,7 @@ export interface MediaSelfy {
 export interface EmployeeBankAccount {
   id: number;
   /**
-   * Mengikuti dokumen induk.
+   * Pilih PT dulu — daftar di bawah mengikuti PT ini. PT data mengikuti karyawan / vendor yang dipilih; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   employee: number | Employee;
@@ -915,7 +915,7 @@ export interface Vendor {
 export interface VendorBankAccount {
   id: number;
   /**
-   * Mengikuti dokumen induk.
+   * Pilih PT dulu — daftar di bawah mengikuti PT ini. PT data mengikuti karyawan / vendor yang dipilih; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   vendor: number | Vendor;
@@ -971,7 +971,11 @@ export interface Project {
   radiusM?: number | null;
   pm: number | User;
   /**
-   * Diusulkan ke Finance saat mencatat transfer pengajuan project ini.
+   * Akun kas/bank PT yang membiayai project ini. Pengajuan project memakai pusat biaya ini; bila Finance membayar dari akun lain, tercatat pinjaman antar project otomatis.
+   */
+  cashAccount?: (number | null) | CashAccount;
+  /**
+   * Master pusat biaya lama (sebelum 21/10/2026); tidak dipakai lagi.
    */
   costCenter?: (number | null) | CostCenter;
   budget?: number | null;
@@ -989,6 +993,51 @@ export interface Project {
    * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
   odooAnalyticRef?: string | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  /**
+   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
+   */
+  isDeleted?: boolean | null;
+  deletedAt?: string | null;
+  deletedBy?: (number | null) | User;
+  deleteReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "cash-accounts".
+ */
+export interface CashAccount {
+  id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
+  name: string;
+  kind: 'cash' | 'bank';
+  bank?: (number | null) | Bank;
+  accountNo?: string | null;
+  accountHolder?: string | null;
+  openingBalance?: number | null;
+  /**
+   * Tanggal go-live akun ini. Transaksi kas sebelum tanggal ini ditolak; saldo awal terkunci setelah periode sejak tanggal ini ditutup. Kosong = tanpa kunci.
+   */
+  openingBalanceDate?: string | null;
+  /**
+   * Opsional: kas kecil / rekening kantor cabang ini (saldo per site di dashboard).
+   */
+  site?: (number | null) | Site;
+  /**
+   * Tandai satu rekening bank aktif per PT. PT lain di grup hanya dapat membayar PT ini (Pengajuan "PT grup") bila rekening ini ditetapkan; kas masuknya tercatat otomatis di sini.
+   */
+  intercompanyReceiving?: boolean | null;
+  odooJournalCode?: string | null;
+  active?: boolean | null;
   uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -1181,57 +1230,12 @@ export interface CashInSource {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "cash-accounts".
- */
-export interface CashAccount {
-  id: number;
-  /**
-   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
-   */
-  company?: (number | null) | Company;
-  name: string;
-  kind: 'cash' | 'bank';
-  bank?: (number | null) | Bank;
-  accountNo?: string | null;
-  accountHolder?: string | null;
-  openingBalance?: number | null;
-  /**
-   * Tanggal go-live akun ini. Transaksi kas sebelum tanggal ini ditolak; saldo awal terkunci setelah periode sejak tanggal ini ditutup. Kosong = tanpa kunci.
-   */
-  openingBalanceDate?: string | null;
-  /**
-   * Opsional: kas kecil / rekening kantor cabang ini (saldo per site di dashboard).
-   */
-  site?: (number | null) | Site;
-  /**
-   * Tandai satu rekening bank aktif per PT. PT lain di grup hanya dapat membayar PT ini (Pengajuan "PT grup") bila rekening ini ditetapkan; kas masuknya tercatat otomatis di sini.
-   */
-  intercompanyReceiving?: boolean | null;
-  odooJournalCode?: string | null;
-  active?: boolean | null;
-  uuid?: string | null;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  /**
-   * Data ini dihapus (soft delete): tidak tampil di daftar dan pemilih. Admin dapat memulihkannya.
-   */
-  isDeleted?: boolean | null;
-  deletedAt?: string | null;
-  deletedBy?: (number | null) | User;
-  deleteReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "team-assignments".
  */
 export interface TeamAssignment {
   id: number;
   /**
-   * Mengikuti dokumen induk.
+   * Pilih PT dulu — daftar di bawah mengikuti PT ini. PT data mengikuti karyawan / vendor yang dipilih; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   employee: number | Employee;
@@ -1407,6 +1411,7 @@ export interface Vehicle {
    * Wajib bila milik pelanggan.
    */
   client?: (number | null) | Client;
+  cashAccount?: (number | null) | CashAccount;
   costCenter?: (number | null) | CostCenter;
   project?: (number | null) | Project;
   /**
@@ -1931,9 +1936,11 @@ export interface CashEntry {
   vehicle?: (number | null) | Vehicle;
   description?: string | null;
   proof?: (number | null) | MediaAttachment;
-  sourceType: 'transfer' | 'settlement_refund' | 'manual' | 'reversal' | 'opening' | 'intercompany';
+  sourceType: 'transfer' | 'settlement_refund' | 'manual' | 'reversal' | 'opening' | 'intercompany' | 'project_loan';
   expenseRequest?: (number | null) | ExpenseRequest;
   transfer?: (number | null) | Transfer;
+  projectLoan?: (number | null) | ProjectLoan;
+  projectLoanRepayment?: (number | null) | ProjectLoanRepayment;
   status: 'posted' | 'void';
   reversalOf?: (number | null) | CashEntry;
   reversedBy?: (number | null) | CashEntry;
@@ -1964,6 +1971,7 @@ export interface Transfer {
   request: number | ExpenseRequest;
   kind: 'advance' | 'reimburse' | 'lpj_shortfall';
   cashAccount: number | CashAccount;
+  paidFromCashAccount?: (number | null) | CashAccount;
   amount: number;
   costCenter?: (number | null) | CostCenter;
   destination?: {
@@ -2044,8 +2052,15 @@ export interface ProjectLoan {
    */
   company?: (number | null) | Company;
   docNo?: string | null;
-  lenderProject: number | Project;
+  origin: 'manual' | 'transfer';
+  lenderProject?: (number | null) | Project;
   borrowerProject: number | Project;
+  lenderCashAccount?: (number | null) | CashAccount;
+  borrowerCashAccount?: (number | null) | CashAccount;
+  cashBacked?: boolean | null;
+  transfer?: (number | null) | Transfer;
+  disbursedAt?: string | null;
+  disbursedBy?: (number | null) | User;
   kind: 'dana' | 'barang';
   amount: number;
   reason: string;
@@ -2065,6 +2080,35 @@ export interface ProjectLoan {
   g1Exception?: string | null;
   source?: ('web' | 'apk') | null;
   uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Dicatat dan dibatalkan (void) lewat layar Pinjaman antar project.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "project-loan-repayments".
+ */
+export interface ProjectLoanRepayment {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  loan: number | ProjectLoan;
+  repayDate: string;
+  amount: number;
+  note?: string | null;
+  status: 'posted' | 'void';
+  voidReason?: string | null;
+  recordedBy: number | User;
+  voidedBy?: (number | null) | User;
+  voidedAt?: string | null;
+  source?: ('web' | 'apk') | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -2774,35 +2818,6 @@ export interface ProgressReport {
   createdAt: string;
 }
 /**
- * Dicatat dan dibatalkan (void) lewat layar Pinjaman antar project.
- *
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "project-loan-repayments".
- */
-export interface ProjectLoanRepayment {
-  id: number;
-  /**
-   * Mengikuti dokumen induk.
-   */
-  company?: (number | null) | Company;
-  loan: number | ProjectLoan;
-  repayDate: string;
-  amount: number;
-  note?: string | null;
-  status: 'posted' | 'void';
-  voidReason?: string | null;
-  recordedBy: number | User;
-  voidedBy?: (number | null) | User;
-  voidedAt?: string | null;
-  source?: ('web' | 'apk') | null;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "notifications".
  */
@@ -2900,7 +2915,9 @@ export interface AuditLog {
     | 'renumbered'
     | 'fund_insufficient'
     | 'soft_delete'
-    | 'restore';
+    | 'restore'
+    | 'disburse'
+    | 'auto_create';
   field?: string | null;
   lineNo?: number | null;
   oldValue?:
@@ -3660,6 +3677,7 @@ export interface ProjectsSelect<T extends boolean = true> {
   lng?: T;
   radiusM?: T;
   pm?: T;
+  cashAccount?: T;
   costCenter?: T;
   budget?: T;
   startDate?: T;
@@ -3963,6 +3981,7 @@ export interface VehiclesSelect<T extends boolean = true> {
   serialNo?: T;
   owner?: T;
   client?: T;
+  cashAccount?: T;
   costCenter?: T;
   project?: T;
   status?: T;
@@ -4248,6 +4267,7 @@ export interface TransfersSelect<T extends boolean = true> {
   request?: T;
   kind?: T;
   cashAccount?: T;
+  paidFromCashAccount?: T;
   amount?: T;
   costCenter?: T;
   destination?:
@@ -4337,6 +4357,8 @@ export interface CashEntriesSelect<T extends boolean = true> {
   sourceType?: T;
   expenseRequest?: T;
   transfer?: T;
+  projectLoan?: T;
+  projectLoanRepayment?: T;
   status?: T;
   reversalOf?: T;
   reversedBy?: T;
@@ -4775,8 +4797,15 @@ export interface BudgetAddendaSelect<T extends boolean = true> {
 export interface ProjectLoansSelect<T extends boolean = true> {
   company?: T;
   docNo?: T;
+  origin?: T;
   lenderProject?: T;
   borrowerProject?: T;
+  lenderCashAccount?: T;
+  borrowerCashAccount?: T;
+  cashBacked?: T;
+  transfer?: T;
+  disbursedAt?: T;
+  disbursedBy?: T;
   kind?: T;
   amount?: T;
   reason?: T;

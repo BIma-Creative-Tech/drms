@@ -54,14 +54,15 @@ function where(scope: ReportScope, f: LoanReportFilter): SQL {
   if (f.overdue) parts.push(OVERDUE)
   for (const t of (f.q ?? '').trim().split(/\s+/).filter(Boolean).slice(0, 5)) {
     const like = `%${t.replace(/[\\%_]/g, (m) => `\\${m}`)}%`
-    parts.push(sql`(l.doc_no ILIKE ${like} OR l.reason ILIKE ${like} OR pb.code ILIKE ${like} OR pb.name ILIKE ${like} OR pl.code ILIKE ${like} OR pl.name ILIKE ${like})`)
+    parts.push(sql`(l.doc_no ILIKE ${like} OR l.reason ILIKE ${like} OR pb.code ILIKE ${like} OR pb.name ILIKE ${like} OR pl.code ILIKE ${like} OR pl.name ILIKE ${like} OR la.name ILIKE ${like})`)
   }
   return sql.join(parts, sql` AND `)
 }
 
-const FROM = sql`project_loans l JOIN companies c ON c.id = l.company_id JOIN projects pb ON pb.id = l.borrower_project_id JOIN projects pl ON pl.id = l.lender_project_id`
+// ADR 0031: an automatic loan has no lender project — its lender is a Pusat Biaya account (`la`)
+const FROM = sql`project_loans l JOIN companies c ON c.id = l.company_id JOIN projects pb ON pb.id = l.borrower_project_id LEFT JOIN projects pl ON pl.id = l.lender_project_id LEFT JOIN cash_accounts la ON la.id = l.lender_cash_account_id`
 
-type Raw = { id: number; company_id: number; doc_no: string | null; status: string; kind: string; loan_date: string; due_date: string; amount: string; repaid_total: string; overdue: boolean; days: number | null; lid: number; lcode: string; lname: string; bid: number; bcode: string; bname: string }
+type Raw = { id: number; company_id: number; doc_no: string | null; status: string; kind: string; loan_date: string; due_date: string; amount: string; repaid_total: string; overdue: boolean; days: number | null; lid: number | null; lcode: string | null; lname: string | null; laname: string | null; bid: number; bcode: string; bname: string }
 
 const toRow = (r: Raw): LoanRow => {
   const amount = Number(r.amount)
@@ -81,7 +82,8 @@ const toRow = (r: Raw): LoanRow => {
     outstanding: active ? amount - repaid : status === 'pending_approval' ? amount : 0,
     overdue: r.overdue,
     daysOverdue: r.overdue ? Number(r.days ?? 0) : 0,
-    lender: { id: Number(r.lid), code: r.lcode, name: r.lname },
+    // ADR 0031: lender = the project, else (automatic loan) the account — `id` 0, `code` "Akun"
+    lender: r.lid === null ? { id: 0, code: 'Akun', name: r.laname ?? '—' } : { id: Number(r.lid), code: r.lcode ?? '', name: r.lname ?? '' },
     borrower: { id: Number(r.bid), code: r.bcode, name: r.bname },
   }
 }
@@ -92,7 +94,7 @@ export async function loanRows(req: PayloadRequest, scope: ReportScope, f: LoanR
     req,
     sql`SELECT l.id, l.company_id, l.doc_no, l.status::text AS status, l.kind::text AS kind, l.loan_date, l.due_date, l.amount, l.repaid_total,
                ${OVERDUE} AS overdue, (${TODAY}::date - l.due_date::date) AS days,
-               pl.id AS lid, pl.code AS lcode, pl.name AS lname, pb.id AS bid, pb.code AS bcode, pb.name AS bname
+               pl.id AS lid, pl.code AS lcode, pl.name AS lname, la.name AS laname, pb.id AS bid, pb.code AS bcode, pb.name AS bname
           FROM ${FROM}
          WHERE ${where(scope, f)} ${page.after ? sql`AND l.id < ${page.after}` : sql``}
          ORDER BY l.id DESC LIMIT ${page.limit}`,
@@ -213,7 +215,7 @@ export const pinjamanReport: ReportDef = {
         columns: [
           { key: 'nomor', label: 'Nomor', type: 'text', primary: true },
           { key: 'tanggal', label: 'Tanggal', type: 'date' },
-          { key: 'pemberi', label: 'Project pemberi', type: 'text', primary: true },
+          { key: 'pemberi', label: 'Pemberi (project / akun)', type: 'text', primary: true },
           { key: 'peminjam', label: 'Project peminjam', type: 'text', primary: true },
           { key: 'jenis', label: 'Jenis', type: 'text' },
           { key: 'nilai', label: 'Nilai (Rp)', type: 'money', primary: true },
@@ -266,7 +268,7 @@ export const pinjamanReport: ReportDef = {
         },
       ],
       notes: [
-        'Pinjaman = klaim tercatat antara project dalam satu PT (tanpa transaksi kas). Nilai, sudah kembali dan sisa dihitung sejak disetujui Direktur; Menunggu persetujuan menampilkan nilai yang diajukan.',
+        'Pinjaman = klaim tercatat antara project dalam satu PT. Dana antar pusat biaya (akun kas) berbeda juga dicatat di buku kas (kas keluar pemberi / kas masuk peminjam); pinjaman otomatis dari transfer: pemberi = akun pembayar. Nilai, sudah kembali dan sisa dihitung sejak disetujui; Menunggu persetujuan menampilkan nilai yang diajukan.',
         `${OVERDUE_LABEL} = jatuh tempo lewat (tanggal PT) dan masih ada sisa. Draft tidak ditampilkan.`,
       ],
       next: list.length > page.limit && last ? Buffer.from(String(last.id)).toString('base64url') : null,

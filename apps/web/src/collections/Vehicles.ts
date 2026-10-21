@@ -8,6 +8,7 @@ import { activeField, odooRefField, uuidField } from '@/fields/common'
 import { normalizeUnitCode, UNIT_STATUS_LABELS, UNIT_STATUSES, unitErrors } from '@/domain/field/rules'
 import { formatPlate, normalizePlate, PLATE_RE } from '@/domain/plates'
 import { companyField, companyHook, lockedUntilCompany, pickerSameCompany } from '@/fields/company'
+import { pusatBiayaField } from '@/fields/pusat-biaya'
 import { validationError } from '@/lib/validation'
 
 const system = { create: () => false, update: () => false }
@@ -66,7 +67,7 @@ export const Vehicles: CollectionConfig = withAudit(
       delete: denyAll,
     },
     hooks: {
-      beforeChange: [companyHook('vehicles', { check: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'client', collection: 'clients' }] }), unitRules],
+      beforeChange: [companyHook('vehicles', { check: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'cashAccount', collection: 'cash-accounts' }, { field: 'client', collection: 'clients' }] }), unitRules],
       beforeValidate: [
         ({ data, originalDoc }) => {
           if (!data) return data
@@ -144,7 +145,9 @@ export const Vehicles: CollectionConfig = withAudit(
         ],
       },
       // DRMS UI 17/10 #4: the vehicle's PT only (same names in every PT); waits for the PT with several PTs selected
-      lockedUntilCompany({ name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya default', ...pickerSameCompany() }),
+      // ADR 0031 (DRMS 21/10): the vehicle's default Pusat Biaya = a cash account of its PT (former cost-center master retired)
+      pusatBiayaField({ name: 'cashAccount', label: 'Pusat biaya default (akun kas)' }),
+      lockedUntilCompany({ name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya lama', ...pickerSameCompany(), access: { create: () => false, update: () => false }, admin: { readOnly: true, condition: (d) => Boolean(d?.costCenter) } }),
       lockedUntilCompany({ name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project default', ...pickerSameCompany() }),
       {
         name: 'status',

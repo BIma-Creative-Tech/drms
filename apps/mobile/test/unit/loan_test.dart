@@ -14,7 +14,10 @@ void main() {
     expect(l.daysOverdue, 6);
     expect(l.samePm, isTrue);
     expect(l.samePmNote, 'PM peminjam = PM pemberi');
-    expect(l.lender.label, 'PRJ-A Gudang Balikpapan');
+    expect(l.lender?.label, 'PRJ-A Gudang Balikpapan');
+    expect(l.lenderLabel, 'PRJ-A Gudang Balikpapan');
+    // ADR 0031: a server before the fields → a manual claim without cash
+    expect((l.origin, l.cashBacked, l.awaitingDisbursement, l.disbursement), ('manual', false, false, null));
     expect(l.borrower.pm?.name, 'Doni Pratama');
     expect(l.amount, 150000000);
     expect(l.repaidTotal, 50000000);
@@ -35,6 +38,32 @@ void main() {
     expect(g.g1Exception, 'direktur_self');
     expect(g.g1Note, contains('satu-satunya Direktur'));
     expect(Loan.fromJson(const {}).status, LoanStatus.draft, reason: 'tolerant parsing');
+  });
+
+  test('ADR 0031: automatic loan — null lender project, the paying account lends; cash numbers', () {
+    final l = Loan.fromJson(loanAutoJson());
+    expect(l.lender, isNull);
+    expect(l.automatic, isTrue);
+    expect(l.lenderLabel, 'Akun Kas Kecil');
+    expect((l.lenderCashAccount?.id, l.borrowerCashAccount?.label), (4, 'Bank Mandiri Operasional'));
+    expect((l.origin, l.originLabel, l.transfer?.label), ('transfer', 'Otomatis (transfer)', 'TRF/DRMS/2610/0012'));
+    expect(l.cashBacked, isTrue);
+    expect((l.disbursement?.kk, l.disbursement?.km), ('KK/DRMS/2610/0021', 'KM/DRMS/2610/0022'));
+    expect((l.disbursedAt, l.disbursedBy?.name), ('2026-10-05T02:10:00.000Z', 'Fina Keuangan'));
+    expect((l.repayments.single.cash?.kk, l.repayments.single.cash?.km), ('KK/DRMS/2610/0031', 'KM/DRMS/2610/0032'));
+    expect(l.borrowedBy(10), isTrue);
+    // a lender without project nor account (malformed) still renders
+    final bare = Loan.fromJson({...loanAutoJson(), 'lenderCashAccount': null});
+    expect(bare.lenderLabel, 'Akun —');
+
+    final w = Loan.fromJson(loanAwaitingJson());
+    expect((w.awaitingDisbursement, w.statusLabel), (true, 'Disetujui – menunggu pencairan'));
+    expect(w.allowedActions, {LoanAction.disburse});
+    expect(w.lender?.label, 'PRJ-A Gudang Balikpapan');
+    expect(Loan.fromJson(loanJson(actions: ['disburse', 'repay'])).allowedActions, {
+      LoanAction.disburse,
+      LoanAction.repay,
+    });
   });
 
   test('options: borrower PM check and lenders of the same PT without the borrower', () {

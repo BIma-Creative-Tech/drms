@@ -596,7 +596,7 @@ function TeamWaitingCard({ id, data, span, i }: { id: string; data: TeamWaiting;
 }
 
 type CashRow = Awaited<ReturnType<typeof ownerDashboard>>['viz']['recentCash'][number]
-const SOURCE: Record<string, string> = { transfer: 'Transfer', settlement_refund: 'Pengembalian LPJ', manual: 'Manual', reversal: 'Jurnal balik', opening: 'Saldo awal', intercompany: 'Antar PT' }
+const SOURCE: Record<string, string> = { transfer: 'Transfer', settlement_refund: 'Pengembalian LPJ', manual: 'Manual', reversal: 'Jurnal balik', opening: 'Saldo awal', intercompany: 'Antar PT', project_loan: 'Pinjaman antar project' }
 
 function RecentCashCard({ id, rows, span, i }: { id: string; rows: CashRow[]; span: 6 | 8 | 12; i: number }) {
   const cols: Col<CashRow>[] = [
@@ -871,7 +871,7 @@ async function Owner({ req, months, siteId, withoutIc }: { req: PayloadRequest; 
             ]}
           />
         </Card>
-        <Card id="cost-centers" title="Pusat biaya bulan ini" sub="K-15, per pusat biaya" span={3} i={14}>
+        <Card id="cost-centers" title="Pusat biaya bulan ini" sub="K-15, per pusat biaya (akun kas)" span={3} i={14}>
           <HBarList
             id="owner-cost-centers"
             fmt={rpShort}
@@ -879,7 +879,7 @@ async function Owner({ req, months, siteId, withoutIc }: { req: PayloadRequest; 
             empty="Belum ada biaya pusat biaya bulan ini."
             items={[...d.costCenters]
               .sort((x, y) => y.total - x.total)
-              .map((c) => ({ key: String(c.id), label: `${c.code} ${c.name}`, value: Math.max(0, c.total), href: `/admin/laporan/rekap-kas?${where({ pusat: String(c.id), dari: d.month, sampai: d.month })}`, attrs: { 'data-pk-cost-center': String(c.id) } }))}
+              .map((c) => ({ key: String(c.id), label: c.name, value: Math.max(0, c.total), href: `/admin/laporan/rekap-kas?${where({ akun: String(c.id), dari: d.month, sampai: d.month })}`, attrs: { 'data-pk-cost-center': String(c.id) } }))}
           />
         </Card>
         <Card id="transfer-queue" title="Antrian transfer" sub="Lihat saja (Finance yang memproses)" span={3} i={15} action={{ href: '/admin/antrian-transfer', label: 'Antrian' }}>
@@ -1227,15 +1227,15 @@ async function Pm({ req, siteId }: { req: PayloadRequest; siteId?: number }) {
           />
         </Card>
 
-        <Card id="pm-cost-centers" title="Pusat biaya saya bulan ini" sub="K-15, tanpa kas manual kantor" span={6} i={10}>
+        <Card id="pm-cost-centers" title="Pusat biaya project saya bulan ini" sub="K-15, per akun kas, tanpa kas manual kantor" span={6} i={10}>
           <HBarList
             id="pm-cost-centers"
             fmt={rpShort}
             exact={rp}
-            empty="Anda tidak memegang pusat biaya."
+            empty="Project Anda belum dipetakan ke pusat biaya (akun kas)."
             items={[...d.costCenters]
               .sort((x, y) => y.total - x.total)
-              .map((c) => ({ key: String(c.id), label: `${c.code} ${c.name}`, value: Math.max(0, c.total), href: `/admin/laporan/rekap-pengajuan?${where({ pusat: String(c.id), dari: monthStart, sampai: lastDay(d.month) })}`, attrs: { 'data-pk-cost-center': String(c.id) } }))}
+              .map((c) => ({ key: String(c.id), label: c.name, value: Math.max(0, c.total), href: `/admin/laporan/rekap-pengajuan?${where({ pusat: String(c.id), dari: monthStart, sampai: lastDay(d.month) })}`, attrs: { 'data-pk-cost-center': String(c.id) } }))}
           />
         </Card>
         <Card id="f5" title="Lapangan" sub="Kehadiran tim hari ini · laporan progress terbaru" span={6} i={11}>
@@ -1264,17 +1264,18 @@ async function Admin({ req }: { req: PayloadRequest }) {
         <KpiTile id="projects-without-pm" icon="target" label="Project tanpa PM" value={formatNumber(g.projectsWithoutPm)} kpi="projects-without-pm" href={`/admin/collections/projects?${where({ 'where[pm][exists]': 'false' })}`} more="Tetapkan PM" i={1}>
           <p className="pk-kpi-x">{g.projectsWithoutPm === 0 ? <StatusPill tone="ok" label="Lengkap" /> : <StatusPill tone="warn" label="Perlu PM" />}</p>
         </KpiTile>
+        {/* ADR 0031: a project without Pusat Biaya (cash account) cannot be paid — Finance's transfer is refused */}
         <KpiTile
-          id="cost-centers-without-manager"
+          id="projects-without-pusat-biaya"
           icon="scale"
-          label="Pusat biaya tanpa penanggung jawab"
-          value={formatNumber(g.costCentersWithoutManager)}
-          kpi="cost-centers-without-manager"
-          href={`/admin/collections/cost-centers?${where({ 'where[manager][exists]': 'false' })}`}
-          more="Tetapkan"
+          label="Project tanpa pusat biaya"
+          value={formatNumber(g.projectsWithoutPusatBiaya)}
+          kpi="projects-without-pusat-biaya"
+          href={`/admin/collections/projects?${where({ 'where[cashAccount][exists]': 'false', 'where[status][not_in]': 'arsip,dibatalkan,selesai' })}`}
+          more="Petakan"
           i={2}
         >
-          <p className="pk-kpi-x">{g.costCentersWithoutManager === 0 ? <StatusPill tone="ok" label="Lengkap" /> : <StatusPill tone="warn" label="Perlu penanggung jawab" />}</p>
+          <p className="pk-kpi-x">{g.projectsWithoutPusatBiaya === 0 ? <StatusPill tone="ok" label="Lengkap" /> : <StatusPill tone="warn" label="Perlu pusat biaya (akun kas)" />}</p>
         </KpiTile>
       </KpiRow>
       <Card id="latest-audit" title="Audit log terbaru" sub="30 hari terakhir" span={12} i={3} action={{ href: '/admin/audit-log', label: 'Audit Log lengkap' }}>

@@ -170,7 +170,8 @@ describe('registry vs the real config, the migration and the snapshot', () => {
     expect(enums).toContain(`"enum_audit_logs_action" ADD VALUE IF NOT EXISTS 'restore'`)
     const snapshot = JSON.parse(readFileSync(join(dir, '20261016_200100_d1610_soft_delete.json'), 'utf8')) as { enums: Record<string, { values: string[] }>; tables: Record<string, { columns: Record<string, unknown>; indexes: Record<string, unknown>; foreignKeys: Record<string, unknown> }> }
     expect(snapshot.enums['public.enum_projects_status']!.values).toEqual(PROJECT_STATUSES.map((x) => x.value))
-    expect(snapshot.enums['public.enum_audit_logs_action']!.values).toEqual([...AUDIT_ACTIONS])
+    // ADR 0031 (20261021_100000_d2110_pb_enums) appended 'disburse' / 'auto_create' after this snapshot
+    expect(snapshot.enums['public.enum_audit_logs_action']!.values).toEqual(AUDIT_ACTIONS.filter((a) => a !== 'disburse' && a !== 'auto_create'))
     for (const t of SOFT_DELETE_TABLES) {
       const tb = snapshot.tables[`public.${t}`]!
       for (const c of ['is_deleted', 'deleted_at', 'deleted_by_id', 'delete_reason']) expect(tb.columns, `${t}.${c}`).toHaveProperty(c)

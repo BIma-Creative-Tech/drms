@@ -11,7 +11,7 @@ import { getRequestTx } from '@/lib/tx'
 import { budgetPct, budgetTone, daysBetween, firstDay, lastDay, periodRange, type BudgetTone } from './rules'
 import {
   companyScopeSql,
-  costCenterScopeSql,
+  pusatBiayaScopeSql,
   includesManualCash,
   inList,
   ledgerCompanies,
@@ -229,7 +229,9 @@ export async function cashFlowMonthly(req: PayloadRequest, scope: ReportScope, f
   if (f.accountId) where.push(sql`ce.cash_account_id = ${f.accountId}`)
   if (f.projectId) where.push(sql`ce.project_id = ${f.projectId}`)
   if (f.costCenterId) where.push(sql`ce.cost_center_id = ${f.costCenterId}`)
-  if (mode === 'operational') where.push(sql`ce.status = 'posted' AND ce.source_type <> 'reversal'`)
+  // ADR 0031: an inter-project loan moves money between two accounts of the SAME PT — not operational cash flow (its KK
+  // and KM cancel out per PT); with an account filter it is a real movement of that account and stays
+  if (mode === 'operational') where.push(f.accountId ? sql`ce.status = 'posted' AND ce.source_type <> 'reversal'` : sql`ce.status = 'posted' AND ce.source_type NOT IN ('reversal', 'project_loan')`)
   if (f.withoutIntercompany) where.push(sql`NOT ${INTERCOMPANY_ENTRY_SQL}`)
   const r = await rows(
     req,
@@ -314,6 +316,12 @@ export async function cashBreakdown(req: PayloadRequest, scope: ReportScope, f: 
                       WHEN icl.source_doc_type = 'intercompany_loan_repayment' THEN 'icloan_repaid_in'
                       ELSE 'intercompany' END
                     FROM intercompany_links icl WHERE icl.source_cash_entry_id = ce.id OR icl.target_cash_entry_id = ce.id LIMIT 1), 'intercompany')
+               -- ADR 0031: the legs of an inter-project loan (disbursement / repayment), split by direction
+               WHEN ce.source_type = 'project_loan' THEN CASE
+                      WHEN ce.project_loan_repayment_id IS NULL AND ce.direction = 'out' THEN 'ploan_given'
+                      WHEN ce.project_loan_repayment_id IS NULL THEN 'ploan_received'
+                      WHEN ce.direction = 'out' THEN 'ploan_repaid_out'
+                      ELSE 'ploan_repaid_in' END
                ELSE ce.source_type::text END AS source_type,
           s.name AS source_name, count(*)::int AS n, sum(ce.amount)::text AS amount
         FROM cash_entries ce LEFT JOIN cash_in_sources s ON s.id = ce.cash_in_source_id
@@ -642,17 +650,19 @@ export type RequestFilter = {
   type?: RequestType
   statuses?: RequestStatus[]
   projectId?: number
-  costCenterId?: number
+  /** ADR 0031: Pusat Biaya = a cash account (`?pusat=`). */
+  pusatBiayaId?: number
   categoryId?: number
   requesterId?: number
 }
 
 /**
- * DRMS 10/10 D2: a request belongs to cost center X when it is a legacy request of X or Finance recorded one of its
- * posted transfers on X (project requests get their cost center at the transfer).
+ * ADR 0031 (DRMS 21/10): a request belongs to Pusat Biaya X (a cash account) when its project is mapped to X or one of
+ * its posted transfers was charged to X (a later re-mapping of the project keeps the old transfers on their account).
  */
-export function requestCostCenterSql(costCenterId: number): SQL {
-  return sql`(er.cost_center_id = ${costCenterId} OR EXISTS (SELECT 1 FROM transfers tcc WHERE tcc.request_id = er.id AND tcc.status = 'posted' AND tcc.cost_center_id = ${costCenterId}))`
+export function requestPusatBiayaSql(accountId: number): SQL {
+  return sql`(er.project_id IN (SELECT pb.id FROM projects pb WHERE pb.cash_account_id = ${accountId})
+              OR EXISTS (SELECT 1 FROM transfers tpb WHERE tpb.request_id = er.id AND tpb.status = 'posted' AND tpb.cash_account_id = ${accountId}))`
 }
 
 export function requestFilterSql(f: RequestFilter): SQL {
@@ -660,7 +670,7 @@ export function requestFilterSql(f: RequestFilter): SQL {
   if (f.type) w.push(sql`er.type = ${f.type}`)
   if (f.statuses?.length) w.push(sql`er.status::text IN (${textList(f.statuses)})`)
   if (f.projectId) w.push(sql`er.project_id = ${f.projectId}`)
-  if (f.costCenterId) w.push(requestCostCenterSql(f.costCenterId))
+  if (f.pusatBiayaId) w.push(requestPusatBiayaSql(f.pusatBiayaId))
   if (f.categoryId) w.push(sql`EXISTS (SELECT 1 FROM expense_requests_lines l2 WHERE l2._parent_id = er.id AND l2.category_id = ${f.categoryId})`)
   if (f.requesterId) w.push(sql`EXISTS (SELECT 1 FROM expense_requests_rels r2 WHERE r2.parent_id = er.id AND r2.path = 'requesters' AND r2.employees_id = ${f.requesterId})`)
   return sql.join(w, sql` AND `)
@@ -806,43 +816,48 @@ export async function vehicleCosts(req: PayloadRequest, scope: ReportScope, f: V
   return { vehicles: [...map.values()], includesManual: manual }
 }
 
-// ================================================================ K-15 cost center month
+// ================================================================ K-15 Pusat Biaya month
 
 /**
- * K-15 per cost center for `period`: K-05 of its requests in the month (posted transfers by
- * transfer date − posted LPJ refunds by entry date) + manual cash-out − manual cash-in of the cost
- * center (posted, not reversal). DRMS 10/10 D2: a transfer counts for the cost center FINANCE chose on it
- * (`transfers.cost_center_id`); transfers recorded before D2 keep the legacy request's own cost center. A refund
- * follows the cost center of the request's (latest posted) transfer, likewise.
+ * K-15 per Pusat Biaya (ADR 0031, DRMS 21/10: a cash account of the PT) for `period`: transfers of requests CHARGED to it
+ * (`transfers.cash_account_id` — the project's Pusat Biaya, also when Finance paid from another account: that one lent
+ * the money, an inter-project loan) by transfer date − LPJ refunds posted on it + manual cash-out − manual cash-in on it
+ * (office scope only, "tanpa kas manual" for the PM). Loan legs, intercompany and reversals are not costs. Requests are
+ * limited to the caller's request scope (a PM: his team's projects).
  */
 export async function costCenterMonth(req: PayloadRequest, scope: ReportScope, period: string) {
   const from = firstDay(period)
   const to = lastDay(period)
+  const manual = includesManualCash(scope)
   const r = await rows(
     req,
-    sql`SELECT cc.id, cc.company_id, cc.code, cc.name,
+    sql`SELECT a.id, a.company_id, a.name,
           (SELECT coalesce(sum(t.amount), 0) FROM transfers t JOIN expense_requests er ON er.id = t.request_id
-            WHERE coalesce(t.cost_center_id, er.cost_center_id) = cc.id AND t.status = 'posted' AND t.transfer_date BETWEEN ${from} AND ${to})::text AS transfers,
+            WHERE t.cash_account_id = a.id AND t.status = 'posted' AND t.transfer_date BETWEEN ${from} AND ${to} AND ${requestScopeSql(scope)})::text AS transfers,
           (SELECT coalesce(sum(c.amount), 0) FROM cash_entries c JOIN expense_requests er ON er.id = c.expense_request_id
-            WHERE coalesce((SELECT t2.cost_center_id FROM transfers t2 WHERE t2.request_id = er.id AND t2.status = 'posted' AND t2.cost_center_id IS NOT NULL ORDER BY t2.id DESC LIMIT 1), er.cost_center_id) = cc.id
-              AND c.source_type = 'settlement_refund' AND c.status = 'posted' AND c.entry_date BETWEEN ${from} AND ${to})::text AS refunds,
-          (SELECT coalesce(sum(c.amount) FILTER (WHERE c.direction = 'out'), 0) FROM cash_entries c
-            WHERE c.cost_center_id = cc.id AND c.source_type = 'manual' AND c.status = 'posted' AND c.period = ${period})::text AS manual_out,
-          (SELECT coalesce(sum(c.amount) FILTER (WHERE c.direction = 'in'), 0) FROM cash_entries c
-            WHERE c.cost_center_id = cc.id AND c.source_type = 'manual' AND c.status = 'posted' AND c.period = ${period})::text AS manual_in
-        FROM cost_centers cc WHERE ${costCenterScopeSql(scope)} ORDER BY cc.code, cc.id`,
+            WHERE c.cash_account_id = a.id AND c.source_type = 'settlement_refund' AND c.status = 'posted' AND c.entry_date BETWEEN ${from} AND ${to} AND ${requestScopeSql(scope)})::text AS refunds,
+          ${
+            manual
+              ? sql`(SELECT coalesce(sum(c.amount) FILTER (WHERE c.direction = 'out'), 0) FROM cash_entries c
+                      WHERE c.cash_account_id = a.id AND c.source_type = 'manual' AND c.status = 'posted' AND c.period = ${period} AND ${ledgerScopeSql(scope, 'c')})::text AS manual_out,
+                    (SELECT coalesce(sum(c.amount) FILTER (WHERE c.direction = 'in'), 0) FROM cash_entries c
+                      WHERE c.cash_account_id = a.id AND c.source_type = 'manual' AND c.status = 'posted' AND c.period = ${period} AND ${ledgerScopeSql(scope, 'c')})::text AS manual_in`
+              : sql`'0' AS manual_out, '0' AS manual_in`
+          }
+        FROM cash_accounts a WHERE ${pusatBiayaScopeSql(scope)} ORDER BY a.name, a.id`,
   )
   return r.map((x) => {
     const fromRequests = num(x.transfers) - num(x.refunds)
     const manualOut = num(x.manual_out)
     const manualIn = num(x.manual_in)
-    return { id: num(x.id), companyId: num(x.company_id), code: String(x.code), name: String(x.name), fromRequests, manualOut, manualIn, total: fromRequests + manualOut - manualIn }
+    // `code` kept for the dashboard / API shape (accounts have no code): the account name
+    return { id: num(x.id), companyId: num(x.company_id), code: '', name: String(x.name), fromRequests, manualOut, manualIn, total: fromRequests + manualOut - manualIn }
   })
 }
 
 // ================================================================ K-17 spending per category / scope
 
-export type SpendFilter = { from: string; to: string; basis: 'dicairkan' | 'realisasi'; group: 'kategori' | 'lingkup'; type?: RequestType; projectId?: number; costCenterId?: number; categoryId?: number }
+export type SpendFilter = { from: string; to: string; basis: 'dicairkan' | 'realisasi'; group: 'kategori' | 'lingkup'; type?: RequestType; projectId?: number; pusatBiayaId?: number; categoryId?: number }
 
 /**
  * K-17. Dicairkan: line totals of requests with a posted advance/reimburse transfer dated in range
@@ -857,11 +872,11 @@ export async function spending(req: PayloadRequest, scope: ReportScope, f: Spend
   const reqWhere: SQL[] = [requestScopeSql(scope)]
   if (f.type) reqWhere.push(sql`er.type = ${f.type}`)
   if (f.projectId) reqWhere.push(sql`er.project_id = ${f.projectId}`)
-  if (f.costCenterId) reqWhere.push(requestCostCenterSql(f.costCenterId))
+  if (f.pusatBiayaId) reqWhere.push(requestPusatBiayaSql(f.pusatBiayaId))
   const catWhere = f.categoryId ? sql`AND l.category_id = ${f.categoryId}` : sql``
   const manWhere: SQL[] = [sql`ce.source_type = 'manual'`, sql`ce.direction = 'out'`, sql`ce.status = 'posted'`, sql`ce.entry_date BETWEEN ${f.from} AND ${f.to}`, ledgerScopeSql(scope)]
   if (f.projectId) manWhere.push(sql`ce.project_id = ${f.projectId}`)
-  if (f.costCenterId) manWhere.push(sql`ce.cost_center_id = ${f.costCenterId}`)
+  if (f.pusatBiayaId) manWhere.push(sql`ce.cash_account_id = ${f.pusatBiayaId}`) // ADR 0031: manual cash ON the Pusat Biaya account
   if (f.categoryId) manWhere.push(sql`ce.category_id = ${f.categoryId}`)
   const W = sql.join(reqWhere, sql` AND `)
   const lineSource =
@@ -956,7 +971,8 @@ export async function ownRequests(req: PayloadRequest, scope: ReportScope, opts:
  * Admin home: onboarding gaps (approval prerequisites, F2) of the PTs `companyIds` (the caller's
  * Admin PTs, ADR 0016): active accounts with an incomplete membership (no employee or no role) in
  * those PTs + active accounts without any membership (onboarding: account first, membership next);
- * projects without PM and cost centers without manager of those PTs. `byCompany` per PT.
+ * projects without PM and (ADR 0031) open projects without Pusat Biaya (cash account) of those PTs. `byCompany` per PT.
+ * `costCentersWithoutManager`: deprecated (the cost-center master is retired), always 0.
  */
 export async function masterGaps(req: PayloadRequest, companyIds: readonly number[]) {
   const pts = companyScopeSql(sql`m.company_id`, companyIds)
@@ -976,7 +992,7 @@ export async function masterGaps(req: PayloadRequest, companyIds: readonly numbe
         ? rows(req, sql`SELECT count(*)::int AS n FROM users u WHERE coalesce(u.active, true) AND NOT EXISTS (SELECT 1 FROM company_memberships m WHERE m.user_id = u.id AND coalesce(m.active, true))`)
         : Promise.resolve([{ n: 0 }]),
     () => rows(req, sql`SELECT p.company_id, count(*)::int AS n FROM projects p WHERE p.pm_id IS NULL AND p.status::text NOT IN ('arsip', 'dibatalkan') AND p.is_deleted IS NOT TRUE AND ${companyScopeSql(sql`p.company_id`, companyIds)} GROUP BY p.company_id`),
-    () => rows(req, sql`SELECT cc.company_id, count(*)::int AS n FROM cost_centers cc WHERE cc.manager_id IS NULL AND coalesce(cc.active, true) AND ${companyScopeSql(sql`cc.company_id`, companyIds)} GROUP BY cc.company_id`),
+    () => rows(req, sql`SELECT p.company_id, count(*)::int AS n FROM projects p WHERE p.cash_account_id IS NULL AND p.status::text NOT IN ('arsip', 'dibatalkan', 'selesai') AND p.is_deleted IS NOT TRUE AND ${companyScopeSql(sql`p.company_id`, companyIds)} GROUP BY p.company_id`),
   )
   const sum = (list: Array<Record<string, unknown>>) => list.reduce((a, x) => a + num(x.n), 0)
   const of = (list: Array<Record<string, unknown>>, cid: number) => num(list.find((x) => num(x.company_id) === cid)?.n)
@@ -984,8 +1000,9 @@ export async function masterGaps(req: PayloadRequest, companyIds: readonly numbe
     usersIncomplete: sum(u) + num(orphan[0]?.n),
     usersWithoutMembership: num(orphan[0]?.n),
     projectsWithoutPm: sum(p),
-    costCentersWithoutManager: sum(c),
-    byCompany: [...companyIds].sort((a, b) => a - b).map((cid) => ({ companyId: cid, usersIncomplete: of(u, cid), projectsWithoutPm: of(p, cid), costCentersWithoutManager: of(c, cid) })),
+    projectsWithoutPusatBiaya: sum(c),
+    costCentersWithoutManager: 0,
+    byCompany: [...companyIds].sort((a, b) => a - b).map((cid) => ({ companyId: cid, usersIncomplete: of(u, cid), projectsWithoutPm: of(p, cid), projectsWithoutPusatBiaya: of(c, cid), costCentersWithoutManager: 0 })),
   }
 }
 

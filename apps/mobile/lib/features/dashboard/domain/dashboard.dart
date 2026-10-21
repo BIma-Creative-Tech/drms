@@ -441,6 +441,8 @@ const cashSourceLabels = {
   'reversal': 'Jurnal balik',
   'opening': 'Saldo awal',
   'intercompany': 'Antar PT',
+  // ADR 0031: the KK / KM legs of an inter-project loan (disbursement, repayment)
+  'project_loan': 'Pinjaman antar project',
 };
 
 /// ADR 0028 cash-entry `intercompany` counterpart (the other leg of a payment between PTs): numbers and PT only.
@@ -539,7 +541,7 @@ class RecentCashEntry {
   ];
 }
 
-/// "Pusat biaya bulan ini" (K-15).
+/// "Pusat biaya bulan ini" (K-15). ADR 0031: one row per Pusat Biaya = cash account (`code` is empty — name only).
 class CostCenterMonth {
   const CostCenterMonth(this.id, this.code, this.name, this.total);
   final int id;
@@ -924,17 +926,20 @@ class StaffDashboard {
 
 /// `GET /dashboard/admin` — Admin home: master-data gaps (the audit log stays on the web).
 class AdminDashboard {
-  const AdminDashboard({this.usersIncomplete = 0, this.projectsWithoutPm = 0, this.costCentersWithoutManager = 0});
+  const AdminDashboard({this.usersIncomplete = 0, this.projectsWithoutPm = 0, this.projectsWithoutPusatBiaya = 0});
   final int usersIncomplete;
   final int projectsWithoutPm;
-  final int costCentersWithoutManager;
+
+  /// ADR 0031: open projects without Pusat Biaya (cash account) — their transfers are refused until mapped
+  /// (`costCentersWithoutManager` is deprecated, always 0).
+  final int projectsWithoutPusatBiaya;
 
   static AdminDashboard fromJson(Json j) {
     final g = _m(j['gaps']);
     return AdminDashboard(
       usersIncomplete: _i(g['usersIncomplete']),
       projectsWithoutPm: _i(g['projectsWithoutPm']),
-      costCentersWithoutManager: _i(g['costCentersWithoutManager']),
+      projectsWithoutPusatBiaya: _i(g['projectsWithoutPusatBiaya']),
     );
   }
 }

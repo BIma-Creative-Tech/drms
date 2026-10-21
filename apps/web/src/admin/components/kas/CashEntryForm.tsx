@@ -345,7 +345,8 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
             {(
               [
                 ['project', 'Project'],
-                ['pusat', 'Pusat biaya'],
+                // ADR 0031: the account above IS the Pusat Biaya; the old cost-center option stays only on a legacy entry
+                ...(entry?.costCenterId ? ([['pusat', 'Pusat biaya lama']] as const) : []),
                 ['none', 'Tidak ada'],
               ] as const
             ).map(([v, l]) => (
@@ -355,7 +356,7 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
               </label>
             ))}
           </div>
-          <p className="help">Project ATAU pusat biaya — tidak keduanya.</p>
+          <p className="help">Pusat biaya = akun kas yang dipilih. Pilih project bila biaya ini milik project tertentu.</p>
         </div>
         {scope === 'project' ? select('projectId', 'Project', options.projects, entry?.projectId, { required: true }) : null}
         {scope === 'pusat' ? select('costCenterId', 'Pusat biaya', options.costCenters, entry?.costCenterId, { required: true }) : null}

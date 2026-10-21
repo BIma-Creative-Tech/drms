@@ -38,7 +38,7 @@ import { ptLabel } from '@/lib/pt-options'
 
 import {
   auditScope,
-  costCenterScopeSql,
+  pusatBiayaScopeSql,
   includesManualCash,
   ledgerCompanies,
   ledgerScopeSql,
@@ -127,6 +127,25 @@ const statusesOf = (sp: URLSearchParams): RequestStatus[] => {
  * `company_id = <that PT>`, so an id of another PT matches nothing. A legacy scope without
  * companies → an empty scope (MC4: fail closed for every kind).
  */
+/**
+ * ADR 0031: a `?pusat=` filter of a request report that narrows by SCOPE (Kelengkapan): the projects mapped to that
+ * account, intersected with the scope per PT (office PT: those projects; team: the team's among them). No account → as is.
+ */
+export async function narrowToPusatBiaya(req: PayloadRequest, scope: ReportScope, accountId?: number): Promise<ReportScope> {
+  if (!accountId || scope.kind === 'none' || scope.kind === 'own' || !scope.companies) return scope
+  const r = await rows(req, sql`SELECT p.id, p.company_id FROM projects p WHERE p.cash_account_id = ${accountId} AND p.is_deleted IS NOT TRUE`)
+  const byPt = new Map<number, number[]>()
+  for (const x of r) byPt.set(num(x.company_id), [...(byPt.get(num(x.company_id)) ?? []), num(x.id)])
+  return fromCompanies(
+    scope.companies.map((c) => {
+      if (c.kind === 'own') return c
+      const mapped = byPt.get(c.company) ?? []
+      const site = c.onlySites ? { onlySites: c.onlySites } : {}
+      return { company: c.company, kind: 'team', projects: c.kind === 'team' ? c.projects.filter((p) => mapped.includes(p)) : mapped, costCenters: [], ...site }
+    }),
+  )
+}
+
 export function narrowScope(scope: ReportScope, projectId?: number, costCenterId?: number): ReportScope {
   if (!projectId && !costCenterId) return scope
   if (scope.kind === 'none' || scope.kind === 'own') return scope
@@ -186,10 +205,11 @@ async function projectOptions(req: PayloadRequest, scope: ReportScope): Promise<
   const r = await rows(req, sql`SELECT p.id, p.company_id, p.code, p.name FROM projects p WHERE ${projectScopeSql(scope)} ORDER BY p.code, p.company_id`)
   return r.map((x) => ({ value: String(x.id), label: pre(x.company_id, `${x.code} ${x.name}`) }))
 }
-async function costCenterOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
+/** ADR 0031: Pusat Biaya options = the cash accounts of the scope (team: the accounts its projects are mapped to). */
+async function pusatBiayaOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
   const pre = await ptPrefix(req, scope)
-  const r = await rows(req, sql`SELECT cc.id, cc.company_id, cc.code, cc.name FROM cost_centers cc WHERE ${costCenterScopeSql(scope)} ORDER BY cc.code, cc.company_id`)
-  return r.map((x) => ({ value: String(x.id), label: pre(x.company_id, `${x.code} ${x.name}`) }))
+  const r = await rows(req, sql`SELECT a.id, a.company_id, a.name FROM cash_accounts a WHERE ${pusatBiayaScopeSql(scope)} ORDER BY a.name, a.company_id`)
+  return r.map((x) => ({ value: String(x.id), label: pre(x.company_id, String(x.name)) }))
 }
 /** Categories of the scope's PTs (per PT: never merged across PTs). */
 async function categoryOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
@@ -266,9 +286,10 @@ const rekapKas: ReportDef = {
     const m = monthRange(sp.get('dari'), sp.get('sampai'), ctx.today)
     // ADR 0028 (owner 2026-10-14): "tanpa antar-PT" leaves both legs of intercompany payments out (no elimination)
     const withoutIntercompany = sp.get('antarpt') === 'tanpa'
-    const f = { from: m.from, to: m.to, accountId: idOf(sp, 'akun'), projectId: idOf(sp, 'project'), costCenterId: idOf(sp, 'pusat'), withoutIntercompany }
+    // ADR 0031: the account IS the Pusat Biaya — `?pusat=` (links of the K-15 card) is the account
+    const f = { from: m.from, to: m.to, accountId: idOf(sp, 'akun') ?? idOf(sp, 'pusat'), projectId: idOf(sp, 'project'), withoutIntercompany }
     const flows = await cashFlowMonthly(req, scope, f, 'book')
-    const withBalance = !f.projectId && !f.costCenterId && !withoutIntercompany
+    const withBalance = !f.projectId && !withoutIntercompany
     const anyIc = !withoutIntercompany && flows.some((x) => x.masukAntarPt !== 0 || x.keluarAntarPt !== 0)
     // QA-14: an account going live inside the range adds its opening balance in that month (own column)
     const golive = withBalance && flows.some((x) => x.saldoAwalAkun !== 0)
@@ -290,7 +311,7 @@ const rekapKas: ReportDef = {
       columns,
       rows: flows.map((x) => ({
         cells: { bulan: periodLabel(x.period), awal: x.openingBalance, ...(golive ? { golive: x.saldoAwalAkun } : {}), masuk: x.masuk, keluar: x.keluar, selisih: x.net, koreksi: x.koreksi, ...(anyIc ? { masukIc: x.masukAntarPt, keluarIc: x.keluarAntarPt } : {}), akhir: x.closingBalance },
-        href: `/admin/laporan/buku-kas?${qs({ dari: `${x.period}-01`, sampai: lastDay(x.period), akun: f.accountId, project: f.projectId, pusat: f.costCenterId, site: siteParam(sp) ?? undefined })}`,
+        href: `/admin/laporan/buku-kas?${qs({ dari: `${x.period}-01`, sampai: lastDay(x.period), akun: f.accountId, project: f.projectId, site: siteParam(sp) ?? undefined })}`,
       })),
       totals: {
         bulan: 'TOTAL',
@@ -320,6 +341,11 @@ const rekapKas: ReportDef = {
       icloan_received: 'Pinjaman antar-PT diterima (hutang)',
       icloan_repaid_in: 'Pengembalian pinjaman antar-PT diterima',
       icloan_repaid_out: 'Pembayaran hutang antar-PT',
+      // ADR 0031: inter-project loans between two Pusat Biaya of the PT (internal: in and out net to 0 per PT)
+      ploan_given: 'Pinjaman antar project diberikan',
+      ploan_received: 'Pinjaman antar project diterima',
+      ploan_repaid_out: 'Pengembalian pinjaman antar project (keluar)',
+      ploan_repaid_in: 'Pengembalian pinjaman antar project (masuk)',
     }
     return {
       main,
@@ -369,9 +395,8 @@ const rekapKas: ReportDef = {
     return [
       { name: 'dari', label: 'Dari bulan', kind: 'month', value: m.from },
       { name: 'sampai', label: 'Sampai bulan', kind: 'month', value: m.to },
-      sel('akun', 'Akun kas', sp, await accountOptions(req, ledger)),
+      sel('akun', 'Akun kas / pusat biaya', sp, await accountOptions(req, ledger)),
       sel('project', 'Project', sp, await projectOptions(req, ledger)),
-      sel('pusat', 'Pusat biaya', sp, await costCenterOptions(req, ledger)),
       // ADR 0028 (owner 2026-10-14): consolidated view without the intercompany legs (no automatic elimination)
       sel('antarpt', 'Antar PT', sp, [{ value: 'tanpa', label: 'Tanpa antar-PT' }]),
     ]
@@ -384,8 +409,8 @@ const rekapKas: ReportDef = {
 
 // ================================================================ buku-kas (ledger rows)
 
-const SOURCE_TYPES = ['transfer', 'settlement_refund', 'manual', 'reversal', 'opening', 'intercompany'] as const
-const SOURCE_LABELS: Record<string, string> = { transfer: 'Transfer pengajuan', settlement_refund: 'Pengembalian LPJ', manual: 'Manual', reversal: 'Jurnal balik', opening: 'Saldo awal', intercompany: 'Antar PT' }
+const SOURCE_TYPES = ['transfer', 'settlement_refund', 'manual', 'reversal', 'opening', 'intercompany', 'project_loan'] as const
+const SOURCE_LABELS: Record<string, string> = { transfer: 'Transfer pengajuan', settlement_refund: 'Pengembalian LPJ', manual: 'Manual', reversal: 'Jurnal balik', opening: 'Saldo awal', intercompany: 'Antar PT', project_loan: 'Pinjaman antar project' }
 
 /** Only the `all` PTs of a scope (cash ledger reports: Finance/Owner of the PT). */
 function ledgerOnly(scope: ReportScope): ReportScope {
@@ -395,7 +420,8 @@ function ledgerOnly(scope: ReportScope): ReportScope {
 function ledgerWhere(scope: ReportScope, sp: URLSearchParams, ctx: Ctx): SQL {
   const r = dateRange(sp.get('dari'), sp.get('sampai'), ctx.today)
   const w: SQL[] = [sql`ce.entry_date BETWEEN ${r.from} AND ${r.to}`, ledgerScopeSql(scope)]
-  const acc = idOf(sp, 'akun')
+  // ADR 0031: the account IS the Pusat Biaya (`?pusat=` = an account id)
+  const acc = idOf(sp, 'akun') ?? idOf(sp, 'pusat')
   if (acc) w.push(sql`ce.cash_account_id = ${acc}`)
   const arah = sp.get('arah')
   if (arah === 'in' || arah === 'out') w.push(sql`ce.direction = ${arah}`)
@@ -405,8 +431,6 @@ function ledgerWhere(scope: ReportScope, sp: URLSearchParams, ctx: Ctx): SQL {
   if (st === 'posted' || st === 'void') w.push(sql`ce.status = ${st}`)
   const p = idOf(sp, 'project')
   if (p) w.push(sql`ce.project_id = ${p}`)
-  const c = idOf(sp, 'pusat')
-  if (c) w.push(sql`ce.cost_center_id = ${c}`)
   return sql.join(w, sql` AND `)
 }
 
@@ -504,7 +528,7 @@ const bukuKas: ReportDef = {
     const ledger = ledgerOnly(scope)
     return [
       ...(await dateFields(req, sp)),
-      sel('akun', 'Akun kas', sp, await accountOptions(req, ledger)),
+      sel('akun', 'Akun kas / pusat biaya', sp, await accountOptions(req, ledger)),
       sel('arah', 'Arah', sp, [
         { value: 'in', label: 'Masuk' },
         { value: 'out', label: 'Keluar' },
@@ -520,7 +544,6 @@ const bukuKas: ReportDef = {
         { value: 'void', label: 'void' },
       ]),
       sel('project', 'Project', sp, await projectOptions(req, ledger)),
-      sel('pusat', 'Pusat biaya', sp, await costCenterOptions(req, ledger)),
     ]
   },
   fileStem(ctx, sp) {
@@ -547,8 +570,8 @@ const pengeluaranKategori: ReportDef = {
     const basis = sp.get('dasar') === 'realisasi' ? 'realisasi' : 'dicairkan'
     const group = sp.get('grup') === 'lingkup' ? 'lingkup' : 'kategori'
     const projectId = idOf(sp, 'project')
-    const costCenterId = idOf(sp, 'pusat')
-    const s = await spending(req, scope, { from: r.from, to: r.to, basis, group, type: typeOf(sp), projectId, costCenterId, categoryId: idOf(sp, 'kategori') })
+    const pusatBiayaId = idOf(sp, 'pusat')
+    const s = await spending(req, scope, { from: r.from, to: r.to, basis, group, type: typeOf(sp), projectId, pusatBiayaId, categoryId: idOf(sp, 'kategori') })
     const items = s.items
     const total = s.total
     const manualShown = s.includesManual
@@ -568,7 +591,7 @@ const pengeluaranKategori: ReportDef = {
           cells: { label: i.label, n: i.requestCount, req: i.fromRequests, manual: i.fromManual, total: i.total, share: total > 0 ? Math.round((i.total / total) * 1000) / 10 : 0 },
           href:
             group === 'kategori' && /^\d+$/.test(i.key)
-              ? `/admin/laporan/rekap-pengajuan?${qs({ dari: r.from, sampai: r.to, kategori: i.key, jenis: typeOf(sp), project: projectId, pusat: costCenterId })}`
+              ? `/admin/laporan/rekap-pengajuan?${qs({ dari: r.from, sampai: r.to, kategori: i.key, jenis: typeOf(sp), project: projectId, pusat: pusatBiayaId })}`
               : undefined,
           company: i.companyId,
         })),
@@ -600,7 +623,7 @@ const pengeluaranKategori: ReportDef = {
       ]),
       sel('jenis', 'Jenis', sp, typeOptions),
       sel('project', 'Project', sp, await projectOptions(req, scope)),
-      sel('pusat', 'Pusat biaya', sp, await costCenterOptions(req, scope)),
+      sel('pusat', 'Pusat biaya (akun kas)', sp, await pusatBiayaOptions(req, scope)),
       sel('kategori', 'Kategori', sp, await categoryOptions(req, scope)),
     ]
   },
@@ -717,7 +740,7 @@ function requestFilter(sp: URLSearchParams, ctx: Ctx): RequestFilter {
     type: typeOf(sp),
     statuses: statusesOf(sp),
     projectId: idOf(sp, 'project'),
-    costCenterId: idOf(sp, 'pusat'),
+    pusatBiayaId: idOf(sp, 'pusat'),
     categoryId: idOf(sp, 'kategori'),
     requesterId: idOf(sp, 'pemohon'),
   }
@@ -828,7 +851,7 @@ const rekapPengajuan: ReportDef = {
         value: statusesOf(sp),
       },
       sel('project', 'Project', sp, await projectOptions(req, scope)),
-      sel('pusat', 'Pusat biaya', sp, await costCenterOptions(req, scope)),
+      sel('pusat', 'Pusat biaya (akun kas)', sp, await pusatBiayaOptions(req, scope)),
       sel('kategori', 'Kategori', sp, await categoryOptions(req, scope)),
       sel('pemohon', 'Pemohon', sp, await requesterOptions(req, scope)),
     ]
@@ -854,7 +877,7 @@ const kelengkapan: ReportDef = {
   async run(req, scope, sp) {
     const ctx = await reportContext(req)
     const r = dateRange(sp.get('dari'), sp.get('sampai'), ctx.today)
-    const eff = narrowScope(scope, idOf(sp, 'project'), idOf(sp, 'pusat'))
+    const eff = await narrowToPusatBiaya(req, narrowScope(scope, idOf(sp, 'project')), idOf(sp, 'pusat'))
     const s = await lpjSummary(req, eff, r.from, r.to)
     return {
       main: {
@@ -918,7 +941,7 @@ const kelengkapan: ReportDef = {
     }
   },
   async filters(req, scope, sp) {
-    return [...(await dateFields(req, sp)), sel('project', 'Project', sp, await projectOptions(req, scope)), sel('pusat', 'Pusat biaya', sp, await costCenterOptions(req, scope))]
+    return [...(await dateFields(req, sp)), sel('project', 'Project', sp, await projectOptions(req, scope)), sel('pusat', 'Pusat biaya (akun kas)', sp, await pusatBiayaOptions(req, scope))]
   },
   fileStem(ctx) {
     return `kelengkapan_${ctx.today}`

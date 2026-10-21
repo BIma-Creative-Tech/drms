@@ -1,7 +1,7 @@
 import { APIError, type CollectionBeforeChangeHook, type CollectionConfig } from 'payload'
 
-import { denyAll, relId } from '@/access/roles'
-import { byRole, rolesAllowed } from '@/access/policies'
+import { denyAll, hasRoleAny, relId } from '@/access/roles'
+import { byRole, fieldRoles, rolesAllowed } from '@/access/policies'
 import { reasonOnChange, reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, rupiahField, uuidField } from '@/fields/common'
 
@@ -80,15 +80,28 @@ const intercompanyReceivingRules: CollectionBeforeChangeHook = async ({ data, or
   return data
 }
 
-/** Akun kas/bank perusahaan. Finance C/R/U, Owner R/U, Admin C/R/U (requirements §4 "Master data"). */
+/** ADR 0031: bank details, opening balance and Kas settings — the Kas roles of the account's PT only (not the PM). */
+const kasDetails = { read: fieldRoles('pk-admin', 'pk-finance', 'pk-owner') }
+
+/**
+ * Akun kas/bank perusahaan. Finance C/R/U, Owner R/U, Admin C/R/U (requirements §4 "Master data").
+ * ADR 0031 (DRMS 21/10): an account is also a project's "Pusat biaya" — the PM reads the ACTIVE accounts of his PT
+ * (name / kind / site only, `kasDetails`) to map his project; balances stay behind the Kas endpoints (Finance / Direktur).
+ */
 export const CashAccounts: CollectionConfig = withAudit(
   {
     slug: 'cash-accounts',
     labels: { singular: 'Akun kas/bank', plural: 'Akun kas/bank' },
-    admin: { useAsTitle: 'name', group: 'Keuangan', defaultColumns: ['name', 'kind', 'accountNo', 'site', 'intercompanyReceiving', 'active'] },
+    admin: {
+      useAsTitle: 'name',
+      group: 'Keuangan',
+      defaultColumns: ['name', 'kind', 'accountNo', 'site', 'intercompanyReceiving', 'active'],
+      // ADR 0031: the PM reads accounts only as the project's Pusat Biaya picker — no menu entry
+      hidden: ({ user }) => !hasRoleAny({ user } as never, 'pk-admin', 'pk-finance', 'pk-owner'),
+    },
     hooks: { beforeChange: [companyHook('cash-accounts', { check: [{ field: 'site', collection: 'sites' }] }), openingBalanceLock, intercompanyReceivingRules] },
     access: {
-      read: byRole({ 'pk-admin': true, 'pk-finance': true, 'pk-owner': true }),
+      read: byRole({ 'pk-admin': true, 'pk-finance': true, 'pk-owner': true, 'pk-pm': () => ({ active: { not_equals: false } }) }),
       create: rolesAllowed('pk-admin', 'pk-finance'),
       update: byRole({ 'pk-admin': true, 'pk-finance': true, 'pk-owner': true }),
       delete: denyAll,
@@ -107,11 +120,12 @@ export const CashAccounts: CollectionConfig = withAudit(
           { label: 'Bank', value: 'bank' },
         ],
       },
-      { name: 'bank', type: 'relationship', relationTo: 'banks', label: 'Bank' },
-      { name: 'accountNo', type: 'text', label: 'Nomor rekening', maxLength: 34 },
-      { name: 'accountHolder', type: 'text', label: 'Atas nama', maxLength: 128 },
-      rupiahField('openingBalance', 'Saldo awal (Rp)'),
+      { name: 'bank', type: 'relationship', relationTo: 'banks', label: 'Bank', access: kasDetails },
+      { name: 'accountNo', type: 'text', label: 'Nomor rekening', maxLength: 34, access: kasDetails },
+      { name: 'accountHolder', type: 'text', label: 'Atas nama', maxLength: 128, access: kasDetails },
+      { ...rupiahField('openingBalance', 'Saldo awal (Rp)'), access: kasDetails },
       businessDateField('openingBalanceDate', 'Tanggal saldo awal', {
+        access: kasDetails,
         admin: {
           description:
             'Tanggal go-live akun ini. Transaksi kas sebelum tanggal ini ditolak; saldo awal terkunci setelah periode sejak tanggal ini ditutup. Kosong = tanpa kunci.',
@@ -135,12 +149,13 @@ export const CashAccounts: CollectionConfig = withAudit(
         type: 'checkbox',
         label: 'Rekening penerimaan antar-PT',
         defaultValue: false,
+        access: kasDetails,
         admin: {
           description: 'Tandai satu rekening bank aktif per PT. PT lain di grup hanya dapat membayar PT ini (Pengajuan "PT grup") bila rekening ini ditetapkan; kas masuknya tercatat otomatis di sini.',
           components: { Cell: '@/admin/components/IntercompanyReceivingCell#IntercompanyReceivingCell' },
         },
       },
-      { name: 'odooJournalCode', type: 'text', label: 'Kode jurnal Odoo', maxLength: 16 },
+      { name: 'odooJournalCode', type: 'text', label: 'Kode jurnal Odoo', maxLength: 16, access: kasDetails },
       activeField(),
       uuidField(),
     ],

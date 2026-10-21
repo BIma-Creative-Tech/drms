@@ -964,7 +964,7 @@
   "kpiRecentCashEmpty": "Belum ada transaksi kas.",
   "kpiVoid": "Void",
   "kpiCostCentersTitle": "Pusat biaya bulan ini",
-  "kpiCostCentersTeamTitle": "Pusat biaya saya bulan ini",
+  "kpiCostCentersTeamTitle": "Pusat biaya project saya bulan ini",
   "kpiCostCentersEmpty": "Belum ada biaya pusat biaya bulan ini.",
   "kpiAdvancesTitle": "Pengajuan baru belum LPJ",
   "kpiAdvancesSubtitle": "Terlambat bila lebih dari {days} hari sejak transfer pertama",
@@ -1052,7 +1052,6 @@
   },
   "kpiAdminUsers": "User tanpa karyawan/peran",
   "kpiAdminProjects": "Project tanpa PM",
-  "kpiAdminCostCenters": "Pusat biaya tanpa penanggung jawab",
   "kpiAdminComplete": "Lengkap",
   "kpiAdminIncomplete": "Perlu dilengkapi",
   "kpiAdminWebHint": "Lengkapi data master dan lihat audit log di web admin.",
@@ -2394,7 +2393,7 @@
     }
   },
   "projectChangeConfirm": "Ganti project",
-  "draftCostCenterLegacy": "Draft ini dibuat dengan pusat biaya. Pengajuan sekarang wajib memakai project — pilih project; pusat biaya diisi Finance saat transfer.",
+  "draftCostCenterLegacy": "Pusat biaya lama tidak dipakai lagi: pusat biaya kini akun kas project. Pilih project (pembayaran vendor / antar-PT boleh tanpa project).",
   "draftLinesNeedRap": "{count} baris belum memilih item RAP — lengkapi sebelum diajukan.",
   "@draftLinesNeedRap": {
     "placeholders": {
@@ -2428,7 +2427,6 @@
   "projectKind": "Jenis project",
   "projectStatus": "Status",
   "projectContractValue": "Nilai kontrak (RAB)",
-  "projectNoCostCenter": "Belum ada — dipilih Finance saat transfer",
   "projectClient": "Klien",
   "projectPeriod": "Periode",
   "projectProgress": "Progress fisik",
@@ -2497,7 +2495,7 @@
       }
     }
   },
-  "costCenterByFinance": "dipilih Finance saat transfer",
+  "costCenterByFinance": "dipilih Finance (tanpa project)",
   "bankVerified": "Terverifikasi",
   "bankUnverified": "Belum diverifikasi",
   "openFlags": "Flag terbuka: {count}",
@@ -2537,9 +2535,6 @@
   "transferAmountHelp": "Nominal disetujui — ditetapkan server, tidak dapat diubah.",
   "bankDestination": "Rekening tujuan",
   "cashAccountLabel": "Akun kas",
-  "costCenterPickHint": "Pilih pusat biaya…",
-  "costCenterSuggested": "Usulan: pusat biaya default project. Ubah bila perlu.",
-  "costCenterNoDefault": "Project belum punya pusat biaya default — pilih.",
   "bankRefLabel": "No. referensi bank",
   "bankRefHint": "mis. nomor referensi di bukti",
   "transferProofLabel": "Bukti transfer",
@@ -2629,7 +2624,7 @@
       }
     }
   },
-  "loanApproveBody": "{borrower} meminjam {amount} dari {lender}. Tidak ada transaksi kas yang dibuat; pinjaman tercatat sebagai piutang antar project.",
+  "loanApproveBody": "{borrower} meminjam {amount} dari {lender}. Bila pusat biaya kedua project berbeda (dana), Finance mencairkan dana: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat biaya peminjam.",
   "@loanApproveBody": {
     "placeholders": {
       "borrower": {
@@ -2742,7 +2737,6 @@
   "vendorPaymentHint": "Pembayaran vendor: Finance mentransfer ke rekening vendor; invoice = bukti — tanpa nota per baris dan tanpa LPJ.",
   "sectionVendorPayment": "Pembayaran vendor",
   "vendorAccountsNone": "Vendor ini belum punya rekening aktif — minta Finance / Admin menambahkannya.",
-  "vendorCostCenterHint": "Tanpa project: pilih pusat biaya (mis. tagihan kantor).",
   "payeePtGrup": "PT grup",
   "fieldPayeeCompany": "PT penerima",
   "payeeCompanyPickHint": "Pilih PT penerima",
@@ -3441,7 +3435,7 @@
   "cashAmountHelp": "Rupiah tanpa desimal; titik sebagai pemisah ribuan",
   "cashScope": "Dibebankan ke",
   "cashScopeNone": "Tidak ada",
-  "cashScopeHelp": "Project ATAU pusat biaya — tidak keduanya.",
+  "cashScopeHelp": "Pusat biaya = akun kas yang dipilih. Pilih project bila biaya ini milik project tertentu.",
   "cashVehicleOptional": "Kendaraan (opsional)",
   "cashVehicleNone": "— tanpa kendaraan —",
   "cashVehicleHint": "Kategori ini biasanya dicatat per kendaraan.",
@@ -3453,7 +3447,7 @@
   "cashReasonHelp": "Tercatat di audit log bersama nilai lama dan baru.",
   "cashRulesTitle": "Aturan",
   "cashRule1": "Kas masuk wajib sumber; kas keluar wajib kategori.",
-  "cashRule2": "Dibebankan ke project atau pusat biaya, tidak keduanya.",
+  "cashRule2": "Pusat biaya = akun kas transaksi; pilih project bila biayanya milik project tertentu.",
   "cashRule3": "Tanggal tidak boleh di masa depan atau di periode yang sudah ditutup.",
   "cashRule3Lock": "Tanggal tidak boleh di masa depan atau di periode yang sudah ditutup (s/d {date}).",
   "@cashRule3Lock": {
@@ -3681,7 +3675,7 @@
   "voidTransferEmpty": "Tidak ada transfer yang bisa dibatalkan.",
   "voidTransferFinanceOnly": "Void: Finance PT ini",
   "loanListTitle": "Pinjaman antar project",
-  "loanListNote": "Diajukan PM project peminjam · disetujui Direktur · tanpa transaksi kas (klaim tercatat antar project dalam satu PT)",
+  "loanListNote": "Diajukan PM project peminjam · disetujui Direktur · dana antar pusat biaya berbeda dicairkan Finance (kas keluar/masuk) · otomatis bila transfer dibayar dari akun lain",
   "loanKpiPending": "Menunggu persetujuan",
   "loanKpiPendingNone": "Tidak ada yang menunggu Anda ✓",
   "loanKpiPendingMine": "{count} menunggu keputusan Anda",
@@ -4297,5 +4291,194 @@
   "vendorReasonHint": "Wajib bila menonaktifkan vendor atau rekening, atau mengubah rekening.",
   "recordFile": "Buka file",
   "settingsAppTitle": "Setting aplikasi",
-  "reportsAuditLog": "Audit Log"
+  "reportsAuditLog": "Audit Log",
+  "directPaymentNoProjectHint": "Tanpa project: tanpa pusat biaya — Finance memilih akun pembayar saat transfer.",
+  "costCenterLegacyLabel": "Pusat biaya lama",
+  "costCenterLegacyValue": "Pusat biaya lama: {name}",
+  "@costCenterLegacyValue": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "pusatBiayaUnmapped": "Project belum dipetakan ke pusat biaya (akun kas)",
+  "pusatBiayaQueueMissing": "project belum dipetakan",
+  "paidFromAccountLabel": "Dibayar dari akun",
+  "paidFromAccountLoan": "{account} (pinjaman {loan})",
+  "@paidFromAccountLoan": {
+    "placeholders": {
+      "account": {
+        "type": "String"
+      },
+      "loan": {
+        "type": "String"
+      }
+    }
+  },
+  "transferPaidFrom": "Dibayar dari {account}",
+  "@transferPaidFrom": {
+    "placeholders": {
+      "account": {
+        "type": "String"
+      }
+    }
+  },
+  "transferProjectLoan": "Pinjaman antar project {no}",
+  "@transferProjectLoan": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "transferPusatBiayaSuffix": " (pusat biaya project)",
+  "transferPusatBiayaHelp": "Pusat biaya project: {name}.",
+  "@transferPusatBiayaHelp": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "transferPusatBiayaMissingHelp": "Project belum punya pusat biaya (akun kas) — transfer ditolak sampai dipetakan di data project.",
+  "transferLoanReasonLabel": "Alasan membayar dari akun lain",
+  "transferLoanReasonHint": "mis. saldo pusat biaya project belum cukup",
+  "transferLoanNote": "Akun ini bukan pusat biaya project ({pusatBiaya}). Akan tercatat otomatis pinjaman antar project: kas keluar dari akun pembayar dan kas masuk ke pusat biaya project.",
+  "@transferLoanNote": {
+    "placeholders": {
+      "pusatBiaya": {
+        "type": "String"
+      }
+    }
+  },
+  "transferLoanDueLabel": "Jatuh tempo pinjaman",
+  "transferLoanDueHelp": "Kosong = 30 hari setelah tanggal transfer.",
+  "transferLoanDueDefault": "30 hari setelah tanggal transfer",
+  "transferRecordedLoan": "Transfer {trf} tercatat. Dibayar dari akun lain: pinjaman antar project {loan} tercatat otomatis.",
+  "@transferRecordedLoan": {
+    "placeholders": {
+      "trf": {
+        "type": "String"
+      },
+      "loan": {
+        "type": "String"
+      }
+    }
+  },
+  "loanDisburse": "Cairkan",
+  "loanDisburseTitle": "Cairkan {title}?",
+  "@loanDisburseTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "loanDisburseBody": "Dicatat hari ini: kas keluar {amount} dari {lender} dan kas masuk ke {borrower}. Pastikan dana sudah dipindahkan di bank.",
+  "@loanDisburseBody": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "lender": {
+        "type": "String"
+      },
+      "borrower": {
+        "type": "String"
+      }
+    }
+  },
+  "loanDisbursed": "{title} dicairkan: kas keluar {kk}, kas masuk {km}.",
+  "@loanDisbursed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "kk": {
+        "type": "String"
+      },
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "loanDisbursedShort": "{title} dicairkan.",
+  "@loanDisbursedShort": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "loanLenderAccount": "Akun pemberi pinjaman",
+  "loanLenderPusatBiaya": "Pusat biaya pemberi",
+  "loanBorrowerPusatBiaya": "Pusat biaya peminjam",
+  "loanOrigin": "Asal",
+  "loanOriginTransfer": "{origin} · transfer {no}",
+  "@loanOriginTransfer": {
+    "placeholders": {
+      "origin": {
+        "type": "String"
+      },
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "loanCash": "Kas",
+  "loanCashDisbursed": "Dicairkan {when} · KK {kk} · KM {km}",
+  "@loanCashDisbursed": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "kk": {
+        "type": "String"
+      },
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "loanCashWaiting": "Menunggu pencairan Finance",
+  "loanCashCancelled": "Dibatalkan (jurnal balik)",
+  "loanCashTbd": "Ditentukan saat disetujui (dana antar pusat biaya berbeda → dicairkan Finance)",
+  "loanCashNone": "Tanpa transaksi kas (barang, atau pusat biaya sama)",
+  "loanAwaitingDisbursement": "Disetujui — menunggu Finance mencairkan dana dari {lender} ke {borrower}.",
+  "@loanAwaitingDisbursement": {
+    "placeholders": {
+      "lender": {
+        "type": "String"
+      },
+      "borrower": {
+        "type": "String"
+      }
+    }
+  },
+  "loanStepDisburse": "Pencairan Finance",
+  "loanStepDisbursed": "Dicairkan",
+  "loanStepAutomatic": "Otomatis dari transfer {no}",
+  "@loanStepAutomatic": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "loanStepRecorded": "Dicatat & dicairkan",
+  "loanStepCancelled": "Dibatalkan",
+  "loanRepaymentCash": "KK {kk} · KM {km}",
+  "@loanRepaymentCash": {
+    "placeholders": {
+      "kk": {
+        "type": "String"
+      },
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiAdminPusatBiaya": "Project tanpa pusat biaya",
+  "kpiCostCentersTeamEmpty": "Project Anda belum dipetakan ke pusat biaya (akun kas)."
 }

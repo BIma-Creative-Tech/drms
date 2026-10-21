@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 import { companyFilterParam, createCompanyField } from './schemas'
 
-import { LOAN_ACTIONS, LOAN_G1_EXCEPTIONS, LOAN_KINDS, LOAN_STATUSES, MAX_LOAN_AMOUNT, NOTE_MAX } from '@/domain/loans/rules'
+import { LOAN_ACTIONS, LOAN_G1_EXCEPTIONS, LOAN_KINDS, LOAN_ORIGINS, LOAN_STATUSES, MAX_LOAN_AMOUNT, NOTE_MAX } from '@/domain/loans/rules'
 
 /**
  * /api/v1 contract for ADR 0022 Pinjaman antar project: web + APK (PM creates / submits, Direktur decides from the
@@ -56,9 +56,20 @@ export const RepaymentCreate = z
     amount: amount.meta({ description: 'Nominal pengembalian (Rp, > 0, ≤ sisa pinjaman).' }),
     repayDate: date.optional().meta({ description: 'Default today (PT TZ); between the loan date and today.' }),
     note: z.string().trim().max(NOTE_MAX).nullable().optional(),
+    confirmOverdraft: z.boolean().optional().meta({ description: 'ADR 0031 (cash-backed loan): confirm that the borrower\'s account goes below 0 (else 409 CASH_OVERDRAFT_CONFIRM_REQUIRED); audited.' }),
   })
   .strict()
   .meta({ id: 'ProjectLoanRepaymentCreate' })
+
+export const LoanDisburse = z
+  .object({
+    disburseDate: date.optional().meta({ description: 'Default today (PT TZ); between the loan date and today — date of the KK / KM.' }),
+    note: z.string().trim().max(NOTE_MAX).nullable().optional(),
+    proofMediaId: id.nullable().optional().meta({ description: 'Optional proof (media-attachments, an unclaimed upload of the caller) — stored on the KK.' }),
+    confirmOverdraft: z.boolean().optional().meta({ description: 'Confirm that the lender\'s account goes below 0 (else 409 CASH_OVERDRAFT_CONFIRM_REQUIRED); audited.' }),
+  })
+  .strict()
+  .meta({ id: 'ProjectLoanDisburse', description: 'ADR 0031 "Cairkan" (Finance): KK on the lender\'s Pusat Biaya + KM on the borrower\'s, for the loan amount, once.' })
 
 export const LoanListQuery = z
   .object({
@@ -75,6 +86,7 @@ export const LoanListQuery = z
   .meta({ id: 'ProjectLoanListQuery' })
 
 const projectRef = z.object({ id, code: z.string().nullable(), name: z.string().nullable(), pm: z.object({ id, name: z.string().nullable() }).nullable() })
+const accountRef = z.object({ id, name: z.string().nullable() })
 const userRef = z.object({ id, name: z.string().nullable() })
 
 export const LoanSummary = z
@@ -90,8 +102,17 @@ export const LoanSummary = z
     daysOverdue: z.number().int(),
     kind: z.enum(LOAN_KINDS),
     kindLabel: z.string(),
-    lenderProject: projectRef,
+    origin: z.enum(LOAN_ORIGINS).meta({ description: 'ADR 0031: manual = PM → Direktur; transfer = automatic (Finance paid a project request from another account).' }),
+    originLabel: z.string(),
+    lenderProject: projectRef.nullable().meta({ description: 'Null for an automatic loan — its lender is `lenderCashAccount`.' }),
     borrowerProject: projectRef,
+    lenderCashAccount: accountRef.nullable().meta({ description: 'ADR 0031: Pusat Biaya of the lender (frozen at the approval / the transfer).' }),
+    borrowerCashAccount: accountRef.nullable().meta({ description: 'ADR 0031: Pusat Biaya of the borrower project.' }),
+    cashBacked: z.boolean().meta({ description: 'ADR 0031: money between two different accounts — disbursement and repayments post KK / KM.' }),
+    disbursedAt: z.string().nullable(),
+    disbursedBy: z.object({ id, name: z.string().nullable() }).nullable(),
+    awaitingDisbursement: z.boolean().meta({ description: 'Approved, cash-backed, not yet disbursed by Finance ("Disetujui – menunggu pencairan").' }),
+    transfer: z.object({ id, docNo: z.string().nullable() }).nullable().meta({ description: 'ADR 0031: the transfer of an automatic loan.' }),
     amount: rupiah,
     repaidTotal: rupiah,
     outstanding: rupiah.meta({ description: 'amount − posted repayments (Draft / Menunggu: the requested amount; Ditolak / Dibatalkan: 0).' }),
@@ -113,7 +134,8 @@ export const LoanSummary = z
   .meta({ id: 'ProjectLoanSummary' })
 
 export const LoanDetail = LoanSummary.extend({
-  allowedActions: z.array(z.enum(LOAN_ACTIONS)).meta({ description: 'edit/submit: creator PM (Draft); cancel: creator (Draft/Menunggu) or Direktur (Disetujui, no repayment); approve/reject: Direktur pool (G1); repay: borrower PM / Finance.' }),
+  allowedActions: z.array(z.enum(LOAN_ACTIONS)).meta({ description: 'edit/submit: creator PM (Draft); cancel: creator (Draft/Menunggu) or Direktur (Disetujui, no repayment, not disbursed, not automatic); approve/reject: Direktur pool (G1); disburse: Finance (approved cash-backed loan, once); repay: borrower PM / Finance — Finance only after the disbursement for a cash-backed loan.' }),
+  disbursement: z.object({ kk: z.string().nullable(), km: z.string().nullable() }).nullable().meta({ description: 'ADR 0031: entry numbers of the disbursement KK (lender) / KM (borrower); null when no cash moved.' }),
   mayVoidRepayment: z.boolean(),
   today: date.meta({ description: 'Business date of the loan\'s PT (max date of a repayment).' }),
   g1Note: z.string().nullable(),
@@ -131,6 +153,7 @@ export const LoanDetail = LoanSummary.extend({
       voidedBy: userRef.nullable(),
       voidedAt: z.string().nullable(),
       createdAt: z.string().nullable(),
+      cash: z.object({ kk: z.string().nullable(), km: z.string().nullable() }).nullable().meta({ description: 'ADR 0031: entry numbers of the repayment KK (borrower) / KM (lender); null for a claim or a voided repayment.' }),
     }),
   ),
   decisions: z.array(z.object({ id, actor: z.object({ id: id.nullable(), name: z.string().nullable() }), decision: z.enum(['approved', 'rejected']), reason: z.string().nullable(), decidedAt: z.string().nullable(), signatureSource: z.string().nullable() })),

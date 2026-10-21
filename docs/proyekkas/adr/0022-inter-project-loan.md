@@ -279,3 +279,11 @@ Money lent **between PTs** is the "Pinjaman antar-PT" of [ADR 0029](0029-fund-ch
 real cash movements through `intercompany_links`, doc types `intercompany_loan_disbursement` /
 `intercompany_loan_repayment` — these replace the provisional names `intercompany_loan` / `intercompany_loan_repayment`
 of the 2026-10-14 note above). Same-PT project loans (`PJ`, Q-L2) are unchanged.
+
+## Note 2026-10-21 (ADR 0031)
+
+§5 is **amended**: with the project → cash account mapping ("Pusat Biaya = akun kas"), a loan of **money** between two
+projects with different Pusat Biaya posts KK on the lender account and KM on the borrower account when Finance
+disburses it ("Cairkan"), and every repayment posts the mirror pair (Finance only). Goods, or two projects on the same
+account, stay a notional claim (option B). A transfer paid from an account other than the project's Pusat Biaya creates
+an automatic, approved loan whose lender is that account (`origin = 'transfer'`). See ADR 0031.

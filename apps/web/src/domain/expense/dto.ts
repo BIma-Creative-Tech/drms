@@ -14,6 +14,7 @@ import { FUND_VIEW_ROLES, fundPanel } from '@/domain/fundcheck/service'
 import { withFlagVisibility } from './flag-visibility'
 import { receiptsOf } from './receipts'
 import { settlementOfRequest } from './lpj'
+import { requestPusatBiaya } from './transfers'
 import { shortfallSummary } from './shortfall-approval'
 import { SETTLEMENT_STATUS_LABELS } from './settlement-rules'
 import { nextActor, requestStatusLabel, timeline } from './timeline'
@@ -124,6 +125,27 @@ export async function detail(req: PayloadRequest, id: number) {
       : [],
   )
 
+  // ADR 0031: accounts of each transfer (charged = Pusat Biaya, paid from another one) + its automatic loan
+  const accIds = [...new Set(transfers.flatMap((t) => [relId(t.cashAccount), relId(t.paidFromCashAccount)]).filter((x): x is number => x !== undefined))]
+  const accNames = new Map(
+    accIds.length
+      ? (await req.payload.find({ collection: 'cash-accounts', where: { id: { in: accIds } }, depth: 0, pagination: false, select: { name: true }, overrideAccess: true /* SYSTEM-READ: account names of a visible request's transfers */, req })).docs.map((a) => [a.id as number, (a as { name?: string }).name ?? null])
+      : [],
+  )
+  const accRef = (v: unknown) => {
+    const a = relId(v)
+    return a === undefined ? null : { id: a, name: accNames.get(a) ?? null }
+  }
+  const transferLoans = new Map(
+    transfers.some((t) => relId(t.paidFromCashAccount) !== undefined)
+      ? (await req.payload.find({ collection: 'project-loans', where: { transfer: { in: transfers.map((t) => t.id as number) } }, depth: 0, pagination: false, select: { transfer: true, docNo: true, status: true }, overrideAccess: true /* SYSTEM-READ: automatic loans of a visible request's transfers */, req })).docs.map((l) => [
+          relId((l as { transfer?: unknown }).transfer)!,
+          { id: l.id as number, docNo: (l as { docNo?: string | null }).docNo ?? null, status: String((l as { status?: string }).status) },
+        ])
+      : [],
+  )
+  const pusatBiaya = await requestPusatBiaya(req, { project: relId(doc.project) })
+
   const projectDoc = doc.project && typeof doc.project === 'object' ? (doc.project as { id: number; budget?: number | null }) : null
   let budget: { basis: 'project' | 'none'; pctBefore: number | null; pctAfter: number | null } = { basis: 'none', pctBefore: null, pctAfter: null }
   // owner 2026-10-11: the committed-% of the RAB (with the request total it reveals the RAB) only for the money roles
@@ -169,6 +191,8 @@ export async function detail(req: PayloadRequest, id: number) {
     uuid: (doc.uuid as string) ?? null,
     project: ref(doc.project, (d) => ({ code: d.code, name: d.name })),
     costCenter: ref(doc.costCenter, (d) => ({ code: d.code, name: d.name })),
+    // ADR 0031: Pusat Biaya = the project's cash account (read-only on the request; null without project / mapping)
+    pusatBiaya,
     urgencyLevel: ref(doc.urgencyLevel, (d) => ({ code: d.code, name: d.name, rank: d.rank })),
     notes: doc.notes ?? null,
     requesters: (doc.requesters ?? []).map((r) => ref(r, (d) => ({ code: d.code, name: d.name }))),
@@ -289,8 +313,11 @@ export async function detail(req: PayloadRequest, id: number) {
       amount: t.amount as number,
       transferDate: t.transferDate as string,
       transferAt: (t.transferAt as string | null | undefined) ?? null,
-      // D2: cost center chosen by Finance (null on transfers recorded before D2)
+      // D2 legacy: cost center chosen by Finance (transfers of 10/10–21/10/2026)
       costCenter: ccNames.get(relId(t.costCenter) ?? -1) ?? null,
+      cashAccount: accRef(t.cashAccount),
+      paidFromCashAccount: accRef(t.paidFromCashAccount),
+      projectLoan: transferLoans.get(t.id as number) ?? null,
       bankRef: t.bankRef as string,
       status: t.status as string,
       cashEntryId: relId(t.cashEntry) ?? null,

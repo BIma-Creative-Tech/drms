@@ -533,9 +533,12 @@ class RecentCashCard extends StatelessWidget {
 
 /// "Pusat biaya bulan ini" (K-15).
 class CostCentersCard extends StatelessWidget {
-  const CostCentersCard({super.key, required this.rows, required this.title});
+  const CostCentersCard({super.key, required this.rows, required this.title, this.empty});
   final List<CostCenterMonth> rows;
   final String title;
+
+  /// Empty text (default "Belum ada biaya pusat biaya bulan ini."; PM: his projects are not mapped yet, ADR 0031).
+  final String? empty;
 
   @override
   Widget build(BuildContext context) {
@@ -544,8 +547,9 @@ class CostCentersCard extends StatelessWidget {
       key: const Key('dash-cost-centers'),
       title: title,
       child: HBarList(
-        empty: t.kpiCostCentersEmpty,
+        empty: empty ?? t.kpiCostCentersEmpty,
         items: [
+          // ADR 0031: a Pusat Biaya is a cash account — `code` is empty, the label is its name
           for (final c in rows)
             HBarItem(label: _project(c.code, c.name), value: math.max(0, c.total), valueText: formatRupiah(c.total)),
         ],

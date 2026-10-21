@@ -85,7 +85,7 @@ export const BookQuery = z.object({
   site: optId,
   status: optEnums(['posted', 'void']),
   /** ADR 0028: "Sumber" — source types (e.g. `intercompany` = Antar PT). */
-  sumber: optEnums(['transfer', 'settlement_refund', 'manual', 'reversal', 'opening', 'intercompany']),
+  sumber: optEnums(['transfer', 'settlement_refund', 'manual', 'reversal', 'opening', 'intercompany', 'project_loan']),
   /** DRMS 10/10 D8: free text over number + description, page size 20 / 50 / 100 (default 50). */
   q: z.preprocess((v) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined), z.string().max(100).optional()).catch(undefined),
   per: z.coerce.number().int().refine((n) => n === 20 || n === 50 || n === 100).optional().catch(undefined),
@@ -144,6 +144,8 @@ export function voidHint(e: Pick<CashEntryDoc, 'sourceType' | 'status'>, ic?: { 
   if (e.sourceType === 'intercompany' && ic?.sourceDocType === 'intercompany_loan') return 'Di-void lewat pinjaman antar-PT (PJA) oleh Finance PT pembayar'
   // ADR 0028: the receiving PT's automatic KM — voided only by the paying PT's transfer void
   if (e.sourceType === 'intercompany') return 'Di-void lewat pembatalan transfer di PT pengirim'
+  // ADR 0031: a leg of an inter-project loan — voided with the transfer (automatic loan) or the repayment void
+  if (e.sourceType === 'project_loan') return 'Di-void lewat pinjaman antar project (transfer / pengembalian)'
   return null
 }
 

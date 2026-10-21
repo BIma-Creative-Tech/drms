@@ -22,7 +22,7 @@ export const Transfers: CollectionConfig = withAudit(
   {
     slug: 'transfers',
     labels: { singular: 'Transfer', plural: 'Transfer' },
-    admin: { group: 'Keuangan', useAsTitle: 'docNo', defaultColumns: ['docNo', 'request', 'kind', 'amount', 'costCenter', 'transferAt', 'status'], components: { views: { edit: RIWAYAT_TAB } } },
+    admin: { group: 'Keuangan', useAsTitle: 'docNo', defaultColumns: ['docNo', 'request', 'kind', 'amount', 'cashAccount', 'transferAt', 'status'], components: { views: { edit: RIWAYAT_TAB } } },
     access: {
       // Finance/Owner/Admin: all rows of their PTs; requesters own; PM team (via the request scope).
       read: byVisibleRequest('request'),
@@ -30,17 +30,20 @@ export const Transfers: CollectionConfig = withAudit(
       update: denyAll,
       delete: denyDeleteLogged('transfer'),
     },
-    hooks: { beforeChange: [companyHook('transfers', { derive: [{ field: 'request', collection: 'expense-requests' }], check: [{ field: 'cashAccount', collection: 'cash-accounts' }, { field: 'cashEntry', collection: 'cash-entries' }, { field: 'costCenter', collection: 'cost-centers' }] })] },
+    hooks: { beforeChange: [companyHook('transfers', { derive: [{ field: 'request', collection: 'expense-requests' }], check: [{ field: 'cashAccount', collection: 'cash-accounts' }, { field: 'paidFromCashAccount', collection: 'cash-accounts' }, { field: 'cashEntry', collection: 'cash-entries' }, { field: 'costCenter', collection: 'cost-centers' }] })] },
     fields: [
       companyField({ derived: true }),
       { name: 'docNo', type: 'text', label: 'Nomor', index: true, admin: ro },
       { name: 'request', type: 'relationship', relationTo: 'expense-requests', required: true, index: true, admin: ro },
       { name: 'kind', type: 'select', required: true, options: ['advance', 'reimburse', 'lpj_shortfall'].map((v) => ({ label: v, value: v })), admin: ro },
-      { name: 'cashAccount', type: 'relationship', relationTo: 'cash-accounts', label: 'Akun kas sumber', required: true, admin: ro },
+      // ADR 0031: the account the transfer is CHARGED to = the project's Pusat Biaya (the KK is posted here)
+      { name: 'cashAccount', type: 'relationship', relationTo: 'cash-accounts', label: 'Akun kas (pusat biaya)', required: true, admin: ro },
+      // ADR 0031 (DRMS 21/10 #4): the account Finance actually paid from when it is NOT the Pusat Biaya — the automatic
+      // inter-project loan (project-loans.transfer) moves the money: KK here, KM on `cashAccount`. Null = paid from it.
+      { name: 'paidFromCashAccount', type: 'relationship', relationTo: 'cash-accounts', label: 'Dibayar dari akun', index: true, admin: ro },
       { name: 'amount', type: 'number', label: 'Nominal (Rp)', required: true, admin: ro },
-      // D2 (DRMS 10/10): cost center set by Finance when recording the transfer (mandatory for advance / reimburse,
-      // DB trigger transfers_guard_cost_center; default = the project's cost center). Immutable like the row.
-      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, admin: ro },
+      // D2 (DRMS 10/10) legacy: the former cost center Finance chose (transfers before ADR 0031; new rows leave it empty)
+      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya lama', index: true, admin: { ...ro, condition: (d) => Boolean(d?.costCenter) } },
       {
         name: 'destination',
         type: 'group',

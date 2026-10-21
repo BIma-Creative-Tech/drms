@@ -20,11 +20,6 @@ final cashAccountsProvider = FutureProvider.autoDispose.family<List<CashAccountO
   (ref, companyId) => ref.watch(financeApiProvider).cashAccounts(companyId),
 );
 
-/// Active cost centers of one PT for the transfer form (D2).
-final costCentersProvider = FutureProvider.autoDispose.family<List<CostCenterOption>, int?>(
-  (ref, companyId) => ref.watch(financeApiProvider).costCenters(companyId),
-);
-
 /// Camera / gallery picker of the transfer proof (same capture as receipts; replaced in tests).
 typedef ProofPicker = Future<Uint8List?> Function(BuildContext context, {required bool fromCamera});
 

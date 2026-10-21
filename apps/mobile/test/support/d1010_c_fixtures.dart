@@ -28,6 +28,7 @@ Map<String, dynamic> projectJson(int id, {String status = 'berjalan', int? over}
   'contractValue': 2500000000,
   'progressPct': 42.5,
   'costCenter': {'id': 7, 'code': 'OPS-PB', 'name': 'Ops Palangka Banjar'},
+  'pusatBiaya': {'id': 3, 'name': 'Bank Mandiri Operasional'},
   'rapPlanned': 1800000000,
   'rapRealised': 810000000,
   'rapPercent': 45,
@@ -95,7 +96,8 @@ Map<String, dynamic> queueJson(
   bool over = false,
   int mismatch = 0,
   bool verified = true,
-  Map<String, dynamic>? costCenter = const {'id': 7, 'code': 'OPS-PB', 'name': 'Ops Palangka Banjar'},
+  Map<String, dynamic>? pusatBiaya = const {'id': 3, 'name': 'Bank Mandiri Operasional'},
+  bool pusatBiayaMissing = false,
 }) => {
   'id': id,
   'docNo': 'PB/DRMS/2610/${id.toString().padLeft(4, '0')}',
@@ -110,7 +112,10 @@ Map<String, dynamic> queueJson(
   'companyId': 1,
   'openWarningFlags': 1,
   'project': {'id': 9, 'code': 'PRJ-09', 'name': 'Jalan Tambang Blok B'},
-  'costCenter': costCenter,
+  // ADR 0031: `costCenter` is deprecated (always null); the project's Pusat Biaya is a cash account
+  'costCenter': null,
+  'pusatBiaya': pusatBiaya,
+  'pusatBiayaMissing': pusatBiayaMissing,
   'bank': {'bankName': 'Mandiri', 'accountNo': '•••0123', 'accountHolder': 'Doni Pratama'},
   'bankVerification': verified ? 'verified' : 'unverified',
   'flags': {'warning': 1, 'info': 0, 'receiptMismatch': mismatch},
@@ -119,7 +124,7 @@ Map<String, dynamic> queueJson(
 
 List<TransferQueueItem> queueFixture() => [
   transferQueueItemFromJson(queueJson(42, over: true, mismatch: 2)),
-  transferQueueItemFromJson(queueJson(43, type: 'advance', costCenter: null, verified: false)),
+  transferQueueItemFromJson(queueJson(43, type: 'advance', pusatBiaya: null, verified: false)),
 ];
 
 class FakeProjectsApi extends Fake implements ProjectsApi {
@@ -223,19 +228,16 @@ class FakeFinanceApi extends Fake implements FinanceApi {
   /// Codes of 409 confirmations to answer first (e.g. BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED).
   final confirmFirst = <String>[];
 
+  /// Queue answered by [transferQueue] (default [queueFixture]).
+  List<TransferQueueItem>? queue;
+
   @override
-  Future<List<TransferQueueItem>> transferQueue() async => queueFixture();
+  Future<List<TransferQueueItem>> transferQueue() async => queue ?? queueFixture();
 
   @override
   Future<List<CashAccountOption>> cashAccounts(int? companyId) async => const [
     CashAccountOption(id: 3, name: 'Bank Mandiri Operasional', companyId: 1, balance: 52000000),
     CashAccountOption(id: 4, name: 'Kas Kecil', companyId: 1, balance: 1500000),
-  ];
-
-  @override
-  Future<List<CostCenterOption>> costCenters(int? companyId, {String q = ''}) async => const [
-    CostCenterOption(id: 7, code: 'OPS-PB', name: 'Ops Palangka Banjar', companyId: 1),
-    CostCenterOption(id: 8, code: 'WS-PR', name: 'Workshop Palangka Raya', companyId: 1),
   ];
 
   @override
@@ -245,7 +247,7 @@ class FakeFinanceApi extends Fake implements FinanceApi {
   }
 
   @override
-  Future<ExpenseDetail> recordTransfer(
+  Future<TransferOutcome> recordTransfer(
     int requestId,
     Map<String, dynamic> body, {
     required String idempotencyKey,
@@ -255,11 +257,25 @@ class FakeFinanceApi extends Fake implements FinanceApi {
       final code = confirmFirst.removeAt(0);
       throw problem409(code);
     }
-    return detailFromJson({
-      ...detailJson(status: 'transferred', allowed: const []),
-      'transfers': [
-        {'id': 1, 'docNo': 'TRF/DRMS/2610/0001', 'kind': 'reimburse', 'amount': 1447500, 'status': 'posted'},
-      ],
+    // ADR 0031: paid from another account than the Pusat Biaya (a loan reason was sent) → the automatic loan
+    final loan = body.containsKey('loanReason');
+    return transferOutcomeFromJson({
+      'request': {
+        ...detailJson(status: 'transferred', allowed: const []),
+        'transfers': [
+          {
+            'id': 1,
+            'docNo': 'TRF/DRMS/2610/0001',
+            'kind': 'reimburse',
+            'amount': 1447500,
+            'status': 'posted',
+            'cashAccount': {'id': 3, 'name': 'Bank Mandiri Operasional'},
+            'paidFromCashAccount': loan ? {'id': 4, 'name': 'Kas Kecil'} : null,
+            'projectLoan': loan ? {'id': 61, 'docNo': 'PJ/DRMS/2610/0007', 'status': 'approved'} : null,
+          },
+        ],
+      },
+      'projectLoan': loan ? {'id': 61, 'docNo': 'PJ/DRMS/2610/0007', 'kk': 'KK/0101', 'km': 'KM/0102'} : null,
     });
   }
 }

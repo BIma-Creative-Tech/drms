@@ -61,15 +61,11 @@ enum RapCheck {
 /// Everything required before "Ajukan" (online submit).
 List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee, RapCheck rap = RapCheck.strict}) {
   final issues = <DraftIssue>[...validateForSave(d), ...requesterIssues(d, selfOnlyEmployee: selfOnlyEmployee)];
-  // D2: project required (no non-project requests; Finance sets the cost center at transfer). ADR 0027 (client
-  // 2026-10-14): a vendor payment may name a cost center instead (e.g. office bills); ADR 0028: a PT grup payment too.
-  if (d.projectId == null && !(d.isDirectPayment && d.costCenterId != null)) {
-    final message = d.isVendor
-        ? 'Pilih project atau pusat biaya (pembayaran vendor).'
-        : d.isPtGrup
-        ? 'Pilih project atau pusat biaya (pembayaran antar-PT).'
-        : 'Project wajib dipilih.';
-    issues.add(DraftIssue('projectId', message));
+  // D2: project required (no non-project requests). ADR 0031 (DRMS 21/10): the Pusat Biaya is the project's cash
+  // account — the requester never picks one; a vendor / PT grup payment may go without project (office bills: no
+  // Pusat Biaya, Finance picks the paying account). A legacy cost center no longer counts.
+  if (d.projectId == null && !d.isDirectPayment) {
+    issues.add(const DraftIssue('projectId', 'Project wajib dipilih.'));
   } else if (d.projectId != null && rap == RapCheck.missing) {
     issues.add(const DraftIssue('projectId', rapMissingMessage));
   }

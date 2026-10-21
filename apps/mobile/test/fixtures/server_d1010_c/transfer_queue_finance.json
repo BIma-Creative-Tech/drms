@@ -23,11 +23,12 @@
     "code": "UJI-PRJ",
     "name": "Proyek Uji"
    },
-   "costCenter": {
+   "costCenter": null,
+   "pusatBiaya": {
     "id": 1,
-    "code": "OPS-PB",
-    "name": "Ops Palangka Banjar"
+    "name": "Kas Kecil"
    },
+   "pusatBiayaMissing": false,
    "bank": {
     "bankName": "Bank Mandiri",
     "accountNo": "9990001112223",
@@ -69,11 +70,12 @@
     "code": "UJI-PRJ",
     "name": "Proyek Uji"
    },
-   "costCenter": {
+   "costCenter": null,
+   "pusatBiaya": {
     "id": 1,
-    "code": "OPS-PB",
-    "name": "Ops Palangka Banjar"
+    "name": "Kas Kecil"
    },
+   "pusatBiayaMissing": false,
    "bank": {
     "bankName": "Bank Mandiri",
     "accountNo": "9990001112223",

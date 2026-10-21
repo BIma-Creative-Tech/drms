@@ -123,7 +123,7 @@ void main() {
     expect(find.text('Project Anda belum punya RAP'), findsOneWidget);
     expect(find.byKey(const Key('dash-sla')), findsNothing);
     expect(find.byKey(const Key('dash-rap-monitor')), findsNothing);
-    expect(find.text('Pusat biaya saya bulan ini'), findsOneWidget);
+    expect(find.text('Pusat biaya project saya bulan ini'), findsOneWidget);
     expect(tester.widget<Text>(find.byKey(const Key('trend-readout'))).data, contains('Rp 18.750.000'));
   });
 
@@ -216,6 +216,9 @@ void main() {
     expect(find.byKey(const Key('kpi-admin')), findsOneWidget);
     expect(find.text('Perlu dilengkapi'), findsNWidgets(2));
     expect(find.text('Lengkap'), findsOneWidget);
+    // ADR 0031: "Project tanpa pusat biaya" replaces "Pusat biaya tanpa penanggung jawab"
+    expect(find.text('Project tanpa pusat biaya'), findsOneWidget);
+    expect(find.text('Pusat biaya tanpa penanggung jawab'), findsNothing);
     expect(find.byKey(const Key('kpi-staff')), findsNothing);
   });
 }

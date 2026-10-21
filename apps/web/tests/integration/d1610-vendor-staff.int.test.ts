@@ -14,8 +14,8 @@ import { ADR0013_FALLBACK_RULE, api, makeFlowUser, makeWorld, png, sysCreate, up
  * - Staff READ the vendors and vendor accounts of its own PT (REST + masters, the picker) — never of a PT it is not
  *   mapped to — and never create / update them (REST + /api/v1/vendor-form);
  * - a Staff vendor payment follows the NORMAL Staff flow: the PT's default rule ("Default — PM project lalu Direktur"):
- *   PM project ("Diketahui" = Persetujuan PM) → Direktur → Owner → Finance transfer → Selesai (no LPJ); on a cost center
- *   (no project) "Diketahui" = the cost center's manager. The seeded Finance vendor rule stays Finance-only;
+ *   PM project ("Diketahui" = Persetujuan PM) → Direktur → Owner → Finance transfer → Selesai (no LPJ); without project
+ *   (ADR 0031) the PM step is left out, the Direktur decides. The seeded Finance vendor rule stays Finance-only;
  * - Admin / Owner-only callers are still refused (403).
  * The world's unscoped ADR 0013 test fallback rule (priority 90) is switched off in this file so the SEEDED default rule
  * decides (restored in afterAll). Fictional data only.
@@ -167,12 +167,12 @@ describe('Staff files a vendor payment (own PT) → the normal Staff flow', () =
     expect(t.request.settlement).toBeNull()
   })
 
-  it('on a cost center (no project): default rule, "Diketahui" = the cost center manager', async () => {
+  it('without project (ADR 0031: no Pusat Biaya, the cost center is ignored): default rule without the PM step → the Direktur decides', async () => {
     const d = await ok(api('POST', E, w.users.staffA, await vendorBody(w.users.staffA, { projectId: null, costCenterId: ccS }), key()), 201)
-    expect(d).toMatchObject({ projectId: null, costCenterId: ccS, payeeType: 'vendor' })
+    expect(d).toMatchObject({ projectId: null, costCenterId: null, payeeType: 'vendor' })
     const s = await ok(api('POST', `${E}/${d.id}/submit`, w.users.staffA, {}, key()))
-    expect(s.status).toBe('pending_ack')
-    expect(s.approvalRule).toMatchObject({ name: DEFAULT_RULE, acknowledgeBy: 'scope_manager', acknowledgerUserId: w.users.pm.id })
+    expect(s.status).toBe('pending_approval')
+    expect(s.approvalRule).toMatchObject({ name: DEFAULT_RULE, acknowledgerUserId: null })
   })
 
   it('Staff rules still apply: only for itself, only its assigned project, only vendors / accounts of the PT', async () => {

@@ -179,16 +179,16 @@ void main() {
     expect(summaryFromJson({...vendorDetailJson(), 'payeeType': 'vendor'}).payeeType, PayeeType.vendor);
   });
 
-  test('client 2026-10-14: a vendor payment on a cost center (no project) is sendable; employee drafts keep D2', () {
-    final onCc = vendorDraft().copyWith(projectId: null, costCenterId: 7, lines: const []);
-    expect(validateForSubmit(onCc).map((i) => i.field), isNot(contains('projectId')));
-    expect(draftToSyncPayload(onCc)['cost_center_id'], 7);
-    expect(draftToCreateBody(onCc)['costCenterId'], 7);
-    final neither = onCc.copyWith(costCenterId: null);
-    expect(validateForSubmit(neither).map((i) => i.field), contains('projectId'));
-    final withProject = vendorDraft().copyWith(costCenterId: 7);
-    expect(draftToSyncPayload(withProject).containsKey('cost_center_id'), isFalse, reason: 'project wins');
-    final emp = onCc.copyWith(payeeType: PayeeType.karyawan);
+  test('ADR 0031: a vendor payment without project is sendable, no cost center sent; employee drafts keep D2', () {
+    final noProject = vendorDraft().copyWith(projectId: null, lines: const []);
+    expect(validateForSubmit(noProject).map((i) => i.field), isNot(contains('projectId')));
+    expect(draftToSyncPayload(noProject).containsKey('cost_center_id'), isFalse);
+    expect(draftToCreateBody(noProject).containsKey('costCenterId'), isFalse);
+    // a legacy draft's old cost center is never sent (the Pusat Biaya is the project's cash account)
+    final legacy = noProject.copyWith(costCenterId: 7);
+    expect(draftToSyncPayload(legacy).containsKey('cost_center_id'), isFalse);
+    expect(draftToCreateBody(legacy).containsKey('costCenterId'), isFalse);
+    final emp = legacy.copyWith(payeeType: PayeeType.karyawan);
     expect(draftToSyncPayload(emp).containsKey('cost_center_id'), isFalse);
     expect(validateForSubmit(emp).map((i) => i.field), contains('projectId'));
   });

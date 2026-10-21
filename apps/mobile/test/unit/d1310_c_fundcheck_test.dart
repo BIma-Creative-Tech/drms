@@ -354,12 +354,10 @@ void main() {
       );
     });
 
-    test('checks: no cost center asked', () {
+    test('checks: no Pusat Biaya / loan reason asked', () {
       final now = DateTime.utc(2026, 10, 14, 4);
       final issues = validateTransferForm(
         cashAccountId: null,
-        costCenterId: null,
-        requireCostCenter: false,
         transferAt: null,
         zoneOffset: const Duration(hours: 8),
         bankRef: '',

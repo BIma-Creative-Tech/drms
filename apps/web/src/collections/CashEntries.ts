@@ -32,7 +32,7 @@ export const CashEntries: CollectionConfig = withAudit(
       update: denyAll,
       delete: denyDeleteLogged('cash_entry'),
     },
-    hooks: { beforeChange: [companyHook('cash-entries', { derive: [{ field: 'cashAccount', collection: 'cash-accounts' }], check: [{ field: 'category', collection: 'expense-categories' }, { field: 'cashInSource', collection: 'cash-in-sources' }, { field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'vehicle', collection: 'vehicles' }, { field: 'expenseRequest', collection: 'expense-requests' }, { field: 'transfer', collection: 'transfers' }, { field: 'reversalOf', collection: 'cash-entries' }] })] },
+    hooks: { beforeChange: [companyHook('cash-entries', { derive: [{ field: 'cashAccount', collection: 'cash-accounts' }], check: [{ field: 'category', collection: 'expense-categories' }, { field: 'cashInSource', collection: 'cash-in-sources' }, { field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'vehicle', collection: 'vehicles' }, { field: 'expenseRequest', collection: 'expense-requests' }, { field: 'transfer', collection: 'transfers' }, { field: 'reversalOf', collection: 'cash-entries' }, { field: 'projectLoan', collection: 'project-loans' }, { field: 'projectLoanRepayment', collection: 'project-loan-repayments' }] })] },
     fields: [
       companyField({ derived: true }),
       { name: 'entryNo', type: 'text', label: 'Nomor', index: true, admin: ro },
@@ -61,11 +61,16 @@ export const CashEntries: CollectionConfig = withAudit(
           { label: 'Saldo awal', value: 'opening' },
           // ADR 0028: the automatic Kas Masuk of a payment from another PT of the group (paired in intercompany_links)
           { label: 'Antar PT', value: 'intercompany' },
+          // ADR 0031: cash leg of an inter-project loan (disbursement / automatic loan of a transfer / repayment)
+          { label: 'Pinjaman antar project', value: 'project_loan' },
         ],
         admin: ro,
       },
       { name: 'expenseRequest', type: 'relationship', relationTo: 'expense-requests', index: true, admin: ro },
       { name: 'transfer', type: 'relationship', relationTo: 'transfers', admin: ro },
+      // ADR 0031: the inter-project loan (and repayment) a `project_loan` entry — or its reversal — belongs to
+      { name: 'projectLoan', type: 'relationship', relationTo: 'project-loans', label: 'Pinjaman antar project', index: true, admin: ro },
+      { name: 'projectLoanRepayment', type: 'relationship', relationTo: 'project-loan-repayments', label: 'Pengembalian pinjaman', admin: ro },
       { name: 'status', type: 'select', required: true, defaultValue: 'posted', index: true, options: [{ label: 'Posted', value: 'posted' }, { label: 'Void', value: 'void' }], admin: ro },
       { name: 'reversalOf', type: 'relationship', relationTo: 'cash-entries', label: 'Jurnal balik dari', admin: ro },
       { name: 'reversedBy', type: 'relationship', relationTo: 'cash-entries', label: 'Dibalik oleh', admin: ro },

@@ -51,6 +51,7 @@ ProjectSummary projectFromJson(Map<String, dynamic> j) => ProjectSummary(
   contractValue: _intN(j['contractValue']),
   progressPct: _dblN(j['progressPct']),
   costCenter: _ref(j['costCenter']),
+  pusatBiaya: _ref(j['pusatBiaya']),
   site: _ref(j['site']),
   rapPlanned: _intN(j['rapPlanned'] ?? _map(j['rap'])?['planned']),
   rapRealised: _intN(j['rapRealised'] ?? _map(j['rap'])?['realised']),

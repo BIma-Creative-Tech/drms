@@ -6,6 +6,7 @@ import { writeAudit, writeAuditDetached } from '@/audit/writer'
 import { contextCompanyId, displayNames, membersWithRole } from '@/domain/companies'
 import { signDecision, signerColumns, type DecisionSigner } from '@/domain/direktur-signature'
 import { today } from '@/domain/expense/common'
+import { claimMedia } from '@/domain/expense/receipts'
 import { notificationTemplate, pushEnabled } from '@/domain/notifications'
 import { parseBusinessDate } from '@/domain/numbering'
 import { allocateDocNo } from '@/domain/numbering-db'
@@ -15,8 +16,14 @@ import { searchWhere } from '@/lib/text-search'
 import { getRequestTx } from '@/lib/tx'
 
 import { mayReadLoans } from './access'
+import { legNumbers, postLoanLegs, voidLoanLegs } from './cash'
 import {
+  addDays,
+  AUTO_LOAN_DUE_DAYS,
+  AWAITING_DISBURSEMENT_LABEL,
   daysOverdue,
+  isCashBacked,
+  LOAN_ORIGIN_LABELS,
   DIREKTUR_SELF_NOTE,
   direkturPool,
   isOverdue,
@@ -36,6 +43,7 @@ import {
   type LoanActorContext,
   type LoanG1Exception,
   type LoanKind,
+  type LoanOrigin,
   type LoanStatus,
 } from './rules'
 import { closedProjectMessage, isClosedProjectStatus } from '@/domain/projects/status'
@@ -49,7 +57,10 @@ import { closedProjectMessage, isClosedProjectStatus } from '@/domain/projects/s
  * → Menunggu persetujuan Direktur → Disetujui | Ditolak (reason). Repayments (borrower PM / Finance, no approval,
  * ≤ outstanding) → Sebagian kembali → Lunas; void (Direktur / Finance, reason) moves the status back. Cancel: the
  * creator in Draft / Menunggu, a Direktur after approval while no repayment is posted.
- * NO cash entry is written anywhere in this module (notional allocation, ADR 0022 §5 option B).
+ * ADR 0031 (DRMS 21/10, amends ADR 0022 §5): the approval freezes both projects' Pusat Biaya (cash accounts); money
+ * between two different accounts is `cashBacked` → Finance "Cairkan" posts KK lender / KM borrower (domain/loans/cash.ts)
+ * and repayments (Finance only) post the mirror pair; a void reverses them. Goods, or one account, stay a claim (no cash).
+ * `createTransferLoan`: the automatic, approved loan of a transfer Finance paid from another account (origin `transfer`).
  */
 
 export class LoanError extends APIError {
@@ -72,7 +83,15 @@ export type LoanDoc = {
   company?: unknown
   uuid?: string | null
   docNo?: string | null
-  lenderProject: unknown
+  /** ADR 0031 */
+  origin?: LoanOrigin | null
+  lenderCashAccount?: unknown
+  borrowerCashAccount?: unknown
+  cashBacked?: boolean | null
+  transfer?: unknown
+  disbursedAt?: string | null
+  disbursedBy?: unknown
+  lenderProject?: unknown
   borrowerProject: unknown
   kind: LoanKind
   amount: number
@@ -111,7 +130,7 @@ export type RepaymentDoc = {
   createdAt?: string
 }
 
-type ProjectRow = { id: number; code?: string; name?: string; status?: string | null; pm?: unknown; company?: unknown }
+type ProjectRow = { id: number; code?: string; name?: string; status?: string | null; pm?: unknown; company?: unknown; cashAccount?: unknown }
 
 type DecisionRow = { id: number; cycle: number; position: string; level: number; actor?: unknown; actorName?: string | null; decision: 'approved' | 'rejected' | 'acknowledged'; reason?: string | null; decidedAt?: string | null; signatureSource?: string | null }
 
@@ -144,6 +163,28 @@ async function loadProject(req: PayloadRequest, projectId: number, path: string)
   const p = (await req.payload.findByID({ collection: 'projects', id: projectId, depth: 0, overrideAccess: true /* SYSTEM-READ: PT / PM / status (caller checked) */, req, disableErrors: true })) as ProjectRow | null
   if (!p) fail(404, 'NOT_FOUND', 'Project tidak ditemukan.', path)
   return p!
+}
+
+/** Lender project of a manual loan (an automatic loan's lender is an account → undefined). */
+async function lenderOf(req: PayloadRequest, doc: LoanDoc): Promise<ProjectRow | undefined> {
+  const id = relId(doc.lenderProject)
+  return id === undefined ? undefined : loadProject(req, id, 'lenderProjectId')
+}
+
+/** Names of cash accounts (Pusat Biaya) — SYSTEM-READ: the account name is shown on a loan the caller may read. */
+async function accountNames(req: PayloadRequest, ids: ReadonlyArray<number | undefined>): Promise<Map<number, string>> {
+  const want = [...new Set(ids.filter((x): x is number => x !== undefined))]
+  if (want.length === 0) return new Map()
+  const r = await req.payload.find({ collection: 'cash-accounts', where: { id: { in: want } }, depth: 0, pagination: false, select: { name: true }, overrideAccess: true /* SYSTEM-READ: account names of a readable loan */, req })
+  return new Map((r.docs as unknown as Array<{ id: number; name?: string }>).map((a) => [a.id, a.name ?? `#${a.id}`]))
+}
+
+/** ADR 0031: `{lenderAccount}` / `{borrowerAccount}` of the notification texts. */
+async function accountVars(req: PayloadRequest, doc: LoanDoc): Promise<Record<string, string>> {
+  const l = relId(doc.lenderCashAccount)
+  const b = relId(doc.borrowerCashAccount)
+  const m = await accountNames(req, [l, b])
+  return { lenderAccount: l === undefined ? '' : (m.get(l) ?? ''), borrowerAccount: b === undefined ? '' : (m.get(b) ?? '') }
 }
 
 async function decisionsOf(req: PayloadRequest, loanId: number): Promise<DecisionRow[]> {
@@ -196,6 +237,9 @@ export async function actorContext(req: PayloadRequest, doc: LoanDoc, repayments
     isFinance: hasRole(req, 'pk-finance', company),
     mayDecide: mayDecide({ callerId: uid, creatorId: relId(doc.createdBy) ?? -2, callerIsDirektur: decides, g1Exception: doc.g1Exception ?? null }),
     hasRepayment: posted || repaid(doc) > 0,
+    cashBacked: doc.cashBacked === true,
+    disbursed: Boolean(doc.disbursedAt),
+    origin: doc.origin ?? 'manual',
   }
 }
 
@@ -221,13 +265,27 @@ async function requireAction(req: PayloadRequest, doc: LoanDoc, action: LoanActi
     if (doc.status !== 'pending_approval') fail(409, 'STATE_CONFLICT', `Aksi tidak dapat dilakukan pada status pinjaman saat ini (${LOAN_STATUS_LABELS[doc.status]}).`)
     return fail(403, 'FORBIDDEN', 'Anda tidak berhak memutuskan pinjaman ini.')
   }
+  if (action === 'disburse') {
+    // ADR 0031: Finance of the loan's PT posts the cash of an approved cash-backed loan once
+    if (!ctx.isFinance) fail(403, 'FORBIDDEN', 'Pencairan pinjaman dicatat oleh Finance.')
+    if (!ctx.cashBacked) fail(409, 'STATE_CONFLICT', 'Pinjaman ini tidak menggerakkan kas (barang, atau kedua project memakai pusat biaya yang sama).')
+    if (ctx.disbursed) fail(409, 'STATE_CONFLICT', 'Pinjaman ini sudah dicairkan.')
+    return fail(409, 'STATE_CONFLICT', `Pencairan hanya untuk pinjaman yang sudah disetujui (status: ${LOAN_STATUS_LABELS[doc.status]}).`)
+  }
   if (action === 'repay') {
+    if (ctx.cashBacked) {
+      // ADR 0031: a repayment of a cash-backed loan posts KK / KM → Finance, after the disbursement
+      if (!ctx.isFinance) fail(403, 'FORBIDDEN', 'Pengembalian pinjaman yang menggerakkan kas dicatat oleh Finance.')
+      if (!ctx.disbursed) fail(409, 'STATE_CONFLICT', 'Pinjaman belum dicairkan Finance; pengembalian dicatat setelah pencairan.')
+    }
     if (!ctx.isBorrowerPm && !ctx.isFinance) fail(403, 'FORBIDDEN', 'Pengembalian dicatat oleh PM project peminjam atau Finance.')
     return fail(409, 'STATE_CONFLICT', `Pengembalian hanya untuk pinjaman yang sudah disetujui dan belum lunas (status: ${LOAN_STATUS_LABELS[doc.status]}).`)
   }
   if (action === 'cancel') {
+    if (ctx.origin === 'transfer') fail(409, 'STATE_CONFLICT', 'Pinjaman otomatis dari transfer dibatalkan lewat pembatalan (void) transfernya.')
     if (!ctx.isCreator && !ctx.isDirektur) fail(403, 'FORBIDDEN', 'Hanya pembuat (sebelum diputuskan) atau Direktur (setelah disetujui) yang dapat membatalkan pinjaman.')
     if (ctx.status === 'approved' && ctx.hasRepayment) fail(409, 'STATE_CONFLICT', 'Pinjaman yang sudah ada pengembaliannya tidak dapat dibatalkan.')
+    if (ctx.status === 'approved' && ctx.cashBacked && ctx.disbursed) fail(409, 'STATE_CONFLICT', 'Pinjaman yang sudah dicairkan tidak dapat dibatalkan; catat pengembaliannya.')
     return fail(409, 'STATE_CONFLICT', `Pinjaman tidak dapat dibatalkan pada status ${LOAN_STATUS_LABELS[doc.status]}.`)
   }
   // edit / submit
@@ -254,7 +312,16 @@ async function updateLoan(req: PayloadRequest, id: number, data: Record<string, 
 
 // ---------------------------------------------------------------- notifications
 
-export type LoanEvent = 'project_loan.pending' | 'project_loan.submitted' | 'project_loan.approved' | 'project_loan.rejected' | 'project_loan.repaid' | 'project_loan.overdue'
+export type LoanEvent =
+  | 'project_loan.pending'
+  | 'project_loan.submitted'
+  | 'project_loan.approved'
+  | 'project_loan.rejected'
+  | 'project_loan.repaid'
+  | 'project_loan.overdue'
+  | 'project_loan.disburse_pending'
+  | 'project_loan.disbursed'
+  | 'project_loan.auto_created'
 
 export const LOAN_NOTIFICATION_DEFAULTS: Record<LoanEvent, { title: string; body: string }> = {
   'project_loan.pending': { title: 'Persetujuan Direktur: {docNo}', body: 'Pinjaman antar project {docNo}: {borrower} meminjam {amount} dari {lender}. Menunggu persetujuan Anda sebagai Direktur.' },
@@ -263,13 +330,18 @@ export const LOAN_NOTIFICATION_DEFAULTS: Record<LoanEvent, { title: string; body
   'project_loan.rejected': { title: 'Pinjaman ditolak: {docNo}', body: 'Pinjaman antar project {docNo} ({borrower} dari {lender}) ditolak. Lihat alasan di detail pinjaman.' },
   'project_loan.repaid': { title: 'Pengembalian pinjaman: {docNo}', body: 'Pengembalian {payment} untuk pinjaman {docNo} ({borrower} ke {lender}) dicatat. Sisa pinjaman {outstanding}.' },
   'project_loan.overdue': { title: 'Pinjaman terlambat: {docNo}', body: 'Pinjaman antar project {docNo} ({borrower} dari {lender}) lewat jatuh tempo {dueDate} ({days} hari). Sisa {outstanding}.' },
+  // ADR 0031
+  'project_loan.disburse_pending': { title: 'Cairkan pinjaman: {docNo}', body: 'Pinjaman antar project {docNo} ({borrower} dari {lender}, {amount}) disetujui Direktur. Cairkan dari {lenderAccount} ke {borrowerAccount}.' },
+  'project_loan.disbursed': { title: 'Pinjaman dicairkan: {docNo}', body: 'Pinjaman antar project {docNo} ({amount}) dicairkan: kas keluar {lenderAccount}, kas masuk {borrowerAccount}. Jatuh tempo {dueDate}.' },
+  'project_loan.auto_created': { title: 'Pinjaman otomatis: {docNo}', body: 'Transfer {transferNo} untuk {borrower} dibayar dari {lenderAccount}, bukan pusat biaya project ({borrowerAccount}). Tercatat pinjaman {docNo} {amount}, jatuh tempo {dueDate}.' },
 }
 
 export function loanVars(doc: Pick<LoanDoc, 'id' | 'docNo' | 'amount' | 'dueDate' | 'repaidTotal'>, lender: ProjectRow | undefined, borrower: ProjectRow | undefined, extra: Record<string, string> = {}): Record<string, string> {
   const name = (p?: ProjectRow) => `${p?.code ?? ''} ${p?.name ?? ''}`.trim()
   return {
     docNo: doc.docNo ?? `#${doc.id}`,
-    lender: name(lender),
+    // ADR 0031: an automatic loan has no lender project — its lender is the account (`extra.lenderAccount`)
+    lender: lender ? name(lender) : (extra.lenderAccount ?? ''),
     borrower: name(borrower),
     amount: formatRupiah(Number(doc.amount)),
     dueDate: doc.dueDate,
@@ -458,9 +530,9 @@ export async function cancelLoan(req: PayloadRequest, id: number, reason: string
   const r = reason.trim()
   const cancelled = await updateLoan(req, id, { status: 'cancelled', cancelReason: r, outstanding: 0 }, r)
   if (doc.status === 'approved') {
-    const lender = await loadProject(req, relId(doc.lenderProject)!, 'lenderProjectId')
+    const lender = await lenderOf(req, doc)
     const borrower = await loadProject(req, relId(doc.borrowerProject)!, 'borrowerProjectId')
-    await notify(req, cancelled, 'project_loan.rejected', [relId(doc.createdBy)!, ...pmOf(lender)], loanVars(cancelled, lender, borrower))
+    await notify(req, cancelled, 'project_loan.rejected', [relId(doc.createdBy)!, ...(lender ? pmOf(lender) : [])], loanVars(cancelled, lender, borrower, await accountVars(req, doc)))
   }
   return cancelled
 }
@@ -475,14 +547,16 @@ export async function cancelLoanForProject(req: PayloadRequest, id: number, reas
   const doc = await loadRawLoan(req, id)
   const r = reason.trim()
   const repaidAny = doc.status === 'approved' && (repaid(doc) > 0 || (await repaymentsOf(req, doc.id)).some((x) => x.status === 'posted'))
-  if (!['draft', 'pending_approval', 'approved'].includes(doc.status) || repaidAny) {
-    fail(409, 'STATE_CONFLICT', `Pinjaman ${doc.docNo ?? `#${id}`} (${LOAN_STATUS_LABELS[doc.status]}) tidak dapat dibatalkan${repaidAny ? ': sudah ada pengembalian' : ''}.`)
+  // ADR 0031: cash already moved (disbursed / automatic loan) → settle by repayment (or the transfer void), not by the cascade
+  const moved = doc.cashBacked === true && Boolean(doc.disbursedAt)
+  if (!['draft', 'pending_approval', 'approved'].includes(doc.status) || repaidAny || moved) {
+    fail(409, 'STATE_CONFLICT', `Pinjaman ${doc.docNo ?? `#${id}`} (${LOAN_STATUS_LABELS[doc.status]}) tidak dapat dibatalkan${repaidAny ? ': sudah ada pengembalian' : moved ? ': kasnya sudah dicairkan' : ''}.`)
   }
   const cancelled = await updateLoan(req, id, { status: 'cancelled', cancelReason: r, outstanding: 0 }, r)
   if (doc.status === 'approved') {
-    const lender = await loadProject(req, relId(doc.lenderProject)!, 'lenderProjectId')
+    const lender = await lenderOf(req, doc)
     const borrower = await loadProject(req, relId(doc.borrowerProject)!, 'borrowerProjectId')
-    await notify(req, cancelled, 'project_loan.rejected', [relId(doc.createdBy)!, ...pmOf(lender)], loanVars(cancelled, lender, borrower))
+    await notify(req, cancelled, 'project_loan.rejected', [relId(doc.createdBy)!, ...(lender ? pmOf(lender) : [])], loanVars(cancelled, lender, borrower, await accountVars(req, doc)))
   }
   return cancelled
 }
@@ -531,18 +605,24 @@ async function decide(req: PayloadRequest, id: number, decision: 'approved' | 'r
   const visible = await loadVisibleLoan(req, id, { lock: true })
   await requireAction(req, visible, decision === 'approved' ? 'approve' : 'reject')
   const doc = await loadRawLoan(req, id)
-  const lender = await loadProject(req, relId(doc.lenderProject)!, 'lenderProjectId')
+  const lender = (await lenderOf(req, doc))!
   const borrower = await loadProject(req, relId(doc.borrowerProject)!, 'borrowerProjectId')
   if (decision === 'approved' && (isClosedProjectStatus(lender.status) || isClosedProjectStatus(borrower.status))) fail(409, 'STATE_CONFLICT', `${closedProjectMessage(isClosedProjectStatus(lender.status) ? lender.status : borrower.status).replace(/\.$/, '')}; pinjaman tidak dapat disetujui.`)
   // ADR 0025: the loan decision IS the Direktur step — a designated representative signs as the PT's definitive Direktur
   const sig = await signDecision(req, { companyId: relId(doc.company), callerId: userId(req)!, direkturStep: true, capturedId: opts.signatureMediaId, required: false })
   await insertDecision(req, doc, decision, reason, sig)
   const now = new Date().toISOString()
+  // ADR 0031: the approval freezes both projects' Pusat Biaya; money between two different accounts moves cash (Cairkan)
+  const lenderCashAccount = relId(lender.cashAccount) ?? null
+  const borrowerCashAccount = relId(borrower.cashAccount) ?? null
+  const cashBacked = isCashBacked({ kind: doc.kind, lenderCashAccountId: lenderCashAccount, borrowerCashAccountId: borrowerCashAccount })
   const updated =
     decision === 'approved'
-      ? await updateLoan(req, id, { status: 'approved', decidedAt: now, decidedBy: userId(req), outstanding: amountOf(doc) })
+      ? await updateLoan(req, id, { status: 'approved', decidedAt: now, decidedBy: userId(req), outstanding: amountOf(doc), lenderCashAccount, borrowerCashAccount, cashBacked })
       : await updateLoan(req, id, { status: 'rejected', decidedAt: now, decidedBy: userId(req), rejectReason: reason, outstanding: 0 }, reason ?? undefined)
-  await notify(req, updated, decision === 'approved' ? 'project_loan.approved' : 'project_loan.rejected', [relId(doc.createdBy)!, ...pmOf(lender)], loanVars(updated, lender, borrower))
+  const vars = loanVars(updated, lender, borrower, await accountVars(req, updated))
+  await notify(req, updated, decision === 'approved' ? 'project_loan.approved' : 'project_loan.rejected', [relId(doc.createdBy)!, ...pmOf(lender)], vars)
+  if (decision === 'approved' && cashBacked) await notify(req, updated, 'project_loan.disburse_pending', await membersWithRole(req, 'pk-finance', relId(doc.company)!), vars)
   return updated
 }
 
@@ -560,9 +640,12 @@ async function applyRepayments(req: PayloadRequest, doc: LoanDoc, reason?: strin
   return updateLoan(req, doc.id, { repaidTotal: total, outstanding: outstandingOf(amount, total), status: statusForRepaid(amount, total) }, reason)
 }
 
-export type RepaymentInput = { amount: number; repayDate?: string; note?: string | null }
+export type RepaymentInput = { amount: number; repayDate?: string; note?: string | null; confirmOverdraft?: boolean }
 
-/** ADR 0022 §7 (Q-L7): borrower PM or Finance records a (partial) repayment; no approval; ≤ outstanding. */
+/**
+ * ADR 0022 §7 (Q-L7): borrower PM or Finance records a (partial) repayment; no approval; ≤ outstanding. ADR 0031: a
+ * cash-backed loan is repaid by Finance after the disbursement and the repayment posts its KK / KM.
+ */
 export async function addRepayment(req: PayloadRequest, id: number, input: RepaymentInput): Promise<LoanDoc> {
   const doc = await loadVisibleLoan(req, id, { lock: true }) // serialises concurrent repayments
   await requireAction(req, doc, 'repay')
@@ -573,7 +656,7 @@ export async function addRepayment(req: PayloadRequest, id: number, input: Repay
   const outstanding = outstandingOf(amountOf(fresh), repaid(fresh))
   const errs = repaymentInputErrors({ amount: input.amount, repayDate, note: input.note ?? undefined }, { loanDate: fresh.loanDate, outstanding }, todayStr)
   if (errs.length > 0) throw new LoanError(400, errs[0]!.message, 'VALIDATION', errs[0]!.path)
-  await req.payload.create({
+  const repayment = (await req.payload.create({
     collection: 'project-loan-repayments',
     data: {
       loan: id,
@@ -585,17 +668,31 @@ export async function addRepayment(req: PayloadRequest, id: number, input: Repay
       source: requestMeta(req).source === 'apk' ? 'apk' : 'web',
     } as never,
     depth: 0,
-    overrideAccess: true, // SYSTEM-WRITE: append-only repayment after the role check above (no cash entry, ADR 0022 §5)
+    overrideAccess: true, // SYSTEM-WRITE: append-only repayment after the role check above
     req,
-  })
+  })) as unknown as RepaymentDoc
+  if (fresh.cashBacked === true) {
+    // ADR 0031: the money goes back — KK on the borrower's Pusat Biaya, KM on the lender's (same transaction)
+    await postLoanLegs(req, {
+      loanId: id,
+      repaymentId: repayment.id,
+      fromAccountId: relId(fresh.borrowerCashAccount)!,
+      toAccountId: relId(fresh.lenderCashAccount)!,
+      amount: input.amount,
+      date: repayDate,
+      description: `Pengembalian pinjaman ${fresh.docNo ?? `#${id}`}${input.note?.trim() ? ` — ${input.note.trim()}` : ''}`,
+      borrowerProjectId: relId(fresh.borrowerProject) ?? null,
+      confirmOverdraft: input.confirmOverdraft === true,
+    })
+  }
   const updated = await applyRepayments(req, fresh)
-  const lender = await loadProject(req, relId(fresh.lenderProject)!, 'lenderProjectId')
+  const lender = await lenderOf(req, fresh)
   const borrower = await loadProject(req, relId(fresh.borrowerProject)!, 'borrowerProjectId')
-  await notify(req, updated, 'project_loan.repaid', [...(await direkturOf(req, company)), ...pmOf(lender)], loanVars(updated, lender, borrower, { payment: formatRupiah(input.amount) }))
+  await notify(req, updated, 'project_loan.repaid', [...(await direkturOf(req, company)), ...(lender ? pmOf(lender) : [])], loanVars(updated, lender, borrower, { payment: formatRupiah(input.amount), ...(await accountVars(req, fresh)) }))
   return updated
 }
 
-/** Void of a posted repayment (Direktur / Finance, reason required, audited `void`); the loan status moves back. */
+/** Void of a posted repayment (Direktur / Finance — ADR 0031: Finance only when it moved cash — reason required, audited `void`); the loan status moves back. */
 export async function voidRepayment(req: PayloadRequest, id: number, repaymentId: number, reason: string): Promise<LoanDoc> {
   const doc = await loadVisibleLoan(req, id, { lock: true })
   const ctx = await actorContext(req, doc)
@@ -622,16 +719,169 @@ export async function voidRepayment(req: PayloadRequest, id: number, repaymentId
     delete req.context.auditReason
   }
   const fresh = await loadRawLoan(req, id)
+  // ADR 0031: the repayment's KK / KM are reversed with it (same reason)
+  if (fresh.cashBacked === true) await voidLoanLegs(req, id, repaymentId, `Void pengembalian pinjaman ${fresh.docNo ?? `#${id}`}: ${r}`.slice(0, 900))
   return applyRepayments(req, fresh, `Void pengembalian #${repaymentId}: ${r}`.slice(0, 1000))
+}
+
+// ---------------------------------------------------------------- ADR 0031: cash of a loan (disbursement, automatic loan)
+
+export type DisburseInput = { disburseDate?: string; note?: string | null; proofMediaId?: number | null; confirmOverdraft?: boolean }
+
+/**
+ * ADR 0031 "Cairkan" (Finance of the loan's PT): an approved cash-backed manual loan → KK on the lender's Pusat Biaya +
+ * KM on the borrower's, dated `disburseDate` (default today; not before the loan date, not in the future); once.
+ */
+export async function disburseLoan(req: PayloadRequest, id: number, input: DisburseInput = {}): Promise<LoanDoc> {
+  const doc = await loadVisibleLoan(req, id, { lock: true })
+  await requireAction(req, doc, 'disburse')
+  const fresh = await loadRawLoan(req, id)
+  const company = relId(fresh.company)!
+  const todayStr = await today(req, company)
+  const date = input.disburseDate ?? todayStr
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) fail(400, 'VALIDATION', 'Tanggal pencairan harus YYYY-MM-DD.', 'disburseDate')
+  if (date > todayStr) fail(400, 'VALIDATION', 'Tanggal pencairan tidak boleh di masa depan.', 'disburseDate')
+  if (date < fresh.loanDate) fail(400, 'VALIDATION', 'Tanggal pencairan tidak boleh sebelum tanggal pinjaman.', 'disburseDate')
+  const legs = await postLoanLegs(req, {
+    loanId: id,
+    fromAccountId: relId(fresh.lenderCashAccount)!,
+    toAccountId: relId(fresh.borrowerCashAccount)!,
+    amount: amountOf(fresh),
+    date,
+    description: `Pencairan pinjaman ${fresh.docNo ?? `#${id}`}${input.note?.trim() ? ` — ${input.note.trim()}` : ''}`,
+    borrowerProjectId: relId(fresh.borrowerProject) ?? null,
+    confirmOverdraft: input.confirmOverdraft === true,
+    proofId: input.proofMediaId ?? null,
+  })
+  if (input.proofMediaId) await claimMedia(req, 'media-attachments', input.proofMediaId, legs.kk.id, { ownerType: 'cash_entry' })
+  const updated = await updateLoan(req, id, { disbursedAt: new Date().toISOString(), disbursedBy: userId(req) })
+  await writeAudit(req, [
+    { action: 'disburse', docType: 'project_loan', docId: String(id), docNo: fresh.docNo ?? undefined, field: 'disbursedAt', newValue: { amount: amountOf(fresh), date, kk: legs.kk.entryNo, km: legs.km.entryNo, lenderCashAccountId: relId(fresh.lenderCashAccount), borrowerCashAccountId: relId(fresh.borrowerCashAccount) } },
+  ])
+  const lender = await lenderOf(req, fresh)
+  const borrower = await loadProject(req, relId(fresh.borrowerProject)!, 'borrowerProjectId')
+  await notify(req, updated, 'project_loan.disbursed', [relId(fresh.createdBy)!, ...pmOf(borrower), ...(lender ? pmOf(lender) : [])], loanVars(updated, lender, borrower, await accountVars(req, updated)))
+  return updated
+}
+
+export type TransferLoanInput = {
+  /** The request's project (borrower) and its Pusat Biaya (charged account). */
+  borrowerProjectId: number
+  borrowerCashAccountId: number
+  /** The account Finance actually paid from (lender). */
+  lenderCashAccountId: number
+  amount: number
+  transfer: { id: number; docNo: string }
+  request: { id: number; docNo?: string | null; title: string }
+  transferDate: string
+  reason: string
+  dueDate?: string | null
+  confirmOverdraft?: boolean
+}
+
+/**
+ * ADR 0031 (DRMS 21/10 #4–#5): Finance paid a project request from account B ≠ the project's Pusat Biaya A → an
+ * automatic, APPROVED loan "B → project" (origin `transfer`, lender = the account, no Direktur step — the user's
+ * decision 2026-10-21, notified to the project's PM and the Direktur) with its cash legs: KK on B, KM on A. The caller
+ * (recordTransfer) then posts the transfer KK on A, so A nets to 0 and B carries the payment — like the bank statement.
+ */
+export async function createTransferLoan(req: PayloadRequest, input: TransferLoanInput): Promise<{ loan: LoanDoc; kk: string; km: string }> {
+  const r = input.reason.trim()
+  if (r.length < 3) fail(400, 'VALIDATION', 'Alasan membayar dari akun lain wajib diisi (min. 3 karakter): tercatat sebagai pinjaman antar project.', 'loanReason')
+  const borrower = await loadProject(req, input.borrowerProjectId, 'borrowerProjectId')
+  const company = relId(borrower.company)!
+  const dueDate = input.dueDate ?? addDays(input.transferDate, AUTO_LOAN_DUE_DAYS)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || dueDate < input.transferDate) fail(400, 'VALIDATION', 'Jatuh tempo pinjaman tidak boleh sebelum tanggal transfer.', 'loanDueDate')
+  const { docNo } = await allocateDocNo(req, 'project_loan', { companyId: company, date: parseBusinessDate(input.transferDate) })
+  const now = new Date().toISOString()
+  const loan = (await req.payload.create({
+    collection: 'project-loans',
+    data: {
+      origin: 'transfer',
+      docNo,
+      borrowerProject: input.borrowerProjectId,
+      lenderCashAccount: input.lenderCashAccountId,
+      borrowerCashAccount: input.borrowerCashAccountId,
+      cashBacked: true,
+      transfer: input.transfer.id,
+      kind: 'dana',
+      amount: input.amount,
+      reason: `${r} (transfer ${input.transfer.docNo}, pengajuan ${input.request.docNo ?? `#${input.request.id}`})`.slice(0, 1000),
+      loanDate: input.transferDate,
+      dueDate,
+      status: 'approved',
+      repaidTotal: 0,
+      outstanding: input.amount,
+      createdBy: userId(req)!,
+      submittedAt: now,
+      decidedAt: now,
+      decidedBy: userId(req)!,
+      disbursedAt: now,
+      disbursedBy: userId(req)!,
+      approvalCycle: 0,
+      source: requestMeta(req).source === 'apk' ? 'apk' : 'web',
+    } as never,
+    depth: 0,
+    overrideAccess: true, // SYSTEM-WRITE: automatic loan of a guarded transfer (DB: born approved + disbursed, origin shape)
+    req,
+  })) as unknown as LoanDoc
+  const legs = await postLoanLegs(req, {
+    loanId: loan.id,
+    fromAccountId: input.lenderCashAccountId,
+    toAccountId: input.borrowerCashAccountId,
+    amount: input.amount,
+    date: input.transferDate,
+    description: `Pinjaman ${docNo}: transfer ${input.transfer.docNo} (${input.request.docNo ?? ''} ${input.request.title}) dibayar dari akun lain`.trim(),
+    borrowerProjectId: input.borrowerProjectId,
+    confirmOverdraft: input.confirmOverdraft === true,
+  })
+  await writeAudit(req, [
+    {
+      action: 'auto_create',
+      docType: 'project_loan',
+      docId: String(loan.id),
+      docNo,
+      field: 'transfer',
+      newValue: { transferId: input.transfer.id, transferNo: input.transfer.docNo, requestId: input.request.id, amount: input.amount, lenderCashAccountId: input.lenderCashAccountId, borrowerCashAccountId: input.borrowerCashAccountId, kk: legs.kk.entryNo, km: legs.km.entryNo },
+      reason: r,
+      companyId: company,
+    },
+  ])
+  const vars = loanVars(loan, undefined, borrower, { ...(await accountVars(req, loan)), transferNo: input.transfer.docNo })
+  await notify(req, loan, 'project_loan.auto_created', [...pmOf(borrower), ...(await direkturOf(req, company))], vars)
+  return { loan, kk: legs.kk.entryNo, km: legs.km.entryNo }
+}
+
+/** ADR 0031: the automatic loan of a transfer (null for a transfer paid from its Pusat Biaya). */
+export async function transferLoanOf(req: PayloadRequest, transferId: number): Promise<LoanDoc | null> {
+  const r = await req.payload.find({ collection: 'project-loans', where: { transfer: { equals: transferId } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: loan of a transfer the caller acts on */, req })
+  return (r.docs[0] as unknown as LoanDoc | undefined) ?? null
+}
+
+/**
+ * ADR 0031: void of a transfer paid from another account → its automatic loan is cancelled and its KK / KM reversed
+ * (refused while a repayment is posted: void the repayments first).
+ */
+export async function cancelTransferLoan(req: PayloadRequest, transferId: number, reason: string): Promise<LoanDoc | null> {
+  const loan = await transferLoanOf(req, transferId)
+  if (!loan || loan.status === 'cancelled') return loan
+  await lockLoan(req, loan.id)
+  const fresh = await loadRawLoan(req, loan.id)
+  if (repaid(fresh) > 0 || (await repaymentsOf(req, fresh.id)).some((x) => x.status === 'posted')) {
+    fail(409, 'STATE_CONFLICT', `Transfer ini tercatat sebagai pinjaman ${fresh.docNo ?? ''} yang sudah ada pengembaliannya. Void pengembaliannya dulu.`)
+  }
+  const r = `Transfer dibatalkan: ${reason.trim()}`.slice(0, 1000)
+  await voidLoanLegs(req, fresh.id, null, r.slice(0, 900))
+  return updateLoan(req, fresh.id, { status: 'cancelled', cancelReason: r, outstanding: 0 }, r)
 }
 
 // ---------------------------------------------------------------- read models
 
 /** `representedDecider`: loan id → name of the PT's definitive Direktur when a representative decided it (ADR 0025). */
-type Names = { projects: Map<number, ProjectRow>; users: Map<number, string>; representedDecider: Map<number, string> }
+type Names = { projects: Map<number, ProjectRow>; users: Map<number, string>; representedDecider: Map<number, string>; accounts: Map<number, string>; transfers: Map<number, string | null> }
 
 async function names(req: PayloadRequest, docs: readonly LoanDoc[], extraUsers: number[] = []): Promise<Names> {
-  const out: Names = { projects: new Map(), users: new Map(), representedDecider: new Map() }
+  const out: Names = { projects: new Map(), users: new Map(), representedDecider: new Map(), accounts: new Map(), transfers: new Map() }
   const decided = docs.filter((d) => relId(d.decidedBy) !== undefined).map((d) => d.id)
   if (decided.length) {
     // ADR 0025: "Diputuskan oleh" shows the definitive Direktur, never the representative (rows keep the real user)
@@ -655,9 +905,21 @@ async function names(req: PayloadRequest, docs: readonly LoanDoc[], extraUsers: 
     const r = await req.payload.find({ collection: 'projects', where: { id: { in: pIds } }, depth: 0, pagination: false, select: { code: true, name: true, status: true, pm: true, company: true }, overrideAccess: true /* SYSTEM-READ: names of projects of readable loans */, req })
     for (const p of r.docs as unknown as ProjectRow[]) out.projects.set(p.id, p)
   }
-  const uids = [...new Set([...docs.flatMap((d) => [relId(d.createdBy), relId(d.decidedBy)]), ...[...out.projects.values()].map((p) => relId(p.pm)), ...extraUsers].filter((x): x is number => x !== undefined))]
+  // ADR 0031: Pusat Biaya names + transfer numbers of automatic loans
+  out.accounts = await accountNames(req, docs.flatMap((d) => [relId(d.lenderCashAccount), relId(d.borrowerCashAccount)]))
+  const tIds = [...new Set(docs.map((d) => relId(d.transfer)).filter((x): x is number => x !== undefined))]
+  if (tIds.length) {
+    const r = await req.payload.find({ collection: 'transfers', where: { id: { in: tIds } }, depth: 0, pagination: false, select: { docNo: true }, overrideAccess: true /* SYSTEM-READ: transfer numbers of readable loans */, req })
+    for (const t of r.docs as unknown as Array<{ id: number; docNo?: string | null }>) out.transfers.set(t.id, t.docNo ?? null)
+  }
+  const uids = [...new Set([...docs.flatMap((d) => [relId(d.createdBy), relId(d.decidedBy), relId(d.disbursedBy)]), ...[...out.projects.values()].map((p) => relId(p.pm)), ...extraUsers].filter((x): x is number => x !== undefined))]
   if (uids.length) for (const [k, v] of await displayNames(req, uids)) out.users.set(k, v)
   return out
+}
+
+const accountRef = (n: Names, v: unknown) => {
+  const id = relId(v)
+  return id === undefined ? null : { id, name: n.accounts.get(id) ?? null }
 }
 
 const projectRef = (n: Names, id: number) => {
@@ -673,21 +935,34 @@ function summary(d: LoanDoc, n: Names, todayStr: string) {
   const l = { status: d.status, dueDate: d.dueDate, outstanding }
   const uid = relId(d.createdBy)!
   const decider = relId(d.decidedBy)
+  const disburser = relId(d.disbursedBy)
   const overdue = isOverdue(l, todayStr)
+  const lenderId = relId(d.lenderProject)
+  const transferId = relId(d.transfer)
+  const awaiting = d.status === 'approved' && d.cashBacked === true && !d.disbursedAt
   return {
     id: d.id,
     uuid: d.uuid ?? null,
     companyId: relId(d.company) ?? null,
     docNo: d.docNo ?? null,
     status: d.status,
-    statusLabel: LOAN_STATUS_LABELS[d.status],
+    statusLabel: awaiting ? AWAITING_DISBURSEMENT_LABEL : LOAN_STATUS_LABELS[d.status],
     overdue,
     overdueLabel: overdue ? OVERDUE_LABEL : null,
     daysOverdue: daysOverdue(l, todayStr),
     kind: d.kind,
     kindLabel: LOAN_KIND_LABELS[d.kind],
-    lenderProject: projectRef(n, relId(d.lenderProject)!),
+    origin: d.origin ?? 'manual',
+    originLabel: LOAN_ORIGIN_LABELS[d.origin ?? 'manual'],
+    lenderProject: lenderId === undefined ? null : projectRef(n, lenderId),
     borrowerProject: projectRef(n, relId(d.borrowerProject)!),
+    lenderCashAccount: accountRef(n, d.lenderCashAccount),
+    borrowerCashAccount: accountRef(n, d.borrowerCashAccount),
+    cashBacked: d.cashBacked === true,
+    disbursedAt: d.disbursedAt ?? null,
+    disbursedBy: disburser === undefined ? null : { id: disburser, name: n.users.get(disburser) ?? null },
+    awaitingDisbursement: awaiting,
+    transfer: transferId === undefined ? null : { id: transferId, docNo: n.transfers.get(transferId) ?? null },
     amount,
     repaidTotal: rep,
     outstanding,
@@ -721,9 +996,15 @@ export async function loanDetail(req: PayloadRequest, doc: LoanDoc) {
   const s = summary(doc, n, todayStr)
   const selfDecided = doc.g1Exception === 'direktur_self' && decisions.some((x) => relId(x.actor) === relId(doc.createdBy))
   let k = 0
+  // ADR 0031: KK / KM numbers of the disbursement and of each posted repayment of a cash-backed loan
+  const cash = doc.cashBacked === true
+  const disbursement = cash && doc.disbursedAt ? await legNumbers(req, doc.id, null) : null
+  const repaymentCash = new Map<number, { kk: string | null; km: string | null }>()
+  if (cash) for (const r of rows.filter((x) => x.status === 'posted')) repaymentCash.set(r.id, await legNumbers(req, doc.id, r.id))
   return {
     ...s,
     allowedActions: loanAllowedActions(ctx),
+    disbursement,
     mayVoidRepayment: mayVoidRepayment(ctx),
     g1Note: doc.g1Exception === 'direktur_self' ? (selfDecided ? DIREKTUR_SELF_NOTE : 'Pembuat adalah satu-satunya Direktur PT: ia dapat memutuskan pinjamannya sendiri (tercatat di audit).') : null,
     repayments: rows.map((r) => ({
@@ -739,6 +1020,7 @@ export async function loanDetail(req: PayloadRequest, doc: LoanDoc) {
       voidedBy: relId(r.voidedBy) === undefined ? null : { id: relId(r.voidedBy)!, name: n.users.get(relId(r.voidedBy)!) ?? null },
       voidedAt: r.voidedAt ?? null,
       createdAt: r.createdAt ?? null,
+      cash: repaymentCash.get(r.id) ?? null,
     })),
     decisions: decisions.map((r) => ({
       id: r.id,

@@ -932,10 +932,9 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
       if (widget.repay && (amount == null || amount <= 0)) 'amount': 'Nominal pengembalian wajib diisi (> 0).',
       if (widget.repay && amount != null && amount > widget.loan.outstanding)
         'amount': 'Nominal melebihi sisa pinjaman.',
+      // ADR 0029: no Pusat Biaya here (a loan between PTs is never a cost) — no automatic loan reason either
       ...validateTransferForm(
         cashAccountId: _cashAccountId,
-        costCenterId: null,
-        requireCostCenter: false,
         transferAt: _at,
         zoneOffset: _zoneOffset,
         bankRef: _bankRef.text,

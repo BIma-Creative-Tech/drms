@@ -3,8 +3,6 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
-import '../../expense/data/expense_mappers.dart';
-import '../../expense/domain/expense_request.dart';
 import '../domain/transfer_queue.dart';
 
 List<dynamic> _list(Object? v) => v is List ? v : const [];
@@ -39,20 +37,6 @@ class FinanceApi {
     ].where((a) => a.active).toList(),
   );
 
-  /// Active cost centers of PT [companyId] (`GET /cost-centers?company=&q=`, D2 picker).
-  Future<List<CostCenterOption>> costCenters(int? companyId, {String q = ''}) => client.run(
-    (d) => d.get<dynamic>(
-      '/cost-centers',
-      queryParameters: {'company': ?companyId, if (q.trim().isNotEmpty) 'q': q.trim()},
-      options: ApiClient.allCompanies(),
-    ),
-    (data) => [
-      for (final i in _list(_map(data)?['docs'] ?? _map(data)?['items']))
-        // the server lists active ones unless `active=all`; never offer an inactive one (400 at the transfer)
-        if (_map(i) case final j? when j['active'] != false) costCenterFromJson(j),
-    ],
-  );
-
   /// Transfer proof (compressed JPEG) → `media-transfer-proofs` id (`POST /media/transfer-proofs`, Finance only).
   Future<int> uploadProof(Uint8List bytes, {required String filename}) => client.run(
     (d) => d.post<dynamic>(
@@ -65,9 +49,10 @@ class FinanceApi {
     (data) => ((data as Map<String, dynamic>)['id'] as num).toInt(),
   );
 
-  /// `POST /expense-requests/{id}/transfer` ([transferBody]) → the updated request. A 409 with
+  /// `POST /expense-requests/{id}/transfer` ([transferBody]) → the updated request and, ADR 0031, the automatic
+  /// inter-project loan when paid from another account than the Pusat Biaya. A 409 with
   /// `CASH_OVERDRAFT_CONFIRM_REQUIRED` / `BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED` asks for a confirmation.
-  Future<ExpenseDetail> recordTransfer(int requestId, Map<String, dynamic> body, {required String idempotencyKey}) =>
+  Future<TransferOutcome> recordTransfer(int requestId, Map<String, dynamic> body, {required String idempotencyKey}) =>
       client.run(
         (d) => d.post<dynamic>(
           '/expense-requests/$requestId/transfer',
@@ -75,6 +60,6 @@ class FinanceApi {
           // One document (MC3): the Finance role IN its PT counts, not the PT switcher.
           options: ApiClient.allCompanies(Options(headers: {'Idempotency-Key': idempotencyKey})),
         ),
-        (data) => detailFromJson(_map(_map(data)?['request']) ?? (data as Map<String, dynamic>)),
+        (data) => transferOutcomeFromJson(data as Map<String, dynamic>),
       );
 }

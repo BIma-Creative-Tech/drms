@@ -52,12 +52,6 @@ export async function TransferQueue(props: AdminViewServerProps) {
     return { all: q.length, page, items: page.items, review: await loadReimburseReview(req), done: donePage.items, donePage, mine: await approvedByCaller(req, page.items.map((x) => x.id)) }
   })
   const canTransfer = allowed(req, ['pk-finance'])
-  // D2: cost centers of the PTs (Finance reads all of its PTs) — the transfer form's mandatory picker
-  const costCenters = canTransfer
-    ? (
-        await req.payload.find({ collection: 'cost-centers', where: { active: { not_equals: false } }, depth: 0, pagination: false, sort: 'code', select: { code: true, name: true, company: true }, user: req.user, overrideAccess: false, req })
-      ).docs.map((c) => ({ id: c.id as number, label: `${String((c as { code?: string }).code ?? '')} ${String((c as { name?: string }).name ?? '')}`.trim(), company: relId((c as { company?: unknown }).company) ?? null }))
-    : []
   const accounts = canTransfer
     ? (
         await req.payload.find({ collection: 'cash-accounts', where: { active: { not_equals: false } }, depth: 0, pagination: false, sort: 'name', select: { name: true, company: true }, user: req.user, overrideAccess: false, req })
@@ -117,9 +111,9 @@ export async function TransferQueue(props: AdminViewServerProps) {
                   {docLink(r.id, r.docNo ?? `#${r.id}`)}
                   <div>{r.title}</div>
                   <div style={{ fontSize: 12 }}>{r.scope}</div>
-                  {/* D2: cost center proposed to Finance (project default) */}
-                  <div style={{ fontSize: 12, color: 'var(--pk-muted-fg)' }} data-pk-queue-cost-center={r.id}>
-                    Pusat biaya: {r.costCenter ? `${r.costCenter.code} ${r.costCenter.name}`.trim() : 'dipilih Finance saat transfer'}
+                  {/* ADR 0031: the project's Pusat Biaya (cash account) — default source of the transfer */}
+                  <div style={{ fontSize: 12, color: r.pusatBiayaMissing ? 'var(--pk-tone-warn)' : 'var(--pk-muted-fg)' }} data-pk-queue-cost-center={r.id}>
+                    Pusat biaya: {r.pusatBiaya ? r.pusatBiaya.name : r.pusatBiayaMissing ? 'project belum dipetakan' : 'dipilih Finance (tanpa project)'}
                   </div>
                 </td>
                 <td style={td} data-label="Jenis">
@@ -192,7 +186,8 @@ export async function TransferQueue(props: AdminViewServerProps) {
                       bankRef="required"
                       proof={{ kind: 'transfer-proofs', required: true }}
                       amountText={`Transfer ${rp(r.approvedAmount)}`}
-                      costCenter={{ options: costCenters.filter((c) => c.company === itemCompany(r)), defaultId: r.costCenter?.id ?? null }}
+                      pusatBiaya={r.pusatBiaya}
+                      pusatBiayaMissing={r.pusatBiayaMissing}
                     />
                     {/* D1810: Finance cancels an approved request instead of transferring it (e.g. the amount really approved in
                         the field differs) — reason mandatory, the server re-checks role + status (state.ts `cancel`). */}

@@ -46,6 +46,7 @@ class ProjectSummary {
     this.contractValue,
     this.progressPct,
     this.costCenter,
+    this.pusatBiaya,
     this.site,
     this.rapPlanned,
     this.rapRealised,
@@ -73,8 +74,12 @@ class ProjectSummary {
   /// Physical progress % (E4).
   final double? progressPct;
 
-  /// D2: default cost center of the project (proposed to Finance at the transfer).
+  /// D2 legacy cost center of the project (retired by ADR 0031).
   final RefItem? costCenter;
+
+  /// ADR 0031: the project's Pusat Biaya = a cash account of its PT (`pusatBiaya {id, name}`, name only); null = not
+  /// mapped yet (Finance's transfers are refused).
+  final RefItem? pusatBiaya;
 
   /// ADR 0023: the site (kantor cabang) that handles the project; null = none (or a server before sites).
   final RefItem? site;
@@ -140,6 +145,7 @@ class ProjectDetail {
   final RapSummary rap;
 
   RefItem? get costCenter => project.costCenter;
+  RefItem? get pusatBiaya => project.pusatBiaya;
   RefItem? get site => project.site;
 }
 

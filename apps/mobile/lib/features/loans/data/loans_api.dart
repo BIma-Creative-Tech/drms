@@ -4,7 +4,9 @@ import '../../../core/network/api_client.dart';
 import '../domain/loan.dart';
 
 /// `/api/v1/project-loans` (ADR 0022). Online only; every write carries an Idempotency-Key (one per opened form /
-/// action). Phase 3 (user 2026-10-19): repayments and their void too.
+/// action). Phase 3 (user 2026-10-19): repayments and their void too. ADR 0031: Finance "Cairkan" of a cash-backed
+/// loan; a cash move that takes the paying account below 0 answers 409 `CASH_OVERDRAFT_CONFIRM_REQUIRED` (re-sent with
+/// `confirmOverdraft`).
 class LoansApi {
   LoansApi(this.client);
   final ApiClient client;
@@ -127,17 +129,45 @@ class LoansApi {
     _one,
   );
 
-  /// `POST /project-loans/{id}/repayments` {amount, repayDate, note?} — borrower PM / Finance ("Catat pengembalian").
+  /// `POST /project-loans/{id}/repayments` {amount, repayDate, note?, confirmOverdraft?} — borrower PM / Finance
+  /// ("Catat pengembalian"; ADR 0031: Finance only once a cash-backed loan is disbursed).
   Future<Loan> addRepayment(
     int id, {
     required int amount,
     required String repayDate,
     String? note,
+    bool confirmOverdraft = false,
     required String idempotencyKey,
   }) => client.run(
     (d) => d.post<dynamic>(
       '/project-loans/$id/repayments',
-      data: {'amount': amount, 'repayDate': repayDate, if (note != null && note.trim().isNotEmpty) 'note': note.trim()},
+      data: {
+        'amount': amount,
+        'repayDate': repayDate,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+        if (confirmOverdraft) 'confirmOverdraft': true,
+      },
+      options: _idem(idempotencyKey),
+    ),
+    _one,
+  );
+
+  /// ADR 0031 `POST /project-loans/{id}/disburse` (openapi `ProjectLoanDisburse`) — Finance "Cairkan": KK on the
+  /// lender's Pusat Biaya + KM on the borrower's, dated [disburseDate] (default today in the PT zone), once.
+  Future<Loan> disburse(
+    int id, {
+    String? disburseDate,
+    String? note,
+    bool confirmOverdraft = false,
+    required String idempotencyKey,
+  }) => client.run(
+    (d) => d.post<dynamic>(
+      '/project-loans/$id/disburse',
+      data: {
+        'disburseDate': ?disburseDate,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+        if (confirmOverdraft) 'confirmOverdraft': true,
+      },
       options: _idem(idempotencyKey),
     ),
     _one,

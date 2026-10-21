@@ -15,6 +15,8 @@ import { claimMedia, recomputeFlags } from './receipts'
 import { isBusinessDate, isDirectPayment, payeeOf } from './types'
 import { postReceipt, prepareReceipt, voidReceipt } from '@/domain/intercompany/service'
 import { lockFunds } from '@/domain/fundcheck/service'
+import { cancelTransferLoan, createTransferLoan } from '@/domain/loans/service'
+import { PROJECT_WITHOUT_PB } from '@/fields/pusat-biaya'
 
 export type TransferInput = {
   cashAccountId: number
@@ -28,10 +30,16 @@ export type TransferInput = {
    */
   transferAt?: string
   /**
-   * D2 (DRMS 10/10): cost center of the money, chosen by Finance (mandatory). Omitted → the project's default cost
-   * center (projects.costCenter), else a legacy request's own cost center; none → 400.
+   * D2 (DRMS 10/10) legacy, ignored since ADR 0031 (DRMS 21/10): the Pusat Biaya is the project's cash account
+   * (`projects.cashAccount`), never chosen at the transfer.
    */
   costCenterId?: number | null
+  /**
+   * ADR 0031 (DRMS 21/10 #4): `cashAccountId` is the account Finance PAYS from. When it is not the project's Pusat Biaya,
+   * an automatic inter-project loan is recorded — `loanReason` required, `loanDueDate` optional (default +30 days).
+   */
+  loanReason?: string | null
+  loanDueDate?: string | null
   /** Optional echo of the amount; must equal the approved amount (G3: Finance cannot change it). */
   amount?: number
   /** QA-04: confirm a transfer that makes the cash account balance negative (audited). */
@@ -117,47 +125,34 @@ export async function transferMoment(req: PayloadRequest, companyId: number | un
   return { instant: instant!, date }
 }
 
-/**
- * D2: the transfer's cost center — Finance's choice, else the default of the request's project (or of its site, ADR
- * 0023), else (legacy) the request's own cost center. Must be an ACTIVE cost center of the request's PT.
- */
-export async function transferCostCenter(req: PayloadRequest, doc: { project?: unknown; costCenter?: unknown }, companyId: number | undefined, chosen: number | null): Promise<number> {
-  let id = chosen
-  if (id === null) id = (await suggestedCostCenter(req, doc))?.id ?? null
-  if (id === null) fail(400, 'Pusat biaya wajib dipilih (Finance menentukan pusat biaya saat transfer).', [{ path: 'costCenterId', message: 'Pusat biaya wajib dipilih.' }])
-  const cc = (await req.payload.findByID({ collection: 'cost-centers', id: id!, depth: 0, overrideAccess: true /* SYSTEM-READ: PT + active checked below */, req, disableErrors: true })) as { company?: unknown; active?: boolean | null } | null
-  if (!cc || cc.active === false || (companyId !== undefined && relId(cc.company) !== companyId)) {
-    fail(400, 'Pusat biaya tidak ditemukan, nonaktif, atau bukan pusat biaya PT pengajuan ini.', [{ path: 'costCenterId', message: 'Pusat biaya tidak valid.' }])
-  }
-  return id!
-}
+export type PusatBiaya = { id: number; name: string }
 
 /**
- * D2: cost center proposed to Finance — the project's default (projects.costCenter), else (ADR 0023 §1) the default
- * cost center of the project's site, else a legacy request's own.
+ * ADR 0031 (DRMS 21/10): the Pusat Biaya of a request = its project's cash account (`projects.cashAccount`, active or
+ * not — a deactivated one is refused by the posting). Null for a request without project or an unmapped project.
  */
-export async function suggestedCostCenter(req: PayloadRequest, doc: { project?: unknown; costCenter?: unknown }): Promise<{ id: number; code: string; name: string } | null> {
+export async function requestPusatBiaya(req: PayloadRequest, doc: { project?: unknown }): Promise<PusatBiaya | null> {
   const projectId = relId(doc.project)
-  let id: number | undefined
-  if (projectId !== undefined) {
-    const p = (await req.payload.findByID({ collection: 'projects', id: projectId, depth: 0, select: { costCenter: true, site: true }, overrideAccess: true /* SYSTEM-READ: default cost center of the request's project */, req, disableErrors: true })) as {
-      costCenter?: unknown
-      site?: unknown
-    } | null
-    id = relId(p?.costCenter)
-    const site = relId(p?.site)
-    if (id === undefined && site !== undefined) {
-      const st = (await req.payload.findByID({ collection: 'sites', id: site, depth: 0, select: { costCenter: true }, overrideAccess: true /* SYSTEM-READ: default cost center of the project's site */, req, disableErrors: true })) as { costCenter?: unknown } | null
-      id = relId(st?.costCenter)
-    }
-  }
-  id ??= relId(doc.costCenter)
+  if (projectId === undefined) return null
+  const p = (await req.payload.findByID({ collection: 'projects', id: projectId, depth: 0, select: { cashAccount: true }, overrideAccess: true /* SYSTEM-READ: Pusat Biaya of the request's project */, req, disableErrors: true })) as { cashAccount?: unknown } | null
+  const id = relId(p?.cashAccount)
   if (id === undefined) return null
-  const cc = (await req.payload.findByID({ collection: 'cost-centers', id, depth: 0, select: { code: true, name: true, active: true }, overrideAccess: true /* SYSTEM-READ: name of the suggestion */, req, disableErrors: true })) as { code?: string; name?: string; active?: boolean | null } | null
-  return cc && cc.active !== false ? { id, code: cc.code ?? '', name: cc.name ?? '' } : null
+  const a = (await req.payload.findByID({ collection: 'cash-accounts', id, depth: 0, select: { name: true }, overrideAccess: true /* SYSTEM-READ: name of the Pusat Biaya */, req, disableErrors: true })) as { name?: string } | null
+  return { id, name: a?.name ?? `#${id}` }
 }
 
-/** D2: cost center of the request's latest posted advance / reimburse transfer (null for legacy transfers). */
+/**
+ * ADR 0031: the account a transfer of this request is CHARGED to — the project's Pusat Biaya (409 when the project is
+ * not mapped yet); a request without project (vendor / PT grup payment, legacy) is charged to the account paid from.
+ */
+export async function chargedAccount(req: PayloadRequest, doc: { project?: unknown }, paidFrom: number): Promise<{ charged: number; pusatBiaya: PusatBiaya | null }> {
+  if (relId(doc.project) === undefined) return { charged: paidFrom, pusatBiaya: null }
+  const pb = await requestPusatBiaya(req, doc)
+  if (!pb) fail(409, PROJECT_WITHOUT_PB)
+  return { charged: pb!.id, pusatBiaya: pb }
+}
+
+/** D2 legacy: cost center of the request's latest posted advance / reimburse transfer (null since ADR 0031). */
 export async function requestTransferCostCenter(req: PayloadRequest, requestId: number): Promise<number | null> {
   const t = await req.payload.find({
     collection: 'transfers',
@@ -204,7 +199,16 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
   assertOnOrAfterOpening(account, transferDate, 'transferDate') // QA-05: 400 instead of the wrapped trigger error
   const lock = await currentLockDate(req, companyId)
   if (lock && transferDate <= lock) fail(409, `Periode ${transferDate.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
-  const costCenterId = await transferCostCenter(req, doc, companyId, input.costCenterId ?? null) // D2
+  // ADR 0031 (DRMS 21/10 #4): charged to the project's Pusat Biaya; paid from another account → automatic loan
+  const { charged, pusatBiaya } = await chargedAccount(req, doc, input.cashAccountId)
+  const paidFromOther = charged !== input.cashAccountId
+  if (paidFromOther) {
+    assertOnOrAfterOpening(await assertAccount(req, charged, companyId), transferDate, 'transferDate')
+    if (!input.loanReason?.trim()) {
+      fail(400, `Akun pembayar bukan pusat biaya project (${pusatBiaya!.name}): isi alasan — tercatat sebagai pinjaman antar project.`, [{ path: 'loanReason', message: 'Alasan wajib diisi.' }])
+    }
+  }
+  const costCenterId = relId(doc.costCenter) ?? null // D2 legacy request: its own cost center (new requests: none)
   const destination = await checkDestination(req, doc, input.confirmUnverifiedAccount === true) // QA-17
   // ADR 0028 §6 step 2: the receiving PT's checks run BEFORE anything is written (closed period → 409, changed account → 409)
   const payee = payeeOf(doc.payeeType)
@@ -221,7 +225,8 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
       docNo,
       request: id,
       kind: doc.type,
-      cashAccount: input.cashAccountId,
+      cashAccount: charged,
+      paidFromCashAccount: paidFromOther ? input.cashAccountId : null,
       amount: approved,
       costCenter: costCenterId,
       destination: { ...doc.bankSnapshot },
@@ -236,15 +241,30 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
     overrideAccess: true, // SYSTEM-WRITE: transfer after guards (DB: amount = approved, period open)
     req,
   })) as unknown as TransferDoc
+  // ADR 0031 #5: the loan's KK (paying account) + KM (Pusat Biaya) first, then the transfer KK on the Pusat Biaya
+  const loan = paidFromOther
+    ? await createTransferLoan(req, {
+        borrowerProjectId: relId(doc.project)!,
+        borrowerCashAccountId: charged,
+        lenderCashAccountId: input.cashAccountId,
+        amount: approved,
+        transfer: { id: transfer.id, docNo },
+        request: { id, docNo: doc.docNo ?? null, title: doc.title },
+        transferDate,
+        reason: input.loanReason ?? '',
+        dueDate: input.loanDueDate ?? null,
+        confirmOverdraft: input.confirmOverdraft === true,
+      })
+    : null
   const categories = [...new Set((doc.lines ?? []).map((l) => relId(l.category)).filter((x): x is number => x !== undefined))]
   const entry = await postEntry(req, {
     direction: 'out',
     entryDate: transferDate,
-    cashAccountId: input.cashAccountId,
+    cashAccountId: charged,
     amount: approved,
     categoryId: categories.length === 1 ? categories[0] : null,
     projectId: relId(doc.project) ?? null,
-    costCenterId, // D2: the cost center Finance chose (legacy request: its own one)
+    costCenterId, // D2 legacy only
     description: `Transfer ${docNo} — ${doc.docNo ?? ''} ${doc.title}`.slice(0, 1000),
     sourceType: 'transfer',
     expenseRequestId: id,
@@ -281,6 +301,7 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
     cashEntry: entry,
     request: updated,
     intercompany: ic && receiving ? { cashEntryId: ic.km.id, cashEntryNo: ic.km.entryNo, company: { id: receiving.target.id, shortCode: receiving.target.shortCode, name: receiving.target.name } } : null,
+    projectLoan: loan ? { id: loan.loan.id, docNo: loan.loan.docNo ?? null, kk: loan.kk, km: loan.km } : null,
   }
 }
 
@@ -303,6 +324,8 @@ export async function voidTransfer(req: PayloadRequest, id: number, transferId: 
   const entryId = relId(t.cashEntry)
   const voided = entryId ? await voidEntry(req, entryId, reason, { viaTransfer: true }) : null
   const ic = await voidReceipt(req, transferId, reason) // ADR 0028: null for every other transfer
+  // ADR 0031: a transfer paid from another account takes its automatic loan (and the loan's KK / KM) with it
+  const loan = await cancelTransferLoan(req, transferId, reason)
   req.context.auditReason = reason
   const transfer = await req.payload.update({
     collection: 'transfers',
@@ -314,7 +337,7 @@ export async function voidTransfer(req: PayloadRequest, id: number, transferId: 
   })
   const back = doc.type === 'advance' ? 'approved' : 'receipts_verified'
   const updated = await updateRequest(req, id, { status: back, transferredTotal: Math.max(0, (doc.transferredTotal ?? 0) - t.amount) }, reason)
-  return { transfer, reversal: voided?.reversal ?? null, intercompanyReversal: ic?.reversal ?? null, request: updated }
+  return { transfer, reversal: voided?.reversal ?? null, intercompanyReversal: ic?.reversal ?? null, projectLoan: loan ? { id: loan.id, docNo: loan.docNo ?? null, status: loan.status } : null, request: updated }
 }
 
 /**

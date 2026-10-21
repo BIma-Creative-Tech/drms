@@ -232,16 +232,12 @@ describe('transfer → Selesai (no LPJ)', () => {
   })
 })
 
-describe('client 2026-10-14: a vendor payment on a cost center (no project)', () => {
-  it('Finance files on a cost center → Finance vendor rule (Direktur) → transfer books that cost center → Selesai', async () => {
+describe('ADR 0031: a vendor payment without project (no Pusat Biaya; client 2026-10-14 cost center retired)', () => {
+  it('Finance files without project (a cost center sent is ignored) → Finance vendor rule (Direktur) → transfer from the account Finance picks → Selesai', async () => {
     const cc = await sysCreate('cost-centers', { code: 'VND-KTR', name: 'VND Kantor', manager: pmV.id })
-    const body = await vendorBody(financeV, { projectId: null, costCenterId: cc })
-    const d = await ok(api('POST', E, financeV, body, key()), 201)
-    expect(d).toMatchObject({ projectId: null, costCenterId: cc, payeeType: 'vendor' })
-    // both is refused; an employee request still ignores a cost center (D2)
-    const both = await api('POST', E, financeV, await vendorBody(financeV, { costCenterId: cc }), key())
-    expect([201, 400]).toContain(both.status)
-    if (both.status === 201) expect(both.body).toMatchObject({ projectId: projectV, costCenterId: null })
+    const d = await ok(api('POST', E, financeV, await vendorBody(financeV, { projectId: null, costCenterId: cc }), key()), 201)
+    expect(d).toMatchObject({ projectId: null, costCenterId: null, payeeType: 'vendor' })
+    // an employee request ignores a cost center too (D2); the DB refuses one set later
     const emp = await ok(api('POST', E, w.users.staffA, { type: 'advance', title: 'Biaya kantor', projectId: w.project, costCenterId: cc, requesterIds: [w.emp.a], bankAccountId: w.accA, lines: [] }, key()), 201)
     expect(emp.costCenterId).toBeNull()
     expect((await sqlError('app', 'UPDATE expense_requests SET cost_center_id = $1 WHERE id = $2', [cc, emp.id]))?.code).toBe('23514')
@@ -254,17 +250,11 @@ describe('client 2026-10-14: a vendor payment on a cost center (no project)', ()
     const o = await ok(api('POST', `${E}/${d.id}/approve`, principalV, {}, key()))
     expect(o.status).toBe('approved')
     const q = await ok(api('GET', '/api/v1/transfer-queue', w.users.finance))
-    expect(q.items.find((i: { id: number }) => i.id === d.id)?.costCenter?.id).toBe(cc)
+    expect(q.items.find((i: { id: number }) => i.id === d.id)).toMatchObject({ costCenter: null, pusatBiaya: null, pusatBiayaMissing: false })
     const proof = (await ok(upload('/api/v1/media/transfer-proofs', w.users.finance, await png()), 201)).id as number
     const t = await ok(api('POST', `${E}/${d.id}/transfer`, w.users.finance, { cashAccountId: w.cashAccount, bankRef: `VNDCC-${d.id}`, proofMediaId: proof }, key()), 201)
     expect(t.request.status).toBe('completed')
-    expect((await sqlAs('app', 'SELECT cost_center_id FROM transfers WHERE id = $1', [t.transferId])).rows[0].cost_center_id).toBe(cc)
-  })
-
-  it('a vendor payment with neither project nor cost center cannot be sent', async () => {
-    const d = await ok(api('POST', E, financeV, await vendorBody(financeV, { projectId: null }), key()), 201)
-    const sent = await api('POST', `${E}/${d.id}/submit`, financeV, {}, key())
-    expect(sent.status).toBe(400)
-    expect(sent.body.errors.map((e: { path: string }) => e.path)).toContain('projectId')
+    expect(t.projectLoan).toBeNull()
+    expect((await sqlAs('app', 'SELECT cost_center_id, cash_account_id::int AS a, paid_from_cash_account_id AS p FROM transfers WHERE id = $1', [t.transferId])).rows[0]).toEqual({ cost_center_id: null, a: w.cashAccount, p: null })
   })
 })

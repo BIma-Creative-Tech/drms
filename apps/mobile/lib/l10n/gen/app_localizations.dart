@@ -2644,7 +2644,7 @@ abstract class AppLocalizations {
   /// No description provided for @kpiCostCentersTeamTitle.
   ///
   /// In id, this message translates to:
-  /// **'Pusat biaya saya bulan ini'**
+  /// **'Pusat biaya project saya bulan ini'**
   String get kpiCostCentersTeamTitle;
 
   /// No description provided for @kpiCostCentersEmpty.
@@ -2790,12 +2790,6 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Project tanpa PM'**
   String get kpiAdminProjects;
-
-  /// No description provided for @kpiAdminCostCenters.
-  ///
-  /// In id, this message translates to:
-  /// **'Pusat biaya tanpa penanggung jawab'**
-  String get kpiAdminCostCenters;
 
   /// No description provided for @kpiAdminComplete.
   ///
@@ -5980,7 +5974,7 @@ abstract class AppLocalizations {
   /// No description provided for @draftCostCenterLegacy.
   ///
   /// In id, this message translates to:
-  /// **'Draft ini dibuat dengan pusat biaya. Pengajuan sekarang wajib memakai project — pilih project; pusat biaya diisi Finance saat transfer.'**
+  /// **'Pusat biaya lama tidak dipakai lagi: pusat biaya kini akun kas project. Pilih project (pembayaran vendor / antar-PT boleh tanpa project).'**
   String get draftCostCenterLegacy;
 
   /// No description provided for @draftLinesNeedRap.
@@ -6096,12 +6090,6 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Nilai kontrak (RAB)'**
   String get projectContractValue;
-
-  /// No description provided for @projectNoCostCenter.
-  ///
-  /// In id, this message translates to:
-  /// **'Belum ada — dipilih Finance saat transfer'**
-  String get projectNoCostCenter;
 
   /// No description provided for @projectClient.
   ///
@@ -6286,7 +6274,7 @@ abstract class AppLocalizations {
   /// No description provided for @costCenterByFinance.
   ///
   /// In id, this message translates to:
-  /// **'dipilih Finance saat transfer'**
+  /// **'dipilih Finance (tanpa project)'**
   String get costCenterByFinance;
 
   /// No description provided for @bankVerified.
@@ -6396,24 +6384,6 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Akun kas'**
   String get cashAccountLabel;
-
-  /// No description provided for @costCenterPickHint.
-  ///
-  /// In id, this message translates to:
-  /// **'Pilih pusat biaya…'**
-  String get costCenterPickHint;
-
-  /// No description provided for @costCenterSuggested.
-  ///
-  /// In id, this message translates to:
-  /// **'Usulan: pusat biaya default project. Ubah bila perlu.'**
-  String get costCenterSuggested;
-
-  /// No description provided for @costCenterNoDefault.
-  ///
-  /// In id, this message translates to:
-  /// **'Project belum punya pusat biaya default — pilih.'**
-  String get costCenterNoDefault;
 
   /// No description provided for @bankRefLabel.
   ///
@@ -6724,7 +6694,7 @@ abstract class AppLocalizations {
   /// No description provided for @loanApproveBody.
   ///
   /// In id, this message translates to:
-  /// **'{borrower} meminjam {amount} dari {lender}. Tidak ada transaksi kas yang dibuat; pinjaman tercatat sebagai piutang antar project.'**
+  /// **'{borrower} meminjam {amount} dari {lender}. Bila pusat biaya kedua project berbeda (dana), Finance mencairkan dana: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat biaya peminjam.'**
   String loanApproveBody(String borrower, String amount, String lender);
 
   /// No description provided for @loanRejectTitle.
@@ -6966,12 +6936,6 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Vendor ini belum punya rekening aktif — minta Finance / Admin menambahkannya.'**
   String get vendorAccountsNone;
-
-  /// No description provided for @vendorCostCenterHint.
-  ///
-  /// In id, this message translates to:
-  /// **'Tanpa project: pilih pusat biaya (mis. tagihan kantor).'**
-  String get vendorCostCenterHint;
 
   /// No description provided for @payeePtGrup.
   ///
@@ -8338,7 +8302,7 @@ abstract class AppLocalizations {
   /// No description provided for @cashScopeHelp.
   ///
   /// In id, this message translates to:
-  /// **'Project ATAU pusat biaya — tidak keduanya.'**
+  /// **'Pusat biaya = akun kas yang dipilih. Pilih project bila biaya ini milik project tertentu.'**
   String get cashScopeHelp;
 
   /// No description provided for @cashVehicleOptional.
@@ -8410,7 +8374,7 @@ abstract class AppLocalizations {
   /// No description provided for @cashRule2.
   ///
   /// In id, this message translates to:
-  /// **'Dibebankan ke project atau pusat biaya, tidak keduanya.'**
+  /// **'Pusat biaya = akun kas transaksi; pilih project bila biayanya milik project tertentu.'**
   String get cashRule2;
 
   /// No description provided for @cashRule3.
@@ -8776,7 +8740,7 @@ abstract class AppLocalizations {
   /// No description provided for @loanListNote.
   ///
   /// In id, this message translates to:
-  /// **'Diajukan PM project peminjam · disetujui Direktur · tanpa transaksi kas (klaim tercatat antar project dalam satu PT)'**
+  /// **'Diajukan PM project peminjam · disetujui Direktur · dana antar pusat biaya berbeda dicairkan Finance (kas keluar/masuk) · otomatis bila transfer dibayar dari akun lain'**
   String get loanListNote;
 
   /// No description provided for @loanKpiPending.
@@ -10164,6 +10128,270 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Audit Log'**
   String get reportsAuditLog;
+
+  /// No description provided for @directPaymentNoProjectHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanpa project: tanpa pusat biaya — Finance memilih akun pembayar saat transfer.'**
+  String get directPaymentNoProjectHint;
+
+  /// No description provided for @costCenterLegacyLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Pusat biaya lama'**
+  String get costCenterLegacyLabel;
+
+  /// No description provided for @costCenterLegacyValue.
+  ///
+  /// In id, this message translates to:
+  /// **'Pusat biaya lama: {name}'**
+  String costCenterLegacyValue(String name);
+
+  /// No description provided for @pusatBiayaUnmapped.
+  ///
+  /// In id, this message translates to:
+  /// **'Project belum dipetakan ke pusat biaya (akun kas)'**
+  String get pusatBiayaUnmapped;
+
+  /// No description provided for @pusatBiayaQueueMissing.
+  ///
+  /// In id, this message translates to:
+  /// **'project belum dipetakan'**
+  String get pusatBiayaQueueMissing;
+
+  /// No description provided for @paidFromAccountLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibayar dari akun'**
+  String get paidFromAccountLabel;
+
+  /// No description provided for @paidFromAccountLoan.
+  ///
+  /// In id, this message translates to:
+  /// **'{account} (pinjaman {loan})'**
+  String paidFromAccountLoan(String account, String loan);
+
+  /// No description provided for @transferPaidFrom.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibayar dari {account}'**
+  String transferPaidFrom(String account);
+
+  /// No description provided for @transferProjectLoan.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman antar project {no}'**
+  String transferProjectLoan(String no);
+
+  /// No description provided for @transferPusatBiayaSuffix.
+  ///
+  /// In id, this message translates to:
+  /// **' (pusat biaya project)'**
+  String get transferPusatBiayaSuffix;
+
+  /// No description provided for @transferPusatBiayaHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Pusat biaya project: {name}.'**
+  String transferPusatBiayaHelp(String name);
+
+  /// No description provided for @transferPusatBiayaMissingHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Project belum punya pusat biaya (akun kas) — transfer ditolak sampai dipetakan di data project.'**
+  String get transferPusatBiayaMissingHelp;
+
+  /// No description provided for @transferLoanReasonLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Alasan membayar dari akun lain'**
+  String get transferLoanReasonLabel;
+
+  /// No description provided for @transferLoanReasonHint.
+  ///
+  /// In id, this message translates to:
+  /// **'mis. saldo pusat biaya project belum cukup'**
+  String get transferLoanReasonHint;
+
+  /// No description provided for @transferLoanNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun ini bukan pusat biaya project ({pusatBiaya}). Akan tercatat otomatis pinjaman antar project: kas keluar dari akun pembayar dan kas masuk ke pusat biaya project.'**
+  String transferLoanNote(String pusatBiaya);
+
+  /// No description provided for @transferLoanDueLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Jatuh tempo pinjaman'**
+  String get transferLoanDueLabel;
+
+  /// No description provided for @transferLoanDueHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Kosong = 30 hari setelah tanggal transfer.'**
+  String get transferLoanDueHelp;
+
+  /// No description provided for @transferLoanDueDefault.
+  ///
+  /// In id, this message translates to:
+  /// **'30 hari setelah tanggal transfer'**
+  String get transferLoanDueDefault;
+
+  /// No description provided for @transferRecordedLoan.
+  ///
+  /// In id, this message translates to:
+  /// **'Transfer {trf} tercatat. Dibayar dari akun lain: pinjaman antar project {loan} tercatat otomatis.'**
+  String transferRecordedLoan(String trf, String loan);
+
+  /// No description provided for @loanDisburse.
+  ///
+  /// In id, this message translates to:
+  /// **'Cairkan'**
+  String get loanDisburse;
+
+  /// No description provided for @loanDisburseTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Cairkan {title}?'**
+  String loanDisburseTitle(String title);
+
+  /// No description provided for @loanDisburseBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Dicatat hari ini: kas keluar {amount} dari {lender} dan kas masuk ke {borrower}. Pastikan dana sudah dipindahkan di bank.'**
+  String loanDisburseBody(String amount, String lender, String borrower);
+
+  /// No description provided for @loanDisbursed.
+  ///
+  /// In id, this message translates to:
+  /// **'{title} dicairkan: kas keluar {kk}, kas masuk {km}.'**
+  String loanDisbursed(String title, String kk, String km);
+
+  /// No description provided for @loanDisbursedShort.
+  ///
+  /// In id, this message translates to:
+  /// **'{title} dicairkan.'**
+  String loanDisbursedShort(String title);
+
+  /// No description provided for @loanLenderAccount.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun pemberi pinjaman'**
+  String get loanLenderAccount;
+
+  /// No description provided for @loanLenderPusatBiaya.
+  ///
+  /// In id, this message translates to:
+  /// **'Pusat biaya pemberi'**
+  String get loanLenderPusatBiaya;
+
+  /// No description provided for @loanBorrowerPusatBiaya.
+  ///
+  /// In id, this message translates to:
+  /// **'Pusat biaya peminjam'**
+  String get loanBorrowerPusatBiaya;
+
+  /// No description provided for @loanOrigin.
+  ///
+  /// In id, this message translates to:
+  /// **'Asal'**
+  String get loanOrigin;
+
+  /// No description provided for @loanOriginTransfer.
+  ///
+  /// In id, this message translates to:
+  /// **'{origin} · transfer {no}'**
+  String loanOriginTransfer(String origin, String no);
+
+  /// No description provided for @loanCash.
+  ///
+  /// In id, this message translates to:
+  /// **'Kas'**
+  String get loanCash;
+
+  /// No description provided for @loanCashDisbursed.
+  ///
+  /// In id, this message translates to:
+  /// **'Dicairkan {when} · KK {kk} · KM {km}'**
+  String loanCashDisbursed(String when, String kk, String km);
+
+  /// No description provided for @loanCashWaiting.
+  ///
+  /// In id, this message translates to:
+  /// **'Menunggu pencairan Finance'**
+  String get loanCashWaiting;
+
+  /// No description provided for @loanCashCancelled.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibatalkan (jurnal balik)'**
+  String get loanCashCancelled;
+
+  /// No description provided for @loanCashTbd.
+  ///
+  /// In id, this message translates to:
+  /// **'Ditentukan saat disetujui (dana antar pusat biaya berbeda → dicairkan Finance)'**
+  String get loanCashTbd;
+
+  /// No description provided for @loanCashNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanpa transaksi kas (barang, atau pusat biaya sama)'**
+  String get loanCashNone;
+
+  /// No description provided for @loanAwaitingDisbursement.
+  ///
+  /// In id, this message translates to:
+  /// **'Disetujui — menunggu Finance mencairkan dana dari {lender} ke {borrower}.'**
+  String loanAwaitingDisbursement(String lender, String borrower);
+
+  /// No description provided for @loanStepDisburse.
+  ///
+  /// In id, this message translates to:
+  /// **'Pencairan Finance'**
+  String get loanStepDisburse;
+
+  /// No description provided for @loanStepDisbursed.
+  ///
+  /// In id, this message translates to:
+  /// **'Dicairkan'**
+  String get loanStepDisbursed;
+
+  /// No description provided for @loanStepAutomatic.
+  ///
+  /// In id, this message translates to:
+  /// **'Otomatis dari transfer {no}'**
+  String loanStepAutomatic(String no);
+
+  /// No description provided for @loanStepRecorded.
+  ///
+  /// In id, this message translates to:
+  /// **'Dicatat & dicairkan'**
+  String get loanStepRecorded;
+
+  /// No description provided for @loanStepCancelled.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibatalkan'**
+  String get loanStepCancelled;
+
+  /// No description provided for @loanRepaymentCash.
+  ///
+  /// In id, this message translates to:
+  /// **'KK {kk} · KM {km}'**
+  String loanRepaymentCash(String kk, String km);
+
+  /// No description provided for @kpiAdminPusatBiaya.
+  ///
+  /// In id, this message translates to:
+  /// **'Project tanpa pusat biaya'**
+  String get kpiAdminPusatBiaya;
+
+  /// No description provided for @kpiCostCentersTeamEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Project Anda belum dipetakan ke pusat biaya (akun kas).'**
+  String get kpiCostCentersTeamEmpty;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

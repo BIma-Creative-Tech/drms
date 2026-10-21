@@ -139,12 +139,14 @@ void main() {
     });
   });
 
-  test('GET /transfer-queue: project, cost center suggestion, SLA, flags, bank', () {
+  test('GET /transfer-queue: project, Pusat Biaya (ADR 0031), SLA, flags, bank', () {
     final raw = _map('transfer_queue_finance')['items'] as List;
     final j = raw.first as Map<String, dynamic>;
     final it = transferQueueItemFromJson(j);
     expect(it.project?.code, 'UJI-PRJ');
-    expect(it.costCenter?.id, (j['costCenter'] as Map)['id']);
+    expect(it.pusatBiaya?.id, (j['pusatBiaya'] as Map)['id']);
+    expect(it.pusatBiaya?.label, (j['pusatBiaya'] as Map)['name']);
+    expect(it.pusatBiayaMissing, isFalse);
     expect(it.bankName, (j['bank'] as Map)['bankName']);
     expect(it.bankAccountNo, (j['bank'] as Map)['accountNo']);
     expect(it.bankAccountHolder, (j['bank'] as Map)['accountHolder']);
@@ -163,27 +165,6 @@ void main() {
     setUp(() {
       adapter = FakeDioAdapter((c) {
         if (c.uri.path.endsWith('/cash-accounts/balances')) return (200, _fx('cash_balances_finance'));
-        if (c.uri.path.endsWith('/cost-centers')) {
-          // as the server with ?active=all: the APK must still drop the inactive one
-          final m = _map('cost_centers_finance');
-          return (
-            200,
-            {
-              ...m,
-              'docs': [
-                ...m['docs'] as List,
-                {
-                  'id': 99,
-                  'code': 'OLD-CC',
-                  'name': 'Pusat biaya lama',
-                  'type': 'operational',
-                  'companyId': 1,
-                  'active': false,
-                },
-              ],
-            },
-          );
-        }
         if (c.uri.path.endsWith('/transfer')) return (201, _fx('transfer_post_finance'));
         return (404, {'errors': <Object>[]});
       });
@@ -204,16 +185,10 @@ void main() {
       expect(adapter.calls.single.uri.queryParameters['company'], '1');
     });
 
-    test('cost center picker: active only', () async {
-      final ccs = await api.costCenters(1);
-      expect(ccs.map((c) => c.code), ['OPS-PB']);
-    });
-
     test('POST body has exactly the fields the server accepted; response → detail with the transfer', () async {
       final accepted = _map('transfer_body');
       final body = transferBody(
         cashAccountId: accepted['cashAccountId'] as int,
-        costCenterId: accepted['costCenterId'] as int,
         transferAt: transferAtString(DateTime(2026, 10, 11, 20, 51), const Duration(hours: 8)),
         bankRef: ' ${accepted['bankRef']} ',
         proofMediaId: accepted['proofMediaId'] as int,
@@ -226,10 +201,12 @@ void main() {
         RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})?$').hasMatch(body['transferAt'] as String),
         isTrue,
       );
-      final d = await api.recordTransfer(9, body, idempotencyKey: 'k-1');
-      final t = d.transfers.single;
+      final out = await api.recordTransfer(9, body, idempotencyKey: 'k-1');
+      final t = out.request.transfers.single;
       expect(t.docNo, startsWith('TRF/'));
+      // D2 legacy transfer (captured before ADR 0031): its cost center is still read
       expect(t.costCenter?.code, 'OPS-PB');
+      expect((out.projectLoan, out.loanNo), (null, null), reason: 'paid from the Pusat Biaya: no automatic loan');
       expect(t.transferAt, isNotNull);
       expect(adapter.calls.single.headers['Idempotency-Key'], 'k-1');
     });

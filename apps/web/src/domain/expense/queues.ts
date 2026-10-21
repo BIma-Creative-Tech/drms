@@ -7,7 +7,7 @@ import { companyRefs, type CompanyRef } from '@/domain/companies'
 import { actorContext, ids, projectCommitted, settings, type RequestDoc } from './common'
 import { isDecisionSnapshot, isNoApproval, noApprovalRequesterRole, OWNER_ROLE } from './decision'
 import { DEFAULT_TRANSFER_SLA_HOURS, queueAge } from './sla'
-import { suggestedCostCenter } from './transfers'
+import { requestPusatBiaya } from './transfers'
 import { withFlagVisibility } from './flag-visibility'
 import { budgetImpact, lastLevel, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
@@ -191,11 +191,17 @@ export async function transferQueue(req: PayloadRequest, f?: QueueFilter) {
     const approvedAt = (d as { approvedAt?: string | null }).approvedAt ?? null
     const age = queueAge(approvedAt ? new Date(approvedAt) : null, now, slaHours)
     const p = d.project && typeof d.project === 'object' ? d.project : null
+    const projectId = p?.id ?? relId(d.project)
+    const pusatBiaya = projectId === undefined ? null : await requestPusatBiaya(req, { project: projectId })
     items.push({
       ...base(d, refs),
       project: p ? { id: p.id, code: p.code ?? null, name: p.name ?? null } : null,
-      // D2: cost center proposed to Finance (the project's default, else a legacy request's own); null = Finance picks
-      costCenter: await suggestedCostCenter(req, { project: p?.id ?? d.project, costCenter: d.costCenter && typeof d.costCenter === 'object' ? d.costCenter.id : d.costCenter }),
+      // D2 legacy (deprecated, always null since ADR 0031 — older APKs still read the key)
+      costCenter: null,
+      // ADR 0031: the project's Pusat Biaya (cash account) — the default "Dibayar dari akun"; another account = automatic
+      // loan. `pusatBiayaMissing`: a project request whose project is not mapped yet (the transfer is refused).
+      pusatBiaya,
+      pusatBiayaMissing: projectId !== undefined && !pusatBiaya,
       bank: d.bankSnapshot ?? null,
       // ADR 0027: a vendor payment's destination is the vendor account (same confirmation rule)
       // ADR 0028: the receiving PT's designated account is an own group account — trusted (never asked)

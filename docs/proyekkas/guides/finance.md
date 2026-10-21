@@ -108,8 +108,8 @@ invoice adalah buktinya.
    tersimpan sekaligus, DRMS 16/10). Atau Master Data → **Rekening vendor**. Periksa nomor dan nama pemilik lalu ubah
    **Status verifikasi** menjadi *Terverifikasi* (hanya Finance / Admin). Mengubah nomor / nama / bank wajib dengan
    alasan (tercatat di audit).
-2. **Buat pengajuan:** Keuangan → Pengajuan biaya → Buat baru → **Jenis penerima: Vendor**. Pilih project — atau,
-   tanpa project (mis. tagihan kantor), **Pusat biaya** —, **Vendor**,
+2. **Buat pengajuan:** Keuangan → Pengajuan biaya → Buat baru → **Jenis penerima: Vendor**. Pilih project — atau
+   biarkan kosong untuk tagihan tanpa project (mis. tagihan kantor) —, **Vendor**,
    **Rekening vendor** (hanya rekening aktif vendor itu), isi **Nomor invoice**, **Tanggal invoice**, *Jatuh tempo*
    (opsional) dan unggah **File invoice** (foto / PDF). Isi baris item seperti biasa (item RAP per baris). Pemohon =
    Anda sendiri; jenis otomatis *Pengajuan Baru*. **Kirim pengajuan**.
@@ -266,3 +266,20 @@ TOTAL). **Kop** laporan dan file unduhan: satu PT = kop PT itu; beberapa PT = ko
   sebagai "Dibuat Oleh"). Beri tahu karyawan secara langsung (tidak ada notifikasi otomatis).
 - **Addendum RAB:** setelah Direktur setuju, addendum masuk **Persetujuan** Anda → **Setujui (Finance)** / Tolak.
 - **Master keuangan:** Akun kas/bank, Sumber kas masuk, Kategori, Satuan, Bank, Rekening karyawan.
+
+## Pusat biaya = akun kas (sejak 21 Okt 2026, ADR 0031)
+
+- **Pusat biaya** setiap project adalah **akun kas/bank PT** yang dipilih di data project (Proyek → Project → *Pusat
+  biaya (akun kas)*). Pengaju tidak memilih pusat biaya lagi; di detail pengajuan tertulis *Pusat biaya: <akun>*.
+- **Antrian Transfer:** *Dibayar dari akun* otomatis berisi pusat biaya project. Bila Anda memilih akun lain, isi
+  **Alasan membayar dari akun lain** (wajib) dan *Jatuh tempo* (kosong = 30 hari). Sistem otomatis mencatat
+  **pinjaman antar project** (nomor PJ, langsung disetujui): **kas keluar** dari akun pembayar dan **kas masuk** ke
+  pusat biaya project, lalu kas keluar transfer dari pusat biaya. PM project dan Direktur diberi tahu.
+- Project yang **belum dipetakan** ke pusat biaya tidak bisa ditransfer (*project belum dipetakan* di antrian) — minta
+  Direktur / Admin / PM mengisi pusat biaya di data project.
+- **Pinjaman antar project (PJ) dana** antara dua pusat biaya berbeda: setelah Direktur menyetujui, buka pinjaman →
+  **Cairkan** (kas keluar dari pusat biaya pemberi, kas masuk ke pusat biaya peminjam). Pengembaliannya dicatat Finance
+  (kas keluar dari peminjam, kas masuk ke pemberi); *Void* pengembalian membuat jurnal baliknya. Pinjaman barang, atau
+  dua project dengan pusat biaya sama, tetap tanpa transaksi kas.
+- **Batalkan transfer** yang dibayar dari akun lain ikut membatalkan pinjaman otomatisnya (kas keluar/masuknya dibalik);
+  tidak bisa selama pinjaman itu sudah punya pengembalian (void pengembaliannya dulu).

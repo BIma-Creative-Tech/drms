@@ -3,7 +3,7 @@ import type { CollectionConfig } from 'payload'
 import { denyAll } from '@/access/roles'
 import { anyOf, byRole, ownUser, teamProjects } from '@/access/policies'
 import { withAudit } from '@/audit/hooks'
-import { LOAN_KIND_LABELS, LOAN_KINDS, LOAN_STATUS_LABELS, LOAN_STATUSES } from '@/domain/loans/rules'
+import { LOAN_KIND_LABELS, LOAN_KINDS, LOAN_ORIGIN_LABELS, LOAN_ORIGINS, LOAN_STATUS_LABELS, LOAN_STATUSES } from '@/domain/loans/rules'
 import { rupiahField, uuidField } from '@/fields/common'
 import { companyField, companyHook } from '@/fields/company'
 import { USER_NAME_VIEW } from '@/fields/users'
@@ -12,8 +12,12 @@ import { businessDateField, ro } from './fields-f2'
 
 /**
  * ADR 0022 Pinjaman antar project (`PJ/{COMPANY}/{YY}{MM}/{seq}`, DRMS 10/10 point 15, owner D6 + Q-L1…Q-L7):
- * a recorded, Direktur-approved claim of the lender project on the borrower project of the SAME PT. Notional
- * allocation (ADR 0022 §5 option B) — no cash entry is ever written for a loan or its repayments.
+ * a recorded, Direktur-approved claim of the lender project on the borrower project of the SAME PT.
+ * ADR 0031 (DRMS 21/10, amends ADR 0022 §5): a loan of MONEY between two different Pusat Biaya (cash accounts) moves
+ * cash — Finance "Cairkan" posts KK on the lender account + KM on the borrower account, repayments the mirror pair
+ * (`cash_entries.project_loan_id`). A loan of goods, or between projects of the same account, stays a claim. A second
+ * origin `transfer`: Finance paid a project request from another account → automatic, approved loan whose lender is
+ * that ACCOUNT (no lender project), cash legs posted with the transfer.
  * Written ONLY by the domain service (`domain/loans/service.ts`, /api/v1/project-loans) — HTTP create/update/delete
  * are closed. Read: Direktur / Admin / Finance of the PT, PM of the borrower or lender project (team scope) and the
  * creator; Staff / Operator never (money figures, owner 2026-10-10).
@@ -27,7 +31,7 @@ export const ProjectLoans: CollectionConfig = withAudit(
     admin: {
       group: 'Keuangan',
       useAsTitle: 'docNo',
-      defaultColumns: ['docNo', 'lenderProject', 'borrowerProject', 'amount', 'outstanding', 'status', 'dueDate'],
+      defaultColumns: ['docNo', 'origin', 'lenderProject', 'lenderCashAccount', 'borrowerProject', 'amount', 'outstanding', 'status', 'dueDate'],
       listSearchableFields: ['docNo'],
       description: 'Diajukan dan diputuskan lewat layar Pinjaman antar project (bukan dari form ini).',
     },
@@ -50,14 +54,30 @@ export const ProjectLoans: CollectionConfig = withAudit(
             { field: 'borrowerProject', collection: 'projects' },
             { field: 'lenderProject', collection: 'projects' },
           ],
+          check: [
+            { field: 'lenderCashAccount', collection: 'cash-accounts' },
+            { field: 'borrowerCashAccount', collection: 'cash-accounts' },
+            { field: 'transfer', collection: 'transfers' },
+          ],
         }),
       ],
     },
     fields: [
       companyField({ derived: true }),
       { name: 'docNo', type: 'text', label: 'No. pinjaman', index: true, admin: ro },
-      { name: 'lenderProject', type: 'relationship', relationTo: 'projects', label: 'Project pemberi pinjaman', required: true, index: true, admin: ro },
+      // ADR 0031: `manual` = PM → Direktur (ADR 0022); `transfer` = automatic when Finance pays from another account
+      { name: 'origin', type: 'select', label: 'Asal', required: true, defaultValue: 'manual', index: true, options: LOAN_ORIGINS.map((o) => ({ label: LOAN_ORIGIN_LABELS[o], value: o })), admin: ro },
+      // manual loans only (DB CHECK project_loans_origin_shape); an automatic loan's lender is an account
+      { name: 'lenderProject', type: 'relationship', relationTo: 'projects', label: 'Project pemberi pinjaman', index: true, admin: ro },
       { name: 'borrowerProject', type: 'relationship', relationTo: 'projects', label: 'Project peminjam', required: true, index: true, admin: ro },
+      // ADR 0031: Pusat Biaya (cash account) of each side — frozen at approval (manual) / at the transfer (automatic)
+      { name: 'lenderCashAccount', type: 'relationship', relationTo: 'cash-accounts', label: 'Akun kas pemberi', index: true, admin: ro },
+      { name: 'borrowerCashAccount', type: 'relationship', relationTo: 'cash-accounts', label: 'Akun kas peminjam', index: true, admin: ro },
+      // true = money between two different accounts: disbursement and repayments post KK / KM (ADR 0031)
+      { name: 'cashBacked', type: 'checkbox', label: 'Menggerakkan kas', defaultValue: false, admin: ro },
+      { name: 'transfer', type: 'relationship', relationTo: 'transfers', label: 'Transfer pengajuan', index: true, admin: { ...ro, condition: (d) => d?.origin === 'transfer' } },
+      { name: 'disbursedAt', type: 'date', label: 'Dicairkan', admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
+      { name: 'disbursedBy', type: 'relationship', relationTo: 'users', label: 'Dicairkan oleh', admin: { ...ro, components: USER_NAME_VIEW } },
       {
         name: 'kind',
         type: 'select',
@@ -107,7 +127,7 @@ export const ProjectLoans: CollectionConfig = withAudit(
   {
     docType: 'project_loan',
     // docNo: `number_issued` row written by allocateDocNo(); cycle / timestamps are workflow internals
-    exclude: ['docNo', 'approvalCycle', 'submittedAt', 'decidedAt'],
+    exclude: ['docNo', 'approvalCycle', 'submittedAt', 'decidedAt', 'disbursedAt'],
     docNo: (doc) => (typeof doc.docNo === 'string' ? doc.docNo : undefined),
     actionFor: (c) => (c.field === 'status' ? 'status_change' : undefined),
   },

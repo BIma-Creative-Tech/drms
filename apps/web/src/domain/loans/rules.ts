@@ -3,8 +3,11 @@
  * Pure module (unit-tested, bundled into the OpenAPI generator): statuses, transitions, input validation, the
  * outstanding / overdue arithmetic and the Direktur pool (G1, ADR 0021 "Utamakan Direktur lain"). No Payload import.
  *
- * A loan is a RECORDED CLAIM of the lender project on the borrower project inside one PT (notional allocation,
- * ADR 0022 §5 option B): no cash entry is ever written for a loan or a repayment.
+ * A loan is a RECORDED CLAIM of the lender on the borrower project inside one PT. ADR 0031 (DRMS 21/10, amends ADR
+ * 0022 §5): money lent between two different Pusat Biaya (cash accounts) also MOVES cash — `cashBacked` — through
+ * Finance's "Cairkan" (KK lender account + KM borrower account) and every repayment (the mirror pair). Goods, or two
+ * projects of the same account, stay a notional claim. Origin `transfer`: the automatic loan of a transfer paid from
+ * another account (lender = that account, approved and disbursed with the transfer).
  */
 
 import { formatRupiah } from '@/lib/money'
@@ -29,7 +32,32 @@ export const LOAN_KINDS = ['dana', 'barang'] as const
 export type LoanKind = (typeof LOAN_KINDS)[number]
 export const LOAN_KIND_LABELS: Record<LoanKind, string> = { dana: 'Dana', barang: 'Barang/material' }
 
-export const LOAN_ACTIONS = ['edit', 'submit', 'cancel', 'approve', 'reject', 'repay'] as const
+/** ADR 0031: `manual` = PM submits, Direktur approves (ADR 0022); `transfer` = automatic, from a transfer paid from another account. */
+export const LOAN_ORIGINS = ['manual', 'transfer'] as const
+export type LoanOrigin = (typeof LOAN_ORIGINS)[number]
+export const LOAN_ORIGIN_LABELS: Record<LoanOrigin, string> = { manual: 'Diajukan PM', transfer: 'Otomatis dari transfer' }
+
+/** ADR 0031: an approved cash-backed loan not yet disbursed by Finance. */
+export const AWAITING_DISBURSEMENT_LABEL = 'Disetujui – menunggu pencairan'
+
+/**
+ * ADR 0031: does a loan move cash? Money (`dana`) between two DIFFERENT, known Pusat Biaya accounts. Goods, or both
+ * projects on the same account (or a project without one), stay a notional claim (ADR 0022 §5 option B).
+ */
+export function isCashBacked(l: { kind: LoanKind; lenderCashAccountId: number | null | undefined; borrowerCashAccountId: number | null | undefined }): boolean {
+  return l.kind === 'dana' && typeof l.lenderCashAccountId === 'number' && typeof l.borrowerCashAccountId === 'number' && l.lenderCashAccountId !== l.borrowerCashAccountId
+}
+
+/** Default due date of an automatic loan: loan date + 30 days (Q-L4: a due date is always set). */
+export const AUTO_LOAN_DUE_DAYS = 30
+
+export function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+export const LOAN_ACTIONS = ['edit', 'submit', 'cancel', 'approve', 'reject', 'disburse', 'repay'] as const
 export type LoanAction = (typeof LOAN_ACTIONS)[number]
 
 /** G1 exception recorded on the loan (ADR 0022 §4, Q-L5): the creator PM is the PT's only Direktur. */
@@ -169,18 +197,31 @@ export type LoanActorContext = {
   mayDecide: boolean
   /** A posted repayment exists. */
   hasRepayment: boolean
+  /** ADR 0031: the loan moves cash (money between two different Pusat Biaya accounts). */
+  cashBacked?: boolean
+  /** ADR 0031: Finance posted the disbursement (or the automatic loan was paid with its transfer). */
+  disbursed?: boolean
+  /** ADR 0031: `transfer` = automatic loan (cancelled only through its transfer's void). */
+  origin?: LoanOrigin
 }
 
 /** Actions the caller may take now (UI + service guard; the DB re-checks G1 and the transitions). */
 export function loanAllowedActions(c: LoanActorContext): LoanAction[] {
   const out: LoanAction[] = []
+  const auto = c.origin === 'transfer'
   if (c.status === 'draft' && c.isCreator && c.isBorrowerPm) out.push('edit', 'submit')
   if (c.isCreator && (c.status === 'draft' || c.status === 'pending_approval')) out.push('cancel')
-  else if (c.isDirektur && c.status === 'approved' && !c.hasRepayment) out.push('cancel')
+  // ADR 0031: a disbursed loan is settled by repayments (its cash cannot be "un-lent"); an automatic one goes with its transfer
+  else if (c.isDirektur && c.status === 'approved' && !c.hasRepayment && !auto && !(c.cashBacked && c.disbursed)) out.push('cancel')
   if (c.status === 'pending_approval' && c.mayDecide) out.push('approve', 'reject')
-  if (LOAN_REPAYABLE.includes(c.status) && (c.isBorrowerPm || c.isFinance)) out.push('repay')
+  if (c.status === 'approved' && c.cashBacked && !c.disbursed && c.isFinance) out.push('disburse')
+  // ADR 0031: a cash-backed loan is repaid in cash → Finance only, after the disbursement; a claim as before (Q-L7)
+  if (LOAN_REPAYABLE.includes(c.status) && (c.cashBacked ? c.disbursed && c.isFinance : c.isBorrowerPm || c.isFinance)) out.push('repay')
   return out
 }
 
-/** Void of a posted repayment (ADR 0022 §7): Direktur or Finance of the PT, reason required. */
-export const mayVoidRepayment = (c: Pick<LoanActorContext, 'isDirektur' | 'isFinance'>): boolean => c.isDirektur || c.isFinance
+/**
+ * Void of a posted repayment (ADR 0022 §7): Direktur or Finance of the PT, reason required. ADR 0031: a repayment that
+ * moved cash is reversed in the cash book → Finance only.
+ */
+export const mayVoidRepayment = (c: Pick<LoanActorContext, 'isDirektur' | 'isFinance' | 'cashBacked'>): boolean => (c.cashBacked ? c.isFinance : c.isDirektur || c.isFinance)

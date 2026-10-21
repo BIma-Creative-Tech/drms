@@ -61,7 +61,8 @@ Pilih jenisnya dulu:
 1. Beranda → **Ajukan Pengajuan Baru** atau **Ajukan Reimburse**. Bila Anda bekerja di lebih dari satu PT, muncul
    **Untuk PT mana?** → ketuk PT tempat biaya ini dibebankan. Di editor tertulis **PT: …**. (Pesan "Anda tidak bisa
    membuat pengajuan di PT yang dipilih. Ganti PT di beranda." = ubah pilihan PT di Beranda dulu.)
-2. Isi **Judul**, pilih **Project** *atau* **Pusat biaya** (salah satu saja), **Tanggal dibutuhkan**.
+2. Isi **Judul**, pilih **Project**, **Tanggal dibutuhkan**. (Pusat biaya tidak dipilih lagi — sejak 21 Okt 2026 pusat
+   biaya = akun kas project, diisi saat project dibuat.)
 3. **Diajukan oleh**: nama Anda sudah terisi. Staff hanya bisa mengajukan **untuk dirinya sendiri** (keputusan
    pemilik 8 Okt 2026): daftar pilihan hanya berisi nama Anda. Pengajuan untuk orang lain dibuat oleh PM, Admin atau
    Finance. Draft lama yang mencantumkan orang lain ditolak saat diajukan dengan pesan "Staff hanya dapat mengajukan

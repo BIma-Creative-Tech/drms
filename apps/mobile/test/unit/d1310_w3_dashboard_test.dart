@@ -115,6 +115,6 @@ void main() {
 
   test('Admin (/dashboard/admin): master-data gaps', () {
     final a = AdminDashboard.fromJson(adminW3Json());
-    expect((a.usersIncomplete, a.projectsWithoutPm, a.costCentersWithoutManager), (2, 0, 1));
+    expect((a.usersIncomplete, a.projectsWithoutPm, a.projectsWithoutPusatBiaya), (2, 0, 1));
   });
 }

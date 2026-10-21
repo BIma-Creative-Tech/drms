@@ -18,6 +18,8 @@ const cashSourceLabels = {
   'reversal': 'Jurnal balik',
   'opening': 'Saldo awal',
   'intercompany': 'Antar PT',
+  // ADR 0031: the KK / KM legs of an inter-project loan (disbursement, repayment)
+  'project_loan': 'Pinjaman antar project',
 };
 
 /// Web IC_LOAN_LEG_LABELS (ADR 0029).

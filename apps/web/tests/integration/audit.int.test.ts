@@ -32,7 +32,9 @@ const fixtures: Record<string, Fixture> = {
     update: { isDefault: true },
     field: 'isDefault',
   },
-  projects: { create: () => ({ code: 'AUD-PRJ', name: 'Project Audit', client: ids.clients, pm: admin.id }), update: { address: 'Jl. Audit 1' }, field: 'address' },
+  // ADR 0031: a project is created with its Pusat Biaya (a cash account of the PT) → the account first
+  'cash-accounts': { create: () => ({ name: 'Kas Audit', kind: 'cash' }), update: { accountHolder: 'PT DRMS' }, field: 'accountHolder' },
+  projects: { create: () => ({ code: 'AUD-PRJ', name: 'Project Audit', client: ids.clients, pm: admin.id, cashAccount: ids['cash-accounts'] }), update: { address: 'Jl. Audit 1' }, field: 'address' },
   'project-stages': { create: () => ({ project: ids.projects, name: 'Pondasi', weightPct: 30, sequence: 1 }), update: { weightPct: 40 }, field: 'weightPct' },
   'stage-templates': {
     create: () => ({ name: 'Tpl Audit', items: [{ name: 'A', weightPct: 100, sequence: 1 }] }),
@@ -43,7 +45,6 @@ const fixtures: Record<string, Fixture> = {
   'expense-categories': { create: () => ({ code: 'AUD-CAT', name: 'Kat Audit', allowedUoms: [ids.uoms] }), update: { allowedUoms: [] }, field: 'allowedUoms' },
   'budget-lines': { create: () => ({ project: ids.projects, category: ids['expense-categories'], amount: 1_000_000 }), update: { amount: 1_500_000 }, field: 'amount' },
   'cash-in-sources': { create: () => ({ code: 'AUD-CIS', name: 'CIS Audit' }), update: { name: 'CIS Audit 2' }, field: 'name' },
-  'cash-accounts': { create: () => ({ name: 'Kas Audit', kind: 'cash' }), update: { accountHolder: 'PT DRMS' }, field: 'accountHolder' },
   'cost-centers': { create: () => ({ code: 'AUD-CC', name: 'CC Audit' }), update: { name: 'CC Audit 2' }, field: 'name' },
   // ADR 0023
   sites: { create: () => ({ code: 'AUD-SITE', name: 'Site Audit' }), update: { name: 'Site Audit 2' }, field: 'name' },
@@ -56,7 +57,7 @@ const fixtures: Record<string, Fixture> = {
     field: 'maxAmount',
   },
   'notification-templates': { create: () => ({ event: 'audit.test', title: 'T', body: 'B' }), update: { title: 'T2' }, field: 'title' },
-  vehicles: { create: () => ({ plateNo: 'kh 1 au', type: 'Pickup', costCenter: ids['cost-centers'] }), update: { brandModel: 'Toyota' }, field: 'brandModel' },
+  vehicles: { create: () => ({ plateNo: 'kh 1 au', type: 'Pickup', cashAccount: ids['cash-accounts'] }), update: { brandModel: 'Toyota' }, field: 'brandModel' },
   'urgency-levels': { create: () => ({ code: 'AUD-URG', name: 'Urgensi Audit', rank: 9 }), update: { name: 'Urgensi Audit 2' }, field: 'name' },
   'document-sequences': {
     create: () => ({ docType: 'reversal', docCode: 'RV', pattern: 'RV/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1, timezone: 'Asia/Makassar' }),
