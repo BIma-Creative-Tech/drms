@@ -9,7 +9,8 @@ import { withPrelude } from './20261013_610000_d1310_renumber'
  * 1. Same PT (ADR 0016 §4) for every new reference — own `*_pb_company_refs` triggers (the existing ones stay as they
  *    are): projects / vehicles → cash account; transfers.paid_from → cash account; cash_entries → loan / repayment;
  *    project_loans → both accounts + transfer; disbursed_by an active member of the PT.
- * 2. Transfers (`pk_transfers_cost_center_required` REPLACED — the cost center is no longer required, D2 retired):
+ * 2. Requests (`pk_expense_requests_project_rules` REPLACED): no new cost center; a vendor / PT grup payment may be sent
+ *    without project. Transfers (`pk_transfers_cost_center_required` REPLACED — the cost center is no longer required, D2 retired):
  *    an advance / reimburse transfer of a PROJECT request is charged to the project's Pusat Biaya
  *    (`cash_account_id = projects.cash_account_id`, which must be set); `paid_from_cash_account_id` only on a project
  *    request and different from the charged account; at commit (deferred) a transfer paid from another account has its
@@ -202,6 +203,59 @@ const LOANS_GUARD_NEW = `
     END
     $fn$;`
 
+/** pk_expense_requests_project_rules as of 20261014_100200_d1310_intercompany_guard (restored by down). */
+const PROJECT_RULES_PREV = `
+    CREATE OR REPLACE FUNCTION pk_expense_requests_project_rules() RETURNS trigger LANGUAGE plpgsql AS $fn$
+    BEGIN
+      IF TG_OP = 'INSERT' THEN
+        -- Payload writes an update of a row with hasMany children as INSERT … ON CONFLICT (id) DO UPDATE: the INSERT
+        -- step of an EXISTING row is passed through (the UPDATE branch below then checks the change)
+        IF EXISTS (SELECT 1 FROM expense_requests WHERE id = NEW.id) THEN RETURN NEW; END IF;
+        -- ADR 0027 / 0028: a vendor / PT grup payment without a project names its cost center
+        IF NEW.cost_center_id IS NOT NULL AND NOT (NEW.payee_type::text IN ('vendor', 'pt_grup') AND NEW.project_id IS NULL) THEN
+          RAISE EXCEPTION 'expense_requests: new requests have no cost center — Finance sets it on the transfer (D2)' USING ERRCODE = '23514';
+        END IF;
+        RETURN NEW;
+      END IF;
+      IF NEW.cost_center_id IS NOT NULL AND NEW.cost_center_id IS DISTINCT FROM OLD.cost_center_id
+         AND NOT (NEW.payee_type::text IN ('vendor', 'pt_grup') AND OLD.status = 'draft' AND NEW.project_id IS NULL) THEN
+        RAISE EXCEPTION 'expense_requests %: the cost center of a request cannot be set or changed (D2)', OLD.id USING ERRCODE = '23514';
+      END IF;
+      IF OLD.status = 'draft' AND NEW.status NOT IN ('draft', 'cancelled') AND NEW.project_id IS NULL
+         AND NOT (NEW.cost_center_id IS NOT NULL AND (coalesce(OLD.approval_cycle, 0) > 0 OR NEW.payee_type::text IN ('vendor', 'pt_grup'))) THEN
+        RAISE EXCEPTION 'expense_requests %: a request is sent with a project (D2)', OLD.id USING ERRCODE = '23514';
+      END IF;
+      RETURN NEW;
+    END
+    $fn$;`
+
+/** ADR 0031: no new cost center at all; a vendor / PT grup payment may be SENT without project. */
+const PROJECT_RULES_NEW = `
+    CREATE OR REPLACE FUNCTION pk_expense_requests_project_rules() RETURNS trigger LANGUAGE plpgsql AS $fn$
+    BEGIN
+      IF TG_OP = 'INSERT' THEN
+        -- Payload writes an update of a row with hasMany children as INSERT … ON CONFLICT (id) DO UPDATE: the INSERT
+        -- step of an EXISTING row is passed through (the UPDATE branch below then checks the change)
+        IF EXISTS (SELECT 1 FROM expense_requests WHERE id = NEW.id) THEN RETURN NEW; END IF;
+        -- ADR 0031: the cost-center master is retired — no new request names one (Pusat Biaya = the project's cash account)
+        IF NEW.cost_center_id IS NOT NULL THEN
+          RAISE EXCEPTION 'expense_requests: new requests have no cost center (ADR 0031)' USING ERRCODE = '23514';
+        END IF;
+        RETURN NEW;
+      END IF;
+      IF NEW.cost_center_id IS NOT NULL AND NEW.cost_center_id IS DISTINCT FROM OLD.cost_center_id THEN
+        RAISE EXCEPTION 'expense_requests %: the cost center of a request cannot be set or changed (D2, ADR 0031)', OLD.id USING ERRCODE = '23514';
+      END IF;
+      -- ADR 0031: a vendor / PT grup payment may be sent without project (no Pusat Biaya); a legacy cost-center request
+      -- that was submitted before keeps its workflow
+      IF OLD.status = 'draft' AND NEW.status NOT IN ('draft', 'cancelled') AND NEW.project_id IS NULL
+         AND NOT (NEW.payee_type::text IN ('vendor', 'pt_grup') OR (NEW.cost_center_id IS NOT NULL AND coalesce(OLD.approval_cycle, 0) > 0)) THEN
+        RAISE EXCEPTION 'expense_requests %: a request is sent with a project (D2)', OLD.id USING ERRCODE = '23514';
+      END IF;
+      RETURN NEW;
+    END
+    $fn$;`
+
 export async function up({ db }: MigrateUpArgs): Promise<void> {
   await db.execute(sql`
     DO $pk$
@@ -223,8 +277,9 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
       EXECUTE FUNCTION pk_same_company('lender_cash_account_id', 'cash_accounts', 'borrower_cash_account_id', 'cash_accounts', 'transfer_id', 'transfers');
     CREATE TRIGGER project_loans_pb_company_members BEFORE INSERT OR UPDATE ON project_loans FOR EACH ROW EXECUTE FUNCTION pk_company_member('disbursed_by_id');`)
 
-  // ---- 2. transfers
+  // ---- 2. transfers (+ requests: the project rule without the cost center)
   await db.execute(sql.raw(TRANSFERS_CC_NEW))
+  await db.execute(sql.raw(PROJECT_RULES_NEW))
   await db.execute(sql`
     CREATE OR REPLACE FUNCTION pk_transfers_paid_from_loan() RETURNS trigger LANGUAGE plpgsql AS $fn$
     BEGIN
@@ -352,4 +407,5 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
     DROP TRIGGER IF EXISTS projects_pb_company_refs ON projects;`)
   await db.execute(sql.raw(withPrelude(LOANS_GUARD_PREV)))
   await db.execute(sql.raw(TRANSFERS_CC_PREV))
+  await db.execute(sql.raw(PROJECT_RULES_PREV))
 }

@@ -477,8 +477,8 @@ describe('migration 20261008_090000_qa_finance_integrity', () => {
       await run('ALTER TABLE settlements ENABLE TRIGGER USER')
       await run('ALTER TABLE audit_logs DISABLE TRIGGER USER')
       // + the values of LATER migrations (approval_pm_direktur ADR 0021, d1310_renumber, d1310_fundcheck ADR 0029): their
-      // rows (written by whichever files ran earlier in the same CI part) would block the enum rebuild
-      await run("DELETE FROM audit_logs WHERE action::text IN ('overdraft_confirmed', 'bank_unverified_confirmed', 'approval_policy_exception', 'renumbered', 'fund_insufficient')")
+      // rows (written by whichever files ran earlier in the same CI part) would block the enum rebuild; ADR 0031: disburse / auto_create
+      await run("DELETE FROM audit_logs WHERE action::text IN ('overdraft_confirmed', 'bank_unverified_confirmed', 'approval_policy_exception', 'renumbered', 'fund_insufficient', 'disburse', 'auto_create')")
       await run('ALTER TABLE audit_logs ENABLE TRIGGER USER')
       await migrationDown({ db } as never)
       const cols = (await db.execute(sql.raw("SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name = 'settlements' AND column_name LIKE 'shortfall_approval%'"))) as { rows: Array<{ n: number }> }
