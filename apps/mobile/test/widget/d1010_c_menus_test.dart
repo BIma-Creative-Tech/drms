@@ -497,14 +497,22 @@ void main() {
         v(at: at, account: 4)['loanReason'],
         'Isi alasan membayar dari akun lain (tercatat sebagai pinjaman antar project).',
       );
-      expect(v(at: at, account: 4, reason: ' ab ')['loanReason'], isNotNull, reason: 'min 3 after trim');
+      expect(
+        v(at: at, account: 4, reason: ' ab ')['loanReason'],
+        isNotNull,
+        reason: 'min 3 after trim',
+      );
       expect(v(at: at, account: 4, reason: 'saldo kurang'), isEmpty);
       expect(v(at: at, account: 4, reason: 'saldo kurang', due: '2026-11-10'), isEmpty);
       expect(
         v(at: at, account: 4, reason: 'saldo kurang', due: '2026-10-10')['loanDueDate'],
         'Jatuh tempo pinjaman tidak boleh sebelum tanggal transfer.',
       );
-      expect(v(at: at, reason: '', due: '2026-10-01'), isEmpty, reason: 'paid from the Pusat Biaya: no loan fields');
+      expect(
+        v(at: at, reason: '', due: '2026-10-01'),
+        isEmpty,
+        reason: 'paid from the Pusat Biaya: no loan fields',
+      );
       expect(
         v(at: at, pb: null, missing: true)['pusatBiaya'],
         'Project belum dipetakan ke pusat biaya (akun kas). Petakan dulu di data project.',

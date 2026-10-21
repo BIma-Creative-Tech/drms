@@ -467,7 +467,9 @@ class _LoanPanel extends StatelessWidget {
     return Container(
       key: const Key('transfer-loan-panel'),
       padding: const EdgeInsets.only(left: 10),
-      decoration: BoxDecoration(border: Border(left: BorderSide(color: warn, width: 3))),
+      decoration: BoxDecoration(
+        border: Border(left: BorderSide(color: warn, width: 3)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
