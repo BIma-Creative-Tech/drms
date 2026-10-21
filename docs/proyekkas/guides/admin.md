@@ -240,7 +240,7 @@ sampai selesai).
 | Nama aturan | Default — PM project lalu Direktur (semua nominal) |
 | Dokumen | Pengajuan biaya |
 | Diketahui Oleh | **Wajib** |
-| Pengisi "Diketahui Oleh" | **PM project (manajer pusat biaya bila tanpa project)** |
+| Pengisi "Diketahui Oleh" | **PM project** (pembayaran vendor / antar-PT tanpa project: langsung Direktur, ADR 0031) |
 | Level approval | **1 = Direktur** (tidak ada level Finance) |
 
 - **PM project** = isian **Project Manager** di data project; untuk pengajuan pusat biaya = **Penanggung jawab
@@ -508,3 +508,12 @@ nomornya) hanya tampil bagi pengguna yang juga terdaftar di PT itu — pengguna 
 sekali; file dan logo sebuah PT hanya untuk anggota PT itu, dan file PT yang dinonaktifkan tidak terbuka bagi pengguna
 PT lain. Admin grup tetap memegang wewenangnya (membuat/menonaktifkan PT, setting aplikasi, akses semua pengguna, audit
 log tanpa PT).
+
+## Pusat biaya = akun kas (sejak 21 Okt 2026, ADR 0031)
+
+- Master **Pusat biaya** lama disembunyikan (data lama tetap). Pusat biaya sekarang = **akun kas/bank PT**.
+- Saat membuat project (Direktur / Admin / PM) wajib memilih **Pusat biaya (akun kas)**. PM hanya melihat nama akun
+  aktif PT-nya (tanpa nomor rekening dan saldo).
+- Kartu dashboard Admin **Project tanpa pusat biaya**: project aktif yang belum dipetakan — transfer pengajuannya
+  ditolak sampai dipetakan.
+- Kendaraan: *Pusat biaya default (akun kas)* menggantikan pusat biaya lama.

@@ -1283,7 +1283,52 @@
             "$ref": "#/components/schemas/Ref"
           },
           "costCenter": {
-            "$ref": "#/components/schemas/Ref"
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "description": "D2 legacy: the cost center of an old non-project request (none since ADR 0031)."
+          },
+          "pusatBiaya": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "ADR 0031 (DRMS 21/10): the Pusat Biaya = the project's cash account (read-only; null without project or while the project is not mapped)."
           },
           "urgencyLevel": {
             "type": [
@@ -2173,7 +2218,80 @@
                   "required": [
                     "id"
                   ],
-                  "description": "D2: cost center chosen by Finance (null on transfers recorded before DRMS 10/10)."
+                  "description": "D2 legacy: cost center chosen by Finance (transfers of 10/10–21/10/2026 only)."
+                },
+                "cashAccount": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "description": "ADR 0031: account the transfer is charged to (the project's Pusat Biaya)."
+                },
+                "paidFromCashAccount": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "description": "ADR 0031: account actually paid from when not the Pusat Biaya (null = paid from it)."
+                },
+                "projectLoan": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "docNo": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "docNo",
+                    "status"
+                  ],
+                  "description": "ADR 0031: the automatic inter-project loan of a transfer paid from another account."
                 },
                 "bankRef": {
                   "type": "string"
@@ -2677,6 +2795,7 @@
           "uuid",
           "project",
           "costCenter",
+          "pusatBiaya",
           "urgencyLevel",
           "notes",
           "requesters",
@@ -4061,6 +4180,37 @@
               "company"
             ],
             "description": "ADR 0028: the Kas Masuk posted in the receiving PT (PT grup payment); null otherwise."
+          },
+          "projectLoan": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "docNo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kk": {
+                "type": "string"
+              },
+              "km": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "docNo",
+              "kk",
+              "km"
+            ],
+            "description": "ADR 0031: the automatic inter-project loan when paid from an account other than the project's Pusat Biaya (its KK on the paying account, KM on the Pusat Biaya); null otherwise."
           }
         },
         "required": [
@@ -4077,7 +4227,8 @@
         "properties": {
           "cashAccountId": {
             "type": "integer",
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "description": "ADR 0031: the account Finance PAYS from (active, of the request PT). Default in the UI = the project's Pusat Biaya (GET /transfer-queue pusatBiaya); another account → automatic inter-project loan (loanReason required)."
           },
           "bankRef": {
             "type": "string",
@@ -4105,7 +4256,23 @@
               "null"
             ],
             "exclusiveMinimum": 0,
-            "description": "D2 (DRMS 10/10): cost center of the money, chosen by Finance — active, of the request PT. Omitted/null → the project default (GET /transfer-queue costCenter), else 400 (path costCenterId)."
+            "description": "DEPRECATED (ADR 0031, DRMS 21/10): ignored — the Pusat Biaya is the project's cash account. Still accepted so older apps keep working."
+          },
+          "loanReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000,
+            "description": "ADR 0031: required (min 3) when cashAccountId is not the project's Pusat Biaya — the reason of the automatic inter-project loan (400 path loanReason)."
+          },
+          "loanDueDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "ADR 0031: due date of the automatic loan (default transfer date + 30 days; not before the transfer date)."
           },
           "amount": {
             "type": "integer",
@@ -4325,7 +4492,31 @@
             "required": [
               "id"
             ],
-            "description": "D2: suggested cost center of the transfer (the project default, else a legacy request's own); null = Finance must pick one."
+            "description": "DEPRECATED (ADR 0031): always null — see pusatBiaya."
+          },
+          "pusatBiaya": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "ADR 0031: the project's Pusat Biaya (cash account) — default source account; paying from another one records an automatic inter-project loan. Null without project / unmapped project."
+          },
+          "pusatBiayaMissing": {
+            "type": "boolean",
+            "description": "ADR 0031: project request whose project has no Pusat Biaya yet → the transfer is refused (409) until it is mapped."
           },
           "bank": {
             "type": [
@@ -4490,6 +4681,8 @@
           "companyId",
           "project",
           "costCenter",
+          "pusatBiaya",
+          "pusatBiayaMissing",
           "bank",
           "bankVerification",
           "flags",
@@ -19061,8 +19254,22 @@
           "kindLabel": {
             "type": "string"
           },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "transfer"
+            ],
+            "description": "ADR 0031: manual = PM → Direktur; transfer = automatic (Finance paid a project request from another account)."
+          },
+          "originLabel": {
+            "type": "string"
+          },
           "lenderProject": {
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "properties": {
               "id": {
                 "type": "integer",
@@ -19108,7 +19315,8 @@
               "code",
               "name",
               "pm"
-            ]
+            ],
+            "description": "Null for an automatic loan — its lender is `lenderCashAccount`."
           },
           "borrowerProject": {
             "type": "object",
@@ -19158,6 +19366,111 @@
               "name",
               "pm"
             ]
+          },
+          "lenderCashAccount": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "ADR 0031: Pusat Biaya of the lender (frozen at the approval / the transfer)."
+          },
+          "borrowerCashAccount": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "ADR 0031: Pusat Biaya of the borrower project."
+          },
+          "cashBacked": {
+            "type": "boolean",
+            "description": "ADR 0031: money between two different accounts — disbursement and repayments post KK / KM."
+          },
+          "disbursedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "disbursedBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "awaitingDisbursement": {
+            "type": "boolean",
+            "description": "Approved, cash-backed, not yet disbursed by Finance (\"Disetujui – menunggu pencairan\")."
+          },
+          "transfer": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "docNo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "docNo"
+            ],
+            "description": "ADR 0031: the transfer of an automatic loan."
           },
           "amount": {
             "type": "integer"
@@ -19293,8 +19606,17 @@
           "daysOverdue",
           "kind",
           "kindLabel",
+          "origin",
+          "originLabel",
           "lenderProject",
           "borrowerProject",
+          "lenderCashAccount",
+          "borrowerCashAccount",
+          "cashBacked",
+          "disbursedAt",
+          "disbursedBy",
+          "awaitingDisbursement",
+          "transfer",
           "amount",
           "repaidTotal",
           "outstanding",
@@ -19460,8 +19782,22 @@
           "kindLabel": {
             "type": "string"
           },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "transfer"
+            ],
+            "description": "ADR 0031: manual = PM → Direktur; transfer = automatic (Finance paid a project request from another account)."
+          },
+          "originLabel": {
+            "type": "string"
+          },
           "lenderProject": {
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "properties": {
               "id": {
                 "type": "integer",
@@ -19507,7 +19843,8 @@
               "code",
               "name",
               "pm"
-            ]
+            ],
+            "description": "Null for an automatic loan — its lender is `lenderCashAccount`."
           },
           "borrowerProject": {
             "type": "object",
@@ -19557,6 +19894,111 @@
               "name",
               "pm"
             ]
+          },
+          "lenderCashAccount": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "ADR 0031: Pusat Biaya of the lender (frozen at the approval / the transfer)."
+          },
+          "borrowerCashAccount": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "ADR 0031: Pusat Biaya of the borrower project."
+          },
+          "cashBacked": {
+            "type": "boolean",
+            "description": "ADR 0031: money between two different accounts — disbursement and repayments post KK / KM."
+          },
+          "disbursedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "disbursedBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "awaitingDisbursement": {
+            "type": "boolean",
+            "description": "Approved, cash-backed, not yet disbursed by Finance (\"Disetujui – menunggu pencairan\")."
+          },
+          "transfer": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "docNo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "docNo"
+            ],
+            "description": "ADR 0031: the transfer of an automatic loan."
           },
           "amount": {
             "type": "integer"
@@ -19689,10 +20131,36 @@
                 "cancel",
                 "approve",
                 "reject",
+                "disburse",
                 "repay"
               ]
             },
-            "description": "edit/submit: creator PM (Draft); cancel: creator (Draft/Menunggu) or Direktur (Disetujui, no repayment); approve/reject: Direktur pool (G1); repay: borrower PM / Finance."
+            "description": "edit/submit: creator PM (Draft); cancel: creator (Draft/Menunggu) or Direktur (Disetujui, no repayment, not disbursed, not automatic); approve/reject: Direktur pool (G1); disburse: Finance (approved cash-backed loan, once); repay: borrower PM / Finance — Finance only after the disbursement for a cash-backed loan."
+          },
+          "disbursement": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "kk": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "km": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "kk",
+              "km"
+            ],
+            "description": "ADR 0031: entry numbers of the disbursement KK (lender) / KM (borrower); null when no cash moved."
           },
           "mayVoidRepayment": {
             "type": "boolean"
@@ -19807,6 +20275,31 @@
                     "string",
                     "null"
                   ]
+                },
+                "cash": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "kk": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "km": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kk",
+                    "km"
+                  ],
+                  "description": "ADR 0031: entry numbers of the repayment KK (borrower) / KM (lender); null for a claim or a voided repayment."
                 }
               },
               "required": [
@@ -19821,7 +20314,8 @@
                 "recordedBy",
                 "voidedBy",
                 "voidedAt",
-                "createdAt"
+                "createdAt",
+                "cash"
               ]
             }
           },
@@ -19905,8 +20399,17 @@
           "daysOverdue",
           "kind",
           "kindLabel",
+          "origin",
+          "originLabel",
           "lenderProject",
           "borrowerProject",
+          "lenderCashAccount",
+          "borrowerCashAccount",
+          "cashBacked",
+          "disbursedAt",
+          "disbursedBy",
+          "awaitingDisbursement",
+          "transfer",
           "amount",
           "repaidTotal",
           "outstanding",
@@ -19925,6 +20428,7 @@
           "source",
           "createdAt",
           "allowedActions",
+          "disbursement",
           "mayVoidRepayment",
           "today",
           "g1Note",
@@ -20078,6 +20582,37 @@
         ],
         "additionalProperties": false
       },
+      "ProjectLoanDisburse": {
+        "type": "object",
+        "properties": {
+          "disburseDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Default today (PT TZ); between the loan date and today — date of the KK / KM."
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "proofMediaId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "Optional proof (media-attachments, an unclaimed upload of the caller) — stored on the KK."
+          },
+          "confirmOverdraft": {
+            "type": "boolean",
+            "description": "Confirm that the lender's account goes below 0 (else 409 CASH_OVERDRAFT_CONFIRM_REQUIRED); audited."
+          }
+        },
+        "additionalProperties": false,
+        "description": "ADR 0031 \"Cairkan\" (Finance): KK on the lender's Pusat Biaya + KM on the borrower's, for the loan amount, once."
+      },
       "ProjectLoanRepaymentCreate": {
         "type": "object",
         "properties": {
@@ -20098,6 +20633,10 @@
               "null"
             ],
             "maxLength": 500
+          },
+          "confirmOverdraft": {
+            "type": "boolean",
+            "description": "ADR 0031 (cash-backed loan): confirm that the borrower's account goes below 0 (else 409 CASH_OVERDRAFT_CONFIRM_REQUIRED); audited."
           }
         },
         "required": [
@@ -37440,8 +37979,13 @@
                         "projectsWithoutPm": {
                           "type": "integer"
                         },
+                        "projectsWithoutPusatBiaya": {
+                          "type": "integer",
+                          "description": "ADR 0031: open projects without Pusat Biaya (cash account) — their transfers are refused until mapped."
+                        },
                         "costCentersWithoutManager": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "DEPRECATED (ADR 0031: the cost-center master is retired) — always 0."
                         },
                         "byCompany": {
                           "type": "array",
@@ -37458,6 +38002,9 @@
                               "projectsWithoutPm": {
                                 "type": "integer"
                               },
+                              "projectsWithoutPusatBiaya": {
+                                "type": "integer"
+                              },
                               "costCentersWithoutManager": {
                                 "type": "integer"
                               }
@@ -37466,6 +38013,7 @@
                               "companyId",
                               "usersIncomplete",
                               "projectsWithoutPm",
+                              "projectsWithoutPusatBiaya",
                               "costCentersWithoutManager"
                             ]
                           }
@@ -37474,6 +38022,7 @@
                       "required": [
                         "usersIncomplete",
                         "projectsWithoutPm",
+                        "projectsWithoutPusatBiaya",
                         "costCentersWithoutManager",
                         "byCompany"
                       ]
@@ -50765,9 +51314,159 @@
         }
       }
     },
+    "/project-loans/{id}/disburse": {
+      "post": {
+        "summary": "ADR 0031 \"Cairkan\" (Finance): an approved cash-backed loan (money between two different Pusat Biaya) → KK on the lender account + KM on the borrower account, once",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectLoanDisburse"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/project-loans/{id}/repayments": {
       "post": {
-        "summary": "Record a repayment (borrower PM or Finance; no approval; amount ≤ outstanding) → Sebagian kembali / Lunas",
+        "summary": "Record a repayment (borrower PM or Finance; Finance only — after the disbursement — when the loan moves cash; no approval; amount ≤ outstanding) → Sebagian kembali / Lunas",
         "security": [
           {
             "bearer": []
