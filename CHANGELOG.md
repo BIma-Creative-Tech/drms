@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-22
+
+**Pusat Biaya = akun kas; inter-project loans move cash (ADR 0031, user 2026-10-21, PR #131); APK 0.11.0.** Three
+migrations (`20261021_100000_d2110_pb_enums`, `_100100_d2110_pb_schema`, `_100200_d2110_pb_guard`). **No data is
+mapped automatically:** until a project is mapped to its Pusat Biaya (project form, Direktur / Admin / PM), the transfers
+of its requests are refused (409, Admin tile "Project tanpa pusat biaya"). API contract: additive, plus one deprecation
+(`costCenterId` on drafts and transfers is ignored; `TransferQueueItem.costCenter` is always null). **APK 0.11.0**
+(`mobile-v0.11.0`) needs server 0.19.0; APK 0.10.0 keeps working but cannot record a transfer that needs a loan reason.
+
+### Added
+
+- **Project → Pusat Biaya (cash account of the PT)**: `projects.cashAccount`, required when a user creates a project.
+  The PM reads the names of his PT's active accounts (no bank data, no balance). Request detail and project API show it.
+- **Automatic inter-project loan:** when Finance pays a project request from an account other than the project's Pusat
+  Biaya, a reason is required and an approved loan is recorded (lender = the paying account). It posts KK on the paying
+  account and KM on the Pusat Biaya, then the transfer KK on the Pusat Biaya; PM project and Direktur are notified. A
+  transfer void reverses it (refused while the loan has a repayment).
+- **"Cairkan" (Finance)** for an approved money loan between two different Pusat Biaya (`POST
+  /project-loans/{id}/disburse`): KK on the lender account, KM on the borrower account. Repayments of such a loan are
+  recorded by Finance with the mirror KK / KM; a void reverses them. Goods, or the same account, stay a claim.
+- Cash source `project_loan` ("Pinjaman antar project"); audit actions `disburse`, `auto_create`.
+
+### Changed
+
+- The cost-center master is retired (hidden; history kept). Requests no longer name a cost center; a vendor / PT grup
+  payment without project goes straight to the Direktur (no PM step). Vehicles: "Pusat biaya default (akun kas)".
+- K-15 "Pusat biaya bulan ini" per cash account; report filter `pusat` = an account; inter-project loan legs are not
+  operational cash flow (own lines in Rekap Kas). Admin tile "Project tanpa pusat biaya" replaces "Pusat biaya tanpa
+  penanggung jawab".
+- ADR 0022 §5 amended (loans of money between two accounts post cash). Fund check (ADR 0029) unchanged: per PT.
+
 ## [0.18.2] - 2026-10-20
 
 **The "Persetujuan" tile now shows how many items wait for the caller's decision.** **No migration**, no APK update
