@@ -15,7 +15,8 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$FundCommitmentItem {
 
-/// request | shortfall | loan (loan: [id] = the inter-PT loan the PT lends, not yet disbursed).
+/// request | shortfall | loan | project_loan (loan: [id] = the inter-PT loan the PT lends, not yet disbursed;
+/// project_loan: [id] = the approved inter-project loan the Pusat Biaya lends, not yet disbursed).
  String get kind; int get id; String? get docNo; int get amount; String get status;
 /// Create a copy of FundCommitmentItem
 /// with the given fields replaced by the non-null parameter values.
@@ -220,7 +221,8 @@ class _FundCommitmentItem extends FundCommitmentItem {
   const _FundCommitmentItem({required this.kind, required this.id, this.docNo, required this.amount, this.status = ''}): super._();
   
 
-/// request | shortfall | loan (loan: [id] = the inter-PT loan the PT lends, not yet disbursed).
+/// request | shortfall | loan | project_loan (loan: [id] = the inter-PT loan the PT lends, not yet disbursed;
+/// project_loan: [id] = the approved inter-project loan the Pusat Biaya lends, not yet disbursed).
 @override final  String kind;
 @override final  int id;
 @override final  String? docNo;
@@ -570,6 +572,291 @@ as String?,
 }
 
 /// @nodoc
+mixin _$FundPusatBiaya {
+
+ int get accountId; String get name; int get balance; int get commitments; int get available; List<FundCommitmentItem> get commitmentItems;
+/// Create a copy of FundPusatBiaya
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$FundPusatBiayaCopyWith<FundPusatBiaya> get copyWith => _$FundPusatBiayaCopyWithImpl<FundPusatBiaya>(this as FundPusatBiaya, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  final _this = this as FundPusatBiaya;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is FundPusatBiaya&&(identical(other.accountId, _this.accountId) || other.accountId == _this.accountId)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.balance, _this.balance) || other.balance == _this.balance)&&(identical(other.commitments, _this.commitments) || other.commitments == _this.commitments)&&(identical(other.available, _this.available) || other.available == _this.available)&&const DeepCollectionEquality().equals(other.commitmentItems, _this.commitmentItems));
+}
+
+
+@override
+int get hashCode {
+  final _this = this as FundPusatBiaya;
+  return Object.hash(runtimeType,_this.accountId,_this.name,_this.balance,_this.commitments,_this.available,const DeepCollectionEquality().hash(_this.commitmentItems));
+}
+
+@override
+String toString() {
+  final _this = this as FundPusatBiaya;
+  return 'FundPusatBiaya(accountId: ${_this.accountId}, name: ${_this.name}, balance: ${_this.balance}, commitments: ${_this.commitments}, available: ${_this.available}, commitmentItems: ${_this.commitmentItems})';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $FundPusatBiayaCopyWith<$Res>  {
+  factory $FundPusatBiayaCopyWith(FundPusatBiaya value, $Res Function(FundPusatBiaya) _then) = _$FundPusatBiayaCopyWithImpl;
+@useResult
+$Res call({
+ int accountId, String name, int balance, int commitments, int available, List<FundCommitmentItem> commitmentItems
+});
+
+
+
+
+}
+/// @nodoc
+class _$FundPusatBiayaCopyWithImpl<$Res>
+    implements $FundPusatBiayaCopyWith<$Res> {
+  _$FundPusatBiayaCopyWithImpl(this._self, this._then);
+
+  final FundPusatBiaya _self;
+  final $Res Function(FundPusatBiaya) _then;
+
+/// Create a copy of FundPusatBiaya
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? accountId = null,Object? name = null,Object? balance = null,Object? commitments = null,Object? available = null,Object? commitmentItems = null,}) {
+  return _then(FundPusatBiaya(
+accountId: null == accountId ? _self.accountId : accountId // ignore: cast_nullable_to_non_nullable
+as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,balance: null == balance ? _self.balance : balance // ignore: cast_nullable_to_non_nullable
+as int,commitments: null == commitments ? _self.commitments : commitments // ignore: cast_nullable_to_non_nullable
+as int,available: null == available ? _self.available : available // ignore: cast_nullable_to_non_nullable
+as int,commitmentItems: null == commitmentItems ? _self.commitmentItems : commitmentItems // ignore: cast_nullable_to_non_nullable
+as List<FundCommitmentItem>,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [FundPusatBiaya].
+extension FundPusatBiayaPatterns on FundPusatBiaya {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _FundPusatBiaya value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _FundPusatBiaya() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _FundPusatBiaya value)  $default,){
+final _that = this;
+switch (_that) {
+case _FundPusatBiaya():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _FundPusatBiaya value)?  $default,){
+final _that = this;
+switch (_that) {
+case _FundPusatBiaya() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int accountId,  String name,  int balance,  int commitments,  int available,  List<FundCommitmentItem> commitmentItems)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _FundPusatBiaya() when $default != null:
+return $default(_that.accountId,_that.name,_that.balance,_that.commitments,_that.available,_that.commitmentItems);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int accountId,  String name,  int balance,  int commitments,  int available,  List<FundCommitmentItem> commitmentItems)  $default,) {final _that = this;
+switch (_that) {
+case _FundPusatBiaya():
+return $default(_that.accountId,_that.name,_that.balance,_that.commitments,_that.available,_that.commitmentItems);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int accountId,  String name,  int balance,  int commitments,  int available,  List<FundCommitmentItem> commitmentItems)?  $default,) {final _that = this;
+switch (_that) {
+case _FundPusatBiaya() when $default != null:
+return $default(_that.accountId,_that.name,_that.balance,_that.commitments,_that.available,_that.commitmentItems);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+
+
+class _FundPusatBiaya implements FundPusatBiaya {
+  const _FundPusatBiaya({required this.accountId, required this.name, this.balance = 0, this.commitments = 0, this.available = 0,  List<FundCommitmentItem> commitmentItems = const <FundCommitmentItem>[]}): _commitmentItems = commitmentItems;
+  
+
+@override final  int accountId;
+@override final  String name;
+@override@JsonKey() final  int balance;
+@override@JsonKey() final  int commitments;
+@override@JsonKey() final  int available;
+ final  List<FundCommitmentItem> _commitmentItems;
+@override@JsonKey() List<FundCommitmentItem> get commitmentItems {
+  if (_commitmentItems is EqualUnmodifiableListView) return _commitmentItems;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_commitmentItems);
+}
+
+
+/// Create a copy of FundPusatBiaya
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$FundPusatBiayaCopyWith<_FundPusatBiaya> get copyWith => __$FundPusatBiayaCopyWithImpl<_FundPusatBiaya>(this, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _FundPusatBiaya&&(identical(other.accountId, accountId) || other.accountId == accountId)&&(identical(other.name, name) || other.name == name)&&(identical(other.balance, balance) || other.balance == balance)&&(identical(other.commitments, commitments) || other.commitments == commitments)&&(identical(other.available, available) || other.available == available)&&const DeepCollectionEquality().equals(other.commitmentItems, _commitmentItems));
+}
+
+
+@override
+int get hashCode {
+    return Object.hash(runtimeType,accountId,name,balance,commitments,available,const DeepCollectionEquality().hash(_commitmentItems));
+}
+
+@override
+String toString() {
+    return 'FundPusatBiaya(accountId: $accountId, name: $name, balance: $balance, commitments: $commitments, available: $available, commitmentItems: $commitmentItems)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$FundPusatBiayaCopyWith<$Res> implements $FundPusatBiayaCopyWith<$Res> {
+  factory _$FundPusatBiayaCopyWith(_FundPusatBiaya value, $Res Function(_FundPusatBiaya) _then) = __$FundPusatBiayaCopyWithImpl;
+@override @useResult
+$Res call({
+ int accountId, String name, int balance, int commitments, int available, List<FundCommitmentItem> commitmentItems
+});
+
+
+
+
+}
+/// @nodoc
+class __$FundPusatBiayaCopyWithImpl<$Res>
+    implements _$FundPusatBiayaCopyWith<$Res> {
+  __$FundPusatBiayaCopyWithImpl(this._self, this._then);
+
+  final _FundPusatBiaya _self;
+  final $Res Function(_FundPusatBiaya) _then;
+
+/// Create a copy of FundPusatBiaya
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? accountId = null,Object? name = null,Object? balance = null,Object? commitments = null,Object? available = null,Object? commitmentItems = null,}) {
+  return _then(_FundPusatBiaya(
+accountId: null == accountId ? _self.accountId : accountId // ignore: cast_nullable_to_non_nullable
+as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,balance: null == balance ? _self.balance : balance // ignore: cast_nullable_to_non_nullable
+as int,commitments: null == commitments ? _self.commitments : commitments // ignore: cast_nullable_to_non_nullable
+as int,available: null == available ? _self.available : available // ignore: cast_nullable_to_non_nullable
+as int,commitmentItems: null == commitmentItems ? _self._commitmentItems : commitmentItems // ignore: cast_nullable_to_non_nullable
+as List<FundCommitmentItem>,
+  ));
+}
+
+
+}
+
+/// @nodoc
 mixin _$FundCheck {
 
  int get companyId; String? get companyCode; String? get companyName;/// `companies.fundCheckEnabled` — off: the panel is information only (no block).
@@ -577,7 +864,10 @@ mixin _$FundCheck {
  bool get applies; FundCheckStatus get status;/// enabled ∧ applies ∧ insufficient: "Setujui" (or "Kirim") is refused by the server (409 FUND_INSUFFICIENT).
  bool get blocked; String? get blockedText; int get balance; int get commitments; int get available; int get needed; int get gap;/// "n akun, tanpa akun site".
  int get accountCount; int get excludedSiteCount; int get excludedSiteBalance;/// Other requests of the PT waiting at their final decision (not committed).
- int get waitingCount; int get waitingAmount; List<FundCommitmentItem> get commitmentItems; List<FundLoanRef> get loans;
+ int get waitingCount; int get waitingAmount; List<FundCommitmentItem> get commitmentItems; List<FundLoanRef> get loans;/// Where Finance pays from (null: an older server).
+ FundCheckRoute? get route;/// Indonesian one-liner of [route] (null when pt / short, or an older server).
+ String? get routeText;/// The project's Pusat Biaya; null = no project / not mapped (checked per PT only) or an older server.
+ FundPusatBiaya? get pusatBiaya;
 /// Create a copy of FundCheck
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -589,20 +879,20 @@ $FundCheckCopyWith<FundCheck> get copyWith => _$FundCheckCopyWithImpl<FundCheck>
 @override
 bool operator ==(Object other) {
   final _this = this as FundCheck;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is FundCheck&&(identical(other.companyId, _this.companyId) || other.companyId == _this.companyId)&&(identical(other.companyCode, _this.companyCode) || other.companyCode == _this.companyCode)&&(identical(other.companyName, _this.companyName) || other.companyName == _this.companyName)&&(identical(other.enabled, _this.enabled) || other.enabled == _this.enabled)&&(identical(other.applies, _this.applies) || other.applies == _this.applies)&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.blocked, _this.blocked) || other.blocked == _this.blocked)&&(identical(other.blockedText, _this.blockedText) || other.blockedText == _this.blockedText)&&(identical(other.balance, _this.balance) || other.balance == _this.balance)&&(identical(other.commitments, _this.commitments) || other.commitments == _this.commitments)&&(identical(other.available, _this.available) || other.available == _this.available)&&(identical(other.needed, _this.needed) || other.needed == _this.needed)&&(identical(other.gap, _this.gap) || other.gap == _this.gap)&&(identical(other.accountCount, _this.accountCount) || other.accountCount == _this.accountCount)&&(identical(other.excludedSiteCount, _this.excludedSiteCount) || other.excludedSiteCount == _this.excludedSiteCount)&&(identical(other.excludedSiteBalance, _this.excludedSiteBalance) || other.excludedSiteBalance == _this.excludedSiteBalance)&&(identical(other.waitingCount, _this.waitingCount) || other.waitingCount == _this.waitingCount)&&(identical(other.waitingAmount, _this.waitingAmount) || other.waitingAmount == _this.waitingAmount)&&const DeepCollectionEquality().equals(other.commitmentItems, _this.commitmentItems)&&const DeepCollectionEquality().equals(other.loans, _this.loans));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is FundCheck&&(identical(other.companyId, _this.companyId) || other.companyId == _this.companyId)&&(identical(other.companyCode, _this.companyCode) || other.companyCode == _this.companyCode)&&(identical(other.companyName, _this.companyName) || other.companyName == _this.companyName)&&(identical(other.enabled, _this.enabled) || other.enabled == _this.enabled)&&(identical(other.applies, _this.applies) || other.applies == _this.applies)&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.blocked, _this.blocked) || other.blocked == _this.blocked)&&(identical(other.blockedText, _this.blockedText) || other.blockedText == _this.blockedText)&&(identical(other.balance, _this.balance) || other.balance == _this.balance)&&(identical(other.commitments, _this.commitments) || other.commitments == _this.commitments)&&(identical(other.available, _this.available) || other.available == _this.available)&&(identical(other.needed, _this.needed) || other.needed == _this.needed)&&(identical(other.gap, _this.gap) || other.gap == _this.gap)&&(identical(other.accountCount, _this.accountCount) || other.accountCount == _this.accountCount)&&(identical(other.excludedSiteCount, _this.excludedSiteCount) || other.excludedSiteCount == _this.excludedSiteCount)&&(identical(other.excludedSiteBalance, _this.excludedSiteBalance) || other.excludedSiteBalance == _this.excludedSiteBalance)&&(identical(other.waitingCount, _this.waitingCount) || other.waitingCount == _this.waitingCount)&&(identical(other.waitingAmount, _this.waitingAmount) || other.waitingAmount == _this.waitingAmount)&&const DeepCollectionEquality().equals(other.commitmentItems, _this.commitmentItems)&&const DeepCollectionEquality().equals(other.loans, _this.loans)&&(identical(other.route, _this.route) || other.route == _this.route)&&(identical(other.routeText, _this.routeText) || other.routeText == _this.routeText)&&(identical(other.pusatBiaya, _this.pusatBiaya) || other.pusatBiaya == _this.pusatBiaya));
 }
 
 
 @override
 int get hashCode {
   final _this = this as FundCheck;
-  return Object.hashAll([runtimeType,_this.companyId,_this.companyCode,_this.companyName,_this.enabled,_this.applies,_this.status,_this.blocked,_this.blockedText,_this.balance,_this.commitments,_this.available,_this.needed,_this.gap,_this.accountCount,_this.excludedSiteCount,_this.excludedSiteBalance,_this.waitingCount,_this.waitingAmount,const DeepCollectionEquality().hash(_this.commitmentItems),const DeepCollectionEquality().hash(_this.loans)]);
+  return Object.hashAll([runtimeType,_this.companyId,_this.companyCode,_this.companyName,_this.enabled,_this.applies,_this.status,_this.blocked,_this.blockedText,_this.balance,_this.commitments,_this.available,_this.needed,_this.gap,_this.accountCount,_this.excludedSiteCount,_this.excludedSiteBalance,_this.waitingCount,_this.waitingAmount,const DeepCollectionEquality().hash(_this.commitmentItems),const DeepCollectionEquality().hash(_this.loans),_this.route,_this.routeText,_this.pusatBiaya]);
 }
 
 @override
 String toString() {
   final _this = this as FundCheck;
-  return 'FundCheck(companyId: ${_this.companyId}, companyCode: ${_this.companyCode}, companyName: ${_this.companyName}, enabled: ${_this.enabled}, applies: ${_this.applies}, status: ${_this.status}, blocked: ${_this.blocked}, blockedText: ${_this.blockedText}, balance: ${_this.balance}, commitments: ${_this.commitments}, available: ${_this.available}, needed: ${_this.needed}, gap: ${_this.gap}, accountCount: ${_this.accountCount}, excludedSiteCount: ${_this.excludedSiteCount}, excludedSiteBalance: ${_this.excludedSiteBalance}, waitingCount: ${_this.waitingCount}, waitingAmount: ${_this.waitingAmount}, commitmentItems: ${_this.commitmentItems}, loans: ${_this.loans})';
+  return 'FundCheck(companyId: ${_this.companyId}, companyCode: ${_this.companyCode}, companyName: ${_this.companyName}, enabled: ${_this.enabled}, applies: ${_this.applies}, status: ${_this.status}, blocked: ${_this.blocked}, blockedText: ${_this.blockedText}, balance: ${_this.balance}, commitments: ${_this.commitments}, available: ${_this.available}, needed: ${_this.needed}, gap: ${_this.gap}, accountCount: ${_this.accountCount}, excludedSiteCount: ${_this.excludedSiteCount}, excludedSiteBalance: ${_this.excludedSiteBalance}, waitingCount: ${_this.waitingCount}, waitingAmount: ${_this.waitingAmount}, commitmentItems: ${_this.commitmentItems}, loans: ${_this.loans}, route: ${_this.route}, routeText: ${_this.routeText}, pusatBiaya: ${_this.pusatBiaya})';
 }
 
 
@@ -613,11 +903,11 @@ abstract mixin class $FundCheckCopyWith<$Res>  {
   factory $FundCheckCopyWith(FundCheck value, $Res Function(FundCheck) _then) = _$FundCheckCopyWithImpl;
 @useResult
 $Res call({
- int companyId, String? companyCode, String? companyName, bool enabled, bool applies, FundCheckStatus status, bool blocked, String? blockedText, int balance, int commitments, int available, int needed, int gap, int accountCount, int excludedSiteCount, int excludedSiteBalance, int waitingCount, int waitingAmount, List<FundCommitmentItem> commitmentItems, List<FundLoanRef> loans
+ int companyId, String? companyCode, String? companyName, bool enabled, bool applies, FundCheckStatus status, bool blocked, String? blockedText, int balance, int commitments, int available, int needed, int gap, int accountCount, int excludedSiteCount, int excludedSiteBalance, int waitingCount, int waitingAmount, List<FundCommitmentItem> commitmentItems, List<FundLoanRef> loans, FundCheckRoute? route, String? routeText, FundPusatBiaya? pusatBiaya
 });
 
 
-
+$FundPusatBiayaCopyWith<$Res>? get pusatBiaya;
 
 }
 /// @nodoc
@@ -630,7 +920,7 @@ class _$FundCheckCopyWithImpl<$Res>
 
 /// Create a copy of FundCheck
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? companyId = null,Object? companyCode = freezed,Object? companyName = freezed,Object? enabled = null,Object? applies = null,Object? status = null,Object? blocked = null,Object? blockedText = freezed,Object? balance = null,Object? commitments = null,Object? available = null,Object? needed = null,Object? gap = null,Object? accountCount = null,Object? excludedSiteCount = null,Object? excludedSiteBalance = null,Object? waitingCount = null,Object? waitingAmount = null,Object? commitmentItems = null,Object? loans = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? companyId = null,Object? companyCode = freezed,Object? companyName = freezed,Object? enabled = null,Object? applies = null,Object? status = null,Object? blocked = null,Object? blockedText = freezed,Object? balance = null,Object? commitments = null,Object? available = null,Object? needed = null,Object? gap = null,Object? accountCount = null,Object? excludedSiteCount = null,Object? excludedSiteBalance = null,Object? waitingCount = null,Object? waitingAmount = null,Object? commitmentItems = null,Object? loans = null,Object? route = freezed,Object? routeText = freezed,Object? pusatBiaya = freezed,}) {
   return _then(FundCheck(
 companyId: null == companyId ? _self.companyId : companyId // ignore: cast_nullable_to_non_nullable
 as int,companyCode: freezed == companyCode ? _self.companyCode : companyCode // ignore: cast_nullable_to_non_nullable
@@ -652,10 +942,25 @@ as int,waitingCount: null == waitingCount ? _self.waitingCount : waitingCount //
 as int,waitingAmount: null == waitingAmount ? _self.waitingAmount : waitingAmount // ignore: cast_nullable_to_non_nullable
 as int,commitmentItems: null == commitmentItems ? _self.commitmentItems : commitmentItems // ignore: cast_nullable_to_non_nullable
 as List<FundCommitmentItem>,loans: null == loans ? _self.loans : loans // ignore: cast_nullable_to_non_nullable
-as List<FundLoanRef>,
+as List<FundLoanRef>,route: freezed == route ? _self.route : route // ignore: cast_nullable_to_non_nullable
+as FundCheckRoute?,routeText: freezed == routeText ? _self.routeText : routeText // ignore: cast_nullable_to_non_nullable
+as String?,pusatBiaya: freezed == pusatBiaya ? _self.pusatBiaya : pusatBiaya // ignore: cast_nullable_to_non_nullable
+as FundPusatBiaya?,
   ));
 }
+/// Create a copy of FundCheck
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$FundPusatBiayaCopyWith<$Res>? get pusatBiaya {
+    if (_self.pusatBiaya == null) {
+    return null;
+  }
 
+  return $FundPusatBiayaCopyWith<$Res>(_self.pusatBiaya!, (value) {
+    return _then(_self.copyWith(pusatBiaya: value));
+  });
+}
 }
 
 
@@ -737,10 +1042,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int companyId,  String? companyCode,  String? companyName,  bool enabled,  bool applies,  FundCheckStatus status,  bool blocked,  String? blockedText,  int balance,  int commitments,  int available,  int needed,  int gap,  int accountCount,  int excludedSiteCount,  int excludedSiteBalance,  int waitingCount,  int waitingAmount,  List<FundCommitmentItem> commitmentItems,  List<FundLoanRef> loans)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int companyId,  String? companyCode,  String? companyName,  bool enabled,  bool applies,  FundCheckStatus status,  bool blocked,  String? blockedText,  int balance,  int commitments,  int available,  int needed,  int gap,  int accountCount,  int excludedSiteCount,  int excludedSiteBalance,  int waitingCount,  int waitingAmount,  List<FundCommitmentItem> commitmentItems,  List<FundLoanRef> loans,  FundCheckRoute? route,  String? routeText,  FundPusatBiaya? pusatBiaya)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _FundCheck() when $default != null:
-return $default(_that.companyId,_that.companyCode,_that.companyName,_that.enabled,_that.applies,_that.status,_that.blocked,_that.blockedText,_that.balance,_that.commitments,_that.available,_that.needed,_that.gap,_that.accountCount,_that.excludedSiteCount,_that.excludedSiteBalance,_that.waitingCount,_that.waitingAmount,_that.commitmentItems,_that.loans);case _:
+return $default(_that.companyId,_that.companyCode,_that.companyName,_that.enabled,_that.applies,_that.status,_that.blocked,_that.blockedText,_that.balance,_that.commitments,_that.available,_that.needed,_that.gap,_that.accountCount,_that.excludedSiteCount,_that.excludedSiteBalance,_that.waitingCount,_that.waitingAmount,_that.commitmentItems,_that.loans,_that.route,_that.routeText,_that.pusatBiaya);case _:
   return orElse();
 
 }
@@ -758,10 +1063,10 @@ return $default(_that.companyId,_that.companyCode,_that.companyName,_that.enable
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int companyId,  String? companyCode,  String? companyName,  bool enabled,  bool applies,  FundCheckStatus status,  bool blocked,  String? blockedText,  int balance,  int commitments,  int available,  int needed,  int gap,  int accountCount,  int excludedSiteCount,  int excludedSiteBalance,  int waitingCount,  int waitingAmount,  List<FundCommitmentItem> commitmentItems,  List<FundLoanRef> loans)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int companyId,  String? companyCode,  String? companyName,  bool enabled,  bool applies,  FundCheckStatus status,  bool blocked,  String? blockedText,  int balance,  int commitments,  int available,  int needed,  int gap,  int accountCount,  int excludedSiteCount,  int excludedSiteBalance,  int waitingCount,  int waitingAmount,  List<FundCommitmentItem> commitmentItems,  List<FundLoanRef> loans,  FundCheckRoute? route,  String? routeText,  FundPusatBiaya? pusatBiaya)  $default,) {final _that = this;
 switch (_that) {
 case _FundCheck():
-return $default(_that.companyId,_that.companyCode,_that.companyName,_that.enabled,_that.applies,_that.status,_that.blocked,_that.blockedText,_that.balance,_that.commitments,_that.available,_that.needed,_that.gap,_that.accountCount,_that.excludedSiteCount,_that.excludedSiteBalance,_that.waitingCount,_that.waitingAmount,_that.commitmentItems,_that.loans);case _:
+return $default(_that.companyId,_that.companyCode,_that.companyName,_that.enabled,_that.applies,_that.status,_that.blocked,_that.blockedText,_that.balance,_that.commitments,_that.available,_that.needed,_that.gap,_that.accountCount,_that.excludedSiteCount,_that.excludedSiteBalance,_that.waitingCount,_that.waitingAmount,_that.commitmentItems,_that.loans,_that.route,_that.routeText,_that.pusatBiaya);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -778,10 +1083,10 @@ return $default(_that.companyId,_that.companyCode,_that.companyName,_that.enable
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int companyId,  String? companyCode,  String? companyName,  bool enabled,  bool applies,  FundCheckStatus status,  bool blocked,  String? blockedText,  int balance,  int commitments,  int available,  int needed,  int gap,  int accountCount,  int excludedSiteCount,  int excludedSiteBalance,  int waitingCount,  int waitingAmount,  List<FundCommitmentItem> commitmentItems,  List<FundLoanRef> loans)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int companyId,  String? companyCode,  String? companyName,  bool enabled,  bool applies,  FundCheckStatus status,  bool blocked,  String? blockedText,  int balance,  int commitments,  int available,  int needed,  int gap,  int accountCount,  int excludedSiteCount,  int excludedSiteBalance,  int waitingCount,  int waitingAmount,  List<FundCommitmentItem> commitmentItems,  List<FundLoanRef> loans,  FundCheckRoute? route,  String? routeText,  FundPusatBiaya? pusatBiaya)?  $default,) {final _that = this;
 switch (_that) {
 case _FundCheck() when $default != null:
-return $default(_that.companyId,_that.companyCode,_that.companyName,_that.enabled,_that.applies,_that.status,_that.blocked,_that.blockedText,_that.balance,_that.commitments,_that.available,_that.needed,_that.gap,_that.accountCount,_that.excludedSiteCount,_that.excludedSiteBalance,_that.waitingCount,_that.waitingAmount,_that.commitmentItems,_that.loans);case _:
+return $default(_that.companyId,_that.companyCode,_that.companyName,_that.enabled,_that.applies,_that.status,_that.blocked,_that.blockedText,_that.balance,_that.commitments,_that.available,_that.needed,_that.gap,_that.accountCount,_that.excludedSiteCount,_that.excludedSiteBalance,_that.waitingCount,_that.waitingAmount,_that.commitmentItems,_that.loans,_that.route,_that.routeText,_that.pusatBiaya);case _:
   return null;
 
 }
@@ -793,7 +1098,7 @@ return $default(_that.companyId,_that.companyCode,_that.companyName,_that.enable
 
 
 class _FundCheck extends FundCheck {
-  const _FundCheck({required this.companyId, this.companyCode, this.companyName, this.enabled = false, this.applies = false, this.status = FundCheckStatus.notApplicable, this.blocked = false, this.blockedText, this.balance = 0, this.commitments = 0, this.available = 0, this.needed = 0, this.gap = 0, this.accountCount = 0, this.excludedSiteCount = 0, this.excludedSiteBalance = 0, this.waitingCount = 0, this.waitingAmount = 0,  List<FundCommitmentItem> commitmentItems = const <FundCommitmentItem>[],  List<FundLoanRef> loans = const <FundLoanRef>[]}): _commitmentItems = commitmentItems,_loans = loans,super._();
+  const _FundCheck({required this.companyId, this.companyCode, this.companyName, this.enabled = false, this.applies = false, this.status = FundCheckStatus.notApplicable, this.blocked = false, this.blockedText, this.balance = 0, this.commitments = 0, this.available = 0, this.needed = 0, this.gap = 0, this.accountCount = 0, this.excludedSiteCount = 0, this.excludedSiteBalance = 0, this.waitingCount = 0, this.waitingAmount = 0,  List<FundCommitmentItem> commitmentItems = const <FundCommitmentItem>[],  List<FundLoanRef> loans = const <FundLoanRef>[], this.route, this.routeText, this.pusatBiaya}): _commitmentItems = commitmentItems,_loans = loans,super._();
   
 
 @override final  int companyId;
@@ -833,6 +1138,12 @@ class _FundCheck extends FundCheck {
   return EqualUnmodifiableListView(_loans);
 }
 
+/// Where Finance pays from (null: an older server).
+@override final  FundCheckRoute? route;
+/// Indonesian one-liner of [route] (null when pt / short, or an older server).
+@override final  String? routeText;
+/// The project's Pusat Biaya; null = no project / not mapped (checked per PT only) or an older server.
+@override final  FundPusatBiaya? pusatBiaya;
 
 /// Create a copy of FundCheck
 /// with the given fields replaced by the non-null parameter values.
@@ -844,18 +1155,18 @@ _$FundCheckCopyWith<_FundCheck> get copyWith => __$FundCheckCopyWithImpl<_FundCh
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _FundCheck&&(identical(other.companyId, companyId) || other.companyId == companyId)&&(identical(other.companyCode, companyCode) || other.companyCode == companyCode)&&(identical(other.companyName, companyName) || other.companyName == companyName)&&(identical(other.enabled, enabled) || other.enabled == enabled)&&(identical(other.applies, applies) || other.applies == applies)&&(identical(other.status, status) || other.status == status)&&(identical(other.blocked, blocked) || other.blocked == blocked)&&(identical(other.blockedText, blockedText) || other.blockedText == blockedText)&&(identical(other.balance, balance) || other.balance == balance)&&(identical(other.commitments, commitments) || other.commitments == commitments)&&(identical(other.available, available) || other.available == available)&&(identical(other.needed, needed) || other.needed == needed)&&(identical(other.gap, gap) || other.gap == gap)&&(identical(other.accountCount, accountCount) || other.accountCount == accountCount)&&(identical(other.excludedSiteCount, excludedSiteCount) || other.excludedSiteCount == excludedSiteCount)&&(identical(other.excludedSiteBalance, excludedSiteBalance) || other.excludedSiteBalance == excludedSiteBalance)&&(identical(other.waitingCount, waitingCount) || other.waitingCount == waitingCount)&&(identical(other.waitingAmount, waitingAmount) || other.waitingAmount == waitingAmount)&&const DeepCollectionEquality().equals(other.commitmentItems, _commitmentItems)&&const DeepCollectionEquality().equals(other.loans, _loans));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _FundCheck&&(identical(other.companyId, companyId) || other.companyId == companyId)&&(identical(other.companyCode, companyCode) || other.companyCode == companyCode)&&(identical(other.companyName, companyName) || other.companyName == companyName)&&(identical(other.enabled, enabled) || other.enabled == enabled)&&(identical(other.applies, applies) || other.applies == applies)&&(identical(other.status, status) || other.status == status)&&(identical(other.blocked, blocked) || other.blocked == blocked)&&(identical(other.blockedText, blockedText) || other.blockedText == blockedText)&&(identical(other.balance, balance) || other.balance == balance)&&(identical(other.commitments, commitments) || other.commitments == commitments)&&(identical(other.available, available) || other.available == available)&&(identical(other.needed, needed) || other.needed == needed)&&(identical(other.gap, gap) || other.gap == gap)&&(identical(other.accountCount, accountCount) || other.accountCount == accountCount)&&(identical(other.excludedSiteCount, excludedSiteCount) || other.excludedSiteCount == excludedSiteCount)&&(identical(other.excludedSiteBalance, excludedSiteBalance) || other.excludedSiteBalance == excludedSiteBalance)&&(identical(other.waitingCount, waitingCount) || other.waitingCount == waitingCount)&&(identical(other.waitingAmount, waitingAmount) || other.waitingAmount == waitingAmount)&&const DeepCollectionEquality().equals(other.commitmentItems, _commitmentItems)&&const DeepCollectionEquality().equals(other.loans, _loans)&&(identical(other.route, route) || other.route == route)&&(identical(other.routeText, routeText) || other.routeText == routeText)&&(identical(other.pusatBiaya, pusatBiaya) || other.pusatBiaya == pusatBiaya));
 }
 
 
 @override
 int get hashCode {
-    return Object.hashAll([runtimeType,companyId,companyCode,companyName,enabled,applies,status,blocked,blockedText,balance,commitments,available,needed,gap,accountCount,excludedSiteCount,excludedSiteBalance,waitingCount,waitingAmount,const DeepCollectionEquality().hash(_commitmentItems),const DeepCollectionEquality().hash(_loans)]);
+    return Object.hashAll([runtimeType,companyId,companyCode,companyName,enabled,applies,status,blocked,blockedText,balance,commitments,available,needed,gap,accountCount,excludedSiteCount,excludedSiteBalance,waitingCount,waitingAmount,const DeepCollectionEquality().hash(_commitmentItems),const DeepCollectionEquality().hash(_loans),route,routeText,pusatBiaya]);
 }
 
 @override
 String toString() {
-    return 'FundCheck(companyId: $companyId, companyCode: $companyCode, companyName: $companyName, enabled: $enabled, applies: $applies, status: $status, blocked: $blocked, blockedText: $blockedText, balance: $balance, commitments: $commitments, available: $available, needed: $needed, gap: $gap, accountCount: $accountCount, excludedSiteCount: $excludedSiteCount, excludedSiteBalance: $excludedSiteBalance, waitingCount: $waitingCount, waitingAmount: $waitingAmount, commitmentItems: $commitmentItems, loans: $loans)';
+    return 'FundCheck(companyId: $companyId, companyCode: $companyCode, companyName: $companyName, enabled: $enabled, applies: $applies, status: $status, blocked: $blocked, blockedText: $blockedText, balance: $balance, commitments: $commitments, available: $available, needed: $needed, gap: $gap, accountCount: $accountCount, excludedSiteCount: $excludedSiteCount, excludedSiteBalance: $excludedSiteBalance, waitingCount: $waitingCount, waitingAmount: $waitingAmount, commitmentItems: $commitmentItems, loans: $loans, route: $route, routeText: $routeText, pusatBiaya: $pusatBiaya)';
 }
 
 
@@ -866,11 +1177,11 @@ abstract mixin class _$FundCheckCopyWith<$Res> implements $FundCheckCopyWith<$Re
   factory _$FundCheckCopyWith(_FundCheck value, $Res Function(_FundCheck) _then) = __$FundCheckCopyWithImpl;
 @override @useResult
 $Res call({
- int companyId, String? companyCode, String? companyName, bool enabled, bool applies, FundCheckStatus status, bool blocked, String? blockedText, int balance, int commitments, int available, int needed, int gap, int accountCount, int excludedSiteCount, int excludedSiteBalance, int waitingCount, int waitingAmount, List<FundCommitmentItem> commitmentItems, List<FundLoanRef> loans
+ int companyId, String? companyCode, String? companyName, bool enabled, bool applies, FundCheckStatus status, bool blocked, String? blockedText, int balance, int commitments, int available, int needed, int gap, int accountCount, int excludedSiteCount, int excludedSiteBalance, int waitingCount, int waitingAmount, List<FundCommitmentItem> commitmentItems, List<FundLoanRef> loans, FundCheckRoute? route, String? routeText, FundPusatBiaya? pusatBiaya
 });
 
 
-
+@override $FundPusatBiayaCopyWith<$Res>? get pusatBiaya;
 
 }
 /// @nodoc
@@ -883,7 +1194,7 @@ class __$FundCheckCopyWithImpl<$Res>
 
 /// Create a copy of FundCheck
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? companyId = null,Object? companyCode = freezed,Object? companyName = freezed,Object? enabled = null,Object? applies = null,Object? status = null,Object? blocked = null,Object? blockedText = freezed,Object? balance = null,Object? commitments = null,Object? available = null,Object? needed = null,Object? gap = null,Object? accountCount = null,Object? excludedSiteCount = null,Object? excludedSiteBalance = null,Object? waitingCount = null,Object? waitingAmount = null,Object? commitmentItems = null,Object? loans = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? companyId = null,Object? companyCode = freezed,Object? companyName = freezed,Object? enabled = null,Object? applies = null,Object? status = null,Object? blocked = null,Object? blockedText = freezed,Object? balance = null,Object? commitments = null,Object? available = null,Object? needed = null,Object? gap = null,Object? accountCount = null,Object? excludedSiteCount = null,Object? excludedSiteBalance = null,Object? waitingCount = null,Object? waitingAmount = null,Object? commitmentItems = null,Object? loans = null,Object? route = freezed,Object? routeText = freezed,Object? pusatBiaya = freezed,}) {
   return _then(_FundCheck(
 companyId: null == companyId ? _self.companyId : companyId // ignore: cast_nullable_to_non_nullable
 as int,companyCode: freezed == companyCode ? _self.companyCode : companyCode // ignore: cast_nullable_to_non_nullable
@@ -905,11 +1216,26 @@ as int,waitingCount: null == waitingCount ? _self.waitingCount : waitingCount //
 as int,waitingAmount: null == waitingAmount ? _self.waitingAmount : waitingAmount // ignore: cast_nullable_to_non_nullable
 as int,commitmentItems: null == commitmentItems ? _self._commitmentItems : commitmentItems // ignore: cast_nullable_to_non_nullable
 as List<FundCommitmentItem>,loans: null == loans ? _self._loans : loans // ignore: cast_nullable_to_non_nullable
-as List<FundLoanRef>,
+as List<FundLoanRef>,route: freezed == route ? _self.route : route // ignore: cast_nullable_to_non_nullable
+as FundCheckRoute?,routeText: freezed == routeText ? _self.routeText : routeText // ignore: cast_nullable_to_non_nullable
+as String?,pusatBiaya: freezed == pusatBiaya ? _self.pusatBiaya : pusatBiaya // ignore: cast_nullable_to_non_nullable
+as FundPusatBiaya?,
   ));
 }
 
+/// Create a copy of FundCheck
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$FundPusatBiayaCopyWith<$Res>? get pusatBiaya {
+    if (_self.pusatBiaya == null) {
+    return null;
+  }
 
+  return $FundPusatBiayaCopyWith<$Res>(_self.pusatBiaya!, (value) {
+    return _then(_self.copyWith(pusatBiaya: value));
+  });
+}
 }
 
 // dart format on

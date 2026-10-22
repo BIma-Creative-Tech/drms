@@ -180,7 +180,9 @@ KK di PT pembayar, **KM "Antar PT" otomatis** di rekening penerimaan antar-PT PT
    baris Kas menampilkan nomor PJA dan PT lawannya.
 5. **Cek dana di persetujuan:** bila PT Anda menyalakan "Cek dana saat persetujuan", panel **Ketersediaan dana PT** di
    pengajuan menunjukkan saldo (tanpa akun site), komitmen dan dana tersedia; pengajuan disetujui yang lama tidak
-   ditransfer tetap menahan dana — transfer atau batalkan.
+   ditransfer tetap menahan dana — transfer atau batalkan. Sejak 0.19.1 panel juga menampilkan **pusat biaya**
+   project (dana bebas akun itu). Pengajuan lolos bila pusat biaya **atau** PT cukup. Baris di bawah angka
+   menyebut dari akun mana Anda membayar: pusat biaya sendiri, atau akun lain (pinjaman antar project otomatis).
 
 ## 4. LPJ Pengajuan Baru
 

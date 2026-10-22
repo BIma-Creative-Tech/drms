@@ -317,13 +317,28 @@ export const FundCheck = z
     commitments: signedRupiah.meta({ description: 'Komitmen: approved-not-transferred + unpaid LPJ shortfalls + loans instructed with this PT as lender.' }),
     available: signedRupiah.meta({ description: 'Dana tersedia = balance − commitments (may be negative).' }),
     needed: rupiah.meta({ description: 'Dibutuhkan: the request\'s grand total (not yet committed).' }),
-    gap: rupiah.meta({ description: 'Kurang = max(0, needed − available).' }),
+    gap: rupiah.meta({ description: 'Kurang = max(0, needed − max(available, pusatBiaya.available)) (ADR 0031 amendment: Pusat Biaya first, then PT).' }),
+    route: z.enum(['pusat_biaya', 'other_account', 'pt', 'short']).meta({
+      description: 'ADR 0031 amendment: pusat_biaya = the project\'s Pusat Biaya covers the need; other_account = it does not, the PT does (Finance pays from another account → automatic inter-project loan); pt = no Pusat Biaya, the PT covers it; short = neither.',
+    }),
+    routeText: z.string().nullable().meta({ description: 'Indonesian one-liner of `route` (null when pt / short).' }),
+    pusatBiaya: z
+      .object({
+        accountId: id,
+        name: z.string(),
+        balance: signedRupiah.meta({ description: 'Saldo of the account (a site account too).' }),
+        commitments: rupiah.meta({ description: 'Approved-not-transferred requests of the projects mapped to it + their unpaid LPJ shortfalls + approved, not yet disbursed cash-backed loans it lends.' }),
+        available: signedRupiah.meta({ description: 'Dana bebas = balance − commitments.' }),
+        commitmentItems: z.array(z.object({ kind: z.enum(['request', 'shortfall', 'loan', 'project_loan']), id, docNo: z.string().nullable(), amount: rupiah, status: z.string() })),
+      })
+      .nullable()
+      .meta({ description: 'The project\'s Pusat Biaya (cash account) and its figures; null = no project / not mapped (checked per PT only).' }),
     accountCount: z.number().int().meta({ description: '"n akun, tanpa akun site".' }),
     excludedSiteAccounts: z.object({ count: z.number().int(), balance: signedRupiah }),
     waitingAtOwner: z.object({ count: z.number().int(), amount: rupiah }).meta({ description: 'Other requests of the PT waiting at their final decision (not committed: first approved, first served).' }),
     commitmentItems: z
-      .array(z.object({ kind: z.enum(['request', 'shortfall', 'loan']), id, docNo: z.string().nullable(), amount: rupiah, status: z.string() }))
-      .meta({ description: 'The commitments behind the figure, largest first (max 20). kind loan: id = the inter-PT loan.' }),
+      .array(z.object({ kind: z.enum(['request', 'shortfall', 'loan', 'project_loan']), id, docNo: z.string().nullable(), amount: rupiah, status: z.string() }))
+      .meta({ description: 'The commitments behind the figure, largest first (max 20). kind loan: id = the inter-PT loan; project_loan (Pusat Biaya list only): id = the inter-project loan.' }),
     loans: z
       .array(
         z.object({

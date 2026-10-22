@@ -90,6 +90,33 @@ project is not mapped).
 - Loan legs are internal: excluded from K-02 operational flow (PT level), own lines in Rekap Kas.
 - Admin tile "Project tanpa pusat biaya" replaces "Pusat biaya tanpa penanggung jawab".
 
+### 6. Fund check per Pusat Biaya first (amendment, user 2026-10-22)
+
+ADR 0029 kept the fund check per PT. With every project mapped to a Pusat Biaya that hid free money. In production,
+PT LAS was short overall: 196 jt in five accounts against 286 jt of commitments, most of them on CSR BULUNGAN. A
+17 jt request of a CSR SEPASO project was blocked even though CSR SEPASO itself had 51 jt and no commitment. User
+decision **"PB dulu, lalu PT"**:
+
+- **Dana bebas Pusat Biaya** = balance of the project's account. A site account counts here, because it is the
+  project's own account. From that balance subtract the account's commitments:
+  - approved-but-not-transferred requests of the projects mapped to the account;
+  - their verified, unpaid LPJ shortfalls;
+  - approved, cash-backed inter-project loans the account lends that are not yet disbursed.
+
+  SQL: `pk_pb_balance` / `pk_pb_commitments`.
+- The final approval (and the Owner's own submit) passes when the request is covered by the Pusat Biaya **or** by the
+  PT's "Dana tersedia" (ADR 0029, unchanged), whichever is larger. SQL: `pk_request_fund_available(company, project)`.
+  The DB backstop `pk_expense_fund_guard` uses the same function, under the same per-PT lock.
+- Route shown in the panel (web + APK `fundCheck.route` / `routeText`):
+  - `pusat_biaya`: Finance pays from the Pusat Biaya.
+  - `other_account`: the Pusat Biaya is short but the PT has the money. Finance pays from another account, and the
+    transfer creates the automatic inter-project loan (§3).
+  - `pt`: no mapped project; the PT has the money.
+  - `short`: neither covers the request. Reject it, or the Owner orders an inter-PT loan.
+- Requests without a project (vendor / PT grup) and projects not yet mapped are checked per PT only, as before.
+- Consequence: an overcommitted account no longer blocks the other projects of its PT. The PT total can go further
+  negative, and the dashboard and the PT figure in the panel still show that.
+
 ## Migration / rollout
 
 1. `20261021_100000_d2110_pb_enums` (cash source `project_loan`, audit `disburse`, `auto_create`).

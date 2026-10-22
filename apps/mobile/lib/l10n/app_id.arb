@@ -2855,6 +2855,26 @@
       }
     }
   },
+  "fundPbTitle": "Pusat biaya: {name}",
+  "@fundPbTitle": {
+    "description": "ADR 0031 amendment: heading of the Pusat Biaya figures in the fund panel (web FundPanel.tsx).",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "fundPbBalance": "Saldo akun",
+  "fundPbAvailable": "Dana bebas",
+  "fundPtSection": "Seluruh PT {pt}",
+  "@fundPtSection": {
+    "description": "ADR 0031 amendment: heading of the PT figures after the Pusat Biaya ones.",
+    "placeholders": {
+      "pt": {
+        "type": "String"
+      }
+    }
+  },
   "fundCommitments": "Komitmen",
   "fundCommitmentDetails": "Rincian komitmen ({count})",
   "@fundCommitmentDetails": {

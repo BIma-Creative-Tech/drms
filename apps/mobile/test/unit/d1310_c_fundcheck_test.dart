@@ -64,6 +64,62 @@ void main() {
       expect(FundCheckStatus.fromCode('weird'), FundCheckStatus.notApplicable);
     });
 
+    test('ADR 0031 amendment: route, routeText and the Pusat Biaya with its commitments (project_loan)', () {
+      final f = fundCheckFromJson(fundCheckPbJson())!;
+      expect(f.route, FundCheckRoute.pusatBiaya);
+      expect(f.routeText, 'Dana pusat biaya CSR SEPASO/KUTIM cukup — Finance membayar dari akun ini.');
+      final pb = f.pusatBiaya!;
+      expect([pb.accountId, pb.name], [12, 'CSR SEPASO/KUTIM']);
+      expect([pb.balance, pb.commitments, pb.available], [3100000, 600000, 2500000]);
+      expect(pb.commitmentItems.map((c) => '${c.kind}:${c.label}:${c.amount}'), [
+        'project_loan:PJP/DRMS/2610/0003:400000',
+        'request:PB/DRMS/2610/0010:200000',
+      ]);
+      expect(pb.commitmentItems.first.kindLabel, 'Pinjaman antar project disetujui, belum dicairkan');
+      expect([f.available, f.gap, f.short, f.blockedReason], [1000000, 0, false, null], reason: 'available = the PT');
+      expect(fundCheckFromJson(fundCheckPbJson(route: 'other_account'))!.route, FundCheckRoute.otherAccount);
+      expect(FundCheckRoute.fromCode('pt'), FundCheckRoute.pt);
+      expect(FundCheckRoute.fromCode('weird'), isNull);
+    });
+
+    test('ADR 0031 amendment: an older server (no route / routeText / pusatBiaya) or a malformed Pusat Biaya', () {
+      final old = fundCheckFromJson(fundCheckJson())!;
+      expect([old.route, old.routeText, old.pusatBiaya], [null, null, null]);
+      final bad = fundCheckFromJson({
+        ...fundCheckPbJson(),
+        'route': 42,
+        'pusatBiaya': {'name': 'Tanpa id'},
+      })!;
+      expect([bad.route, bad.pusatBiaya], [null, null]);
+      final noName = fundCheckFromJson({
+        ...fundCheckPbJson(),
+        'pusatBiaya': {'accountId': 12, 'commitmentItems': 'x'},
+      })!;
+      expect(noName.pusatBiaya, const FundPusatBiaya(accountId: 12, name: '#12'));
+    });
+
+    test('ADR 0031 amendment: blocked with a Pusat Biaya names it (server text, else the local sentence)', () {
+      final short = fundCheckFromJson(fundCheckPbJson(route: 'short'))!;
+      expect(short.route, FundCheckRoute.short);
+      expect(short.routeText, isNull);
+      expect(short.short, isTrue);
+      expect(
+        short.blockedReason,
+        'Dana pusat biaya CSR SEPASO/KUTIM maupun dana PT tidak cukup — kurang Rp 447.500. Tolak, atau perintahkan '
+        'pinjaman antar-PT.',
+      );
+      final local = fundCheckFromJson({...fundCheckPbJson(route: 'short'), 'blockedText': null})!;
+      expect(local.blockedReason, short.blockedReason);
+      expect(fundBlockedText(447500, pbName: 'CSR SEPASO/KUTIM'), short.blockedReason);
+      expect(fundBlockedText(447500, pbName: ''), fundBlockedText(447500));
+      expect(
+        fundBlockedDraftText(447500, pbName: 'CSR SEPASO/KUTIM'),
+        'Dana pusat biaya CSR SEPASO/KUTIM maupun dana PT tidak cukup — kurang Rp 447.500. Pengajuan Anda tidak dapat '
+        'dikirim sampai dana tersedia; perintahkan pinjaman antar-PT.',
+      );
+      expect(fundBlockedDraftText(447500), startsWith('Dana PT tidak cukup — kurang Rp 447.500. Pengajuan Anda'));
+    });
+
     test('instruction route: borrower = the PT, the request pre-linked, amount = the gap', () {
       final d = detailFromJson(fundDetailJson());
       final uri = Uri.parse(icLoanInstructPath(d));
@@ -143,6 +199,25 @@ void main() {
       expect(
         fundProblemMessage(bare),
         'Dana PT tidak cukup untuk langkah ini. Tolak, atau perintahkan pinjaman antar-PT.',
+      );
+    });
+
+    test('ADR 0031 amendment: a body with the Pusat Biaya and the figures only names it', () {
+      final e = ProblemException.fromJson(409, {
+        'title': 'Conflict',
+        'code': 'FUND_INSUFFICIENT',
+        'companyId': 1,
+        'available': 1000000,
+        'needed': 1447500,
+        'gap': 447500,
+        'pusatBiayaAccountId': 12,
+        'pusatBiayaName': 'CSR SEPASO/KUTIM',
+        'pusatBiayaAvailable': 400000,
+      });
+      expect(
+        fundProblemMessage(e),
+        'Dana pusat biaya CSR SEPASO/KUTIM maupun dana PT tidak cukup: tersedia Rp 1.000.000, dibutuhkan '
+        'Rp 1.447.500, kurang Rp 447.500. Tolak, atau perintahkan pinjaman antar-PT.',
       );
     });
 

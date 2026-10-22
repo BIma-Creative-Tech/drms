@@ -43,6 +43,46 @@ Map<String, dynamic> fundCheckJson({
   ],
 };
 
+/// ADR 0031 amendment (user 2026-10-22, "PB dulu, lalu PT"): the same request of a project mapped to the Pusat Biaya
+/// "CSR SEPASO/KUTIM" (cash account 12). [route]: pusat_biaya = its Dana bebas Rp 2.500.000 covers the Rp 1.447.500;
+/// other_account = Dana bebas Rp 400.000, the PT's Rp 2.000.000 covers it; short = Dana bebas Rp 400.000 and the PT's
+/// Rp 1.000.000 → short Rp 447.500 (against the larger figure).
+Map<String, dynamic> fundCheckPbJson({String route = 'pusat_biaya'}) {
+  final pbAvailable = route == 'pusat_biaya' ? 2500000 : 400000;
+  final ptAvailable = route == 'other_account' ? 2000000 : 1000000;
+  final short = route == 'short';
+  return {
+    ...fundCheckJson(blocked: short),
+    'status': short ? 'insufficient' : 'ok',
+    'blockedText': short
+        ? 'Dana pusat biaya CSR SEPASO/KUTIM maupun dana PT tidak cukup — kurang Rp 447.500. Tolak, atau perintahkan '
+              'pinjaman antar-PT.'
+        : null,
+    'available': ptAvailable,
+    'gap': short ? 447500 : 0,
+    'loans': const [],
+    'route': route,
+    'routeText': switch (route) {
+      'pusat_biaya' => 'Dana pusat biaya CSR SEPASO/KUTIM cukup — Finance membayar dari akun ini.',
+      'other_account' =>
+        'Dana pusat biaya CSR SEPASO/KUTIM kurang Rp 1.047.500, tetapi dana PT cukup — Finance membayar dari akun lain '
+            'di PT ini (tercatat sebagai pinjaman antar project otomatis).',
+      _ => null,
+    },
+    'pusatBiaya': {
+      'accountId': 12,
+      'name': 'CSR SEPASO/KUTIM',
+      'balance': pbAvailable + 600000,
+      'commitments': 600000,
+      'available': pbAvailable,
+      'commitmentItems': [
+        {'kind': 'project_loan', 'id': 8, 'docNo': 'PJP/DRMS/2610/0003', 'amount': 400000, 'status': 'approved'},
+        {'kind': 'request', 'id': 40, 'docNo': 'PB/DRMS/2610/0010', 'amount': 200000, 'status': 'approved'},
+      ],
+    },
+  };
+}
+
 /// Request detail at the Owner step (ADR 0026 rule Direktur → Owner) with the fund panel; [allowed] = the caller's
 /// actions (the Owner: approve, reject, instruct_loan).
 Map<String, dynamic> fundDetailJson({

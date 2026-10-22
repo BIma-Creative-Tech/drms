@@ -40,6 +40,14 @@ sendiri saat **Kirim**) **ditolak bila dana PT tidak cukup**:
   dihitung) − **komitmen**: pengajuan yang sudah disetujui tetapi belum ditransfer, kekurangan LPJ yang belum dibayar,
   dan perintah pinjaman antar-PT dari PT ini yang belum dicairkan. Pengajuan yang masih menunggu persetujuan belum
   dihitung — yang disetujui lebih dulu memakai dana lebih dulu.
+- **Pusat biaya dulu, lalu PT** (sejak 0.19.1). Untuk project yang sudah dipetakan, panel menampilkan dulu
+  **Pusat biaya: <akun>**: saldo akun − komitmen project-project di akun itu = **dana bebas**. Pengajuan **lolos** bila
+  dana bebas pusat biaya **atau** dana tersedia PT mencukupi:
+  - Pusat biaya cukup: Finance membayar dari akun itu.
+  - Hanya PT yang cukup: Finance membayar dari akun lain dan tercatat sebagai pinjaman antar project otomatis.
+  - Ditolak hanya bila keduanya kurang.
+
+  Pengajuan tanpa project dan project yang belum dipetakan tetap dicek per PT.
 - Di halaman pengajuan ada panel **"Ketersediaan dana PT …"** (saldo, komitmen + rinciannya, dana tersedia, dibutuhkan,
   **kurang Rp …**). Saat dana kurang tombol **Setujui** nonaktif dengan alasannya; **Tolak** tetap bisa. Di kotak
   Persetujuan baris itu bertanda **"Dana kurang Rp …"**. Anda juga mendapat notifikasi "Dana PT … tidak cukup" saat
