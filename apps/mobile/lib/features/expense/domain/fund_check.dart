@@ -23,12 +23,35 @@ enum FundCheckStatus {
       FundCheckStatus.values.where((s) => s.code == c).firstOrNull ?? FundCheckStatus.notApplicable;
 }
 
-/// One commitment behind "Komitmen" (`fundCheck.commitmentItems[]`, largest first, max 20).
+/// `fundCheck.route` (ADR 0031 amendment, user 2026-10-22 "PB dulu, lalu PT"): where Finance pays the request from at
+/// its approval, or that neither the Pusat Biaya nor the PT covers it. Null = an older server (no field).
+enum FundCheckRoute {
+  /// The project's Pusat Biaya covers the need: Finance pays from that account.
+  pusatBiaya('pusat_biaya'),
+
+  /// The Pusat Biaya does not, the PT does: Finance pays from another account of the PT (automatic inter-project loan).
+  otherAccount('other_account'),
+
+  /// No Pusat Biaya; the PT covers it.
+  pt('pt'),
+
+  /// Neither covers it.
+  short('short');
+
+  const FundCheckRoute(this.code);
+  final String code;
+
+  static FundCheckRoute? fromCode(String? c) => FundCheckRoute.values.where((r) => r.code == c).firstOrNull;
+}
+
+/// One commitment behind "Komitmen" (`fundCheck.commitmentItems[]` / `fundCheck.pusatBiaya.commitmentItems[]`, largest
+/// first, max 20).
 @freezed
 abstract class FundCommitmentItem with _$FundCommitmentItem {
   const FundCommitmentItem._();
   const factory FundCommitmentItem({
-    /// request | shortfall | loan (loan: [id] = the inter-PT loan the PT lends, not yet disbursed).
+    /// request | shortfall | loan | project_loan (loan: [id] = the inter-PT loan the PT lends, not yet disbursed;
+    /// project_loan: [id] = the approved inter-project loan the Pusat Biaya lends, not yet disbursed).
     required String kind,
     required int id,
     String? docNo,
@@ -41,6 +64,7 @@ abstract class FundCommitmentItem with _$FundCommitmentItem {
     'request' => 'Pengajuan disetujui, belum ditransfer',
     'shortfall' => 'Kekurangan LPJ belum dibayar',
     'loan' => 'Perintah pinjaman (PT ini pemberi), belum dicairkan',
+    'project_loan' => 'Pinjaman antar project disetujui, belum dicairkan',
     _ => kind,
   };
 
@@ -79,7 +103,22 @@ String icLoanStatusLabel(String code) => switch (code) {
   _ => code,
 };
 
-/// `ExpenseRequestDetail.fundCheck` (openapi). Figures are integer Rupiah; [available] may be negative.
+/// `fundCheck.pusatBiaya` (ADR 0031 amendment): the project's Pusat Biaya (a cash account) and its figures — Saldo akun −
+/// Komitmen = Dana bebas ([available], may be negative).
+@freezed
+abstract class FundPusatBiaya with _$FundPusatBiaya {
+  const factory FundPusatBiaya({
+    required int accountId,
+    required String name,
+    @Default(0) int balance,
+    @Default(0) int commitments,
+    @Default(0) int available,
+    @Default(<FundCommitmentItem>[]) List<FundCommitmentItem> commitmentItems,
+  }) = _FundPusatBiaya;
+}
+
+/// `ExpenseRequestDetail.fundCheck` (openapi). Figures are integer Rupiah; [available] (the PT's) may be negative.
+/// [gap] / [status] / [blocked] are computed by the server against max(PT available, Pusat Biaya available).
 @freezed
 abstract class FundCheck with _$FundCheck {
   const FundCheck._();
@@ -114,6 +153,15 @@ abstract class FundCheck with _$FundCheck {
     @Default(0) int waitingAmount,
     @Default(<FundCommitmentItem>[]) List<FundCommitmentItem> commitmentItems,
     @Default(<FundLoanRef>[]) List<FundLoanRef> loans,
+
+    /// Where Finance pays from (null: an older server).
+    FundCheckRoute? route,
+
+    /// Indonesian one-liner of [route] (null when pt / short, or an older server).
+    String? routeText,
+
+    /// The project's Pusat Biaya; null = no project / not mapped (checked per PT only) or an older server.
+    FundPusatBiaya? pusatBiaya,
   }) = _FundCheck;
 
   /// "Kurang Rp X" (red) instead of "Cukup".
@@ -123,18 +171,23 @@ abstract class FundCheck with _$FundCheck {
   String get code => companyCode ?? '#$companyId';
 
   /// Text of the disabled "Setujui": the server's `blockedText`, else the same sentence built locally.
-  String? get blockedReason =>
-      !blocked ? null : (blockedText?.trim().isNotEmpty == true ? blockedText : fundBlockedText(gap));
+  String? get blockedReason => !blocked
+      ? null
+      : (blockedText?.trim().isNotEmpty == true ? blockedText : fundBlockedText(gap, pbName: pusatBiaya?.name));
 }
 
-/// Web `blockedDecisionText` (`domain/fundcheck/rules.ts`).
-String fundBlockedText(int gap) =>
-    'Dana PT tidak cukup — kurang ${formatRupiah(gap)}. Tolak, atau perintahkan pinjaman antar-PT.';
+/// Subject of the shortfall sentences: the Pusat Biaya and the PT, or the PT only (web `rules.ts` / `FundPanel.tsx`).
+String _fundWho(String? pbName) =>
+    pbName != null && pbName.isNotEmpty ? 'Dana pusat biaya $pbName maupun dana PT' : 'Dana PT';
+
+/// Web `blockedDecisionText` (`domain/fundcheck/rules.ts`); [pbName] = the project's Pusat Biaya, if any.
+String fundBlockedText(int gap, {String? pbName}) =>
+    '${_fundWho(pbName)} tidak cukup — kurang ${formatRupiah(gap)}. Tolak, atau perintahkan pinjaman antar-PT.';
 
 /// Draft variant of the web panel (the Owner's own request is checked at submit and stays Draft).
-String fundBlockedDraftText(int gap) =>
-    'Dana PT tidak cukup — kurang ${formatRupiah(gap)}. Pengajuan Anda tidak dapat dikirim sampai dana tersedia; '
-    'perintahkan pinjaman antar-PT.';
+String fundBlockedDraftText(int gap, {String? pbName}) =>
+    '${_fundWho(pbName)} tidak cukup — kurang ${formatRupiah(gap)}. Pengajuan Anda tidak dapat dikirim sampai dana '
+    'tersedia; perintahkan pinjaman antar-PT.';
 
 /// Machine code of the refusal (openapi; `domain/fundcheck/rules.ts`).
 const fundInsufficientCode = 'FUND_INSUFFICIENT';
@@ -148,9 +201,9 @@ String? serverSentence(Object? v) {
 int? _num(Object? v) => v is num ? v.toInt() : null;
 
 /// Indonesian message of a 409 `FUND_INSUFFICIENT` (final approval, the Owner's own submit, a repayment), null for any
-/// other problem. The server's sentence names the PT and the figures, so it wins; the local text is the fallback for a
-/// body with the figures only (`available`, `needed`, `gap`), then a generic sentence. [draft] = the refused step was
-/// the Owner's own submit (the request stays Draft).
+/// other problem. The server's sentence names the PT (and the Pusat Biaya) and the figures, so it wins; the local text is
+/// the fallback for a body with the figures only (`available`, `needed`, `gap`, optionally `pusatBiayaName`), then a
+/// generic sentence. [draft] = the refused step was the Owner's own submit (the request stays Draft).
 String? fundProblemMessage(ProblemException e, {bool draft = false}) {
   if (e.code != fundInsufficientCode) return null;
   final server = serverSentence(e.detail) ?? serverSentence(e.title);
@@ -161,8 +214,10 @@ String? fundProblemMessage(ProblemException e, {bool draft = false}) {
   final tail = draft
       ? 'Pengajuan tetap Draft — perintahkan pinjaman antar-PT, lalu kirim lagi.'
       : 'Tolak, atau perintahkan pinjaman antar-PT.';
-  if (available == null || needed == null) return 'Dana PT tidak cukup untuk langkah ini. $tail';
+  final pbName = b['pusatBiayaName'] is String ? (b['pusatBiayaName'] as String).trim() : null;
+  final who = _fundWho(pbName);
+  if (available == null || needed == null) return '$who tidak cukup untuk langkah ini. $tail';
   final gap = _num(b['gap']) ?? (needed - available < 0 ? 0 : needed - available);
-  return 'Dana PT tidak cukup: tersedia ${formatRupiah(available)}, dibutuhkan ${formatRupiah(needed)}, '
+  return '$who tidak cukup: tersedia ${formatRupiah(available)}, dibutuhkan ${formatRupiah(needed)}, '
       'kurang ${formatRupiah(gap)}. $tail';
 }

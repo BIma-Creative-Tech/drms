@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-10-22
+
+**Fund check per Pusat Biaya first, then PT (ADR 0031 §6, user 2026-10-22).** One migration
+(`20261022_100000_d2210_pb_fund`, functions only, no data change).
+
+### Changed
+- Final approval (and the Owner's own submit) of a request whose project is mapped to a Pusat Biaya passes when the
+  account's **dana bebas** covers it, or when the PT's **Dana tersedia** does (whichever is larger):
+  - dana bebas = account balance − approved-not-transferred requests of the projects mapped to it − their unpaid LPJ
+    shortfalls − approved, undisbursed cash-backed loans it lends.
+  - SQL `pk_pb_balance`, `pk_pb_commitments`, `pk_request_fund_available`. The DB backstop `pk_expense_fund_guard` uses
+    the same rule.
+  - Requests without a mapped project are checked per PT as before.
+- Request detail `fundCheck` gains `route` (`pusat_biaya` | `other_account` | `pt` | `short`), `routeText`, and
+  `pusatBiaya` (figures + commitment items). `gap`, `blocked` and `blockedText` use the larger figure.
+- 409 FUND_INSUFFICIENT adds `pusatBiayaAccountId`, `pusatBiayaName` and `pusatBiayaAvailable`. Its sentence names the
+  Pusat Biaya.
+- Web panel "Ketersediaan dana" shows the Pusat Biaya block before the PT figures, plus the route line. APK parity.
+- Approval inbox badge "Dana kurang" uses the same rule.
+
+### Fixed
+- `migrations/index.ts` listed two 0.19.0 migrations twice. The 0.19.0 migrate ran each of them once, in order, so
+  production was not affected.
+
 ## [0.19.0] - 2026-10-22
 
 **Pusat Biaya = akun kas; inter-project loans move cash (ADR 0031, user 2026-10-21, PR #131); APK 0.11.0.** Three

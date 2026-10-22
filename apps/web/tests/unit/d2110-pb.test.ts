@@ -77,9 +77,10 @@ describe('project Pusat Biaya validation', () => {
 })
 
 describe('migrations wiring', () => {
-  it('enum → schema → guard, last in the list', () => {
+  it('enum → schema → guard, in this order', () => {
     const names = migrations.map((m) => m.name)
-    expect(names.slice(-3)).toEqual(['20261021_100000_d2110_pb_enums', '20261021_100100_d2110_pb_schema', '20261021_100200_d2110_pb_guard'])
+    const i = names.indexOf('20261021_100000_d2110_pb_enums')
+    expect(names.slice(i, i + 3)).toEqual(['20261021_100000_d2110_pb_enums', '20261021_100100_d2110_pb_schema', '20261021_100200_d2110_pb_guard'])
   })
 
   it('renumber lists: the loan guard keeps its prelude, the new trigger functions are neutral', () => {

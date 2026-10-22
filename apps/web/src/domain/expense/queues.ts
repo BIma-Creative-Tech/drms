@@ -13,8 +13,7 @@ import { budgetImpact, lastLevel, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
 import { ackStepLabel, approvalStepLabel, decisionByOf, requestStatusLabel } from './timeline'
 import { payeeOf, requestKindLabel, TRANSFER_QUEUE_WHERE } from './types'
-import { inboxFundShort } from '@/domain/fundcheck/service'
-import type { FundFigures } from '@/domain/fundcheck/rules'
+import { inboxFundShort, newFundCache } from '@/domain/fundcheck/service'
 
 export { TRANSFER_QUEUE_WHERE }
 
@@ -140,7 +139,7 @@ export async function approvalInbox(req: PayloadRequest, f?: QueueFilter) {
   const warnPct = s.budgetWarnPct ?? 85
   const warnOf = new Map<number, number>()
   // ADR 0029 §2: one availability per PT per inbox read (badge "Dana kurang Rp X")
-  const funds = new Map<number, FundFigures | null>()
+  const funds = newFundCache()
   const out = []
   for (const d of docs) {
     const cid = relId((d as { company?: unknown }).company)
@@ -165,7 +164,7 @@ export async function approvalInbox(req: PayloadRequest, f?: QueueFilter) {
       decisionBy: decisionByOf(snap, step, step === 'acknowledge' ? 0 : (d.currentLevel ?? 1)),
       finalStep,
       // ADR 0029: the gap of a row at its final decision (PT with the fund check on, Kas viewer) — "Dana kurang Rp X"
-      fundShort: await inboxFundShort(req, { company: (d as { company?: unknown }).company, grandTotal: d.grandTotal ?? 0, finalStep }, funds),
+      fundShort: await inboxFundShort(req, { company: (d as { company?: unknown }).company, project: d.project, grandTotal: d.grandTotal ?? 0, finalStep }, funds),
       selfApproval: snap?.selfApproval ?? null,
       budget: { basis: p?.budget ? ('project' as const) : ('none' as const), pctBefore: b.before, pctAfter: b.after, overWarn: b.after !== null && b.after > itemWarn, warnPct: itemWarn },
       flags: await flagCounts(req, d.id),

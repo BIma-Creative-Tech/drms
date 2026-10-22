@@ -15,6 +15,7 @@ import 'package:proyekkas/features/expense/application/expense_providers.dart';
 import 'package:proyekkas/features/expense/data/expense_mappers.dart';
 import 'package:proyekkas/features/expense/domain/expense_request.dart';
 import 'package:proyekkas/features/expense/presentation/request_detail_screen.dart';
+import 'package:proyekkas/features/expense/presentation/widgets/fund_check_panel.dart';
 import 'package:proyekkas/features/expense/presentation/widgets/receipt_thumb.dart';
 import 'package:proyekkas/features/finance/application/finance_providers.dart';
 import 'package:proyekkas/features/finance/domain/transfer_queue.dart';
@@ -202,6 +203,112 @@ void main() {
       expect(_onPressed(tester, find.byKey(const Key('action-approve'))), isNotNull);
     });
 
+    testWidgets('ADR 0031 amendment: Pusat Biaya first (Saldo akun − Komitmen = Dana bebas), then "Seluruh PT", the '
+        'route text; Setujui enabled', (tester) async {
+      await pumpScreen(
+        tester,
+        const RequestDetailScreen(id: 42),
+        auth: _owner(),
+        overrides: [
+          requestDetailProvider(42).overrideWith(
+            (ref) async =>
+                detailFromJson(fundDetailJson(allowed: const ['approve', 'reject'], fundCheck: fundCheckPbJson())),
+          ),
+          receiptThumbProvider(901).overrideWith((ref) => Future.error(const NetworkException())),
+        ],
+      );
+      expect(_text(tester, 'fund-pb-title'), 'Pusat biaya: CSR SEPASO/KUTIM');
+      expect(_text(tester, 'fund-pb-balance'), 'Rp 3.100.000');
+      expect(_text(tester, 'fund-pb-commitments'), '− Rp 600.000');
+      expect(_text(tester, 'fund-pb-available'), 'Rp 2.500.000');
+      expect(_text(tester, 'fund-pt-title'), 'Seluruh PT DRMS');
+      expect(_text(tester, 'fund-available'), 'Rp 1.000.000');
+      expect(_text(tester, 'fund-gap'), 'Cukup');
+      expect(_text(tester, 'fund-route'), 'Dana pusat biaya CSR SEPASO/KUTIM cukup — Finance membayar dari akun ini.');
+      expect(find.byKey(const Key('fund-blocked-text')), findsNothing);
+      // order: Pusat Biaya figures above the PT ones
+      expect(
+        tester.getTopLeft(find.byKey(const Key('fund-pb-available'))).dy,
+        lessThan(tester.getTopLeft(find.byKey(const Key('fund-pt-title'))).dy),
+      );
+      expect(
+        tester.getTopLeft(find.byKey(const Key('fund-pt-title'))).dy,
+        lessThan(tester.getTopLeft(find.byKey(const Key('fund-balance'))).dy),
+      );
+      // the Pusat Biaya's commitment list (expandable), with the inter-project loan
+      expect(find.byKey(const Key('fund-pb-commitment-project_loan-8')), findsNothing);
+      await tester.ensureVisible(find.byKey(const Key('fund-pb-commitment-list')));
+      await tester.tap(find.byKey(const Key('fund-pb-commitment-list')));
+      await tester.pumpAndSettle();
+      expect(
+        _text(tester, 'fund-pb-commitment-project_loan-8'),
+        'PJP/DRMS/2610/0003 · Rp 400.000 · Pinjaman antar project disetujui, belum dicairkan',
+      );
+      expect(_onPressed(tester, find.byKey(const Key('action-approve'))), isNotNull);
+    });
+
+    testWidgets('ADR 0031 amendment: neither the Pusat Biaya nor the PT covers it → blocked text names both, no route '
+        'text', (tester) async {
+      await pumpScreen(
+        tester,
+        const RequestDetailScreen(id: 42),
+        auth: _owner(),
+        overrides: [
+          requestDetailProvider(42)
+              .overrideWith((ref) async => detailFromJson(fundDetailJson(fundCheck: fundCheckPbJson(route: 'short')))),
+          receiptThumbProvider(901).overrideWith((ref) => Future.error(const NetworkException())),
+        ],
+      );
+      expect(_text(tester, 'fund-pb-available'), 'Rp 400.000');
+      expect(_text(tester, 'fund-gap'), 'Kurang Rp 447.500');
+      expect(find.byKey(const Key('fund-route')), findsNothing);
+      expect(
+        _text(tester, 'fund-blocked-text'),
+        'Dana pusat biaya CSR SEPASO/KUTIM maupun dana PT tidak cukup — kurang Rp 447.500. Tolak, atau perintahkan '
+        'pinjaman antar-PT.',
+      );
+      expect(_onPressed(tester, find.byKey(const Key('action-approve'))), isNull);
+    });
+
+    testWidgets('ADR 0031 amendment: other account route text; the Owner\'s own Draft names the Pusat Biaya', (
+      tester,
+    ) async {
+      final other = detailFromJson(fundDetailJson(fundCheck: fundCheckPbJson(route: 'other_account')));
+      final draft = detailFromJson(
+        fundDetailJson(
+          allowed: const [],
+          status: 'draft',
+          fundCheck: fundCheckPbJson(route: 'short'),
+        ),
+      );
+      await pumpScreen(
+        tester,
+        Scaffold(
+          body: ListView(
+            children: [
+              FundCheckPanel(key: const Key('other'), detail: other),
+              FundCheckPanel(key: const Key('draft'), detail: draft),
+            ],
+          ),
+        ),
+        auth: _owner(),
+      );
+      String? inPanel(String panel, String key) =>
+          tester.widget<Text>(find.descendant(of: find.byKey(Key(panel)), matching: find.byKey(Key(key)))).data;
+      expect(
+        inPanel('other', 'fund-route'),
+        'Dana pusat biaya CSR SEPASO/KUTIM kurang Rp 1.047.500, tetapi dana PT cukup — Finance membayar dari akun lain '
+        'di PT ini (tercatat sebagai pinjaman antar project otomatis).',
+      );
+      expect(inPanel('other', 'fund-gap'), 'Cukup');
+      await tester.ensureVisible(find.byKey(const Key('draft')));
+      expect(
+        inPanel('draft', 'fund-blocked-text'),
+        'Dana pusat biaya CSR SEPASO/KUTIM maupun dana PT tidak cukup — kurang Rp 447.500. Pengajuan Anda tidak dapat '
+        'dikirim sampai dana tersedia; perintahkan pinjaman antar-PT.',
+      );
+    });
+
     testWidgets('no fundCheck (Staff, older server): no panel', (tester) async {
       await pumpScreen(
         tester,
@@ -230,6 +337,23 @@ void main() {
       expect(find.byKey(const Key('fund-blocked-text')), findsOneWidget);
       expect(find.byKey(const Key('fund-commitment-list')), findsNothing, reason: 'compact');
       expect(_onPressed(tester, _button('decision-confirm')), isNull);
+    });
+
+    testWidgets('ADR 0031 amendment: the Pusat Biaya figures (compact: no commitment list) and the route text', (
+      tester,
+    ) async {
+      final d = detailFromJson(fundDetailJson(allowed: const ['approve', 'reject'], fundCheck: fundCheckPbJson()));
+      await pumpScreen(
+        tester,
+        Scaffold(
+          body: DecisionSheet(detail: d, decision: Decision.approve),
+        ),
+        auth: _owner(),
+      );
+      expect(_text(tester, 'fund-pb-available'), 'Rp 2.500.000');
+      expect(find.byKey(const Key('fund-pb-commitment-list')), findsNothing, reason: 'compact');
+      expect(find.byKey(const Key('fund-route')), findsOneWidget);
+      expect(_onPressed(tester, _button('decision-confirm')), isNotNull);
     });
 
     testWidgets('blocked: "Tolak" stays possible', (tester) async {

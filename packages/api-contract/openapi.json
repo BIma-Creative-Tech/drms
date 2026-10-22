@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "RR Teams API v1",
-    "version": "0.19.0",
+    "version": "0.19.1",
     "description": "Versioned contract for the Android APK and admin custom views (architecture §6). Errors: RFC 9457."
   },
   "servers": [
@@ -2466,7 +2466,104 @@
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 10000000000000,
-                "description": "Kurang = max(0, needed − available)."
+                "description": "Kurang = max(0, needed − max(available, pusatBiaya.available)) (ADR 0031 amendment: Pusat Biaya first, then PT)."
+              },
+              "route": {
+                "type": "string",
+                "enum": [
+                  "pusat_biaya",
+                  "other_account",
+                  "pt",
+                  "short"
+                ],
+                "description": "ADR 0031 amendment: pusat_biaya = the project's Pusat Biaya covers the need; other_account = it does not, the PT does (Finance pays from another account → automatic inter-project loan); pt = no Pusat Biaya, the PT covers it; short = neither."
+              },
+              "routeText": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Indonesian one-liner of `route` (null when pt / short)."
+              },
+              "pusatBiaya": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "accountId": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "balance": {
+                    "type": "integer",
+                    "description": "Saldo of the account (a site account too)."
+                  },
+                  "commitments": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000000000000,
+                    "description": "Approved-not-transferred requests of the projects mapped to it + their unpaid LPJ shortfalls + approved, not yet disbursed cash-backed loans it lends."
+                  },
+                  "available": {
+                    "type": "integer",
+                    "description": "Dana bebas = balance − commitments."
+                  },
+                  "commitmentItems": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "request",
+                            "shortfall",
+                            "loan",
+                            "project_loan"
+                          ]
+                        },
+                        "id": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
+                        "docNo": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 10000000000000
+                        },
+                        "status": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "id",
+                        "docNo",
+                        "amount",
+                        "status"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "accountId",
+                  "name",
+                  "balance",
+                  "commitments",
+                  "available",
+                  "commitmentItems"
+                ],
+                "description": "The project's Pusat Biaya (cash account) and its figures; null = no project / not mapped (checked per PT only)."
               },
               "accountCount": {
                 "type": "integer",
@@ -2515,7 +2612,8 @@
                       "enum": [
                         "request",
                         "shortfall",
-                        "loan"
+                        "loan",
+                        "project_loan"
                       ]
                     },
                     "id": {
@@ -2545,7 +2643,7 @@
                     "status"
                   ]
                 },
-                "description": "The commitments behind the figure, largest first (max 20). kind loan: id = the inter-PT loan."
+                "description": "The commitments behind the figure, largest first (max 20). kind loan: id = the inter-PT loan; project_loan (Pusat Biaya list only): id = the inter-project loan."
               },
               "loans": {
                 "type": "array",
@@ -2616,6 +2714,9 @@
               "available",
               "needed",
               "gap",
+              "route",
+              "routeText",
+              "pusatBiaya",
               "accountCount",
               "excludedSiteAccounts",
               "waitingAtOwner",
@@ -26619,7 +26720,7 @@
     },
     "/expense-requests/{id}/approve": {
       "post": {
-        "summary": "Approve the current level (G1/G2, ADR 0013 / 0026; budget % before → after); PM/Staff/Admin → 403 (audited). ADR 0029: the decision that makes the request \"Disetujui\" (normally the Owner level; a rule without an Owner level: its last level) is refused for a PT with the fund check on when the request's grand total exceeds the PT's \"Dana tersedia\" → 409 code FUND_INSUFFICIENT (companyId, balance, commitments, available, needed, gap; audited fund_insufficient); the request stays at its step. Checked decisions store fundBalance / fundCommitments / fundAvailable",
+        "summary": "Approve the current level (G1/G2, ADR 0013 / 0026; budget % before → after); PM/Staff/Admin → 403 (audited). ADR 0029: the decision that makes the request \"Disetujui\" (normally the Owner level; a rule without an Owner level: its last level) is refused for a PT with the fund check on when the request's grand total exceeds BOTH the dana bebas of its project's Pusat Biaya and the PT's \"Dana tersedia\" (ADR 0031 amendment: Pusat Biaya first, then PT; per PT only without a mapped project) → 409 code FUND_INSUFFICIENT (companyId, balance, commitments, available = the larger figure, needed, gap; with a Pusat Biaya also pusatBiayaAccountId / pusatBiayaName / pusatBiayaAvailable; audited fund_insufficient); the request stays at its step. Checked decisions store fundBalance / fundCommitments / fundAvailable",
         "security": [
           {
             "bearer": []

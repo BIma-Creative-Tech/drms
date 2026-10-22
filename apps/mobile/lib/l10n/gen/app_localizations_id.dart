@@ -4003,6 +4003,22 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
+  String fundPbTitle(String name) {
+    return 'Pusat biaya: $name';
+  }
+
+  @override
+  String get fundPbBalance => 'Saldo akun';
+
+  @override
+  String get fundPbAvailable => 'Dana bebas';
+
+  @override
+  String fundPtSection(String pt) {
+    return 'Seluruh PT $pt';
+  }
+
+  @override
   String get fundCommitments => 'Komitmen';
 
   @override

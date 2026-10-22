@@ -25,7 +25,9 @@ String icLoanInstructPath(ExpenseDetail d) {
 /// (expandable list) = Dana tersedia; Dibutuhkan; Kurang (red) or "Cukup" (green); other requests waiting at the final
 /// step; linked inter-PT loans; the blocked text; "Perintahkan pinjaman antar-PT" ([onInstructLoan], Owner, short).
 /// Read-only before the final step ("cek akhir di persetujuan Owner"). Shown on the request detail and in the decision
-/// sheet ([compact]: no commitment list, no loans).
+/// sheet ([compact]: no commitment lists, no loans).
+/// ADR 0031 amendment (user 2026-10-22, "PB dulu, lalu PT"): a mapped project shows its Pusat Biaya first (Saldo akun −
+/// Komitmen = Dana bebas), then "Seluruh PT <code>" with the PT figures; `routeText` says which account Finance pays from.
 class FundCheckPanel extends StatelessWidget {
   const FundCheckPanel({super.key, required this.detail, this.onInstructLoan, this.compact = false});
   final ExpenseDetail detail;
@@ -63,6 +65,40 @@ class FundCheckPanel extends StatelessWidget {
     final site = f.excludedSiteCount > 0
         ? ' — ${t.fundSiteExcluded(f.excludedSiteCount, formatRupiah(f.excludedSiteBalance))}'
         : '';
+    Widget commitmentList(List<FundCommitmentItem> items, String keyPrefix) => Theme(
+      data: theme.copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        key: Key('$keyPrefix-list'),
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(left: 8, bottom: 4),
+        dense: true,
+        title: Text(t.fundCommitmentDetails(items.length), style: theme.textTheme.bodySmall),
+        children: [
+          for (final c in items)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Text(
+                  '${c.label} · ${formatRupiah(c.amount)} · ${c.kindLabel}',
+                  key: Key('$keyPrefix-${c.kind}-${c.id}'),
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    Widget heading(String text, Key key) => Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 2),
+      child: Text(
+        text,
+        key: key,
+        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+      ),
+    );
+    final pb = f.pusatBiaya;
+    final routeText = f.routeText?.trim() ?? '';
     final blocked = f.blockedReason;
     final draft = detail.status == RequestStatus.draft;
     return Card(
@@ -95,6 +131,22 @@ class FundCheckPanel extends StatelessWidget {
             else if (!f.applies)
               Text(t.fundNotFinal, key: const Key('fund-not-final'), style: muted),
             const SizedBox(height: 6),
+            if (pb != null) ...[
+              heading(t.fundPbTitle(pb.name), const Key('fund-pb-title')),
+              row(t.fundPbBalance, Text(formatRupiah(pb.balance), key: const Key('fund-pb-balance'), style: money)),
+              row(
+                t.fundCommitments,
+                Text('− ${formatRupiah(pb.commitments)}', key: const Key('fund-pb-commitments'), style: money),
+              ),
+              if (!compact && pb.commitmentItems.isNotEmpty) commitmentList(pb.commitmentItems, 'fund-pb-commitment'),
+              row(
+                t.fundPbAvailable,
+                Text(formatRupiah(pb.available), key: const Key('fund-pb-available'), style: bold),
+                strong: true,
+              ),
+              const SizedBox(height: 4),
+              heading(t.fundPtSection(f.code), const Key('fund-pt-title')),
+            ],
             row(
               t.fundBalance,
               Text(
@@ -107,31 +159,7 @@ class FundCheckPanel extends StatelessWidget {
               t.fundCommitments,
               Text('− ${formatRupiah(f.commitments)}', key: const Key('fund-commitments'), style: money),
             ),
-            if (!compact && f.commitmentItems.isNotEmpty)
-              Theme(
-                data: theme.copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  key: const Key('fund-commitment-list'),
-                  tilePadding: EdgeInsets.zero,
-                  childrenPadding: const EdgeInsets.only(left: 8, bottom: 4),
-                  dense: true,
-                  title: Text(t.fundCommitmentDetails(f.commitmentItems.length), style: theme.textTheme.bodySmall),
-                  children: [
-                    for (final c in f.commitmentItems)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Text(
-                            '${c.label} · ${formatRupiah(c.amount)} · ${c.kindLabel}',
-                            key: Key('fund-commitment-${c.kind}-${c.id}'),
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+            if (!compact && f.commitmentItems.isNotEmpty) commitmentList(f.commitmentItems, 'fund-commitment'),
             row(
               t.fundAvailable,
               Text(formatRupiah(f.available), key: const Key('fund-available'), style: bold),
@@ -156,6 +184,11 @@ class FundCheckPanel extends StatelessWidget {
                 ),
               ),
             ),
+            if (routeText.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(routeText, key: const Key('fund-route'), style: theme.textTheme.bodyMedium),
+              ),
             if (f.waitingCount > 0)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
@@ -179,7 +212,7 @@ class FundCheckPanel extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  draft ? fundBlockedDraftText(f.gap) : blocked,
+                  draft ? fundBlockedDraftText(f.gap, pbName: pb?.name) : blocked,
                   key: const Key('fund-blocked-text'),
                   style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
                 ),

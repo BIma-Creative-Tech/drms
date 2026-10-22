@@ -93,6 +93,7 @@ import * as migration_20261017_100000_d1710_service_types from './20261017_10000
 import * as migration_20261021_100000_d2110_pb_enums from './20261021_100000_d2110_pb_enums';
 import * as migration_20261021_100100_d2110_pb_schema from './20261021_100100_d2110_pb_schema';
 import * as migration_20261021_100200_d2110_pb_guard from './20261021_100200_d2110_pb_guard';
+import * as migration_20261022_100000_d2210_pb_fund from './20261022_100000_d2210_pb_fund';
 
 export const migrations = [
   {
@@ -561,16 +562,6 @@ export const migrations = [
     name: '20261021_100000_d2110_pb_enums',
   },
   {
-    up: migration_20261021_100200_d2110_pb_guard.up,
-    down: migration_20261021_100200_d2110_pb_guard.down,
-    name: '20261021_100200_d2110_pb_guard',
-  },
-  {
-    up: migration_20261021_100000_d2110_pb_enums.up,
-    down: migration_20261021_100000_d2110_pb_enums.down,
-    name: '20261021_100000_d2110_pb_enums',
-  },
-  {
     up: migration_20261021_100100_d2110_pb_schema.up,
     down: migration_20261021_100100_d2110_pb_schema.down,
     name: '20261021_100100_d2110_pb_schema',
@@ -579,5 +570,10 @@ export const migrations = [
     up: migration_20261021_100200_d2110_pb_guard.up,
     down: migration_20261021_100200_d2110_pb_guard.down,
     name: '20261021_100200_d2110_pb_guard',
+  },
+  {
+    up: migration_20261022_100000_d2210_pb_fund.up,
+    down: migration_20261022_100000_d2210_pb_fund.down,
+    name: '20261022_100000_d2210_pb_fund',
   },
 ];

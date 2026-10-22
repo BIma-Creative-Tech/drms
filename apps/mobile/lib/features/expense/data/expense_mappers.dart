@@ -215,17 +215,7 @@ FundCheck? fundCheckFromJson(Object? v) {
     excludedSiteBalance: _int(excluded?['balance']),
     waitingCount: _int(waiting?['count']),
     waitingAmount: _int(waiting?['amount']),
-    commitmentItems: [
-      for (final c in _list(m['commitmentItems']))
-        if (_map(c) case final x? when _intN(x['id']) != null)
-          FundCommitmentItem(
-            kind: '${x['kind'] ?? ''}',
-            id: _int(x['id']),
-            docNo: _strN(x['docNo']),
-            amount: _int(x['amount']),
-            status: '${x['status'] ?? ''}',
-          ),
-    ],
+    commitmentItems: _fundCommitmentItems(m['commitmentItems']),
     loans: [
       for (final l in _list(m['loans']))
         if (_map(l) case final x? when _intN(x['id']) != null)
@@ -238,6 +228,37 @@ FundCheck? fundCheckFromJson(Object? v) {
             serverStatusLabel: _strN(x['statusLabel']),
           ),
     ],
+    route: FundCheckRoute.fromCode(_strN(m['route'])),
+    routeText: _strN(m['routeText']),
+    pusatBiaya: _fundPusatBiaya(m['pusatBiaya']),
+  );
+}
+
+/// `fundCheck.commitmentItems[]` / `fundCheck.pusatBiaya.commitmentItems[]` (rows without an id are skipped).
+List<FundCommitmentItem> _fundCommitmentItems(Object? v) => [
+  for (final c in _list(v))
+    if (_map(c) case final x? when _intN(x['id']) != null)
+      FundCommitmentItem(
+        kind: '${x['kind'] ?? ''}',
+        id: _int(x['id']),
+        docNo: _strN(x['docNo']),
+        amount: _int(x['amount']),
+        status: '${x['status'] ?? ''}',
+      ),
+];
+
+/// ADR 0031 amendment `fundCheck.pusatBiaya` (null when absent / malformed: not mapped, or an older server).
+FundPusatBiaya? _fundPusatBiaya(Object? v) {
+  final m = _map(v);
+  final accountId = _intN(m?['accountId']);
+  if (m == null || accountId == null) return null;
+  return FundPusatBiaya(
+    accountId: accountId,
+    name: _strN(m['name']) ?? '#$accountId',
+    balance: _int(m['balance']),
+    commitments: _int(m['commitments']),
+    available: _int(m['available']),
+    commitmentItems: _fundCommitmentItems(m['commitmentItems']),
   );
 }
 
