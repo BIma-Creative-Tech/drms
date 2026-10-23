@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+- Notification bell badge, `/admin/notifikasi` (list + "belum dibaca") and `GET /api/v1/notifications` (`unreadCount`)
+  now follow the PT switcher (user 2026-10-23): "Semua PT saya" = every own notification; a narrowed selection = the
+  selected PTs' rows plus rows without a PT. "Tandai semua dibaca" marks only those rows. APK follows via
+  `X-Company-Ids` (no app change).
+
 ## [0.19.1] - 2026-10-22
 
 **Fund check per Pusat Biaya first, then PT (ADR 0031 §6, user 2026-10-22).** One migration

@@ -1,6 +1,6 @@
-import type { PayloadRequest } from 'payload'
+import type { PayloadRequest, Where } from 'payload'
 
-import { relId, userId, type Role } from '@/access/roles'
+import { companyContextOf, relId, userId, type Role } from '@/access/roles'
 import { formatRupiah } from '@/lib/money'
 import { DEFAULT_TZ, startOfLocalDay } from '@/lib/time'
 
@@ -468,6 +468,17 @@ async function deliver(req: PayloadRequest, doc: Doc, events: Array<{ event: Not
     }
   }
   return written
+}
+
+/**
+ * DRMS 23/10: the bell count, /admin/notifikasi and /api/v1/notifications follow the PT switcher —
+ * "Semua PT saya" (every membership selected) = every own notification; a narrowed selection = rows of
+ * the selected PTs plus rows without a PT (not about any one PT). `null` = no narrowing needed.
+ */
+export function selectedCompaniesWhere(user: unknown): Where | null {
+  const c = companyContextOf(user)
+  if (!c || c.memberships.every((m) => c.selected.includes(m.company))) return null
+  return { or: [{ company: { exists: false } }, ...(c.selected.length ? [{ company: { in: c.selected } }] : [])] }
 }
 
 /** Admin page of a notification's document, or null when there is none. S3e: used by the web notification page (/admin/notifikasi). */
