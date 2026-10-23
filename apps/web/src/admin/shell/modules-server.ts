@@ -9,6 +9,7 @@ import { shortfallInboxCount } from '@/domain/expense/shortfall-approval'
 import { TRANSFER_QUEUE_WHERE } from '@/domain/expense/types'
 import { loanInboxCount } from '@/domain/loans/service'
 import { pickDisplayName, resolveDisplayName } from '@/domain/user-display-name'
+import { selectedCompaniesWhere } from '@/domain/notifications'
 
 import { normalizeSelection, type SwitcherState } from './company-switcher'
 import { canCreateFrom, quickCreateGroups, type QuickCreateGroup } from './quick-create'
@@ -58,10 +59,11 @@ export async function loadBadges(
 
 /** S3e (US-05): unread in-app notifications of the caller (bell in the top bar). */
 export async function loadUnread(payload: Pick<Payload, 'count'>, user: TypedUser): Promise<number> {
+  const pt = selectedCompaniesWhere(user) // DRMS 23/10: the badge follows the PT switcher
   try {
     const r = await payload.count({
       collection: 'notifications',
-      where: { and: [{ user: { equals: user.id } }, { readAt: { exists: false } }] },
+      where: { and: [{ user: { equals: user.id } }, { readAt: { exists: false } }, ...(pt ? [pt] : [])] },
       user,
       overrideAccess: false,
     })
