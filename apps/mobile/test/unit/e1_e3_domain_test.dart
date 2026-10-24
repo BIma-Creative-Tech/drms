@@ -178,7 +178,9 @@ void main() {
       'project': {'id': 9, 'code': 'PRJ-09', 'name': 'Jalan Tambang Blok B'},
       'costCenter': null,
       // D2410 (point 6): a general attachment uploaded on the web
-      'attachments': [{'id': 77, 'fileName': 'rekap.pdf', 'mimeType': 'application/pdf'}],
+      'attachments': [
+        {'id': 77, 'fileName': 'rekap.pdf', 'mimeType': 'application/pdf'},
+      ],
       'lines': [
         {
           'id': '66f0a1b2c3d4e5f601234567', // web-created line: Payload row id, not a UUID

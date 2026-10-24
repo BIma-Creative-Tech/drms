@@ -63,7 +63,11 @@ class DraftAttachmentsSection extends StatelessWidget {
             ),
           ),
         if (error != null)
-          Text(error!, key: const Key('draft-attachments-error'), style: TextStyle(color: theme.colorScheme.error)),
+          Text(
+            error!,
+            key: const Key('draft-attachments-error'),
+            style: TextStyle(color: theme.colorScheme.error),
+          ),
         Wrap(
           spacing: 8,
           children: [

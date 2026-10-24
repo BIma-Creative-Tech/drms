@@ -612,7 +612,10 @@ Json draftToSyncPayload(DraftRequest d, {bool includeDraftId = false}) => {
   // are uploaded by the sync engine — POST /media/attachments — and appended to `attachment_ids`)
   'attachment_ids': [for (final a in d.attachments) ?a.serverFileId],
   if (d.attachments.any((a) => a.isLocal))
-    attachmentsPlaceholderKey: [for (final a in d.attachments) if (a.isLocal) a.mediaUuid!],
+    attachmentsPlaceholderKey: [
+      for (final a in d.attachments)
+        if (a.isLocal) a.mediaUuid!,
+    ],
   // ADR 0027 / 0028: vendor / PT grup payment only (an employee draft stays byte-compatible with servers before Wave 4;
   // the payee type of a draft the server knows is fixed in the editor)
   if (d.isDirectPayment) ...{

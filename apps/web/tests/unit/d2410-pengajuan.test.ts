@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { filterTicks, filterValue, multiSummary, tickState } from '@/admin/components/list/MultiSelect'
 import { actionBarProps } from '@/admin/components/request/action-bar'
 import { buildPkListConfig } from '@/admin/pk-list/config'
-import { parsePkQuery, pkWhere } from '@/admin/pk-list/query'
+import { parsePkQuery, pkWhere, type VirtualWheres } from '@/admin/pk-list/query'
 import { AUDIT_ACTIONS } from '@/audit/writer'
 import { SELF_PROCESSED_NOTE, selfProcessedAudit } from '@/domain/expense/common'
 import { REIMBURSE_ATTACHMENT_MESSAGE } from '@/domain/expense/drafts'
@@ -67,9 +67,9 @@ describe('point 8: "Menunggu persetujuan Owner" status filter', () => {
     expect(status.kind === 'select' && status.options.map((o) => o.value)).toContain(PENDING_OWNER)
     const q = parsePkQuery({ 'f.status': `approved,${PENDING_OWNER}` }, cfg)
     expect(q.filters.status).toEqual(['approved', PENDING_OWNER])
-    const virtual = { status: { [PENDING_OWNER]: { id: { in: [7, 9] } }, pending_approval: { and: [{ status: { equals: 'pending_approval' } }, { id: { not_in: [7, 9] } }] } } }
+    const virtual: VirtualWheres = { status: { [PENDING_OWNER]: { id: { in: [7, 9] } }, pending_approval: { and: [{ status: { equals: 'pending_approval' } }, { id: { not_in: [7, 9] } }] } } }
     expect(pkWhere(q, cfg, { selected: null, virtual })).toEqual({ and: [{ or: [{ status: { in: ['approved'] } }, { id: { in: [7, 9] } }] }] })
-    expect(pkWhere(parsePkQuery({ 'f.status': 'pending_approval' }, cfg), cfg, { selected: null, virtual })).toEqual({ and: [virtual.status.pending_approval] })
+    expect(pkWhere(parsePkQuery({ 'f.status': 'pending_approval' }, cfg), cfg, { selected: null, virtual })).toEqual({ and: [virtual.status!.pending_approval] })
     expect(pkWhere(parsePkQuery({ 'f.status': 'draft' }, cfg), cfg, { selected: null, virtual })).toEqual({ and: [{ status: { in: ['draft'] } }] })
     // another collection never gets it
     const other = buildPkListConfig({ slug: 'budget-addenda', fields: [{ name: 'status', type: 'select', options: [{ label: 'x', value: 'pending_approval' }] }], admin: {} } as never)

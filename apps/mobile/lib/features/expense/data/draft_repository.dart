@@ -328,6 +328,9 @@ DraftRequest withVendorJson(DraftRequest d, String? json) {
     invoiceDueDate: s('invoiceDueDate'),
     invoiceMediaUuid: s('invoiceMediaUuid'),
     invoiceFileId: n('invoiceFileId'),
-    attachments: [if (attachments is List) for (final a in attachments) ?DraftAttachment.fromJson(a)],
+    attachments: [
+      if (attachments is List)
+        for (final a in attachments) ?DraftAttachment.fromJson(a),
+    ],
   );
 }
