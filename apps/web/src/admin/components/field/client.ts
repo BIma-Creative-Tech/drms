@@ -1,5 +1,6 @@
 'use client'
 import { problemText } from '../ActionButton'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle, type Summary } from '../feedback/feedback'
 
 /**
  * FR1 web forms — client helpers. Photos go through the same upload as the APK and the progress
@@ -47,4 +48,17 @@ export async function getJson<T>(url: string): Promise<T | null> {
   const res = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
   if (!res.ok) return null
   return (await res.json().catch(() => null)) as T | null
+}
+
+/**
+ * DRMS 24/10 (popup before + after every data-changing action): "Yakin ingin <aksi> <laporan>?" with the summary
+ * (project, unit, date …) after the form's own validation; false = Batal (nothing is uploaded or sent).
+ */
+export function askField(action: string, object: string | null, summary: Summary, description?: string): Promise<boolean> {
+  return confirmAction({ title: confirmTitle(action, object), summary, description, confirmLabel: confirmLabel(action) })
+}
+
+/** DRMS 24/10: result popup of a field form — `error` null = "Berhasil: <aksi> <laporan>" (shown across the redirect). */
+export function fieldResult(action: string, object: string | null, error: string | null) {
+  showResult(error ? { ok: false, title: failureTitle(action), message: error } : { ok: true, title: successTitle(action, object) })
 }

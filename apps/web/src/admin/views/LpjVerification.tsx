@@ -9,6 +9,8 @@ import { withReqTransaction } from '@/lib/system-tx'
 
 import { docHref } from '../doc-links'
 import { ActionButton } from '../components/ActionButton'
+import { DocSummaryProvider } from '../components/feedback/DocContext'
+import { expenseRequestSummary } from '../components/feedback/summaries'
 import { KAS_STYLE } from '../components/kas/style'
 import { ClickableRow } from '../components/list/ClickableRow'
 import { ListToolbar, Pager } from '../components/list/ListToolbar'
@@ -21,11 +23,30 @@ import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp,
 
 type Detail = Awaited<ReturnType<typeof detail>>
 
+/** DRMS 24/10: the LPJ as named in the popups (verify, revision, settle, receipt decisions). */
+function lpjDoc(d: Detail) {
+  const r = expenseRequestSummary(d)
+  const s = d.settlement
+  return {
+    object: s?.docNo ?? r.object,
+    summary: [...r.summary.filter(([k]) => k !== 'Status' && k !== 'Total'), ['LPJ', s?.docNo ?? null], ['Ditransfer', rp(d.transferredTotal)], ['Total nota', rp(s?.receiptsTotal)], ['Selisih', rp(s?.difference)]] as const,
+  }
+}
+
+/** DRMS 24/10: Valid / Tolak name the receipt. */
+function receiptDoc(d: Detail, r: Detail['receipts'][number]) {
+  return {
+    object: `nota ${r.receiptNo ?? r.vendorName}`,
+    summary: [['Pengajuan', d.docNo ?? `#${d.id}`], ['Vendor / toko', r.vendorName], ['No. nota', r.receiptNo], ['Tanggal nota', r.receiptDate], ['Nominal', rp(r.amount)]] as const,
+  }
+}
+
 /**
  * "Verifikasi LPJ" (M06, US-21/US-22): Pengajuan Baru in "LPJ Diajukan" — per receipt valid / tolak,
  * revision request with a note, verification (verified total = Σ valid receipts) — and in
  * "LPJ Terverifikasi" the settlement: surplus → KM "Pengembalian LPJ", shortfall → transfer.
  * Owner sees the queue read-only; Finance acts (never on its own request, server-enforced).
+ * DRMS 24/10: each LPJ's buttons sit in a DocSummaryProvider (popups name the LPJ, the request and the figures).
  */
 export async function LpjVerification(props: AdminViewServerProps) {
   const req = props.initPageResult.req
@@ -83,7 +104,8 @@ export async function LpjVerification(props: AdminViewServerProps) {
       <h2>LPJ diajukan ({submitted.length})</h2>
       {submitted.length === 0 ? <Empty text="Tidak ada LPJ yang menunggu verifikasi." /> : null}
       {submitted.map((d) => (
-        <section key={d.id} style={{ border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16 }}>
+        <DocSummaryProvider key={d.id} {...lpjDoc(d)}>
+        <section style={{ border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
             <div>
               {pt.multi ? (
@@ -161,8 +183,8 @@ export async function LpjVerification(props: AdminViewServerProps) {
                       <td style={td}>
                         {finance && d.allowedActions.includes('receipt_verify') ? (
                           <>
-                            {r.status !== 'valid' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/verify`} label="Valid" /> : null}
-                            {r.status !== 'rejected' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/reject`} label="Tolak" prompt={{ field: 'reason', message: 'Alasan nota ditolak (wajib):', minLength: 3 }} /> : null}
+                            {r.status !== 'valid' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/verify`} label="Valid" {...receiptDoc(d, r)} /> : null}
+                            {r.status !== 'rejected' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/reject`} label="Tolak" {...receiptDoc(d, r)} prompt={{ field: 'reason', message: 'Alasan nota ditolak (wajib):', minLength: 3 }} /> : null}
                           </>
                         ) : null}
                       </td>
@@ -203,8 +225,8 @@ export async function LpjVerification(props: AdminViewServerProps) {
                   </div>
                   {finance && d.allowedActions.includes('receipt_verify') ? (
                     <div className="pk-lcard__actions">
-                      {r.status !== 'valid' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/verify`} label="Valid" /> : null}
-                      {r.status !== 'rejected' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/reject`} label="Tolak" prompt={{ field: 'reason', message: 'Alasan nota ditolak (wajib):', minLength: 3 }} /> : null}
+                      {r.status !== 'valid' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/verify`} label="Valid" {...receiptDoc(d, r)} /> : null}
+                      {r.status !== 'rejected' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/reject`} label="Tolak" {...receiptDoc(d, r)} prompt={{ field: 'reason', message: 'Alasan nota ditolak (wajib):', minLength: 3 }} /> : null}
                     </div>
                   ) : null}
                 </article>
@@ -221,6 +243,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
             </div>
           ) : null}
         </section>
+        </DocSummaryProvider>
       ))}
 
       <h2>Menunggu penyelesaian selisih ({verified.length})</h2>
@@ -229,7 +252,8 @@ export async function LpjVerification(props: AdminViewServerProps) {
         const s = d.settlement!
         const amount = Math.abs(s.difference ?? 0)
         return (
-          <section key={d.id} style={{ border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16 }}>
+          <DocSummaryProvider key={d.id} {...lpjDoc(d)}>
+          <section style={{ border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16 }}>
             <div>
               {pt.multi ? (
                 <>
@@ -269,6 +293,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
               )
             ) : null}
           </section>
+          </DocSummaryProvider>
         )
       })}
       <style>{KAS_STYLE}</style>

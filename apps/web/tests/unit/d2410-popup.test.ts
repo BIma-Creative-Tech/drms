@@ -127,10 +127,10 @@ describe('store', () => {
 describe('wiring', () => {
   it('every collection / global "Simpan" confirms; an own SaveButton (expense requests) is kept', () => {
     const cols = withConfirmSave([{ slug: 'a', fields: [] }, { slug: 'b', fields: [], admin: { components: { edit: { SaveButton: '@/x#X' } } } }] as CollectionConfig[])
-    expect(cols[0].admin?.components?.edit?.SaveButton).toBe(CONFIRM_SAVE_BUTTON)
-    expect(cols[1].admin?.components?.edit?.SaveButton).toBe('@/x#X')
+    expect(cols[0]?.admin?.components?.edit?.SaveButton).toBe(CONFIRM_SAVE_BUTTON)
+    expect(cols[1]?.admin?.components?.edit?.SaveButton).toBe('@/x#X')
     const globals = withGlobalConfirmSave([{ slug: 'g', fields: [] }] as GlobalConfig[])
-    expect(globals[0].admin?.components?.elements?.SaveButton).toBe(CONFIRM_SAVE_BUTTON)
+    expect(globals[0]?.admin?.components?.elements?.SaveButton).toBe(CONFIRM_SAVE_BUTTON)
     expect(src('admin/components/RequestSaveButton.tsx')).toContain('<ConfirmSaveButton {...props} />')
   })
   it('host + save button in the providers / import map; no window.confirm in the shared action components', () => {

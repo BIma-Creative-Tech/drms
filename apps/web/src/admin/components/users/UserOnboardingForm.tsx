@@ -8,6 +8,7 @@ import { ROLE_LABELS, type Role } from '@/access/roles'
 import type { OnboardingDetail } from '@/domain/user-onboarding/service'
 
 import { problemText } from '../ActionButton'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle } from '../feedback/feedback'
 import { lockOwner, roleOptionsFor } from '../access/role-matrix'
 import { MultiSelect } from '../list/MultiSelect'
 import {
@@ -98,6 +99,24 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
       setMsg({ tone: 'bad', text: 'Tidak ada yang disimpan — isi alasan perubahan.' })
       return
     }
+    // DRMS 24/10: popup before (account, PT, status, reason) and after
+    const action = mode === 'create' ? 'Buat pengguna' : 'Simpan perubahan pengguna'
+    const who = draft.user.name.trim() || draft.user.email.trim() || null
+    const deactivating = mode === 'update' && detail.user?.active !== false && !draft.user.active
+    const yes = await confirmAction({
+      title: confirmTitle(deactivating ? 'Nonaktifkan pengguna' : action, who),
+      summary: [
+        ['Nama', draft.user.name.trim() || null],
+        ['Email', draft.user.email.trim() || null],
+        ['PT', activeCompanies(detail, draft).map((c) => c.shortCode).join(', ') || null],
+        ['Status akun', draft.user.active ? 'Aktif' : 'Nonaktif'],
+        ['Alasan', draft.reason.trim() || null],
+      ],
+      description: deactivating ? 'Login, sesi web dan HP langsung dicabut di semua PT.' : undefined,
+      confirmLabel: confirmLabel(deactivating ? 'Nonaktifkan' : mode === 'create' ? 'Buat pengguna' : 'Simpan'),
+      danger: deactivating,
+    })
+    if (!yes) return
     setBusy(true)
     setMsg(null)
     setErrors(new Map())
@@ -108,21 +127,25 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
       const data = (await res.json().catch(() => null)) as { userId?: number; temporaryPassword?: string | null; linkedExistingAccount?: boolean; detail?: OnboardingDetail } | null
       if (res.ok && data?.detail) {
         if (mode === 'create') {
+          showResult({ ok: true, title: successTitle(action, who), message: data.temporaryPassword ? 'Catat kata sandi sementara yang ditampilkan di halaman.' : null })
           setCreated({ id: data.userId!, password: data.temporaryPassword ?? null, linked: data.linkedExistingAccount === true })
           return
         }
         setDetail(data.detail)
         setDraft(draftFromDetail(data.detail))
         setMsg({ tone: 'ok', text: 'Perubahan tersimpan.' })
+        showResult({ ok: true, title: successTitle(deactivating ? 'Nonaktifkan pengguna' : action, who) })
         router.refresh()
       } else {
         const { byKey, tab: errTab } = mapErrors(data, sentOrder)
         setErrors(byKey)
         if (errTab) setTab(errTab)
         setMsg({ tone: 'bad', text: `Tidak ada yang disimpan — ${problemText(data, res.status)}` })
+        showResult({ ok: false, title: failureTitle(action), message: `Tidak ada yang disimpan — ${problemText(data, res.status)}` })
       }
     } catch {
       setMsg({ tone: 'bad', text: 'Gagal menghubungi server. Periksa koneksi lalu coba lagi.' })
+      showResult({ ok: false, title: failureTitle(action), message: 'Gagal menghubungi server. Periksa koneksi lalu coba lagi.' })
     } finally {
       setBusy(false)
     }

@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation'
 import React, { useId, useMemo, useRef, useState } from 'react'
 
 import { problemText } from '../ActionButton'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle } from '../feedback/feedback'
 import { fieldErrors, newIdemKey } from '../kas/client'
 import { WrapText } from '../WrapText'
 
@@ -87,6 +88,14 @@ export function StageEditor({ projectId, stages, canAddRemove, templates }: { pr
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!canSave) return
+    // DRMS 24/10: popup before (stage count, total, removed, reason) and after
+    const summary: Array<[string, string | number | null]> = [
+      ['Jumlah tahapan', rows.length],
+      ['Total bobot', `${fmt(sum)} %`],
+      ['Tahapan dihapus', removed.length ? removed.map((s) => s.name).join(', ') : null],
+      ['Alasan', reason.trim() || null],
+    ]
+    if (!(await confirmAction({ title: confirmTitle('simpan tahapan project'), summary, confirmLabel: confirmLabel('simpan tahapan') }))) return
     setBusy(true)
     setError(null)
     setErrs({})
@@ -99,25 +108,38 @@ export function StageEditor({ projectId, stages, canAddRemove, templates }: { pr
       if (!r.ok) {
         setError(problemText(r.data, r.status))
         setErrs(fieldErrors(r.data))
+        showResult({ ok: false, title: failureTitle('simpan tahapan'), message: problemText(r.data, r.status) })
         return
       }
       setSaved(true)
       setReason('')
+      showResult({ ok: true, title: successTitle('simpan tahapan project') })
       router.refresh()
     } catch {
       setError('Gagal menghubungi server. Coba lagi.')
+      showResult({ ok: false, title: failureTitle('simpan tahapan'), message: 'Gagal menghubungi server. Coba lagi.' })
     } finally {
       setBusy(false)
     }
   }
 
   const applyTemplate = async (templateId: number) => {
+    const name = templates.find((t) => t.id === templateId)?.name ?? null
+    // DRMS 24/10: popup before and after
+    if (!(await confirmAction({ title: confirmTitle('pakai template tahapan', name), summary: [['Template', name]], confirmLabel: confirmLabel('pakai template') }))) return
     setBusy(true)
     setError(null)
     try {
       const r = await put({ templateId })
-      if (!r.ok) setError(problemText(r.data, r.status))
-      else router.refresh()
+      if (!r.ok) {
+        setError(problemText(r.data, r.status))
+        showResult({ ok: false, title: failureTitle('pakai template tahapan'), message: problemText(r.data, r.status) })
+      } else {
+        showResult({ ok: true, title: successTitle('pakai template tahapan', name) })
+        router.refresh()
+      }
+    } catch {
+      showResult({ ok: false, title: failureTitle('pakai template tahapan'), message: 'Gagal menghubungi server. Coba lagi.' })
     } finally {
       setBusy(false)
     }

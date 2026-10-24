@@ -3,7 +3,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import React, { useId, useRef, useState } from 'react'
 
+import { formatRupiah } from '@/lib/money'
+
 import { DateInput } from '../DateInput'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle } from '../feedback/feedback'
 import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 import { WrapSelect } from '../WrapSelect'
@@ -17,6 +20,7 @@ import { WrapSelect } from '../WrapSelect'
  * Idempotency-Key per content version.
  * UI feedback 17/10 #5: the edit page `/pinjaman/:id/ubah` renders this form with the layout of "Ajukan pinjaman"; in
  * edit mode the draft button reads "Simpan perubahan" and "Batal" goes back to the loan (borrower disabled).
+ * DRMS 24/10: confirmation popup (peminjam, pemberi, jenis, nilai, tanggal, jatuh tempo) before, result popup after.
  */
 export type LoanProjectOpt = { id: number; code: string; name: string; companyId: number }
 
@@ -63,6 +67,22 @@ export function LoanForm({ borrowers, lenders, today, initialBorrower, edit }: {
     setErrs(e)
     setError(null)
     if (Object.keys(e).length > 0) return
+    // DRMS 24/10: confirmation popup before, result popup after
+    const action = mode === 'submit' ? 'Ajukan ke Direktur' : edit ? 'Simpan perubahan' : 'Simpan draft'
+    const proj = (x: LoanProjectOpt | undefined) => (x ? `${x.code} ${x.name}` : null)
+    const yes = await confirmAction({
+      title: confirmTitle(action, 'pinjaman antar project'),
+      summary: [
+        ['Project peminjam', proj(borrowers.find((x) => x.id === borrower))],
+        ['Project pemberi', proj(lenders.find((x) => x.id === lender))],
+        ['Jenis', kind === 'dana' ? 'Dana' : 'Barang / material'],
+        ['Nilai', amount.parsed.value !== null ? formatRupiah(amount.parsed.value) : null],
+        ['Tanggal pinjaman', loanDate],
+        ['Jatuh tempo', dueDate],
+      ],
+      confirmLabel: confirmLabel(action),
+    })
+    if (!yes) return
     setBusy(mode)
     const content = { lenderProjectId: lender, kind, amount: amount.parsed.value, reason: reason.trim(), loanDate, dueDate }
     try {
@@ -70,20 +90,26 @@ export function LoanForm({ borrowers, lenders, today, initialBorrower, edit }: {
       if (!r.ok) {
         setError(r.error)
         setErrs(fieldErrors(r.data))
+        showResult({ ok: false, title: failureTitle(action), message: r.error })
         return
       }
-      const id = (r.data as { id: number }).id
+      const saved = r.data as { id: number; docNo?: string | null }
+      const id = saved.id
       if (edit && mode === 'submit') {
         const s = await sendJson('POST', `/api/v1/project-loans/${id}/submit`, {}, newIdemKey())
         if (!s.ok) {
           setError(s.error)
+          showResult({ ok: false, title: failureTitle(action), message: s.error })
           return
         }
       }
+      showResult({ ok: true, title: successTitle(action, saved.docNo ?? 'pinjaman antar project'), message: mode === 'submit' ? 'Pinjaman diajukan; Direktur dinotifikasi.' : 'Draft pinjaman tersimpan.' })
       router.push(`/admin/pinjaman/detail/${id}?${mode === 'submit' ? 'diajukan' : 'tersimpan'}=1`)
       router.refresh()
     } catch {
-      setError('Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+      const msg = 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.'
+      setError(msg)
+      showResult({ ok: false, title: failureTitle(mode === 'submit' ? 'Ajukan ke Direktur' : edit ? 'Simpan perubahan' : 'Simpan draft'), message: msg })
     } finally {
       setBusy(null)
     }

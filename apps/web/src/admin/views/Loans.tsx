@@ -5,6 +5,7 @@ import React from 'react'
 
 import { hasRoleAny, relId, userId } from '@/access/roles'
 import { DecisionBar } from '@/admin/components/DecisionBar'
+import { DocSummaryProvider } from '@/admin/components/feedback/DocContext'
 import { ConfirmAction } from '@/admin/components/addendum/ConfirmAction'
 import { ReasonAction } from '@/admin/components/kas/ReasonAction'
 import { KAS_STYLE } from '@/admin/components/kas/style'
@@ -66,6 +67,11 @@ function StatusCell({ l }: { l: Pick<LoanSummary, 'status' | 'statusLabel' | 'ov
 const projectText = (p: LoanSummary['borrowerProject']) => `${p.code ?? ''} ${p.name ?? ''}`.trim()
 /** ADR 0031: an automatic loan's lender is a Pusat Biaya account (no lender project). */
 const lenderText = (l: Pick<LoanSummary, 'lenderProject' | 'lenderCashAccount'>) => (l.lenderProject ? projectText(l.lenderProject) : `Akun ${l.lenderCashAccount?.name ?? '—'}`)
+/** DRMS 24/10: the loan as named in the popups (submit, disburse, repay, cancel, approve / reject, void). */
+const loanDoc = (l: Pick<LoanSummary, 'id' | 'docNo' | 'kindLabel' | 'amount' | 'dueDate' | 'borrowerProject' | 'lenderProject' | 'lenderCashAccount'>) => {
+  const docNo = l.docNo ?? `Draft pinjaman #${l.id}`
+  return { object: docNo, summary: [['Pinjaman', docNo], ['Jenis', l.kindLabel], ['Peminjam', projectText(l.borrowerProject)], ['Pemberi', lenderText(l)], ['Nilai', rp(l.amount)], ['Jatuh tempo', dateId(l.dueDate)]] as const }
+}
 
 /** Columns of a loan table (list, project tab). `focus` = the project of the tab (shows the direction). */
 function loanCols(pt: PtView, focus?: number): Col<LoanSummary>[] {
@@ -373,6 +379,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
             title={`Void pengembalian ke-${r.seq}?`}
             description={<>Pengembalian {rp(r.amount)} dibatalkan (tidak dihapus); sisa pinjaman bertambah lagi.{l.cashBacked ? ' Kas keluar/masuknya dibuatkan jurnal balik.' : ''} Alasan wajib.</>}
             confirmLabel="Void pengembalian"
+            summary={[...loanDoc(l).summary, ['Pengembalian', `ke-${r.seq} · ${dateId(r.repayDate)}`], ['Nominal pengembalian', rp(r.amount)]]}
             testId={`loan-void-${r.id}`}
           />
         ) : r.status === 'void' ? (
@@ -382,7 +389,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
         ),
     },
   ]
-  return (
+  const page = (
     <Frame props={props} name="pinjaman-detail">
       <style>{STYLE}</style>
       <DashHead title={title} note={`${l.kindLabel} · ${l.originLabel} · ${lenderText(l)} → ${projectText(l.borrowerProject)} · ${l.origin === 'transfer' ? 'dicatat' : 'diajukan'} ${l.createdBy.name ?? '—'}`}>
@@ -582,6 +589,8 @@ export async function LoanDetail(props: AdminViewServerProps) {
       ) : null}
     </Frame>
   )
+  // DRMS 24/10: every action of the page names the loan in its popups
+  return <DocSummaryProvider {...loanDoc(l)}>{page}</DocSummaryProvider>
 }
 
 // ================================================================ project tab "Pinjaman"
@@ -720,9 +729,10 @@ export async function LoanInboxSection({ req }: { req: PayloadRequest }) {
                         </>
                       }
                       confirmLabel="Setujui"
+                      summary={loanDoc(r).summary}
                       testId={`loan-inbox-approve-${r.id}`}
                     />
-                    <ReasonAction url={`/api/v1/project-loans/${r.id}/reject`} label="Tolak" title={`Tolak ${r.docNo}?`} description={<>Alasan penolakan dikirim ke PM peminjam.</>} confirmLabel="Tolak pinjaman" testId={`loan-inbox-reject-${r.id}`} />
+                    <ReasonAction url={`/api/v1/project-loans/${r.id}/reject`} label="Tolak" title={`Tolak ${r.docNo}?`} description={<>Alasan penolakan dikirim ke PM peminjam.</>} confirmLabel="Tolak pinjaman" summary={loanDoc(r).summary} testId={`loan-inbox-reject-${r.id}`} />
                   </div>
                 ),
               },

@@ -576,6 +576,8 @@ function LedgerTable({
                 </>
               }
               confirmLabel="Void transaksi"
+              summary={[['Transaksi', r.entryNo], ['Tanggal', dayMonth(r.entryDate)], ['Arah', r.direction === 'in' ? 'Kas masuk' : 'Kas keluar'], ['Nominal', rp(r.amount)], ['Keterangan', r.description], ['Pengajuan', r.request?.docNo]]}
+              success="Transaksi ditandai Void dan jurnal balik tercatat."
               testId={`void-${r.id}`}
             />
           ) : null}
@@ -912,6 +914,8 @@ export async function TutupBuku(props: AdminViewServerProps) {
                 </>
               }
               confirmLabel="Tutup buku"
+              summary={[['Periode', periodLabel(r.period)], ['PT', pt.ref(company)?.name ?? ptCode(pt, company)], ['Transaksi', r.n], ['Kas masuk', rp(r.tin)], ['Kas keluar', rp(r.tout)]]}
+              success={`Transaksi s/d ${dayMonth(periodEnd(r.period))} terkunci.`}
               testId={`close-${r.period}`}
             />
           )
@@ -924,6 +928,8 @@ export async function TutupBuku(props: AdminViewServerProps) {
               title={`Buka kembali ${periodLabel(r.period)}${acc.close.length > 1 ? ` — ${ptCode(pt, company)}` : ''}?`}
               description={<>Periode ini dapat diposting dan dikoreksi lagi sampai ditutup kembali. Alasan wajib dan tercatat di audit log.</>}
               confirmLabel="Buka kembali"
+              summary={[['Periode', periodLabel(r.period)], ['PT', pt.ref(company)?.name ?? ptCode(pt, company)]]}
+              success="Periode dapat diposting dan dikoreksi lagi."
               testId={`reopen-${r.period}`}
             />
           ) : (

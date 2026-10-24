@@ -7,6 +7,7 @@ import { WEATHER, WEATHER_LABELS, type Weather } from '@/domain/daily/rules'
 import { fmtNum } from '@/domain/field/views'
 
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
+import { askField, fieldResult } from './client'
 import { Choice, decOut, DecimalField, PhotoPicker, ReasonField, usePhotos, type ExistingPhoto } from './parts'
 import { DateInput } from '../DateInput'
 import { WrapSelect } from '../WrapSelect'
@@ -156,6 +157,10 @@ export function DailyReportForm({ mode, projects, itemsByProject, resourcesByCom
       summaryRef.current?.focus()
       return
     }
+    // DRMS 24/10: popup before (project, date, volumes) and after
+    const drAction = mode === 'create' ? 'Kirim laporan harian' : mode === 'edit' ? 'Simpan perubahan laporan harian' : 'Simpan koreksi laporan harian'
+    const drDoc = `${project?.label ?? 'project'} ${date}`
+    if (!(await askField(drAction, drDoc, [['Project', project?.label], ['Tanggal', date], ['Item pekerjaan', workOut.length || null], ['Material', matOut.length || null], ['Tenaga / alat', menOut.length + eqOut.length || null], ['Foto', photos.items.length || null], ['Alasan', reason.trim() || null]]))) return
     setSummary(null)
     try {
       setBusy(photos.items.length ? 'Mengunggah foto…' : 'Menyimpan…')
@@ -181,16 +186,19 @@ export function DailyReportForm({ mode, projects, itemsByProject, resourcesByCom
       if (!idem.current || idem.current.body !== json) idem.current = { body: json, key: newIdemKey() }
       const r = await sendJson(mode === 'edit' ? 'PATCH' : 'POST', url, body, idem.current.key)
       if (!r.ok) {
+        fieldResult(drAction, drDoc, r.error)
         setErrors(fieldErrors(r.data))
         setSummary(r.error)
         summaryRef.current?.focus()
         return
       }
       const saved = r.data as { id: number }
+      fieldResult(drAction, drDoc, null)
       router.push(`/admin/laporan-harian/detail/${saved.id}?${mode === 'create' ? 'baru' : 'disimpan'}=1`)
       router.refresh()
     } catch (x) {
       setSummary(x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi — laporan yang sama tidak akan tercatat dua kali.')
+      fieldResult(drAction, drDoc, x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi.')
       summaryRef.current?.focus()
     } finally {
       setBusy(null)

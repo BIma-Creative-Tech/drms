@@ -7,6 +7,7 @@ import { detectArea, OUTSIDE_AREA_LABEL } from '@/domain/attendance/area'
 import { geofenceError } from '@/domain/attendance/calendar'
 import { errorLine } from '@/lib/field-labels'
 
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle, type Summary } from '../feedback/feedback'
 import { newIdemKey, sendJson, uploadSelfie } from '../kas/client'
 import { gpsErrorMessage, policyBlocks } from './camera'
 import { CAMERA_STYLE, CameraCapture } from './CameraCapture'
@@ -64,12 +65,18 @@ export function CorrectionDialog(p: CorrectionDialogProps) {
     setError(null)
     try {
       const r = await sendJson('POST', `/api/v1/attendance/${p.attendanceId}/correct`, { new_time: `${p.date}T${time}:00${p.offset}`, reason: reason.trim() }, key.current)
-      if (!r.ok) return setError({ field: 'form', text: r.error ?? 'Gagal menyimpan koreksi.' })
+      // DRMS 24/10: the dialog is the confirmation; the result popup follows (error: on top, dialog stays for a retry)
+      if (!r.ok) {
+        showResult({ ok: false, title: failureTitle(`koreksi jam ${kindLabel}`), message: r.error ?? 'Gagal menyimpan koreksi.' })
+        return setError({ field: 'form', text: r.error ?? 'Gagal menyimpan koreksi.' })
+      }
       ref.current?.close()
       setReason('')
+      showResult({ ok: true, title: successTitle(`koreksi jam ${kindLabel}`, `${p.employee} ${p.dateLabel}`), message: `${p.currentLocal} → ${time}` })
       router.refresh()
     } catch {
       setError({ field: 'form', text: 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.' })
+      showResult({ ok: false, title: failureTitle(`koreksi jam ${kindLabel}`), message: 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.' })
     } finally {
       setBusy(false)
     }
@@ -81,7 +88,7 @@ export function CorrectionDialog(p: CorrectionDialogProps) {
       </button>
       <dialog ref={ref} className="pk-dlg" aria-labelledby={`${uid}-t`} aria-describedby={`${uid}-d`} onCancel={(e) => busy && e.preventDefault()}>
         <form onSubmit={submit} noValidate>
-          <h2 id={`${uid}-t`}>Koreksi jam {kindLabel}</h2>
+          <h2 id={`${uid}-t`}>{confirmTitle(`koreksi jam ${kindLabel}`, p.employee)}</h2>
           <div id={`${uid}-d`} className="desc">
             {p.employee} · {p.dateLabel} · {p.location}
             {p.corrected ? ' · sudah pernah dikoreksi (riwayat di bawah halaman)' : ''}
@@ -163,7 +170,7 @@ export function CorrectionDialog(p: CorrectionDialogProps) {
               Batal
             </button>
             <button type="submit" className="pk-kbtn primary" disabled={busy} data-pk-confirm="correct">
-              {busy ? 'Menyimpan…' : 'Simpan koreksi'}
+              {busy ? 'Menyimpan…' : confirmLabel('simpan koreksi')}
             </button>
           </div>
         </form>
@@ -242,20 +249,26 @@ async function rest(method: 'POST' | 'PATCH', url: string, body: unknown): Promi
   return { ok: res.ok, error: res.ok ? null : payloadError(data, res.status) }
 }
 
+/** DRMS 24/10: what a save asks before it runs ("Yakin ingin <action> <object>?" + summary) and names in the result popup. */
+type Ask = { action: string; object?: string | null; summary?: Summary }
+
 function useSave() {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const run = async (method: 'POST' | 'PATCH', url: string, body: unknown, okText: string) => {
+  const run = async (method: 'POST' | 'PATCH', url: string, body: unknown, okText: string, ask: Ask) => {
+    if (!(await confirmAction({ title: confirmTitle(ask.action, ask.object), summary: ask.summary, confirmLabel: confirmLabel(ask.action) }))) return false
     setBusy(true)
     setMsg(null)
     try {
       const r = await rest(method, url, body)
       setMsg(r.ok ? { ok: true, text: okText } : { ok: false, text: r.error ?? 'Gagal menyimpan.' })
+      showResult(r.ok ? { ok: true, title: successTitle(ask.action, ask.object), message: okText } : { ok: false, title: failureTitle(ask.action), message: r.error ?? 'Gagal menyimpan.' })
       if (r.ok) router.refresh()
       return r.ok
     } catch {
       setMsg({ ok: false, text: 'Gagal menghubungi server. Coba lagi.' })
+      showResult({ ok: false, title: failureTitle(ask.action), message: 'Gagal menghubungi server. Coba lagi.' })
       return false
     } finally {
       setBusy(false)
@@ -285,7 +298,14 @@ export function ScheduleAssign({ employeeId, employee, current, options, disable
       className="pk-inline"
       onSubmit={(e) => {
         e.preventDefault()
-        void run('PATCH', `/api/employees/${employeeId}?depth=0`, { workSchedule: value ? Number(value) : null }, 'Tersimpan.')
+        void run('PATCH', `/api/employees/${employeeId}?depth=0`, { workSchedule: value ? Number(value) : null }, 'Tersimpan.', {
+          action: 'simpan jadwal kerja',
+          object: employee,
+          summary: [
+            ['Karyawan', employee],
+            ['Jadwal', options.find((o) => String(o.id) === value)?.label ?? 'Default perusahaan'],
+          ],
+        })
       }}
       data-pk-form="schedule-assign"
       data-pk-employee={employeeId}
@@ -321,7 +341,10 @@ export function DefaultSchedule({ current, companyId, options, disabled }: { cur
       className="pk-inline"
       onSubmit={(e) => {
         e.preventDefault()
-        void run('PATCH', `/api/companies/${companyId}?depth=0`, { defaultWorkSchedule: value ? Number(value) : null }, 'Jadwal default tersimpan.')
+        void run('PATCH', `/api/companies/${companyId}?depth=0`, { defaultWorkSchedule: value ? Number(value) : null }, 'Jadwal default tersimpan.', {
+          action: 'simpan jadwal default perusahaan',
+          summary: [['Jadwal', options.find((o) => String(o.id) === value)?.label ?? 'Tidak ada (keterlambatan tidak dihitung)']],
+        })
       }}
       data-pk-form="default-schedule"
     >
@@ -370,10 +393,11 @@ export function HolidayAdd({ year, edit, cancelHref }: { year: string; edit?: { 
         if (edit && reason.trim().length < 3) return setErr('Alasan perubahan minimal 3 karakter.')
         setErr(null)
         if (edit) {
-          if (await run('PATCH', `/api/holidays/${edit.id}?depth=0`, { date, name: name.trim(), changeReason: reason.trim() }, `Hari libur ${date} diperbarui.`) && cancelHref) router.push(cancelHref)
+          const ask: Ask = { action: 'simpan perubahan hari libur', object: date, summary: [['Tanggal', date], ['Keterangan', name.trim()], ['Alasan', reason.trim()]] }
+          if (await run('PATCH', `/api/holidays/${edit.id}?depth=0`, { date, name: name.trim(), changeReason: reason.trim() }, `Hari libur ${date} diperbarui.`, ask) && cancelHref) router.push(cancelHref)
           return
         }
-        if (await run('POST', '/api/holidays?depth=0', { date, name: name.trim() }, `Hari libur ${date} ditambahkan.`)) {
+        if (await run('POST', '/api/holidays?depth=0', { date, name: name.trim() }, `Hari libur ${date} ditambahkan.`, { action: 'tambah hari libur', object: date, summary: [['Tanggal', date], ['Keterangan', name.trim()]] })) {
           setDate('')
           setName('')
         }
@@ -433,7 +457,16 @@ export function GeofenceForm({ costCenterId, name, lat, lng, radiusM, defaultRad
         const x = check()
         setErr(x)
         if (x) return
-        void run('PATCH', `/api/cost-centers/${costCenterId}?depth=0`, { lat: numOrNull(v.lat), lng: numOrNull(v.lng), radiusM: numOrNull(v.r) }, 'Geofence tersimpan.')
+        void run('PATCH', `/api/cost-centers/${costCenterId}?depth=0`, { lat: numOrNull(v.lat), lng: numOrNull(v.lng), radiusM: numOrNull(v.r) }, 'Geofence tersimpan.', {
+          action: 'simpan geofence',
+          object: name,
+          summary: [
+            ['Lokasi', name],
+            ['Latitude', v.lat.trim() || '—'],
+            ['Longitude', v.lng.trim() || '—'],
+            ['Radius (m)', v.r.trim() || `${defaultRadius} (default)`],
+          ],
+        })
       }}
       data-pk-form="geofence"
       data-pk-cost-center={costCenterId}
@@ -614,6 +647,9 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
     setError(null)
     if (!loc || !action) return
     if (!photo) return setError('Ambil foto selfie dengan kamera dulu.')
+    // DRMS 24/10: popup before (location) and after (result) the attendance
+    const label = action === 'check_in' ? 'Absen masuk' : 'Absen pulang'
+    if (!(await confirmAction({ title: confirmTitle(label, `di ${loc.label}`), summary: [['Lokasi', loc.label], ['Masuk', loc.checkIn]], description: 'Lokasi GPS diambil saat Anda menekan Ya.', confirmLabel: confirmLabel(label) }))) return
     const file = new File([photo], 'selfie.jpg', { type: 'image/jpeg' })
     setBusy(true)
     try {
@@ -627,7 +663,12 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
         selfie_media_id: selfieId,
       }
       const r = await sendJson('POST', `/api/v1/attendance/${action === 'check_in' ? 'check-in' : 'check-out'}`, body)
-      if (!r.ok) return setError(r.error ?? 'Gagal mengirim absensi.')
+      if (!r.ok) {
+        showResult({ ok: false, title: failureTitle(label), message: r.error ?? 'Gagal mengirim absensi.' })
+        return setError(r.error ?? 'Gagal mengirim absensi.')
+      }
+      const outside = (r.data as { outsideArea?: boolean } | null)?.outsideArea
+      showResult({ ok: true, title: successTitle(label, loc.label), message: outside ? `Tercatat "${OUTSIDE_AREA_LABEL}".` : null })
       // DRMS 13/10 A2: a Non-OnSite attendance outside every registered location is recorded "Di luar area"
       if ((r.data as { outsideArea?: boolean } | null)?.outsideArea) setArea({ tone: 'warn', inside: [], text: `Tercatat "${OUTSIDE_AREA_LABEL}".` })
       setPhoto(null)
@@ -635,6 +676,7 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
       router.refresh()
     } catch (err) {
       setError((err as Error).message || 'Gagal mengirim absensi.')
+      showResult({ ok: false, title: failureTitle(label), message: (err as Error).message || 'Gagal mengirim absensi.' })
     } finally {
       setBusy(false)
     }

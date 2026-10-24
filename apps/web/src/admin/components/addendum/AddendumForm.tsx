@@ -5,6 +5,7 @@ import React, { useId, useRef, useState } from 'react'
 
 import { formatRupiah } from '@/lib/money'
 
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle } from '../feedback/feedback'
 import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 import { WrapSelect } from '../WrapSelect'
@@ -52,6 +53,16 @@ export function AddendumForm({ projects, initialProject, edit }: { projects: Pro
     setErrs(e)
     setError(null)
     if (Object.keys(e).length > 0) return
+    // DRMS 24/10: popup before (project, RAB lama → baru, alasan) and after
+    const action = mode === 'submit' ? 'Ajukan addendum RAB' : edit ? 'Simpan perubahan addendum' : 'Simpan draft addendum'
+    const doc = p ? `${p.code} ${p.name}` : null
+    const summary: Array<[string, string | null]> = [
+      ['Project', doc],
+      ['Nominal tambahan', formatRupiah(addition)],
+      ['RAB lama → baru', p && p.budget !== null ? `${formatRupiah(p.budget)} → ${formatRupiah(p.budget + addition)}` : null],
+      ['Alasan', reason.trim()],
+    ]
+    if (!(await confirmAction({ title: confirmTitle(action, doc ? `untuk ${doc}` : null), summary, description: mode === 'submit' ? 'Addendum dikirim untuk persetujuan; isi terkunci setelah diajukan.' : undefined, confirmLabel: confirmLabel(action) }))) return
     setBusy(mode)
     try {
       const r = edit
@@ -60,6 +71,7 @@ export function AddendumForm({ projects, initialProject, edit }: { projects: Pro
       if (!r.ok) {
         setError(r.error)
         setErrs(fieldErrors(r.data))
+        showResult({ ok: false, title: failureTitle(action), message: r.error })
         return
       }
       const id = (r.data as { id: number }).id
@@ -67,13 +79,16 @@ export function AddendumForm({ projects, initialProject, edit }: { projects: Pro
         const s = await sendJson('POST', `/api/v1/budget-addenda/${id}/submit`, {}, newIdemKey())
         if (!s.ok) {
           setError(s.error)
+          showResult({ ok: false, title: failureTitle(action), message: `Perubahan tersimpan, tetapi belum diajukan: ${s.error ?? ''}` })
           return
         }
       }
+      showResult({ ok: true, title: successTitle(action, doc ? `untuk ${doc}` : null), message: mode === 'submit' ? 'Addendum menunggu persetujuan.' : null })
       router.push(`/admin/addendum/detail/${id}?${mode === 'submit' ? 'diajukan' : 'tersimpan'}=1`)
       router.refresh()
     } catch {
       setError('Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+      showResult({ ok: false, title: failureTitle(action), message: 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.' })
     } finally {
       setBusy(null)
     }

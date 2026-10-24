@@ -7,6 +7,7 @@ import { MAX_PHOTOS, SERVICE_TYPES_REQUIRED, UNIT_STATUS_LABELS, UNIT_STATUSES, 
 import { fmtNum } from '@/domain/field/views'
 
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
+import { askField, fieldResult } from './client'
 import { CheckGroup, Choice, decOut, DecimalField, LinesEditor, linesFrom, linesOut, PhotoPicker, ReasonField, usePhotos, type ExistingPhoto, type LineDraft } from './parts'
 import { DateInput } from '../DateInput'
 import { WrapSelect } from '../WrapSelect'
@@ -143,6 +144,10 @@ export function ServiceReportForm({ mode = 'create', report, projects, units, un
       summaryRef.current?.focus()
       return
     }
+    // DRMS 24/10: popup before (unit, date, changed fields) and after
+    const svAction = mode === 'correction' ? 'Simpan koreksi laporan servis' : 'Simpan perubahan laporan servis'
+    const svDoc = `${unit?.label ?? 'unit'} ${r.reportDate}`
+    if (!(await askField(svAction, svDoc, [['Unit', unit?.label], ['Tanggal', r.reportDate], ['Kolom diubah', Object.keys(body).length], ['Foto baru', photos.items.length || null], ['Alasan', reason.trim() || null]]))) return
     setSummary(null)
     try {
       if (photos.items.length) {
@@ -155,15 +160,18 @@ export function ServiceReportForm({ mode = 'create', report, projects, units, un
       if (!idem.current || idem.current.body !== json) idem.current = { body: json, key: newIdemKey() }
       const res = mode === 'correction' ? await sendJson('POST', `/api/v1/service-reports/${r.id}/corrections`, body, idem.current.key) : await sendJson('PATCH', `/api/v1/service-reports/${r.id}`, body, idem.current.key)
       if (!res.ok) {
+        fieldResult(svAction, svDoc, res.error)
         setErrors(fieldErrors(res.data))
         setSummary(res.error)
         summaryRef.current?.focus()
         return
       }
+      fieldResult(svAction, svDoc, null)
       router.push(`/admin/laporan-servis/detail/${r.id}?disimpan=1`)
       router.refresh()
     } catch (x) {
       setSummary(x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+      fieldResult(svAction, svDoc, x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi.')
       summaryRef.current?.focus()
     } finally {
       setBusy(null)
@@ -193,6 +201,9 @@ export function ServiceReportForm({ mode = 'create', report, projects, units, un
       await saveChanges(r0)
       return
     }
+    // DRMS 24/10: popup before (project, unit, date, HM, status after) and after
+    const svDoc = `${unit!.label} ${date}`
+    if (!(await askField('Kirim laporan servis', svDoc, [['Project', project!.label], ['Unit', unit!.label], ['Tanggal', date], ['HM', typeof hmVal === 'number' ? fmtNum(hmVal) : null], ['Status unit setelah servis', status ? UNIT_STATUS_LABELS[status] : null], ['Foto', photos.items.length || null]]))) return
     setSummary(null)
     try {
       setBusy(photos.items.length ? 'Mengunggah foto…' : 'Menyimpan…')
@@ -220,6 +231,7 @@ export function ServiceReportForm({ mode = 'create', report, projects, units, un
       if (!idem.current || idem.current.body !== json) idem.current = { body: json, key: newIdemKey() }
       const r = await sendJson('POST', '/api/v1/service-reports', body, idem.current.key)
       if (!r.ok) {
+        fieldResult('Kirim laporan servis', svDoc, r.error)
         const fe = fieldErrors(r.data)
         setErrors(fe)
         setSummary(r.error)
@@ -227,10 +239,12 @@ export function ServiceReportForm({ mode = 'create', report, projects, units, un
         return
       }
       const created = r.data as { id: number }
+      fieldResult('Kirim laporan servis', svDoc, null)
       router.push(`/admin/laporan-servis/detail/${created.id}?baru=1`)
       router.refresh()
     } catch (x) {
       setSummary(x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi — laporan yang sama tidak akan tercatat dua kali.')
+      fieldResult('Kirim laporan servis', svDoc, x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi.')
       summaryRef.current?.focus()
     } finally {
       setBusy(null)

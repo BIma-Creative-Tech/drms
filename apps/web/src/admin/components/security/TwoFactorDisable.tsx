@@ -1,38 +1,37 @@
 'use client'
-import React, { useId, useState } from 'react'
+import React, { useRef, useState } from 'react'
+
+import { confirmAction, confirmLabel, confirmTitle } from '../feedback/feedback'
 
 /**
- * "Nonaktifkan 2FA" with an inline confirmation step (no window.confirm). The confirmed form posts
- * to /auth/account-action (same-origin; the server checks the credential is the caller's own), which
- * sends the user to Keycloak: login again (password + code), confirm there, back to the page.
+ * "Nonaktifkan 2FA" — DRMS 24/10: the app confirmation popup (feedback.ts; was an inline confirmation step, never
+ * window.confirm). The confirmed form posts to /auth/account-action (same-origin; the server checks the credential is
+ * the caller's own), which sends the user to Keycloak: login again (password + code), confirm there, back to the page
+ * — the outcome is shown there as the result popup (?status=…, KeamananAkun → SecurityResult).
  */
 export function TwoFactorDisable({ credentialId, label }: { credentialId: string; label: string }) {
-  const [asking, setAsking] = useState(false)
   const [sending, setSending] = useState(false)
-  const id = useId()
-  if (!asking) {
-    return (
-      <button type="button" className="pk-btn" onClick={() => setAsking(true)} data-pk-2fa-disable={credentialId}>
-        Nonaktifkan 2FA
-      </button>
-    )
+  const form = useRef<HTMLFormElement>(null)
+  const onClick = async () => {
+    const yes = await confirmAction({
+      title: confirmTitle('Nonaktifkan 2FA', `untuk ${label}`),
+      summary: [['Autentikator', label]],
+      description: 'Akun Anda kembali hanya dilindungi kata sandi. Anda akan diminta login ulang (kata sandi dan kode autentikator) lalu mengonfirmasi di halaman Keycloak.',
+      confirmLabel: confirmLabel('Nonaktifkan'),
+      danger: true,
+      testId: '2fa-disable',
+    })
+    if (!yes) return
+    setSending(true)
+    form.current?.submit()
   }
   return (
-    <form method="post" action="/auth/account-action" className="pk-sec__confirm" role="group" aria-labelledby={id} onSubmit={() => setSending(true)} data-pk-2fa-confirm>
+    <form ref={form} method="post" action="/auth/account-action" data-pk-2fa-confirm>
       <input type="hidden" name="action" value="disable" />
       <input type="hidden" name="credentialId" value={credentialId} />
-      <p id={id}>
-        Nonaktifkan 2FA untuk <strong>{label}</strong>? Akun Anda kembali hanya dilindungi kata sandi. Anda akan diminta login ulang (kata sandi dan kode
-        autentikator) lalu mengonfirmasi di halaman Keycloak.
-      </p>
-      <div className="pk-actions">
-        <button type="submit" className="pk-btn pk-btn--danger" disabled={sending} autoFocus>
-          {sending ? 'Mengalihkan…' : 'Ya, nonaktifkan'}
-        </button>
-        <button type="button" className="pk-btn" onClick={() => setAsking(false)} disabled={sending}>
-          Batal
-        </button>
-      </div>
+      <button type="button" className="pk-btn pk-btn--danger" onClick={() => void onClick()} disabled={sending} data-pk-2fa-disable={credentialId}>
+        {sending ? 'Mengalihkan…' : 'Nonaktifkan 2FA'}
+      </button>
     </form>
   )
 }

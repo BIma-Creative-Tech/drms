@@ -134,9 +134,9 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
                           </a>
                         )
                       }
-                      return <ActionButton url={`/api/v1/expense-requests/${r.id}/${r.step}`} label={t.label} variant="primary" confirm={t.confirm} />
+                      return <ActionButton url={`/api/v1/expense-requests/${r.id}/${r.step}`} label={t.label} variant="primary" confirm={t.confirm} {...inboxDoc(r)} />
                     })()}
-                    <ActionButton url={`/api/v1/expense-requests/${r.id}/reject`} label="Tolak" prompt={REJECT_PROMPT} />
+                    <ActionButton url={`/api/v1/expense-requests/${r.id}/reject`} label="Tolak" prompt={REJECT_PROMPT} {...inboxDoc(r)} />
                   </td>
                 </ClickableRow>
               ))}
@@ -153,6 +153,12 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
       <LoanInboxSection req={req} />
     </Shell>
   )
+}
+
+/** DRMS 24/10: the request as named in the decision popups (number, title, requester, project, total). */
+function inboxDoc(r: Awaited<ReturnType<typeof approvalInbox>>['items'][number]) {
+  const docNo = r.docNo ?? `#${r.id}`
+  return { object: docNo, summary: [[r.typeLabel, docNo], ['Judul', r.title], ['Pemohon', r.requesters || null], ['Proyek / pusat biaya', r.scope || null], ['Total', rp(r.grandTotal)], ['Langkah', r.stepLabel]] as const }
 }
 
 export default ApprovalInbox
