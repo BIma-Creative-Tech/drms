@@ -52,7 +52,7 @@ export type PkListConfig = {
  * documents (pengajuan, nota, transfer …) can run into thousands and are reached by search instead.
  */
 export const FILTER_TARGETS: ReadonlySet<string> = new Set([
-  'projects', 'employees', 'users', 'clients', 'vendors', 'cost-centers', 'sites', 'urgency-levels', 'expense-categories',
+  'projects', 'employees', 'users', 'clients', 'vendors', 'cost-centers', 'urgency-levels', 'expense-categories',
   'cash-accounts', 'cash-in-sources', 'banks', 'vehicles', 'uoms', 'resource-types', 'service-types', 'project-stages', 'stage-templates',
   'work-schedules', 'rap-templates', 'approval-rules',
 ])
@@ -61,16 +61,15 @@ export const FILTER_TARGETS: ReadonlySet<string> = new Set([
 const EXPLICIT: Record<string, { filters?: readonly string[]; dates?: readonly string[] }> = {
   // ADR 0027: "Jenis penerima" (karyawan / vendor) filter
   'expense-requests': { filters: ['status', 'type', 'payeeType', 'project', 'urgencyLevel', 'costCenter'], dates: ['requestDate'] },
-  projects: { filters: ['status', 'kind', 'client', 'site', 'pm'], dates: ['startDate'] },
-  employees: { filters: ['attendanceType', 'homeSite', 'workSchedule', 'active'] },
-  sites: { filters: ['isHeadOffice', 'costCenter', 'active'] },
+  projects: { filters: ['status', 'kind', 'client', 'pm'], dates: ['startDate'] },
+  employees: { filters: ['attendanceType', 'workSchedule', 'active'] },
   vendors: { filters: ['active'] },
   users: { filters: ['active'] },
   'cash-entries': { filters: ['direction', 'status', 'sourceType', 'cashAccount'], dates: ['entryDate'] },
   transfers: { filters: ['status', 'kind', 'costCenter'], dates: ['transferAt'] },
   receipts: { filters: ['status'], dates: ['receiptDate'] },
   settlements: { filters: ['status', 'settlementType'] },
-  attendances: { filters: ['kind', 'source', 'project', 'site', 'outsideArea'] },
+  attendances: { filters: ['kind', 'source', 'project', 'costCenter', 'outsideArea'] },
   'attendance-corrections': { filters: ['employee', 'kind', 'correctedBy'], dates: ['correctedAt'] },
   notifications: { dates: ['createdAt'] },
   'audit-logs': { filters: ['action', 'docType', 'source'], dates: ['serverTime'] },

@@ -148,8 +148,8 @@ periode kontrak unit — pelapor lapangan tetap paling lama 14 hari ke belakang.
 
 ### 6a. Cek dana & pinjaman antar-PT (ADR 0029)
 
-- Di pengajuan yang menunggu persetujuan Anda (dan Owner) tampil panel **"Ketersediaan dana PT"** (saldo tanpa akun
-  site − komitmen = dana tersedia) — informasi; **cek akhir di Owner**. Pada aturan tanpa level Owner, persetujuan
+- Di pengajuan yang menunggu persetujuan Anda (dan Owner) tampil panel **"Ketersediaan dana PT"** (saldo tanpa akun kas
+  cabang lama bertanda site − komitmen = dana tersedia) — informasi; **cek akhir di Owner**. Pada aturan tanpa level Owner, persetujuan
   terakhir Anda sendiri yang ditolak bila dana PT kurang (Owner diberi tahu dan dapat memerintahkan pinjaman antar-PT).
 - Anda dapat melihat **Pinjaman antar-PT** PT Anda (Keuangan → Pinjaman antar-PT) dan diberi tahu saat pinjaman
   diperintahkan / dicairkan / dikembalikan; perintah dan pembatalan hanya oleh Owner.

@@ -20,7 +20,6 @@ export const ProjectListQuery = z
     page: z.coerce.number().int().min(1).max(100_000).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     company: companyFilterParam,
-    site: z.string().regex(/^\d{1,10}$/).optional().meta({ description: 'ADR 0023: only projects of this site (narrows the read scope).' }),
   })
   .meta({ id: 'ProjectListQuery' })
 
@@ -40,7 +39,6 @@ export const ProjectListItem = z
     progressPct: z.number().nullable(),
     costCenter: Ref.nullable().meta({ description: 'D2 legacy cost center (retired by ADR 0031).' }),
     pusatBiaya: z.object({ id, name: z.string() }).nullable().meta({ description: 'ADR 0031: the project\'s Pusat Biaya = a cash account of its PT (name only); null = not mapped yet (transfers refused).' }),
-    site: Ref.nullable().meta({ description: 'ADR 0023: site (kantor cabang) that handles the project.' }),
     rapPlanned: z.number().nullable().meta({ description: 'D4: Σ planned RAP amount (price roles only).' }),
     rapRealised: z.number().nullable().meta({ description: 'D4: Σ approved line totals charged to RAP items (price roles only).' }),
     rapPercent: z.number().nullable().meta({ description: 'D4: rapRealised / rapPlanned × 100 (price roles only).' }),
@@ -121,4 +119,4 @@ export const SiteList = z
     ),
     totalDocs: z.number().int(),
   })
-  .meta({ id: 'SiteList', description: 'ADR 0023: sites (kantor cabang) of the selected PTs.' })
+  .meta({ id: 'SiteList', description: 'ADR 0023 sites — ADR 0032: removed from the product; always an empty list (kept for APK ≤ 0.11.1).' })

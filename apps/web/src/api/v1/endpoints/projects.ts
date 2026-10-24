@@ -26,7 +26,7 @@ export const listProjectsEndpoint = v1({
   handler: async ({ req }) => {
     const q = ProjectListQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
     if (!q.success) throw badRequest(q.error.issues)
-    return json(await listProjects(req, { q: q.data.q, status: q.data.status, page: q.data.page, limit: q.data.limit, companies: await companyQuery(req), site: q.data.site ? Number(q.data.site) : undefined }))
+    return json(await listProjects(req, { q: q.data.q, status: q.data.status, page: q.data.page, limit: q.data.limit, companies: await companyQuery(req) }))
   },
 })
 
@@ -51,7 +51,7 @@ export const listCostCentersEndpoint = v1({
   },
 })
 
-/** ADR 0023 §6: sites (kantor cabang) of the selected PTs with the caller's check-in / on-behalf flags. */
+/** ADR 0023 §6 sites — ADR 0032: removed from the product; kept for APK ≤ 0.11.1, always an empty list. */
 export const listSitesEndpoint = v1({
   path: '/sites',
   method: 'get',

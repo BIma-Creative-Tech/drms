@@ -157,17 +157,8 @@ const BalancePoint = z.object({ period: z.string(), balance: rp.meta({ descripti
 const DisbursedPoint = z.object({ period: z.string(), net: rp.meta({ description: 'K-05 Dicairkan bersih in the month' }) })
 const StatusSplit = z.object({ count: z.number().int(), sum: rp })
 
-/** ADR 0023: site filter options + (owner/finance) K-01 per site (accounts flagged with a site; "Tanpa site" row). */
-const SiteOption = z.object({ id: z.number().int(), companyId: ptId, code: z.string(), name: z.string(), active: z.boolean() })
-const SiteCash = z.object({ siteId: z.number().int().nullable(), companyId: ptId.nullable(), code: z.string(), name: z.string(), balance: rp, accounts: z.number().int() })
-const SiteSummary = SiteCash.extend({
-  projectsRunning: z.number().int(),
-  attendanceToday: z.number().int().meta({ description: 'Employees with a check-in today at the site or a project of the site.' }),
-  disbursedMonth: rp.meta({ description: 'K-05 net disbursed this month for the site\'s projects.' }),
-})
-
 // ---- DRMS 13/10 Wave 3: cards shared by the web dashboard and the APK home (dashboards.ts slaBlock / loanBlock /
-// rapMissingBlock / rapMonitoringBlock). Scopes as on the web: NOT narrowed by `?site=` nor by the layout role.
+// rapMissingBlock / rapMonitoringBlock). Scopes as on the web: NOT narrowed by the layout role.
 const SlaBlock = z
   .object({
     month: z.string(),
@@ -259,9 +250,6 @@ export const OwnerDashboard = z.object({
   asOf: z.string(),
   month: z.string(),
   companies: Companies,
-  sites: z
-    .object({ options: z.array(SiteOption), selected: z.number().int().nullable(), cash: z.array(SiteCash), summary: z.array(SiteSummary).meta({ description: 'Per-site breakdown (only without a site filter).' }) })
-    .meta({ description: 'ADR 0023: empty lists when the PTs have no site.' }),
   cash: z.object({
     total: rp,
     accounts: z.array(z.object({ id: z.number().int(), companyId: ptId, name: z.string(), active: z.boolean(), balance: rp })),
@@ -316,7 +304,6 @@ export const FinanceDashboard = z.object({
   asOf: z.string(),
   month: z.string(),
   companies: Companies,
-  sites: z.object({ options: z.array(SiteOption), selected: z.number().int().nullable(), cash: z.array(SiteCash) }).meta({ description: 'ADR 0023: per-site cash balance; empty without sites.' }),
   transferQueue: TransferQueueSummary,
   reimburseToVerify: z.object({ count: z.number().int(), warnings: z.number().int() }),
   lpjToVerify: z.number().int(),
@@ -380,7 +367,6 @@ export const PmDashboard = z.object({
   asOf: z.string(),
   month: z.string(),
   companies: Companies,
-  sites: z.object({ options: z.array(SiteOption), selected: z.number().int().nullable() }).meta({ description: 'ADR 0023: site filter options (sites of the PM\'s PTs).' }),
   hasScope: z.boolean(),
   waitingForMe: z.number().int().meta({ description: 'ADR 0021: requests waiting for the PM\'s own "Persetujuan PM" (PM project → Direktur rule); 0 on Direktur → Finance requests (ADR 0013).' }),
   teamWaiting: z
@@ -494,11 +480,5 @@ export const ReportQuery = z
     sumber: z.string().optional(),
     bulan: z.string().optional().meta({ description: 'YYYY-MM (absensi; default current month)' }),
     pt: z.string().optional().meta({ description: 'MC2: PT filter (company ids, repeatable or comma list) — narrows the scope; a PT outside the caller\'s selection → 403 code COMPANY_NOT_ALLOWED (QA-MC4-14)' }),
-    site: z.string().optional().meta({ description: 'ADR 0023: site id (kantor cabang) — narrows the scope (requests/projects through the project\'s site, cash through the account\'s site, attendance through the row\'s site); never widens.' }),
   })
   .meta({ description: 'Same filters as the web report page; PM filters are intersected with the team scope.' })
-
-/** ADR 0023 §5: dashboard query — `site` narrows the scope (never widens). */
-export const DashboardQuery = z
-  .object({ site: z.string().regex(/^\d{1,9}$/).optional().meta({ description: 'ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card.' }) })
-  .meta({ id: 'DashboardQuery' })

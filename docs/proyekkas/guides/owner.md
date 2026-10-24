@@ -36,8 +36,8 @@ oleh Owner itu sendiri.
 Bila Admin grup menyalakan **"Cek dana saat persetujuan"** untuk sebuah PT, persetujuan terakhir Anda (dan pengajuan Anda
 sendiri saat **Kirim**) **ditolak bila dana PT tidak cukup**:
 
-- **Dana tersedia** = saldo semua akun kas/bank PT yang **tidak** ditandai site (kas kecil / rekening cabang tidak
-  dihitung) − **komitmen**: pengajuan yang sudah disetujui tetapi belum ditransfer, kekurangan LPJ yang belum dibayar,
+- **Dana tersedia** = saldo semua akun kas/bank PT — kecuali akun yang dulu ditandai site (kas kecil / rekening cabang;
+  site dihapus 24 Okt 2026, keputusan apakah akun itu dihitung menunggu Anda, ADR 0032 §4) − **komitmen**: pengajuan yang sudah disetujui tetapi belum ditransfer, kekurangan LPJ yang belum dibayar,
   dan perintah pinjaman antar-PT dari PT ini yang belum dicairkan. Pengajuan yang masih menunggu persetujuan belum
   dihitung — yang disetujui lebih dulu memakai dana lebih dulu.
 - **Pusat biaya dulu, lalu PT** (sejak 0.19.1). Untuk project yang sudah dipetakan, panel menampilkan dulu

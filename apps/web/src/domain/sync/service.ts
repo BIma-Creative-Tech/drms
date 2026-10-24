@@ -3,7 +3,7 @@ import { APIError, ValidationError, type CollectionSlug, type PayloadRequest } f
 import type { z } from 'zod'
 
 import { runUnderCompany } from '@/access/company-context'
-import { companyContextOf, employeeIn, hasRole, mappedCompanies, relId, userId, type Membership } from '@/access/roles'
+import { companyContextOf, employeeIn, mappedCompanies, relId, userId, type Membership } from '@/access/roles'
 import { companyOf } from '@/domain/companies'
 import { FIELD_COLLECTIONS } from '@/domain/field/access'
 import {
@@ -31,7 +31,7 @@ import { withReqTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
-import { AttendanceReject, LOCATION_COLLECTION, locationOf, recordAttendance, userOfEmployee } from '@/domain/attendance/record'
+import { AttendanceReject, LOCATION_COLLECTION, locationOf, onBehalfActor, recordAttendance } from '@/domain/attendance/record'
 
 import { attendanceTimeOf, employeeOfUser } from './attendance'
 import { judgeTime, type TimeVerdict } from './clock'
@@ -529,18 +529,21 @@ async function applyAttendance(c: ItemCtx, verdict: TimeVerdict, receivedAt: Dat
   const own = locCompany !== undefined ? employeeIn(req, locCompany) : await employeeOfUser(req, uid)
   let employee: number
   let user: number | null
+  let source: 'self' | 'pm' | 'admin' = 'self'
   if (onBehalf) {
-    const ob = p as SyncOnBehalf
     // US-14: "diabsenkan oleh PM" — requirements §4 "Absensi": PM C (atas nama tim). Not an approval
-    // (ADR 0013 covers expense decisions only), so the PM keeps this right.
-    if (!hasRole(req, 'pk-pm', locCompany)) reject('FORBIDDEN', 'Hanya PM yang dapat mengabsenkan anggota tim.')
-    if (own !== undefined && own === ob.employee_id) reject('FORBIDDEN', 'Absensi Anda sendiri dicatat lewat absen masuk/pulang biasa.', 'payload.employee_id')
-    const emp = (await req.payload.findByID({ collection: 'employees', id: ob.employee_id, depth: 0, overrideAccess: true /* SYSTEM-READ: target employee of on-behalf */, req, disableErrors: true })) as { active?: boolean | null; company?: unknown } | null
-    if (!emp || !isMapped(req, relId(emp.company))) reject('NOT_FOUND', 'Karyawan tidak ditemukan.', 'payload.employee_id')
-    if (relId(emp!.company) !== locCompany) reject('COMPANY_MISMATCH', 'Karyawan dan lokasi berada di PT yang berbeda.', 'payload.employee_id')
-    if (emp!.active === false) reject('VALIDATION', 'Karyawan sudah nonaktif.', 'payload.employee_id')
-    employee = ob.employee_id
-    user = await userOfEmployee(req, employee)
+    // (ADR 0013 covers expense decisions only), so the PM keeps this right. ADR 0032: an Admin Staff of the PT records
+    // for ANY employee of it (source `admin`; wins over PM when the caller holds both).
+    let actor: Awaited<ReturnType<typeof onBehalfActor>>
+    try {
+      actor = await onBehalfActor(req, { employeeId: (p as SyncOnBehalf).employee_id, locCompany, own, pmAllowed: true })
+    } catch (err) {
+      if (err instanceof AttendanceReject) return reject(err.code, err.message, err.field)
+      throw err
+    }
+    employee = actor.employee
+    user = actor.user
+    source = actor.source
   } else {
     if (own === undefined) reject('VALIDATION', 'Akun Anda belum terhubung ke data karyawan. Hubungi Admin.')
     employee = own!
@@ -569,7 +572,7 @@ async function applyAttendance(c: ItemCtx, verdict: TimeVerdict, receivedAt: Dat
       flags: [...verdict.flags, ...timeFlags],
       clientUuid: item.client_uuid,
       device: device ?? null,
-      source: onBehalf ? 'pm' : 'self',
+      source,
       recordedBy: onBehalf ? uid : null,
       onBehalfReason: onBehalf ? (p as SyncOnBehalf).reason : null,
       timeZone: features.timezone,

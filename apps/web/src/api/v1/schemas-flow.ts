@@ -799,7 +799,8 @@ export const MembershipBatchBody = z
             user: id,
             company: id,
             // pk-operator (owner 2026-10-09) is offered by the web matrix ('Opr') — it was missing here (400 on save)
-            roles: z.array(z.enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator'])).max(7),
+            // ADR 0032: pk-admin-staff (Admin Staff, 'AdmS')
+            roles: z.array(z.enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator', 'pk-admin-staff'])).max(8),
             employee: id.nullable().optional().meta({ description: 'Employee of THIS PT (null = unlink; omitted = unchanged).' }),
             active: z.boolean().optional(),
           })

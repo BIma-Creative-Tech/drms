@@ -168,7 +168,7 @@ Owner memerintahkan pinjaman dari PT yang punya dana ke PT yang kurang (nomor `P
 KK di PT pembayar, **KM "Antar PT" otomatis** di rekening penerimaan antar-PT PT penerima — keduanya bukan biaya.
 
 1. **Pencairan (Finance PT pemberi):** **Antrian Transfer** → bagian **"Pencairan pinjaman antar-PT"** (atau Keuangan →
-   Pinjaman antar-PT → detail) → pilih akun sumber (rekening kantor pusat, **bukan** akun site), tanggal & jam sesuai
+   Pinjaman antar-PT → detail) → pilih akun sumber (rekening kantor pusat, **bukan** akun kas cabang lama yang ditandai site), tanggal & jam sesuai
    bukti, no. referensi, bukti → **Catat pencairan**. Nilai = nilai perintah. Ditolak bila:
    - Anda sendiri yang memerintahkan (G1) — minta Finance lain;
    - dana tersedia PT Anda kini kurang (*"Dana tersedia PT … kurang untuk pencairan"*) — perintah tetap menunggu, Owner
@@ -187,7 +187,7 @@ KK di PT pembayar, **KM "Antar PT" otomatis** di rekening penerimaan antar-PT PT
    "Pinjaman antar-PT diberikan / diterima", "Pengembalian pinjaman antar-PT diterima", "Pembayaran hutang antar-PT";
    baris Kas menampilkan nomor PJA dan PT lawannya.
 5. **Cek dana di persetujuan:** bila PT Anda menyalakan "Cek dana saat persetujuan", panel **Ketersediaan dana PT** di
-   pengajuan menunjukkan saldo (tanpa akun site), komitmen dan dana tersedia; pengajuan disetujui yang lama tidak
+   pengajuan menunjukkan saldo (tanpa akun kas cabang lama bertanda site), komitmen dan dana tersedia; pengajuan disetujui yang lama tidak
    ditransfer tetap menahan dana — transfer atau batalkan. Sejak 0.19.1 panel juga menampilkan **pusat biaya**
    project (dana bebas akun itu). Pengajuan lolos bila pusat biaya **atau** PT cukup. Baris di bawah angka
    menyebut dari akun mana Anda membayar: pusat biaya sendiri, atau akun lain (pinjaman antar project otomatis).

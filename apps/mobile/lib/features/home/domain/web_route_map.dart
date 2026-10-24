@@ -74,6 +74,8 @@ const Map<String, String> webToApk = {
   '/absensi/absen': '/attendance',
   '/absensi': '/attendance?tab=team',
   '/absensi/rekap': '/attendance?tab=recap',
+  // ADR 0032: Admin Staff "Absenkan karyawan" = the on-behalf screen
+  '/absensi/absenkan': '/attendance/on-behalf',
   // phase 6 (user 2026-10-19): Jadwal & hari libur, the attendance collections
   '/absensi/jadwal': '/attendance-schedule',
   '/collections/attendances': '/data/attendances',
@@ -105,7 +107,6 @@ const Map<String, String> webToApk = {
   '/collections/vehicles': '/data/vehicles',
   '/collections/vendors': '/data/vendors',
   '/collections/vendor-bank-accounts': '/data/vendor-bank-accounts',
-  '/collections/sites': '/data/sites',
   '/collections/media-receipts': '/data/media-receipts',
   '/collections/media-transfer-proofs': '/data/media-transfer-proofs',
   '/collections/media-selfies': '/data/media-selfies',

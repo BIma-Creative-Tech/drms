@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
-import { companyContextOf, exactRolesIn, exactRolesOf, membershipsOf, relId, userRoles, type Membership, type Role } from '@/access/roles'
+import { companyContextOf, exactRolesIn, exactRolesOf, membershipsOf, userRoles, type Membership, type Role } from '@/access/roles'
 import { appSettings, companyById, settings } from '@/domain/companies'
 import { isNoApprovalRule } from '@/domain/expense/decision'
 import { mayFileIntercompany } from '@/domain/expense/drafts'
@@ -67,6 +67,9 @@ export function meCapabilities(
     instructIntercompanyLoan: stored.includes('pk-principal'),
     disburseIntercompanyLoan: stored.includes('pk-finance'),
     fundCheckEnabled: opts.fundCheckEnabled === true,
+    // ADR 0032: "Absenkan karyawan" — PM (team members at team locations) or Admin Staff (any employee of the PT)
+    attendanceOnBehalf: roles.some((r) => r === 'pk-pm' || r === 'pk-admin-staff'),
+    attendanceAdminStaff: roles.includes('pk-admin-staff'),
   }
 }
 
@@ -83,8 +86,7 @@ export function legacyCompanyOf(selected: readonly Membership[]): number | null 
   return (sorted.find((m) => m.employee !== null) ?? sorted[0])?.company ?? null
 }
 
-type SiteRef = { id: number; code: string; name: string }
-type EmployeeRef = { id: number; code: string; name: string; homeSite: SiteRef | null }
+type EmployeeRef = { id: number; code: string; name: string }
 
 async function employeeRefs(req: PayloadRequest, ids: number[]): Promise<Map<number, EmployeeRef>> {
   const out = new Map<number, EmployeeRef>()
@@ -94,19 +96,12 @@ async function employeeRefs(req: PayloadRequest, ids: number[]): Promise<Map<num
     where: { id: { in: ids } },
     depth: 0,
     pagination: false,
-    select: { code: true, name: true, homeSite: true },
+    select: { code: true, name: true },
     overrideAccess: true, // SYSTEM-READ: the caller's OWN membership employees (ids from the auth context)
     req,
   })
-  const docs = res.docs as unknown as Array<{ id: number; code: string; name: string; homeSite?: unknown }>
-  // ADR 0023: "Site penempatan" of the own employee (profile + APK attendance picker hint)
-  const siteIds = [...new Set(docs.map((e) => relId(e.homeSite)).filter((x): x is number => x !== undefined))]
-  const sites = new Map<number, SiteRef>()
-  if (siteIds.length) {
-    const r = await req.payload.find({ collection: 'sites', where: { id: { in: siteIds } }, depth: 0, pagination: false, select: { code: true, name: true }, overrideAccess: true /* SYSTEM-READ: home sites of the caller's own employees */, req })
-    for (const x of r.docs as unknown as SiteRef[]) sites.set(x.id, { id: x.id, code: x.code, name: x.name })
-  }
-  for (const e of docs) out.set(e.id, { id: e.id, code: e.code, name: e.name, homeSite: sites.get(relId(e.homeSite) ?? -1) ?? null })
+  // ADR 0032: no "Site penempatan" (ADR 0023 `homeSite`) any more — the APK treats a missing value as none
+  for (const e of res.docs as unknown as EmployeeRef[]) out.set(e.id, { id: e.id, code: e.code, name: e.name })
   return out
 }
 

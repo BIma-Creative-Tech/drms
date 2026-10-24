@@ -4,17 +4,18 @@ import type { AdminViewServerProps, PayloadRequest } from 'payload'
 import Link from 'next/link'
 import React from 'react'
 
-import { hasRoleAny, ownEmployees, relId, userId } from '@/access/roles'
-import { CorrectionDialog, DefaultSchedule, GeofenceForm, HolidayAdd, ScheduleAssign, SelfCheckForm, SelfieButton, type Option, type SelfCheckLocation } from '@/admin/components/absensi/AttendanceActions'
+import { hasRoleAny, membershipsOf, ownEmployees, relId, userId } from '@/access/roles'
+import { CorrectionDialog, DefaultSchedule, GeofenceForm, HolidayAdd, OnBehalfForm, ScheduleAssign, SelfCheckForm, SelfieButton, type Option, type SelfCheckLocation } from '@/admin/components/absensi/AttendanceActions'
 import { KAS_STYLE } from '@/admin/components/kas/style'
 import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
 import { matchesQuery, spValue } from '@/admin/list-query'
 import { Icon as Glyph } from '@/admin/modules/Icon'
 import type { DayRecap, LocationDay, LocationRef, RecapSummary, TeamTodayRow } from '@/domain/attendance/aggregate'
 import { classCounts, classifyDay, DAY_CLASSES, LEGEND, minutesText, monthWeeks, offsetText, shiftMonth, type DayClass } from '@/domain/attendance/calendar'
-import { attendanceContext, attendanceScope, employeeRef, narrowAttScope, narrowAttToCompanies, narrowAttToSite, type AttScope } from '@/domain/attendance/queries'
+import { attendanceContext, attendanceScope, employeeRef, narrowAttScope, narrowAttToCompanies, type AttScope } from '@/domain/attendance/queries'
 import { OUTSIDE_AREA_LABEL } from '@/domain/attendance/area'
-import { eligibleLocations, employeeAttendance, referenceSite, type EmployeeAttendance } from '@/domain/attendance/eligibility'
+import { eligibleLocations, employeeAttendance, type EmployeeAttendance } from '@/domain/attendance/eligibility'
+import { onBehalfOptions, type OnBehalfOptions } from '@/domain/attendance/on-behalf'
 import { dayRowsAt } from '@/domain/attendance/record'
 import type { ScheduleSnapshot } from '@/domain/attendance/schedule'
 import { employeeRecap, myRecap, teamTodayFor, type MonthlyRecap, type TeamTodayResult } from '@/domain/attendance/service'
@@ -231,11 +232,15 @@ function Frame({ props, name, children }: { props: AdminViewServerProps; name: s
   )
 }
 
-function SubNav({ active, scope }: { active: 'today' | 'absen' | 'rekap' | 'jadwal'; scope: AttScope | null }) {
+/** ADR 0032: "Absenkan karyawan" is offered to an Admin Staff (any selected PT; the page re-checks per PT). */
+const isAdminStaff = (req: PayloadRequest) => hasRoleAny(req, 'pk-admin-staff')
+
+function SubNav({ active, scope, absenkan = false }: { active: 'today' | 'absen' | 'absenkan' | 'rekap' | 'jadwal'; scope: AttScope | null; absenkan?: boolean }) {
   const items: Array<[typeof active, string, string]> = scope
     ? [
         ['today', '/admin/absensi', 'Tim hari ini'],
         ['absen', '/admin/absensi/absen', 'Absen'],
+        ...(absenkan ? [['absenkan', '/admin/absensi/absenkan', 'Absenkan karyawan'] as [typeof active, string, string]] : []),
         ['rekap', '/admin/absensi/rekap', 'Rekap bulanan'],
         ['jadwal', '/admin/absensi/jadwal', 'Jadwal & hari libur'],
       ]
@@ -317,50 +322,32 @@ function MemberCard({ m, tz, month, pt }: { m: TeamTodayRow; tz: string; month: 
           </span>
         ))}
         {m.lateMinutes > 0 ? <StatusPill tone="warn" label={`Terlambat ${minutesText(m.lateMinutes)}`} /> : null}
-        {m.onBehalf ? <StatusPill tone="progress" label="Diabsenkan PM" /> : null}
+        {m.onBehalf ? <StatusPill tone="progress" label="Diabsenkan" /> : null}
         {m.corrected ? <StatusPill tone="none" label="Dikoreksi" /> : null}
       </div>
     </li>
   )
 }
 
-/** ADR 0023: location chip / label per location type (project, pusat biaya, site = kantor cabang). */
+/** Location chip / label per location type (project, pusat biaya; `site` = a legacy ADR 0023 check-in, history only). */
 const LOC_CHIP: Record<'project' | 'cost_center' | 'site', string> = { project: 'proj', cost_center: 'cc', site: 'site' }
 const LOC_TITLE: Record<'project' | 'cost_center' | 'site', string> = { project: 'Project', cost_center: 'Pusat biaya', site: 'Site' }
-
-/** ADR 0023 §5: "Site" filter of the attendance views (hidden while the PTs have no site). */
-function SiteSelect({ options, value, all = 'Semua site' }: { options: Array<{ id: number; label: string }>; value: number | undefined; all?: string }) {
-  if (options.length === 0) return null
-  return (
-    <label>
-      Site
-      <select name="site" defaultValue={String(value ?? '')} data-pk-filter-site>
-        <option value="">{all}</option>
-        {options.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  )
-}
 
 export async function AbsensiToday(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const sp = (props.searchParams ?? {}) as SP
   if (foreignPtParam(req, props.searchParams)) return <PtNotAllowed props={props} title="Absensi hari ini" />
   const pt = await ptView(req)
-  let data: { scope: AttScope | null; r: TeamTodayResult | null; loc: { projects: Opt[]; costCenters: Opt[]; sites: Opt[] }; today: string; lateCount: number; pts: number[]; chosen: number | undefined } | null = null
+  let data: { scope: AttScope | null; r: TeamTodayResult | null; loc: { projects: Opt[]; costCenters: Opt[] }; today: string; lateCount: number; pts: number[]; chosen: number | undefined } | null = null
   try {
     data = await withReqTransaction(req, async () => {
       const scope = await attendanceScope(req)
       const ctx = await attendanceContext(req)
       const pts = scopePts(scope, pt)
       const chosen = ptParam(sp, pts)
-      if (!scope) return { scope, r: null, loc: { projects: [], costCenters: [], sites: [] }, today: ctx.today, lateCount: 0, pts, chosen }
+      if (!scope) return { scope, r: null, loc: { projects: [], costCenters: [] }, today: ctx.today, lateCount: 0, pts, chosen }
       const date = /^\d{4}-\d{2}-\d{2}$/.test(one(sp, 'tanggal')) && one(sp, 'tanggal') <= ctx.today ? one(sp, 'tanggal') : ctx.today
-      const r = await teamTodayFor(req, { date, projectId: idParam(sp, 'project'), costCenterId: idParam(sp, 'pusat'), siteId: idParam(sp, 'site'), companyIds: chosen ? [chosen] : undefined })
+      const r = await teamTodayFor(req, { date, projectId: idParam(sp, 'project'), costCenterId: idParam(sp, 'pusat'), companyIds: chosen ? [chosen] : undefined })
       return { scope, r, loc: await scopeLocations(req, scope), today: ctx.today, lateCount: r.members.filter((m) => m.lateMinutes > 0).length, pts, chosen }
     })
   } catch (err) {
@@ -383,7 +370,7 @@ export async function AbsensiToday(props: AdminViewServerProps) {
   const month = r.date.slice(0, 7)
   // DRMS 10/10 D8: name/code search over the board (the KPI tiles keep counting the whole team)
   const search = spValue(props.searchParams, 'q').slice(0, 100)
-  const filtered = Boolean(idParam(sp, 'project') || idParam(sp, 'pusat') || idParam(sp, 'site') || chosen || search)
+  const filtered = Boolean(idParam(sp, 'project') || idParam(sp, 'pusat') || chosen || search)
   const col = (key: 'belum_absen' | 'hadir' | 'selesai', title: string, note: string) => {
     const list = r.members.filter((m) => m.status === key && matchesQuery([m.employee.name, m.employee.code], search))
     return (
@@ -410,7 +397,7 @@ export async function AbsensiToday(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="absensi-today">
       <DashHead title="Absensi · Tim hari ini" note={`${WD_LONG[wdOf(r.date) - 1]}, ${dayMonth(r.date)} (WITA) · ${r.scope === 'team' ? 'anggota tim di project/pusat biaya Anda' : 'semua karyawan yang ditugaskan'}${r.date === today ? '' : ' · tanggal lampau'}`} />
-      <SubNav active="today" scope={scope} />
+      <SubNav active="today" scope={scope} absenkan={isAdminStaff(req)} />
       <form className="pk-filter" method="get" action="/admin/absensi" role="search" aria-label="Filter tim hari ini" data-pk-filter="absensi-today">
         <label className="pk-filter__search">
           Cari
@@ -443,7 +430,6 @@ export async function AbsensiToday(props: AdminViewServerProps) {
             ))}
           </select>
         </label>
-        <SiteSelect options={ptOptionsOf(loc.sites, pt, chosen)} value={idParam(sp, 'site')} />
         <button type="submit" className="pk-kbtn primary">
           Terapkan
         </button>
@@ -505,8 +491,8 @@ export async function AbsensiToday(props: AdminViewServerProps) {
         </div>
       )}
       <p className="pk-note">
-        Waktu = zona perusahaan ({r.timezone}), memakai koreksi terakhir (T10). Lokasi: <span className="pk-chip proj">project</span> <span className="pk-chip cc">pusat biaya</span> <span className="pk-chip site">site</span> tempat absen (atau yang
-        ditugaskan bila belum absen).
+        Waktu = zona perusahaan ({r.timezone}), memakai koreksi terakhir (T10). Lokasi: <span className="pk-chip proj">project</span> <span className="pk-chip cc">pusat biaya</span> tempat absen (atau yang ditugaskan bila belum
+        absen).
       </p>
     </Frame>
   )
@@ -621,7 +607,7 @@ function Stamp({ loc, kind, d, tz }: { loc: LocationDay; kind: 'checkIn' | 'chec
   return (
     <span>
       <b>{hhmm(s.time, tz)}</b>
-      {s.source === 'pm' ? ' · PM' : ''}
+      {s.source === 'pm' ? ' · PM' : s.source === 'admin' ? ' · Admin Staff' : ''}
       {s.corrected ? ' · dikoreksi' : ''}
       {s.outsideArea ? (
         <span className="pk-chip warn" data-pk-outside-area>
@@ -636,10 +622,10 @@ function Stamp({ loc, kind, d, tz }: { loc: LocationDay; kind: 'checkIn' | 'chec
 
 /**
  * Owner decision 2026-10-09: web self check-in/out, every role. DRMS 13/10 A2: the location list is every registered
- * location of the caller's PT(s) with its point (`eligibleLocations`), so the form can detect the area from the
- * browser GPS; a Non-OnSite employee also gets a "Di luar area" entry (reference = home site, else head office).
- * POST /attendance/check-in|check-out re-check everything (type rule, geofence for OnSite, Non-OnSite resolution,
- * company-settings.syncAttendanceEnabled, ADR 0018 privacy ack).
+ * location of the caller's PT(s) with its point (`eligibleLocations`: projects, cost centers — ADR 0032: no site), so
+ * the form can detect the area from the browser GPS. POST /attendance/check-in|check-out re-check everything (type
+ * rule: OnSite inside the chosen location, Non-OnSite inside any — outside all refused —, company-settings
+ * .syncAttendanceEnabled, ADR 0018 privacy ack).
  */
 export async function AbsensiAbsen(props: AdminViewServerProps) {
   const req = props.initPageResult.req
@@ -672,22 +658,8 @@ export async function AbsensiAbsen(props: AdminViewServerProps) {
           lat: l.lat,
           lng: l.lng,
           radiusM: l.radiusM,
-          ...(l.home ? { home: true } : {}),
-          ...(l.isHeadOffice ? { headOffice: true } : {}),
           ...(employees.find((e) => e.id === l.employee)?.type === 'non_onsite' ? { nonOnsite: true } : {}),
         })
-      }
-      // DRMS 13/10 A2 (owner 2026-10-14): Non-OnSite has no location restriction — "Di luar area" at the reference site
-      for (const e of employees) {
-        if (e.type !== 'non_onsite') continue
-        const ref = await referenceSite(req, e)
-        if (!ref) continue
-        const rows = await dayRowsAt(req, e.id, { type: 'site', id: ref.id }, ctx.today)
-        const at = (k: 'check_in' | 'check_out') => {
-          const r = rows.find((x) => x.kind === k)
-          return r ? formatServerTime(String(r.effective_time), ctx.timeZone) : null
-        }
-        locations.push({ type: 'site', id: ref.id, label: `${OUTSIDE_AREA_LABEL} (ref. ${ref.code} ${ref.name})`, checkIn: at('check_in'), checkOut: at('check_out'), outsideArea: true, nonOnsite: true })
       }
       const privacyBlocked = uid === undefined ? false : (await privacyAckCheck(req, uid)).required
       return { scope, locations, privacyBlocked }
@@ -699,9 +671,52 @@ export async function AbsensiAbsen(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="absensi-absen">
       <DashHead title="Absensi · Absen" note="Absen masuk / pulang dari web, aturan sama dengan aplikasi Android." />
-      <SubNav active="absen" scope={scope} />
+      <SubNav active="absen" scope={scope} absenkan={isAdminStaff(req)} />
       <Card id="self-check" title="Absen hari ini" span={12}>
         <SelfCheckForm locations={locations} privacyBlocked={privacyBlocked} />
+      </Card>
+    </Frame>
+  )
+}
+
+/**
+ * ADR 0032 (DRMS 24/10): "Absensi · Absenkan karyawan" — an Admin Staff records a check-in / check-out ON BEHALF of an
+ * employee of its PT (also one without an account, e.g. a tukang harian): the photo of the employee is taken with the
+ * Admin Staff's device camera, the GPS fix is the Admin Staff's (the employee's OnSite / Non-OnSite rule applies to it),
+ * a reason is mandatory; the row shows "diabsenkan oleh <Admin Staff>". POST /attendance/on-behalf re-checks
+ * everything (role in the PT, employee of the PT and not the own, geofence, syncAttendanceEnabled, privacy ack).
+ */
+export async function AbsensiAbsenkan(props: AdminViewServerProps) {
+  const req = props.initPageResult.req
+  let data: { scope: AttScope | null; options: OnBehalfOptions; privacyBlocked: boolean; multi: boolean } | null = null
+  try {
+    data = await withReqTransaction(req, async () => {
+      const scope = await attendanceScope(req)
+      const pts = membershipsOf(req.user).map((m) => m.company)
+      const options = await onBehalfOptions(req, pts)
+      const uid = userId(req)
+      const privacyBlocked = uid === undefined ? false : (await privacyAckCheck(req, uid)).required
+      return { scope, options, privacyBlocked, multi: options.companies.length > 1 }
+    })
+  } catch (err) {
+    return <Failed props={props} name="absensi-absenkan" title="Absensi · Absenkan karyawan" err={err} req={req} />
+  }
+  const { scope, options, privacyBlocked, multi } = data
+  if (options.companies.length === 0) return <NoAccess props={props} />
+  const pt = await ptView(req)
+  const ptCode = (id: number) => pt.ref(id)?.shortCode ?? String(id)
+  const label = (company: number, text: string) => (multi ? `[${ptCode(company)}] ${text}` : text)
+  return (
+    <Frame props={props} name="absensi-absenkan">
+      <DashHead title="Absensi · Absenkan karyawan" note="Admin Staff: absen masuk / pulang atas nama karyawan PT (juga tanpa akun). Foto dan GPS dari perangkat Anda; nama Anda dan alasannya tercatat." />
+      <SubNav active="absenkan" scope={scope} absenkan />
+      <Card id="on-behalf" title="Absenkan karyawan" span={12}>
+        <OnBehalfForm
+          employees={options.employees.map((e) => ({ id: e.id, company: e.company, label: label(e.company, `${e.name} (${e.code})`), nonOnsite: e.attendanceType === 'non_onsite', hasAccount: e.hasAccount }))}
+          locations={options.locations.map((l) => ({ type: l.kind, id: l.id, company: l.company, label: label(l.company, `${l.code} ${l.name}`), lat: l.lat, lng: l.lng, radiusM: l.radiusM }))}
+          disabledCompanies={options.companies.filter((c) => !c.attendanceEnabled).map((c) => c.id)}
+          privacyBlocked={privacyBlocked}
+        />
       </Card>
     </Frame>
   )
@@ -722,7 +737,7 @@ type RekapData = {
   canCorrect: boolean
   own: boolean
   grid: Awaited<ReturnType<typeof teamMonth>> | null
-  loc: { projects: Opt[]; costCenters: Opt[]; sites: Opt[] }
+  loc: { projects: Opt[]; costCenters: Opt[] }
 }
 
 export async function AbsensiRekap(props: AdminViewServerProps) {
@@ -744,7 +759,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
       const to = lastDay(month)
       const empId = idParam(sp, 'karyawan')
       const ownEmp = relId((req.user as { employee?: unknown } | null)?.employee)
-      const base = { pt, pts, chosen, scope, today: ctx.today, tz: ctx.timeZone, month, history: [], selfies: new Map<number, boolean>(), canCorrect: false, own: false, grid: null, loc: { projects: [], costCenters: [], sites: [] } }
+      const base = { pt, pts, chosen, scope, today: ctx.today, tz: ctx.timeZone, month, history: [], selfies: new Map<number, boolean>(), canCorrect: false, own: false, grid: null, loc: { projects: [], costCenters: [] } }
       if (!scope) {
         // Staff: own recap only (US-09).
         const recap = ownEmp !== undefined ? await myRecap(req, month) : null
@@ -754,8 +769,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
       const employees = await recapEmployees(req, scope, from, to)
       if (empId === undefined) {
         // mc2-contract §0.1: narrowAttScope keeps each PT's own ids — a project id of another PT matches nothing
-        // ADR 0023 §5: the site filter only narrows (extra predicate per PT)
-        const narrowed = narrowAttToSite(narrowAttScope(scope, idParam(sp, 'project'), idParam(sp, 'pusat')), idParam(sp, 'site'))
+        const narrowed = narrowAttScope(scope, idParam(sp, 'project'), idParam(sp, 'pusat'))
         return { ...base, employees, recap: null, grid: await teamMonth(req, narrowed, month), loc: await scopeLocations(req, scope) }
       }
       const recap = await employeeRecap(req, empId, month)
@@ -788,7 +802,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
           ) : null}
         </div>
       </DashHead>
-      <SubNav active="rekap" scope={d.scope} />
+      <SubNav active="rekap" scope={d.scope} absenkan={isAdminStaff(req)} />
       {d.scope ? (
         <form className="pk-filter" method="get" action="/admin/absensi/rekap" role="search" aria-label="Pilih karyawan dan bulan" data-pk-filter="absensi-rekap">
           <PtSelect pt={d.pt} pts={d.pts} value={d.chosen} />
@@ -831,7 +845,6 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
                   ))}
                 </select>
               </label>
-              <SiteSelect options={ptOptionsOf(d.loc.sites, d.pt, d.chosen)} value={idParam(sp, 'site')} all="Semua" />
             </>
           ) : null}
           <button type="submit" className="pk-kbtn primary">
@@ -846,7 +859,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
 
 function monthHref(sp: SP, month: string): string {
   const q = new URLSearchParams()
-  for (const k of ['karyawan', 'project', 'pusat', 'site', 'pt']) if (one(sp, k)) q.set(k, one(sp, k))
+  for (const k of ['karyawan', 'project', 'pusat', 'pt']) if (one(sp, k)) q.set(k, one(sp, k))
   q.set('bulan', month)
   return `/admin/absensi/rekap?${q.toString()}`
 }
@@ -879,7 +892,7 @@ function EmployeeRecap({ d, recap }: { d: RekapData; recap: MonthlyRecap }) {
           <KpiTile id="rk-work" icon="target" label="Jam kerja" value={minutesText(s.workMinutes)} kpi="rk-work" i={4}>
             <p className="pk-kpi-x">{s.incompleteDays > 0 ? <StatusPill tone="warn" label={`${s.incompleteDays} hari tanpa absen pulang`} /> : 'semua hari lengkap'}</p>
           </KpiTile>
-          <KpiTile id="rk-other" icon="users" label="Diabsenkan PM / dikoreksi" value={`${s.onBehalfDays} / ${s.correctedDays}`} kpi="rk-other" i={5}>
+          <KpiTile id="rk-other" icon="users" label="Diabsenkan / dikoreksi" value={`${s.onBehalfDays} / ${s.correctedDays}`} kpi="rk-other" i={5}>
             <p className="pk-kpi-x">
               libur: <b>{s.holidayWorkDays}</b> · non-kerja: <b>{s.offDayWorkDays}</b> hari masuk
             </p>
@@ -1251,7 +1264,7 @@ export async function AbsensiJadwal(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="absensi-jadwal">
       <DashHead title="Absensi · Jadwal & hari libur" note="Dasar perhitungan terlambat / pulang cepat / tidak hadir (Q-30) dan geofence pusat biaya (Q-40)." />
-      <SubNav active="jadwal" scope={scope} />
+      <SubNav active="jadwal" scope={scope} absenkan={isAdminStaff(req)} />
       {!canWrite ? (
         <Alert tone="info" attr="read-only">
           Tampilan baca. Perubahan jadwal, hari libur dan geofence oleh Admin atau Direktur (tercatat di audit log).

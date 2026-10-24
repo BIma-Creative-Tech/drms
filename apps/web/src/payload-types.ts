@@ -562,7 +562,7 @@ export interface CompanyMembership {
   user: number | User;
   company: number | Company;
   employee?: (number | null) | Employee;
-  roles?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator')[] | null;
+  roles?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator' | 'pk-admin-staff')[] | null;
   active?: boolean | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -1300,7 +1300,7 @@ export interface ApprovalRule {
   acknowledge: 'required' | 'optional' | 'none';
   acknowledgeBy: 'scope_manager' | 'role' | 'user';
   acknowledgeRole?:
-    ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator') | null;
+    ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator' | 'pk-admin-staff') | null;
   acknowledgeUser?: (number | null) | User;
   signDiajukan: 'required' | 'optional' | 'none';
   signDibuat: 'required' | 'optional' | 'none';
@@ -1311,7 +1311,7 @@ export interface ApprovalRule {
     | {
         level: number;
         approverRole?:
-          ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator') | null;
+          ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator' | 'pk-admin-staff') | null;
         approverUser?: (number | null) | User;
         id?: string | null;
       }[]
@@ -2659,7 +2659,7 @@ export interface Attendance {
   project?: (number | null) | Project;
   costCenter?: (number | null) | CostCenter;
   site?: (number | null) | Site;
-  source: 'self' | 'pm';
+  source: 'self' | 'pm' | 'admin';
   recordedBy?: (number | null) | User;
   onBehalfReason?: string | null;
   localDate: string;

@@ -6,7 +6,7 @@ import { reasonOnChange, reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, rupiahField, uuidField } from '@/fields/common'
 
 import { businessDateField } from './fields-f2'
-import { companyField, companyHook, lockedUntilCompany, pickerSameCompany, siteOptions } from '@/fields/company'
+import { companyField, companyHook, legacySiteField } from '@/fields/company'
 import { validationError } from '@/lib/validation'
 
 /**
@@ -95,7 +95,7 @@ export const CashAccounts: CollectionConfig = withAudit(
     admin: {
       useAsTitle: 'name',
       group: 'Keuangan',
-      defaultColumns: ['name', 'kind', 'accountNo', 'site', 'intercompanyReceiving', 'active'],
+      defaultColumns: ['name', 'kind', 'accountNo', 'intercompanyReceiving', 'active'],
       // ADR 0031: the PM reads accounts only as the project's Pusat Biaya picker — no menu entry
       hidden: ({ user }) => !hasRoleAny({ user } as never, 'pk-admin', 'pk-finance', 'pk-owner'),
     },
@@ -131,18 +131,9 @@ export const CashAccounts: CollectionConfig = withAudit(
             'Tanggal go-live akun ini. Transaksi kas sebelum tanggal ini ditolak; saldo awal terkunci setelah periode sejak tanggal ini ditutup. Kosong = tanpa kunci.',
         },
       }),
-      // ADR 0023 (Q-S7): petty cash of a branch office — filter of the cash book / K-01 balances and the per-site balance
-      // on the dashboards. Cash rules are unchanged (still a PT account).
-      lockedUntilCompany({
-        name: 'site',
-        type: 'relationship',
-        relationTo: 'sites',
-        label: 'Site',
-        index: true,
-        ...pickerSameCompany(),
-        filterOptions: siteOptions,
-        admin: { placeholder: 'Pilih site…', description: 'Opsional: kas kecil / rekening kantor cabang ini (saldo per site di dashboard).' },
-      }),
+      // ADR 0032: the site flag (ADR 0023 Q-S7) removed from the product — hidden legacy column. An account flagged
+      // before stays outside the PT fund pool (ADR 0029 fund check / inter-PT loans) until decided otherwise.
+      legacySiteField('site', 'Site (lama)'),
       {
         // ADR 0028: payments from the other PTs of the group arrive here (automatic Kas Masuk "Antar PT")
         name: 'intercompanyReceiving',

@@ -34,6 +34,48 @@ migration (`20261024_100000_d2410_timesheet_hm_optional`: `unit_timesheets.hm_st
 - APK: date picker window from `timesheetMinDate`; HM optional (both or none, photo only with HM, untouched prefill not
   sent); edit may add the missing HM photo; drift schema 12 (`field_recent_timesheets` HM nullable, cache rebuilt);
   l10n `fieldHmOptional`, `fieldTimesheetBackdateWide`.
+**Absensi: site dihapus, Non-OnSite hanya di lokasi terdaftar, role Admin Staff (ADR 0032, user 2026-10-24).** Four
+migrations (`20261024_200000_d2410_site_assignments` data, `_210000_d2410_admin_staff_enums` + snapshot,
+`_210100_d2410_admin_staff_guard`). No table or column is dropped. API: `/api/v1/sites` and masters `sites` stay for
+APK ≤ 0.11.1 (empty / tombstones).
+
+### Removed
+- Sites (ADR 0023) from the product: Site master menu / form / create, "Buat site dari pusat biaya", "Site penempatan"
+  on Data Karyawan, Site on Project / Akun kas / Penugasan tim (form, list column, filter), the Site filter on Tim hari
+  ini, rekap, reports and Kas, the dashboard Site filter and the cards "Saldo kas per site" / "Ringkasan per site",
+  `/me` `employee.homeSite`, `ProjectListItem.site`, `?site=` on reports, dashboards, `/projects`,
+  `/cash-accounts/balances` and Kas, `lookups.sites`. APK: site in profile, project detail, onboarding, masters.
+- The "Di luar area" check-in of Karyawan Non-OnSite (new records only; the label stays for existing rows).
+
+### Changed
+- Attendance locations are projects (and cost centers with a point); a site check-in from an old APK is refused for
+  OnSite ("Site tidak lagi dipakai sebagai lokasi absen"). Work-schedule fallback employee → PT; the PM team scope has
+  no team sites.
+- Karyawan Non-OnSite checks in and out only inside the geofence of any registered location of the own PT (picked
+  automatically, nearest when several); outside every location → 409 `OUTSIDE_GEOFENCE` with an Indonesian message. A
+  check-out closes the day's open check-in (flag `CHECK_OUT_ELSEWHERE` when the fix is inside another location).
+  `GET /attendance/locations` returns `homeSiteId` / `referenceSite` null and `isHeadOffice` / `home` false.
+- Data migration: every team assignment to a site becomes an assignment to each active project of that site (first
+  project on the row, one new row per further project, same employee / role / dates); without such a project a running
+  site assignment is ended. Each change is audited (`audit_logs` source `system`) and logged.
+- Help texts of "Tipe absensi" (Data Karyawan, Pengguna form, APK) describe the new rule.
+- On-behalf labels: "Diabsenkan" (PM or Admin Staff, with the recorder's name) in recap, report and selfie stamp.
+
+### Added
+- Role `pk-admin-staff` "Admin Staff" (per PT): reads every attendance (selfies audited) and correction of the PT,
+  records check-in / check-out on behalf of any employee of the PT (also without an account), corrects attendance
+  (never own, reason required), reads Data Karyawan (no bank accounts), Tim hari ini, Rekap, Jadwal (read), Laporan
+  Absensi. No finance / request access. Restricted panel, dashboard layout "Admin Staff", role pickers / matrix (AdmS),
+  APK `Role.adminStaff` (Operator bottom bar + team tab).
+- Web **Absensi → Absenkan karyawan** (`/admin/absensi/absenkan`): camera selfie + GPS of the Admin Staff, reason;
+  `GET /api/v1/attendance/on-behalf/options`, `POST /api/v1/attendance/on-behalf`. Attendance source `admin`
+  ("Diabsenkan oleh Admin Staff"). APK on-behalf screen lists the Admin Staff candidates (cached offline).
+- `/me` capabilities `attendanceOnBehalf`, `attendanceAdminStaff`.
+
+### Open questions
+- Cash accounts already flagged with a site stay outside the fund pool (ADR 0029) until the owner decides (ADR 0032 §4).
+- The go-live import workbook still carries the Site sheet / `kode_site` columns (CLI writes the hidden legacy columns).
+
 ## [0.19.2] - 2026-10-24
 
 **Security release: dependency bumps only.** No code change, no migration, APK unchanged (0.11.1).

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import React, { useEffect, useId, useRef, useState } from 'react'
 
-import { detectArea, OUTSIDE_AREA_LABEL } from '@/domain/attendance/area'
+import { detectArea } from '@/domain/attendance/area'
 import { geofenceError } from '@/domain/attendance/calendar'
 import { errorLine } from '@/lib/field-labels'
 
@@ -477,34 +477,27 @@ export function GeofenceForm({ costCenterId, name, lat, lng, radiusM, defaultRad
 }
 
 /**
- * ADR 0023: `site` = kantor pusat / kantor cabang (`home` = "Site penempatan", `headOffice` = "Kantor pusat"). DRMS
- * 13/10 A2: the list is every registered location of the caller's PT with its point + effective radius (area
- * detection from the browser GPS); `nonOnsite` = the employee there is Non-OnSite (no location restriction);
- * `outsideArea` = the "Di luar area" entry of a Non-OnSite employee (id = the reference site).
+ * DRMS 13/10 A2: the list is every registered location of the caller's PT with its point + effective radius (area
+ * detection from the browser GPS) — ADR 0032: projects and cost centers (no site, no "Di luar area" entry);
+ * `nonOnsite` = the employee there is Non-OnSite (any registered location, picked by the server).
  */
 export type SelfCheckLocation = {
-  type: 'project' | 'cost_center' | 'site'
+  type: 'project' | 'cost_center'
   id: number
   label: string
   checkIn: string | null
   checkOut: string | null
-  home?: boolean
-  headOffice?: boolean
   lat?: number
   lng?: number
   radiusM?: number
   nonOnsite?: boolean
-  outsideArea?: boolean
 }
 
-const LOC_FIELD: Record<SelfCheckLocation['type'], string> = { project: 'project_id', cost_center: 'cost_center_id', site: 'site_id' }
-const LOC_KIND: Record<SelfCheckLocation['type'], string> = { project: 'Project', cost_center: 'Pusat biaya', site: 'Site (kantor cabang)' }
-const locKeyOf = (l: Pick<SelfCheckLocation, 'type' | 'id' | 'outsideArea'>) => `${l.type}:${l.id}${l.outsideArea ? ':luar' : ''}`
+const LOC_FIELD: Record<SelfCheckLocation['type'], string> = { project: 'project_id', cost_center: 'cost_center_id' }
+const LOC_KIND: Record<SelfCheckLocation['type'], string> = { project: 'Project', cost_center: 'Pusat biaya' }
+const locKeyOf = (l: Pick<SelfCheckLocation, 'type' | 'id'>) => `${l.type}:${l.id}`
 
-/**
- * DRMS 18/10: the location + action of the selected radio. Match by locKeyOf (the "Di luar area" entry is
- * `site:<ref>:luar`); matching by `type:id` never found it → camera and button disabled ("Sudah selesai hari ini").
- */
+/** DRMS 18/10: the location + action of the selected radio (matched by locKeyOf). */
 export function selfCheckPick(locations: readonly SelfCheckLocation[], key: string): { loc: SelfCheckLocation | undefined; action: 'check_in' | 'check_out' | null } {
   const loc = locations.find((l) => locKeyOf(l) === key)
   return { loc, action: loc ? (!loc.checkIn ? 'check_in' : !loc.checkOut ? 'check_out' : null) : null }
@@ -515,11 +508,12 @@ type AreaNote = { text: string; tone: 'ok' | 'warn'; inside: string[] }
 /**
  * DRMS 13/10 A2: recognise the area from a GPS fix — one location whose geofence contains the fix → chosen; several
  * (overlapping) → the nearest is chosen and the user may pick another of them; none → manual choice (fallback) with
- * the nearest as a hint — or, for a Non-OnSite employee, the "Di luar area" entry (no location restriction, owner
- * 2026-10-14). Pure (exported for the unit test); the server re-checks and decides where the record belongs.
+ * the nearest as a hint. ADR 0032: a Non-OnSite employee outside every location cannot check in (no "Di luar area"
+ * any more) — the note says so. Pure (exported for the unit test); the server re-checks and decides where the record
+ * belongs.
  */
 export function areaNote(locations: readonly SelfCheckLocation[], fix: { lat: number; lng: number; accuracyM: number | null }): { pick: string | null; note: AreaNote } {
-  const d = detectArea(locations.filter((l) => !l.outsideArea), fix)
+  const d = detectArea(locations, fix)
   const first = d.inside[0]
   if (first && d.inside.length === 1) {
     return { pick: locKeyOf(first), note: { tone: 'ok', inside: [locKeyOf(first)], text: `Lokasi terdeteksi otomatis: ${first.label} (${first.distanceM} m dari titik).` } }
@@ -534,10 +528,11 @@ export function areaNote(locations: readonly SelfCheckLocation[], fix: { lat: nu
       },
     }
   }
-  const outside = locations.find((l) => l.outsideArea)
-  if (outside) {
-    const near = d.nearest ? ` Terdekat: ${d.nearest.label} (${d.nearest.distanceM} m).` : ''
-    return { pick: locKeyOf(outside), note: { tone: 'warn', inside: [], text: `Posisi Anda di luar semua area absen terdaftar: absen dicatat "${OUTSIDE_AREA_LABEL}" ${outside.label.replace(`${OUTSIDE_AREA_LABEL} `, '')}.${near}` } }
+  if (d.nearest && locations.some((l) => l.nonOnsite)) {
+    return {
+      pick: null,
+      note: { tone: 'warn', inside: [], text: `Posisi Anda di luar semua lokasi terdaftar. Karyawan Non-OnSite hanya bisa absen di dalam area lokasi project / pusat biaya PT. Terdekat: ${d.nearest.label} (${d.nearest.distanceM} m, radius ${d.nearest.radiusM} m).` },
+    }
   }
   if (d.nearest) {
     return {
@@ -628,8 +623,6 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
       }
       const r = await sendJson('POST', `/api/v1/attendance/${action === 'check_in' ? 'check-in' : 'check-out'}`, body)
       if (!r.ok) return setError(r.error ?? 'Gagal mengirim absensi.')
-      // DRMS 13/10 A2: a Non-OnSite attendance outside every registered location is recorded "Di luar area"
-      if ((r.data as { outsideArea?: boolean } | null)?.outsideArea) setArea({ tone: 'warn', inside: [], text: `Tercatat "${OUTSIDE_AREA_LABEL}".` })
       setPhoto(null)
       setCamKey((k) => k + 1)
       router.refresh()
@@ -641,7 +634,7 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
   }
 
   if (locations.length === 0) {
-    return <EmptyStateInline text="Belum ada lokasi absen untuk Anda: PT Anda belum punya lokasi terdaftar dengan titik koordinat (site, kantor pusat, project, pusat biaya), dan untuk karyawan Non-OnSite belum ada site penempatan / kantor pusat. Hubungi Admin." />
+    return <EmptyStateInline text="Belum ada lokasi absen untuk Anda: PT Anda belum punya lokasi terdaftar (project / pusat biaya) dengan titik koordinat. Hubungi Admin." />
   }
   if (privacyBlocked) {
     return (
@@ -676,7 +669,7 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
               <input type="radio" name="self-check-loc" value={key} checked={locKey === key} onChange={() => setLocKey(key)} />
               <span className="name">
                 {l.label}
-                <span className="sub">{l.outsideArea ? 'Karyawan Non-OnSite: absen di mana saja' : l.home ? 'Site penempatan' : l.headOffice ? 'Kantor pusat' : LOC_KIND[l.type]}</span>
+                <span className="sub">{LOC_KIND[l.type]}</span>
               </span>
               <span className="st">
                 {l.checkOut ? `Selesai · pulang ${l.checkOut}` : l.checkIn ? `Masuk ${l.checkIn}` : 'Belum absen'}
@@ -700,6 +693,193 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
       {error ? (
         <p className="pk-kerr" role="alert">
           {error}
+        </p>
+      ) : null}
+    </form>
+  )
+}
+
+/** ADR 0032: an employee the Admin Staff may record for (`hasAccount` false = no user account, e.g. a tukang harian). */
+export type OnBehalfEmployee = { id: number; company: number; label: string; nonOnsite: boolean; hasAccount: boolean }
+/** ADR 0032: a registered location of the employee's PT with its point (area detection from the Admin Staff's GPS). */
+export type OnBehalfLocation = { type: 'project' | 'cost_center'; id: number; company: number; label: string; lat: number; lng: number; radiusM: number }
+
+/**
+ * ADR 0032 (DRMS 24/10): "Absenkan karyawan" — an Admin Staff records a check-in / check-out ON BEHALF of an employee of
+ * its PT (also without an account). The photo of the employee comes from this device's live camera, the GPS fix from
+ * this device (the employee's OnSite / Non-OnSite rule is applied to it by the server), the reason is mandatory.
+ * POST /attendance/on-behalf re-checks everything; the row shows "diabsenkan oleh <Anda>".
+ */
+export function OnBehalfForm({ employees, locations, disabledCompanies, privacyBlocked }: { employees: OnBehalfEmployee[]; locations: OnBehalfLocation[]; disabledCompanies: number[]; privacyBlocked: boolean }) {
+  const router = useRouter()
+  const [employeeId, setEmployeeId] = useState<number | null>(null)
+  const [locKey, setLocKey] = useState('')
+  const [kind, setKind] = useState<'check_in' | 'check_out'>('check_in')
+  const [reason, setReason] = useState('')
+  const [photo, setPhoto] = useState<Blob | null>(null)
+  const [camKey, setCamKey] = useState(0)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState<string | null>(null)
+  const [area, setArea] = useState<AreaNote | null>(null)
+
+  const who = employees.find((e) => e.id === employeeId) ?? null
+  const mine: SelfCheckLocation[] = who
+    ? locations.filter((l) => l.company === who.company).map((l) => ({ type: l.type, id: l.id, label: l.label, checkIn: null, checkOut: null, lat: l.lat, lng: l.lng, radiusM: l.radiusM, nonOnsite: who.nonOnsite }))
+    : []
+  const loc = mine.find((l) => locKeyOf(l) === locKey) ?? mine[0] ?? null
+  const disabled = who !== null && disabledCompanies.includes(who.company)
+
+  const detect = async () => {
+    setError(null)
+    setBusy(true)
+    try {
+      const pos = await getPosition()
+      const r = areaNote(mine, { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracyM: pos.coords.accuracy ?? null })
+      if (r.pick) setLocKey(r.pick)
+      setArea(r.note)
+    } catch (err) {
+      setError((err as Error).message || 'Gagal mengambil lokasi GPS.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setDone(null)
+    if (!who || !loc) return setError('Pilih karyawan dan lokasi dulu.')
+    if (reason.trim().length < 3) return setError('Alasan wajib diisi, minimal 3 karakter.')
+    if (!photo) return setError('Ambil foto karyawan dengan kamera dulu.')
+    const file = new File([photo], 'selfie.jpg', { type: 'image/jpeg' })
+    setBusy(true)
+    try {
+      const pos = await getPosition()
+      const selfieId = await uploadSelfie(file)
+      const r = await sendJson('POST', '/api/v1/attendance/on-behalf', {
+        employee_id: who.id,
+        kind,
+        [LOC_FIELD[loc.type]]: loc.id,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy_m: pos.coords.accuracy ?? null,
+        selfie_media_id: selfieId,
+        reason: reason.trim(),
+      })
+      if (!r.ok) return setError(r.error ?? 'Gagal mengirim absensi.')
+      setDone(`${kind === 'check_in' ? 'Absen masuk' : 'Absen pulang'} ${who.label} tercatat (diabsenkan oleh Anda).`)
+      setPhoto(null)
+      setReason('')
+      setCamKey((k) => k + 1)
+      router.refresh()
+    } catch (err) {
+      setError((err as Error).message || 'Gagal mengirim absensi.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (employees.length === 0) return <EmptyStateInline text="Belum ada karyawan aktif di PT Anda yang dapat diabsenkan." />
+  if (privacyBlocked) {
+    return (
+      <p className="pk-kerr" role="alert">
+        Anda belum menekan &quot;Saya mengerti&quot; pada pemberitahuan privasi terbaru. Baca <Link href="/privasi">pemberitahuan privasi</Link>, muat ulang
+        halaman ini, lalu coba lagi.
+      </p>
+    )
+  }
+  return (
+    <form className="pk-kform pk-selfcheck" onSubmit={submit} data-pk-form="on-behalf">
+      <div className="pk-fgrid">
+        <label className="pk-fld">
+          <span className="lbl">Karyawan</span>
+          <WrapSelect
+            value={employeeId ?? ''}
+            disabled={busy}
+            onChange={(ev) => {
+              setEmployeeId(ev.target.value ? Number(ev.target.value) : null)
+              setLocKey('')
+              setArea(null)
+              setDone(null)
+            }}
+            data-pk-field="employee"
+          >
+            <option value="">– pilih karyawan –</option>
+            {employees.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.label}
+                {x.hasAccount ? '' : ' · tanpa akun'}
+              </option>
+            ))}
+          </WrapSelect>
+          {who ? <span className="help">{who.nonOnsite ? 'Karyawan Non-OnSite: lokasi terdaftar yang memuat posisi GPS Anda dipakai otomatis.' : 'Karyawan OnSite: posisi GPS Anda harus di dalam radius lokasi yang dipilih.'}</span> : null}
+        </label>
+        <label className="pk-fld">
+          <span className="lbl">Jenis</span>
+          <WrapSelect value={kind} disabled={busy} onChange={(ev) => setKind(ev.target.value === 'check_out' ? 'check_out' : 'check_in')} data-pk-field="kind">
+            <option value="check_in">Absen masuk</option>
+            <option value="check_out">Absen pulang</option>
+          </WrapSelect>
+        </label>
+      </div>
+      {who ? (
+        <>
+          <div className="pk-sc-detect">
+            <button type="button" className="pk-kbtn" onClick={() => void detect()} disabled={busy || mine.length === 0} data-pk-action="detect-area">
+              Deteksi lokasi otomatis
+            </button>
+            {area ? (
+              <span className="note" data-tone={area.tone} role="status" data-pk-area-note>
+                {area.text}
+              </span>
+            ) : null}
+          </div>
+          {mine.length === 0 ? (
+            <EmptyStateInline text="PT karyawan ini belum punya lokasi terdaftar (project / pusat biaya) dengan titik koordinat. Hubungi Admin." />
+          ) : (
+            <fieldset className="pk-sc-locs" disabled={busy}>
+              <legend>Lokasi</legend>
+              {mine.map((l) => {
+                const key = locKeyOf(l)
+                const inside = area?.inside.includes(key) ?? false
+                return (
+                  <label key={key} className="pk-sc-loc" data-pk-loc={key} data-area={inside ? 'in' : undefined}>
+                    <input type="radio" name="on-behalf-loc" value={key} checked={loc !== null && locKeyOf(loc) === key} onChange={() => setLocKey(key)} />
+                    <span className="name">
+                      {l.label}
+                      <span className="sub">{LOC_KIND[l.type]}</span>
+                    </span>
+                    <span className="st">{inside ? 'Anda di area ini' : ''}</span>
+                  </label>
+                )
+              })}
+            </fieldset>
+          )}
+        </>
+      ) : null}
+      <label className="pk-fld">
+        <span className="lbl">Alasan (wajib)</span>
+        <WrapText value={reason} maxLength={500} disabled={busy} onChange={(ev) => setReason(ev.target.value)} placeholder="Contoh: tukang harian tanpa HP" data-pk-field="reason" />
+      </label>
+      <div className="pk-fld">
+        <span className="lbl">Foto karyawan</span>
+        <CameraCapture key={camKey} disabled={busy || !who || disabled} onChange={setPhoto} />
+        <p className="help">Hanya kamera langsung (bukan galeri). Server membubuhkan tanggal, jam, lokasi dan nama Anda pada foto. Lokasi GPS perangkat ini diambil saat menekan tombol.</p>
+        <style>{CAMERA_STYLE}</style>
+      </div>
+      {disabled ? <p className="pk-kerr">Absensi dari web belum diaktifkan untuk PT karyawan ini (Setting perusahaan).</p> : null}
+      <button type="submit" className="pk-kbtn primary pk-sc-go" disabled={busy || !who || !loc || disabled} data-pk-action={`on-behalf-${kind}`}>
+        {busy ? 'Mengirim…' : kind === 'check_in' ? 'Absenkan masuk' : 'Absenkan pulang'}
+      </button>
+      {error ? (
+        <p className="pk-kerr" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {done ? (
+        <p className="pk-okmsg" role="status" data-pk-done>
+          {done}
         </p>
       ) : null}
     </form>

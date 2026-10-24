@@ -264,10 +264,11 @@ describe('APK needs (E3 / AC-10 server side)', () => {
     }
     // ADR 0029: instruct = STORED pk-principal (the Direktur here is not the Owner), disburse = STORED pk-finance; the
     // fund check is off by default
-    const icl = (instruct: boolean, disburse: boolean) => ({ instructIntercompanyLoan: instruct, disburseIntercompanyLoan: disburse, fundCheckEnabled: false })
+    // ADR 0032: on-behalf = PM (team) or Admin Staff
+    const icl = (instruct: boolean, disburse: boolean, onBehalf = false) => ({ instructIntercompanyLoan: instruct, disburseIntercompanyLoan: disburse, fundCheckEnabled: false, attendanceOnBehalf: onBehalf, attendanceAdminStaff: false })
     expect(await cap(w.users.owner)).toEqual({ approvalInbox: true, teamMonitor: false, progressReportCreate: true, intercompanyPayment: true, ...icl(false, false) })
     expect(await cap(w.users.finance)).toEqual({ approvalInbox: true, teamMonitor: false, progressReportCreate: false, intercompanyPayment: true, ...icl(false, true) })
-    expect(await cap(w.users.pm)).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, intercompanyPayment: true, ...icl(false, false) })
+    expect(await cap(w.users.pm)).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, intercompanyPayment: true, ...icl(false, false, true) })
     expect(await cap(w.users.staffA)).toEqual({ approvalInbox: false, teamMonitor: false, progressReportCreate: false, intercompanyPayment: false, ...icl(false, false) })
   })
 })

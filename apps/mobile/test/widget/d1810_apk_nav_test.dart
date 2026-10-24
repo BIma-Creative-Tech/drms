@@ -157,6 +157,7 @@ void main() {
         '/field',
         '/requests',
         '/attendance',
+        '/attendance/on-behalf',
         '/profile',
         '/notifications',
         '/security',

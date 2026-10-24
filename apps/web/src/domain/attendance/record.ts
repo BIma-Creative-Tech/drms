@@ -12,25 +12,26 @@ import { getRequestTx } from '@/lib/tx'
 
 import { snapshotOf, type ScheduleSnapshot } from './schedule'
 import { effectiveRadiusM } from './calendar'
-import { geofenceRequired, NOT_ELIGIBLE_OTHER_PT, OUTSIDE_AREA_LABEL, pickContaining } from './area'
-import { eligibleLocations, employeeAttendance, referenceSite, type EmployeeAttendance } from './eligibility'
+import { CHECK_OUT_ELSEWHERE_FLAG, geofenceRequired, NON_ONSITE_OUTSIDE, NOT_ELIGIBLE_OTHER_PT, pickContaining } from './area'
+import { eligibleLocations, employeeAttendance, type EmployeeAttendance } from './eligibility'
 import { companyOf, settings, userOfEmployee as userOfEmployeeLink } from '@/domain/companies'
 import { closedProjectMessage, isClosedProjectStatus } from '@/domain/projects/status'
 
 /**
  * E6 — the ONE write path of `attendances` (sync items attendance.check_in / check_out / on_behalf,
- * US-01/02/14, Q-40). ADR 0023: a location is a project, a cost center or a site (kantor cabang).
- * DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13, Non-OnSite rule owner 2026-10-14): WHERE an employee may check in
- * follows the employee's attendance type, no team assignment needed — OnSite: inside any registered location of the
- * own PT with a point; Non-OnSite: no location restriction (`resolveNonOnsite`: the location containing the fix, else
- * "Di luar area" referenced to the home site / head office, `attendances.outside_area`). A PM on-behalf still needs
- * the requested location in the PM's team. Server-side checks, in this order (error codes are part of the APK
- * contract; `NOT_ASSIGNED` = a location outside the employee's PT):
- * MOCK_LOCATION → NOT_FOUND/VALIDATION (location) → NO_GEOFENCE (OnSite) → NOT_ASSIGNED → OUTSIDE_GEOFENCE (OnSite) →
+ * US-01/02/14, Q-40). A location is a project or a cost center (ADR 0032: no site any more — a `site` stays only in
+ * the history rows of ADR 0023). WHERE an employee may check in follows the employee's attendance type, no team
+ * assignment needed (DRMS 13/10 A2) — OnSite: inside the CHOSEN registered location of the own PT; Non-OnSite
+ * (ADR 0032): inside ANY registered location of the own PT, picked by the server (`resolveNonOnsite`), outside every
+ * one → refused OUTSIDE_GEOFENCE. A PM on-behalf still needs the requested location in the PM's team. Server-side
+ * checks, in this order (error codes are part of the APK contract; `NOT_ASSIGNED` = a location outside the employee's PT):
+ * MOCK_LOCATION → NOT_FOUND/VALIDATION (location) → NO_GEOFENCE (OnSite) → NOT_ASSIGNED → OUTSIDE_GEOFENCE →
  * MEDIA_MISSING / FORBIDDEN (selfie) → ALREADY_CHECKED_IN / NO_CHECK_IN / ALREADY_CHECKED_OUT.
  * On-behalf (source `pm`) additionally: caller holds pk-pm, the location is in the caller's TEAM
  * scope, the employee is not the caller, reason mandatory (schema) — the selfie and GPS come from
- * the PM's phone (plan fase1-golive E6).
+ * the PM's phone (plan fase1-golive E6). ADR 0032 (source `admin`, "diabsenkan oleh Admin Staff"): caller holds
+ * pk-admin-staff in the location's PT — ANY employee of that PT (also without an account), any registered location;
+ * the employee's own attendance-type rule is evaluated against the Admin Staff's GPS fix; never the own employee.
  */
 export class AttendanceReject extends Error {
   constructor(
@@ -86,7 +87,8 @@ export type RecordInput = {
   flags: string[]
   clientUuid: string
   device: number | null
-  source: 'self' | 'pm'
+  /** `pm` = diabsenkan PM (team), `admin` = diabsenkan Admin Staff (ADR 0032, any employee of the PT). */
+  source: 'self' | 'pm' | 'admin'
   recordedBy: number | null
   onBehalfReason: string | null
   timeZone: string
@@ -96,23 +98,19 @@ export type RecordInput = {
 
 const LABEL: Record<Location['type'], string> = { project: 'project', cost_center: 'pusat biaya', site: 'site' }
 
+/** ADR 0032: refusal of a check-in at a site (sites are no longer attendance locations). */
+export const SITE_REMOVED = 'Site tidak lagi dipakai sebagai lokasi absen. Pilih lokasi project (atau pusat biaya).'
+
 /**
- * Current schedule of an employee: own work schedule, else the default schedule of the employee's home site (ADR 0023
- * §3: a branch office can have its own office hours), else the company default, else null.
+ * Current schedule of an employee: own work schedule, else the company default, else null (ADR 0032: the home-site
+ * default of ADR 0023 §3 is gone with the sites).
  */
 export async function scheduleOfEmployee(req: PayloadRequest, employee: number, defaultScheduleId?: number | null): Promise<ScheduleSnapshot | null> {
   const emp = (await req.payload.findByID({ collection: 'employees', id: employee, depth: 1, overrideAccess: true /* SYSTEM-READ: schedule of the employee */, req, disableErrors: true })) as {
     workSchedule?: unknown
-    homeSite?: unknown
   } | null
   const own = emp?.workSchedule && typeof emp.workSchedule === 'object' ? snapshotOf(emp.workSchedule as Record<string, unknown>) : null
   if (own) return own
-  const siteDefault = relId((emp?.homeSite as { defaultWorkSchedule?: unknown } | null | undefined)?.defaultWorkSchedule)
-  if (siteDefault !== undefined) {
-    const doc = await req.payload.findByID({ collection: 'work-schedules', id: siteDefault, depth: 0, overrideAccess: true /* SYSTEM-READ: home-site schedule */, req, disableErrors: true })
-    const snap = snapshotOf(doc as Record<string, unknown> | null)
-    if (snap) return snap
-  }
   let defId = defaultScheduleId
   if (defId === undefined) {
     const s = await settings(req, relId((emp as { company?: unknown } | null)?.company))
@@ -203,38 +201,38 @@ type Resolved = { location: Location; distance: number; outsideArea: boolean; fl
 const measure = (input: Pick<RecordInput, 'lat' | 'lng'>, doc: { lat?: number | null; lng?: number | null }) =>
   typeof doc.lat === 'number' && typeof doc.lng === 'number' ? Math.round(haversineM(input.lat, input.lng, doc.lat, doc.lng)) : null
 
+/** Point of a location row (no status checks: the open check-in of the day may sit at a since-closed location). */
+async function pointOf(req: PayloadRequest, loc: Location): Promise<{ lat?: number | null; lng?: number | null }> {
+  const doc = await req.payload.findByID({ collection: LOCATION_COLLECTION[loc.type], id: loc.id, depth: 0, overrideAccess: true /* SYSTEM-READ: point of the open check-in's location */, req, disableErrors: true })
+  return (doc as { lat?: number | null; lng?: number | null } | null) ?? {}
+}
+
 /**
- * Non-OnSite (owner 2026-10-14): no location restriction; WHERE the record belongs:
- * - check-out with an open check-in today → that location (it closes the day's pair); `outsideArea` when the fix is
- *   not inside it;
- * - else the requested location when the fix is inside it, else the nearest registered location of the PT containing
- *   the fix;
- * - else "Di luar area": the home site (else the PT head office), `outsideArea`, distance to its point (0 + flag
- *   NO_REFERENCE_POINT when it has none). Neither home site nor head office → VALIDATION (the Admin must set one).
+ * Non-OnSite (ADR 0032, user decision 2026-10-24): check-in AND check-out only inside the geofence of ANY registered
+ * location of the own PT (no assignment). WHERE the record belongs:
+ * - the requested location when the fix lies inside it, else the nearest registered location containing the fix;
+ *   none → OUTSIDE_GEOFENCE (no "Di luar area" record any more);
+ * - a check-out with an open check-in today closes that pair: recorded at the open check-in's location; when the fix
+ *   lies inside ANOTHER registered location the row carries the flag CHECK_OUT_ELSEWHERE and `distance_m` = the
+ *   distance to the open location.
  */
-async function resolveNonOnsite(req: PayloadRequest, emp: EmployeeAttendance, input: RecordInput, localDate: string, field: string): Promise<Resolved> {
+async function resolveNonOnsite(req: PayloadRequest, emp: EmployeeAttendance, input: RecordInput, localDate: string, pre: string): Promise<Resolved> {
   const fix = { lat: input.lat, lng: input.lng, accuracyM: input.accuracyM }
   const candidates = (await eligibleLocations(req, [emp])).map((l) => ({ ...l, key: `${l.kind}:${l.id}` }))
+  const hit = pickContaining(`${input.location.type}:${input.location.id}`, candidates, fix)
+  if (!hit) return reject('OUTSIDE_GEOFENCE', NON_ONSITE_OUTSIDE, `${pre}lat`)
   if (input.kind === 'check_out') {
     const open = await openCheckIn(req, emp.company, emp.id, localDate)
-    if (open) {
-      const key = `${open.type}:${open.id}`
-      const c = candidates.find((x) => x.key === key)
-      const inside = c ? pickContaining(key, [c], fix) : null
-      if (inside) return { location: open, distance: inside.distanceM, outsideArea: false, flags: [] }
-      const doc = await loadLocationDoc(req, open, field)
-      const d = measure(input, doc)
-      return { location: open, distance: d ?? 0, outsideArea: true, flags: d === null ? ['NO_REFERENCE_POINT'] : [] }
+    if (open && `${open.type}:${open.id}` !== hit.key) {
+      // the open check-in itself contains the fix too (overlapping geofences) → no flag
+      const own = candidates.find((x) => x.key === `${open.type}:${open.id}`)
+      const inOwn = own ? pickContaining(own.key, [own], fix) : null
+      if (inOwn) return { location: open, distance: inOwn.distanceM, outsideArea: false, flags: [] }
+      const d = measure(input, await pointOf(req, open))
+      return { location: open, distance: d ?? 0, outsideArea: false, flags: [CHECK_OUT_ELSEWHERE_FLAG] }
     }
   }
-  const hit = pickContaining(`${input.location.type}:${input.location.id}`, candidates, fix)
-  if (hit) return { location: { type: hit.kind, id: hit.id }, distance: hit.distanceM, outsideArea: false, flags: [] }
-  const ref = await referenceSite(req, emp)
-  if (!ref) {
-    return reject('VALIDATION', `Absen "${OUTSIDE_AREA_LABEL}" belum bisa dicatat: site penempatan karyawan / kantor pusat PT belum ditetapkan Admin.`, field)
-  }
-  const d = measure(input, ref)
-  return { location: { type: 'site', id: ref.id }, distance: d ?? 0, outsideArea: true, flags: d === null ? ['NO_REFERENCE_POINT'] : [] }
+  return { location: { type: hit.kind, id: hit.id }, distance: hit.distanceM, outsideArea: false, flags: [] }
 }
 
 export type RecordResult = { id: number; localDate: string; location: Location; outsideArea: boolean; distanceM: number }
@@ -249,7 +247,9 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
   const company = relId((doc as { company?: unknown }).company)
   const emp = await employeeAttendance(req, input.employee)
   const onsite = !emp || geofenceRequired(emp.type)
-  // OnSite: the requested location needs a point (Non-OnSite: no location restriction)
+  // ADR 0032: a site is no longer a check-in location (old APKs may still send `site_id`)
+  if (input.location.type === 'site' && onsite) reject('VALIDATION', SITE_REMOVED, locField)
+  // OnSite: the requested location needs a point (Non-OnSite: the server picks a registered location containing the fix)
   const geo = onsite ? await withGeofence(req, doc, input.location, locField) : doc
   const localDate = localDateString(input.time, input.timeZone)
   if (input.source === 'pm') {
@@ -257,10 +257,12 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
     // ADR 0016 §5: PM role + team scope IN THE LOCATION's PT
     if (!hasRole(req, 'pk-pm', company)) reject('FORBIDDEN', `Hanya untuk ${LABEL[input.location.type]} tim Anda.`, locField)
     const scope = await resolveScope(req, company ?? null)
-    // ADR 0023 Q-S5: at a site = a PM assigned (role PM) to the site or the PM of a project of that site
-    const team = input.location.type === 'project' ? scope.teamProjects : input.location.type === 'site' ? scope.teamSites : scope.teamCostCenters
+    // ADR 0032: no site in a PM's team any more
+    const team = input.location.type === 'project' ? scope.teamProjects : input.location.type === 'site' ? [] : scope.teamCostCenters
     if (!team.includes(input.location.id)) reject('FORBIDDEN', `Hanya untuk ${LABEL[input.location.type]} tim Anda.`, locField)
   }
+  // ADR 0032: Admin Staff IN THE LOCATION's PT (any location / employee of that PT; the PT match is checked below)
+  if (input.source === 'admin' && !hasRole(req, 'pk-admin-staff', company)) reject('FORBIDDEN', 'Hanya Admin Staff PT ini yang dapat mengabsenkan karyawan.', locField)
   // DRMS 13/10 A2: own PT only (normally caught earlier as NOT_FOUND / COMPANY_MISMATCH; the DB trigger too)
   if (!emp || emp.company !== company) reject('NOT_ASSIGNED', NOT_ELIGIBLE_OTHER_PT, locField)
   let resolved: Resolved
@@ -271,7 +273,7 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
     }
     resolved = { location: input.location, distance: d, outsideArea: false, flags: [] }
   } else {
-    resolved = await resolveNonOnsite(req, emp!, input, localDate, locField)
+    resolved = await resolveNonOnsite(req, emp!, input, localDate, pre)
   }
   const location = resolved.location
   const distance = resolved.distance
@@ -304,7 +306,7 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
       costCenter: location.type === 'cost_center' ? location.id : null,
       // ADR 0023: the DB (pk_attendance_site) fills the project's site for a project check-in; NULL for a cost center
       site: location.type === 'site' ? location.id : null,
-      // DRMS 13/10 A2: Non-OnSite outside every registered location ("Di luar area", reference = `location`)
+      // DRMS 13/10 A2 "Di luar area" — ADR 0032: never set for a new row (Non-OnSite outside every location is refused)
       outsideArea: resolved.outsideArea,
       source: input.source,
       recordedBy: input.recordedBy,
@@ -344,7 +346,7 @@ export type WebCheckInput = { location: Location; lat: number; lng: number; accu
  * syncAttendanceEnabled, ADR 0018 privacy ack) and the SAME single write path (recordAttendance
  * above). Unlike the APK: no offline queue (no replay/idempotency table needed — `clientUuid` is
  * generated here, one-shot), no mocked-location signal (browser geolocation has none to report),
- * no "diabsenkan PM" (web self-service only; PM on-behalf stays an APK/sync feature).
+ * no "diabsenkan PM" here (web self-service; the Admin Staff on-behalf of ADR 0032 is recordWebOnBehalf below).
  */
 export async function recordWebAttendance(req: PayloadRequest, kind: AttendanceKind, input: WebCheckInput): Promise<RecordResult> {
   const uid = userId(req)
@@ -392,5 +394,83 @@ export async function recordWebAttendance(req: PayloadRequest, kind: AttendanceK
     recordedBy: null,
     onBehalfReason: null,
     timeZone: s.timezone || DEFAULT_TZ,
+  })
+}
+
+export type OnBehalfActor = { employee: number; user: number | null; source: 'pm' | 'admin' }
+
+/**
+ * Who records an on-behalf attendance and for whom (sync item `attendance.on_behalf` and the web
+ * POST /attendance/on-behalf): Admin Staff of the PT (ADR 0032; any employee of the PT) wins over PM (US-14; team
+ * locations, checked in recordAttendance). Never the caller's own employee; the employee must exist in a mapped PT,
+ * be active and belong to the location's PT. `pmAllowed` false = Admin Staff only (web).
+ */
+export async function onBehalfActor(req: PayloadRequest, opts: { employeeId: number; locCompany: number | undefined; own: number | undefined; pmAllowed: boolean; field?: string }): Promise<OnBehalfActor> {
+  const field = opts.field ?? 'payload.employee_id'
+  const source: 'pm' | 'admin' | null = hasRole(req, 'pk-admin-staff', opts.locCompany) ? 'admin' : opts.pmAllowed && hasRole(req, 'pk-pm', opts.locCompany) ? 'pm' : null
+  if (!source) reject('FORBIDDEN', opts.pmAllowed ? 'Hanya PM atau Admin Staff yang dapat mengabsenkan karyawan.' : 'Hanya Admin Staff PT ini yang dapat mengabsenkan karyawan.')
+  if (opts.own !== undefined && opts.own === opts.employeeId) reject('FORBIDDEN', 'Absensi Anda sendiri dicatat lewat absen masuk/pulang biasa.', field)
+  const emp = (await req.payload.findByID({ collection: 'employees', id: opts.employeeId, depth: 0, overrideAccess: true /* SYSTEM-READ: target employee of on-behalf */, req, disableErrors: true })) as { active?: boolean | null; company?: unknown } | null
+  const mapped = mappedCompanies(req)
+  const empCompany = relId(emp?.company)
+  if (!emp || (mapped !== null && !mapped.includes(empCompany ?? -1))) reject('NOT_FOUND', 'Karyawan tidak ditemukan.', field)
+  if (empCompany !== opts.locCompany) reject('COMPANY_MISMATCH', 'Karyawan dan lokasi berada di PT yang berbeda.', field)
+  if (emp!.active === false) reject('VALIDATION', 'Karyawan sudah nonaktif.', field)
+  return { employee: opts.employeeId, user: await userOfEmployee(req, opts.employeeId), source: source! }
+}
+
+export type WebOnBehalfInput = WebCheckInput & { employeeId: number; kind: AttendanceKind; reason: string }
+
+/**
+ * ADR 0032 (DRMS 24/10): an Admin Staff records a check-in / check-out ON BEHALF of an employee of its PT from the web
+ * (Absensi · Absenkan karyawan) — also an employee without an account (tukang harian). The selfie is taken with the
+ * Admin Staff's device camera and uploaded by it; the location rules of the EMPLOYEE's attendance type are evaluated
+ * against the Admin Staff's GPS fix; the row carries source `admin`, recorded_by = the Admin Staff and the reason. Same
+ * gates as the web self check-in (syncAttendanceEnabled of the PT, ADR 0018 privacy ack of the caller) and the SAME
+ * write path (recordAttendance).
+ */
+export async function recordWebOnBehalf(req: PayloadRequest, input: WebOnBehalfInput): Promise<RecordResult> {
+  const uid = userId(req)
+  if (uid === undefined) reject('VALIDATION', 'Tidak terautentikasi.')
+  const locRaw = await companyOf(req, LOCATION_COLLECTION[input.location.type], input.location.id)
+  const mapped = mappedCompanies(req)
+  const locCompany = locRaw !== undefined && (mapped === null || mapped.includes(locRaw)) ? locRaw : undefined
+  if (locCompany === undefined) reject('NOT_FOUND', input.location.type === 'project' ? 'Project tidak ditemukan.' : 'Pusat biaya tidak ditemukan.', LOCATION_FIELD[input.location.type])
+  const actor = await onBehalfActor(req, { employeeId: input.employeeId, locCompany, own: employeeIn(req, locCompany!), pmAllowed: false, field: 'employee_id' })
+
+  const s = (await settings(req, locCompany)) as { syncAttendanceEnabled?: boolean | null; timezone?: string | null }
+  if (s.syncAttendanceEnabled !== true) reject('FEATURE_DISABLED', 'Absensi dari web belum diaktifkan server (Setting perusahaan).')
+  const check = await privacyAckCheck(req, uid!)
+  if (check.required) {
+    await auditPrivacyDenied(req, check, { docType: 'attendance', field: 'attendance.on_behalf', companyId: locCompany ?? null })
+    reject(PRIVACY_ACK_REQUIRED, PRIVACY_ACK_REQUIRED_DETAIL)
+  }
+
+  const now = new Date()
+  return recordAttendance(req, {
+    kind: input.kind,
+    employee: actor.employee,
+    user: actor.user,
+    location: input.location,
+    lat: input.lat,
+    lng: input.lng,
+    accuracyM: input.accuracyM,
+    isMocked: false,
+    selfieId: input.selfieId,
+    uploader: uid!,
+    time: now,
+    timeTrust: 'server',
+    estimatedTime: null,
+    receivedAt: now,
+    deviceTime: now.toISOString(),
+    offline: false,
+    flags: [],
+    clientUuid: randomUUID(),
+    device: null,
+    source: actor.source,
+    recordedBy: uid!,
+    onBehalfReason: input.reason.trim(),
+    timeZone: s.timezone || DEFAULT_TZ,
+    fieldPrefix: '',
   })
 }

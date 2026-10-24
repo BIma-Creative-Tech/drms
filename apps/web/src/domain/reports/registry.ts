@@ -45,9 +45,7 @@ import {
   ledgerScopeSql,
   masterScopeSql,
   narrowToCompanies,
-  narrowToSite,
   projectScopeSql,
-  siteScopeSql,
   requestScopeSql,
   scopeCompanies,
   fromCompanies,
@@ -103,8 +101,6 @@ export type ReportDef = {
   fileStem(ctx: Ctx, sp: URLSearchParams): string
   /** Data scope of the caller; default officeScope (Finance/Owner all, PM team). */
   scope?(req: PayloadRequest): Promise<ReportScope>
-  /** ADR 0023 §5: offer the "Site" filter (parameter `site`) — reports whose rows derive a site. */
-  siteFilter?: boolean
 }
 
 // ---------------------------------------------------------------- shared parsing
@@ -180,13 +176,8 @@ export function ptParam(sp: URLSearchParams): number[] | null {
     .map((v) => Number(v.trim()))
   return ids.length ? [...new Set(ids)] : null
 }
-/** ADR 0023 §5: report parameter `site` (one site id of the selected PTs): narrows the scope, never widens. */
-export const SITE_PARAM = 'site'
-export function siteParam(sp: URLSearchParams): number | null {
-  const v = (sp.get(SITE_PARAM) ?? '').trim()
-  return /^\d{1,9}$/.test(v) && Number(v) > 0 ? Number(v) : null
-}
-export const effectiveScope = (scope: ReportScope, sp: URLSearchParams): ReportScope => narrowToSite(narrowToCompanies(scope, ptParam(sp)), siteParam(sp))
+/** ADR 0032: no report "Site" filter any more (ADR 0023 sites removed from the product) — only the PT narrows. */
+export const effectiveScope = (scope: ReportScope, sp: URLSearchParams): ReportScope => narrowToCompanies(scope, ptParam(sp))
 
 /** Master option label, PT-tagged (`[CS1] Material`, lib/pt-options.ts) when the scope spans more than one PT. */
 async function ptPrefix(req: PayloadRequest, scope: ReportScope): Promise<(companyId: unknown, label: string) => string> {
@@ -275,7 +266,6 @@ export function describeFilters(fields: FilterField[]): string[] {
 
 const rekapKas: ReportDef = {
   code: 'rekap-kas',
-  siteFilter: true,
   title: 'Rekap Kas',
   kpi: 'K-01, K-02a',
   description: 'Saldo per akun dan arus kas per bulan (masuk/keluar, koreksi void). Angka resmi buku kas.',
@@ -313,7 +303,7 @@ const rekapKas: ReportDef = {
       columns,
       rows: flows.map((x) => ({
         cells: { bulan: periodLabel(x.period), awal: x.openingBalance, ...(golive ? { golive: x.saldoAwalAkun } : {}), masuk: x.masuk, keluar: x.keluar, selisih: x.net, koreksi: x.koreksi, ...(anyIc ? { masukIc: x.masukAntarPt, keluarIc: x.keluarAntarPt } : {}), akhir: x.closingBalance },
-        href: `/admin/laporan/buku-kas?${qs({ dari: `${x.period}-01`, sampai: lastDay(x.period), akun: f.accountId, project: f.projectId, site: siteParam(sp) ?? undefined })}`,
+        href: `/admin/laporan/buku-kas?${qs({ dari: `${x.period}-01`, sampai: lastDay(x.period), akun: f.accountId, project: f.projectId })}`,
       })),
       totals: {
         bulan: 'TOTAL',
@@ -438,7 +428,6 @@ function ledgerWhere(scope: ReportScope, sp: URLSearchParams, ctx: Ctx): SQL {
 
 const bukuKas: ReportDef = {
   code: 'buku-kas',
-  siteFilter: true,
   title: 'Buku Kas',
   kpi: 'baris buku kas',
   description: 'Daftar transaksi kas per baris (KM/KK, void dan jurnal balik), terbaru di atas.',
@@ -558,7 +547,6 @@ const bukuKas: ReportDef = {
 
 const pengeluaranKategori: ReportDef = {
   code: 'pengeluaran-kategori',
-  siteFilter: true,
   title: 'Pengeluaran per Kategori',
   kpi: 'K-17, K-06',
   description: 'Dana dicairkan atau realisasi terverifikasi per kategori (dari baris item) atau per project/pusat biaya, plus kas keluar manual.',
@@ -639,7 +627,6 @@ const pengeluaranKategori: ReportDef = {
 
 const anggaranProject: ReportDef = {
   code: 'anggaran-project',
-  siteFilter: true,
   title: 'Anggaran Project',
   kpi: 'K-07, K-08, K-05, K-06, K-09',
   description: 'RAB vs Komitmen vs Dicairkan vs Realisasi per project; per kategori bila project punya RAB kategori.',
@@ -750,7 +737,6 @@ function requestFilter(sp: URLSearchParams, ctx: Ctx): RequestFilter {
 
 const rekapPengajuan: ReportDef = {
   code: 'rekap-pengajuan',
-  siteFilter: true,
   title: 'Rekap Pengajuan',
   kpi: 'K-13',
   description: 'Pengajuan (non-draft) per status, jenis, kategori dan periode tanggal pengajuan.',
@@ -872,7 +858,6 @@ const rekapPengajuan: ReportDef = {
 
 const kelengkapan: ReportDef = {
   code: 'kelengkapan',
-  siteFilter: true,
   title: 'Kelengkapan Nota/LPJ',
   kpi: 'K-12',
   description: 'Pengajuan baru belum LPJ (dan yang terlambat), LPJ menunggu, nota reimburse menunggu, flag peringatan terbuka.',
@@ -1190,17 +1175,6 @@ async function ptField(req: PayloadRequest, scope: ReportScope, sp: URLSearchPar
   return [{ name: PT_PARAM, label: 'PT', kind: 'multiselect', options: refs.map((r) => ({ value: String(r.id), label: `${r.shortCode} — ${r.name}` })), value: chosen }]
 }
 
-/**
- * ADR 0023 §5: "Site" filter field (single select) — the sites of the PTs in the (PT-narrowed) scope, inactive ones
- * marked; hidden while those PTs have no site. Value = the `site` parameter (an unknown id narrows to nothing).
- */
-async function siteField(req: PayloadRequest, scope: ReportScope, sp: URLSearchParams): Promise<FilterField[]> {
-  const pre = await ptPrefix(req, scope)
-  const r = await rows(req, sql`SELECT s.id, s.company_id, s.code, s.name, coalesce(s.active, true) AS active FROM sites s WHERE ${siteScopeSql(scope)} ORDER BY s.code, s.company_id`)
-  if (r.length === 0) return []
-  return [sel(SITE_PARAM, 'Site', sp, r.map((x) => ({ value: String(x.id), label: pre(x.company_id, `${x.code} ${x.name}${x.active ? '' : ' (nonaktif)'}`) })))]
-}
-
 function withCompanies(def: ReportDef): ReportDef {
   return {
     ...def,
@@ -1210,8 +1184,7 @@ function withCompanies(def: ReportDef): ReportDef {
     },
     async filters(req, scope, sp) {
       const base = scope.companies || !def.scope ? scope : await def.scope(req)
-      const byPt = narrowToCompanies(base, ptParam(sp))
-      return [...(await ptField(req, base, sp)), ...(def.siteFilter ? await siteField(req, byPt, sp) : []), ...(await def.filters(req, effectiveScope(base, sp), sp))]
+      return [...(await ptField(req, base, sp)), ...(await def.filters(req, effectiveScope(base, sp), sp))]
     },
   }
 }
