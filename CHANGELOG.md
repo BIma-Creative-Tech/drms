@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Security
+- Dependency bumps for CRITICAL/HIGH advisories found by `npm audit` / trivy on 2026-10-24 (no code change):
+  - `next` + `eslint-config-next` 16.3.8 → 16.4.2 (GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr unauthenticated RCE;
+    GHSA-p3m5-59mp-jv5r DoS).
+  - `dompurify` 3.4.8 → 3.4.17 via `overrides` (transitive through monaco-editor; GHSA-cg2g-xh64-v4q7 and others).
+  - `undici` override 7.29.1 → 7.30.1; `zod` 4.6.5 → 4.6.7.
+  - Remaining `npm audit` findings are moderate only (esbuild via drizzle-kit, fast-uri, nodemailer).
+
 ## [0.19.1] - 2026-10-22
 
 **Fund check per Pusat Biaya first, then PT (ADR 0031 §6, user 2026-10-22).** One migration
