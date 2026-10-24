@@ -3205,6 +3205,14 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
   }
 
+  // D2410: the tri-state "Semua" box above the options (filter mode), separated like the PT switcher's "Semua PT saya"
+  .pk-ms__all {
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--pk-border);
+    border-radius: 0;
+    font-weight: 600;
+  }
+
   .pk-ms__none,
   .pk-ms__error {
     margin: 0;
