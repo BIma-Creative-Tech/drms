@@ -1125,8 +1125,8 @@
   },
   "attendanceDetectNoPoint": "Belum ada lokasi absen dengan titik koordinat. Hubungi Admin.",
   "attendanceAreaChoice": "Area absen di posisi Anda",
-  "attendanceTypeOnsite": "Karyawan OnSite: boleh absen di semua lokasi terdaftar PT (site, kantor pusat, project, pusat biaya).",
-  "attendanceTypeNonOnsite": "Karyawan Non-OnSite: boleh absen di mana saja; di luar lokasi terdaftar dicatat \"Di luar area\".",
+  "attendanceTypeOnsite": "Karyawan OnSite: absen di dalam radius lokasi yang dipilih (project / pusat biaya terdaftar PT).",
+  "attendanceTypeNonOnsite": "Karyawan Non-OnSite: absen masuk / pulang di dalam radius lokasi terdaftar PT mana pun; lokasi dipilih otomatis.",
   "attendanceOutsideArea": "Di luar area",
   "attendanceOutsideAreaHint": "Karyawan Non-OnSite: di luar lokasi terdaftar, absen tetap bisa dan dicatat \"Di luar area\".",
   "attendanceDetectOutsideArea": "Posisi Anda di luar semua lokasi terdaftar: absen dicatat \"Di luar area\" (ref. {name}).",
@@ -1138,6 +1138,7 @@
     }
   },
   "attendanceNoReference": "Absen \"Di luar area\" belum bisa: site penempatan / kantor pusat PT belum ditetapkan Admin.",
+  "attendanceNonOnsiteOutside": "Anda di luar semua lokasi terdaftar PT. Karyawan Non-OnSite hanya bisa absen di dalam area lokasi project / pusat biaya PT. Mendekatlah ke lokasi terdaftar.",
   "distanceInside": "Di dalam area absen",
   "distanceOutside": "Di luar area absen",
   "distanceDetail": "Radius {radius} m + toleransi GPS {allowance} m (akurasi GPS ±{accuracy} m, maks. 50 m dihitung).",

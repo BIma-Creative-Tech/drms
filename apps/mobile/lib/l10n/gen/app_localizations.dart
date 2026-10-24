@@ -2986,13 +2986,13 @@ abstract class AppLocalizations {
   /// No description provided for @attendanceTypeOnsite.
   ///
   /// In id, this message translates to:
-  /// **'Karyawan OnSite: boleh absen di semua lokasi terdaftar PT (site, kantor pusat, project, pusat biaya).'**
+  /// **'Karyawan OnSite: absen di dalam radius lokasi yang dipilih (project / pusat biaya terdaftar PT).'**
   String get attendanceTypeOnsite;
 
   /// No description provided for @attendanceTypeNonOnsite.
   ///
   /// In id, this message translates to:
-  /// **'Karyawan Non-OnSite: boleh absen di mana saja; di luar lokasi terdaftar dicatat \"Di luar area\".'**
+  /// **'Karyawan Non-OnSite: absen masuk / pulang di dalam radius lokasi terdaftar PT mana pun; lokasi dipilih otomatis.'**
   String get attendanceTypeNonOnsite;
 
   /// No description provided for @attendanceOutsideArea.
@@ -3018,6 +3018,12 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Absen \"Di luar area\" belum bisa: site penempatan / kantor pusat PT belum ditetapkan Admin.'**
   String get attendanceNoReference;
+
+  /// No description provided for @attendanceNonOnsiteOutside.
+  ///
+  /// In id, this message translates to:
+  /// **'Anda di luar semua lokasi terdaftar PT. Karyawan Non-OnSite hanya bisa absen di dalam area lokasi project / pusat biaya PT. Mendekatlah ke lokasi terdaftar.'**
+  String get attendanceNonOnsiteOutside;
 
   /// No description provided for @distanceInside.
   ///

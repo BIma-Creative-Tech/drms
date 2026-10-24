@@ -392,7 +392,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                         <option value="onsite">Karyawan OnSite</option>
                         <option value="non_onsite">Karyawan Non-OnSite</option>
                       </WrapSelect>,
-                      { help: 'OnSite: absen di semua lokasi terdaftar PT (site, kantor pusat, project, pusat biaya) tanpa penugasan. Non-OnSite (staf kantor): hanya kantor pusat dan kantor cabang.' },
+                      { help: 'OnSite: absen di lokasi terdaftar PT yang dipilih (project / pusat biaya), di dalam radiusnya. Non-OnSite (staf kantor): di dalam radius lokasi terdaftar PT mana pun, dipilih otomatis; di luar semua lokasi ditolak.' },
                     )}
                     {field(
                       `${k}.active`,

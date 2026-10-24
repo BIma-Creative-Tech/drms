@@ -4,10 +4,12 @@
  * domain/attendance/eligibility.ts), the web self check-in form (client component) and the unit tests. The APK has
  * the same rules in Dart (apps/mobile/lib/features/attendance/domain/attendance.dart).
  *
- * - OnSite: may check in at ANY registered location of the own PT that has a point (site — incl. the head office —,
- *   project, cost center); no team assignment / home site needed; outside the radius → refused.
- * - Non-OnSite (owner 2026-10-14): NO location restriction. Inside a registered location of the PT → that location;
- *   anywhere else → recorded "Di luar area", referenced to the home site (else the PT head office) with the distance.
+ * ADR 0032 (DRMS 24/10, user decision; sites removed — registered locations = projects, plus cost centers with a point):
+ * - OnSite: may check in at ANY registered location of the own PT that has a point; the fix must lie inside the CHOSEN
+ *   location; no team assignment needed; outside the radius → refused.
+ * - Non-OnSite: check-in AND check-out only inside the geofence of ANY active registered location of the own PT — no
+ *   assignment needed, the location is picked automatically (the containing one, the nearest when several); outside
+ *   every location → refused (no new "Di luar area" record; that label stays for the history rows of 14–24/10).
  * Both: own PT only, GPS fix required and stored, mock location refused, selfie / privacy rules unchanged. The server
  * stays authoritative (record.ts).
  */
@@ -35,28 +37,43 @@ export const ATTENDANCE_TYPES = ['onsite', 'non_onsite'] as const
 export type AttendanceType = (typeof ATTENDANCE_TYPES)[number]
 
 /**
- * Default of new and existing employees: `onsite`. OnSite allows a superset of what the assignment rule allowed
- * before (every assigned project / cost center / site and the home site are registered locations of the own PT), so
- * no check-in that worked before is refused after the migration. The Admin sets office staff to Non-OnSite.
+ * Default of new and existing employees: `onsite` (the chosen location must contain the fix). The Admin sets office
+ * staff to Non-OnSite (any registered location of the PT, picked automatically).
  */
 export const DEFAULT_ATTENDANCE_TYPE: AttendanceType = 'onsite'
 
 export const ATTENDANCE_TYPE_LABEL: Record<AttendanceType, string> = { onsite: 'Karyawan OnSite', non_onsite: 'Karyawan Non-OnSite' }
 
-export type LocationKind = 'project' | 'cost_center' | 'site'
+/** ADR 0032: a registered check-in location (no site any more). */
+export type LocationKind = 'project' | 'cost_center'
 
 /** Stored value → type (anything unknown / missing = the default). */
 export function attendanceTypeOf(v: unknown): AttendanceType {
   return v === 'non_onsite' ? 'non_onsite' : DEFAULT_ATTENDANCE_TYPE
 }
 
-/** Does the type require the fix inside the chosen location's geofence? OnSite yes; Non-OnSite no ("Di luar area"). */
+/**
+ * Does the type require the fix inside the CHOSEN location's geofence? OnSite yes; Non-OnSite no — it must lie inside
+ * ANY registered location of the PT, the server picks it (record.ts resolveNonOnsite, ADR 0032).
+ */
 export function geofenceRequired(type: AttendanceType): boolean {
   return type === 'onsite'
 }
 
-/** Label of a Non-OnSite attendance outside every registered location (reports, recaps, APK history, web). */
+/**
+ * Label of a Non-OnSite attendance recorded outside every registered location (14–24/10, ADR 0023 revision 2026-10-14)
+ * — history only since ADR 0032 (reports, recaps, APK history, web).
+ */
 export const OUTSIDE_AREA_LABEL = 'Di luar area'
+
+/** ADR 0032: refusal of a Non-OnSite check-in / check-out outside every registered location of the PT. */
+export const NON_ONSITE_OUTSIDE = 'Anda di luar semua lokasi terdaftar PT. Karyawan Non-OnSite hanya bisa absen masuk / pulang di dalam area lokasi project (atau pusat biaya) PT-nya. Mendekatlah ke lokasi terdaftar.'
+
+/**
+ * ADR 0032: flag of a Non-OnSite check-out recorded at the day's open check-in while the fix lies inside ANOTHER
+ * registered location of the PT (the check-out closes the pair; `distance_m` = distance to the open location).
+ */
+export const CHECK_OUT_ELSEWHERE_FLAG = 'CHECK_OUT_ELSEWHERE'
 
 /** Fact / recap flag of an outside-area attendance (`attendances.outside_area`). */
 export const OUTSIDE_AREA_FLAG = 'OUTSIDE_AREA'
@@ -67,7 +84,7 @@ export const NOT_ELIGIBLE_OTHER_PT = 'Lokasi ini bukan lokasi terdaftar PT karya
 export type AreaCandidate = { lat?: number | null; lng?: number | null; radiusM?: number | null }
 export type AreaMatch<T> = T & { distanceM: number }
 export type AreaDetection<T> = {
-  /** Locations whose geofence contains the fix, nearest first (ties keep the input order: home site first). */
+  /** Locations whose geofence contains the fix, nearest first (ties keep the input order). */
   inside: Array<AreaMatch<T>>
   /** Nearest location with a point (inside or not); null when none has a point. */
   nearest: AreaMatch<T> | null
@@ -89,16 +106,15 @@ export function detectArea<T extends AreaCandidate>(items: readonly T[], fix: { 
   return { inside: measured.filter((m) => insideGeofence(m.distanceM, m.radiusM as number, fix.accuracyM)), nearest: measured[0] ?? null }
 }
 
-/** Order of an eligible-location list: home site, head office, other sites, projects, cost centers; then by code. */
-const KIND_RANK: Record<LocationKind, number> = { site: 2, project: 3, cost_center: 4 }
-export function compareEligible(a: { kind: LocationKind; code: string; home?: boolean; isHeadOffice?: boolean }, b: { kind: LocationKind; code: string; home?: boolean; isHeadOffice?: boolean }): number {
-  const rank = (x: typeof a) => (x.home ? 0 : x.kind === 'site' && x.isHeadOffice ? 1 : KIND_RANK[x.kind])
-  return rank(a) - rank(b) || a.code.localeCompare(b.code)
+/** Order of an eligible-location list: projects, then cost centers; then by code. */
+const KIND_RANK: Record<LocationKind, number> = { project: 0, cost_center: 1 }
+export function compareEligible(a: { kind: LocationKind; code: string }, b: { kind: LocationKind; code: string }): number {
+  return KIND_RANK[a.kind] - KIND_RANK[b.kind] || a.code.localeCompare(b.code)
 }
 
 /**
  * Non-OnSite resolution (server and clients): the requested location when the fix lies inside it, else the nearest
- * registered location containing the fix, else null (= "Di luar area"). `key` identifies a candidate (`kind:id`).
+ * registered location containing the fix, else null (= refused, ADR 0032). `key` identifies a candidate (`kind:id`).
  */
 export function pickContaining<T extends AreaCandidate & { key: string }>(requestedKey: string | null, candidates: readonly T[], fix: { lat: number; lng: number; accuracyM?: number | null }): AreaMatch<T> | null {
   const d = detectArea(candidates, fix)

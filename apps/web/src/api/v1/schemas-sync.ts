@@ -129,13 +129,14 @@ export const SyncDraftDeletePayload = z
   .meta({ id: 'SyncDraftDeletePayload', description: 'Soft delete = the draft is cancelled (no hard delete).' })
 export type SyncDraftDelete = z.infer<typeof SyncDraftDeletePayload>
 
-/** Exactly one of project_id / cost_center_id / site_id (E6, Q-40: cost-center geofence; ADR 0023: site). */
+/** Exactly one of project_id / cost_center_id / site_id (E6, Q-40: cost-center geofence; ADR 0023 site — ADR 0032: refused, kept so an APK ≤ 0.11.1 gets the reason). */
 const oneLocation = (v: { project_id?: number | null; cost_center_id?: number | null; site_id?: number | null }) => [v.project_id, v.cost_center_id, v.site_id].filter((x) => x !== undefined).length === 1
 const oneLocationError = { message: 'Isi salah satu: project_id, cost_center_id, ATAU site_id.', path: ['project_id'] }
 
 /**
  * `attendance.check_in` / `attendance.check_out` (US-01/US-02, ADR 0010 decisions 7/8): own
- * attendance at an ASSIGNED project OR cost center (E6, Q-40) with a geofence. The selfie is uploaded
+ * attendance at a registered project OR cost center of the own PT (E6, Q-40; DRMS 13/10 A2: no assignment) with a
+ * geofence — OnSite inside the given one, Non-OnSite (ADR 0032) inside any (outside all → OUTSIDE_GEOFENCE). The selfie is uploaded
  * first with POST /api/v1/media/selfies. Enabled by company-settings.syncAttendanceEnabled (else
  * `rejected FEATURE_DISABLED`). Corrections (US-15) are POST /api/v1/attendance/{id}/correct.
  */
@@ -143,7 +144,7 @@ export const SyncAttendancePayload = z
   .object({
     project_id: id.optional().meta({ description: 'Project (exactly one of project_id / cost_center_id / site_id).' }),
     cost_center_id: id.optional().meta({ description: 'Cost center / operational location (E6, Q-40).' }),
-    site_id: id.optional().meta({ description: 'ADR 0023: site (kantor cabang) — allowed at the home site or with an active site assignment.' }),
+    site_id: id.optional().meta({ description: 'ADR 0023 site — ADR 0032: no longer a check-in location (OnSite → VALIDATION; Non-OnSite: a hint only, recorded at the registered location containing the fix).' }),
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
     accuracy_m: z.number().min(0).max(10_000).nullable().optional().meta({ description: 'GPS accuracy radius (m); up to 50 m is added to the geofence radius.' }),

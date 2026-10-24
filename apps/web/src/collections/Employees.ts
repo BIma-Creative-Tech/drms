@@ -127,9 +127,9 @@ export const Employees: CollectionConfig = withAudit(
       lockedUntilCompany({ name: 'workSchedule', type: 'relationship', relationTo: 'work-schedules', label: 'Jadwal kerja', ...pickerSameCompany(), admin: { description: 'Kosong = jadwal default perusahaan (Setting perusahaan).' } }),
       // ADR 0032: "Site penempatan" (ADR 0023) removed from the product — hidden legacy column, no longer used
       legacySiteField('homeSite', 'Site penempatan (lama)'),
-      // DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13): where the employee may check in — OnSite: any registered location
-      // of the PT with a point (site, project, cost center; no assignment needed); Non-OnSite: head office + branch
-      // offices (sites) only. Default OnSite (= no check-in that worked before is refused). Rule: domain/attendance/area.ts.
+      // DRMS 13/10 A2 / ADR 0032: where the employee may check in (no assignment needed) — OnSite: inside the CHOSEN
+      // registered location of the PT (project / cost center with a point); Non-OnSite: inside ANY registered location of
+      // the PT (picked automatically; outside all refused). Default OnSite. Rule: domain/attendance/area.ts.
       {
         name: 'attendanceType',
         type: 'select',
@@ -139,7 +139,7 @@ export const Employees: CollectionConfig = withAudit(
         options: ATTENDANCE_TYPES.map((value) => ({ value, label: ATTENDANCE_TYPE_LABEL[value] })),
         admin: {
           description:
-            'Karyawan OnSite: boleh absen di semua lokasi terdaftar PT yang punya titik (site, kantor pusat, project, pusat biaya) tanpa penugasan. Karyawan Non-OnSite (staf kantor): hanya di kantor pusat dan kantor cabang (site).',
+            'Karyawan OnSite: absen di lokasi terdaftar PT yang dipilih (project / pusat biaya yang punya titik) — harus di dalam radius lokasi itu, tanpa penugasan. Karyawan Non-OnSite (staf kantor): absen masuk dan pulang di dalam radius lokasi terdaftar PT mana pun; lokasi dipilih otomatis, di luar semua lokasi ditolak.',
         },
       },
       { name: 'faceRefPhoto', type: 'upload', relationTo: 'media-selfies', label: 'Foto wajah referensi' },

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import React, { useEffect, useId, useRef, useState } from 'react'
 
-import { detectArea, OUTSIDE_AREA_LABEL } from '@/domain/attendance/area'
+import { detectArea } from '@/domain/attendance/area'
 import { geofenceError } from '@/domain/attendance/calendar'
 import { errorLine } from '@/lib/field-labels'
 
@@ -477,34 +477,27 @@ export function GeofenceForm({ costCenterId, name, lat, lng, radiusM, defaultRad
 }
 
 /**
- * ADR 0023: `site` = kantor pusat / kantor cabang (`home` = "Site penempatan", `headOffice` = "Kantor pusat"). DRMS
- * 13/10 A2: the list is every registered location of the caller's PT with its point + effective radius (area
- * detection from the browser GPS); `nonOnsite` = the employee there is Non-OnSite (no location restriction);
- * `outsideArea` = the "Di luar area" entry of a Non-OnSite employee (id = the reference site).
+ * DRMS 13/10 A2: the list is every registered location of the caller's PT with its point + effective radius (area
+ * detection from the browser GPS) — ADR 0032: projects and cost centers (no site, no "Di luar area" entry);
+ * `nonOnsite` = the employee there is Non-OnSite (any registered location, picked by the server).
  */
 export type SelfCheckLocation = {
-  type: 'project' | 'cost_center' | 'site'
+  type: 'project' | 'cost_center'
   id: number
   label: string
   checkIn: string | null
   checkOut: string | null
-  home?: boolean
-  headOffice?: boolean
   lat?: number
   lng?: number
   radiusM?: number
   nonOnsite?: boolean
-  outsideArea?: boolean
 }
 
-const LOC_FIELD: Record<SelfCheckLocation['type'], string> = { project: 'project_id', cost_center: 'cost_center_id', site: 'site_id' }
-const LOC_KIND: Record<SelfCheckLocation['type'], string> = { project: 'Project', cost_center: 'Pusat biaya', site: 'Site (kantor cabang)' }
-const locKeyOf = (l: Pick<SelfCheckLocation, 'type' | 'id' | 'outsideArea'>) => `${l.type}:${l.id}${l.outsideArea ? ':luar' : ''}`
+const LOC_FIELD: Record<SelfCheckLocation['type'], string> = { project: 'project_id', cost_center: 'cost_center_id' }
+const LOC_KIND: Record<SelfCheckLocation['type'], string> = { project: 'Project', cost_center: 'Pusat biaya' }
+const locKeyOf = (l: Pick<SelfCheckLocation, 'type' | 'id'>) => `${l.type}:${l.id}`
 
-/**
- * DRMS 18/10: the location + action of the selected radio. Match by locKeyOf (the "Di luar area" entry is
- * `site:<ref>:luar`); matching by `type:id` never found it → camera and button disabled ("Sudah selesai hari ini").
- */
+/** DRMS 18/10: the location + action of the selected radio (matched by locKeyOf). */
 export function selfCheckPick(locations: readonly SelfCheckLocation[], key: string): { loc: SelfCheckLocation | undefined; action: 'check_in' | 'check_out' | null } {
   const loc = locations.find((l) => locKeyOf(l) === key)
   return { loc, action: loc ? (!loc.checkIn ? 'check_in' : !loc.checkOut ? 'check_out' : null) : null }
@@ -515,11 +508,12 @@ type AreaNote = { text: string; tone: 'ok' | 'warn'; inside: string[] }
 /**
  * DRMS 13/10 A2: recognise the area from a GPS fix — one location whose geofence contains the fix → chosen; several
  * (overlapping) → the nearest is chosen and the user may pick another of them; none → manual choice (fallback) with
- * the nearest as a hint — or, for a Non-OnSite employee, the "Di luar area" entry (no location restriction, owner
- * 2026-10-14). Pure (exported for the unit test); the server re-checks and decides where the record belongs.
+ * the nearest as a hint. ADR 0032: a Non-OnSite employee outside every location cannot check in (no "Di luar area"
+ * any more) — the note says so. Pure (exported for the unit test); the server re-checks and decides where the record
+ * belongs.
  */
 export function areaNote(locations: readonly SelfCheckLocation[], fix: { lat: number; lng: number; accuracyM: number | null }): { pick: string | null; note: AreaNote } {
-  const d = detectArea(locations.filter((l) => !l.outsideArea), fix)
+  const d = detectArea(locations, fix)
   const first = d.inside[0]
   if (first && d.inside.length === 1) {
     return { pick: locKeyOf(first), note: { tone: 'ok', inside: [locKeyOf(first)], text: `Lokasi terdeteksi otomatis: ${first.label} (${first.distanceM} m dari titik).` } }
@@ -534,10 +528,11 @@ export function areaNote(locations: readonly SelfCheckLocation[], fix: { lat: nu
       },
     }
   }
-  const outside = locations.find((l) => l.outsideArea)
-  if (outside) {
-    const near = d.nearest ? ` Terdekat: ${d.nearest.label} (${d.nearest.distanceM} m).` : ''
-    return { pick: locKeyOf(outside), note: { tone: 'warn', inside: [], text: `Posisi Anda di luar semua area absen terdaftar: absen dicatat "${OUTSIDE_AREA_LABEL}" ${outside.label.replace(`${OUTSIDE_AREA_LABEL} `, '')}.${near}` } }
+  if (d.nearest && locations.some((l) => l.nonOnsite)) {
+    return {
+      pick: null,
+      note: { tone: 'warn', inside: [], text: `Posisi Anda di luar semua lokasi terdaftar. Karyawan Non-OnSite hanya bisa absen di dalam area lokasi project / pusat biaya PT. Terdekat: ${d.nearest.label} (${d.nearest.distanceM} m, radius ${d.nearest.radiusM} m).` },
+    }
   }
   if (d.nearest) {
     return {
@@ -628,8 +623,6 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
       }
       const r = await sendJson('POST', `/api/v1/attendance/${action === 'check_in' ? 'check-in' : 'check-out'}`, body)
       if (!r.ok) return setError(r.error ?? 'Gagal mengirim absensi.')
-      // DRMS 13/10 A2: a Non-OnSite attendance outside every registered location is recorded "Di luar area"
-      if ((r.data as { outsideArea?: boolean } | null)?.outsideArea) setArea({ tone: 'warn', inside: [], text: `Tercatat "${OUTSIDE_AREA_LABEL}".` })
       setPhoto(null)
       setCamKey((k) => k + 1)
       router.refresh()
@@ -641,7 +634,7 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
   }
 
   if (locations.length === 0) {
-    return <EmptyStateInline text="Belum ada lokasi absen untuk Anda: PT Anda belum punya lokasi terdaftar dengan titik koordinat (site, kantor pusat, project, pusat biaya), dan untuk karyawan Non-OnSite belum ada site penempatan / kantor pusat. Hubungi Admin." />
+    return <EmptyStateInline text="Belum ada lokasi absen untuk Anda: PT Anda belum punya lokasi terdaftar (project / pusat biaya) dengan titik koordinat. Hubungi Admin." />
   }
   if (privacyBlocked) {
     return (
@@ -676,7 +669,7 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
               <input type="radio" name="self-check-loc" value={key} checked={locKey === key} onChange={() => setLocKey(key)} />
               <span className="name">
                 {l.label}
-                <span className="sub">{l.outsideArea ? 'Karyawan Non-OnSite: absen di mana saja' : l.home ? 'Site penempatan' : l.headOffice ? 'Kantor pusat' : LOC_KIND[l.type]}</span>
+                <span className="sub">{LOC_KIND[l.type]}</span>
               </span>
               <span className="st">
                 {l.checkOut ? `Selesai · pulang ${l.checkOut}` : l.checkIn ? `Masuk ${l.checkIn}` : 'Belum absen'}

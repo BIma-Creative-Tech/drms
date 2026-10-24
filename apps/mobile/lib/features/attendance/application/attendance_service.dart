@@ -162,18 +162,6 @@ Future<Map<String, List<MasterItem>>> _scopedMasters(Ref ref, String sub) {
   return ref.watch(mastersRepositoryProvider).cached(sub, companyIds: scope);
 }
 
-/// ADR 0023: every cached site of the scope (active only — `cached` drops deactivated rows) with the caller's
-/// flags `home` / `assigned` / `team` from the server.
-final _masterSitesProvider = FutureProvider<List<ProjectSite>>((ref) async {
-  final sub = ref.watch(currentSubProvider);
-  if (sub == null) return const [];
-  ref.watch(mastersRevisionProvider);
-  final masters = await _scopedMasters(ref, sub);
-  return [
-    for (final m in masters[MasterTypes.sites] ?? const <MasterItem>[]) ProjectSite.fromMaster(m, kind: SiteKind.site),
-  ];
-});
-
 /// DRMS 13/10 A2: the cached eligible locations of the switcher scope (works offline); null = nothing received yet
 /// (first start offline, or a server before A2) → the picker falls back to [_assignedLocationsProvider].
 final eligibleLocationsProvider = FutureProvider<EligibleLocations?>((ref) async {
@@ -187,9 +175,9 @@ final eligibleLocationsProvider = FutureProvider<EligibleLocations?>((ref) async
   return cached.scoped(scope);
 });
 
-/// Own check-in locations with their geofence. DRMS 13/10 A2: the server's eligible list by attendance type
-/// (OnSite: every registered location of the PT with a point; Non-OnSite: head office + branch offices), home site
-/// first, then the head office — no assignment needed. Without that list (server before A2 / never online) the
+/// Own check-in locations with their geofence. DRMS 13/10 A2 / ADR 0032: the server's eligible list (every registered
+/// location of the PT with a point — projects, cost centers; OnSite inside the chosen one, Non-OnSite inside any) — no
+/// assignment needed. Without that list (server before A2 / never online) the
 /// assignment-based masters list ([_assignedLocationsProvider]). The first entry is the default of the picker; the
 /// screen then selects the location whose geofence contains the GPS fix (auto-detect).
 final attendanceSitesProvider = FutureProvider<List<ProjectSite>>((ref) async {
@@ -199,23 +187,14 @@ final attendanceSitesProvider = FutureProvider<List<ProjectSite>>((ref) async {
 });
 
 /// Locations of the user from the masters (access-filtered server-side: Staff = assigned, PM = team), with
-/// their geofence: ADR 0023 sites where the user may check in (home site = "Site penempatan" first, then the
-/// sites of a team assignment), projects (archived hidden) and cost centers ("pusat biaya", E6 Q-40). Own picker
-/// with a server before DRMS 13/10 A2, and the team locations of "diabsenkan PM" (always).
+/// their geofence: projects (archived hidden) and cost centers ("pusat biaya", E6 Q-40; ADR 0032: no site). Own
+/// picker with a server before DRMS 13/10 A2, and the team locations of "diabsenkan PM" (always).
 final _assignedLocationsProvider = FutureProvider<List<ProjectSite>>((ref) async {
   final sub = ref.watch(currentSubProvider);
   if (sub == null) return const [];
   ref.watch(mastersRevisionProvider);
   final masters = await _scopedMasters(ref, sub);
-  final sites = [
-    for (final s in await ref.watch(_masterSitesProvider.future))
-      if (s.home || s.assigned) s,
-  ];
   return [
-    for (final s in sites)
-      if (s.home) s,
-    for (final s in sites)
-      if (!s.home) s,
     for (final m in masters[MasterTypes.projects] ?? const <MasterItem>[])
       if (m.extra['status'] != 'arsip') ProjectSite.fromMaster(m),
     for (final m in masters[MasterTypes.costCenters] ?? const <MasterItem>[])
@@ -232,9 +211,7 @@ class OnBehalfCandidate {
 }
 
 /// Team members of the PM from the cached `team-assignments` masters (works offline; the server
-/// re-checks the assignment on the local date). The PM's own employee is excluded (never own).
-/// ADR 0023 (Q-S5): at a site of the PM's team (`team`), the members are the employees stationed there
-/// (`employees.homeSite`) and those with a team assignment to the site.
+/// re-checks the assignment on the local date). The PM's own employee is excluded (never own). ADR 0032: no site.
 final onBehalfCandidatesProvider = FutureProvider<List<OnBehalfCandidate>>((ref) async {
   final sub = ref.watch(currentSubProvider);
   if (sub == null) return const [];
@@ -246,9 +223,7 @@ final onBehalfCandidatesProvider = FutureProvider<List<OnBehalfCandidate>>((ref)
       profile == null || profile.companies.isEmpty || profile.forCompany(s.companyId).canAttendOnBehalf;
   final sites = [
     for (final s in await ref.watch(_assignedLocationsProvider.future))
-      if (s.kind != SiteKind.site && pmIn(s)) s,
-    for (final s in await ref.watch(_masterSitesProvider.future))
-      if (s.team && pmIn(s)) s,
+      if (pmIn(s)) s,
   ];
   final names = {for (final e in masters[MasterTypes.employees] ?? const <MasterItem>[]) e.id: e.label};
   final today = toYmd(DateTime.now());
@@ -270,16 +245,7 @@ final onBehalfCandidatesProvider = FutureProvider<List<OnBehalfCandidate>>((ref)
     if (start != null && start.compareTo(today) > 0) continue;
     if (end != null && end.compareTo(today) < 0) continue;
     int? id(String k) => (a.extra[k] as num?)?.toInt();
-    add(
-      emp,
-      find(SiteKind.project, id('project')) ??
-          find(SiteKind.costCenter, id('costCenter')) ??
-          find(SiteKind.site, id('site')),
-    );
-  }
-  // ADR 0023: stationed at a team site (no assignment rows needed)
-  for (final e in masters[MasterTypes.employees] ?? const <MasterItem>[]) {
-    add(e.id, find(SiteKind.site, (e.extra['homeSite'] as num?)?.toInt()));
+    add(emp, find(SiteKind.project, id('project')) ?? find(SiteKind.costCenter, id('costCenter')));
   }
   final out = [
     for (final e in byEmployee.entries)

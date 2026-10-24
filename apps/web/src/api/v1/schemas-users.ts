@@ -34,7 +34,7 @@ export const OnboardingEmployeeInput = z
     nickname: optText(64, 'Nama panggilan').nullable().optional(),
     position: optText(128, 'Jabatan').nullable().optional(),
     phone: optText(32, 'No. HP karyawan').nullable().optional(),
-    attendanceType: z.enum(['onsite', 'non_onsite']).optional().meta({ description: 'DRMS 13/10 A2 "Tipe absensi": onsite (default for a new employee) = any registered location of the PT; non_onsite = head office + branch offices only.' }),
+    attendanceType: z.enum(['onsite', 'non_onsite']).optional().meta({ description: 'DRMS 13/10 A2 "Tipe absensi": onsite (default for a new employee) = inside the chosen registered location of the PT; non_onsite (ADR 0032) = inside any registered location of the PT (picked automatically, outside all refused).' }),
     active: z.boolean().optional(),
   })
   .strict()
