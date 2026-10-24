@@ -14230,13 +14230,13 @@
           "name": "hm_start",
           "type": "numeric",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "hm_end": {
           "name": "hm_end",
           "type": "numeric",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "work_hours": {
           "name": "work_hours",
