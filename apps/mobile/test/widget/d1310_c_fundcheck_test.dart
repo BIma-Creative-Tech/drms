@@ -519,7 +519,8 @@ void main() {
       await tester.tap(find.byKey(const Key('icloan-confirm')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('icloan-error')), findsOneWidget);
-      expect(find.textContaining('Dana tersedia PT LAS Rp 300.000 — kurang untuk pinjaman'), findsOneWidget);
+      // D2410: inline and in the "Gagal" popup
+      expect(find.textContaining('Dana tersedia PT LAS Rp 300.000 — kurang untuk pinjaman'), findsNWidgets(2));
     });
 
     testWidgets('borrower without a receiving account: explained, submit disabled', (tester) async {
@@ -668,6 +669,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(_button('icloan-disburse-submit'));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
 
       // 409 CASH_OVERDRAFT_CONFIRM_REQUIRED → "Tetap simpan" → second call with confirmOverdraft
       expect(find.byKey(const Key('icloan-override-confirm')), findsOneWidget);
@@ -725,8 +727,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(_button('icloan-disburse-submit'));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       expect(find.byKey(const Key('icloan-disburse-error')), findsOneWidget);
-      expect(find.textContaining('tutup buku s/d 2026-10-31'), findsOneWidget);
+      expect(find.textContaining('tutup buku s/d 2026-10-31'), findsNWidgets(2));
       expect(find.byType(IcLoanDisburseScreen), findsOneWidget);
     });
   });

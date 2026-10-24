@@ -173,6 +173,7 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('daily-submit')));
     await tester.tap(find.byKey(const Key('daily-submit')));
     await tester.pumpAndSettle();
+    await confirmPopup(tester);
     final d = service.submitted.single;
     expect(d.type, FieldReportType.dailyReport);
     expect(d.projectId, 51);

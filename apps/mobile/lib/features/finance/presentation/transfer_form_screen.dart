@@ -13,6 +13,7 @@ import '../../../core/format/rupiah.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/online_only_button.dart';
@@ -161,6 +162,11 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
       _error = null;
     });
     if (_issues().isNotEmpty) return;
+    final it = widget.item;
+    if (!confirmOverdraft && !confirmUnverified) {
+      final summary = [it.docNo, it.title, formatRupiah(it.amount), it.bankText, _bankRef.text.trim()];
+      if (!await confirmAction(context, action: t.transferRecord, summary: summary) || !mounted) return;
+    }
     setState(() => _busy = true);
     final api = ref.read(financeApiProvider);
     try {
@@ -187,27 +193,27 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
       final km = detail.intercompany;
       // ADR 0031: paid from another account → the automatic inter-project loan (its number)
       final loanNo = out.loanNo;
-      showSnack(
-        context,
-        km != null && !km.voided
-            ? t.transferRecordedIntercompany(
-                trf ?? '-',
-                km.targetEntryNo,
-                km.companyCode ?? widget.item.payeeCompanyCode ?? '-',
-              )
-            : loanNo != null
-            ? t.transferRecordedLoan(trf ?? '-', loanNo)
-            : trf == null
-            ? t.transferRecorded
-            : t.transferRecordedNo(trf),
-      );
-      context.pop(true);
+      final done = km != null && !km.voided
+          ? t.transferRecordedIntercompany(
+              trf ?? '-',
+              km.targetEntryNo,
+              km.companyCode ?? widget.item.payeeCompanyCode ?? '-',
+            )
+          : loanNo != null
+          ? t.transferRecordedLoan(trf ?? '-', loanNo)
+          : trf == null
+          ? t.transferRecorded
+          : t.transferRecordedNo(trf);
+      await showActionResult(context, message: done, action: t.transferRecord);
+      if (mounted) context.pop(true);
     } on ProblemException catch (e) {
       final prompt = transferOverridePrompt(t, e);
       if (!mounted) return;
       if (prompt == null) {
         // ADR 0028: the receiving PT's closed period / changed account / no account in Indonesian
-        setState(() => _error = intercompanyProblemMessage(e) ?? e.message);
+        final message = intercompanyProblemMessage(e) ?? e.message;
+        setState(() => _error = message);
+        await showActionFailure(context, message, action: t.transferRecord);
         return;
       }
       setState(() => _busy = false);
@@ -236,7 +242,9 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
         confirmUnverified: confirmUnverified || prompt.flag == 'confirmUnverifiedAccount',
       );
     } on Object catch (e) {
-      if (mounted) setState(() => _error = errorText(e));
+      if (!mounted) return;
+      setState(() => _error = errorText(e));
+      await showActionError(context, e, action: t.transferRecord);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

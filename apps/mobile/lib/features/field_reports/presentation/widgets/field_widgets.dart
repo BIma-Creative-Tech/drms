@@ -10,6 +10,7 @@ import '../../../../app/theme.dart';
 import '../../../../core/format/dates.dart';
 import '../../../../core/logging/log.dart';
 import '../../../../l10n/gen/app_localizations.dart';
+import '../../../../shared/widgets/action_feedback.dart';
 import '../../../../shared/widgets/form_grid.dart';
 import '../../../expense/presentation/camera_capture_screen.dart';
 import '../../../progress/presentation/widgets/progress_widgets.dart' show LocalPhotoThumb;
@@ -35,6 +36,24 @@ String formatEditableUntil(String? iso, String? zone) => formatServerDateTime(is
 String fieldDateLabel(String ymd) {
   final d = DateTime.tryParse(ymd);
   return d == null ? ymd : DateFormat('EEE, d MMM yyyy', 'id').format(d);
+}
+
+/// D2410: "Yakin ingin <aksi>?" before a field report is stored on the phone (outbox): project, date (+ unit).
+Future<bool> confirmFieldSubmit(
+  BuildContext context,
+  String action, {
+  required String project,
+  required String date,
+  String? unit,
+}) {
+  return confirmAction(context, action: action, summary: [project, fieldDateLabel(date), unit]);
+}
+
+/// D2410: after storing — "Berhasil" while online (being sent now), "Tersimpan di antrian" offline.
+Future<void> showFieldSubmitted(BuildContext context, String action, {required bool online}) {
+  final t = AppLocalizations.of(context);
+  if (online) return showActionResult(context, message: t.fieldQueuedOnline, action: action);
+  return showActionQueued(context, action: action, message: t.fieldQueuedOffline);
 }
 
 /// Debounced autosave of the draft being edited (only drafts not sent yet; see [FieldService.saveDraft]).

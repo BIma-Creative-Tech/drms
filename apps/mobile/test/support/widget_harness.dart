@@ -116,3 +116,15 @@ Future<void> pumpScreen(
   );
   await tester.pumpAndSettle();
 }
+
+/// D2410: taps "Ya, …" of the confirmation popup (shared/widgets/action_feedback.dart).
+Future<void> confirmPopup(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('confirm-action')));
+  await tester.pumpAndSettle();
+}
+
+/// D2410: closes the result popup ("Berhasil" / "Gagal" / "Tersimpan di antrian") with OK.
+Future<void> dismissResult(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('result-ok')));
+  await tester.pumpAndSettle();
+}

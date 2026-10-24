@@ -6,6 +6,7 @@ import '../../../app/theme.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/form_grid.dart';
 import '../../auth/application/auth_controller.dart';
@@ -278,6 +279,9 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
       showSnack(context, t.fieldFixErrors);
       return;
     }
+    final label = _isEdit ? t.fieldSaveEdit : t.fieldServiceSubmit;
+    final ok = await confirmFieldSubmit(context, label, project: _projectLabel, date: _date, unit: _unitLabel);
+    if (!ok || !mounted) return;
     final online = ref.read(connectivityProvider);
     setState(() => _busy = true);
     _autosave?.cancel();
@@ -285,10 +289,10 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
       await ref.read(fieldServiceProvider).submit(sub, d, online: online);
       ref.read(syncCoordinatorProvider.notifier).requestSync(delay: Duration.zero);
       if (!mounted) return;
-      showSnack(context, online ? t.fieldQueuedOnline : t.fieldQueuedOffline);
-      Navigator.of(context).maybePop();
+      await showFieldSubmitted(context, label, online: online);
+      if (mounted) Navigator.of(context).maybePop();
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -303,8 +307,8 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
     _autosave?.cancel();
     await ref.read(fieldServiceProvider).discard(sub, _uuid);
     if (!mounted) return;
-    showSnack(context, t.fieldDiscarded);
-    Navigator.of(context).maybePop();
+    await showActionResult(context, message: t.fieldDiscarded, action: t.fieldDiscardAction);
+    if (mounted) Navigator.of(context).maybePop();
   }
 
   @override
@@ -759,22 +763,13 @@ class _UnitButton extends StatelessWidget {
 }
 
 /// "Hapus draft?" confirmation (drafts the server never received).
-Future<bool> confirmDiscard(BuildContext context) async {
+/// D2410: the shared "Yakin ingin hapus draft?" popup (danger button).
+Future<bool> confirmDiscard(BuildContext context) {
   final t = AppLocalizations.of(context);
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(t.fieldDiscardTitle),
-      content: Text(t.fieldDiscardBody),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-        FilledButton(
-          key: const Key('field-discard-ok'),
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(t.delete),
-        ),
-      ],
-    ),
+  return confirmAction(
+    context,
+    action: t.fieldDiscardAction,
+    note: t.fieldDiscardBody,
+    confirmKey: const Key('field-discard-ok'),
   );
-  return ok == true;
 }

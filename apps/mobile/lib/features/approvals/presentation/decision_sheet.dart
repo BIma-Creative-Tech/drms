@@ -9,6 +9,7 @@ import '../../../app/providers.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/online_only_button.dart';
 import '../../expense/domain/expense_request.dart';
@@ -29,6 +30,13 @@ Future<bool?> showDecisionSheet(BuildContext context, {required ExpenseDetail de
     );
 
 enum SignatureMode { profile, draw }
+
+/// D2410: the action named in the result popup ("Berhasil: setujui pengajuan").
+String decisionLabel(AppLocalizations t, Decision d) => switch (d) {
+  Decision.acknowledge => t.decisionTitleAcknowledge,
+  Decision.approve => t.decisionTitleApprove,
+  Decision.reject => t.decisionTitleReject,
+};
 
 /// ADR 0025: image of the PT's definitive Direktur signature (authorized endpoint, never cached on disk).
 final direkturSignatureImageProvider = FutureProvider.autoDispose.family<Uint8List, int>(
@@ -102,13 +110,20 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
       // Finance decide, each on their own step; also a request that moved on meanwhile). Show a clear
       // reason; the caller reloads the detail and the inbox.
       // ADR 0029: 409 FUND_INSUFFICIENT — the PT's available funds dropped since the detail was loaded (race).
-      if (mounted)
-        setState(() => _error = fundProblemMessage(e) ?? (e.status == 403 ? t.decisionForbidden : errorText(e)));
+      await _failed(fundProblemMessage(e) ?? (e.status == 403 ? t.decisionForbidden : errorText(e)));
     } on Object catch (e) {
-      if (mounted) setState(() => _error = errorText(e));
+      await _failed(errorText(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// D2410: the refusal stays in the sheet (red text) AND pops up with an OK button.
+  Future<void> _failed(String message) async {
+    if (!mounted) return;
+    setState(() => _error = message);
+    final action = decisionLabel(AppLocalizations.of(context), widget.decision);
+    await showActionFailure(context, message, action: action);
   }
 
   @override

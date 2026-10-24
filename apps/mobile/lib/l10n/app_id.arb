@@ -4500,5 +4500,51 @@
     }
   },
   "kpiAdminPusatBiaya": "Project tanpa pusat biaya",
-  "kpiCostCentersTeamEmpty": "Project Anda belum dipetakan ke pusat biaya (akun kas)."
+  "kpiCostCentersTeamEmpty": "Project Anda belum dipetakan ke pusat biaya (akun kas).",
+  "confirmActionTitle": "Yakin ingin {action}?",
+  "@confirmActionTitle": {
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "confirmActionYes": "Ya, {action}",
+  "@confirmActionYes": {
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "resultOk": "OK",
+  "resultSuccessTitle": "Berhasil",
+  "resultSuccessAction": "Berhasil: {action}",
+  "@resultSuccessAction": {
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "resultFailedTitle": "Gagal",
+  "resultFailedAction": "Gagal: {action}",
+  "@resultFailedAction": {
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "resultQueuedTitle": "Tersimpan di antrian",
+  "resultQueuedBody": "Tersimpan di antrian, akan dikirim saat online.",
+  "actionReceiptsCompleteVerb": "Tandai nota lengkap",
+  "receiptSaveAction": "Simpan nota",
+  "correctionSaveAction": "Simpan koreksi",
+  "scheduleAssignAction": "Ubah jadwal karyawan",
+  "fieldDiscardAction": "Hapus draft",
+  "progressDiscardAction": "Hapus laporan",
+  "progressResendAction": "Kirim versi HP",
+  "accountSignatureSaveAction": "Simpan tanda tangan",
+  "accountSignatureRemoveAction": "Hapus tanda tangan"
 }

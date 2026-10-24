@@ -8,7 +8,7 @@
  *   navigates right after the call (RequesterActions, Payload's redirect after "create") shows it on the next page.
  * Reason dialogs (ActionDialog with a field, kas/ReasonAction, RowRecordAction) ARE the confirmation — they show the
  * summary themselves and only use `showResult`. Pure module (no React, no DOM at import): unit-tested in
- * tests/unit/d2410-popup.test.ts; the APK counterpart is apps/mobile/lib/core/ui/confirm_action.dart.
+ * tests/unit/d2410-popup.test.ts; the APK counterpart is apps/mobile/lib/shared/widgets/action_feedback.dart.
  */
 
 /** Summary rows `[label, value]`; empty values are skipped. */

@@ -304,6 +304,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('on-behalf-submit')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       expect(lenses, [CameraLens.front]);
       final c = service.calls.single;
       expect(c.employee, 44);

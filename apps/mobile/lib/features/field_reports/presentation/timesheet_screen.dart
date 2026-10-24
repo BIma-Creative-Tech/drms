@@ -7,6 +7,7 @@ import '../../../app/theme.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
@@ -266,6 +267,11 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
       showSnack(context, t.fieldFixErrors);
       return;
     }
+    final label = _isEdit
+        ? t.fieldSaveEdit
+        : (next == null || _single ? t.fieldTimesheetSave : t.fieldSaveAndNext(next.label));
+    final ok = await confirmFieldSubmit(context, label, project: _projectLabel, date: _date, unit: _unitLabel);
+    if (!ok || !mounted) return;
     final online = ref.read(connectivityProvider);
     setState(() => _busy = true);
     _autosave?.cancel();
@@ -273,7 +279,8 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
       await ref.read(fieldServiceProvider).submit(sub, d, online: online);
       ref.read(syncCoordinatorProvider.notifier).requestSync(delay: Duration.zero);
       if (!mounted) return;
-      showSnack(context, online ? t.fieldQueuedOnline : t.fieldQueuedOffline);
+      await showFieldSubmitted(context, label, online: online);
+      if (!mounted) return;
       if (next != null && !_single) {
         setState(() => _busy = false);
         await _openUnit(next.id, next.label);
@@ -281,7 +288,7 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
         Navigator.of(context).maybePop();
       }
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

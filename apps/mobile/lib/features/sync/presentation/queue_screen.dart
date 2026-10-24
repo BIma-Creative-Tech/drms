@@ -8,6 +8,7 @@ import '../../../core/db/app_database.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../companies/presentation/company_chip.dart';
@@ -49,7 +50,11 @@ class QueueScreen extends ConsumerWidget {
     Future<void> runSync() async {
       final r = await ref.read(syncCoordinatorProvider.notifier).runNow();
       if (!context.mounted || r == null) return;
-      showSnack(context, r.outcome == SyncRunOutcome.serverUnsupported ? t.syncServerUnsupported : t.syncDone);
+      if (r.outcome == SyncRunOutcome.serverUnsupported) {
+        await showActionFailure(context, t.syncServerUnsupported, action: t.syncNow);
+      } else {
+        await showActionResult(context, message: t.syncDone, action: t.syncNow);
+      }
     }
 
     return Scaffold(
@@ -85,8 +90,12 @@ class QueueScreen extends ConsumerWidget {
                   onPressed: () async {
                     final sub = ref.read(currentSubProvider);
                     if (sub == null) return;
+                    final failed = items.where((r) => r.status == 'failed').length;
+                    final ok = await confirmAction(context, action: t.retryFailed, summary: [t.pendingQueue(failed)]);
+                    if (!ok) return;
                     await ref.read(outboxRepositoryProvider).retryFailed(sub);
                     ref.read(syncCoordinatorProvider.notifier).requestSync();
+                    if (context.mounted) await showActionQueued(context, action: t.retryFailed);
                   },
                   child: Text(t.retryFailed),
                 ),

@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/platform/report_files.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
 import '../../../shared/widgets/photo_viewer.dart';
@@ -210,9 +211,9 @@ class RecordDetailScreen extends ConsumerWidget {
       await ref.read(recordsApiProvider).revokeDevice(id, reason, idempotencyKey: const Uuid().v4());
       ref.invalidate(recordDetailProvider((collection, id)));
       ref.invalidate(recordPageProvider);
-      if (context.mounted) showSnack(context, t.recordRevoked);
+      if (context.mounted) await showActionResult(context, message: t.recordRevoked, action: t.recordRevoke);
     } on Object catch (e) {
-      if (context.mounted) showSnack(context, errorText(e));
+      if (context.mounted) await showActionError(context, e, action: t.recordRevoke);
     }
   }
 
@@ -236,48 +237,42 @@ class RecordDetailScreen extends ConsumerWidget {
         await api.softDelete(collection, id, reason, idempotencyKey: const Uuid().v4());
         ref.invalidate(recordPageProvider);
         if (context.mounted) {
-          showSnack(context, t.recordDeleted);
-          context.pop();
+          await showActionResult(context, message: t.recordDeleted, action: t.recordDelete);
+          if (context.mounted) context.pop();
         }
       } else if (c.action == 'nonaktifkan') {
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (d) => AlertDialog(
-            title: Text(t.recordDeactivateTitle),
-            content: Text([c.blockedReason ?? '', ...c.usage].where((x) => x.isNotEmpty).join('\n')),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(d, false), child: Text(t.cancel)),
-              FilledButton(
-                key: const Key('record-deactivate-ok'),
-                onPressed: () => Navigator.pop(d, true),
-                child: Text(t.recordDeactivate),
-              ),
-            ],
-          ),
-        );
-        if (ok != true || !context.mounted) return;
+        final usage = [c.blockedReason ?? '', ...c.usage].where((x) => x.isNotEmpty).join('\n');
         final form = await api.form(collection, id: id);
+        if (!context.mounted) return;
         String? reason;
+        // D2410: the reason dialog (when the collection asks one) IS the confirmation — never two popups
         if (form.reasonOnDeactivate || form.reasonOnUpdate) {
-          if (!context.mounted) return;
           reason = await showReasonDialog(
             context,
             title: t.recordDeactivateTitle,
-            description: t.cashReasonHelp,
+            description: [usage, t.cashReasonHelp].where((x) => x.isNotEmpty).join('\n\n'),
             confirm: t.recordDeactivate,
             keyPrefix: 'record-deactivate',
           );
           if (reason == null) return;
+        } else {
+          final ok = await confirmAction(
+            context,
+            action: t.recordDeactivate,
+            note: usage,
+            confirmKey: const Key('record-deactivate-ok'),
+          );
+          if (!ok) return;
         }
         await api.update(collection, id, {'active': false}, reason: reason, idempotencyKey: const Uuid().v4());
         ref.invalidate(recordDetailProvider((collection, id)));
         ref.invalidate(recordPageProvider);
-        if (context.mounted) showSnack(context, t.recordDeactivated);
+        if (context.mounted) await showActionResult(context, message: t.recordDeactivated, action: t.recordDeactivate);
       } else {
         showSnack(context, c.blockedReason ?? t.recordNoRight);
       }
     } on Object catch (e) {
-      if (context.mounted) showSnack(context, errorText(e));
+      if (context.mounted) await showActionError(context, e);
     }
   }
 

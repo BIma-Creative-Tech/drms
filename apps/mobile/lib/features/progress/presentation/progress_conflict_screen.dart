@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../sync/application/sync_coordinator.dart';
@@ -33,12 +34,13 @@ class _ProgressConflictScreenState extends ConsumerState<ProgressConflictScreen>
     final t = AppLocalizations.of(context);
     final sub = ref.read(currentSubProvider);
     if (sub == null) return;
+    if (!await confirmAction(context, action: t.progressUseServer, note: t.progressUsedServer) || !mounted) return;
     setState(() => _busy = true);
     await ref.read(progressServiceProvider).useServerVersion(sub, widget.uuid);
     ref.invalidate(progressReportsProvider);
     if (!mounted) return;
-    showSnack(context, t.progressUsedServer);
-    Navigator.of(context).maybePop();
+    await showActionResult(context, message: t.progressUsedServer, action: t.progressUseServer);
+    if (mounted) Navigator.of(context).maybePop();
   }
 
   Future<void> _resend() async {
@@ -57,10 +59,10 @@ class _ProgressConflictScreenState extends ConsumerState<ProgressConflictScreen>
           .resendMine(sub, widget.uuid, reason: reason, online: online, queueEnabled: queue);
       ref.read(syncCoordinatorProvider.notifier).requestSync(delay: Duration.zero);
       if (!mounted) return;
-      showSnack(context, t.progressResent);
-      Navigator.of(context).maybePop();
+      await showActionResult(context, message: t.progressResent, action: t.progressResendAction);
+      if (mounted) Navigator.of(context).maybePop();
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: t.progressResendAction);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -226,7 +228,7 @@ class _ReasonDialogState extends State<_ReasonDialog> {
             }
             Navigator.pop(context, v);
           },
-          child: Text(t.next),
+          child: Text(t.confirmActionYes(actionPhrase(t.progressResendAction))),
         ),
       ],
     );

@@ -156,6 +156,12 @@ void main() {
     await tester.enterText(find.byKey(const Key('lpj-usage-notes')), 'BBM dan penginapan tim survei');
     await tester.tap(find.byKey(const Key('lpj-send')));
     await tester.pumpAndSettle();
+    // D2410: "Yakin ingin kirim LPJ?" before anything is sent, then the result popup
+    expect(find.text('Yakin ingin kirim LPJ?'), findsOneWidget);
+    expect(api.adapter.calls, isEmpty);
+    await tester.tap(find.byKey(const Key('confirm-action')));
+    await tester.pumpAndSettle();
+    expect(find.text('Berhasil: kirim LPJ'), findsOneWidget);
     expect(api.adapter.calls.single.uri.path, '/api/v1/expense-requests/42/lpj/submit');
     expect(api.adapter.calls.single.headers['Idempotency-Key'], isNotNull);
   });

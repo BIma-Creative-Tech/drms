@@ -10,6 +10,7 @@ import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/doc_no_chip.dart';
 import '../../../shared/widgets/form_grid.dart';
@@ -154,24 +155,16 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
     super.dispose();
   }
 
-  Future<bool> _confirmSubmit() async {
+  /// D2410: "Yakin ingin ajukan ke Direktur?" / "Yakin ingin simpan draft?" with the loan's figures.
+  Future<bool> _confirmSave(String label, {required bool submit, int? amount}) {
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t.loanSubmitConfirmTitle),
-        content: Text(t.loanSubmitConfirmBody),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-          FilledButton(
-            key: const Key('loan-submit-confirm'),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(t.loanSubmit),
-          ),
-        ],
-      ),
+    return confirmAction(
+      context,
+      action: label,
+      summary: [widget.initial?.docNo, amount == null ? null : formatRupiah(amount), _reason.text.trim()],
+      note: submit ? t.loanSubmitConfirmBody : null,
+      confirmKey: Key(submit ? 'loan-submit-confirm' : 'loan-draft-confirm'),
     );
-    return ok == true;
   }
 
   Future<void> _save({required bool submit}) async {
@@ -191,7 +184,8 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
       _error = null;
     });
     if (errors.isNotEmpty) return;
-    if (submit && !await _confirmSubmit()) return;
+    final label = submit ? t.loanSubmit : (_editing ? t.loanSaveChanges : t.loanSaveDraft);
+    if (!await _confirmSave(label, submit: submit, amount: amount) || !mounted) return;
     final api = ref.read(loansApiProvider);
     setState(() => _busy = true);
     try {
@@ -226,7 +220,8 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
       }
       if (_borrowerId != null) ref.invalidate(projectLoansProvider(_borrowerId!));
       if (!mounted) return;
-      showSnack(context, submit ? t.loanSubmitted : t.loanSavedDraft);
+      await showActionResult(context, message: submit ? t.loanSubmitted : t.loanSavedDraft, action: label);
+      if (!mounted) return;
       final router = GoRouter.maybeOf(context);
       if (_editing) {
         if (router != null && router.canPop()) {
@@ -240,7 +235,9 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
         await Navigator.of(context).maybePop();
       }
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (!mounted) return;
+      setState(() => _error = e.message);
+      await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -499,38 +496,36 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
       return;
     }
     String? reason;
+    final label = switch (action) {
+      LoanAction.reject => t.loanReject,
+      LoanAction.cancel => t.loanCancel,
+      LoanAction.approve => t.loanApprove,
+      _ => t.loanSubmit,
+    };
+    final summary = [l.title, '${l.borrower.label} ← ${l.lenderLabel}', formatRupiah(l.amount)];
     if (action == LoanAction.reject || action == LoanAction.cancel) {
       reason = await showDialog<String>(
         context: context,
         builder: (_) => _ReasonDialog(
           title: action == LoanAction.reject ? t.loanRejectTitle(l.title) : t.loanCancelTitle,
+          summary: summary,
           prompt: action == LoanAction.reject ? t.loanRejectPrompt : t.loanCancelPrompt,
-          confirm: action == LoanAction.reject ? t.loanReject : t.loanCancel,
+          confirm: label,
         ),
       );
       if (reason == null) return;
     } else {
       final approve = action == LoanAction.approve;
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(approve ? t.loanApproveTitle(l.title) : t.loanSubmitConfirmTitle),
-          content: Text(
-            approve
-                ? t.loanApproveBody(l.borrower.label, formatRupiah(l.amount), l.lenderLabel)
-                : t.loanSubmitConfirmBody,
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-            FilledButton(
-              key: const Key('loan-confirm'),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(approve ? t.loanApprove : t.loanSubmit),
-            ),
-          ],
-        ),
+      final ok = await confirmAction(
+        context,
+        action: label,
+        summary: summary,
+        note: approve
+            ? t.loanApproveBody(l.borrower.label, formatRupiah(l.amount), l.lenderLabel)
+            : t.loanSubmitConfirmBody,
+        confirmKey: const Key('loan-confirm'),
       );
-      if (ok != true) return;
+      if (!ok) return;
     }
     final key = _keys.putIfAbsent(action, () => const Uuid().v7());
     final api = ref.read(loansApiProvider);
@@ -543,9 +538,10 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
         LoanAction.submit => api.submit(l.id, idempotencyKey: key),
         LoanAction.edit || LoanAction.repay || LoanAction.disburse => throw StateError('handled above'),
       };
-      if (mounted) showSnack(context, action == LoanAction.submit ? t.loanSubmitted : t.loanDone);
+      final done = action == LoanAction.submit ? t.loanSubmitted : t.loanDone;
+      if (mounted) await showActionResult(context, message: '${l.title}: $done', action: label);
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       // Also after a refusal (403/409): the buttons must follow the server's current allowedActions.
       ref.invalidate(loanDetailProvider(l.id));
@@ -607,6 +603,8 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
       builder: (_) => _RepaymentSheet(loan: l),
     );
     if (input == null || !mounted) return;
+    final summary = [l.title, formatRupiah(input.amount), formatDateOnly(input.date), input.note];
+    if (!await confirmAction(context, action: t.loanRepaySave, summary: summary) || !mounted) return;
     final key = _keys.putIfAbsent(LoanAction.repay, () => const Uuid().v7());
     final api = ref.read(loansApiProvider);
     Future<Loan> send({bool confirm = false}) => api.addRepayment(
@@ -624,9 +622,10 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
         return;
       }
       _keys.remove(LoanAction.repay); // the next repayment is a new one
-      if (mounted) showSnack(context, t.loanRepayDone(formatRupiah(input.amount)));
+      final done = t.loanRepayDone(formatRupiah(input.amount));
+      if (mounted) await showActionResult(context, message: done, action: t.loanRepaySave);
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: t.loanRepaySave);
     } finally {
       _refreshAll(l);
       if (mounted) setState(() => _busy = false);
@@ -639,22 +638,14 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
     final t = AppLocalizations.of(context);
     final lenderAccount = l.lenderCashAccount?.label ?? '—';
     final borrowerAccount = l.borrowerCashAccount?.label ?? '—';
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t.loanDisburseTitle(l.title)),
-        content: Text(t.loanDisburseBody(formatRupiah(l.amount), lenderAccount, borrowerAccount)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-          FilledButton(
-            key: const Key('loan-disburse-confirm'),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(t.loanDisburse),
-          ),
-        ],
-      ),
+    final ok = await confirmAction(
+      context,
+      action: t.loanDisburse,
+      summary: [l.title, '${l.borrower.label} ← ${l.lenderLabel}', formatRupiah(l.amount)],
+      note: t.loanDisburseBody(formatRupiah(l.amount), lenderAccount, borrowerAccount),
+      confirmKey: const Key('loan-disburse-confirm'),
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     final key = _keys.putIfAbsent(LoanAction.disburse, () => const Uuid().v7());
     final api = ref.read(loansApiProvider);
     Future<Loan> send({bool confirm = false}) =>
@@ -669,12 +660,10 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
       }
       final kk = out.disbursement?.kk;
       final km = out.disbursement?.km;
-      showSnack(
-        context,
-        kk != null && km != null ? t.loanDisbursed(out.title, kk, km) : t.loanDisbursedShort(out.title),
-      );
+      final done = kk != null && km != null ? t.loanDisbursed(out.title, kk, km) : t.loanDisbursedShort(out.title);
+      await showActionResult(context, message: done, action: t.loanDisburse);
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: t.loanDisburse);
     } finally {
       _refreshAll(l);
       ref.invalidate(cashAccountsProvider);
@@ -695,9 +684,9 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
     setState(() => _busy = true);
     try {
       await ref.read(loansApiProvider).voidRepayment(l.id, r.id, reason: reason, idempotencyKey: const Uuid().v7());
-      if (mounted) showSnack(context, t.loanRepaymentVoided);
+      if (mounted) await showActionResult(context, message: t.loanRepaymentVoided, action: t.loanRepaymentVoidConfirm);
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: t.loanRepaymentVoidConfirm);
     } finally {
       _refreshAll(l);
       if (mounted) setState(() => _busy = false);
@@ -1111,8 +1100,9 @@ class _LoanDecisionBar extends ConsumerWidget {
 }
 
 class _ReasonDialog extends StatefulWidget {
-  const _ReasonDialog({required this.title, required this.prompt, required this.confirm});
+  const _ReasonDialog({required this.title, required this.prompt, required this.confirm, this.summary = const []});
   final String title;
+  final List<String> summary;
   final String prompt;
   final String confirm;
   @override
@@ -1132,12 +1122,18 @@ class _ReasonDialogState extends State<_ReasonDialog> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final style = isDestructiveAction(widget.confirm)
+        ? FilledButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError)
+        : null;
     return AlertDialog(
       title: Text(widget.title),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          for (final s in widget.summary) Text(s, style: const TextStyle(fontWeight: FontWeight.w600)),
+          if (widget.summary.isNotEmpty) const SizedBox(height: 8),
           Text(widget.prompt),
           const SizedBox(height: 8),
           TextField(
@@ -1153,6 +1149,7 @@ class _ReasonDialogState extends State<_ReasonDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
         FilledButton(
           key: const Key('loan-reason-ok'),
+          style: style,
           onPressed: () {
             final v = _c.text.trim();
             if (v.length < 3) {
@@ -1161,7 +1158,7 @@ class _ReasonDialogState extends State<_ReasonDialog> {
             }
             Navigator.pop(context, v);
           },
-          child: Text(widget.confirm),
+          child: Text(t.confirmActionYes(actionPhrase(widget.confirm))),
         ),
       ],
     );

@@ -102,6 +102,7 @@ void main() {
     await tester.tap(find.byKey(const Key('addendum-confirm')));
     await tester.pumpAndSettle();
     expect(api.calls, ['ack:61']);
+    await dismissResult(tester);
     await tester.tap(find.text('Tolak'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('addendum-reason-ok')));
@@ -166,7 +167,9 @@ void main() {
     await tester.enterText(find.byKey(const Key('addendum-amount')), '250.000.000');
     await tester.enterText(find.byKey(const Key('addendum-reason')), 'Tambahan pondasi');
     await tester.tap(find.text('Ajukan'));
-    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(api.calls, isEmpty, reason: 'D2410: "Yakin ingin ajukan?" first');
+    await confirmPopup(tester);
     expect(api.calls, ['create:7:250000000:true']);
   });
 
@@ -223,13 +226,18 @@ void main() {
       await tester.enterText(find.byKey(const Key('addendum-reason')), 'Tanah lunak, tambah tiang');
       await tester.tap(find.text('Simpan perubahan'));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       expect(api.calls, ['update:61:300000000:Tanah lunak, tambah tiang']);
+      await dismissResult(tester);
       // Retry with the same body → same Idempotency-Key; another body → a new key (server: 422 on reuse).
       await tester.tap(find.text('Simpan perubahan'));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
+      await dismissResult(tester);
       await tester.enterText(find.byKey(const Key('addendum-reason')), 'Tanah lunak, tambah 4 tiang');
       await tester.tap(find.text('Simpan perubahan'));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       expect(api.keys, hasLength(3));
       expect(api.keys[1], api.keys[0]);
       expect(api.keys[2], isNot(api.keys[0]));
@@ -245,6 +253,7 @@ void main() {
       );
       await tester.tap(find.text('Simpan & ajukan'));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       expect(api.calls, ['update:61:250000000:Tambahan pondasi karena tanah lunak', 'submit:61']);
     });
 

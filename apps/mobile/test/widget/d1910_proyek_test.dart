@@ -235,6 +235,7 @@ void main() {
     expect(find.text('CS1 — PT Contoh Satu'), findsOneWidget);
     await tester.tap(find.byKey(const Key('record-save')));
     await tester.pumpAndSettle();
+    await confirmPopup(tester);
     expect(api.created.single, {'name': 'PT Maju', 'kind': null, 'active': true, 'company': 1});
   });
 
@@ -277,6 +278,7 @@ void main() {
       await tester.enterText(find.byKey(const Key('rap-item-reason')), 'koreksi volume');
       await tester.tap(find.byKey(const Key('rap-item-save')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       expect(api.calls, ['update:5:koreksi volume']);
     });
   });

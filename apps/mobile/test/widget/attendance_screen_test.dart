@@ -89,6 +89,7 @@ void main() {
     expect(find.text('P-01 — Gudang Contoh'), findsOneWidget);
     await tester.tap(find.byKey(const Key('attendance-checkIn')));
     await tester.pumpAndSettle();
+    await confirmPopup(tester);
     expect(selfies, 1);
     expect(service.calls.single.$1, AttendanceKind.checkIn);
     expect(service.calls.single.$2, 7);
@@ -101,6 +102,7 @@ void main() {
     await pump(tester, online: true);
     await tester.tap(find.byKey(const Key('attendance-checkOut')));
     await tester.pumpAndSettle();
+    await confirmPopup(tester);
     expect(service.calls.single.$1, AttendanceKind.checkOut);
     expect(service.calls.single.$4, isTrue);
     expect(find.text('Absen tersimpan dan sedang dikirim.'), findsOneWidget);
@@ -188,6 +190,7 @@ void main() {
     expect(find.textContaining('Absen masuk · BPN — Cabang Balikpapan'), findsOneWidget);
     await tester.tap(find.byKey(const Key('attendance-checkIn')));
     await tester.pumpAndSettle();
+    await confirmPopup(tester);
     expect(service.calls.single.$2, 2, reason: 'the default location is the home site');
   });
 }

@@ -12,6 +12,7 @@ import '../../../core/format/rupiah.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/online_only_button.dart';
@@ -276,6 +277,17 @@ class _CashEntryFormScreenState extends ConsumerState<CashEntryFormScreen> {
       setState(() => _summary = t.cashNoChanges);
       return;
     }
+    final label = _edit ? t.cashSaveChanges : (_in ? t.cashSaveIn : t.cashSaveOut);
+    if (!confirmOverdraft) {
+      final summary = [
+        e?.entryNo,
+        _account?.label,
+        amount == null ? null : formatRupiah(amount),
+        formatDateOnly(_date),
+        description,
+      ];
+      if (!await confirmAction(context, action: label, summary: summary) || !mounted) return;
+    }
     if (confirmOverdraft) body['confirmOverdraft'] = true;
     setState(() => _busy = true);
     final api = ref.read(cashApiProvider);
@@ -285,16 +297,19 @@ class _CashEntryFormScreenState extends ConsumerState<CashEntryFormScreen> {
         body['proofId'] = _proofId;
       }
       final key = _keys.putIfAbsent(jsonEncode(body), () => const Uuid().v4());
+      final String done;
       if (_edit) {
-        await api.update(e!.id, body, idempotencyKey: key);
+        final entry = e!;
+        await api.update(entry.id, body, idempotencyKey: key);
+        done = t.cashUpdated(entry.entryNo);
       } else {
         final no = await api.create(body, idempotencyKey: key);
-        if (mounted) showSnack(context, t.cashSaved(no, _in ? t.cashInLower : t.cashOutLower, formatRupiah(amount!)));
+        done = t.cashSaved(no, _in ? t.cashInLower : t.cashOutLower, formatRupiah(amount!));
       }
       ref.invalidate(cashBookProvider);
       if (!mounted) return;
-      if (_edit) showSnack(context, t.cashUpdated(e!.entryNo));
-      context.pop(true);
+      await showActionResult(context, message: done, action: label);
+      if (mounted) context.pop(true);
     } on ProblemException catch (x) {
       final prompt = _edit ? null : transferOverridePrompt(t, x);
       if (!mounted) return;
@@ -303,6 +318,7 @@ class _CashEntryFormScreenState extends ConsumerState<CashEntryFormScreen> {
           _errors = {for (final f in x.errors) f.path: f.message};
           _summary = x.message;
         });
+        await showActionError(context, x, action: label);
         return;
       }
       setState(() => _busy = false);
@@ -328,7 +344,9 @@ class _CashEntryFormScreenState extends ConsumerState<CashEntryFormScreen> {
       }
       await _submit(confirmOverdraft: true);
     } on Object catch (x) {
-      if (mounted) setState(() => _summary = errorText(x));
+      if (!mounted) return;
+      setState(() => _summary = errorText(x));
+      await showActionError(context, x, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

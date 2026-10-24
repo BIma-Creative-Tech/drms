@@ -9,6 +9,7 @@ import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/online_only_button.dart';
 import '../../approvals/application/inbox_providers.dart';
@@ -164,21 +165,26 @@ class _AddendumCreateScreenState extends ConsumerState<AddendumCreateScreen> {
       _error = null;
     });
     if (errors.isNotEmpty) return;
-    if (_editing) return _saveEdit(addition: addition!, submit: submit);
+    final label = _label(t, submit: submit);
+    final amountRab = addition!;
+    final summary = [widget.initial?.docNo, formatRupiah(amountRab), _reason.text.trim()];
+    if (!await confirmAction(context, action: label, summary: summary) || !mounted) return;
+    if (_editing) return _saveEdit(addition: amountRab, submit: submit);
     setState(() => _busy = true);
     try {
       final a = await ref
           .read(addendumApiProvider)
           .create(
             projectId: _projectId!,
-            addition: addition!,
+            addition: amountRab,
             reason: _reason.text,
             submit: submit,
             idempotencyKey: _key,
           );
       ref.invalidate(addendumListProvider);
       if (!mounted) return;
-      showSnack(context, submit ? t.addendumSubmitted : t.addendumSavedDraft);
+      await showActionResult(context, message: submit ? t.addendumSubmitted : t.addendumSavedDraft, action: label);
+      if (!mounted) return;
       final router = GoRouter.maybeOf(context);
       if (router != null) {
         unawaited(router.pushReplacement('/addenda/${a.id}'));
@@ -186,10 +192,17 @@ class _AddendumCreateScreenState extends ConsumerState<AddendumCreateScreen> {
         await Navigator.of(context).maybePop();
       }
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (!mounted) return;
+      setState(() => _error = e.message);
+      await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  String _label(AppLocalizations t, {required bool submit}) {
+    if (submit) return _editing ? t.addendumSaveAndSubmit : t.addendumSubmit;
+    return _editing ? t.addendumSaveChanges : t.addendumSaveDraft;
   }
 
   Future<void> _saveEdit({required int addition, required bool submit}) async {
@@ -205,7 +218,9 @@ class _AddendumCreateScreenState extends ConsumerState<AddendumCreateScreen> {
       ref.invalidate(addendumDetailProvider(a.id));
       ref.invalidate(addendumListProvider);
       if (!mounted) return;
-      showSnack(context, submit ? t.addendumSubmitted : t.addendumEdited);
+      final label = _label(t, submit: submit);
+      await showActionResult(context, message: submit ? t.addendumSubmitted : t.addendumEdited, action: label);
+      if (!mounted) return;
       final router = GoRouter.maybeOf(context);
       if (router != null && router.canPop()) {
         router.pop();
@@ -213,7 +228,9 @@ class _AddendumCreateScreenState extends ConsumerState<AddendumCreateScreen> {
         await Navigator.of(context).maybePop();
       }
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (!mounted) return;
+      setState(() => _error = e.message);
+      await showActionError(context, e, action: _label(t, submit: submit));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -331,29 +348,34 @@ class _AddendumDetailScreenState extends ConsumerState<AddendumDetailScreen> {
       return;
     }
     String? reason;
+    final label = switch (action) {
+      AddendumAction.acknowledge => t.addendumAcknowledge,
+      AddendumAction.approve => t.addendumApprove,
+      AddendumAction.reject => t.addendumReject,
+      AddendumAction.cancel => t.addendumCancel,
+      _ => t.addendumSubmit,
+    };
+    final a = ref.read(addendumDetailProvider(widget.id)).value;
+    final summary = [a?.docNo, a?.projectLabel, a == null ? null : formatRupiah(a.addition)];
     if (action == AddendumAction.reject || action == AddendumAction.cancel) {
       reason = await showDialog<String>(
         context: context,
-        builder: (_) => _ReasonDialog(title: action == AddendumAction.reject ? t.addendumReject : t.addendumCancel),
-      );
-      if (reason == null) return;
-    } else if (action != AddendumAction.submit) {
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(action == AddendumAction.acknowledge ? t.addendumAcknowledge : t.addendumApprove),
-          content: Text(t.addendumConfirmBody),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-            FilledButton(
-              key: const Key('addendum-confirm'),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(t.yes),
-            ),
-          ],
+        builder: (_) => _ReasonDialog(
+          title: t.confirmActionTitle(actionPhrase(label)),
+          summary: summary,
+          confirm: label,
         ),
       );
-      if (ok != true) return;
+      if (reason == null) return;
+    } else {
+      final ok = await confirmAction(
+        context,
+        action: label,
+        summary: summary,
+        note: action == AddendumAction.submit ? null : t.addendumConfirmBody,
+        confirmKey: const Key('addendum-confirm'),
+      );
+      if (!ok) return;
     }
     final key = _keys.putIfAbsent(action, () => const Uuid().v7());
     final api = ref.read(addendumApiProvider);
@@ -371,9 +393,10 @@ class _AddendumDetailScreenState extends ConsumerState<AddendumDetailScreen> {
       ref.invalidate(addendumInboxProvider);
       ref.invalidate(addendumListProvider);
       ref.invalidate(inboxProvider);
-      if (mounted) showSnack(context, t.addendumDone);
+      final done = '${a?.docNo ?? ''} ${t.addendumDone}'.trim();
+      if (mounted) await showActionResult(context, message: done, action: label);
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -479,8 +502,10 @@ class _AddendumDetailScreenState extends ConsumerState<AddendumDetailScreen> {
 }
 
 class _ReasonDialog extends StatefulWidget {
-  const _ReasonDialog({required this.title});
+  const _ReasonDialog({required this.title, required this.summary, required this.confirm});
   final String title;
+  final List<String?> summary;
+  final String confirm;
   @override
   State<_ReasonDialog> createState() => _ReasonDialogState();
 }
@@ -498,19 +523,38 @@ class _ReasonDialogState extends State<_ReasonDialog> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final style = isDestructiveAction(widget.confirm)
+        ? FilledButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError)
+        : null;
+    final lines = [
+      for (final s in widget.summary)
+        if (s != null && s.isNotEmpty) s,
+    ];
     return AlertDialog(
       title: Text(widget.title),
-      content: TextField(
-        key: const Key('addendum-reason-field'),
-        controller: _c,
-        autofocus: true,
-        maxLength: 1000,
-        decoration: InputDecoration(labelText: t.addendumReason, errorText: _error),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final l in lines) Text(l, style: const TextStyle(fontWeight: FontWeight.w600)),
+            if (lines.isNotEmpty) const SizedBox(height: 8),
+            TextField(
+              key: const Key('addendum-reason-field'),
+              controller: _c,
+              autofocus: true,
+              maxLength: 1000,
+              decoration: InputDecoration(labelText: t.addendumReason, errorText: _error),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
         FilledButton(
           key: const Key('addendum-reason-ok'),
+          style: style,
           onPressed: () {
             final v = _c.text.trim();
             if (v.length < 3) {
@@ -519,7 +563,7 @@ class _ReasonDialogState extends State<_ReasonDialog> {
             }
             Navigator.pop(context, v);
           },
-          child: Text(t.next),
+          child: Text(t.confirmActionYes(actionPhrase(widget.confirm))),
         ),
       ],
     );

@@ -19,7 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     `RowRecordAction` use it, so new buttons built from them get both popups. Payload's document **Simpan** asks
     first and shows the result on every collection and global, the relationship "+" drawer included
     (`withConfirmSave`).
-  - APK: one helper (`lib/core/ui/confirm_action.dart`) used by every action screen.
+  - APK: one helper (`lib/shared/widgets/action_feedback.dart`: `confirmAction`, `showActionResult`) used by every
+    action screen.
 - No migration. No API change.
 
 ## [0.19.1] - 2026-10-22
