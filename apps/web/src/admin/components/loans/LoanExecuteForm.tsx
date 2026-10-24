@@ -4,6 +4,7 @@ import React, { useId, useRef, useState } from 'react'
 
 import { problemText } from '../ActionButton'
 import { DateInput } from '../DateInput'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle, type Summary } from '../feedback/feedback'
 import { OverrideDialog, overridePromptOf, type OverridePrompt } from '../kas/OverrideDialog'
 import { KAS_STYLE } from '../kas/style'
 import { newIdemKey, sendJson } from '../kas/client'
@@ -15,6 +16,8 @@ import { newIdemKey, sendJson } from '../kas/client'
  * approval) and only shown. A 409 CASH_OVERDRAFT_CONFIRM_REQUIRED opens the app dialog; "Tetap simpan" re-sends the
  * same body + `confirmOverdraft` (one Idempotency-Key per body). The server re-checks role, status and dates and posts
  * KK + KM in one transaction.
+ * DRMS 24/10 (popups): "Yakin ingin eksekusi transfer <PJ>?" (pinjaman, nominal, akun, tanggal, catatan, bukti) before
+ * anything is uploaded / sent, the result popup after (the overdraft dialog stays between them when the server asks).
  */
 export type LoanExecuteFormProps = {
   url: string
@@ -24,6 +27,10 @@ export type LoanExecuteFormProps = {
   minDate: string
   today: string
   testId: string
+  /** DRMS 24/10: the order as named in the popups ("PJ/2026/10/0001" / "pengembalian PJ/…"). */
+  docText?: string | null
+  /** DRMS 24/10: summary rows of the confirmation popup (pinjaman, dari → ke, nominal …). */
+  summary?: Summary
 }
 
 async function uploadProof(file: File): Promise<number> {
@@ -35,7 +42,9 @@ async function uploadProof(file: File): Promise<number> {
   return (data as { id: number }).id
 }
 
-export function LoanExecuteForm({ url, amountText, accountsText, minDate, today, testId }: LoanExecuteFormProps) {
+const ACTION = 'Eksekusi transfer'
+
+export function LoanExecuteForm({ url, amountText, accountsText, minDate, today, testId, docText = null, summary = [] }: LoanExecuteFormProps) {
   const router = useRouter()
   const uid = useId()
   const [busy, setBusy] = useState(false)
@@ -47,6 +56,7 @@ export function LoanExecuteForm({ url, amountText, accountsText, minDate, today,
     const r = await sendJson('POST', url, body, newIdemKey())
     if (r.ok) {
       setPrompt(null)
+      showResult({ ok: true, title: successTitle(ACTION, docText), message: 'Kas keluar dan kas masuk tercatat di kedua akun.', testId })
       router.refresh()
       return
     }
@@ -58,6 +68,7 @@ export function LoanExecuteForm({ url, amountText, accountsText, minDate, today,
     }
     setPrompt(null)
     setError(r.error)
+    showResult({ ok: false, title: failureTitle(ACTION), message: r.error, testId })
   }
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -70,13 +81,23 @@ export function LoanExecuteForm({ url, amountText, accountsText, minDate, today,
     if (date < minDate) return setError('Tanggal transfer tidak boleh sebelum tanggal pinjaman.')
     const note = String(f.get('note') ?? '').trim()
     const body: Record<string, unknown> = { executeDate: date, ...(note ? { note } : {}) }
+    const file = f.get('proof')
+    const hasFile = file instanceof File && file.size > 0
+    const yes = await confirmAction({
+      title: confirmTitle(ACTION, docText),
+      summary: [...summary, ['Nominal', amountText], ['Akun', accountsText], ['Tanggal transfer', date], ['Catatan', note || null], ['Bukti transfer', hasFile ? file.name : null]],
+      confirmLabel: confirmLabel(ACTION),
+      testId,
+    })
+    if (!yes) return
     setBusy(true)
     try {
-      const file = f.get('proof')
-      if (file instanceof File && file.size > 0) body.proofMediaId = await uploadProof(file)
+      if (hasFile) body.proofMediaId = await uploadProof(file)
       await send(body)
     } catch (err) {
-      setError((err as Error).message || 'Gagal.')
+      const msg = (err as Error).message || 'Gagal.'
+      setError(msg)
+      showResult({ ok: false, title: failureTitle(ACTION), message: msg, testId })
     } finally {
       setBusy(false)
     }
@@ -88,8 +109,10 @@ export function LoanExecuteForm({ url, amountText, accountsText, minDate, today,
     try {
       await send({ ...pending.current.body, [prompt.flag]: true })
     } catch (err) {
+      const msg = (err as Error).message || 'Gagal.'
       setPrompt(null)
-      setError((err as Error).message || 'Gagal.')
+      setError(msg)
+      showResult({ ok: false, title: failureTitle(ACTION), message: msg, testId })
     } finally {
       setBusy(false)
     }

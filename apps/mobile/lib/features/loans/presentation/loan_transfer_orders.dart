@@ -8,6 +8,7 @@ import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/online_only_button.dart';
 import '../../companies/presentation/company_chip.dart';
@@ -106,6 +107,23 @@ class _LoanTransferOrderCardState extends ConsumerState<LoanTransferOrderCard> {
       builder: (_) => _ExecuteSheet(order: o),
     );
     if (input == null || !mounted) return;
+    // D2410: "Yakin ingin catat transfer?" with the order (PJ, nominal, accounts, date) before, the result popup after
+    final label = t.loanTransferOrderExecute;
+    final docNo = o.docNo ?? '#${o.loanId}';
+    final summary = [
+      '$docNo · ${o.title}',
+      formatRupiah(o.amount),
+      t.loanFlow(o.fromAccount?.label ?? '—', o.toAccount?.label ?? '—'),
+      formatDateOnly(input.date),
+      input.note,
+    ];
+    final ok = await confirmAction(
+      context,
+      action: label,
+      summary: summary,
+      confirmKey: const Key('loan-order-execute-confirm'),
+    );
+    if (!ok || !mounted) return;
     final api = ref.read(loansApiProvider);
     Future<Loan> send({bool confirm = false}) {
       final key = confirm ? '$_key-c' : _key;
@@ -131,9 +149,13 @@ class _LoanTransferOrderCardState extends ConsumerState<LoanTransferOrderCard> {
     try {
       final out = await withLoanOverdraftConfirm(context, send);
       if (!mounted) return;
-      showSnack(context, out == null ? t.overrideCancelled : t.loanTransferOrderDone(o.docNo ?? '#${o.loanId}'));
+      if (out == null) {
+        showSnack(context, t.overrideCancelled);
+      } else {
+        await showActionResult(context, message: t.loanTransferOrderDone(docNo), action: label);
+      }
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       // also after a refusal: the list follows the server
       ref.invalidate(loanTransferOrdersProvider);

@@ -263,7 +263,7 @@ export function TimesheetForm({
     }
     // DRMS 24/10: popup before (contract, unit, date, HM, hours) and after
     const tsDoc = `${unit!.label} ${date}`
-    if (!(await askField('Simpan timesheet', tsDoc, [['Kontrak / project', project!.label], ['Unit', unit!.label], ['Tanggal', date], ['HM awal → akhir', `${num(hs)} → ${num(he)}`], ['Kerja / standby / breakdown (jam)', `${num(w)} / ${num(s ?? 0)} / ${num(b ?? 0)}`]]))) return
+    if (!(await askField('Simpan timesheet', tsDoc, [['Kontrak / project', project!.label], ['Unit', unit!.label], ['Tanggal', date], ['HM awal → akhir', withHm ? `${num(hs)} → ${num(he)}` : 'tanpa HM (opsional)'], ['Kerja / standby / breakdown (jam)', `${num(w)} / ${num(s ?? 0)} / ${num(b ?? 0)}`]]))) return
     setSummary(null)
     try {
       setBusy(photos.items.length ? 'Mengunggah foto HM…' : 'Menyimpan…')

@@ -581,6 +581,7 @@ void main() {
       await tester.ensureVisible(find.byKey(const Key('timesheet-submit')));
       await tester.tap(find.byKey(const Key('timesheet-submit')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       final c = service.submitted.single.$1.timesheet;
       expect((c.hmStart, c.hmEnd, c.hmPhoto, c.workHours), (null, null, null, 8.0));
       await tester.pump(const Duration(seconds: 1));
