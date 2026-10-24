@@ -48,6 +48,18 @@ APK ≤ 0.11.1 (empty / tombstones).
 - Cash accounts already flagged with a site stay outside the fund pool (ADR 0029) until the owner decides (ADR 0032 §4).
 - The go-live import workbook still carries the Site sheet / `kode_site` columns (CLI writes the hidden legacy columns).
 
+## [0.19.2] - 2026-10-24
+
+**Security release: dependency bumps only.** No code change, no migration, APK unchanged (0.11.1).
+
+### Security
+- Dependency bumps for CRITICAL/HIGH advisories found by `npm audit` / trivy on 2026-10-24 (no code change):
+  - `next` + `eslint-config-next` 16.3.8 → 16.4.2 (GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr unauthenticated RCE;
+    GHSA-p3m5-59mp-jv5r DoS).
+  - `dompurify` 3.4.8 → 3.4.17 via `overrides` (transitive through monaco-editor; GHSA-cg2g-xh64-v4q7 and others).
+  - `undici` override 7.29.1 → 7.30.1; `zod` 4.6.5 → 4.6.7.
+  - Remaining `npm audit` findings are moderate only (esbuild via drizzle-kit, fast-uri, nodemailer).
+
 ## [0.19.1] - 2026-10-22
 
 **Fund check per Pusat Biaya first, then PT (ADR 0031 §6, user 2026-10-22).** One migration
