@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { SyncUnitTimesheetPayload } from '@/api/v1/schemas-sync'
+import { migrations } from '@/migrations'
 import { ContractUnitList, UnitTimesheetCorrection, UnitTimesheetUpdate } from '@/api/v1/schemas-field'
 import { BACKDATE_MAX_DAYS, hasHm, hmGap, reportDateError, timesheetErrors, timesheetMinDate } from '@/domain/field/rules'
 import { buildRecap, buildTimesheetMatrix, cellText, hmWeeks, weekLabel, weeklyHm, type MatrixContract, type MatrixTimesheet } from '@/domain/field/views'
@@ -25,6 +26,14 @@ const T = (unitId: number, reportDate: string, hm: [number, number] | null, work
   standbyHours: 0,
   breakdownHours: 0,
   flags: [],
+})
+
+describe('D2410 migration wiring', () => {
+  it('20261024_100000_d2410_timesheet_hm_optional runs after the 0.19.1 migrations, once', () => {
+    const names = migrations.map((m) => m.name)
+    expect(names.filter((n) => n === '20261024_100000_d2410_timesheet_hm_optional')).toHaveLength(1)
+    expect(names.indexOf('20261024_100000_d2410_timesheet_hm_optional')).toBeGreaterThan(names.indexOf('20261022_100000_d2210_pb_fund'))
+  })
 })
 
 describe('D2410 backdate window', () => {
