@@ -17,7 +17,9 @@ import {
   loadRaw,
   loadVisible,
   lockDoc,
+  mayBackdateTimesheet,
   photoDto,
+  photoIdsOf,
   photosOf,
   previousTimesheetEnd,
   refreshUnit,
@@ -35,7 +37,7 @@ import {
   type Timing,
 } from './common'
 import { namesOf, num, projectRef, str, unitRef, userRef } from './refs'
-import { BREAKDOWN_SUGGEST_SERVICE_HOURS, hmGap, round2, timesheetErrors } from './rules'
+import { BREAKDOWN_SUGGEST_SERVICE_HOURS, hasHm, HM_PHOTO_REQUIRED, hmGap, round2, timesheetErrors } from './rules'
 import { scopedFind } from './service'
 
 /**
@@ -44,6 +46,10 @@ import { scopedFind } from './service'
  * (409 DUPLICATE_DATE; unique index is the final guard), the unit must be in an ACTIVE contract unit
  * of the project on that date (409 NOT_IN_CONTRACT; DB trigger), HM_GAP flag when HM start ≠ the
  * previous timesheet's HM end, unit last HM recalculated, exactly one HM photo.
+ * D2410 (user 2026-10-24, ADR 0020 amendment 2026-10-24): HM start/end and the HM photo are OPTIONAL (operators read
+ * the HM about once a week) — both values or none, the photo required only with HM, HM_GAP against the previous
+ * timesheet WITH HM; an edit may clear the HM (null) or add the photo when there is none yet. The PM of the project /
+ * the Direktur may file any past date inside the contract unit's period (`mayBackdateTimesheet`).
  */
 const TYPE = 'unit_timesheet' as const
 const LABEL = 'Timesheet'
@@ -52,8 +58,8 @@ export type TimesheetDoc = FieldDoc & {
   unit: unknown
   contractUnit: unknown
   reportDate: string
-  hmStart: number
-  hmEnd: number
+  hmStart: number | null
+  hmEnd: number | null
   workHours: number
   standbyHours?: number | null
   breakdownHours?: number | null
@@ -75,8 +81,9 @@ export type TimesheetInput = {
   projectId: number
   unitId: number
   reportDate: string
-  hmStart: number
-  hmEnd: number
+  /** D2410: optional, both or none (null = no HM reading on this day). */
+  hmStart?: number | null
+  hmEnd?: number | null
   workHours: number
   standbyHours?: number | null
   breakdownHours?: number | null
@@ -85,11 +92,13 @@ export type TimesheetInput = {
   operatorName?: string | null
   location?: string | null
   notes?: string | null
-  hmPhotoId: number
+  /** D2410: required only with HM. */
+  hmPhotoId?: number | null
   clientUuid?: string | null
 }
 
-export type TimesheetPatch = Partial<Omit<TimesheetInput, 'projectId' | 'unitId' | 'reportDate' | 'hmPhotoId' | 'clientUuid'>> & { reason?: string }
+/** hmStart/hmEnd: undefined = unchanged, null = cleared; hmPhotoId only adds the photo of a timesheet without one. */
+export type TimesheetPatch = Partial<Omit<TimesheetInput, 'projectId' | 'unitId' | 'reportDate' | 'clientUuid'>> & { reason?: string }
 
 const clean = (v: string | null | undefined): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null)
 
@@ -110,7 +119,7 @@ async function existingOn(req: PayloadRequest, company: number, unitId: number, 
   return r.rows[0] ? Number(r.rows[0].id) : null
 }
 
-function flagsFor(base: string[], hmStart: number, prevEnd: number | null, breakdown: number): string[] {
+function flagsFor(base: string[], hmStart: number | null, prevEnd: number | null, breakdown: number): string[] {
   const out = base.filter((f) => f !== 'HM_GAP' && f !== 'BREAKDOWN_SUGGEST_SERVICE')
   if (hmGap(hmStart, prevEnd)) out.push('HM_GAP')
   if (breakdown >= BREAKDOWN_SUGGEST_SERVICE_HOURS) out.push('BREAKDOWN_SUGGEST_SERVICE')
@@ -126,15 +135,18 @@ export async function createTimesheet(req: PayloadRequest, input: TimesheetInput
   const project = await requireReportableProject(req, input.projectId, TYPE)
   const unit = await requireUnit(req, input.unitId, project.company)
   validation(timesheetErrors(input))
+  const withHm = hasHm(input)
+  const photoIds = typeof input.hmPhotoId === 'number' ? [input.hmPhotoId] : []
+  if (withHm && photoIds.length === 0) validation([{ path: 'hmPhotoId', message: HM_PHOTO_REQUIRED }])
   const { today } = await companyDay(req, project.company, timing.time)
-  checkReportDate(input.reportDate, today, 'reportDate')
+  checkReportDate(input.reportDate, today, 'reportDate', { unlimitedBackdate: mayBackdateTimesheet(req, project) })
   const contract = await activeContractOn(req, project.company, project.id, unit.id, input.reportDate)
   if (contract === null) fail(409, 'NOT_IN_CONTRACT', `Unit tidak ada di kontrak aktif project ini pada ${input.reportDate}.`, 'unitId')
   if ((await existingOn(req, project.company, unit.id, input.reportDate)) !== null) {
     fail(409, 'DUPLICATE_DATE', `Timesheet unit ini untuk ${input.reportDate} sudah ada (satu timesheet per unit per tanggal; koreksi lewat edit/koreksi).`, 'reportDate')
   }
-  await checkPhotos(req, TYPE, [input.hmPhotoId], 0)
-  const prevEnd = await previousTimesheetEnd(req, unit.id, project.company, input.reportDate)
+  if (photoIds.length > 0) await checkPhotos(req, TYPE, photoIds, 0)
+  const prevEnd = withHm ? await previousTimesheetEnd(req, unit.id, project.company, input.reportDate) : null
   const base = [...(timing.flags ?? [])]
   if (input.reportDate < today) base.push('BACKDATED')
   const doc = await createDoc<TimesheetDoc>(req, TYPE, {
@@ -143,8 +155,8 @@ export async function createTimesheet(req: PayloadRequest, input: TimesheetInput
     contractUnit: contract,
     reportDate: input.reportDate,
     reporter: uid!,
-    hmStart: round2(input.hmStart),
-    hmEnd: round2(input.hmEnd),
+    hmStart: withHm ? round2(input.hmStart!) : null,
+    hmEnd: withHm ? round2(input.hmEnd!) : null,
     workHours: round2(input.workHours),
     standbyHours: round2(input.standbyHours ?? 0),
     breakdownHours: round2(input.breakdownHours ?? 0),
@@ -153,26 +165,26 @@ export async function createTimesheet(req: PayloadRequest, input: TimesheetInput
     operatorName: clean(input.operatorName),
     location: clean(input.location),
     notes: clean(input.notes),
-    photoCount: 1,
+    photoCount: photoIds.length,
     receivedAt: new Date().toISOString(),
     editableUntil: new Date(Date.now() + 24 * 3_600_000).toISOString(),
     deviceTime: timing.deviceTime ? new Date(timing.deviceTime).toISOString() : null,
     timeTrust: timing.timeTrust,
     offline: timing.offline,
     source: requestMeta(req).source === 'apk' ? 'apk' : 'web',
-    flags: flagsFor(base, input.hmStart, prevEnd, input.breakdownHours ?? 0),
+    flags: flagsFor(base, withHm ? input.hmStart! : null, prevEnd, input.breakdownHours ?? 0),
     syncRev: 1,
     clientUuid: input.clientUuid ?? null,
   })
-  await claimPhotos(req, TYPE, doc.id, [input.hmPhotoId])
+  await claimPhotos(req, TYPE, doc.id, photoIds)
   await refreshUnit(req, unit.id, project.company)
   return { doc: (await loadRaw<TimesheetDoc>(req, TYPE, doc.id))!, created: true }
 }
 
 async function applyPatch(req: PayloadRequest, doc: TimesheetDoc, patch: TimesheetPatch, mode: 'edit' | 'correction', reason: string | undefined): Promise<TimesheetDoc> {
   const merged = {
-    hmStart: patch.hmStart ?? Number(doc.hmStart),
-    hmEnd: patch.hmEnd ?? Number(doc.hmEnd),
+    hmStart: patch.hmStart !== undefined ? patch.hmStart : num(doc.hmStart),
+    hmEnd: patch.hmEnd !== undefined ? patch.hmEnd : num(doc.hmEnd),
     workHours: patch.workHours ?? Number(doc.workHours),
     standbyHours: patch.standbyHours ?? num(doc.standbyHours),
     breakdownHours: patch.breakdownHours ?? num(doc.breakdownHours),
@@ -180,6 +192,12 @@ async function applyPatch(req: PayloadRequest, doc: TimesheetDoc, patch: Timeshe
     fuelLiters: patch.fuelLiters !== undefined ? patch.fuelLiters : num(doc.fuelLiters),
   }
   validation(timesheetErrors(merged))
+  // D2410: the HM photo is required with HM; a timesheet without one may get it on an edit (never replaced)
+  const stored = await photoIdsOf(req, TYPE, doc.id)
+  const addPhoto = typeof patch.hmPhotoId === 'number' && !stored.includes(patch.hmPhotoId) ? patch.hmPhotoId : null
+  if (addPhoto !== null && stored.length > 0) fail(400, 'PHOTO_LIMIT', 'Foto meter HM sudah tersimpan dan tidak dapat diganti.', 'hmPhotoId')
+  if (hasHm(merged) && stored.length === 0 && addPhoto === null) validation([{ path: 'hmPhotoId', message: HM_PHOTO_REQUIRED }])
+  if (addPhoto !== null) await checkPhotos(req, TYPE, [addPhoto], 0)
   const data: Record<string, unknown> = {}
   const set = (k: string, v: unknown, cur: unknown) => {
     if (v !== undefined && JSON.stringify(v ?? null) !== JSON.stringify(cur ?? null)) data[k] = v
@@ -195,11 +213,13 @@ async function applyPatch(req: PayloadRequest, doc: TimesheetDoc, patch: Timeshe
   set('operatorName', patch.operatorName === undefined ? undefined : clean(patch.operatorName), doc.operatorName)
   set('location', patch.location === undefined ? undefined : clean(patch.location), doc.location)
   set('notes', patch.notes === undefined ? undefined : clean(patch.notes), doc.notes)
+  if (addPhoto !== null) data.photoCount = 1
   if (Object.keys(data).length === 0) return doc
   const company = relId(doc.company)!
   const unitId = relId(doc.unit)!
-  const prevEnd = await previousTimesheetEnd(req, unitId, company, doc.reportDate)
-  const flags = flagsFor(flagsOf(doc), merged.hmStart, prevEnd, merged.breakdownHours ?? 0)
+  const withHm = hasHm(merged)
+  const prevEnd = withHm ? await previousTimesheetEnd(req, unitId, company, doc.reportDate) : null
+  const flags = flagsFor(flagsOf(doc), withHm ? merged.hmStart! : null, prevEnd, merged.breakdownHours ?? 0)
   data.flags = mode === 'correction' ? [...new Set([...flags, 'CORRECTED'])] : flags
   data.syncRev = revOf(doc) + 1
   if (mode === 'correction') {
@@ -209,6 +229,7 @@ async function applyPatch(req: PayloadRequest, doc: TimesheetDoc, patch: Timeshe
   } else {
     await writeDoc(req, TYPE, doc.id, data, reason)
   }
+  if (addPhoto !== null) await claimPhotos(req, TYPE, doc.id, [addPhoto])
   await refreshUnit(req, unitId, company)
   return (await loadRaw<TimesheetDoc>(req, TYPE, doc.id))!
 }
@@ -237,8 +258,8 @@ export async function timesheetDtos(req: PayloadRequest, docs: readonly Timeshee
   const n = await namesOf(req, docs)
   const ph = await photosOf(req, TYPE, docs.map((d) => d.id))
   return docs.map((d) => {
-    const hmStart = Number(d.hmStart)
-    const hmEnd = Number(d.hmEnd)
+    const hmStart = num(d.hmStart)
+    const hmEnd = num(d.hmEnd)
     const breakdown = num(d.breakdownHours) ?? 0
     const photo = ph.get(d.id)?.[0]
     return {
@@ -252,7 +273,7 @@ export async function timesheetDtos(req: PayloadRequest, docs: readonly Timeshee
       reporter: userRef(n, d.reporter)!,
       hmStart,
       hmEnd,
-      hmUsed: round2(hmEnd - hmStart),
+      hmUsed: hmStart !== null && hmEnd !== null ? round2(hmEnd - hmStart) : null,
       workHours: Number(d.workHours),
       standbyHours: num(d.standbyHours) ?? 0,
       breakdownHours: breakdown,

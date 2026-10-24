@@ -5,7 +5,7 @@ import { z } from 'zod'
  * Pure module (bundled by scripts/gen-openapi.mjs).
  */
 const id = z.number().int()
-const role = z.enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator'])
+const role = z.enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator', 'pk-admin-staff'])
 
 export const MembershipMatrixQuery = z
   .object({

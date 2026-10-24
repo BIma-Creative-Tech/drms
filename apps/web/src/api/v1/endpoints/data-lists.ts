@@ -66,7 +66,6 @@ export const DATA_COLLECTIONS = [
   'vehicles',
   'vendors',
   'vendor-bank-accounts',
-  'sites',
   'media-receipts',
   'media-transfer-proofs',
   'media-selfies',

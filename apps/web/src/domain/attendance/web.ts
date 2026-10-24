@@ -6,7 +6,7 @@ import { attendanceMonth } from '@/domain/reports/attendance-report'
 import { companyScopeSql, idList, inList } from '@/domain/reports/scope'
 import { getRequestTx } from '@/lib/tx'
 
-import { attendanceContext, attendanceScope, employeeCompanySql, fullCompanies, narrowAttScope, narrowAttToCompanies, narrowAttToSite, teamMembers, type AttScope } from './queries'
+import { attendanceContext, attendanceScope, employeeCompanySql, fullCompanies, narrowAttScope, narrowAttToCompanies, teamMembers, type AttScope } from './queries'
 
 /**
  * E6 web (S2) — read helpers of the admin views (/admin/absensi…). Same scope rules as the
@@ -42,8 +42,8 @@ export async function recapEmployees(req: PayloadRequest, scope: AttScope, from:
   return [...out.entries()].map(([id, v]) => ({ id, ...v })).sort((a, b) => a.label.localeCompare(b.label, 'id') || a.id - b.id)
 }
 
-/** Projects / cost centers / sites (ADR 0023) of the scope (filters of "Tim hari ini" and the team grid). */
-export async function scopeLocations(req: PayloadRequest, scope: AttScope): Promise<{ projects: Opt[]; costCenters: Opt[]; sites: Opt[] }> {
+/** Projects / cost centers of the scope (filters of "Tim hari ini" and the team grid). */
+export async function scopeLocations(req: PayloadRequest, scope: AttScope): Promise<{ projects: Opt[]; costCenters: Opt[] }> {
   const full = fullCompanies(scope)
   const teamP = (scope.parts ?? []).filter((p) => !p.all).flatMap((p) => p.projects) // legacy literal: nothing (MC4)
   const teamC = (scope.parts ?? []).filter((p) => !p.all).flatMap((p) => p.costCenters)
@@ -51,12 +51,8 @@ export async function scopeLocations(req: PayloadRequest, scope: AttScope): Prom
   const cw = sql`((${companyScopeSql(sql`cc.company_id`, full)} AND coalesce(cc.active, true)) OR ${inList(sql`cc.id`, teamC)})`
   const p = await rows<{ id: number; code: string; name: string; company_id: number }>(req, sql`SELECT p.id, p.code, p.name, p.company_id FROM projects p WHERE ${pw} ORDER BY p.code`)
   const c = await rows<{ id: number; code: string; name: string; company_id: number }>(req, sql`SELECT cc.id, cc.code, cc.name, cc.company_id FROM cost_centers cc WHERE ${cw} ORDER BY cc.code`)
-  // ADR 0023: office PTs every active site; a PM part its team sites + the sites of its team projects
-  const teamS = (scope.parts ?? []).filter((x) => !x.all).flatMap((x) => x.sites ?? [])
-  const sw = sql`((${companyScopeSql(sql`s.company_id`, full)} AND coalesce(s.active, true)) OR ${inList(sql`s.id`, teamS)} OR s.id IN (SELECT tp.site_id FROM projects tp WHERE ${inList(sql`tp.id`, teamP)}))`
-  const st = await rows<{ id: number; code: string; name: string; company_id: number }>(req, sql`SELECT s.id, s.code, s.name, s.company_id FROM sites s WHERE ${sw} ORDER BY s.code`)
   const opt = (x: { id: number; code: string; name: string; company_id: number }) => ({ id: Number(x.id), label: `${x.code} ${x.name}`, companyId: Number(x.company_id) })
-  return { projects: p.map(opt), costCenters: c.map(opt), sites: st.map(opt) }
+  return { projects: p.map(opt), costCenters: c.map(opt) }
 }
 
 export type CorrectionRow = { id: number; attendanceId: number; kind: 'check_in' | 'check_out'; localDate: string; oldTime: string; newTime: string; reason: string; by: string; at: string }
@@ -93,7 +89,7 @@ export async function selfieState(req: PayloadRequest, attendanceIds: number[]):
 
 /**
  * Can the caller correct (T10) attendance of `employeeId` (of PT `companyId`)? Mirrors corrections.ts
- * (server re-checks): never the own employee (any PT); Admin OF THE EMPLOYEE'S PT, or PM there with a
+ * (server re-checks): never the own employee (any PT); Admin / Admin Staff OF THE EMPLOYEE'S PT, or PM there with a
  * team scope. Without `companyId`: any PT of the scope. A scope without PT parts → false (MC4).
  */
 export function mayCorrect(req: PayloadRequest, scope: AttScope | null, employeeId: number, companyId?: number): boolean {
@@ -101,7 +97,8 @@ export function mayCorrect(req: PayloadRequest, scope: AttScope | null, employee
   if (ownEmployees(req).includes(employeeId) || relId((req.user as { employee?: unknown } | null)?.employee) === employeeId) return false
   if (!scope.parts) return false // legacy literal without PT parts: fail closed (MC4)
   const pts = companyId !== undefined ? [companyId] : scope.parts.map((p) => p.company)
-  return pts.some((c) => hasRole(req, 'pk-admin', c) || (hasRole(req, 'pk-pm', c) && scope.parts!.some((p) => p.company === c && !p.all)))
+  // ADR 0032: Admin Staff of the PT corrects like the Admin
+  return pts.some((c) => hasRole(req, ['pk-admin', 'pk-admin-staff'], c) || (hasRole(req, 'pk-pm', c) && scope.parts!.some((p) => p.company === c && !p.all)))
 }
 
 /** Team month grid (all members of the scope/filters), same aggregation as the M13 report. */
@@ -109,4 +106,4 @@ export async function teamMonth(req: PayloadRequest, scope: AttScope, month: str
   return attendanceMonth(req, scope, month)
 }
 
-export { attendanceContext, attendanceScope, narrowAttScope, narrowAttToCompanies, narrowAttToSite, userId }
+export { attendanceContext, attendanceScope, narrowAttScope, narrowAttToCompanies, userId }

@@ -9,6 +9,7 @@ import '../../../core/format/dates.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/platform/browser.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../records/data/records_providers.dart';
 
@@ -51,8 +52,9 @@ class _AttendanceScheduleScreenState extends ConsumerState<AttendanceScheduleScr
     _reload();
   }
 
-  Future<void> _setDefault(int companyId, int? scheduleId) async {
+  Future<void> _setDefault(int companyId, int? scheduleId, String name) async {
     final t = AppLocalizations.of(context);
+    if (!await confirmAction(context, action: t.scheduleMakeDefault, summary: [name]) || !mounted) return;
     try {
       await ref
           .read(apiClientProvider)
@@ -64,10 +66,10 @@ class _AttendanceScheduleScreenState extends ConsumerState<AttendanceScheduleScr
             ),
             (_) {},
           );
-      if (mounted) showSnack(context, t.scheduleDefaultSet);
       _reload();
+      if (mounted) await showActionResult(context, message: t.scheduleDefaultSet, action: t.scheduleMakeDefault);
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: t.scheduleMakeDefault);
     }
   }
 
@@ -94,14 +96,19 @@ class _AttendanceScheduleScreenState extends ConsumerState<AttendanceScheduleScr
       ),
     );
     if (picked == null || !mounted) return;
+    final name = picked == 0
+        ? t.scheduleUseDefault
+        : '${schedules.where((s) => s['id'] == picked).firstOrNull?['name'] ?? picked}';
+    final summary = ['${emp['code']} ${emp['name']}', name];
+    if (!await confirmAction(context, action: t.scheduleAssignAction, summary: summary) || !mounted) return;
     try {
       await ref.read(recordsApiProvider).update('employees', '${emp['id']}', {
         'workSchedule': picked == 0 ? null : picked,
       }, idempotencyKey: const Uuid().v4());
-      if (mounted) showSnack(context, t.scheduleAssigned);
       _reload();
+      if (mounted) await showActionResult(context, message: t.scheduleAssigned, action: t.scheduleAssignAction);
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: t.scheduleAssignAction);
     }
   }
 
@@ -176,7 +183,7 @@ class _AttendanceScheduleScreenState extends ConsumerState<AttendanceScheduleScr
                       trailing: canWrite && s['id'] != defaultId && s['active'] != false
                           ? TextButton(
                               key: Key('schedule-default-${s['id']}'),
-                              onPressed: () => _setDefault(companyId, _int(s['id'])),
+                              onPressed: () => _setDefault(companyId, _int(s['id']), '${s['name']}'),
                               child: Text(t.scheduleMakeDefault),
                             )
                           : null,

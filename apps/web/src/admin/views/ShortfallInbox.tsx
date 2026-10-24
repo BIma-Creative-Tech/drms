@@ -13,11 +13,16 @@ import { DataTable, EmptyState, rp, StatusPill, VIZ_STYLE } from './viz'
  * QA-06 / ADR 0019 on "Persetujuan": LPJ shortfalls above approved + tolerance waiting for the caller's
  * decision — Direktur "Setujui" (Diketahui) then Finance approval, reject with a reason. Rendered only
  * when there is something to decide (the section stays out of the way otherwise).
+ * DRMS 24/10: the popups name the request / LPJ with the figures (`doc`).
  */
 export async function ShortfallInboxSection({ req }: { req: PayloadRequest }) {
   const { items } = await withReqTransaction(req, () => shortfallInbox(req))
   if (items.length === 0) return null
   const base = (id: number) => `/api/v1/expense-requests/${id}/lpj/shortfall-approval`
+  const doc = (r: (typeof items)[number]) => ({
+    object: `kekurangan ${r.docNo ?? `#${r.requestId}`}`,
+    summary: [['Pengajuan', r.docNo ?? `#${r.requestId}`], ['Judul', r.title], ['LPJ', r.lpjNo], ['Disetujui', rp(r.approvedAmount)], ['Kekurangan', rp(r.shortfall)], ['Total transfer', rp(r.totalAfter)], ['Langkah', r.stepLabel]] as const,
+  })
   return (
     <F3Root name="shortfall-inbox">
       <style>{VIZ_STYLE}</style>
@@ -73,6 +78,7 @@ export async function ShortfallInboxSection({ req }: { req: PayloadRequest }) {
                     confirm={`Setujui kekurangan ${r.docNo ?? `#${r.requestId}`}? Total transfer menjadi ${rp(r.totalAfter)} (disetujui ${rp(r.approvedAmount)}). ${
                       r.step === 'acknowledge' ? 'Berikutnya approval Finance.' : 'Transfer kekurangan dapat dicatat Finance setelah langkah terakhir.'
                     }`}
+                    {...doc(r)}
                     testId={`shortfall-inbox-${r.step}-${r.requestId}`}
                   />
                   <ActionButton
@@ -80,6 +86,7 @@ export async function ShortfallInboxSection({ req }: { req: PayloadRequest }) {
                     label="Tolak"
                     confirm="Transfer kekurangan tidak dapat dicatat. Alasan dikirim ke Finance."
                     prompt={{ field: 'reason', message: 'Alasan penolakan kekurangan (wajib, minimal 3 karakter):', minLength: 3 }}
+                    {...doc(r)}
                     testId={`shortfall-inbox-reject-${r.requestId}`}
                   />
                 </div>

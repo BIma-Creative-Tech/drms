@@ -4,6 +4,7 @@ import React from 'react'
 import { getTwoFactorStatus, isTwoFactorResult, RESULT_MESSAGES } from '@/auth/two-factor'
 import { DEFAULT_TZ } from '@/lib/time'
 
+import { ConfirmSubmit, SecurityResult } from '../components/security/SecurityFeedback'
 import { TwoFactorDisable } from '../components/security/TwoFactorDisable'
 import { Frame } from './frame'
 import { dateTimeId } from './progress-ui'
@@ -32,8 +33,6 @@ const STYLE = `
 .pk-sec .pk-sec__msg[data-tone="ok"] { color: var(--pk-tone-ok-text); }
 .pk-sec .pk-sec__msg[data-tone="warn"] { color: var(--pk-tone-warn-text); }
 .pk-sec .pk-sec__msg[data-tone="bad"] { color: var(--pk-tone-bad-text); }
-.pk-sec .pk-sec__confirm { flex-basis: 100%; border: 1px solid var(--pk-input); border-radius: var(--style-radius-m); padding: 12px; }
-.pk-sec .pk-sec__confirm p { margin: 0 0 10px; }
 .pk-sec ol.pk-sec__steps { margin: 8px 0 14px; padding-left: 20px; }
 .pk-sec ol.pk-sec__steps li { margin: 2px 0; }
 .pk-sec .pk-btn--danger { background: var(--pk-tone-bad); border-color: var(--pk-tone-bad); color: #FFFFFF; }
@@ -64,6 +63,8 @@ export async function KeamananAkunView(props: AdminViewServerProps) {
         {result ? (
           <div className="pk-sec__msg" data-tone={result.tone} role={result.tone === 'bad' ? 'alert' : 'status'} data-pk-2fa-result={String(raw)}>
             {result.text}
+            {/* DRMS 24/10: the outcome also as the result popup */}
+            <SecurityResult ok={result.tone === 'ok'} title={raw === 'enabled' ? 'Berhasil: aktifkan 2FA' : raw === 'disabled' ? 'Berhasil: nonaktifkan 2FA' : raw === 'cancelled' ? 'Dibatalkan' : 'Gagal: ubah 2FA'} message={result.text} />
           </div>
         ) : null}
 
@@ -105,9 +106,9 @@ export async function KeamananAkunView(props: AdminViewServerProps) {
               </ol>
               <form method="post" action="/auth/account-action" data-pk-2fa-enable>
                 <input type="hidden" name="action" value="enable" />
-                <button type="submit" className="pk-btn primary">
+                <ConfirmSubmit className="pk-btn primary" action="Aktifkan 2FA" description="Anda diminta login ulang lalu memindai kode QR dengan aplikasi autentikator.">
                   Aktifkan 2FA
-                </button>
+                </ConfirmSubmit>
               </form>
             </>
           ) : (
@@ -115,9 +116,9 @@ export async function KeamananAkunView(props: AdminViewServerProps) {
               <p>Status 2FA tidak dapat diperiksa saat ini (server login tidak terjangkau atau belum dikonfigurasi). Anda tetap dapat mengaktifkan 2FA; menonaktifkan hanya bisa setelah status terbaca.</p>
               <form method="post" action="/auth/account-action" data-pk-2fa-enable>
                 <input type="hidden" name="action" value="enable" />
-                <button type="submit" className="pk-btn">
+                <ConfirmSubmit className="pk-btn" action="Aktifkan 2FA" description="Anda diminta login ulang lalu memindai kode QR dengan aplikasi autentikator.">
                   Aktifkan 2FA
-                </button>
+                </ConfirmSubmit>
               </form>
             </>
           )}

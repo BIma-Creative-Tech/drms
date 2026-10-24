@@ -98,7 +98,7 @@ class _FakeLoansApi extends Fake implements IntercompanyLoansApi {
   }
 }
 
-/// The lender's accounts: a head-office bank account and a site petty-cash account (not in the fund pool).
+/// The lender's accounts: a head-office bank account and a legacy site petty-cash account (DRMS 24/10: in the fund pool too).
 class _LenderFinanceApi extends FakeFinanceApi {
   @override
   Future<List<CashAccountOption>> cashAccounts(int? companyId) async => const [
@@ -122,10 +122,7 @@ void main() {
       );
       expect(find.byKey(const Key('fund-check')), findsOneWidget);
       expect(_text(tester, 'fund-title'), 'Ketersediaan dana PT DRMS');
-      expect(
-        _text(tester, 'fund-balance'),
-        'Rp 5.000.000 (2 akun, tanpa akun site — 1 akun site Rp 750.000 tidak dihitung)',
-      );
+      expect(_text(tester, 'fund-balance'), 'Rp 5.000.000 (2 akun)');
       expect(_text(tester, 'fund-commitments'), '− Rp 4.000.000');
       expect(_text(tester, 'fund-available'), 'Rp 1.000.000');
       expect(_text(tester, 'fund-needed'), 'Rp 1.447.500');
@@ -519,7 +516,8 @@ void main() {
       await tester.tap(find.byKey(const Key('icloan-confirm')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('icloan-error')), findsOneWidget);
-      expect(find.textContaining('Dana tersedia PT LAS Rp 300.000 — kurang untuk pinjaman'), findsOneWidget);
+      // D2410: inline and in the "Gagal" popup
+      expect(find.textContaining('Dana tersedia PT LAS Rp 300.000 — kurang untuk pinjaman'), findsNWidgets(2));
     });
 
     testWidgets('borrower without a receiving account: explained, submit disabled', (tester) async {
@@ -614,7 +612,9 @@ void main() {
       expect(find.byKey(const Key('icloan-queue')), findsNothing);
     });
 
-    testWidgets('form: head-office accounts only, overdraft confirmation, then the KK / KM numbers', (tester) async {
+    testWidgets('form: every active account (no site exclusion), overdraft confirmation, then the KK / KM numbers', (
+      tester,
+    ) async {
       final loans = _FakeLoansApi()..refuse.add(problem409('CASH_OVERDRAFT_CONFIRM_REQUIRED'));
       final finance = _LenderFinanceApi();
       final loan = IcLoan.fromJson(icLoanDetailJson());
@@ -641,10 +641,10 @@ void main() {
         'Transfer Rp 500.000 dari PT LAS ke rekening penerimaan antar-PT PT DRMS',
       );
       expect(_text(tester, 'icloan-destination'), 'Rekening tujuan: Mandiri · ••••0123 · PT Contoh Dirgantara');
-      // the site account is not offered
+      // DRMS 24/10: a (legacy) site account is offered too
       await tester.tap(find.byKey(const Key('icloan-cash-account')));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Kas Kecil Site'), findsNothing);
+      expect(find.textContaining('Kas Kecil Site'), findsWidgets);
       expect(find.textContaining('Bank Operasional LAS'), findsWidgets);
       await tester.tap(find.text('Batal').last);
       await tester.pumpAndSettle();
@@ -668,6 +668,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(_button('icloan-disburse-submit'));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
 
       // 409 CASH_OVERDRAFT_CONFIRM_REQUIRED → "Tetap simpan" → second call with confirmOverdraft
       expect(find.byKey(const Key('icloan-override-confirm')), findsOneWidget);
@@ -725,8 +726,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(_button('icloan-disburse-submit'));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       expect(find.byKey(const Key('icloan-disburse-error')), findsOneWidget);
-      expect(find.textContaining('tutup buku s/d 2026-10-31'), findsOneWidget);
+      expect(find.textContaining('tutup buku s/d 2026-10-31'), findsNWidgets(2));
       expect(find.byType(IcLoanDisburseScreen), findsOneWidget);
     });
   });

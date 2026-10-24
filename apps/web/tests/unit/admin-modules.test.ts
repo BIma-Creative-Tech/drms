@@ -29,7 +29,8 @@ beforeAll(async () => {
   config = await (await import('@/payload.config')).default
 })
 
-const INTERNAL = (slug: string) => slug.startsWith('payload-')
+// ADR 0032: `sites` is a hidden legacy collection (no menu, no create) — kept for history / old APKs only
+const INTERNAL = (slug: string) => slug.startsWith('payload-') || slug === 'sites'
 
 /** Same rule as @payloadcms/ui getVisibleEntities (3.90.1): hidden fn(user) / boolean. */
 function visibleFor(user: unknown) {
@@ -70,7 +71,9 @@ async function modulesFor(roles: Role[], badge = 0, fieldReports = false): Promi
   const user = withCompanyContext({ id: 42, collection: 'users', email: 'uji@contoh.test', name: 'Uji Coba' }, [{ company: 1, roles, employee: null }], null, roles.includes('pk-admin')) as unknown as TypedUser
   // FR1: companies.fieldReportsEnabled of the selected PT (loadFeatures); without `find` → off
   const find = fieldReports ? { find: async () => ({ docs: [{ id: 1 }] }) } : {}
-  const payload = { config, count: async () => ({ totalDocs: badge }), ...find } as unknown as Payload
+  // DRMS 24/10: loan transfer orders (also in the transfer badge) are counted in d2410-pinjaman.test.ts — 0 here
+  const count = async (a: { collection: string }) => ({ totalDocs: a.collection.startsWith('project-loan') ? 0 : badge })
+  const payload = { config, count, ...find } as unknown as Payload
   return loadModules({ payload, user, permissions: (await readPermissions({ id: 42, roles })) as never, visibleEntities: visibleFor(user) as never })
 }
 

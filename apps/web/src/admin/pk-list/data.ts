@@ -1,16 +1,19 @@
+import { sql } from '@payloadcms/db-postgres'
 import type { Payload, SanitizedCollectionConfig, SanitizedFieldsPermissions, TypedUser, Where } from 'payload'
 
 import { companyContextOf, relId } from '@/access/roles'
 import { pageOfFind, type PageOf } from '@/admin/list-query'
 import { companyLabels } from '@/admin/components/companies/labels'
 import { spValue } from '@/admin/list-query'
+import { PENDING_OWNER } from '@/domain/expense/status-filter'
+import { ownerStepSql } from '@/domain/expense/status-filter-sql'
 import { mayShowDeleted } from '@/domain/soft-delete/collection'
 import { softDeleteEntry } from '@/domain/soft-delete/registry'
 import { ONLY_DELETED, WITH_DELETED } from '@/domain/soft-delete/where'
 import { ptOptions } from '@/lib/pt-options'
 
 import { buildPkListConfig, topLevelFields, type PkListConfig } from './config'
-import { activeColumns, companyScope, parsePkQuery, pkWhere, type PkQuery } from './query'
+import { activeColumns, companyScope, parsePkQuery, pkWhere, type PkQuery, type VirtualWheres } from './query'
 
 /**
  * DRMS 13/10 Umum #3–#8: the data of one PkListView request — config, parsed URL, `where`, one page of rows and
@@ -117,6 +120,25 @@ async function relationshipOptions(payload: Payload, user: TypedUser | null | un
   }
 }
 
+/**
+ * D2410 (point 8): the virtual status values of Keuangan › Pengajuan Biaya — `pending_owner` = the requests waiting for
+ * the Owner (status-filter-sql.ts), `pending_approval` = the other waiting ones. Resolved to ids (only requests IN
+ * approval, a small set) within the caller's PT selection; the list query then applies the caller's access as usual.
+ */
+export async function expenseStatusVirtual(payload: Payload, values: readonly string[], selected: readonly number[] | null): Promise<VirtualWheres | undefined> {
+  if (!values.includes(PENDING_OWNER) && !values.includes('pending_approval')) return undefined
+  const scope = selected && selected.length ? sql` AND er.company_id IN (${sql.join(selected.map((id) => sql`${id}`), sql`, `)})` : sql``
+  const r = (await payload.db.drizzle.execute(sql`SELECT er.id FROM expense_requests er WHERE ${ownerStepSql('er')}${scope} ORDER BY er.id`)) as unknown as { rows: Array<{ id: number }> }
+  const ids = r.rows.map((x) => Number(x.id))
+  return {
+    status: {
+      // no id is 0 → an empty set matches nothing
+      [PENDING_OWNER]: { id: { in: ids.length ? ids : [0] } },
+      pending_approval: ids.length ? { and: [{ status: { equals: 'pending_approval' } }, { id: { not_in: ids } }] } : { status: { equals: 'pending_approval' } },
+    },
+  }
+}
+
 export type LoadArgs = {
   payload: Payload
   user: TypedUser | null | undefined
@@ -133,7 +155,8 @@ export async function loadPkList({ payload, user, collection, searchParams, colu
   const query = parsePkQuery(searchParams, cfg)
   const selected = companyContextOf(user)?.selected ?? null
   const deleted = deletedModeOf(collection.slug, user, searchParams)
-  const base = pkWhere(query, cfg, { selected, readable })
+  const virtual = collection.slug === 'expense-requests' ? await expenseStatusVirtual(payload, query.filters.status ?? [], selected) : undefined
+  const base = pkWhere(query, cfg, { selected, readable, virtual })
   // D1610: an explicit isDeleted condition — kept by the central read rule for Admins only (else ignored)
   const deletedWhere = deleted.mode === 'tampil' ? WITH_DELETED : deleted.mode === 'hanya' ? ONLY_DELETED : null
   const where: Where = deletedWhere ? (Object.keys(base).length ? { and: [base, deletedWhere] } : deletedWhere) : base

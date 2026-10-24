@@ -3,8 +3,8 @@
  * unit-tested, bundled by the OpenAPI generator).
  *
  * Dana tersedia(PT) = Saldo dana(PT) − Komitmen(PT) (§1, owner 2026-10-14 "setuju" on every default):
- * - Saldo dana = Σ balance of the PT's ACTIVE cash / bank accounts WITHOUT a site (every site-flagged account — kas kecil
- *   and rekening kantor cabang — is excluded);
+ * - Saldo dana = Σ balance of the PT's ACTIVE cash / bank accounts (DRMS 24/10, user decision: every project is mapped
+ *   to a cash account — the old site exclusion is gone, migration 20261024_500000 cleared the legacy site flags);
  * - Komitmen = approved-but-not-transferred requests + verified, unsettled LPJ shortfalls + inter-PT loans instructed with
  *   the PT as lender and not yet disbursed.
  * The SQL functions `pk_fund_balance` / `pk_fund_commitments` / `pk_fund_available` (migration 20261015_100200) are the

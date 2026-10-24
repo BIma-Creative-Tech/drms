@@ -36,8 +36,8 @@ oleh Owner itu sendiri.
 Bila Admin grup menyalakan **"Cek dana saat persetujuan"** untuk sebuah PT, persetujuan terakhir Anda (dan pengajuan Anda
 sendiri saat **Kirim**) **ditolak bila dana PT tidak cukup**:
 
-- **Dana tersedia** = saldo semua akun kas/bank PT yang **tidak** ditandai site (kas kecil / rekening cabang tidak
-  dihitung) − **komitmen**: pengajuan yang sudah disetujui tetapi belum ditransfer, kekurangan LPJ yang belum dibayar,
+- **Dana tersedia** = saldo semua akun kas/bank PT — kecuali akun yang dulu ditandai site (kas kecil / rekening cabang;
+  site dihapus 24 Okt 2026, keputusan apakah akun itu dihitung menunggu Anda, ADR 0032 §4) − **komitmen**: pengajuan yang sudah disetujui tetapi belum ditransfer, kekurangan LPJ yang belum dibayar,
   dan perintah pinjaman antar-PT dari PT ini yang belum dicairkan. Pengajuan yang masih menunggu persetujuan belum
   dihitung — yang disetujui lebih dulu memakai dana lebih dulu.
 - **Pusat biaya dulu, lalu PT** (sejak 0.19.1). Untuk project yang sudah dipetakan, panel menampilkan dulu
@@ -66,6 +66,16 @@ sendiri saat **Kirim**) **ditolak bila dana PT tidak cukup**:
 - Dashboard Direktur/Owner: kartu **"Dana tersedia & pinjaman antar-PT"** (dana tersedia, piutang / hutang antar-PT,
   terlambat per PT).
 
-## 3. Yang tetap hanya Direktur
+## 3. Pinjaman antar project: level Owner (sejak 24 Okt 2026)
 
-**Addendum RAB** dan **pinjaman antar project** tetap diputuskan Direktur; Anda dapat melihatnya.
+- Pinjaman antar project (diajukan PM project peminjam atau Finance) dan **pengembalian pinjaman dana** disetujui
+  **Direktur lalu Anda (Owner)**. Setelah Direktur menyetujui, item muncul di **Persetujuan → Pinjaman antar project**
+  (APK: Persetujuan) dengan langkah "Persetujuan Owner": **Setujui** atau **Tolak** (alasan wajib).
+- Setelah Anda menyetujui, pinjaman / pengembalian dana masuk **Antrian Transfer** Finance; Finance mengeksekusi
+  transfernya (kas keluar / masuk di pusat biaya masing-masing project).
+- Anda tidak memutuskan level Direktur, dan tidak memutuskan pengajuan yang Anda ajukan sendiri. Bila PT tidak punya
+  Owner aktif, pengajuan pinjaman ditolak.
+
+## 3a. Yang tetap hanya Direktur
+
+**Addendum RAB** tetap diputuskan Direktur; Anda dapat melihatnya.

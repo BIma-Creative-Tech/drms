@@ -205,7 +205,7 @@ describe('MC3 — GET /me companies[] + deprecated single-PT fields', () => {
     // FR1: field-report capabilities stay false while no selected PT has companies.fieldReportsEnabled
     // ADR 0028: intercompanyPayment over the selected PTs (PM in CS6, Finance in CS7 → may file)
     // ADR 0029: + the inter-PT loan / fund-check hints (Finance in CS7 → disburse; no Owner role; no PT with the check on)
-    expect(me.capabilities).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false, dailyReportCreate: false, intercompanyPayment: true, instructIntercompanyLoan: false, disburseIntercompanyLoan: true, fundCheckEnabled: false })
+    expect(me.capabilities).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false, dailyReportCreate: false, intercompanyPayment: true, instructIntercompanyLoan: false, disburseIntercompanyLoan: true, fundCheckEnabled: false, attendanceOnBehalf: true, attendanceAdminStaff: false })
     expect(me.employee.id).toBe(X.empTriA)
     expect(me.settings.shortCode).toBe('DRMS')
     // narrowed read selection: companies[] still lists every membership, `selected` + legacy follow the selection
@@ -357,6 +357,8 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'PATCH /attendance/default-schedule': 'named-pt', // body companyId; companies update access in that PT
   // DRMS 13/10 A2: own eligible check-in locations (own employee per selected PT; `?company=` narrows)
   'GET /attendance/locations': 'selection',
+  // ADR 0032: Admin Staff on-behalf options of the selected PTs (?company= narrows)
+  'GET /attendance/on-behalf/options': 'selection',
   'GET /projects/progress': 'selection',
   'GET /progress-reports': 'selection',
   'GET /budget-addenda': 'selection',
@@ -368,6 +370,7 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /expense-requests/:id/submit': 'document',
   'POST /expense-requests/:id/withdraw': 'document',
   'POST /expense-requests/:id/cancel': 'document',
+  'POST /expense-requests/:id/delete-draft': 'document',
   'POST /expense-requests/:id/resubmit': 'document',
   'POST /expense-requests/:id/duplicate': 'document', // DRMS 13/10 Persetujuan #12: read the source + create role IN its PT
   'POST /expense-requests/:id/acknowledge': 'document',
@@ -427,6 +430,8 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   // owner decision 2026-10-09: web self check-in/out — PT of the referenced project / cost center, own employee there
   'POST /attendance/check-in': 'named-pt',
   'POST /attendance/check-out': 'named-pt',
+  // ADR 0032: the PT of the named location / employee
+  'POST /attendance/on-behalf': 'named-pt',
   // FR1 (ADR 0020): field reports per project kind
   'GET /service-reports': 'selection',
   'GET /unit-timesheets': 'selection',
@@ -481,6 +486,13 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /project-loans/:id/reject': 'document',
   'POST /project-loans/:id/repayments': 'document',
   'POST /project-loans/:id/repayments/:rid/void': 'document',
+  // 2026-10-24 (#11/#12): transfer orders (selection) + execution / repayment request steps (one loan document)
+  'GET /project-loans/transfer-orders': 'selection',
+  'POST /project-loans/:id/execute': 'document',
+  'POST /project-loans/:id/repayments/:rid/approve': 'document',
+  'POST /project-loans/:id/repayments/:rid/reject': 'document',
+  'POST /project-loans/:id/repayments/:rid/cancel': 'document',
+  'POST /project-loans/:id/repayments/:rid/execute': 'document',
   'POST /project-loans': 'named-pt',
   // D1610 (ADR 0030): row actions — one document, read within the selection, role checked IN its PT
   'GET /records/:collection/:id/delete-check': 'document',

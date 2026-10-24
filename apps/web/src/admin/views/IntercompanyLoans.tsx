@@ -3,6 +3,7 @@ import Link from 'next/link'
 import React from 'react'
 
 import { companiesWithRole, hasRole, hasRoleAny, membershipsOf } from '@/access/roles'
+import { DocSummaryProvider } from '@/admin/components/feedback/DocContext'
 import { IcLoanInstructForm } from '@/admin/components/icloans/IcLoanInstructForm'
 import { IcLoanMoneyForm } from '@/admin/components/icloans/IcLoanMoneyForm'
 import { ReasonAction } from '@/admin/components/kas/ReasonAction'
@@ -60,6 +61,11 @@ function StatusCell({ l }: { l: Pick<IcLoanSummary, 'status' | 'statusLabel' | '
 }
 
 const pt = (c: IcLoanSummary['lender']) => (c ? c.shortCode : '—')
+/** DRMS 24/10: the inter-PT loan as named in the popups (cancel, disburse, repay, void). */
+const icLoanDoc = (l: Pick<IcLoanSummary, 'docNo' | 'lender' | 'borrower' | 'amount' | 'dueDate'>) => ({
+  object: l.docNo,
+  summary: [['Pinjaman antar-PT', l.docNo], ['PT pemberi', pt(l.lender)], ['PT peminjam', pt(l.borrower)], ['Nilai', rp(l.amount)], ['Jatuh tempo', dateId(l.dueDate)]] as const,
+})
 
 function loanCols(): Col<IcLoanSummary>[] {
   return [
@@ -226,11 +232,11 @@ export async function IcLoanNew(props: AdminViewServerProps) {
 
 // ================================================================ detail
 
-/** Active accounts WITHOUT a site of PT `company` the caller reads (source of a loan movement). */
+/** Active accounts of PT `company` the caller reads (source of a loan movement; DRMS 24/10: no site exclusion). */
 async function poolAccounts(req: PayloadRequest, company: number): Promise<Array<{ id: number; name: string }>> {
   const res = await req.payload.find({
     collection: 'cash-accounts',
-    where: { and: [{ company: { equals: company } }, { active: { not_equals: false } }, { site: { exists: false } }] },
+    where: { and: [{ company: { equals: company } }, { active: { not_equals: false } }] },
     depth: 0,
     pagination: false,
     sort: 'name',
@@ -319,6 +325,7 @@ export async function IcLoanDetail(props: AdminViewServerProps) {
             title={`Void ${m.label.toLowerCase()}?`}
             description={<>KK di PT {borrower} dan KM di PT {lender} dibalik; sisa pinjaman bertambah lagi.</>}
             confirmLabel="Void pengembalian"
+            summary={[...icLoanDoc(l).summary, ['Pengembalian', m.label], ['Nominal pengembalian', rp(m.amount)]]}
             testId={`icloan-void-repayment-${m.id}`}
           />
         ) : (
@@ -326,7 +333,7 @@ export async function IcLoanDetail(props: AdminViewServerProps) {
         ),
     },
   ]
-  return (
+  const page = (
     <Frame props={props} name="pinjaman-antar-pt-detail">
       <style>{STYLE}</style>
       <DashHead title={l.docNo} note={`PT ${lender} → PT ${borrower} · diperintahkan ${l.createdBy.name ?? '—'} · ${dateId(l.instructionDate)}`}>
@@ -458,6 +465,8 @@ export async function IcLoanDetail(props: AdminViewServerProps) {
       </Bento>
     </Frame>
   )
+  // DRMS 24/10: every action of the page names the loan in its popups
+  return <DocSummaryProvider {...icLoanDoc(l)}>{page}</DocSummaryProvider>
 }
 
 // ================================================================ transfer queue section (lender Finance)
@@ -493,7 +502,9 @@ export async function IcLoanQueueSection({ req }: { req: PayloadRequest }) {
               Tujuan: {it.destination ? `${it.destination.bankName ?? ''} · ${it.destination.accountHolder} · ${it.destination.accountNoMasked ?? ''}` : 'PT peminjam belum menetapkan rekening penerimaan antar-PT'} · {it.reason}
             </p>
             {it.canDisburse && it.lender && hasRole(req, 'pk-finance', it.lender.id) ? (
-              <IcLoanMoneyForm url={`/api/v1/intercompany-loans/${it.id}/disburse`} submitLabel="Catat pencairan" accounts={d.accounts.get(it.lender.id) ?? []} amountText={`Transfer ${rp(it.amount)}`} testId={`icloan-disburse-${it.id}`} />
+              <DocSummaryProvider {...icLoanDoc(it)}>
+                <IcLoanMoneyForm url={`/api/v1/intercompany-loans/${it.id}/disburse`} submitLabel="Catat pencairan" accounts={d.accounts.get(it.lender.id) ?? []} amountText={`Transfer ${rp(it.amount)}`} testId={`icloan-disburse-${it.id}`} />
+              </DocSummaryProvider>
             ) : it.g1Note ? (
               <p className="pk-note" style={{ margin: 0 }}>
                 <StatusPill tone="warn" label="G1" /> {it.g1Note}

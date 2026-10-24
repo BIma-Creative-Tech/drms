@@ -117,7 +117,7 @@ const ptCode = (pt: PtView, id: number | null | undefined) => pt.ref(id)?.shortC
  */
 const lookupsOf = (lk: Lookups, company: number | undefined, tag?: { pt: PtView; multi: boolean }): Lookups => {
   const f = <T extends Option>(l: T[]) => ptOptions(l, { code: (id) => (tag ? ptCode(tag.pt, id) : `#${id}`), company, multi: tag?.multi ?? false })
-  return { accounts: f(lk.accounts), sites: f(lk.sites), projects: f(lk.projects), costCenters: f(lk.costCenters), categories: f(lk.categories), sources: f(lk.sources), vehicles: f(lk.vehicles) }
+  return { accounts: f(lk.accounts), projects: f(lk.projects), costCenters: f(lk.costCenters), categories: f(lk.categories), sources: f(lk.sources), vehicles: f(lk.vehicles) }
 }
 const lockText = (pt: PtView, locks: ReadonlyArray<{ companyId: number; lockDate: string | null }>) =>
   locks.length === 1
@@ -232,15 +232,12 @@ export async function KasBook(props: AdminViewServerProps) {
   const lk = lookupsOf(d.lk, q.pt, { pt, multi })
   const lockOf = (c: number | null) => locks.find((l) => l.companyId === c)?.lockDate ?? null
   const writeIn = (c: number | null) => c !== null && acc.write.includes(c)
-  // ADR 0023 (Q-S7): with a site filter the totals / tiles cover the accounts flagged with that site
-  const siteAccounts = q.site ? new Set(d.lk.accounts.filter((a) => a.siteId === q.site).map((a) => a.id)) : null
-  const inSite = (a: { cashAccountId: number }) => !siteAccounts || siteAccounts.has(a.cashAccountId)
-  const total = bal.filter(inSite).reduce((s, a) => s + a.balance, 0)
+  const total = bal.reduce((s, a) => s + a.balance, 0)
   // combined balance = Σ per PT (mc2-contract §4: show both)
-  const byPt = shown.map((c) => ({ companyId: c, total: bal.filter((a) => a.companyId === c && inSite(a)).reduce((s, a) => s + a.balance, 0) }))
+  const byPt = shown.map((c) => ({ companyId: c, total: bal.filter((a) => a.companyId === c).reduce((s, a) => s + a.balance, 0) }))
   const activeIds = new Set(lk.accounts.filter((a) => a.active).map((a) => a.id))
-  const tiles = bal.filter((a) => (activeIds.has(a.cashAccountId) || a.balance !== 0) && inSite(a))
-  const filtered = Boolean(q.akun || q.periode || q.project || q.pusat || q.arah || q.status || q.sumber || q.pt || q.site || q.q)
+  const tiles = bal.filter((a) => activeIds.has(a.cashAccountId) || a.balance !== 0)
+  const filtered = Boolean(q.akun || q.periode || q.project || q.pusat || q.arah || q.status || q.sumber || q.pt || q.q)
   const flashAcc = flash ? bal.find((a) => a.cashAccountId === relId(flash.cashAccount)) : undefined
   return (
     <Frame props={props} name="kas">
@@ -364,7 +361,6 @@ function FilterBar({ q, lk, filtered, pt, pts }: { q: BookQuery; lk: Lookups; fi
         <input type="search" name="q" defaultValue={q.q ?? ''} placeholder="Nomor atau keterangan…" maxLength={100} autoComplete="off" data-pk-search="kas" />
       </label>
       {pts.length > 1 ? sel('pt', 'PT', pts.map((c) => ({ id: c, label: `${ptCode(pt, c)} — ${pt.ref(c)?.name ?? ''}` })), q.pt, 'Semua PT') : null}
-      {lk.sites.length ? sel('site', 'Site', lk.sites, q.site, 'Semua site') : null}
       {multi('akun', 'Akun / pusat biaya', ids(lk.accounts), q.akun, 'Semua akun')}
       <label>
         Periode
@@ -576,6 +572,8 @@ function LedgerTable({
                 </>
               }
               confirmLabel="Void transaksi"
+              summary={[['Transaksi', r.entryNo], ['Tanggal', dayMonth(r.entryDate)], ['Arah', r.direction === 'in' ? 'Kas masuk' : 'Kas keluar'], ['Nominal', rp(r.amount)], ['Keterangan', r.description], ['Pengajuan', r.request?.docNo]]}
+              success="Transaksi ditandai Void dan jurnal balik tercatat."
               testId={`void-${r.id}`}
             />
           ) : null}
@@ -630,7 +628,7 @@ function Pager({ q, page, totalPages }: { q: BookQuery; page: number; totalPages
 
 // ================================================================ forms
 
-const emptyLookups: Lookups = { accounts: [], sites: [], projects: [], costCenters: [], categories: [], sources: [], vehicles: [] }
+const emptyLookups: Lookups = { accounts: [], projects: [], costCenters: [], categories: [], sources: [], vehicles: [] }
 
 function formOptions(lk: Lookups, keep: Array<number | null | undefined> = []): CashEntryFormProps['options'] {
   const k = new Set(keep.filter((x): x is number => typeof x === 'number'))
@@ -912,6 +910,8 @@ export async function TutupBuku(props: AdminViewServerProps) {
                 </>
               }
               confirmLabel="Tutup buku"
+              summary={[['Periode', periodLabel(r.period)], ['PT', pt.ref(company)?.name ?? ptCode(pt, company)], ['Transaksi', r.n], ['Kas masuk', rp(r.tin)], ['Kas keluar', rp(r.tout)]]}
+              success={`Transaksi s/d ${dayMonth(periodEnd(r.period))} terkunci.`}
               testId={`close-${r.period}`}
             />
           )
@@ -924,6 +924,8 @@ export async function TutupBuku(props: AdminViewServerProps) {
               title={`Buka kembali ${periodLabel(r.period)}${acc.close.length > 1 ? ` — ${ptCode(pt, company)}` : ''}?`}
               description={<>Periode ini dapat diposting dan dikoreksi lagi sampai ditutup kembali. Alasan wajib dan tercatat di audit log.</>}
               confirmLabel="Buka kembali"
+              summary={[['Periode', periodLabel(r.period)], ['PT', pt.ref(company)?.name ?? ptCode(pt, company)]]}
+              success="Periode dapat diposting dan dikoreksi lagi."
               testId={`reopen-${r.period}`}
             />
           ) : (

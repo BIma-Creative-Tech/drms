@@ -8,6 +8,7 @@ import { partnerFormHref, projectForClientHref } from '@/admin/partner-routes'
 import type { ClientFormDetail, VendorFormDetail } from '@/domain/partners/service'
 
 import { problemText } from '../ActionButton'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle } from '../feedback/feedback'
 import {
   buildBody,
   canManageBanks,
@@ -148,6 +149,23 @@ function PartnerForm({ kind, mode, detail: initial, onSaved, onCancel, initialCo
       setMsg({ tone: 'bad', text: 'Tidak ada yang disimpan — isi alasan perubahan.' })
       return
     }
+    // DRMS 24/10: popup before (name, contacts, accounts, reason) and after — the page and the relationship "+" drawer
+    const noun = kind === 'client' ? 'klien' : 'vendor'
+    const action = mode === 'create' ? `Simpan ${noun} baru` : `Simpan perubahan ${noun}`
+    const who = draft.name.trim() || null
+    const yes = await confirmAction({
+      title: confirmTitle(action, who),
+      summary: [
+        ['Nama', who],
+        ['NPWP', draft.npwp.trim() || null],
+        ['Status', draft.active ? 'Aktif' : 'Nonaktif'],
+        ['Kontak PIC', draft.contacts.length || null],
+        ['Rekening', vendor ? draft.banks.length || null : null],
+        ['Alasan', draft.reason.trim() || null],
+      ],
+      confirmLabel: confirmLabel('simpan'),
+    })
+    if (!yes) return
     setBusy(true)
     setMsg(null)
     setErrors(new Map())
@@ -162,6 +180,7 @@ function PartnerForm({ kind, mode, detail: initial, onSaved, onCancel, initialCo
       })
       const data = (await res.json().catch(() => null)) as { id?: number; detail?: ClientFormDetail | VendorFormDetail } | null
       if (res.ok && data?.detail && typeof data.id === 'number') {
+        showResult({ ok: true, title: successTitle(action, who) })
         if (onSaved) {
           onSaved(data.id, data.detail)
           if (mode === 'update') {
@@ -185,9 +204,11 @@ function PartnerForm({ kind, mode, detail: initial, onSaved, onCancel, initialCo
         setErrors(byKey)
         if (errTab) setTab(errTab)
         setMsg({ tone: 'bad', text: `Tidak ada yang disimpan — ${problemText(data, res.status)}` })
+        showResult({ ok: false, title: failureTitle(action), message: `Tidak ada yang disimpan — ${problemText(data, res.status)}` })
       }
     } catch {
       setMsg({ tone: 'bad', text: 'Gagal menghubungi server. Periksa koneksi lalu coba lagi.' })
+      showResult({ ok: false, title: failureTitle(action), message: 'Gagal menghubungi server. Periksa koneksi lalu coba lagi.' })
     } finally {
       if (!leaving) setBusy(false)
     }

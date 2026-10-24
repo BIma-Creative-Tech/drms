@@ -6,7 +6,7 @@ import type { Detail } from './panel-data'
 
 /**
  * ADR 0029 §2 "Ketersediaan dana PT <code>" on the request page (Finance / Direktur / Owner of the PT, while the request
- * waits for a decision or is the Owner's own Draft): Saldo dana (n akun, tanpa akun site) − Komitmen (expandable list)
+ * waits for a decision or is the Owner's own Draft): Saldo dana (n akun; DRMS 24/10: every active account, no site exclusion) − Komitmen (expandable list)
  * = Dana tersedia; Dibutuhkan = this request; Kurang (red) or "Cukup" (green); the other requests waiting at their final
  * decision; linked inter-PT loans; "Perintahkan pinjaman antar-PT" (Owner, short). Read-only before the final step
  * ("cek akhir di Owner"). The server is the authority: Setujui answers 409 FUND_INSUFFICIENT while short.
@@ -28,10 +28,12 @@ const KIND: Record<'request' | 'shortfall' | 'loan' | 'project_loan', string> = 
   request: 'Pengajuan disetujui, belum ditransfer',
   shortfall: 'Kekurangan LPJ belum dibayar',
   loan: 'Perintah pinjaman (PT ini pemberi), belum dicairkan',
-  project_loan: 'Pinjaman antar project disetujui, belum dicairkan',
+  project_loan: 'Pinjaman antar project disetujui, belum ditransfer',
 }
+/** 2026-10-24 (#12): an approved repayment order of an inter-project loan (kind `project_loan`, id = the loan). */
+const REPAYMENT_ORDER = 'Pengembalian pinjaman antar project disetujui, belum ditransfer'
 
-type Item = { kind: keyof typeof KIND; id: number; docNo: string | null; amount: number }
+type Item = { kind: keyof typeof KIND; id: number; docNo: string | null; amount: number; status?: string }
 
 const itemHref = (c: Item): string =>
   c.kind === 'loan' ? `/admin/pinjaman-antar-pt/detail/${c.id}` : c.kind === 'project_loan' ? `/admin/pinjaman/detail/${c.id}` : `/admin/collections/expense-requests/${c.id}`
@@ -44,7 +46,7 @@ function Items({ items }: { items: Item[] }) {
       <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
         {items.map((c) => (
           <li key={`${c.kind}-${c.id}`} data-pk-commitment={c.kind}>
-            <a href={itemHref(c)}>{c.docNo ?? `#${c.id}`}</a> · {rp(c.amount)} · {KIND[c.kind]}
+            <a href={itemHref(c)}>{c.docNo ?? `#${c.id}`}</a> · {rp(c.amount)} · {c.kind === 'project_loan' && c.status === 'repayment_approved' ? REPAYMENT_ORDER : KIND[c.kind]}
           </li>
         ))}
       </ul>
@@ -94,7 +96,7 @@ export function FundPanel({ d }: { d: Pick<Detail, 'id' | 'fundCheck' | 'allowed
       <dl style={{ ...grid, margin: pb ? '4px 0 0' : grid.margin }}>
         <dt>Saldo dana</dt>
         <dd style={{ margin: 0 }} data-pk-fund="balance">
-          {rp(f.balance)} <span style={{ color: 'var(--theme-elevation-600)' }}>({f.accountCount} akun, tanpa akun site{f.excludedSiteAccounts.count ? ` — ${f.excludedSiteAccounts.count} akun site ${rp(f.excludedSiteAccounts.balance)} tidak dihitung` : ''})</span>
+          {rp(f.balance)} <span style={{ color: 'var(--theme-elevation-600)' }}>({f.accountCount} akun)</span>
         </dd>
         <dt>Komitmen</dt>
         <dd style={{ margin: 0 }} data-pk-fund="commitments">

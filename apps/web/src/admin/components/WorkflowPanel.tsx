@@ -5,6 +5,8 @@ import { isContentEditable } from '@/domain/expense/types'
 import { formatRupiah } from '@/lib/money'
 import { formatServerTime } from '@/pdf/format'
 
+import { DocSummaryProvider } from './feedback/DocContext'
+import { expenseRequestSummary } from './feedback/summaries'
 import { ReasonAction } from './kas/ReasonAction'
 import { KAS_STYLE } from './kas/style'
 import { Act, RequesterActions, type RequesterActionsProps } from './RequesterActions'
@@ -29,8 +31,12 @@ const badge = (tone: 'ok' | 'warn' | 'bad'): React.CSSProperties => ({
   background: tone === 'ok' ? 'var(--pk-tone-ok)' : tone === 'warn' ? 'var(--pk-tone-warn)' : 'var(--pk-tone-bad)',
 })
 
-/** Requester-side actions surfaced in the web panel (F2c). Office actions stay in the work views. */
-const REQUESTER_ACTIONS = ['submit', 'withdraw', 'cancel', 'resubmit', 'add_receipt', 'receipts_resubmit', 'receipts_complete', 'lpj_submit', 'complete'] as const
+/**
+ * Requester-side actions surfaced in the web panel (F2c). Office actions stay in the work views. D2410: no `cancel` —
+ * "Batalkan pengajuan" is an office action at the Finance stage, in the action bar only (also when the Finance / Direktur
+ * user is the requester), so the page never shows it twice.
+ */
+const REQUESTER_ACTIONS = ['submit', 'withdraw', 'delete_draft', 'resubmit', 'add_receipt', 'receipts_resubmit', 'receipts_complete', 'lpj_submit', 'complete'] as const
 
 /**
  * ui field at the top of the expense-request edit view (F2c items 3 + 5) = the MAIN COLUMN of the request page
@@ -62,11 +68,11 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
   const { d, hasSignature, todayDate, tz, office, own, ptName, pt, attachments, stepper } = data
   const next = d.nextActor
   // Requester panel only for the request's creator / requesters (office actions such as a Finance
-  // cancel after approval stay in the work views).
+  // cancel at the Finance stage stay in the action bar / work views).
   const acts = (own ? d.allowedActions.filter((a) => (REQUESTER_ACTIONS as readonly string[]).includes(a)) : []) as RequesterActionsProps['actions']
   const box: React.CSSProperties = { border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16, fontSize: 13 }
   // DRMS 13/10 Persetujuan #4: no "Keputusan siklus sebelumnya" list — earlier cycles stay in "Log perubahan" / "Riwayat"
-  return (
+  const panel = (
     <div className="field-type pk-er-panel" data-pk-panel="workflow">
       <section style={box} data-pk-section="header">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
@@ -228,6 +234,8 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
             profileHref={`/admin/collections/users/${req.user.id}`}
             hasSignature={hasSignature}
             today={todayDate}
+            // D2410 (point 6): a Reimburse is sent with ≥ 1 general attachment (server rule; the panel explains it first)
+            missingAttachment={d.type === 'reimburse' && d.payeeType === 'karyawan' && attachments.length === 0}
             lines={d.lines.map((l) => ({ id: l.id, no: l.no, description: l.description ?? '', total: l.total, incomplete: isContentEditable(d.status) && l.unitPrice === null }))}
             receipts={d.receipts.map((r) => ({
               ...r,
@@ -248,6 +256,8 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
       </div>
     </div>
   )
+  // DRMS 24/10: every action button of the panel names the request in its popups (number, title, requester, total)
+  return <DocSummaryProvider {...expenseRequestSummary(d)}>{panel}</DocSummaryProvider>
 }
 
 export default WorkflowPanel

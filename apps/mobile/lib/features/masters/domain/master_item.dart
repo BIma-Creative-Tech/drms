@@ -66,11 +66,11 @@ abstract final class MasterTypes {
   /// assigned to an aftersales project of the PT).
   static const clients = 'clients';
 
-  /// ADR 0023: sites (kantor cabang) of the PT — attendance locations (own: `home` / `assigned`; on-behalf: `team`).
-  /// Projects carry `site`, employees `homeSite`, team assignments `site` (server ≥ the sites release).
+  /// ADR 0023 sites — ADR 0032: removed from the product. The type stays (old caches, the server answers it empty /
+  /// with tombstones) but the APK no longer asks for it.
   static const sites = 'sites';
 
-  static const forApp = [...forExpense, projectStages, teamAssignments, clients, sites];
+  static const forApp = [...forExpense, projectStages, teamAssignments, clients];
 }
 
 /// Label per type (codes + names; bank accounts masked to the last 4 digits for display).

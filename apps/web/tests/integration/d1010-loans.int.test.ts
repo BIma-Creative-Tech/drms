@@ -15,9 +15,13 @@ import { api, makeFlowUser, makeWorld, sysCreate, type FlowUser, type World } fr
  * PM / Finance (append-only, void with reason) → Lunas. Notional allocation: NO cash entry is ever created. Same PT
  * only (service 400 + DB trigger), numbering PJ/<code>/<YYMM>/####, transitions + frozen content in the DB, overdue
  * (derived) + daily reminder, report / list scope. Fictional data only.
+ * 2026-10-24 (DRMS 24/10 #10): two levels — the Direktur's approval waits for the Owner (`principal`); the loans of
+ * this file are goods (`barang`, a claim) so the notional rules above stay covered — the cash path (transfer orders,
+ * repayment requests) is d2410-pinjaman / d2110-pb.
  */
 let w: World
 let pmDir: FlowUser // PM of `dirProject` AND Direktur of the PT (ADR 0021 "Utamakan Direktur lain")
+let principal: FlowUser // 2026-10-24: Owner (pk-principal) — level 2 of every loan
 let thirdProject = 0 // pm = w.users.pm (PM of both sides → samePm)
 let dirProject = 0
 let otherPt = 0
@@ -31,7 +35,8 @@ const act = (u: FlowUser, id: number, action: string, body: Record<string, unkno
 const cashCount = async () => Number((await sqlAs('app', 'SELECT count(*)::int AS n FROM cash_entries')).rows[0].n)
 const notified = async (id: number, event: string) => (await sqlAs('app', 'SELECT user_id::int AS u FROM notifications WHERE event = $1 AND doc_type = $2 AND doc_id = $3 ORDER BY user_id', [event, 'project_loan', String(id)])).rows.map((r) => r.u as number)
 const denied = async (userId: number) => Number((await sqlAs('app', "SELECT count(*)::int AS n FROM audit_logs WHERE doc_type = 'project_loan' AND action = 'access_denied' AND user_id = $1", [String(userId)])).rows[0].n)
-const body = (over: Record<string, unknown> = {}) => ({ borrowerProjectId: w.project, lenderProjectId: w.otherProject, amount: 20_000_000, reason: 'Termin klien belum cair, bayar material', dueDate: addDays(today, 30), ...over })
+// goods: a notional claim (both world projects share one Pusat Biaya — money between them would be cash-backed, #11)
+const body = (over: Record<string, unknown> = {}) => ({ borrowerProjectId: w.project, lenderProjectId: w.otherProject, kind: 'barang', amount: 20_000_000, reason: 'Termin klien belum cair, bayar material', dueDate: addDays(today, 30), ...over })
 
 async function onlyActive<T>(role: string, keep: number[], fn: () => Promise<T>): Promise<T> {
   const r = await sqlAs('app', `SELECT DISTINCT u.id FROM users u JOIN company_memberships m ON m.user_id = u.id AND coalesce(m.active, true) JOIN company_memberships_roles r ON r.parent_id = m.id WHERE r.value::text = $1 AND u.active AND NOT (u.id = ANY($2::int[]))`, [role, keep])
@@ -49,6 +54,10 @@ async function approved(over: Record<string, unknown> = {}): Promise<number> {
   expect(c.status, JSON.stringify(c.body)).toBe(201)
   const a = await act(w.users.owner, c.body.id, 'approve')
   expect(a.status, JSON.stringify(a.body)).toBe(200)
+  // 2026-10-24 (#10): the Owner's approval is final
+  const o = await act(principal, c.body.id, 'approve')
+  expect(o.status, JSON.stringify(o.body)).toBe(200)
+  expect(o.body.status).toBe('approved')
   return c.body.id
 }
 
@@ -57,6 +66,7 @@ beforeAll(async () => {
   w = await makeWorld('PJL')
   today = (await sqlAs('app', "SELECT to_char(now() AT TIME ZONE 'Asia/Makassar', 'YYYY-MM-DD') AS d")).rows[0].d
   pmDir = await makeFlowUser(['pk-pm', 'pk-owner'], 'pjl-pmdir', null)
+  principal = await makeFlowUser(['pk-principal'], 'pjl-principal', null)
   thirdProject = await sysCreate('projects', { code: 'PJL-P3', name: 'PJL Gudang', pm: w.users.pm.id, budget: 30_000_000, status: 'berjalan' })
   dirProject = await sysCreate('projects', { code: 'PJL-P4', name: 'PJL Direktur', pm: pmDir.id, budget: 30_000_000, status: 'berjalan' })
   otherPt = await sysCreate('companies', { name: 'PT Uji Pinjaman', shortCode: `PJ${Date.now() % 1000}`, timezone: 'Asia/Makassar' })
@@ -91,17 +101,21 @@ describe('create + submit (D6: PM of the borrower project)', () => {
     const cross = await create(w.users.pm, body({ lenderProjectId: foreignProject }))
     expect(cross.status).toBe(400)
     expect(JSON.stringify(cross.body)).toContain('PT yang sama')
-    // the lender's PM is not the borrower PM → 403 + access_denied; office roles do not create (D6)
+    // the lender's PM is not the borrower PM → 403 + access_denied; Direktur / Admin / Staff do not create (D6) —
+    // 2026-10-24 (#10): Finance of the PT does (Draft, `submitterRole: finance`)
     const before = await denied(w.users.otherPm.id)
     expect((await create(w.users.otherPm, body())).status).toBe(403)
     expect(await denied(w.users.otherPm.id)).toBe(before + 1)
-    for (const u of [w.users.staffA, w.users.finance, w.users.owner, w.users.admin]) expect((await create(u, body())).status, u.email).toBe(403)
+    for (const u of [w.users.staffA, w.users.owner, w.users.admin, principal]) expect((await create(u, body())).status, u.email).toBe(403)
+    const fin = await create(w.users.finance, body())
+    expect(fin.status, JSON.stringify(fin.body)).toBe(201)
+    expect(fin.body).toMatchObject({ status: 'draft', submitterRole: 'finance', originLabel: 'Diajukan Finance', allowedActions: expect.arrayContaining(['edit', 'submit', 'cancel']) })
     // HTTP collection writes are closed
     expect((await api('POST', '/api/project-loans', w.users.pm, { borrowerProject: w.project, lenderProject: w.otherProject, amount: 1, reason: 'abc', loanDate: today, dueDate: today, createdBy: w.users.pm.id })).status).toBe(403)
 
     const ok = await create(w.users.pm, body({ kind: 'barang' }))
     expect(ok.status, JSON.stringify(ok.body)).toBe(201)
-    expect(ok.body).toMatchObject({ status: 'draft', docNo: null, kind: 'barang', kindLabel: 'Barang/material', amount: 20_000_000, outstanding: 20_000_000, loanDate: today, allowedActions: expect.arrayContaining(['edit', 'submit', 'cancel']) })
+    expect(ok.body).toMatchObject({ status: 'draft', docNo: null, kind: 'barang', kindLabel: 'Barang/material', amount: 20_000_000, outstanding: 20_000_000, loanDate: today, submitterRole: 'pm', originLabel: 'Diajukan PM', allowedActions: expect.arrayContaining(['edit', 'submit', 'cancel']) })
     id = ok.body.id
   })
 
@@ -114,6 +128,7 @@ describe('create + submit (D6: PM of the borrower project)', () => {
     expect(s.status, JSON.stringify(s.body)).toBe(200)
     expect(s.body.status).toBe('pending_approval')
     expect(s.body.statusLabel).toBe('Menunggu persetujuan Direktur')
+    expect(s.body.approvalLevel).toBe(1)
     expect(s.body.docNo).toMatch(new RegExp(`^PJ/[A-Z0-9]{2,16}/${today.slice(2, 4)}${today.slice(5, 7)}/\\d{4}$`))
     expect(s.body.samePm).toBe(false)
     expect(s.body.g1Exception).toBeNull()
@@ -128,13 +143,14 @@ describe('create + submit (D6: PM of the borrower project)', () => {
     expect(audit).toEqual(expect.arrayContaining(['create', 'update', 'number_issued', 'status_change']))
   })
 
-  it('decisions: PM / Finance / lender PM 403 (+ access_denied), Staff 404, reject needs a reason; Direktur approves; NO cash entry', async () => {
+  it('decisions: PM / Finance / lender PM / Owner at level 1 403 (+ access_denied), Staff 404, reject needs a reason; Direktur → Owner approve; NO cash entry', async () => {
     const before = await denied(w.users.pm.id)
     expect((await act(w.users.pm, id, 'approve')).status).toBe(403)
     expect(await denied(w.users.pm.id)).toBeGreaterThan(before)
     expect((await act(w.users.finance, id, 'approve')).status).toBe(403)
     expect((await act(w.users.otherPm, id, 'approve')).status).toBe(403)
     expect((await act(w.users.staffA, id, 'approve')).status).toBe(404)
+    expect((await act(principal, id, 'approve')).status).toBe(403) // level 1 is the Direktur's (ADR 0026: implied role never decides)
     expect((await act(w.users.owner, id, 'reject', {})).status).toBe(400)
     const inbox = await api('GET', `${L}/inbox`, w.users.owner)
     expect(inbox.body.items.map((i: { id: number }) => i.id)).toContain(id)
@@ -142,13 +158,27 @@ describe('create + submit (D6: PM of the borrower project)', () => {
     const cash = await cashCount()
     const a = await act(w.users.owner, id, 'approve')
     expect(a.status, JSON.stringify(a.body)).toBe(200)
-    expect(a.body).toMatchObject({ status: 'approved', outstanding: 25_000_000, repaidTotal: 0, decidedBy: { id: w.users.owner.id } })
-    expect(a.body.decisions).toEqual([expect.objectContaining({ decision: 'approved', actor: expect.objectContaining({ id: w.users.owner.id }) })])
+    // 2026-10-24 (#10): level 1 approved → waits for the Owner
+    expect(a.body).toMatchObject({ status: 'pending_approval', approvalLevel: 2, statusLabel: 'Menunggu persetujuan Owner', decidedBy: null })
+    expect(await notified(id, 'project_loan.pending_owner')).toEqual(expect.arrayContaining([principal.id])) // other files may add Owners to the PT
+    expect((await act(w.users.owner2, id, 'approve')).status).toBe(403) // the Owner's level
+    expect((await api('GET', `${L}/inbox`, w.users.owner)).body.items.map((i: { id: number }) => i.id)).not.toContain(id)
+    expect((await api('GET', `${L}/inbox`, principal)).body.items.map((i: { id: number }) => i.id)).toContain(id)
+    const o = await act(principal, id, 'approve')
+    expect(o.status, JSON.stringify(o.body)).toBe(200)
+    expect(o.body).toMatchObject({ status: 'approved', outstanding: 25_000_000, repaidTotal: 0, decidedBy: { id: principal.id }, cashBacked: false, awaitingDisbursement: false })
+    expect(o.body.decisions).toEqual([
+      expect.objectContaining({ level: 1, levelLabel: 'Direktur', decision: 'approved', actor: expect.objectContaining({ id: w.users.owner.id }) }),
+      expect.objectContaining({ level: 2, levelLabel: 'Owner', decision: 'approved', actor: expect.objectContaining({ id: principal.id }) }),
+    ])
     expect(await cashCount()).toBe(cash)
-    expect((await act(w.users.owner2, id, 'approve')).status).toBe(409)
+    expect((await act(principal, id, 'approve')).status).toBe(409)
     expect(await notified(id, 'project_loan.approved')).toEqual([w.users.pm.id, w.users.otherPm.id].sort((x, y) => x - y))
-    const rows = await sqlAs('app', "SELECT doc_type::text AS t, position::text AS p, level::int AS level, actor_id FROM approvals WHERE loan_id = $1", [id])
-    expect(rows.rows).toEqual([{ t: 'project_loan', p: 'approval', level: 1, actor_id: w.users.owner.id }])
+    const rows = await sqlAs('app', 'SELECT doc_type::text AS t, position::text AS p, level::int AS level, actor_id FROM approvals WHERE loan_id = $1 ORDER BY level', [id])
+    expect(rows.rows).toEqual([
+      { t: 'project_loan', p: 'approval', level: 1, actor_id: w.users.owner.id },
+      { t: 'project_loan', p: 'approval', level: 2, actor_id: principal.id },
+    ])
     expect((await auditRows('project_loan', id)).map((r) => r.action)).toContain('approve')
   })
 
@@ -251,14 +281,20 @@ describe('G1 (ADR 0021 "Utamakan Direktur lain") + PM of both projects', () => {
     const a = await act(pmDir, c.body.id, 'approve')
     expect(a.status, JSON.stringify(a.body)).toBe(200)
     expect(a.body.g1Note).toBe('Disetujui Direktur pembuat karena satu-satunya Direktur PT')
+    // direktur_self covers level 1 only: the Owner still decides (DB too: the creator can never hold level 2)
+    expect(a.body).toMatchObject({ status: 'pending_approval', approvalLevel: 2 })
     expect((await sqlError('app', `UPDATE project_loans SET g1_exception = NULL WHERE id = ${c.body.id}`))?.code).toBe('42501')
   })
 
-  it('no active Direktur → 409 NO_DIREKTUR at submit', async () => {
+  it('no active Direktur → 409 NO_DIREKTUR at submit; no active Owner → 409 NO_OWNER (2026-10-24 #10)', async () => {
     const d = await create(w.users.pm, body())
     const s = await onlyActive('pk-owner', [], () => act(w.users.pm, d.body.id, 'submit'))
     expect(s.status).toBe(409)
     expect(s.body.code ?? JSON.stringify(s.body)).toMatch(/NO_DIREKTUR|Direktur/)
+    const o = await onlyActive('pk-principal', [], () => act(w.users.pm, d.body.id, 'submit'))
+    expect(o.status, JSON.stringify(o.body)).toBe(409)
+    expect(JSON.stringify(o.body)).toContain('belum punya Owner aktif')
+    expect((await sqlAs('app', 'SELECT status::text AS s FROM project_loans WHERE id = $1', [d.body.id])).rows[0].s).toBe('draft')
   })
 
   it('PM of both projects: allowed, marked "PM peminjam = PM pemberi"', async () => {

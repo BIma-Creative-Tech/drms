@@ -109,6 +109,7 @@ describe('allowed actions (server-driven buttons, web = APK)', () => {
   it('creator PM: edit / submit / cancel in Draft, cancel while waiting; nothing after the decision', () => {
     expect(loanAllowedActions(ctx({ isCreator: true, isBorrowerPm: true }))).toEqual(['edit', 'submit', 'cancel'])
     expect(loanAllowedActions(ctx({ isCreator: true, isBorrowerPm: false }))).toEqual(['cancel']) // no longer PM: may only cancel
+    expect(loanAllowedActions(ctx({ isCreator: true, isFinance: true }))).toEqual(['edit', 'submit', 'cancel']) // 2026-10-24: Finance files too
     expect(loanAllowedActions(ctx({ status: 'pending_approval', isCreator: true, isBorrowerPm: true }))).toEqual(['cancel'])
     expect(loanAllowedActions(ctx({ status: 'approved', isCreator: true, isBorrowerPm: true }))).toEqual(['repay'])
   })

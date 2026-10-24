@@ -381,6 +381,9 @@ abstract class ExpenseDetail with _$ExpenseDetail {
     /// ADR 0031 (DRMS 21/10): the Pusat Biaya = the project's cash account (read-only; null without project or while
     /// the project is not mapped). [costCenter] is a legacy non-project request's own cost center only.
     AccountRef? pusatBiaya,
+
+    // D2410 (point 6): general attachments ("Lampiran", photo / PDF; empty from a server before 0.20).
+    @Default([]) List<RequestAttachment> attachments,
   }) = _ExpenseDetail;
 }
 
@@ -417,6 +420,27 @@ class RequestIntercompany {
 
   @override
   int get hashCode => Object.hash(targetEntryNo, voided, targetCompany, transferId);
+}
+
+/// D2410 (point 6) `ExpenseRequestDetail.attachments[]`: a general attachment of the request — opened through
+/// `GET /media/attachments/{id}/file`.
+class RequestAttachment {
+  const RequestAttachment({required this.id, this.fileName, this.mimeType});
+  final int id;
+  final String? fileName;
+  final String? mimeType;
+
+  bool get isPdf => mimeType == 'application/pdf';
+
+  /// The file name, else "Lampiran #id".
+  String get label => fileName == null || fileName!.isEmpty ? 'Lampiran #$id' : fileName!;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RequestAttachment && other.id == id && other.fileName == fileName && other.mimeType == mimeType;
+
+  @override
+  int get hashCode => Object.hash(id, fileName, mimeType);
 }
 
 /// ADR 0031 `{id, name}` of a cash account (Pusat Biaya, the account a transfer was paid from).

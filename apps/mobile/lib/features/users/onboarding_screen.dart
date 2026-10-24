@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/format/dates.dart';
 import '../../core/network/api_exception.dart';
 import '../../l10n/gen/app_localizations.dart';
+import '../../shared/widgets/action_feedback.dart';
 import '../../shared/widgets/async_body.dart';
 import '../../shared/widgets/online_only_button.dart';
 import '../expense/presentation/widgets/master_picker.dart';
@@ -130,6 +131,8 @@ class _OnboardingFormState extends ConsumerState<_OnboardingForm> {
       setState(() => _summary = t.recordNoChanges);
       return;
     }
+    final summary = [_name.text.trim(), _email.text.trim()];
+    if (!await confirmAction(context, action: t.save, summary: summary) || !mounted) return;
     setState(() => _busy = true);
     try {
       final key = _keys.putIfAbsent(jsonEncode(body), () => const Uuid().v4());
@@ -161,21 +164,22 @@ class _OnboardingFormState extends ConsumerState<_OnboardingForm> {
             ],
           ),
         );
-      } else if (r.linked && !_edit) {
-        showSnack(context, t.onbLinked);
       } else {
-        showSnack(context, t.recordSaved(_name.text.trim()));
+        final done = r.linked && !_edit ? t.onbLinked : t.recordSaved(_name.text.trim());
+        await showActionResult(context, message: done, action: t.save);
       }
       if (mounted) context.pop('${r.id}');
     } on ProblemException catch (e) {
-      if (mounted) {
-        setState(() {
-          _errors = {for (final x in e.errors) x.path: x.message};
-          _summary = e.message;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _errors = {for (final x in e.errors) x.path: x.message};
+        _summary = e.message;
+      });
+      await showActionError(context, e, action: t.save);
     } on Object catch (e) {
-      if (mounted) setState(() => _summary = errorText(e));
+      if (!mounted) return;
+      setState(() => _summary = errorText(e));
+      await showActionError(context, e, action: t.save);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -655,7 +659,6 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
     final c = widget.company;
     final options = switch (_kind) {
       'costCenter' => c.costCenters(),
-      'site' => c.sites(),
       _ => c.projects(),
     };
     return Padding(
@@ -668,8 +671,8 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
           SegmentedButton<String>(
             segments: [
               ButtonSegment(value: 'project', label: Text(t.cashProject)),
+              // ADR 0032: no site option any more (sites removed from the product)
               ButtonSegment(value: 'costCenter', label: Text(t.cashCostCenter)),
-              ButtonSegment(value: 'site', label: Text(t.onbSite)),
             ],
             selected: {_kind},
             onSelectionChanged: (s) => setState(() {

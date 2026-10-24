@@ -7,6 +7,7 @@ import '../../../app/theme.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/reason_dialog.dart';
 import '../../auth/application/auth_controller.dart';
@@ -51,6 +52,7 @@ class _PeriodClosingScreenState extends ConsumerState<PeriodClosingScreen> {
       'close:$company:${r.period}',
       (key) => ref.read(cashApiProvider).close(r.period, company, note: note, idempotencyKey: key),
       t.closingClosed(periodLabel(r.period)),
+      t.closingTitle,
     );
   }
 
@@ -70,22 +72,26 @@ class _PeriodClosingScreenState extends ConsumerState<PeriodClosingScreen> {
       'reopen:$company:${r.period}:$reason',
       (key) => ref.read(cashApiProvider).reopen(r.period, company, reason, idempotencyKey: key),
       t.closingReopened(periodLabel(r.period)),
+      t.closingReopen,
     );
   }
 
-  Future<void> _run(String id, Future<void> Function(String key) action, String done) async {
+  Future<void> _run(String id, Future<void> Function(String key) action, String done, String label) async {
     setState(() => _busy = true);
+    String? error;
     try {
       await action(_keys.putIfAbsent(id, () => const Uuid().v4()));
       _keys.remove(id); // the same month may be closed again after a reopen
-      if (mounted) showSnack(context, done);
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      error = e.message;
     } finally {
       ref.invalidate(periodOverviewProvider);
       ref.invalidate(cashBookProvider);
       if (mounted) setState(() => _busy = false);
     }
+    if (!mounted) return;
+    final outcome = error == null ? ActionOutcome.success : ActionOutcome.failed;
+    await showActionResult(context, message: error ?? done, action: label, outcome: outcome);
   }
 
   @override

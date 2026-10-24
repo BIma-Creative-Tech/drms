@@ -94,6 +94,18 @@ import * as migration_20261021_100000_d2110_pb_enums from './20261021_100000_d21
 import * as migration_20261021_100100_d2110_pb_schema from './20261021_100100_d2110_pb_schema';
 import * as migration_20261021_100200_d2110_pb_guard from './20261021_100200_d2110_pb_guard';
 import * as migration_20261022_100000_d2210_pb_fund from './20261022_100000_d2210_pb_fund';
+import * as migration_20261024_100000_d2410_timesheet_hm_optional from './20261024_100000_d2410_timesheet_hm_optional';
+import * as migration_20261024_200000_d2410_site_assignments from './20261024_200000_d2410_site_assignments';
+import * as migration_20261024_210000_d2410_admin_staff_enums from './20261024_210000_d2410_admin_staff_enums';
+import * as migration_20261024_210100_d2410_admin_staff_guard from './20261024_210100_d2410_admin_staff_guard';
+import * as migration_20261024_300000_d2410_self_processed_enum from './20261024_300000_d2410_self_processed_enum';
+import * as migration_20261024_300100_d2410_finance_self_lpj from './20261024_300100_d2410_finance_self_lpj';
+import * as migration_20261024_400000_d2410_loan_enums from './20261024_400000_d2410_loan_enums';
+import * as migration_20261024_400100_d2410_loan_schema from './20261024_400100_d2410_loan_schema';
+import * as migration_20261024_400200_d2410_loan_data from './20261024_400200_d2410_loan_data';
+import * as migration_20261024_400300_d2410_loan_guard from './20261024_400300_d2410_loan_guard';
+import * as migration_20261024_500000_d2410_site_accounts_fund from './20261024_500000_d2410_site_accounts_fund';
+import * as migration_20261024_510000_d2410_delete_draft_invoice from './20261024_510000_d2410_delete_draft_invoice';
 
 export const migrations = [
   {
@@ -575,5 +587,65 @@ export const migrations = [
     up: migration_20261022_100000_d2210_pb_fund.up,
     down: migration_20261022_100000_d2210_pb_fund.down,
     name: '20261022_100000_d2210_pb_fund',
+  },
+  {
+    up: migration_20261024_100000_d2410_timesheet_hm_optional.up,
+    down: migration_20261024_100000_d2410_timesheet_hm_optional.down,
+    name: '20261024_100000_d2410_timesheet_hm_optional',
+  },
+  {
+    up: migration_20261024_200000_d2410_site_assignments.up,
+    down: migration_20261024_200000_d2410_site_assignments.down,
+    name: '20261024_200000_d2410_site_assignments',
+  },
+  {
+    up: migration_20261024_210000_d2410_admin_staff_enums.up,
+    down: migration_20261024_210000_d2410_admin_staff_enums.down,
+    name: '20261024_210000_d2410_admin_staff_enums',
+  },
+  {
+    up: migration_20261024_210100_d2410_admin_staff_guard.up,
+    down: migration_20261024_210100_d2410_admin_staff_guard.down,
+    name: '20261024_210100_d2410_admin_staff_guard',
+  },
+  {
+    up: migration_20261024_300000_d2410_self_processed_enum.up,
+    down: migration_20261024_300000_d2410_self_processed_enum.down,
+    name: '20261024_300000_d2410_self_processed_enum',
+  },
+  {
+    up: migration_20261024_300100_d2410_finance_self_lpj.up,
+    down: migration_20261024_300100_d2410_finance_self_lpj.down,
+    name: '20261024_300100_d2410_finance_self_lpj',
+  },
+  {
+    up: migration_20261024_400000_d2410_loan_enums.up,
+    down: migration_20261024_400000_d2410_loan_enums.down,
+    name: '20261024_400000_d2410_loan_enums',
+  },
+  {
+    up: migration_20261024_400100_d2410_loan_schema.up,
+    down: migration_20261024_400100_d2410_loan_schema.down,
+    name: '20261024_400100_d2410_loan_schema',
+  },
+  {
+    up: migration_20261024_400200_d2410_loan_data.up,
+    down: migration_20261024_400200_d2410_loan_data.down,
+    name: '20261024_400200_d2410_loan_data',
+  },
+  {
+    up: migration_20261024_400300_d2410_loan_guard.up,
+    down: migration_20261024_400300_d2410_loan_guard.down,
+    name: '20261024_400300_d2410_loan_guard',
+  },
+  {
+    up: migration_20261024_500000_d2410_site_accounts_fund.up,
+    down: migration_20261024_500000_d2410_site_accounts_fund.down,
+    name: '20261024_500000_d2410_site_accounts_fund',
+  },
+  {
+    up: migration_20261024_510000_d2410_delete_draft_invoice.up,
+    down: migration_20261024_510000_d2410_delete_draft_invoice.down,
+    name: '20261024_510000_d2410_delete_draft_invoice',
   },
 ];

@@ -410,9 +410,11 @@ void main() {
       find.descendant(of: find.byKey(const Key('transfer-submit')), matching: find.bySubtype<FilledButton>()),
     );
     await tester.pumpAndSettle();
+    await confirmPopup(tester);
     expect(api.transfers, hasLength(1));
     expect(find.byKey(const Key('transfer-error')), findsOneWidget);
-    expect(find.textContaining('Periode 2026-10 PT LAS sudah ditutup (tutup buku s/d 2026-10-31)'), findsOneWidget);
+    // D2410: inline and in the "Gagal" popup
+    expect(find.textContaining('Periode 2026-10 PT LAS sudah ditutup (tutup buku s/d 2026-10-31)'), findsNWidgets(2));
     expect(find.byType(TransferFormScreen), findsOneWidget, reason: 'stays on the form');
   });
 

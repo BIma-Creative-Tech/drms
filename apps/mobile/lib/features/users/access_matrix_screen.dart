@@ -9,6 +9,7 @@ import '../../app/theme.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../../l10n/gen/app_localizations.dart';
+import '../../shared/widgets/action_feedback.dart';
 import '../../shared/widgets/async_body.dart';
 import '../../shared/widgets/list_search.dart';
 import '../../shared/widgets/reason_dialog.dart';
@@ -159,7 +160,7 @@ class _AccessMatrixScreenState extends ConsumerState<AccessMatrixScreen> {
       _drafts.clear();
       _cellErrors = const {};
       ref.invalidate(accessMatrixProvider);
-      if (mounted) showSnack(context, t.matrixSaved(ops.length));
+      if (mounted) await showActionResult(context, message: t.matrixSaved(ops.length), action: t.save);
     } on ProblemException catch (e) {
       // errors[].path = items.<i> → that op's cell (all-or-nothing: nothing was saved)
       final cells = <String, String>{};
@@ -169,10 +170,10 @@ class _AccessMatrixScreenState extends ConsumerState<AccessMatrixScreen> {
       }
       if (mounted) {
         setState(() => _cellErrors = cells);
-        showSnack(context, e.message);
+        await showActionError(context, e, action: t.save);
       }
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: t.save);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

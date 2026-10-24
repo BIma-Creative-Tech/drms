@@ -7,6 +7,7 @@ import '../../../app/theme.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
@@ -19,8 +20,11 @@ import 'widgets/field_widgets.dart';
 import '../../../shared/widgets/pick_hint.dart';
 
 /// Timesheet Unit (mockup "Android-Timesheet", ADR 0020 §5): contract + date, one tab per unit of the contract
-/// active on that date (✓ / belum), HM awal prefilled from the previous HM akhir (server or this phone), HM akhir,
-/// the required HM photo, work / standby / breakdown hours with a 24 h bar and live validation, breakdown reason,
+/// active on that date (✓ / belum), HM awal prefilled from the last recorded HM akhir (server or this phone), HM akhir,
+/// the HM photo — HM optional, recorded about once a week (user 2026-10-24): both or none, the photo only with HM; a
+/// prefilled HM awal left untouched is not sent while HM akhir is empty — the date window of the caller (PM project /
+/// Direktur: the whole contract period, else 14 days), work / standby / breakdown hours with a 24 h bar and live
+/// validation, breakdown reason,
 /// operator (text), fuel, location, notes, "Salin dari kemarin", "Simpan & lanjut ke (unit berikutnya)", and the
 /// "breakdown ≥ 4 jam → laporan servis" suggestion. One draft per unit and date, autosaved.
 class TimesheetScreen extends ConsumerStatefulWidget {
@@ -61,6 +65,9 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
   String? _hmPhoto;
   double? _prevHm;
   String? _prevHmDate;
+
+  /// HM awal typed (or stored) by the user; false = still the prefill (dropped while HM akhir is empty).
+  bool _hmStartTouched = false;
   bool _loading = false;
   bool _busy = false;
   Map<String, String> _errors = const {};
@@ -129,6 +136,7 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
     _hmPhoto = c.hmPhoto;
     _prevHm = c.previousHmEnd;
     _prevHmDate = c.previousHmDate;
+    _hmStartTouched = c.hmStart != null;
   }
 
   /// Opens unit [unit] on the current date: its local draft (any state) or a new one with HM awal prefilled.
@@ -152,6 +160,8 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
         // the prefill source may have changed since the draft was written (newer server data)
         _prevHm ??= prev.hm;
         _prevHmDate ??= prev.date;
+        // a draft without HM: HM awal prefilled again (untouched)
+        if (!local.timesheet.hasHm && _prevHm != null) _hmStart.text = decInput(_prevHm);
       } else {
         for (final c in _controllers) {
           c.clear();
@@ -166,6 +176,7 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
         _hmPhoto = null;
         _prevHm = prev.hm;
         _prevHmDate = prev.date;
+        _hmStartTouched = false;
         _hmStart.text = decInput(prev.hm);
       }
     });
@@ -181,7 +192,11 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
     content: TimesheetContent(
       unitId: _unitId,
       unitLabel: _unitLabel,
-      hmStart: parseDec(_hmStart.text),
+      hmStart: effectiveHmStart(
+        hmStart: parseDec(_hmStart.text),
+        hmEnd: parseDec(_hmEnd.text),
+        touched: _hmStartTouched,
+      ),
       hmEnd: parseDec(_hmEnd.text),
       workHours: parseDec(_work.text),
       standbyHours: parseDec(_standby.text),
@@ -260,12 +275,19 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
     final sub = ref.read(currentSubProvider);
     if (sub == null || _uuid == null) return;
     final d = _current();
-    final errors = validateTimesheet(d, today: ref.read(fieldTodayProvider));
+    final today = ref.read(fieldTodayProvider);
+    final minDate = _projectId == null ? null : ref.read(fieldTimesheetMinDateProvider(_projectId!)).value;
+    final errors = validateTimesheet(d, today: today, minDate: minDate ?? timesheetMinDate(today, null));
     setState(() => _errors = errors);
     if (errors.isNotEmpty) {
       showSnack(context, t.fieldFixErrors);
       return;
     }
+    final label = _isEdit
+        ? t.fieldSaveEdit
+        : (next == null || _single ? t.fieldTimesheetSave : t.fieldSaveAndNext(next.label));
+    final ok = await confirmFieldSubmit(context, label, project: _projectLabel, date: _date, unit: _unitLabel);
+    if (!ok || !mounted) return;
     final online = ref.read(connectivityProvider);
     setState(() => _busy = true);
     _autosave?.cancel();
@@ -273,7 +295,8 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
       await ref.read(fieldServiceProvider).submit(sub, d, online: online);
       ref.read(syncCoordinatorProvider.notifier).requestSync(delay: Duration.zero);
       if (!mounted) return;
-      showSnack(context, online ? t.fieldQueuedOnline : t.fieldQueuedOffline);
+      await showFieldSubmitted(context, label, online: online);
+      if (!mounted) return;
       if (next != null && !_single) {
         setState(() => _busy = false);
         await _openUnit(next.id, next.label);
@@ -281,7 +304,7 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
         Navigator.of(context).maybePop();
       }
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -373,7 +396,13 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
     final hints = timesheetHints(c);
     final hmUsed = c.hmStart != null && c.hmEnd != null ? c.hmEnd! - c.hmStart! : null;
     final alreadySent = _unitId != null && sentToServer(_unitId!);
-    final dates = allowedReportDates(ref.watch(fieldTodayProvider));
+    final today = ref.watch(fieldTodayProvider);
+    final minDate = _projectId == null
+        ? timesheetMinDate(today, null)
+        : (ref.watch(fieldTimesheetMinDateProvider(_projectId!)).value ?? timesheetMinDate(today, null));
+    final dates = allowedReportDates(today, minDate: minDate);
+    final wideWindow = minDate.compareTo(timesheetMinDate(today, null)) < 0;
+    final photoFixed = _isEdit && (_base?.serverPhotoCount ?? 0) > 0;
     final breakdownOn = (c.breakdownHours ?? 0) > 0;
 
     return Scaffold(
@@ -487,6 +516,11 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
             ],
           ),
           const SizedBox(height: 10),
+          if (wideWindow && !_single)
+            FieldNote(
+              key: const Key('timesheet-date-window'),
+              text: t.fieldTimesheetBackdateWide(fieldDateLabel(minDate)),
+            ),
           if (_projectId != null && tabs.isEmpty && cusAsync?.hasValue == true)
             FieldNote(text: t.fieldNoContractUnits(fieldDateLabel(_date)), warn: true),
           if (tabs.isNotEmpty && !_single)
@@ -533,6 +567,7 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
                 FieldNote(
                   key: const Key('timesheet-hm-hint'),
                   text: [
+                    t.fieldHmOptional,
                     if (_prevHm != null)
                       t.fieldHmPrefilled(_prevHmDate == null ? '-' : fieldDateLabel(_prevHmDate!), fmtNum(_prevHm!)),
                     if (hmUsed != null && hmUsed >= 0) t.fieldHmUsed(fmtNum(hmUsed)),
@@ -549,10 +584,10 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
                         photos: [_hmPhoto!],
                         canAdd: false,
                         onAdd: null,
-                        onRemove: _busy || _isEdit ? null : (_) => setState(() => _hmPhoto = null),
+                        onRemove: _busy ? null : (_) => setState(() => _hmPhoto = null),
                         size: 64,
                       )
-                    else if (!_isEdit)
+                    else if (!photoFixed)
                       SizedBox.square(
                         dimension: 64,
                         child: OutlinedButton(
@@ -568,7 +603,7 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        _isEdit ? t.fieldHmPhotoFixed : t.fieldHmPhotoRequired,
+                        photoFixed ? t.fieldHmPhotoFixed : t.fieldHmPhotoRequired,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: _errors['photos'] != null ? theme.colorScheme.error : null,
                         ),
@@ -729,7 +764,10 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
     inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
     style: TextStyle(fontWeight: FontWeight.w700, fontSize: big ? 20 : 17),
     decoration: InputDecoration(labelText: label, errorText: _errors[key], errorMaxLines: 3),
-    onChanged: (_) => _changed(key == 'workHours' || key == 'standbyHours' || key == 'breakdownHours' ? 'hours' : key),
+    onChanged: (_) {
+      if (key == 'hmStart') _hmStartTouched = true;
+      _changed(key == 'workHours' || key == 'standbyHours' || key == 'breakdownHours' ? 'hours' : key);
+    },
   );
 }
 

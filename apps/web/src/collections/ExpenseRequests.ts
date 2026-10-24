@@ -310,6 +310,7 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
           .replace(/^vendorBankAccountId$/, 'vendorBankAccount')
           .replace(/^payeeCompanyId$/, 'payeeCompany')
           .replace(/^invoiceFileId$/, 'invoiceFile')
+          .replace(/^attachmentIds$/, 'attachments')
           .replace(/\.(uom|category|vehicle|rapItem)Id$/, '.$1')
       throw validationError(
         req,
@@ -547,7 +548,8 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         ],
       },
       { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000, admin: { condition: editableInput() } },
-      { name: 'attachments', type: 'upload', relationTo: 'media-attachments', hasMany: true, label: 'Lampiran', admin: { condition: editableInput() } },
+      // D2410 (point 6): at least one to send a Reimburse (server: validateContent forSubmit); optional for Pengajuan Baru
+      { name: 'attachments', type: 'upload', relationTo: 'media-attachments', hasMany: true, label: 'Lampiran', admin: { description: 'Foto (JPG/PNG) atau PDF. Wajib minimal 1 untuk Reimburse; opsional untuk Pengajuan Baru.', condition: editableInput() } },
       {
         name: 'lines',
         type: 'array',

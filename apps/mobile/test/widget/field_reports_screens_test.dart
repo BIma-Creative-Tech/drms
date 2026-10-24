@@ -8,6 +8,7 @@ import 'package:proyekkas/features/auth/domain/user_profile.dart';
 import 'package:proyekkas/features/field_reports/application/field_providers.dart';
 import 'package:proyekkas/features/field_reports/application/field_service.dart';
 import 'package:proyekkas/features/field_reports/domain/field_models.dart';
+import 'package:proyekkas/features/field_reports/domain/field_rules.dart' show timesheetMinDate;
 import 'package:proyekkas/features/field_reports/presentation/aftersales_screen.dart';
 import 'package:proyekkas/features/field_reports/presentation/field_conflict_screen.dart';
 import 'package:proyekkas/features/field_reports/presentation/field_hub_screen.dart';
@@ -167,6 +168,7 @@ void main() {
     UserProfile? profile,
     List<FieldDraft> local = const [],
     List<TimesheetMark> marks = const [],
+    String? tsMinDate,
     List<Override> extra = const [],
     bool online = true,
   }) => pumpScreen(
@@ -182,6 +184,7 @@ void main() {
       fieldUnitsProvider.overrideWith((ref, key) async => const [ex01, ex02, dz01]),
       fieldContractUnitsProvider.overrideWith((ref, id) async => [cu(ex01), cu(ex02), cu(dz01)]),
       fieldTimesheetMarksProvider.overrideWith((ref, id) async => marks),
+      fieldTimesheetMinDateProvider.overrideWith((ref, id) async => tsMinDate ?? timesheetMinDate(today, null)),
       openFieldDraftsProvider.overrideWith((ref) => Stream.value(local)),
       fieldClientsProvider.overrideWith(
         (ref, c) async => const [
@@ -340,6 +343,8 @@ void main() {
       expect(find.text('EX-01 · HM 1.023 → 1.025 · 1 sparepart · 1 foto'), findsOneWidget);
       await tester.tap(find.byKey(const Key('service-submit')));
       await tester.pumpAndSettle();
+      expect(find.text('Yakin ingin kirim laporan servis?'), findsOneWidget);
+      await confirmPopup(tester);
       final (d, online) = service.submitted.single;
       expect(online, isTrue);
       final c = d.service;
@@ -417,6 +422,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.byKey(const Key('service-submit')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       final c = service.submitted.single.$1.service;
       expect(c.serviceTypeIds, [9, 7]);
       expect(c.serviceTypeNames, {9: 'Las', 7: 'Perbaikan'});
@@ -457,6 +463,7 @@ void main() {
       await pump(tester, ServiceReportScreen(initial: draft(old)));
       await tester.tap(find.byKey(const Key('service-submit')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       final mapped = service.submitted.single.$1.service;
       expect(mapped.serviceTypeIds, [7]);
       expect(mapped.legacyServiceType, isNull);
@@ -476,6 +483,7 @@ void main() {
       expect(find.byKey(const Key('service-type-pemasangan')), findsOneWidget);
       await tester.tap(find.byKey(const Key('service-submit')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       final c = service.submitted.single.$1.service;
       expect(c.serviceTypeIds, isEmpty);
       expect(c.legacyServiceType, 'pemasangan');
@@ -512,7 +520,9 @@ void main() {
       expect(find.text('DZ-01 terisi'), findsOneWidget);
       final hmStart = tester.widget<TextField>(find.byKey(const Key('timesheet-hm-start')));
       expect(hmStart.controller!.text, '1023');
-      expect(find.textContaining('HM awal diisi otomatis dari HM akhir'), findsOneWidget);
+      expect(find.textContaining('HM awal otomatis dari HM akhir terakhir yang tercatat'), findsOneWidget);
+      expect(find.textContaining('HM opsional'), findsOneWidget);
+      expect(find.byKey(const Key('timesheet-date-window')), findsNothing, reason: 'reporter: 14 days');
       await tester.enterText(find.byKey(const Key('timesheet-hm-end')), '1031,5');
       await tester.pump();
       expect(find.textContaining('Selisih HM: 8,5 jam'), findsOneWidget);
@@ -531,7 +541,7 @@ void main() {
       await tester.tap(find.byKey(const Key('timesheet-submit')));
       await tester.pumpAndSettle();
       expect(service.submitted, isEmpty);
-      expect(find.text('Foto meter HM wajib (1 foto).'), findsOneWidget);
+      expect(find.text('Foto meter HM wajib bila HM diisi.'), findsOneWidget);
       expect(find.text('Alasan breakdown wajib bila ada jam breakdown.'), findsOneWidget);
       await tester.enterText(find.byKey(const Key('timesheet-breakdown-reason')), 'Hidrolik bocor');
       await tester.ensureVisible(find.byKey(const Key('timesheet-hm-photo')));
@@ -542,6 +552,7 @@ void main() {
       expect(find.text('Simpan & lanjut ke EX-02'), findsOneWidget);
       await tester.tap(find.byKey(const Key('timesheet-submit')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       final (d, _) = service.submitted.single;
       final c = d.timesheet;
       expect(
@@ -552,8 +563,27 @@ void main() {
         (c.breakdownReason, c.operatorName, c.hmPhoto, c.previousHmEnd),
         ('Hidrolik bocor', 'Slamet', 'ph-1', 1023.0),
       );
+      await dismissResult(tester);
       // next unit opened, empty, HM awal prefilled again
       expect(tester.widget<TextField>(find.byKey(const Key('timesheet-operator'))).controller!.text, '');
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('weekly HM (user 2026-10-24): a day without HM is saved without HM awal and without photo', (
+      tester,
+    ) async {
+      await pump(tester, const TimesheetScreen(projectId: 41), tsMinDate: '2026-08-01');
+      // PM project / Direktur: the whole contract period
+      expect(find.byKey(const Key('timesheet-date-window')), findsOneWidget);
+      expect(tester.widget<TextField>(find.byKey(const Key('timesheet-hm-start'))).controller!.text, '1023');
+      await tester.enterText(find.byKey(const Key('timesheet-work')), '8');
+      await tester.pump();
+      await tester.ensureVisible(find.byKey(const Key('timesheet-submit')));
+      await tester.tap(find.byKey(const Key('timesheet-submit')));
+      await tester.pumpAndSettle();
+      await confirmPopup(tester);
+      final c = service.submitted.single.$1.timesheet;
+      expect((c.hmStart, c.hmEnd, c.hmPhoto, c.workHours), (null, null, null, 8.0));
       await tester.pump(const Duration(seconds: 1));
     });
 
@@ -617,6 +647,7 @@ void main() {
       await tester.ensureVisible(find.byKey(const Key('activity-submit')));
       await tester.tap(find.byKey(const Key('activity-submit')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       final (d, _) = service.submitted.single;
       final c = d.activity;
       expect(
@@ -626,6 +657,7 @@ void main() {
       expect((c.docNo, c.receiver, c.value), ('SJ-0441', 'Budi', 3100000));
       expect(c.photos, ['ph-1']);
       expect(c.filledItems.map((i) => i.summary), ['Seal kit 1 set', 'Filter 4 pcs']);
+      await dismissResult(tester);
       // ready for the next activity (customer kept)
       expect(tester.widget<TextField>(find.byKey(const Key('activity-doc'))).controller!.text, '');
       await tester.pump(const Duration(seconds: 1));
@@ -697,6 +729,7 @@ void main() {
       expect(tester.widget<OutlinedButton>(find.byKey(const Key('field-conflict-resend'))).onPressed, isNull);
       await tester.tap(find.byKey(const Key('field-conflict-use-server')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       expect(service.usedServer, ['c-2']);
     });
   });

@@ -216,6 +216,13 @@ export async function pbCommitmentItems(req: PayloadRequest, accountId: number, 
       SELECT 'project_loan', l.id, l.doc_no, l.amount, l.status::text
         FROM project_loans l
        WHERE l.lender_cash_account_id = ${accountId} AND l.status::text = 'approved' AND coalesce(l.cash_backed, false) AND l.disbursed_at IS NULL
+         AND l.borrower_cash_account_id IS DISTINCT FROM ${accountId}
+      UNION ALL
+      -- 2026-10-24 (#12): an approved repayment order leaves the borrower's account (id = the loan, status repayment_approved)
+      SELECT 'project_loan', l.id, l.doc_no, pr.amount, 'repayment_approved'
+        FROM project_loan_repayments pr JOIN project_loans l ON l.id = pr.loan_id
+       WHERE l.borrower_cash_account_id = ${accountId} AND pr.status::text = 'approved' AND coalesce(l.cash_backed, false)
+         AND l.lender_cash_account_id IS DISTINCT FROM ${accountId}
     ) x WHERE x.amount > 0 ORDER BY x.amount DESC, x.id LIMIT ${limit}`)) as unknown as { rows: Array<{ kind: CommitmentItem['kind']; id: number; doc_no: string | null; amount: string; status: string }> }
   return r.rows.map((x) => ({ kind: x.kind, id: Number(x.id), docNo: x.doc_no, amount: n(x.amount), status: x.status }))
 }
@@ -234,20 +241,21 @@ export async function waitingAtFinal(req: PayloadRequest, companyId: number, exc
   return r.rows.map((x) => ({ id: Number(x.id), docNo: x.doc_no, title: x.title, needed: n(x.needed) }))
 }
 
-/** Accounts behind "Saldo dana" (active, without site) + the excluded site accounts (count, balance). */
+/**
+ * Accounts behind "Saldo dana": every ACTIVE account of the PT. DRMS 24/10 (user decision): no site exclusion any more
+ * (migration 20261024_500000 cleared the legacy site flags) — `excludedSiteAccounts` stays in the contract, always 0.
+ */
 export async function fundAccounts(req: PayloadRequest, companyId: number): Promise<{ accounts: Array<{ id: number; name: string; kind: string; balance: number }>; excludedSiteAccounts: { count: number; balance: number } }> {
   const tx = await getRequestTx(req)
   const r = (await tx.execute(sql`
-    SELECT a.id, a.name, a.kind::text AS kind, a.site_id,
+    SELECT a.id, a.name, a.kind::text AS kind,
            (coalesce(a.opening_balance, 0) + coalesce((SELECT sum(CASE WHEN e.direction = 'in' THEN e.amount ELSE -e.amount END) FROM cash_entries e WHERE e.cash_account_id = a.id), 0))::text AS balance
       FROM cash_accounts a
      WHERE a.company_id = ${companyId} AND a.active IS NOT FALSE
-     ORDER BY a.name, a.id`)) as unknown as { rows: Array<{ id: number; name: string; kind: string; site_id: number | null; balance: string }> }
-  const pool = r.rows.filter((x) => x.site_id === null)
-  const site = r.rows.filter((x) => x.site_id !== null)
+     ORDER BY a.name, a.id`)) as unknown as { rows: Array<{ id: number; name: string; kind: string; balance: string }> }
   return {
-    accounts: pool.map((x) => ({ id: Number(x.id), name: x.name, kind: x.kind, balance: n(x.balance) })),
-    excludedSiteAccounts: { count: site.length, balance: site.reduce((s, x) => s + n(x.balance), 0) },
+    accounts: r.rows.map((x) => ({ id: Number(x.id), name: x.name, kind: x.kind, balance: n(x.balance) })),
+    excludedSiteAccounts: { count: 0, balance: 0 },
   }
 }
 

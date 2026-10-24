@@ -7,6 +7,7 @@ import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/doc_no_chip.dart';
 import '../../../shared/widgets/form_grid.dart';
@@ -18,6 +19,7 @@ import '../application/expense_providers.dart';
 import '../domain/expense_request.dart';
 import '../domain/turn_timeline.dart';
 import 'requester_actions.dart';
+import 'widgets/attachments.dart';
 import 'widgets/fund_check_panel.dart';
 import 'widgets/rap_item_picker.dart';
 import 'widgets/request_stepper.dart';
@@ -217,6 +219,11 @@ class _DetailBody extends ConsumerWidget {
           ],
         ),
       if (d.rejectReason != null) row(t.rejectReasonLabel, d.rejectReason!),
+      // D2410 (point 6): the general attachments ("Lampiran", photo / PDF) — a tap opens the file
+      if (d.attachments.isNotEmpty) ...[
+        section(t.sectionAttachments, key: const Key('section-attachments')),
+        RequestAttachmentList(attachments: d.attachments),
+      ],
       section(t.sectionRequester, key: const Key('section-requester')),
       row(t.requesters, d.requesters.map((r) => r.name ?? '-').join(', ')),
       if (d.createdByName != null) row(t.createdBy, d.createdByName!),
@@ -581,10 +588,12 @@ class _DecisionBar extends ConsumerWidget {
 
     Future<void> open(Decision decision) async {
       final done = await showDecisionSheet(context, detail: detail, decision: decision);
-      if (done == true && context.mounted) showSnack(context, t.decisionDone);
       // Also after a refusal (403/409): the buttons must reflect the server's current allowedActions.
       ref.invalidate(requestDetailProvider(detail.id));
       ref.invalidate(inboxProvider);
+      if (done != true || !context.mounted) return;
+      final message = '${detail.docNo ?? detail.title}: ${t.decisionDone}';
+      await showActionResult(context, message: message, action: decisionActionLabel(t, decision));
     }
 
     final pm = detail.approvalRule?.pmApproval ?? false;

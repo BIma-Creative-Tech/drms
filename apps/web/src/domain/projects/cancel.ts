@@ -6,11 +6,12 @@ import { writeAudit } from '@/audit/writer'
 import { cancelAddendumForProject } from '@/domain/addendum/service'
 import { ADDENDUM_STATUS_LABELS, type AddendumStatus } from '@/domain/addendum/rules'
 import { requestStatusLabel } from '@/domain/expense/timeline'
-import type { RequestStatus, RequestType } from '@/domain/expense/types'
+import { cascadeCancellable } from '@/domain/expense/state'
+import { payeeOf, type RequestStatus, type RequestType } from '@/domain/expense/types'
 import { cancelForProject } from '@/domain/expense/workflow'
 import { cancelLoanForProject } from '@/domain/loans/service'
 import { LOAN_STATUS_LABELS, type LoanStatus } from '@/domain/loans/rules'
-import { mayCancelProject, PROJECT_CANCELLABLE, RecordError, requestCancellable } from '@/domain/soft-delete/service'
+import { mayCancelProject, PROJECT_CANCELLABLE, RecordError } from '@/domain/soft-delete/service'
 import { REASON_MAX, REASON_MIN } from '@/domain/soft-delete/registry'
 import { getRequestTx } from '@/lib/tx'
 
@@ -21,7 +22,8 @@ type SQL = ReturnType<typeof sql>
  * terminal status `dibatalkan` with a required reason, and everything of it that is still in flight is cancelled
  * in the SAME transaction, through the existing state machines (each document's own `cancel` transition, its
  * normal notifications and audit rows), with the reason "Proyek dibatalkan: <alasan>":
- * - pengajuan: draft / menunggu persetujuan; Pengajuan Baru disetujui; Reimburse disetujui / nota terverifikasi /
+ * - pengajuan: draft / menunggu persetujuan (D2410: a system-only cascade — no user cancels these any more,
+ *   state.ts PROJECT_CASCADE_CANCEL_FROM); Pengajuan Baru disetujui; Reimburse disetujui / nota terverifikasi /
  *   revisi nota (state.ts `cancel` rows);
  * - addendum RAB: draft / menunggu;
  * - pinjaman antar project (as lender or borrower): draft / menunggu, disetujui without any repayment.
@@ -100,7 +102,7 @@ async function planOf(req: PayloadRequest, p: ProjectRow): Promise<Pick<CancelPl
       statusLabel: requestStatusLabel(r.type, r.status, r.approval_snapshot as never, r.current_level),
       href: `/admin/collections/expense-requests/${r.id}`,
     }
-    ;(requestCancellable({ type: r.type, status: r.status, payeeType: r.payee_type }) ? cancel : blocking).push(item)
+    ;(cascadeCancellable(r.type, r.status, payeeOf(r.payee_type)) ? cancel : blocking).push(item)
   }
   const addenda = await rows<{ id: number; doc_no: string | null; reason: string | null; status: AddendumStatus }>(
     req,

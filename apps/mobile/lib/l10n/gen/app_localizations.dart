@@ -2986,13 +2986,13 @@ abstract class AppLocalizations {
   /// No description provided for @attendanceTypeOnsite.
   ///
   /// In id, this message translates to:
-  /// **'Karyawan OnSite: boleh absen di semua lokasi terdaftar PT (site, kantor pusat, project, pusat biaya).'**
+  /// **'Karyawan OnSite: absen di dalam radius lokasi yang dipilih (project / pusat biaya terdaftar PT).'**
   String get attendanceTypeOnsite;
 
   /// No description provided for @attendanceTypeNonOnsite.
   ///
   /// In id, this message translates to:
-  /// **'Karyawan Non-OnSite: boleh absen di mana saja; di luar lokasi terdaftar dicatat \"Di luar area\".'**
+  /// **'Karyawan Non-OnSite: absen masuk / pulang di dalam radius lokasi terdaftar PT mana pun; lokasi dipilih otomatis.'**
   String get attendanceTypeNonOnsite;
 
   /// No description provided for @attendanceOutsideArea.
@@ -3018,6 +3018,12 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Absen \"Di luar area\" belum bisa: site penempatan / kantor pusat PT belum ditetapkan Admin.'**
   String get attendanceNoReference;
+
+  /// No description provided for @attendanceNonOnsiteOutside.
+  ///
+  /// In id, this message translates to:
+  /// **'Anda di luar semua lokasi terdaftar PT. Karyawan Non-OnSite hanya bisa absen di dalam area lokasi project / pusat biaya PT. Mendekatlah ke lokasi terdaftar.'**
+  String get attendanceNonOnsiteOutside;
 
   /// No description provided for @distanceInside.
   ///
@@ -3310,13 +3316,13 @@ abstract class AppLocalizations {
   /// No description provided for @onBehalfTitle.
   ///
   /// In id, this message translates to:
-  /// **'Diabsenkan PM'**
+  /// **'Absenkan karyawan'**
   String get onBehalfTitle;
 
   /// No description provided for @onBehalfIntro.
   ///
   /// In id, this message translates to:
-  /// **'Untuk anggota tim yang tidak bisa absen sendiri. Lokasi diambil dari HP Anda, foto karyawan diambil dengan kamera HP Anda. Nama Anda dan alasannya tercatat.'**
+  /// **'Untuk karyawan yang tidak bisa absen sendiri (PM: anggota tim; Admin Staff: semua karyawan PT, juga tanpa akun). Lokasi diambil dari HP Anda, foto karyawan diambil dengan kamera HP Anda. Nama Anda dan alasannya tercatat.'**
   String get onBehalfIntro;
 
   /// No description provided for @onBehalfNoTeam.
@@ -3330,6 +3336,12 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Karyawan'**
   String get onBehalfEmployee;
+
+  /// No description provided for @onBehalfNoAccount.
+  ///
+  /// In id, this message translates to:
+  /// **'tanpa akun'**
+  String get onBehalfNoAccount;
 
   /// No description provided for @onBehalfReason.
   ///
@@ -5068,7 +5080,7 @@ abstract class AppLocalizations {
   /// No description provided for @fieldHmPrefilled.
   ///
   /// In id, this message translates to:
-  /// **'HM awal diisi otomatis dari HM akhir {date} ({hm}).'**
+  /// **'HM awal otomatis dari HM akhir terakhir yang tercatat: {date} ({hm}).'**
   String fieldHmPrefilled(String date, String hm);
 
   /// No description provided for @fieldHmUsed.
@@ -5092,7 +5104,7 @@ abstract class AppLocalizations {
   /// No description provided for @fieldHmPhotoRequired.
   ///
   /// In id, this message translates to:
-  /// **'Foto meter HM akhir (wajib)'**
+  /// **'Foto meter HM akhir (wajib bila HM diisi)'**
   String get fieldHmPhotoRequired;
 
   /// No description provided for @fieldHmPhotoFixed.
@@ -5100,6 +5112,18 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Foto meter HM sudah di server (tidak bisa diganti).'**
   String get fieldHmPhotoFixed;
+
+  /// No description provided for @fieldHmOptional.
+  ///
+  /// In id, this message translates to:
+  /// **'HM opsional — isi saat pencatatan HM mingguan. Bila diisi, HM awal dan HM akhir wajib keduanya, plus foto meter HM. HM awal otomatis tidak dikirim selama HM akhir kosong.'**
+  String get fieldHmOptional;
+
+  /// No description provided for @fieldTimesheetBackdateWide.
+  ///
+  /// In id, this message translates to:
+  /// **'Sebagai PM project / Direktur Anda dapat mengisi timesheet sejak {date} (selama periode kontrak unit).'**
+  String fieldTimesheetBackdateWide(String date);
 
   /// No description provided for @fieldOperatingHours.
   ///
@@ -6538,7 +6562,7 @@ abstract class AppLocalizations {
   /// No description provided for @loanNoBorrower.
   ///
   /// In id, this message translates to:
-  /// **'Pinjaman antar project diajukan oleh PM project peminjam. Anda belum menjadi PM project yang aktif.'**
+  /// **'Pinjaman antar project diajukan oleh PM project peminjam atau Finance. Anda belum menjadi PM project yang aktif.'**
   String get loanNoBorrower;
 
   /// No description provided for @loanBorrower.
@@ -6694,7 +6718,7 @@ abstract class AppLocalizations {
   /// No description provided for @loanApproveBody.
   ///
   /// In id, this message translates to:
-  /// **'{borrower} meminjam {amount} dari {lender}. Bila pusat biaya kedua project berbeda (dana), Finance mencairkan dana: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat biaya peminjam.'**
+  /// **'{borrower} meminjam {amount} dari {lender}. Persetujuan Direktur lalu Owner; untuk dana, Finance kemudian mentransfer lewat Antrian Transfer: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat biaya peminjam.'**
   String loanApproveBody(String borrower, String amount, String lender);
 
   /// No description provided for @loanRejectTitle.
@@ -7102,14 +7126,8 @@ abstract class AppLocalizations {
   /// No description provided for @fundAccounts.
   ///
   /// In id, this message translates to:
-  /// **'{count} akun, tanpa akun site'**
+  /// **'{count} akun'**
   String fundAccounts(int count);
-
-  /// No description provided for @fundSiteExcluded.
-  ///
-  /// In id, this message translates to:
-  /// **'{count} akun site {amount} tidak dihitung'**
-  String fundSiteExcluded(int count, String amount);
 
   /// ADR 0031 amendment: heading of the Pusat Biaya figures in the fund panel (web FundPanel.tsx).
   ///
@@ -10342,7 +10360,7 @@ abstract class AppLocalizations {
   /// No description provided for @loanCashWaiting.
   ///
   /// In id, this message translates to:
-  /// **'Menunggu pencairan Finance'**
+  /// **'Menunggu transfer Finance (Antrian Transfer)'**
   String get loanCashWaiting;
 
   /// No description provided for @loanCashCancelled.
@@ -10354,25 +10372,25 @@ abstract class AppLocalizations {
   /// No description provided for @loanCashTbd.
   ///
   /// In id, this message translates to:
-  /// **'Ditentukan saat disetujui (dana antar pusat biaya berbeda → dicairkan Finance)'**
+  /// **'Ditentukan saat disetujui (dana → ditransfer Finance lewat Antrian Transfer)'**
   String get loanCashTbd;
 
   /// No description provided for @loanCashNone.
   ///
   /// In id, this message translates to:
-  /// **'Tanpa transaksi kas (barang, atau pusat biaya sama)'**
+  /// **'Tanpa transaksi kas (barang, atau pinjaman lama dengan pusat biaya sama)'**
   String get loanCashNone;
 
   /// No description provided for @loanAwaitingDisbursement.
   ///
   /// In id, this message translates to:
-  /// **'Disetujui — menunggu Finance mencairkan dana dari {lender} ke {borrower}.'**
+  /// **'Disetujui — menunggu Finance mentransfer dana dari {lender} ke {borrower} lewat Antrian Transfer.'**
   String loanAwaitingDisbursement(String lender, String borrower);
 
   /// No description provided for @loanStepDisburse.
   ///
   /// In id, this message translates to:
-  /// **'Pencairan Finance'**
+  /// **'Transfer Finance'**
   String get loanStepDisburse;
 
   /// No description provided for @loanStepDisbursed.
@@ -10416,6 +10434,372 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Project Anda belum dipetakan ke pusat biaya (akun kas).'**
   String get kpiCostCentersTeamEmpty;
+
+  /// No description provided for @sectionAttachments.
+  ///
+  /// In id, this message translates to:
+  /// **'Lampiran'**
+  String get sectionAttachments;
+
+  /// No description provided for @attachmentsOptional.
+  ///
+  /// In id, this message translates to:
+  /// **'Lampiran (opsional)'**
+  String get attachmentsOptional;
+
+  /// No description provided for @attachmentsRequired.
+  ///
+  /// In id, this message translates to:
+  /// **'Lampiran (wajib untuk Reimburse)'**
+  String get attachmentsRequired;
+
+  /// No description provided for @attachmentsHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto atau file JPG / PNG / PDF (PDF maks. 5 MB), maks. 20 lampiran.'**
+  String get attachmentsHint;
+
+  /// No description provided for @attachmentFile.
+  ///
+  /// In id, this message translates to:
+  /// **'File'**
+  String get attachmentFile;
+
+  /// No description provided for @attachmentLocal.
+  ///
+  /// In id, this message translates to:
+  /// **'Di HP — terkirim saat sinkron / Ajukan'**
+  String get attachmentLocal;
+
+  /// No description provided for @attachmentOnServer.
+  ///
+  /// In id, this message translates to:
+  /// **'Tersimpan di server'**
+  String get attachmentOnServer;
+
+  /// No description provided for @attachmentRemove.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus lampiran'**
+  String get attachmentRemove;
+
+  /// No description provided for @attachmentsLimit.
+  ///
+  /// In id, this message translates to:
+  /// **'Maksimal {count} lampiran.'**
+  String attachmentsLimit(int count);
+
+  /// No description provided for @attachmentTypeInvalid.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih file JPG, PNG atau PDF.'**
+  String get attachmentTypeInvalid;
+
+  /// No description provided for @attachmentPdfTooLarge.
+  ///
+  /// In id, this message translates to:
+  /// **'File PDF lebih dari 5 MB. Perkecil file-nya atau lampirkan sebagai foto.'**
+  String get attachmentPdfTooLarge;
+
+  /// No description provided for @attachmentPdfInvalid.
+  ///
+  /// In id, this message translates to:
+  /// **'File PDF tidak valid.'**
+  String get attachmentPdfInvalid;
+
+  /// No description provided for @attachmentTooLarge.
+  ///
+  /// In id, this message translates to:
+  /// **'File terlalu besar (maks. 15 MB).'**
+  String get attachmentTooLarge;
+
+  /// No description provided for @loanStepOwner.
+  ///
+  /// In id, this message translates to:
+  /// **'Persetujuan Owner'**
+  String get loanStepOwner;
+
+  /// No description provided for @loanStepSubmittedFinance.
+  ///
+  /// In id, this message translates to:
+  /// **'Diajukan Finance'**
+  String get loanStepSubmittedFinance;
+
+  /// No description provided for @loanOpenTransferQueue.
+  ///
+  /// In id, this message translates to:
+  /// **'Buka Antrian Transfer'**
+  String get loanOpenTransferQueue;
+
+  /// No description provided for @loanRepayRequest.
+  ///
+  /// In id, this message translates to:
+  /// **'Ajukan pengembalian'**
+  String get loanRepayRequest;
+
+  /// No description provided for @loanRepayRequestTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Ajukan pengembalian {title}'**
+  String loanRepayRequestTitle(String title);
+
+  /// No description provided for @loanRepayRequestHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Disetujui Direktur lalu Owner, kemudian ditransfer Finance lewat Antrian Transfer (kas keluar dari pusat biaya peminjam, kas masuk ke pusat biaya pemberi).'**
+  String get loanRepayRequestHint;
+
+  /// No description provided for @loanRepayable.
+  ///
+  /// In id, this message translates to:
+  /// **'Dapat diajukan {amount}'**
+  String loanRepayable(String amount);
+
+  /// No description provided for @loanRepayPlannedDate.
+  ///
+  /// In id, this message translates to:
+  /// **'Rencana tanggal pengembalian'**
+  String get loanRepayPlannedDate;
+
+  /// No description provided for @loanRepayRequested.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengembalian {amount} diajukan ke Direktur.'**
+  String loanRepayRequested(String amount);
+
+  /// No description provided for @loanRepayPlannedOn.
+  ///
+  /// In id, this message translates to:
+  /// **'rencana {date}'**
+  String loanRepayPlannedOn(String date);
+
+  /// No description provided for @loanSubmittedBy.
+  ///
+  /// In id, this message translates to:
+  /// **'diajukan {name}'**
+  String loanSubmittedBy(String name);
+
+  /// No description provided for @loanRepaymentExecutedBy.
+  ///
+  /// In id, this message translates to:
+  /// **'ditransfer {name}'**
+  String loanRepaymentExecutedBy(String name);
+
+  /// No description provided for @loanRepaymentRejected.
+  ///
+  /// In id, this message translates to:
+  /// **'Ditolak: {reason}'**
+  String loanRepaymentRejected(String reason);
+
+  /// No description provided for @loanRepaymentCancelled.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibatalkan: {reason}'**
+  String loanRepaymentCancelled(String reason);
+
+  /// No description provided for @loanRepaymentApproveTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Setujui pengembalian {amount}?'**
+  String loanRepaymentApproveTitle(String amount);
+
+  /// No description provided for @loanRepaymentApproveBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Setelah persetujuan Owner, Finance mentransfer dari pusat biaya peminjam ke pusat biaya pemberi lewat Antrian Transfer.'**
+  String get loanRepaymentApproveBody;
+
+  /// No description provided for @loanRepaymentRejectTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tolak pengembalian {amount}?'**
+  String loanRepaymentRejectTitle(String amount);
+
+  /// No description provided for @loanRepaymentCancelTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Batalkan pengembalian {amount}?'**
+  String loanRepaymentCancelTitle(String amount);
+
+  /// No description provided for @loanRepaymentCancelBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan pengembalian dibatalkan (tidak dihapus). Alasan wajib.'**
+  String get loanRepaymentCancelBody;
+
+  /// No description provided for @loanRepaymentInboxTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengembalian pinjaman {no}'**
+  String loanRepaymentInboxTitle(String no);
+
+  /// No description provided for @loanTransferOrdersTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Transfer pinjaman antar project ({count})'**
+  String loanTransferOrdersTitle(int count);
+
+  /// No description provided for @loanTransferOrderSelf.
+  ///
+  /// In id, this message translates to:
+  /// **'Anda yang mengajukan; boleh dieksekusi sendiri (tercatat di audit).'**
+  String get loanTransferOrderSelf;
+
+  /// No description provided for @loanTransferOrderExecute.
+  ///
+  /// In id, this message translates to:
+  /// **'Catat transfer'**
+  String get loanTransferOrderExecute;
+
+  /// No description provided for @loanTransferOrderExecuteTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Catat transfer {no}'**
+  String loanTransferOrderExecuteTitle(String no);
+
+  /// No description provided for @loanTransferOrderExecuteBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Kas keluar {amount} dari {from} dan kas masuk ke {to}, masing-masing ditandai project-nya. Bukti transfer dapat dilampirkan di web.'**
+  String loanTransferOrderExecuteBody(String amount, String from, String to);
+
+  /// No description provided for @loanTransferOrderDate.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanggal transfer'**
+  String get loanTransferOrderDate;
+
+  /// No description provided for @loanTransferOrderDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Transfer {no} tercatat.'**
+  String loanTransferOrderDone(String no);
+
+  /// No description provided for @confirmActionTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Yakin ingin {action}?'**
+  String confirmActionTitle(String action);
+
+  /// No description provided for @confirmActionYes.
+  ///
+  /// In id, this message translates to:
+  /// **'Ya, {action}'**
+  String confirmActionYes(String action);
+
+  /// No description provided for @resultOk.
+  ///
+  /// In id, this message translates to:
+  /// **'OK'**
+  String get resultOk;
+
+  /// No description provided for @resultSuccessTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Berhasil'**
+  String get resultSuccessTitle;
+
+  /// No description provided for @resultSuccessAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Berhasil: {action}'**
+  String resultSuccessAction(String action);
+
+  /// No description provided for @resultFailedTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Gagal'**
+  String get resultFailedTitle;
+
+  /// No description provided for @resultFailedAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Gagal: {action}'**
+  String resultFailedAction(String action);
+
+  /// No description provided for @resultQueuedTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tersimpan di antrian'**
+  String get resultQueuedTitle;
+
+  /// No description provided for @resultQueuedBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Tersimpan di antrian, akan dikirim saat online.'**
+  String get resultQueuedBody;
+
+  /// No description provided for @actionReceiptsCompleteVerb.
+  ///
+  /// In id, this message translates to:
+  /// **'Tandai nota lengkap'**
+  String get actionReceiptsCompleteVerb;
+
+  /// No description provided for @receiptSaveAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan nota'**
+  String get receiptSaveAction;
+
+  /// No description provided for @correctionSaveAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan koreksi'**
+  String get correctionSaveAction;
+
+  /// No description provided for @scheduleAssignAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah jadwal karyawan'**
+  String get scheduleAssignAction;
+
+  /// No description provided for @fieldDiscardAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus draft'**
+  String get fieldDiscardAction;
+
+  /// No description provided for @progressDiscardAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus laporan'**
+  String get progressDiscardAction;
+
+  /// No description provided for @progressResendAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Kirim versi HP'**
+  String get progressResendAction;
+
+  /// No description provided for @accountSignatureSaveAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan tanda tangan'**
+  String get accountSignatureSaveAction;
+
+  /// No description provided for @accountSignatureRemoveAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus tanda tangan'**
+  String get accountSignatureRemoveAction;
+
+  /// No description provided for @actionDeleteDraft.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus draft'**
+  String get actionDeleteDraft;
+
+  /// No description provided for @deleteDraftServerConfirm.
+  ///
+  /// In id, this message translates to:
+  /// **'Draft dihapus dari daftar dan tidak dapat dikirim lagi; nomor yang sudah terbit tidak dipakai ulang.'**
+  String get deleteDraftServerConfirm;
+
+  /// No description provided for @deleteDraftDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Draft dihapus.'**
+  String get deleteDraftDone;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

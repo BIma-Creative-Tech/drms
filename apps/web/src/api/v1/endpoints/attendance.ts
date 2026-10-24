@@ -7,25 +7,37 @@ import type { z } from 'zod'
 import { employeeIn, memberCompanies, ownEmployees, relId, userId } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
 import { correctAttendance } from '@/domain/attendance/corrections'
-import { eligibleLocations, employeeAttendance, referenceSite, type EmployeeAttendance } from '@/domain/attendance/eligibility'
-import { AttendanceReject, locationOf, recordWebAttendance, type Location } from '@/domain/attendance/record'
+import { eligibleLocations, employeeAttendance, type EmployeeAttendance } from '@/domain/attendance/eligibility'
+import { onBehalfOptions } from '@/domain/attendance/on-behalf'
+import { AttendanceReject, locationOf, recordWebAttendance, recordWebOnBehalf, type Location } from '@/domain/attendance/record'
 import { employeeRecap, myRecap, teamTodayFor } from '@/domain/attendance/service'
 import { fileSize, mediaPath } from '@/lib/media-files'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { companyQuery, singleCompanyQuery } from '../company-query'
 import { HttpError, json, v1 } from '../http'
-import { AttendanceCheckBody, AttendanceCorrectBody, AttendanceLocationsQuery, AttendanceMonthQuery, AttendanceRecapQuery, TeamTodayQuery } from '../schemas-attendance'
+import {
+  AttendanceCheckBody,
+  AttendanceCorrectBody,
+  AttendanceLocationsQuery,
+  AttendanceMonthQuery,
+  AttendanceOnBehalfBody,
+  AttendanceOnBehalfOptionsQuery,
+  AttendanceRecapQuery,
+  TeamTodayQuery,
+} from '../schemas-attendance'
 
 /**
  * E6 attendance endpoints (APK + web S2). "Diabsenkan PM" is APK/sync-only (POST /sync/batch);
  * everything here is reads + T10 correction + the web self-service check-in/out (owner decision
- * 2026-10-09, every role).
+ * 2026-10-09, every role) + ADR 0032 the Admin Staff on-behalf (web; the APK uses the sync item).
  * - GET  /attendance/me?month=YYYY-MM                 US-09 own monthly recap (any role with an employee)
  * - GET  /attendance/recap?employee_id=&month=        recap of an employee: PM team / Admin, Owner, Finance
- * - GET  /attendance/team-today?date=&project_id=&cost_center_id=&site_id=   US-13 (PM team; office roles all)
+ * - GET  /attendance/team-today?date=&project_id=&cost_center_id=   US-13 (PM team; office roles all)
  * - GET  /attendance/locations?company=              DRMS 13/10 A2: own eligible check-in locations (APK auto-detect)
  * - POST /attendance/check-in, /attendance/check-out  self-service web absen (every role)
+ * - GET  /attendance/on-behalf/options?company=       ADR 0032: employees + locations an Admin Staff may record for
+ * - POST /attendance/on-behalf                        ADR 0032: Admin Staff check-in / check-out for an employee of its PT
  * - POST /attendance/{id}/correct {new_time, reason}  US-15 T10 (PM team / Admin; never own; idempotent)
  * - GET  /attendance/{id}/selfie                      selfie of a visible attendance; audited view_sensitive
  */
@@ -51,7 +63,7 @@ export const attendanceMeEndpoint = v1({
 export const attendanceRecapEndpoint = v1({
   path: '/attendance/recap',
   method: 'get',
-  roles: ['pk-pm', 'pk-finance', 'pk-owner', 'pk-admin'],
+  roles: ['pk-pm', 'pk-finance', 'pk-owner', 'pk-admin', 'pk-admin-staff'],
   rateLimit: READ_LIMIT,
   handler: async ({ req }) => {
     const q = AttendanceRecapQuery.safeParse(params(req))
@@ -63,7 +75,7 @@ export const attendanceRecapEndpoint = v1({
 export const teamTodayEndpoint = v1({
   path: '/attendance/team-today',
   method: 'get',
-  roles: ['pk-pm', 'pk-finance', 'pk-owner', 'pk-admin'],
+  roles: ['pk-pm', 'pk-finance', 'pk-owner', 'pk-admin', 'pk-admin-staff'],
   rateLimit: READ_LIMIT,
   handler: async ({ req }) => {
     const q = TeamTodayQuery.safeParse(params(req))
@@ -74,7 +86,6 @@ export const teamTodayEndpoint = v1({
         date: q.data.date,
         projectId: q.data.project_id ? Number(q.data.project_id) : undefined,
         costCenterId: q.data.cost_center_id ? Number(q.data.cost_center_id) : undefined,
-        siteId: q.data.site_id ? Number(q.data.site_id) : undefined,
         companyIds,
       }),
     )
@@ -85,10 +96,11 @@ export const teamTodayEndpoint = v1({
 /**
  * DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13): the caller's eligible check-in locations, per own employee in the
  * selected PTs (`?company=` narrows; the APK asks with every membership PT and caches the list for offline use).
- * Both types get every registered location of the PT with a point (OnSite must be inside one; Non-OnSite is recorded at
- * the containing one, else "Di luar area" referenced to `employees[].referenceSite` = home site, else head office).
- * Only id, kind, code, name, point, radius and the head-office / home flags — no money, no budgets. Read-only; the
- * check-in re-validates everything (domain/attendance/record.ts).
+ * Both types get every registered location of the PT with a point (projects, cost centers — ADR 0032: no site): OnSite
+ * must be inside the chosen one, Non-OnSite inside any of them (picked automatically; outside all → refused). Only id,
+ * kind, code, name, point and radius — no money, no budgets. `homeSiteId` / `referenceSite` / `isHeadOffice` / `home`
+ * stay in the answer for APK ≤ 0.11.1 and are always null / false. Read-only; the check-in re-validates everything
+ * (domain/attendance/record.ts).
  */
 export const attendanceLocationsEndpoint = v1({
   path: '/attendance/locations',
@@ -107,14 +119,9 @@ export const attendanceLocationsEndpoint = v1({
           if (emp && emp.company === c && emp.active) employees.push(emp)
         }
         const items = await eligibleLocations(req, employees)
-        const refs: Array<Awaited<ReturnType<typeof referenceSite>>> = []
-        for (const e of employees) refs.push(e.type === 'non_onsite' ? await referenceSite(req, e) : null)
         return {
-          employees: employees.map((e, i) => {
-            const r = refs[i]
-            return { id: e.id, company: e.company, attendanceType: e.type, homeSiteId: e.homeSite, referenceSite: r ? { id: r.id, code: r.code, name: r.name, lat: r.lat, lng: r.lng } : null }
-          }),
-          items: items.map((l) => ({ kind: l.kind, id: l.id, company: l.company, employeeId: l.employee, code: l.code, name: l.name, lat: l.lat, lng: l.lng, radiusM: l.radiusM, isHeadOffice: l.isHeadOffice, home: l.home })),
+          employees: employees.map((e) => ({ id: e.id, company: e.company, attendanceType: e.type, homeSiteId: null, referenceSite: null })),
+          items: items.map((l) => ({ kind: l.kind, id: l.id, company: l.company, employeeId: l.employee, code: l.code, name: l.name, lat: l.lat, lng: l.lng, radiusM: l.radiusM, isHeadOffice: false, home: false })),
         }
       }),
     )
@@ -134,8 +141,20 @@ const ATTENDANCE_REJECT_STATUS: Record<string, number> = {
   ALREADY_CHECKED_IN: 409,
   NO_CHECK_IN: 409,
   ALREADY_CHECKED_OUT: 409,
+  COMPANY_MISMATCH: 400,
   FEATURE_DISABLED: 403,
   PRIVACY_ACK_REQUIRED: 403,
+}
+
+/** AttendanceReject → problem+json (status by code). */
+function rejected(err: unknown): never {
+  if (err instanceof AttendanceReject) {
+    throw new HttpError(ATTENDANCE_REJECT_STATUS[err.code] ?? 400, err.message, {
+      code: err.code,
+      ...(err.field ? { errors: [{ path: err.field, message: err.message }] } : {}),
+    })
+  }
+  throw err
 }
 
 /** Shared handler of /attendance/check-in and /attendance/check-out (owner decision 2026-10-09). */
@@ -146,13 +165,7 @@ function webCheckHandler(kind: 'check_in' | 'check_out') {
       const r = await recordWebAttendance(req, kind, { location, lat: body.lat, lng: body.lng, accuracyM: body.accuracy_m ?? null, selfieId: body.selfie_media_id })
       return json(r, 201)
     } catch (err) {
-      if (err instanceof AttendanceReject) {
-        throw new HttpError(ATTENDANCE_REJECT_STATUS[err.code] ?? 400, err.message, {
-          code: err.code,
-          ...(err.field ? { errors: [{ path: err.field, message: err.message }] } : {}),
-        })
-      }
-      throw err
+      return rejected(err)
     }
   }
 }
@@ -175,10 +188,55 @@ export const attendanceCheckOutEndpoint = v1({
   handler: webCheckHandler('check_out'),
 })
 
+/**
+ * ADR 0032 (DRMS 24/10): what the caller may record on behalf of as Admin Staff — per PT of the selection where it holds
+ * pk-admin-staff: the active employees (own excluded; `hasAccount` false = no user account) and the registered
+ * locations with their point. Read-only; the APK caches it for offline on-behalf items.
+ */
+export const attendanceOnBehalfOptionsEndpoint = v1({
+  path: '/attendance/on-behalf/options',
+  method: 'get',
+  roles: ['pk-admin-staff', 'pk-pm'],
+  rateLimit: READ_LIMIT,
+  handler: async ({ req }) => {
+    const q = AttendanceOnBehalfOptionsQuery.safeParse(params(req))
+    if (!q.success) throw badQuery(q.error.issues)
+    const companies = (await companyQuery(req)) ?? memberCompanies(req)
+    return json(await withReqTransaction(req, () => onBehalfOptions(req, companies)))
+  },
+})
+
+/** ADR 0032: Admin Staff check-in / check-out for an employee of its PT from the web (source `admin`). */
+export const attendanceOnBehalfEndpoint = v1({
+  path: '/attendance/on-behalf',
+  method: 'post',
+  roles: ['pk-admin-staff', 'pk-pm'],
+  body: AttendanceOnBehalfBody,
+  rateLimit: [30, 60_000],
+  transactional: true,
+  handler: async ({ req, body }) => {
+    try {
+      const r = await recordWebOnBehalf(req, {
+        employeeId: body.employee_id,
+        kind: body.kind,
+        location: locationOf(body),
+        lat: body.lat,
+        lng: body.lng,
+        accuracyM: body.accuracy_m ?? null,
+        selfieId: body.selfie_media_id,
+        reason: body.reason,
+      })
+      return json(r, 201)
+    } catch (err) {
+      return rejected(err)
+    }
+  },
+})
+
 export const correctAttendanceEndpoint = v1({
   path: '/attendance/:id/correct',
   method: 'post',
-  roles: ['pk-pm', 'pk-admin', 'pk-owner', 'pk-finance'],
+  roles: ['pk-pm', 'pk-admin', 'pk-owner', 'pk-finance', 'pk-admin-staff'],
   body: AttendanceCorrectBody,
   rateLimit: [30, 60_000],
   transactional: true,
@@ -255,6 +313,8 @@ export const ATTENDANCE_ENDPOINTS = [
   attendanceLocationsEndpoint,
   attendanceCheckInEndpoint,
   attendanceCheckOutEndpoint,
+  attendanceOnBehalfOptionsEndpoint,
+  attendanceOnBehalfEndpoint,
   correctAttendanceEndpoint,
   attendanceSelfieEndpoint,
 ]

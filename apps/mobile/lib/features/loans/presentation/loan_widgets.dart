@@ -132,8 +132,9 @@ class LoanCard extends StatelessWidget {
   }
 }
 
-/// Inbox section (Direktur): loans waiting for the caller's decision. An unreachable endpoint (older server)
-/// hides the section so the expense inbox below stays usable.
+/// Inbox section (Direktur, Owner): loans and cash-backed repayment requests waiting for the caller's decision (user
+/// decision 2026-10-24: Direktur level 1, then Owner level 2). An unreachable endpoint (older server) hides the section
+/// so the expense inbox below stays usable.
 class LoanInboxSection extends ConsumerWidget {
   const LoanInboxSection({super.key});
 
@@ -142,10 +143,11 @@ class LoanInboxSection extends ConsumerWidget {
     final t = AppLocalizations.of(context);
     final value = ref.watch(loanInboxProvider);
     if (value.hasError || !value.hasValue) return const SizedBox.shrink();
-    final items = value.value!;
-    // Only a Direktur decides loans: other inbox users never see an (always empty) loan section.
-    final direktur = ref.watch(currentProfileProvider)?.has(Role.owner) ?? false;
-    if (items.isEmpty && !direktur) return const SizedBox.shrink();
+    final inbox = value.value!;
+    // Only a Direktur / Owner decides loans: other inbox users never see an (always empty) loan section.
+    final p = ref.watch(currentProfileProvider);
+    final decider = (p?.has(Role.owner) ?? false) || (p?.has(Role.principal) ?? false);
+    if (inbox.count == 0 && !decider) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -155,11 +157,11 @@ class LoanInboxSection extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
             child: Text(
-              items.isEmpty ? t.loanTitle : t.loanInboxTitle(items.length),
+              inbox.count == 0 ? t.loanTitle : t.loanInboxTitle(inbox.count),
               style: Theme.of(context).textTheme.titleMedium,
             ),
           ),
-          if (items.isEmpty)
+          if (inbox.count == 0)
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
               child: Text(
@@ -168,9 +170,80 @@ class LoanInboxSection extends ConsumerWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
-          for (final l in items) LoanCard(loan: l),
+          for (final l in inbox.loans) LoanCard(loan: l),
+          for (final r in inbox.repayments) LoanRepaymentInboxCard(item: r),
           const Divider(height: 16),
         ],
+      ),
+    );
+  }
+}
+
+/// A repayment request in the inbox: loan number, amount, borrower → lender (the money goes back), level label,
+/// planned date, submitter. Opens the loan detail, where the caller decides the request.
+class LoanRepaymentInboxCard extends StatelessWidget {
+  const LoanRepaymentInboxCard({super.key, required this.item});
+  final LoanRepaymentInboxItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final r = item;
+    return Card(
+      key: Key('loan-repayment-inbox-${r.id}'),
+      margin: const EdgeInsets.only(bottom: 10),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push('/loans/${r.loanId}'),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CompanyChipLead(companyId: r.companyId),
+                  Expanded(
+                    child: Text(
+                      t.loanRepaymentInboxTitle(r.loanDocNo ?? '#${r.loanId}'),
+                      style: theme.textTheme.labelLarge,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(
+                    formatRupiah(r.amount),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              // the money goes back: borrower → lender
+              Text(
+                t.loanFlow(r.borrower.label, r.lender?.label ?? '—'),
+                key: Key('loan-repayment-inbox-flow-${r.id}'),
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 6),
+              Chip(
+                avatar: Icon(Icons.hourglass_top, size: 18, color: context.pk.warnText),
+                label: Text(r.statusLabel, overflow: TextOverflow.ellipsis),
+                visualDensity: VisualDensity.compact,
+              ),
+              Text(
+                [
+                  if (r.plannedDate != null) t.loanRepayPlannedOn(formatDateOnly(r.plannedDate)),
+                  if (r.submittedBy?.name != null) t.loanSubmittedBy(r.submittedBy!.name!),
+                  if ((r.note ?? '').isNotEmpty) r.note!,
+                ].join(' · '),
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

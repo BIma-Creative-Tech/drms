@@ -5,7 +5,7 @@
  * merged project timeline. No Payload / React import (unit-tested in tests/unit/fr1-views.test.ts);
  * the numbers use the same rules as the registry reports (availabilityPct, billingEstimate).
  */
-import { addDays, availabilityPct, billingEstimate, contractDaysInMonth, daysBetween, OPEN_PO_STATUSES, round2, type ActivityKind, type BillingEstimate, type PoStatus, type RateBasis } from './rules'
+import { addDays, availabilityPct, BACKDATE_LIMIT_TEXT, billingEstimate, contractDaysInMonth, daysBetween, OPEN_PO_STATUSES, round2, type ActivityKind, type BillingEstimate, type PoStatus, type RateBasis } from './rules'
 
 export const ESTIMATE_LABEL = 'Estimasi — bukan invoice'
 export const ESTIMATE_NOTE = 'Invoice resmi dibuat di luar aplikasi.'
@@ -129,8 +129,9 @@ export type MatrixTimesheet = {
   unitId: number
   contractUnitId: number | null
   reportDate: string
-  hmStart: number
-  hmEnd: number
+  /** null = no HM reading that day (D2410: HM is weekly). */
+  hmStart: number | null
+  hmEnd: number | null
   workHours: number
   standbyHours: number
   breakdownHours: number
@@ -143,7 +144,8 @@ export type MatrixTimesheet = {
  * period), future (after today).
  */
 export type CellState = 'filled' | 'breakdown' | 'missing' | 'off' | 'future'
-export type MatrixCell = { date: string; state: CellState; ts: MatrixTimesheet | null; hmGap: boolean }
+/** `fillable` (D2410): a missing day the caller may still file (date ≥ the caller's `minDate`) — the matrix "+". */
+export type MatrixCell = { date: string; state: CellState; ts: MatrixTimesheet | null; hmGap: boolean; fillable: boolean }
 export type MatrixRow = { contract: MatrixContract; cells: MatrixCell[]; work: number; standby: number; breakdown: number; filled: number; missing: number; gaps: number }
 export type Matrix = { month: string; days: string[]; rows: MatrixRow[]; totals: { work: number; standby: number; breakdown: number; filled: number; missing: number; gaps: number } }
 
@@ -157,9 +159,10 @@ function belongs(t: MatrixTimesheet, c: MatrixContract): boolean {
 
 /**
  * Matrix unit × day of one kontrak_unit project for `month`: one row per contract unit overlapping
- * the month (inactive ones only when they have timesheets), cells per day, row/total sums.
+ * the month (inactive ones only when they have timesheets), cells per day, row/total sums. `minDate` (D2410) = the
+ * caller's earliest timesheet date (`timesheetMinDate`): older missing days stay "missing" but are not `fillable`.
  */
-export function buildTimesheetMatrix(input: { month: string; today: string; contracts: readonly MatrixContract[]; timesheets: readonly MatrixTimesheet[] }): Matrix {
+export function buildTimesheetMatrix(input: { month: string; today: string; contracts: readonly MatrixContract[]; timesheets: readonly MatrixTimesheet[]; minDate?: string }): Matrix {
   const days = monthDays(input.month)
   const first = days[0]!
   const last = days[days.length - 1]!
@@ -178,7 +181,7 @@ export function buildTimesheetMatrix(input: { month: string; today: string; cont
       else if (!inPeriod(date, c) || !c.active) state = 'off'
       else state = 'missing'
       const hmGap = !!ts && ts.flags.includes('HM_GAP')
-      row.cells.push({ date, state, ts, hmGap })
+      row.cells.push({ date, state, ts, hmGap, fillable: state === 'missing' && (input.minDate === undefined || date >= input.minDate) })
       if (ts) {
         row.work += ts.workHours
         row.standby += ts.standbyHours
@@ -206,7 +209,7 @@ export function cellText(c: MatrixCell, unitLabel: string): string {
     if (c.hmGap) parts.push('selisih HM')
     return `${d}: ${parts.join(', ')}`
   }
-  if (c.state === 'missing') return `${d}: belum diisi`
+  if (c.state === 'missing') return `${d}: belum diisi${c.fillable ? '' : ` — ${BACKDATE_LIMIT_TEXT.charAt(0).toLowerCase()}${BACKDATE_LIMIT_TEXT.slice(1)}`}`
   if (c.state === 'future') return `${d}: belum terjadi`
   return `${d}: di luar periode kontrak`
 }
@@ -249,19 +252,19 @@ export function estimateNote(e: BillingEstimate, workHours: number): string | nu
 }
 
 /**
- * Recap rows of the matrix month (registry `rekap-timesheet-kontrak` rules): HM first start → last
- * end, hours, availability, missing days (contract days ≤ today) and — only when `terms` carries a
- * rate (rate roles) — the billing ESTIMATE.
+ * Recap rows of the matrix month (registry `rekap-timesheet-kontrak` rules): HM first recorded start → last recorded
+ * end (D2410: days without HM skipped), hours, availability, missing days (contract days ≤ today) and — only when
+ * `terms` carries a rate (rate roles) — the billing ESTIMATE.
  */
 export function buildRecap(m: Matrix, terms: ReadonlyMap<number, ContractTermsView>): { rows: RecapRow[]; totals: { work: number; standby: number; breakdown: number; missing: number; estimate: number | null } } {
   const rows = m.rows.map((r): RecapRow => {
-    const filled = r.cells.filter((c) => c.ts).map((c) => c.ts!)
+    const withHm = r.cells.filter((c) => c.ts && c.ts.hmStart !== null && c.ts.hmEnd !== null).map((c) => c.ts!)
     const t = terms.get(r.contract.id)
     const est = t && t.rate !== null ? billingEstimate({ rateBasis: t.rateBasis, rate: t.rate, minHoursPerMonth: t.minHoursPerMonth, startDate: r.contract.startDate, endDate: r.contract.endDate }, m.month, r.work) : null
     return {
       contract: r.contract,
-      hmStart: filled.length ? filled[0]!.hmStart : null,
-      hmEnd: filled.length ? filled[filled.length - 1]!.hmEnd : null,
+      hmStart: withHm.length ? withHm[0]!.hmStart : null,
+      hmEnd: withHm.length ? withHm[withHm.length - 1]!.hmEnd : null,
       work: r.work,
       standby: r.standby,
       breakdown: r.breakdown,
@@ -285,6 +288,43 @@ export function buildRecap(m: Matrix, terms: ReadonlyMap<number, ContractTermsVi
       estimate: anyEstimate ? rows.reduce((a, r) => a + (r.estimate?.amount ?? 0), 0) : null,
     },
   }
+}
+
+// ---------------------------------------------------------------- weekly HM (D2410)
+
+/** Label of a Monday–Sunday week: '29 Sep – 5 Okt 2026' / '6–12 Okt 2026'. */
+export function weekLabel(from: string, to: string): string {
+  const [fy, fm, fd] = from.split('-').map(Number) as [number, number, number]
+  const [ty, tm, td] = to.split('-').map(Number) as [number, number, number]
+  if (fy !== ty) return `${fd} ${MONTHS_SHORT[fm - 1]} ${fy} – ${td} ${MONTHS_SHORT[tm - 1]} ${ty}`
+  return fm === tm ? `${fd}–${td} ${MONTHS_SHORT[tm - 1]} ${ty}` : `${fd} ${MONTHS_SHORT[fm - 1]} – ${td} ${MONTHS_SHORT[tm - 1]} ${ty}`
+}
+
+/** Monday–Sunday weeks overlapping 'YYYY-MM' (the first may start in the previous month, the last end in the next). */
+export function hmWeeks(month: string): Array<{ from: string; to: string; label: string }> {
+  const days = monthDays(month)
+  const out: Array<{ from: string; to: string; label: string }> = []
+  for (let from = mondayOf(days[0]!); from <= days[days.length - 1]!; from = addDays(from, 7)) out.push({ from, to: addDays(from, 6), label: weekLabel(from, addDays(from, 6)) })
+  return out
+}
+
+export type HmReading = { reportDate: string; hmStart: number | null; hmEnd: number | null }
+export type HmWeek = { from: string; to: string; label: string; hmStart: number | null; hmEnd: number | null; total: number | null; days: number }
+
+/**
+ * D2410 (user 2026-10-24) weekly HM summary of ONE unit (operators read the HM about once a week): per Monday–Sunday
+ * week overlapping `month` — HM awal = the first recorded HM start of the week, HM akhir = the last recorded HM end,
+ * total = HM akhir − HM awal (the hours the meter ran that week, also on days without a reading), days = days with
+ * HM. Timesheets without HM are skipped; a week without any reading has nulls and 0 days.
+ */
+export function weeklyHm(readings: readonly HmReading[], month: string): HmWeek[] {
+  const withHm = readings.filter((r) => r.hmStart !== null && r.hmEnd !== null).sort((a, b) => (a.reportDate < b.reportDate ? -1 : a.reportDate > b.reportDate ? 1 : 0))
+  return hmWeeks(month).map((w) => {
+    const inWeek = withHm.filter((r) => r.reportDate >= w.from && r.reportDate <= w.to)
+    const hmStart = inWeek.length ? inWeek[0]!.hmStart : null
+    const hmEnd = inWeek.length ? inWeek[inWeek.length - 1]!.hmEnd : null
+    return { ...w, hmStart, hmEnd, total: hmStart !== null && hmEnd !== null ? round2(hmEnd - hmStart) : null, days: new Set(inWeek.map((r) => r.reportDate)).size }
+  })
 }
 
 // ---------------------------------------------------------------- aftersales weekly recap
@@ -400,7 +440,7 @@ export type TimelineEntry = {
 }
 
 export type TimelineService = { id: number; docNo: string | null; reportDate: string; unitLabel: string; serviceTypeLabel: string; statusLabel: string; statusOk: boolean; action: string; hourMeter: number | null; spareparts: number; photos: number; reporter: string | null; corrected: boolean }
-export type TimelineTimesheet = { id: number; reportDate: string; unitId: number; contractUnitId: number | null; unitLabel: string; workHours: number; breakdownHours: number; hmStart: number; hmEnd: number; flags: readonly string[] }
+export type TimelineTimesheet = { id: number; reportDate: string; unitId: number; contractUnitId: number | null; unitLabel: string; workHours: number; breakdownHours: number; hmStart: number | null; hmEnd: number | null; flags: readonly string[] }
 export type TimelineActivity = { id: number; activityDate: string; kindLabel: string; clientName: string | null; docNo: string | null; items: string; poStatusLabel: string | null; reporter: string | null }
 
 const clip = (s: string, n = 110) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)

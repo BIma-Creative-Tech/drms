@@ -97,12 +97,12 @@ Pengguna → Akses PT satu per satu.
    - **Data Karyawan:** per PT → **Buat data karyawan baru** (Kode, Nama lengkap, Nama panggilan,
      Jabatan, No. HP, Status), **Pilih karyawan yang sudah ada** (hanya karyawan PT itu yang belum terhubung ke akun
      lain), atau **Tanpa data karyawan**. Karyawan yang sudah terhubung bisa diubah langsung, atau **Lepas tautan**
-     (data karyawannya tetap ada). Jadwal kerja, site penempatan dan foto wajah: tautan **Buka data karyawan
+     (data karyawannya tetap ada). Jadwal kerja dan foto wajah: tautan **Buka data karyawan
      lengkap ↗**.
    - **Rekening Karyawan:** per PT → **+ Tambah rekening** (Bank, Nomor rekening — hanya
      angka, Atas nama, Status verifikasi, Rekening default, Status). Rekening tidak pernah dihapus — nonaktifkan.
    - **Penugasan Proyek:** per PT (juga karyawan baru di simpan yang sama) → **+ Tambah
-     penugasan**: **Jenis lokasi** (Project / Pusat biaya / Site) lalu pilih satu lokasi aktif PT itu, **Peran** (PM /
+     penugasan**: **Jenis lokasi** (Project / Pusat biaya) lalu pilih satu lokasi aktif PT itu, **Peran** (PM /
      Staff / Mandor), **Mulai**, **Selesai** (boleh kosong). Penugasan yang tersimpan: ubah **Peran** atau isi
      **Selesai** untuk mengakhirinya (wajib alasan); tidak dapat dihapus. Detail lain: tautan **Buka ↗**.
 3. **Simpan** (satu tombol, di bawah). Semua tab disimpan **bersama atau tidak sama sekali**. Bila ada yang salah,
@@ -287,7 +287,9 @@ sampai selesai).
 - Level Owner **tidak pernah dilewati diam-diam**: bila satu-satunya Owner PT adalah pemohon/pembuat pengajuan dengan
   level Owner (mis. Owner membuat pengajuan untuk orang lain), pengiriman ditolak dengan pesan. Bila belum ada Owner
   aktif di PT, pengiriman ditolak "Tidak ada pengguna aktif untuk posisi Approval level n (peran Owner)".
-- **Addendum RAB** dan **pinjaman antar project** tetap hanya Direktur; aturan Addendum RAB tidak boleh berisi Owner.
+- **Addendum RAB** tetap hanya Direktur; aturan Addendum RAB tidak boleh berisi Owner. **Pinjaman antar project**
+  (sejak 24 Okt 2026, tanpa aturan approval — alur tetap di sistem): Direktur lalu Owner; PT tanpa Owner aktif menolak
+  pengajuan pinjaman ("belum punya Owner aktif") — beri peran Owner di Pengguna → Akses PT.
 - Pengajuan yang sudah diajukan sebelum perubahan tetap memakai snapshot lama (Direktur = keputusan terakhir).
 
 ### 4a. Mengubah aturan setelah deploy (sekali, setiap PT: DRMS, LAS, TBK, CS1)
@@ -339,8 +341,9 @@ buat/ubah aturan sementara dengan level 1 = Direktur pengganti (user bernama), l
   alasan wajib (tercatat di Audit Log). Nyalakan per PT **setelah** Finance memastikan saldo semua akun non-site cocok
   dengan rekening koran (saldo awal, semua kas masuk tercatat), mis. alasan "saldo cocok dengan rekening koran per
   <tanggal>". Mematikan = blokir hilang seketika (panel tetap tampil sebagai informasi).
-- Akun kas yang ditandai **site** tidak dihitung sebagai dana PT. Bila rekening cabang harus dihitung, hapus tanda
-  site-nya.
+- Akun kas yang dulu ditandai **site** (kas kecil / rekening cabang, sebelum 24 Okt 2026) tetap tidak dihitung sebagai
+  dana PT; panel cek dana menyebut jumlahnya. Sejak ADR 0032 tanda site tidak bisa diubah lagi dari panel — keputusan
+  apakah akun itu dihitung masih menunggu owner (ADR 0032 §4).
 - Setiap PT yang bisa meminjamkan / meminjam perlu **Rekening penerimaan antar-PT** (§4c).
 - Penomoran baru **Pinjaman antar-PT** `PJA/{COMPANY}/{YY}{MM}/{seq}` (PT pemberi), dibuat otomatis per PT.
 - Pengingat harian **"Pinjaman antar-PT terlambat"** per PT peminjam (tab Pengingat & notifikasi, default aktif).
@@ -441,30 +444,35 @@ semua isian tab ini untuk kembali ke tanda tangan pribadi.
   Jadwal kerja default diatur per PT (**Perusahaan (PT) → Operasional → Jadwal kerja default**).
 - Titik & radius **project** diisi di **Proyek → Project**. Lokasi tanpa titik tidak bisa dipakai absen; titik tanpa
   radius memakai **Radius geofence default** PT itu. Server menambah toleransi akurasi GPS HP (maks. 50 m) ke radius.
-- **Tipe absensi karyawan** (DRMS 13/10 A2): di **Karyawan** (atau **Pengguna → tab Data Karyawan**) isi **Tipe
-  absensi**:
-  - **Karyawan OnSite** (default semua karyawan): boleh absen di **semua lokasi terdaftar PT** yang punya titik —
-    kantor pusat, kantor cabang (site), project, pusat biaya — **tanpa penugasan** (Team Assignment tidak perlu).
-  - **Karyawan Non-OnSite** (staf kantor): **tidak dibatasi lokasi** — boleh absen di site mana pun dan juga di luar
-    lokasi terdaftar (tanpa cek radius, tanpa penugasan). Bila posisinya di dalam lokasi terdaftar, absen dicatat di
-    lokasi itu; bila tidak, dicatat **"Di luar area"** dengan acuan **site penempatan** karyawan (bila kosong:
-    **kantor pusat**) dan jaraknya. Absen pulang menutup absen masuk hari itu. GPS tetap wajib, lokasi palsu tetap
-    ditolak. Tanpa site penempatan dan tanpa kantor pusat, absen di luar area ditolak — isi salah satunya.
-  - **"Di luar area"** terlihat di Rekap absensi (tanda **Di luar area**), di **Laporan Absensi** (kolom Lokasi
-    *Di luar area (ref. …)* dan Keterangan) dan di daftar **Absensi** (kolom/filter **Di luar area**).
+- **Site sudah dihapus** (ADR 0032, 24 Okt 2026): tidak ada lagi menu **Master Data → Site**, "Site penempatan",
+  site di project / akun kas / penugasan, maupun filter site. Lokasi absen = **project** (dan pusat biaya yang punya
+  titik). Penugasan site lama sudah diubah otomatis menjadi penugasan ke project aktif site itu (atau diakhiri bila
+  site itu tidak punya project aktif) — tercatat di Audit Log.
+- **Tipe absensi karyawan:** di **Karyawan** (atau **Pengguna → tab Data Karyawan**) isi **Tipe absensi**:
+  - **Karyawan OnSite** (default semua karyawan): absen di lokasi terdaftar PT yang **dipilih** (project / pusat biaya
+    yang punya titik) dan harus **di dalam radius** lokasi itu — **tanpa penugasan** (Team Assignment tidak perlu).
+  - **Karyawan Non-OnSite** (staf kantor): absen masuk **dan** pulang di dalam radius **lokasi terdaftar PT mana pun**
+    — tanpa penugasan; lokasi yang memuat posisi GPS dipilih otomatis (yang terdekat bila bertumpuk). **Di luar semua
+    lokasi terdaftar absen ditolak** (sejak 24 Okt 2026 tidak ada lagi "Di luar area"). Absen pulang menutup absen
+    masuk hari itu (bila pulang di lokasi lain, baris diberi tanda `CHECK_OUT_ELSEWHERE`). GPS wajib, lokasi palsu
+    ditolak.
+  - Catatan lama **"Di luar area"** (14–24 Okt 2026) tetap terlihat di Rekap, Laporan Absensi dan daftar **Absensi**.
   - Daftar Karyawan bisa difilter per **Tipe absensi**.
-- **Kantor pusat:** di **Master Data → Site** centang **Kantor pusat** pada site kantor pusat PT (maksimal **1 per
-  PT**; untuk memindahkan, hapus centang di site lama dulu) dan isi **titik + radius**. Kantor pusat menjadi acuan
-  "Di luar area" untuk karyawan Non-OnSite yang belum punya site penempatan.
 - APK dan web **mengenali area otomatis**: lokasi yang geofence-nya memuat posisi GPS karyawan langsung terpilih;
-  bila beberapa area bertumpuk, karyawan memilih salah satu; di luar semua area, karyawan OnSite memilih manual
-  (server tetap menolak bila di luar radius), karyawan Non-OnSite otomatis memakai pilihan **"Di luar area"**. Lokasi baru/titik baru terbaca di APK setelah sinkron berikutnya (maks. ±15
-  menit saat online).
+  bila beberapa area bertumpuk, karyawan memilih salah satu; di luar semua area karyawan OnSite memilih manual (server
+  tetap menolak bila di luar radius) dan karyawan Non-OnSite mendapat pesan penolakan. Lokasi / titik baru terbaca di
+  APK setelah sinkron berikutnya (maks. ±15 menit saat online).
 - Bila lebih dari satu PT tampil, halaman absensi punya pilihan **PT** (mis. **Semua PT (DRMS, CS1)**) dan nama lokasi
   diberi awalan `[KODE PT]`.
 - **Laporan → Laporan Absensi**: Admin bisa melihat dan mengunduh (CSV/Excel) untuk semua karyawan PT tempat ia Admin.
 - **Koreksi jam** karyawan: **Absensi → Rekap bulanan** → **Koreksi jam masuk/pulang** + alasan.
-- Mengabsenkan karyawan tanpa HP hanya bisa oleh PM dari APK.
+- **Peran Admin Staff** (ADR 0032): beri peran **Admin Staff** per PT (Pengguna → Akses & Peran, atau Akses PT).
+  Admin Staff mengurus absensi PT itu saja: melihat semua absensi + selfie (tercatat di Audit Log) dan koreksi,
+  **Absensi → Absenkan karyawan** (web; di APK: Absensi → Tim → Absenkan) untuk karyawan PT mana pun — juga **tukang
+  harian tanpa akun** (cukup data Karyawan) — dengan kamera dan GPS perangkat Admin Staff dan alasan wajib (tercatat
+  "diabsenkan oleh <nama>"), koreksi jam (bukan absensinya sendiri), melihat Data Karyawan (tanpa rekening), Tim hari
+  ini, Rekap, Jadwal (baca) dan Laporan Absensi. **Tidak** punya akses keuangan / pengajuan kecuali diberi peran lain.
+- Mengabsenkan karyawan: **Admin Staff** (web + APK, semua karyawan PT) atau **PM** (APK, anggota tim).
 
 ## 8. Pengajuan atas nama karyawan
 

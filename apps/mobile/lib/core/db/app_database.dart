@@ -284,7 +284,8 @@ class FieldClients extends Table {
 }
 
 /// FR1 recent server timesheets (≈ 15 days) per user: HM awal prefill, "Salin dari kemarin", unit tabs
-/// "✓ / belum" while offline.
+/// "✓ / belum" while offline. HM is optional (user 2026-10-24: operators record it about once a week) → NULL
+/// = a timesheet without HM (still counts as "✓" for its unit and date; never an HM prefill source).
 @DataClassName('FieldRecentTimesheetRow')
 class FieldRecentTimesheets extends Table {
   TextColumn get userSub => text()();
@@ -293,8 +294,8 @@ class FieldRecentTimesheets extends Table {
   IntColumn get projectId => integer()();
   IntColumn get unitId => integer()();
   TextColumn get reportDate => text()();
-  RealColumn get hmStart => real()();
-  RealColumn get hmEnd => real()();
+  RealColumn get hmStart => real().nullable()();
+  RealColumn get hmEnd => real().nullable()();
   TextColumn get operatorName => text().nullable()();
   TextColumn get location => text().nullable()();
   RealColumn get fuelLiters => real().nullable()();
@@ -433,7 +434,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -482,6 +483,13 @@ class AppDatabase extends _$AppDatabase {
       // v11 (owner 2026-10-17): service types ("Jenis servis") per PT. Additive only; a service report queued by an
       // older APK keeps its single legacy code and is mapped to the PT's type of the same code when it is sent.
       if (from < 11) await m.createTable(fieldServiceTypes);
+      // v12 (user 2026-10-24, weekly HM): field_recent_timesheets.hm_start / hm_end nullable. The table is a pure
+      // server cache (refilled by the next field refresh), so it is dropped and recreated instead of copied; local
+      // reports, drafts and the queue are untouched (their HM lives in content_json).
+      if (from < 12 && from >= 5) {
+        await m.deleteTable('field_recent_timesheets');
+        await m.createTable(fieldRecentTimesheets);
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');

@@ -37,16 +37,11 @@ function monthOf(sp: URLSearchParams, today: string): string {
 export function attendanceReportScope(scope: ReportScope, projectId?: number, costCenterId?: number): AttScope {
   const none: AttScope = { kind: 'team', projects: [], costCenters: [], parts: [] }
   if (!scope.companies) return none // legacy company-blind literal: fail closed (MC4)
-  // ADR 0023: team sites of a PM PT; the report site filter (`onlySites`) carries over as the attendance site filter
   const base: AttScope =
     attScopeOf(
       scope.companies
         .filter((c) => c.kind !== 'own')
-        .map((c) => ({
-          ...(c.kind === 'all' ? { company: c.company, all: true, projects: [], costCenters: [] } : { company: c.company, all: false, projects: c.kind === 'team' ? c.projects : [], costCenters: c.kind === 'team' ? c.costCenters : [] }),
-          ...(c.kind === 'team' && c.sites?.length ? { sites: c.sites } : {}),
-          ...(c.onlySites ? { onlySites: c.onlySites } : {}),
-        })),
+        .map((c) => (c.kind === 'all' ? { company: c.company, all: true, projects: [], costCenters: [] } : { company: c.company, all: false, projects: c.kind === 'team' ? c.projects : [], costCenters: c.kind === 'team' ? c.costCenters : [] })),
     ) ?? none
   if (!projectId && !costCenterId) return base
   return narrowAttScope(base, projectId, costCenterId)
@@ -101,12 +96,11 @@ const STATUS_LABEL: Record<string, string> = {
 
 export const absensiReport: ReportDef = {
   code: 'absensi',
-  siteFilter: true,
   title: 'Laporan Absensi',
   kpi: 'M13',
   description: 'Rekap absensi per karyawan per bulan: hari kerja, hadir, tidak hadir, terlambat, pulang cepat, jam kerja, hadir di hari libur, diabsenkan PM, koreksi.',
-  // S3e (S-23): Admin reads + exports attendance (requirements §4 matrix), scope all.
-  roles: ['pk-finance', 'pk-owner', 'pk-pm', 'pk-admin'],
+  // S3e (S-23): Admin reads + exports attendance (requirements §4 matrix), scope all. ADR 0032: Admin Staff too.
+  roles: ['pk-finance', 'pk-owner', 'pk-pm', 'pk-admin', 'pk-admin-staff'],
   scope: attendanceOfficeScope,
   formats: ['csv', 'xlsx'],
   paged: false,
@@ -152,7 +146,7 @@ export const absensiReport: ReportDef = {
               pulangCepat: d.earlyLeaveMinutes,
               ket: [
                 d.holidayName ? `Hari libur: ${d.holidayName}` : d.kind === 'off' && d.checkIn ? 'Hari non-kerja' : '',
-                d.onBehalf ? `Diabsenkan PM${d.onBehalfBy.length ? ` (${d.onBehalfBy.join(', ')})` : ''}` : '',
+                d.onBehalf ? `Diabsenkan${d.onBehalfBy.length ? ` (${d.onBehalfBy.join(', ')})` : ''}` : '',
                 d.corrected ? 'Dikoreksi' : '',
                 d.flags.includes(OUTSIDE_AREA_FLAG) ? OUTSIDE_AREA_LABEL : '',
               ]
@@ -180,7 +174,7 @@ export const absensiReport: ReportDef = {
           { key: 'hariLibur', label: 'Hadir hari libur', type: 'int' },
           { key: 'nonKerja', label: 'Hadir hari non-kerja', type: 'int' },
           { key: 'tanpaPulang', label: 'Tanpa absen pulang', type: 'int' },
-          { key: 'olehPm', label: 'Diabsenkan PM (hari)', type: 'int' },
+          { key: 'olehPm', label: 'Diabsenkan PM / Admin Staff (hari)', type: 'int' },
           { key: 'koreksi', label: 'Dikoreksi (hari)', type: 'int' },
         ],
         rows: list.map((e) => ({

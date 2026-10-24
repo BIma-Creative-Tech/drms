@@ -1,6 +1,7 @@
 import type { CollectionConfig, Field } from 'payload'
 
 import { BUSINESS_DATE_FIELD } from '@/collections/fields-f2'
+import { withPendingOwner } from '@/domain/expense/status-filter'
 
 import { ROW_ACTIONS_FIELD } from '../row-actions'
 
@@ -51,7 +52,7 @@ export type PkListConfig = {
  * documents (pengajuan, nota, transfer …) can run into thousands and are reached by search instead.
  */
 export const FILTER_TARGETS: ReadonlySet<string> = new Set([
-  'projects', 'employees', 'users', 'clients', 'vendors', 'cost-centers', 'sites', 'urgency-levels', 'expense-categories',
+  'projects', 'employees', 'users', 'clients', 'vendors', 'cost-centers', 'urgency-levels', 'expense-categories',
   'cash-accounts', 'cash-in-sources', 'banks', 'vehicles', 'uoms', 'resource-types', 'service-types', 'project-stages', 'stage-templates',
   'work-schedules', 'rap-templates', 'approval-rules',
 ])
@@ -60,19 +61,31 @@ export const FILTER_TARGETS: ReadonlySet<string> = new Set([
 const EXPLICIT: Record<string, { filters?: readonly string[]; dates?: readonly string[] }> = {
   // ADR 0027: "Jenis penerima" (karyawan / vendor) filter
   'expense-requests': { filters: ['status', 'type', 'payeeType', 'project', 'urgencyLevel', 'costCenter'], dates: ['requestDate'] },
-  projects: { filters: ['status', 'kind', 'client', 'site', 'pm'], dates: ['startDate'] },
-  employees: { filters: ['attendanceType', 'homeSite', 'workSchedule', 'active'] },
-  sites: { filters: ['isHeadOffice', 'costCenter', 'active'] },
+  projects: { filters: ['status', 'kind', 'client', 'pm'], dates: ['startDate'] },
+  employees: { filters: ['attendanceType', 'workSchedule', 'active'] },
   vendors: { filters: ['active'] },
   users: { filters: ['active'] },
   'cash-entries': { filters: ['direction', 'status', 'sourceType', 'cashAccount'], dates: ['entryDate'] },
   transfers: { filters: ['status', 'kind', 'costCenter'], dates: ['transferAt'] },
   receipts: { filters: ['status'], dates: ['receiptDate'] },
   settlements: { filters: ['status', 'settlementType'] },
-  attendances: { filters: ['kind', 'source', 'project', 'site', 'outsideArea'] },
+  attendances: { filters: ['kind', 'source', 'project', 'costCenter', 'outsideArea'] },
   'attendance-corrections': { filters: ['employee', 'kind', 'correctedBy'], dates: ['correctedAt'] },
   notifications: { dates: ['createdAt'] },
   'audit-logs': { filters: ['action', 'docType', 'source'], dates: ['serverTime'] },
+}
+
+/**
+ * D2410 (point 8): filter values that are not stored values of the field — mapped to a condition by pk-list/data.ts
+ * (query.ts `virtual`). Keuangan › Pengajuan Biaya: "Menunggu persetujuan Owner" next to "Menunggu persetujuan Direktur".
+ */
+const VIRTUAL_OPTIONS: Record<string, Record<string, (options: PkOption[]) => PkOption[]>> = {
+  'expense-requests': { status: (options) => withPendingOwner(options, (o) => ({ value: o.value, label: o.label })) },
+}
+
+/** The virtual filter values of a collection field (data.ts maps them to a `where`). */
+export function hasVirtualOptions(slug: string, field: string): boolean {
+  return !!VIRTUAL_OPTIONS[slug]?.[field]
 }
 
 const MAX_FILTERS = 6
@@ -164,7 +177,8 @@ export function buildPkListConfig(c: Pick<CollectionConfig, 'slug' | 'fields' | 
   for (const n of new Set(candidates)) {
     const f = byName.get(n)
     const def = f ? filterOf(f) : null
-    if (def) filters.push(def)
+    const virtual = def?.kind === 'select' ? VIRTUAL_OPTIONS[c.slug]?.[def.name] : undefined
+    if (def) filters.push(def.kind === 'select' && virtual ? { ...def, options: virtual(def.options) } : def)
     if (filters.length >= MAX_FILTERS) break
   }
   const dateNames = explicit?.dates ?? wanted

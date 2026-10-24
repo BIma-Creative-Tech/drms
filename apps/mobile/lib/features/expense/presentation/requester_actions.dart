@@ -10,6 +10,7 @@ import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/online_only_button.dart';
 import '../../auth/application/auth_controller.dart';
@@ -72,7 +73,7 @@ class RequesterActionsSection extends ConsumerWidget {
           key: const Key('action-lpj-submit'),
           label: lpjAgain ? t.actionLpjResubmit : t.actionLpjSubmit,
           icon: Icons.send,
-          onPressed: () => _submitLpj(context, ref),
+          onPressed: () => _submitLpj(context, ref, lpjAgain ? t.actionLpjResubmit : t.actionLpjSubmit),
         ),
       if (a.contains(RequesterAction.receiptsResubmit.code) && incomplete.isNotEmpty)
         Text(
@@ -113,29 +114,21 @@ class RequesterActionsSection extends ConsumerWidget {
 
   Future<void> _confirmAndRun(BuildContext context, WidgetRef ref, RequesterAction action, String question) async {
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        content: Text(question),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
-          FilledButton(
-            key: const Key('confirm-action'),
-            onPressed: () => Navigator.pop(c, true),
-            child: Text(t.confirm),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !context.mounted) return;
-    await _run(context, ref, () {
+    final label = switch (action) {
+      RequesterAction.receiptsComplete => t.actionReceiptsCompleteVerb,
+      RequesterAction.receiptsResubmit => t.actionReceiptsResubmit,
+      _ => t.actionComplete,
+    };
+    final ok = await confirmAction(context, action: label, summary: requestSummary(detail), note: question);
+    if (!ok || !context.mounted) return;
+    await _run(context, ref, label, () {
       return ref.read(expenseApiProvider).requesterAction(detail.id, action, idempotencyKey: const Uuid().v7());
     });
   }
 
   /// d1010 (13): usage notes + LPJ photos (camera or gallery, compressed on the phone, max 10). New photos
   /// are uploaded first (`POST /media/receipts`, like receipts), then `lpj/submit` carries every photo id.
-  Future<void> _submitLpj(BuildContext context, WidgetRef ref) async {
+  Future<void> _submitLpj(BuildContext context, WidgetRef ref, String label) async {
     final t = AppLocalizations.of(context);
     final first = (detail.settlement?.submitCount ?? 0) == 0;
     final sent = await Navigator.of(context).push<LpjSubmission>(
@@ -145,8 +138,11 @@ class RequesterActionsSection extends ConsumerWidget {
       ),
     );
     if (sent == null || !context.mounted) return;
+    final summary = [detail.settlement?.docNo, ...requestSummary(detail)];
+    final ok = await confirmAction(context, action: label, summary: summary);
+    if (!ok || !context.mounted) return;
     if (sent.newPhotos.isNotEmpty) showSnack(context, t.lpjUploadingPhotos);
-    await _run(context, ref, () {
+    await _run(context, ref, label, () {
       return submitLpjWithPhotos(
         ref.read(expenseApiProvider),
         requestId: detail.id,
@@ -156,16 +152,15 @@ class RequesterActionsSection extends ConsumerWidget {
     });
   }
 
-  Future<void> _run(BuildContext context, WidgetRef ref, Future<Object?> Function() call) async {
+  Future<void> _run(BuildContext context, WidgetRef ref, String label, Future<Object?> Function() call) async {
     final t = AppLocalizations.of(context);
     try {
       await call();
-      if (!context.mounted) return;
-      showSnack(context, t.actionSaved);
-    } on Object catch (e) {
-      if (context.mounted) showSnack(context, errorText(e));
-    } finally {
       ref.invalidate(requestDetailProvider(detail.id));
+      if (context.mounted) await showActionResult(context, message: t.actionSaved, action: label);
+    } on Object catch (e) {
+      ref.invalidate(requestDetailProvider(detail.id));
+      if (context.mounted) await showActionError(context, e, action: label);
     }
   }
 }
@@ -209,6 +204,15 @@ class RequestLifecycleActions extends ConsumerWidget {
           outlined: true,
           onPressed: () => _withReason(context, ref, withdraw: true),
         ),
+      // D2410 "Hapus draft": an own server Draft nobody decided on (never submitted, or withdrawn before a decision)
+      if (isDraft && a.contains('delete_draft'))
+        OnlineOnlyButton(
+          key: const Key('action-delete-draft'),
+          label: t.actionDeleteDraft,
+          icon: Icons.delete_outline,
+          outlined: true,
+          onPressed: () => _deleteDraft(context, ref),
+        ),
       if (a.contains('cancel'))
         OnlineOnlyButton(
           key: const Key('action-cancel'),
@@ -238,10 +242,13 @@ class RequestLifecycleActions extends ConsumerWidget {
 
   Future<void> _withReason(BuildContext context, WidgetRef ref, {required bool withdraw}) async {
     final t = AppLocalizations.of(context);
+    final label = withdraw ? t.actionWithdraw : t.actionCancelRequest;
     final reason = await showDialog<String>(
       context: context,
       builder: (_) => _TextPromptDialog(
-        title: withdraw ? t.actionWithdraw : t.actionCancelRequest,
+        title: t.confirmActionTitle(actionPhrase(label)),
+        summary: requestSummary(detail),
+        confirm: label,
         label: withdraw ? t.withdrawReason : t.cancelReason,
         hint: withdraw ? t.withdrawHint : t.cancelHint,
         required: true,
@@ -257,31 +264,44 @@ class RequestLifecycleActions extends ConsumerWidget {
       } else {
         await api.cancel(detail.id, reason.trim(), idempotencyKey: key);
       }
-      if (context.mounted) showSnack(context, withdraw ? t.withdrawDone : t.cancelDone);
-    } on Object catch (e) {
-      if (context.mounted) showSnack(context, errorText(e));
-    } finally {
       _refreshLists(ref);
+      final done = withdraw ? t.withdrawDone : t.cancelDone;
+      if (context.mounted) await showActionResult(context, message: done, action: label);
+    } on Object catch (e) {
+      _refreshLists(ref);
+      if (context.mounted) await showActionError(context, e, action: label);
+    }
+  }
+
+  /// D2410 "Hapus draft" through the popups: "Yakin ingin hapus draft?" (danger) → soft delete → result → back.
+  Future<void> _deleteDraft(BuildContext context, WidgetRef ref) async {
+    final t = AppLocalizations.of(context);
+    final label = t.actionDeleteDraft;
+    final ok = await confirmAction(
+      context,
+      action: label,
+      summary: requestSummary(detail),
+      note: t.deleteDraftServerConfirm,
+      confirmKey: const Key('delete-draft-confirm'),
+    );
+    if (!ok || !context.mounted) return;
+    try {
+      await ref.read(expenseApiProvider).deleteDraft(detail.id, idempotencyKey: const Uuid().v7());
+      _refreshLists(ref);
+      if (!context.mounted) return;
+      await showActionResult(context, message: t.deleteDraftDone, action: label);
+      if (context.mounted) await Navigator.of(context).maybePop();
+    } on Object catch (e) {
+      _refreshLists(ref);
+      if (context.mounted) await showActionError(context, e, action: label);
     }
   }
 
   Future<void> _resubmit(BuildContext context, WidgetRef ref) async {
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        content: Text(t.resubmitConfirm),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
-          FilledButton(
-            key: const Key('confirm-action'),
-            onPressed: () => Navigator.pop(c, true),
-            child: Text(t.confirm),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !context.mounted) return;
+    final label = t.actionResubmit;
+    final ok = await confirmAction(context, action: label, summary: requestSummary(detail), note: t.resubmitConfirm);
+    if (!ok || !context.mounted) return;
     try {
       // One key per original request: a retry after a lost answer returns the same new draft.
       final created = await ref
@@ -289,13 +309,16 @@ class RequestLifecycleActions extends ConsumerWidget {
           .resubmit(detail.id, idempotencyKey: const Uuid().v5(Namespace.url.value, 'pk-resubmit:${detail.id}'));
       _refreshLists(ref);
       if (!context.mounted) return;
-      showSnack(context, t.resubmitDone);
-      await _openInEditor(context, ref, created);
+      await showActionResult(context, message: t.resubmitDone, action: label);
+      if (context.mounted) await _openInEditor(context, ref, created);
     } on Object catch (e) {
-      if (context.mounted) showSnack(context, errorText(e));
+      if (context.mounted) await showActionError(context, e, action: label);
     }
   }
 }
+
+/// Confirmation summary of a request (D2410): number, title, amount.
+List<String?> requestSummary(ExpenseDetail d) => [d.docNo, d.title, formatRupiah(d.grandTotal)];
 
 /// Server Draft → local editor (fresh server copy first, so the import carries the current `rev`).
 Future<void> _openInEditor(BuildContext context, WidgetRef ref, ExpenseDetail d) async {
@@ -355,6 +378,9 @@ Future<void> addServerReceipt(BuildContext context, WidgetRef ref, ExpenseDetail
     builder: (_) => ReceiptDetailsDialog(photo: photo.bytes),
   );
   if (fields == null || !context.mounted) return;
+  final label = t.receiptSaveAction;
+  final summary = [d.docNo, '${line.no}. ${line.description ?? '-'}', fields.vendorName, formatRupiah(fields.amount)];
+  if (!await confirmAction(context, action: label, summary: summary) || !context.mounted) return;
   showSnack(context, t.uploadingReceipt);
   try {
     await uploadServerReceipt(
@@ -365,11 +391,11 @@ Future<void> addServerReceipt(BuildContext context, WidgetRef ref, ExpenseDetail
       fields: fields,
       idempotencyKey: const Uuid().v7(),
     );
-    if (context.mounted) showSnack(context, t.receiptSaved);
-  } on Object catch (e) {
-    if (context.mounted) showSnack(context, errorText(e));
-  } finally {
     ref.invalidate(requestDetailProvider(d.id));
+    if (context.mounted) await showActionResult(context, message: t.receiptSaved, action: label);
+  } on Object catch (e) {
+    ref.invalidate(requestDetailProvider(d.id));
+    if (context.mounted) await showActionError(context, e, action: label);
   }
 }
 
@@ -423,7 +449,9 @@ Future<void> removeServerReceipt(BuildContext context, WidgetRef ref, ExpenseDet
   final reason = await showDialog<String>(
     context: context,
     builder: (_) => _TextPromptDialog(
-      title: '${t.receiptRemove}: ${r.vendorName} · ${formatRupiah(r.amount)} · ${formatDateOnly(r.receiptDate)}',
+      title: t.confirmActionTitle(actionPhrase(t.receiptRemove)),
+      summary: [d.docNo, r.vendorName, formatRupiah(r.amount), formatDateOnly(r.receiptDate)],
+      confirm: t.receiptRemove,
       label: t.receiptRemoveReason,
       required: true,
       fieldKey: const Key('receipt-remove-reason'),
@@ -432,11 +460,11 @@ Future<void> removeServerReceipt(BuildContext context, WidgetRef ref, ExpenseDet
   if (reason == null || !context.mounted) return;
   try {
     await ref.read(expenseApiProvider).removeReceipt(d.id, r.id, reason.trim(), idempotencyKey: const Uuid().v7());
-    if (context.mounted) showSnack(context, t.receiptRemoved);
-  } on Object catch (e) {
-    if (context.mounted) showSnack(context, errorText(e));
-  } finally {
     ref.invalidate(requestDetailProvider(d.id));
+    if (context.mounted) await showActionResult(context, message: t.receiptRemoved, action: t.receiptRemove);
+  } on Object catch (e) {
+    ref.invalidate(requestDetailProvider(d.id));
+    if (context.mounted) await showActionError(context, e, action: t.receiptRemove);
   }
 }
 
@@ -446,9 +474,13 @@ class _TextPromptDialog extends StatefulWidget {
     required this.label,
     required this.required,
     required this.fieldKey,
+    required this.confirm,
+    this.summary = const [],
     this.hint,
   });
   final String title;
+  final List<String?> summary;
+  final String confirm;
   final String label;
   final String? hint;
   final bool required;
@@ -471,20 +503,39 @@ class _TextPromptDialogState extends State<_TextPromptDialog> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final style = isDestructiveAction(widget.confirm)
+        ? FilledButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError)
+        : null;
+    final lines = [
+      for (final s in widget.summary)
+        if (s != null && s.trim().isNotEmpty) s.trim(),
+    ];
     return AlertDialog(
       title: Text(widget.title),
-      content: TextField(
-        key: widget.fieldKey,
-        controller: _c,
-        minLines: 2,
-        maxLines: 5,
-        maxLength: 2000,
-        decoration: InputDecoration(labelText: widget.label, helperText: widget.hint, errorText: _error),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final l in lines) Text(l, style: const TextStyle(fontWeight: FontWeight.w600)),
+            if (lines.isNotEmpty) const SizedBox(height: 8),
+            TextField(
+              key: widget.fieldKey,
+              controller: _c,
+              minLines: 2,
+              maxLines: 5,
+              maxLength: 2000,
+              decoration: InputDecoration(labelText: widget.label, helperText: widget.hint, errorText: _error),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
         FilledButton(
           key: const Key('prompt-ok'),
+          style: style,
           onPressed: () {
             final v = _c.text.trim();
             if ((widget.required || v.isNotEmpty) && v.length < 3) {
@@ -493,7 +544,7 @@ class _TextPromptDialogState extends State<_TextPromptDialog> {
             }
             Navigator.pop(context, v);
           },
-          child: Text(t.confirm),
+          child: Text(t.confirmActionYes(actionPhrase(widget.confirm))),
         ),
       ],
     );

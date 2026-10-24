@@ -208,12 +208,13 @@ class FieldRepository {
     }
   }
 
-  /// After a delivery: the recent-timesheet cache gets the new timesheet, the unit cache its HM / status.
+  /// After a delivery: the recent-timesheet cache gets the new timesheet (with or without HM — it fills the unit
+  /// tab either way), the unit cache its HM / status.
   Future<void> _learn(String sub, FieldDraft d, Json? copy, int? serverId) async {
     if (d.content case final DailyContent c) return _learnDaily(sub, c);
     final unitId = d.unitId;
     final company = d.companyId;
-    if (d.content case final TimesheetContent c when unitId != null && company != null && c.hmEnd != null) {
+    if (d.content case final TimesheetContent c when unitId != null && company != null) {
       final id = fIntN(copy?['id']) ?? serverId ?? d.serverId;
       if (id != null) {
         await db
@@ -226,8 +227,8 @@ class FieldRepository {
                 projectId: d.projectId,
                 unitId: unitId,
                 reportDate: d.reportDate,
-                hmStart: fDblN(copy?['hm_start']) ?? c.hmStart ?? 0,
-                hmEnd: fDblN(copy?['hm_end']) ?? c.hmEnd!,
+                hmStart: Value(copy == null ? c.hmStart : fDblN(copy['hm_start'])),
+                hmEnd: Value(copy == null ? c.hmEnd : fDblN(copy['hm_end'])),
                 operatorName: Value(c.operatorName.trim().isEmpty ? null : c.operatorName.trim()),
                 location: Value(c.location.trim().isEmpty ? null : c.location.trim()),
                 fuelLiters: Value(c.fuelLiters),
@@ -460,8 +461,8 @@ class FieldRepository {
                 projectId: projectId,
                 unitId: unit,
                 reportDate: r.date,
-                hmStart: fDblN(r.raw['hmStart']) ?? 0,
-                hmEnd: fDblN(r.raw['hmEnd']) ?? 0,
+                hmStart: Value(fDblN(r.raw['hmStart'])),
+                hmEnd: Value(fDblN(r.raw['hmEnd'])),
                 operatorName: Value(fStrN(r.raw['operatorName'])),
                 location: Value(fStrN(r.raw['location'])),
                 fuelLiters: Value(fDblN(r.raw['fuelLiters'])),
@@ -495,13 +496,13 @@ class FieldRepository {
     for (final r in await lq.get()) {
       final d = _toDraft(r);
       final c = d.timesheet;
-      if (c.unitId == null || c.hmEnd == null || d.syncState == FieldSyncState.local) continue;
+      if (c.unitId == null || d.syncState == FieldSyncState.local) continue;
       local.add(
         TimesheetMark(
           unitId: c.unitId!,
           reportDate: d.reportDate,
-          hmStart: c.hmStart ?? c.hmEnd!,
-          hmEnd: c.hmEnd!,
+          hmStart: c.hmStart,
+          hmEnd: c.hmEnd,
           operatorName: c.operatorName,
           location: c.location,
           fuelLiters: c.fuelLiters,
@@ -526,7 +527,7 @@ class FieldRepository {
             .get();
     return [
       for (final m in marks)
-        if (!m.local) (m.reportDate, m.hmEnd),
+        if (!m.local && m.hmEnd != null) (m.reportDate, m.hmEnd!),
       for (final r in rows)
         if (r.clientUuid != excludeUuid) (r.reportDate, r.hourMeter!),
     ];
@@ -680,6 +681,16 @@ class FieldRepository {
       );
     }
   }
+
+  /// `timesheetMinDate` of the project's last contract-units pull (user 2026-10-24: PM project / Direktur may fill any
+  /// date of the contract period); null = unknown (older server / never pulled) → the 14-day rule.
+  Future<String?> timesheetMinDate(String sub, int projectId) async {
+    final v = await db.kvGet('field:ts-min-date:$sub:$projectId');
+    return v == null || v.isEmpty ? null : v;
+  }
+
+  Future<void> setTimesheetMinDate(String sub, int projectId, String? date) =>
+      db.kvPut('field:ts-min-date:$sub:$projectId', date ?? '');
 
   /// Delta-sync marker of `GET /units?project=` (server time of the last pull).
   Future<String?> unitsSince(String sub, int projectId) => db.kvGet('field:units-since:$sub:$projectId');

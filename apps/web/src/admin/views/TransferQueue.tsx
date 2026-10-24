@@ -10,6 +10,7 @@ import { REQUEST_TYPE_LABELS, REQUEST_TYPES } from '@/domain/expense/types'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { docHref } from '../doc-links'
+import { DocSummaryProvider } from '../components/feedback/DocContext'
 import { ReasonAction } from '../components/kas/ReasonAction'
 import { KAS_STYLE } from '../components/kas/style'
 import { ListToolbar, Pager } from '../components/list/ListToolbar'
@@ -20,12 +21,15 @@ import { ReimburseReceiptReview, loadReimburseReview } from '../components/Reimb
 import { SlaAgeBadge } from '../components/SlaAgeBadge'
 import { accountsOf, itemCompany, PtChip, PtScopeNote, ptView } from './pt'
 import { IcLoanQueueSection } from './IntercompanyLoans'
+import { LoanTransferOrderSection } from './Loans'
 import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
 
 /**
  * "Antrian Transfer" (M05, US-19/US-20): Pengajuan Baru "Disetujui (Antri Transfer)" and Reimburse
  * "Nota Terverifikasi (Antri Transfer)", sorted by needed date, open flags shown. Finance records
  * the transfer (cash account, bank reference, proof); the amount is the approved amount (G3).
+ * DRMS 24/10 #11/#12: + "Transfer pinjaman antar project" (approved loans / repayment requests of inter-project loans).
+ * DRMS 24/10: the transfer / cancel / void popups name the request (number, title, account, amount).
  */
 export async function TransferQueue(props: AdminViewServerProps) {
   const req = props.initPageResult.req
@@ -179,16 +183,18 @@ export async function TransferQueue(props: AdminViewServerProps) {
                         <span style={badge('warn')}>Perhatian</span> <strong>Anda juga yang menyetujui</strong> pengajuan ini. Bila ada Finance lain, sebaiknya transfer dicatat oleh orang lain (pemisahan tugas).
                       </div>
                     ) : null}
-                    <MoneyForm
-                      url={`/api/v1/expense-requests/${r.id}/transfer`}
-                      submitLabel="Catat transfer"
-                      cashAccounts={accountsOf(accounts, itemCompany(r))}
-                      bankRef="required"
-                      proof={{ kind: 'transfer-proofs', required: true }}
-                      amountText={`Transfer ${rp(r.approvedAmount)}`}
-                      pusatBiaya={r.pusatBiaya}
-                      pusatBiayaMissing={r.pusatBiayaMissing}
-                    />
+                    <DocSummaryProvider {...queueDoc(r)}>
+                      <MoneyForm
+                        url={`/api/v1/expense-requests/${r.id}/transfer`}
+                        submitLabel="Catat transfer"
+                        cashAccounts={accountsOf(accounts, itemCompany(r))}
+                        bankRef="required"
+                        proof={{ kind: 'transfer-proofs', required: true }}
+                        amountText={`Transfer ${rp(r.approvedAmount)}`}
+                        pusatBiaya={r.pusatBiaya}
+                        pusatBiayaMissing={r.pusatBiayaMissing}
+                      />
+                    </DocSummaryProvider>
                     {/* D1810: Finance cancels an approved request instead of transferring it (e.g. the amount really approved in
                         the field differs) — reason mandatory, the server re-checks role + status (state.ts `cancel`). */}
                     <div style={{ marginTop: 8 }} data-pk-queue-cancel={r.id}>
@@ -204,6 +210,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
                         }
                         fieldLabel="Alasan pembatalan"
                         confirmLabel="Batalkan pengajuan"
+                        summary={queueDoc(r).summary}
                         variant="secondary"
                         testId={`cancel-request-${r.id}`}
                       />
@@ -217,6 +224,8 @@ export async function TransferQueue(props: AdminViewServerProps) {
       )}
       {items.length > 0 ? <Pager id="antrian-transfer" path="/admin/antrian-transfer" sp={props.searchParams} page={page} unit="pengajuan" /> : null}
       <style>{KAS_STYLE}</style>
+      {/* DRMS 24/10 #11/#12: transfer orders of inter-project loans (disbursements + repayments approved by the Owner) */}
+      <LoanTransferOrderSection req={req} companyIds={ptIds.length ? ptIds : undefined} />
       {/* ADR 0029 §3.5: "Pencairan pinjaman antar-PT" — instructed loans whose lender is a PT where the caller is Finance */}
       <IcLoanQueueSection req={req} />
       {/* E2 (US-24, T8): recorded transfers that can still be voided (request "Sudah Ditransfer"). */}
@@ -274,6 +283,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
                           </>
                         }
                         confirmLabel="Void transfer"
+                        summary={[['Transfer', t.transferNo], ['Tanggal', t.transferDate], ['Pengajuan', t.requestNo ?? `#${t.requestId}`], ['Judul', t.requestTitle], ['Nominal', rp(t.amount)]]}
                         testId={`void-transfer-${t.transferId}`}
                       />
                       ) : (
@@ -290,6 +300,23 @@ export async function TransferQueue(props: AdminViewServerProps) {
       {done.length > 0 ? <Pager id="transfer-tercatat" path="/admin/antrian-transfer" sp={props.searchParams} page={donePage} pageKey="hal2" unit="transfer" /> : null}
     </Shell>
   )
+}
+
+type QueueItem = Awaited<ReturnType<typeof transferQueue>>[number]
+
+/** DRMS 24/10: the queue item as named in the popups (transfer, cancel). */
+function queueDoc(r: QueueItem) {
+  const docNo = r.docNo ?? `#${r.id}`
+  return {
+    object: docNo,
+    summary: [
+      ['Pengajuan', docNo],
+      ['Judul', r.title],
+      ['Lingkup', r.scope],
+      ['Rekening tujuan', r.bank ? [r.bank.bankName, r.bank.accountHolder, r.bank.accountNo].filter(Boolean).join(' · ') : null],
+      ['Nominal disetujui', rp(r.approvedAmount)],
+    ] as const,
+  }
 }
 
 export default TransferQueue

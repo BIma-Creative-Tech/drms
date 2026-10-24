@@ -86,6 +86,8 @@ export const ActionEnum = z
     'settle_reverse',
     // ADR 0029: the Owner orders an inter-PT loan for a short request (POST /intercompany-loans)
     'instruct_loan',
+    // D2410 "Hapus draft" (POST /expense-requests/{id}/delete-draft)
+    'delete_draft',
   ])
   .meta({ id: 'RequestAction' })
 
@@ -154,6 +156,9 @@ export const SignBody = z
   .meta({ id: 'SignBody' })
 
 export const ReasonBody = z.object({ reason }).strict().meta({ id: 'ReasonBody' })
+
+/** D2410 "Hapus draft": the reason is optional (default "Draft dihapus oleh pemohon" in the audit row). */
+export const OptionalReasonBody = z.object({ reason: z.string().trim().max(1000).optional() }).strict().meta({ id: 'OptionalReasonBody' })
 
 export const RejectBody = z
   .object({ reason, signatureMediaId: id.nullable().optional() })
@@ -313,7 +318,7 @@ export const FundCheck = z
     status: z.enum(['ok', 'insufficient', 'not_applicable']),
     blocked: z.boolean().meta({ description: 'enabled ∧ applies ∧ insufficient.' }),
     blockedText: z.string().nullable().meta({ description: '"Dana PT tidak cukup — kurang Rp X. Tolak, atau perintahkan pinjaman antar-PT."' }),
-    balance: signedRupiah.meta({ description: 'Saldo dana: Σ balance of the PT\'s active accounts WITHOUT a site.' }),
+    balance: signedRupiah.meta({ description: 'Saldo dana: Σ balance of the PT\'s active accounts (no site exclusion since DRMS 24/10).' }),
     commitments: signedRupiah.meta({ description: 'Komitmen: approved-not-transferred + unpaid LPJ shortfalls + loans instructed with this PT as lender.' }),
     available: signedRupiah.meta({ description: 'Dana tersedia = balance − commitments (may be negative).' }),
     needed: rupiah.meta({ description: 'Dibutuhkan: the request\'s grand total (not yet committed).' }),
@@ -333,7 +338,7 @@ export const FundCheck = z
       })
       .nullable()
       .meta({ description: 'The project\'s Pusat Biaya (cash account) and its figures; null = no project / not mapped (checked per PT only).' }),
-    accountCount: z.number().int().meta({ description: '"n akun, tanpa akun site".' }),
+    accountCount: z.number().int().meta({ description: '"n akun" (every active account).' }),
     excludedSiteAccounts: z.object({ count: z.number().int(), balance: signedRupiah }),
     waitingAtOwner: z.object({ count: z.number().int(), amount: rupiah }).meta({ description: 'Other requests of the PT waiting at their final decision (not committed: first approved, first served).' }),
     commitmentItems: z
@@ -380,6 +385,9 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
     })
     .nullable()
     .meta({ id: 'VendorInvoice', description: 'ADR 0027: the vendor invoice (the proof of a vendor payment — no LPJ); ADR 0028: the receiving PT\'s document (invoice / memo) of a PT grup payment. null for payeeType karyawan.' }),
+  attachments: z
+    .array(z.object({ id, fileName: z.string().nullable(), mimeType: z.string().nullable() }))
+    .meta({ description: 'D2410: general attachments ("Lampiran", photo / PDF; GET /api/v1/media/attachments/{id}/file). A Reimburse is submitted with at least one.' }),
   payeeCompany: z
     .object({ id, shortCode: z.string().nullish(), name: z.string().nullish() })
     .nullable()
@@ -796,7 +804,8 @@ export const MembershipBatchBody = z
             user: id,
             company: id,
             // pk-operator (owner 2026-10-09) is offered by the web matrix ('Opr') — it was missing here (400 on save)
-            roles: z.array(z.enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator'])).max(7),
+            // ADR 0032: pk-admin-staff (Admin Staff, 'AdmS')
+            roles: z.array(z.enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator', 'pk-admin-staff'])).max(8),
             employee: id.nullable().optional().meta({ description: 'Employee of THIS PT (null = unlink; omitted = unchanged).' }),
             active: z.boolean().optional(),
           })

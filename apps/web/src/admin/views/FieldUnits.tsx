@@ -8,8 +8,8 @@ import { mayReadRates } from '@/domain/field/access'
 import { BACKDATE_MAX_DAYS, addDays, BREAKDOWN_SUGGEST_SERVICE_HOURS, serviceTypeNames, UNIT_STATUS_LABELS, type UnitStatus } from '@/domain/field/rules'
 import { listServiceReports } from '@/domain/field/service'
 import { timesheetDto, type TimesheetDoc } from '@/domain/field/timesheet'
-import { buildRecap, buildTimesheetMatrix, cellText, ESTIMATE_LABEL, ESTIMATE_NOTE, fmtNum, longDate, monthDays, monthLabel, monthParam, recentMonths, shortDay, type Matrix } from '@/domain/field/views'
-import { contractsOf, type ContractView, fieldProjects, historyOf, mayCorrectIn, mayCreateIn, type ProjectOpt, timesheetsOf, todayOf, unitsOf, visibleFieldDoc, visibleProject, visibleUnit } from '@/domain/field/web'
+import { buildRecap, buildTimesheetMatrix, cellText, ESTIMATE_LABEL, ESTIMATE_NOTE, fmtNum, hmWeeks, longDate, monthDays, monthLabel, monthParam, recentMonths, shortDay, weeklyHm, type Matrix, type MatrixTimesheet } from '@/domain/field/views'
+import { contractsOf, type ContractView, fieldProjects, historyOf, mayCorrectIn, mayCreateIn, type ProjectOpt, timesheetMinDateFor, timesheetsOf, todayOf, unitsOf, visibleFieldDoc, visibleProject, visibleUnit } from '@/domain/field/web'
 import { availabilityPct } from '@/domain/field/rules'
 import { companyById } from '@/domain/companies'
 import { withReqTransaction } from '@/lib/system-tx'
@@ -185,7 +185,9 @@ export async function FieldContractDetail(props: AdminViewServerProps) {
     const today = await todayOf(req, project.companyId)
     const month = monthParam(one(sp.bulan), today)
     const contracts = await contractsOf(req, [project.id])
-    const ts = tab === 'timesheet' || tab === 'rekap' ? await timesheetsOf(req, { projectIds: [project.id], from: `${month}-01`, to: monthDays(month).at(-1)! }) : []
+    // D2410: the Rekap tab also needs the whole Monday–Sunday weeks around the month (weekly HM)
+    const weeks = hmWeeks(month)
+    const ts = tab === 'timesheet' || tab === 'rekap' ? await timesheetsOf(req, { projectIds: [project.id], from: tab === 'rekap' ? weeks[0]!.from : `${month}-01`, to: tab === 'rekap' ? weeks.at(-1)!.to : monthDays(month).at(-1)! }) : []
     const units = tab === 'unit' ? await unitsOf(req, [project.companyId], { ids: contracts.map((c) => c.unitId) }) : []
     return { project, today, month, contracts, ts, units }
   })
@@ -204,8 +206,10 @@ export async function FieldContractDetail(props: AdminViewServerProps) {
     )
   }
   const { project, today, month, contracts } = d
-  const m = buildTimesheetMatrix({ month, today, contracts, timesheets: d.ts })
   const creator = mayCreateIn(req, project.companyId) && project.status !== 'arsip' && project.status !== 'dibatalkan'
+  // D2410: "+" only on days the caller may still file (reporter 14 days; PM of the project / Direktur the whole period)
+  const minDate = timesheetMinDateFor(req, project, today, contracts)
+  const m = buildTimesheetMatrix({ month, today, contracts, timesheets: d.ts, minDate: creator ? minDate : undefined })
   const q = (t: Tab, extra: Record<string, string> = {}) => `?${new URLSearchParams({ tab: t, ...(t === 'timesheet' || t === 'rekap' ? { bulan: month } : {}), ...extra }).toString()}`
   const activeNow = contracts.filter((c) => c.active && c.startDate <= today && (c.endDate === null || c.endDate >= today))
   const tabs = [
@@ -235,7 +239,7 @@ export async function FieldContractDetail(props: AdminViewServerProps) {
       <Tabs label="Bagian kontrak" tabs={tabs} current={tab} />
       {tab === 'timesheet' || tab === 'rekap' ? <MonthBar base={contractHref(project.id)} tab={tab} month={month} today={today} exports={office ? exportLinks('rekap-timesheet-kontrak', exportQ) : []} /> : null}
       {tab === 'timesheet' ? <MatrixCard m={m} today={today} projectId={project.id} creator={creator} /> : null}
-      {tab === 'rekap' ? <RecapCard m={m} contracts={contracts} today={today} req={req} companyId={project.companyId} /> : null}
+      {tab === 'rekap' ? <RecapCard m={m} contracts={contracts} ts={d.ts} today={today} req={req} companyId={project.companyId} /> : null}
       {tab === 'unit' ? <ContractUnitsCard req={req} project={project} contracts={contracts} units={d.units} today={today} /> : null}
       {tab === 'timeline' ? <ProjectTimeline req={req} project={project} sp={sp} base={contractHref(project.id)} /> : null}
     </FieldFrame>
@@ -291,7 +295,7 @@ function MatrixCard({ m, today, projectId, creator }: { m: Matrix; today: string
           <p className="pk-kpi-x">{m.totals.gaps ? `⚠ ${m.totals.gaps} selisih HM` : 'tanpa selisih HM'}</p>
         </KpiTile>
       </KpiRow>
-      <Card id="matrix" title={`Jam kerja per hari · ${monthLabel(m.month)}`} sub="Angka = jam kerja · klik sel untuk detail atau isi timesheet">
+      <Card id="matrix" title={`Jam kerja per hari · ${monthLabel(m.month)}`} sub={`Angka = jam kerja · klik sel untuk detail atau isi timesheet${creator && m.rows.some((r) => r.cells.some((c) => c.state === 'missing' && !c.fillable)) ? ` · hari belum diisi bertanda ! lebih dari ${BACKDATE_MAX_DAYS} hari lalu hanya dapat diisi PM project atau Direktur` : ''}`}>
         <p className="pk-mxlegend" aria-hidden>
           <span>
             <i className="missing" />
@@ -354,7 +358,7 @@ function MatrixCard({ m, today, projectId, creator }: { m: Matrix; today: string
                             </Link>
                           </td>
                         )
-                      if (c.state === 'missing' && creator)
+                      if (c.state === 'missing' && c.fillable && creator)
                         return (
                           <td key={c.date} className={cls} data-pk-cell="missing">
                             <Link href={tsNewHref({ project: projectId, unit: r.contract.unitId, date: c.date })} prefetch={false} aria-label={`${label} — isi timesheet`} title={`${label} — isi timesheet`}>
@@ -393,7 +397,7 @@ function MatrixCard({ m, today, projectId, creator }: { m: Matrix; today: string
   )
 }
 
-function RecapCard({ m, contracts, today, req, companyId }: { m: Matrix; contracts: ContractView[]; today: string; req: PayloadRequest; companyId: number }) {
+function RecapCard({ m, contracts, ts, today, req, companyId }: { m: Matrix; contracts: ContractView[]; ts: readonly MatrixTimesheet[]; today: string; req: PayloadRequest; companyId: number }) {
   const terms = new Map(contracts.filter((c) => c.terms).map((c) => [c.id, c.terms!]))
   const r = buildRecap(m, terms)
   const rates = mayReadRates(req, companyId) && r.rows.some((x) => x.estimate !== null)
@@ -439,6 +443,33 @@ function RecapCard({ m, contracts, today, req, companyId }: { m: Matrix; contrac
       : []),
   ]
   const notes = r.rows.filter((x) => x.estimateNote).map((x) => `${x.contract.label}: ${x.estimateNote}`)
+  // D2410 (user 2026-10-24): HM is read about once a week → weekly HM per unit (weeks Monday–Sunday overlapping the month)
+  const weeks = hmWeeks(m.month)
+  const units = [...new Map(m.rows.map((x) => [x.contract.unitId, x.contract.label])).entries()]
+  const hmRows = units.map(([unitId, label]) => ({ unitId, label, weeks: weeklyHm(ts.filter((t) => t.unitId === unitId), m.month) }))
+  type HmRow = (typeof hmRows)[number]
+  const hmCols: Col<HmRow>[] = [
+    { key: 'u', label: 'Unit', cell: (x) => <b>{x.label}</b> },
+    ...weeks.map(
+      (wk, i): Col<HmRow> => ({
+        key: `w${i}`,
+        label: wk.label,
+        num: true,
+        cell: (x) => {
+          const v = x.weeks[i]!
+          if (v.days === 0) return <span title="Belum ada HM tercatat minggu ini">—</span>
+          return (
+            <span data-pk-hm-week={wk.from}>
+              <b>{fmtNum(v.total)}</b> jam
+              <span className="sub">
+                {fmtNum(v.hmStart)} → {fmtNum(v.hmEnd)} · {v.days} hari ber-HM
+              </span>
+            </span>
+          )
+        },
+      }),
+    ),
+  ]
   return (
     <Bento label="Rekap kontrak">
       <Card id="recap" title={`Rekap ${monthLabel(m.month)} (s/d ${dateId(until)})`} sub={rates ? undefined : 'Tarif dan estimasi tagihan hanya untuk Direktur, Finance, dan Admin.'}>
@@ -473,9 +504,15 @@ function RecapCard({ m, contracts, today, req, companyId }: { m: Matrix; contrac
             </p>
           ))}
           <p style={{ margin: 0 }}>
-            Ketersediaan = (jam kerja + standby) / (jam kerja + standby + breakdown). Hari belum diisi dihitung s/d hari ini untuk hari yang tercakup kontrak.
+            HM awal → akhir = HM pertama dan terakhir yang tercatat di bulan ini (timesheet tanpa HM dilewati). Ketersediaan = (jam kerja + standby) / (jam kerja + standby + breakdown). Hari belum diisi dihitung s/d hari ini untuk hari yang tercakup kontrak.
             {rates ? ` Per jam = tarif × maks(jam kerja, minimum jam); per bulan = tarif × hari kontrak / hari dalam bulan. ${ESTIMATE_NOTE}` : ''}
           </p>
+        </div>
+      </Card>
+      <Card id="hm-weekly" title={`HM mingguan · ${monthLabel(m.month)}`} sub="HM dicatat ±1× seminggu · per minggu Senin–Minggu: total = HM akhir − HM awal yang tercatat">
+        <DataTable id="hm-weekly" cols={hmCols} rows={hmRows} rowKey={(x) => x.unitId} rowAttrs={(x) => ({ 'data-pk-row': x.label })} caption={`HM mingguan ${monthLabel(m.month)}`} empty={<EmptyState text="Belum ada unit kontrak di bulan ini." />} />
+        <div className="pk-card-f">
+          <p style={{ margin: 0 }}>HM awal = HM awal pertama yang tercatat di minggu itu, HM akhir = HM akhir terakhir; hari ber-HM = hari dengan timesheet yang mengisi HM. Minggu di tepi bulan memuat hari dari bulan sebelum/sesudahnya.</p>
         </div>
       </Card>
     </Bento>
@@ -580,7 +617,7 @@ export async function FieldUnitDetail(props: AdminViewServerProps) {
       date: t.reportDate,
       kind: 'timesheet' as const,
       title: `Timesheet · ${fmtNum(t.workHours)} jam kerja${t.breakdownHours > 0 ? ` · breakdown ${fmtNum(t.breakdownHours)}` : ''}`,
-      detail: `HM ${fmtNum(t.hmStart)} → ${fmtNum(t.hmEnd)} · ${pname.get(t.projectId)?.code ?? ''}`,
+      detail: `${t.hmStart !== null ? `HM ${fmtNum(t.hmStart)} → ${fmtNum(t.hmEnd)}` : 'tanpa HM'} · ${pname.get(t.projectId)?.code ?? ''}`,
       href: tsHref(t.id),
       flags: t.flags,
     })),
@@ -698,10 +735,10 @@ function TimesheetRules() {
     <Card id="timesheet-help" title="Aturan" span={4}>
       <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
         <li>Unit harus aktif di kontrak pada tanggal tersebut.</li>
-        <li>HM akhir ≥ HM awal. HM awal berbeda dari HM akhir sebelumnya → ditandai <b>selisih HM</b> untuk PM.</li>
-        <li>Jam kerja + standby + breakdown maks. 24; breakdown wajib alasan.</li>
-        <li>Foto meter HM wajib (1 foto).</li>
-        <li>Tanggal paling lama {BACKDATE_MAX_DAYS} hari ke belakang.</li>
+        <li>Jam kerja wajib; jam kerja + standby + breakdown maks. 24; breakdown wajib alasan.</li>
+        <li>HM opsional — dicatat ±1× seminggu. Bila diisi: HM awal dan HM akhir keduanya, HM akhir ≥ HM awal, dan foto meter HM wajib (1 foto).</li>
+        <li>HM awal berbeda dari HM akhir timesheet ber-HM sebelumnya → ditandai <b>selisih HM</b> untuk PM.</li>
+        <li>Tanggal paling lama {BACKDATE_MAX_DAYS} hari ke belakang; PM project dan Direktur boleh tanggal mana pun dalam periode kontrak unit.</li>
       </ul>
     </Card>
   )
@@ -718,7 +755,9 @@ export async function FieldTimesheetNew(props: AdminViewServerProps) {
     const contracts = await contractsOf(req, projects.map((p) => p.id))
     const units = await unitsOf(req, companies, { ids: contracts.map((c) => c.unitId) })
     const today = await todayOf(req, companies[0])
-    return { projects, contracts, units, today }
+    // D2410: earliest date per project (reporter 14 days; PM of the project / Direktur the whole contract period)
+    const minDates = new Map(projects.map((p) => [p.id, timesheetMinDateFor(req, p, today, contracts.filter((c) => c.projectId === p.id))]))
+    return { projects, contracts, units, today, minDates }
   })
   const hm = new Map(d.units.map((u) => [u.id, u.lastHourMeter]))
   // DRMS UI 17/10 #4: project labels tagged `[CS1]` while several PTs are selected
@@ -727,13 +766,14 @@ export async function FieldTimesheetNew(props: AdminViewServerProps) {
       projectId: p.id,
       label: p.label,
       companyId: p.companyId,
+      minDate: d.minDates.get(p.id),
       units: d.contracts.filter((c) => c.projectId === p.id).map((c) => ({ contractUnitId: c.id, unitId: c.unitId, label: c.label, startDate: c.startDate, endDate: c.endDate, active: c.active, lastHm: hm.get(c.unitId) ?? null })),
     }))
     .filter((p) => p.units.some((u) => u.active))
   const initialProject = idParam(sp.project)
   return (
     <FieldFrame props={props} name="timesheet-baru">
-      <DashHead title="Isi timesheet unit" note="Satu timesheet per unit per hari · HM awal otomatis dari HM akhir sebelumnya · bisa diedit pelapor 24 jam, setelah itu koreksi oleh PM/Direktur">
+      <DashHead title="Isi timesheet unit" note="Satu timesheet per unit per hari · HM opsional (±1× seminggu), HM awal otomatis dari HM akhir terakhir yang tercatat · bisa diedit pelapor 24 jam, setelah itu koreksi oleh PM/Direktur">
         <div className="pk-kact">
           <BtnLink href={initialProject ? contractHref(initialProject) : '/admin/unit-kontrak'} icon="arrowLeft">
             Kembali
@@ -834,9 +874,15 @@ export async function FieldTimesheetDetail(props: AdminViewServerProps) {
       ) : null}
       <Bento label="Timesheet">
         <KpiRow cols={3}>
-          <KpiTile id="t-hm" icon="clock" label="HM awal → akhir" value={`${fmtNum(t.hmStart)} → ${fmtNum(t.hmEnd)}`} kpi="ts-hm" i={0}>
+          <KpiTile id="t-hm" icon="clock" label="HM awal → akhir" value={t.hmStart !== null ? `${fmtNum(t.hmStart)} → ${fmtNum(t.hmEnd)}` : '—'} kpi="ts-hm" i={0}>
             <p className="pk-kpi-x">
-              selisih <b>{fmtNum(t.hmUsed)}</b> jam
+              {t.hmUsed !== null ? (
+                <>
+                  selisih <b>{fmtNum(t.hmUsed)}</b> jam
+                </>
+              ) : (
+                'HM tidak diisi hari ini (HM dicatat ±1× seminggu)'
+              )}
             </p>
           </KpiTile>
           <KpiTile id="t-hours" icon="target" label="Jam kerja" value={fmtNum(t.workHours)} kpi="ts-work" i={1}>
@@ -874,7 +920,7 @@ export async function FieldTimesheetDetail(props: AdminViewServerProps) {
           <MetaRows d={t} tz={tz} />
         </Card>
         <Card id="ts-photo" title="Foto meter HM" span={5} i={5}>
-          <PhotoGallery photos={t.hmPhoto ? [t.hmPhoto] : []} label={`meter HM ${unitName}`} empty="Tanpa foto HM." />
+          <PhotoGallery photos={t.hmPhoto ? [t.hmPhoto] : []} label={`meter HM ${unitName}`} empty={t.hmStart === null ? 'Tanpa foto HM (HM tidak diisi).' : 'Tanpa foto HM.'} />
         </Card>
         <Card id="ts-history" title="Riwayat & koreksi" span={7} i={6}>
           <History entries={history} tz={tz} />

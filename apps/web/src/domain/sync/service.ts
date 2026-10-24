@@ -3,7 +3,7 @@ import { APIError, ValidationError, type CollectionSlug, type PayloadRequest } f
 import type { z } from 'zod'
 
 import { runUnderCompany } from '@/access/company-context'
-import { companyContextOf, employeeIn, hasRole, mappedCompanies, relId, userId, type Membership } from '@/access/roles'
+import { companyContextOf, employeeIn, mappedCompanies, relId, userId, type Membership } from '@/access/roles'
 import { companyOf } from '@/domain/companies'
 import { FIELD_COLLECTIONS } from '@/domain/field/access'
 import {
@@ -24,14 +24,14 @@ import { ids, loadRaw, loadVisible, lockRequest, settings, type RequestDoc } fro
 import { payeeOf } from '@/domain/expense/types'
 import { createDraft, updateDraft, type DraftInput, type LineInputApi } from '@/domain/expense/drafts'
 import { addReceipt, editReceipt } from '@/domain/expense/receipts'
-import { cancel } from '@/domain/expense/workflow'
+import { deleteDraft, discardDraft } from '@/domain/expense/workflow'
 import { auditPrivacyDenied, PRIVACY_ACK_REQUIRED, PRIVACY_ACK_REQUIRED_DETAIL, privacyAckCheck } from '@/legal/privacy-enforcement'
 import { isDbGuardError } from '@/lib/pg-error'
 import { withReqTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
-import { AttendanceReject, LOCATION_COLLECTION, locationOf, recordAttendance, userOfEmployee } from '@/domain/attendance/record'
+import { AttendanceReject, LOCATION_COLLECTION, locationOf, onBehalfActor, recordAttendance } from '@/domain/attendance/record'
 
 import { attendanceTimeOf, employeeOfUser } from './attendance'
 import { judgeTime, type TimeVerdict } from './clock'
@@ -65,7 +65,8 @@ import { applyProgressReport, ProgressSyncReject } from './progress'
  * - Conflicts: an edit of an existing draft must carry `base_rev` = the server `rev`; a stale or
  *   missing `base_rev` → `conflict` + `server_copy` (server wins, nothing changes).
  * - Drafts are edited only by their creator and only in status Draft (else `rejected
- *   NOT_EDITABLE`); delete = cancel (soft delete, requirements §1.2 #6).
+ *   NOT_EDITABLE`); delete = "Dibatalkan" of a never-submitted draft (requirements §1.2 #6; D2410 "Hapus draft": a
+ *   numbered — withdrawn, never decided — draft is soft-deleted like on the web, flag DELETED).
  * - Attendance check-in/out + PM on-behalf (company-settings.syncAttendanceEnabled; checks in
  *   domain/attendance/record.ts): assigned project/cost center with a geofence, inside radius
  *   (+ capped GPS accuracy), not mocked, selfie uploaded by the caller, one check-in and one
@@ -342,6 +343,8 @@ function toDraftInput(p: SyncDraftUpsert): DraftInput {
   if (p.invoice_date !== undefined) input.invoiceDate = p.invoice_date
   if (p.invoice_due_date !== undefined) input.invoiceDueDate = p.invoice_due_date
   if (p.invoice_file_id !== undefined) input.invoiceFileId = p.invoice_file_id
+  // D2410 (point 6): the general attachments ("Lampiran") — replaces the list; omitted (APK ≤ 0.11) = unchanged
+  if (p.attachment_ids !== undefined) input.attachmentIds = p.attachment_ids
   if (p.lines !== undefined) {
     input.lines = p.lines.map(
       (l): LineInputApi => ({
@@ -498,12 +501,16 @@ async function applyDraftDelete(c: ItemCtx): Promise<Outcome> {
   const reason = p.reason ?? 'Draft dihapus dari aplikasi'
   req.context.auditReason = reason
   try {
-    await cancel(req, doc.id, reason)
+    // never submitted: closed as "Dibatalkan" (the outcome the APK always received); D2410 "Hapus draft": a draft
+    // submitted before (withdrawn, numbered) and never decided is soft-deleted by the same rule as the web / REST
+    // (deleteDraft: own Draft, no decision in any cycle, number never reused) — a decided one → 409 → rejected
+    if (doc.docNo) await deleteDraft(req, doc.id, reason)
+    else await discardDraft(req, doc.id, reason)
   } finally {
     delete req.context.auditReason
   }
   const copy = await draftCopy(req, doc.id)
-  return { status: 'applied', id: doc.id, rev: copy.rev, copy, flags: [], errors: [] }
+  return { status: 'applied', id: doc.id, rev: copy.rev, copy, flags: doc.docNo ? ['DELETED'] : [], errors: [] }
 }
 
 // ------------------------------------------------------------------------------------ attendance
@@ -521,18 +528,21 @@ async function applyAttendance(c: ItemCtx, verdict: TimeVerdict, receivedAt: Dat
   const own = locCompany !== undefined ? employeeIn(req, locCompany) : await employeeOfUser(req, uid)
   let employee: number
   let user: number | null
+  let source: 'self' | 'pm' | 'admin' = 'self'
   if (onBehalf) {
-    const ob = p as SyncOnBehalf
     // US-14: "diabsenkan oleh PM" — requirements §4 "Absensi": PM C (atas nama tim). Not an approval
-    // (ADR 0013 covers expense decisions only), so the PM keeps this right.
-    if (!hasRole(req, 'pk-pm', locCompany)) reject('FORBIDDEN', 'Hanya PM yang dapat mengabsenkan anggota tim.')
-    if (own !== undefined && own === ob.employee_id) reject('FORBIDDEN', 'Absensi Anda sendiri dicatat lewat absen masuk/pulang biasa.', 'payload.employee_id')
-    const emp = (await req.payload.findByID({ collection: 'employees', id: ob.employee_id, depth: 0, overrideAccess: true /* SYSTEM-READ: target employee of on-behalf */, req, disableErrors: true })) as { active?: boolean | null; company?: unknown } | null
-    if (!emp || !isMapped(req, relId(emp.company))) reject('NOT_FOUND', 'Karyawan tidak ditemukan.', 'payload.employee_id')
-    if (relId(emp!.company) !== locCompany) reject('COMPANY_MISMATCH', 'Karyawan dan lokasi berada di PT yang berbeda.', 'payload.employee_id')
-    if (emp!.active === false) reject('VALIDATION', 'Karyawan sudah nonaktif.', 'payload.employee_id')
-    employee = ob.employee_id
-    user = await userOfEmployee(req, employee)
+    // (ADR 0013 covers expense decisions only), so the PM keeps this right. ADR 0032: an Admin Staff of the PT records
+    // for ANY employee of it (source `admin`; wins over PM when the caller holds both).
+    let actor: Awaited<ReturnType<typeof onBehalfActor>>
+    try {
+      actor = await onBehalfActor(req, { employeeId: (p as SyncOnBehalf).employee_id, locCompany, own, pmAllowed: true })
+    } catch (err) {
+      if (err instanceof AttendanceReject) return reject(err.code, err.message, err.field)
+      throw err
+    }
+    employee = actor.employee
+    user = actor.user
+    source = actor.source
   } else {
     if (own === undefined) reject('VALIDATION', 'Akun Anda belum terhubung ke data karyawan. Hubungi Admin.')
     employee = own!
@@ -561,7 +571,7 @@ async function applyAttendance(c: ItemCtx, verdict: TimeVerdict, receivedAt: Dat
       flags: [...verdict.flags, ...timeFlags],
       clientUuid: item.client_uuid,
       device: device ?? null,
-      source: onBehalf ? 'pm' : 'self',
+      source,
       recordedBy: onBehalf ? uid : null,
       onBehalfReason: onBehalf ? (p as SyncOnBehalf).reason : null,
       timeZone: features.timezone,

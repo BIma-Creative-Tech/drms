@@ -483,7 +483,7 @@ async function intercompanySourceCode(req: PayloadRequest, kmId: number): Promis
  * for the cash accounts of `companyIds` — default: the selected PTs where the caller is Finance /
  * Direktur (ADR 0016 §5; combined balance = Σ per PT, each item carries `companyId`).
  */
-export async function balances(req: PayloadRequest, asOf?: string, opts: { companyIds?: readonly number[]; siteId?: number } = {}) {
+export async function balances(req: PayloadRequest, asOf?: string, opts: { companyIds?: readonly number[] } = {}) {
   const tx = await getRequestTx(req)
   const until = asOf && isBusinessDate(asOf) ? asOf : '9999-12-31'
   const pts = (opts.companyIds ?? kasCompanies(req)).filter((c) => Number.isSafeInteger(c))
@@ -498,7 +498,7 @@ export async function balances(req: PayloadRequest, asOf?: string, opts: { compa
     WHERE a.company_id IN (${sql.join(
       pts.map((c) => sql`${c}`),
       sql`, `,
-    )}) AND ${opts.siteId ? sql`a.site_id = ${opts.siteId}` : sql`TRUE`}
+    )})
     GROUP BY a.id, a.name, a.active, a.opening_balance, a.opening_balance_date
     ORDER BY a.id`)) as unknown as { rows: Array<{ id: number; company_id: number; site_id: number | null; name: string; active: boolean | null; opening: string; total_in: string; total_out: string }> }
   return r.rows.map((x) => {

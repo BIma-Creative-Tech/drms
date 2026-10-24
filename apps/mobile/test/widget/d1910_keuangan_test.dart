@@ -347,6 +347,8 @@ void main() {
       await tester.tap(find.byKey(const Key('close-2026-09-ok')));
       await tester.pumpAndSettle();
       expect(api.calls, ['close:2026-09:1:']);
+      expect(find.byKey(const Key('result-success')), findsOneWidget);
+      await dismissResult(tester);
 
       await tester.tap(find.byKey(const Key('closing-reopen-2026-08')));
       await tester.pumpAndSettle();
@@ -433,7 +435,9 @@ void main() {
     await tester.enterText(find.byKey(const Key('loan-repay-amount')), '25000000');
     await tester.tap(find.byKey(const Key('loan-repay-save')));
     await tester.pumpAndSettle();
+    await confirmPopup(tester);
     expect(api.calls, ['repay:42:25000000:2026-10-19:']);
+    await dismissResult(tester);
 
     expect(find.byKey(const Key('loan-repayment-2-void')), findsNothing, reason: 'already void');
     await tester.tap(find.byKey(const Key('loan-repayment-1-void')));

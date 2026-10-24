@@ -172,12 +172,20 @@ const officeSignatures = officeRule(async (req, ids) => {
   return or.length === 0 ? false : or.length === 1 ? or[0]! : { or }
 })
 
+/** ADR 0032: Admin Staff reads the attendance selfies of the PTs where it holds the role (+ its own uploads). */
+const adminStaffSelfies: Rule = async ({ req }) => {
+  const own: Where = { uploadedBy: { equals: (req.user as { id?: number } | null)?.id ?? -1 } }
+  const ids = companiesWithRole(req, ['pk-admin-staff'])
+  return ids.length ? { or: [{ ownerCompany: { in: ids } }, own] } : own
+}
+
 const ownOrOffice: Access = byRoleAny({
   'pk-admin': officeOwned,
   'pk-owner': officeOwned,
   'pk-finance': officeOwned,
   'pk-pm': ownUser('uploadedBy'),
   'pk-staff': ownUser('uploadedBy'),
+  'pk-admin-staff': adminStaffSelfies,
 })
 
 const signatureRead: Access = byRoleAny({
@@ -318,7 +326,7 @@ export const MediaSelfies = mediaCollection({
   ownerCompany: true,
   // Owner decision 2026-10-09: web self check-in/out is every role, so every role may upload a selfie
   // (previously staff/pm/admin only, from when only the APK captured attendance).
-  access: { read: focused('media-selfies', ownOrOffice, false), create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-admin', 'pk-owner', 'pk-finance', 'pk-operator') },
+  access: { read: focused('media-selfies', ownOrOffice, false), create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-admin', 'pk-owner', 'pk-finance', 'pk-operator', 'pk-admin-staff') },
   // ADR 0018 (owner 2026-10-05): no selfie of an uploader without the current privacy acknowledgement while
   // "Versi APK minimum" ≥ 0.3.3 (403 PRIVACY_ACK_REQUIRED, audited access_denied).
   createGuard: assertSelfieUploadAllowed,

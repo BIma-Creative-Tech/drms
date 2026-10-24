@@ -12,13 +12,13 @@ import { api, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser } f
 /**
  * ADR 0029 (DRMS 13/10 Phase C) "Cek dana di persetujuan Owner + Pinjaman antar-PT" through the real API + DB guards,
  * with the owner's answers of 2026-10-14 ("setuju" on every default). Three fresh fictional PTs: L (lender, Rp 500 jt),
- * M (borrower: bank Rp 100 jt + a SITE petty-cash account Rp 40 jt that never counts), N (no designated receiving
+ * M (borrower: bank Rp 100 jt + a legacy SITE-flagged petty-cash account Rp 0 that COUNTS since DRMS 24/10), N (no designated receiving
  * account). One Owner (pk-principal in L, M and N; also Finance in L for the G1 case).
  *  0. switch OFF (default): today's behaviour — the Owner approves beyond the funds; the panel is information only
  *  1. switch ON: group admin only, reason required, audited
  *  2. the block: 409 FUND_INSUFFICIENT with the figures, request stays at the Owner step, audit row, panel, inbox
  *     badge, `instruct_loan`, Owner notification `expense.fund_shortfall`
- *  3. commitments: approved-not-transferred, LPJ shortfall, instructed loan (lender side); site accounts excluded
+ *  3. commitments: approved-not-transferred, LPJ shortfall, instructed loan (lender side); no site exclusion (DRMS 24/10)
  *  4. concurrency: two approvals racing on the same money → exactly one passes
  *  5. the Owner's own request: checked at submit, stays Draft
  *  6. a rule without an Owner level: the final (Direktur) approval is checked, the Owner notified
@@ -53,6 +53,7 @@ let accStaff = 0
 let accOwnerEmp = 0
 let accL = 0
 let accM = 0
+let accSiteM = 0
 let cat = 0
 let uom = 0
 let srcM = 0
@@ -84,7 +85,8 @@ beforeAll(async () => {
   accL = await sysCreate('cash-accounts', { company: L, name: 'Bank Pemberi', kind: 'bank', bank, accountNo: `61${Date.now() % 1e9}`, accountHolder: 'PT Contoh Pemberi Dana', openingBalance: 500 * JT, openingBalanceDate: '2020-01-01', intercompanyReceiving: true })
   accM = await sysCreate('cash-accounts', { company: M, name: 'Bank Peminjam', kind: 'bank', bank, accountNo: `62${Date.now() % 1e9}`, accountHolder: 'PT Contoh Peminjam Dana', openingBalance: 100 * JT, openingBalanceDate: '2020-01-01', intercompanyReceiving: true })
   const site = await sysCreate('sites', { company: M, code: `FCS${n}`, name: 'Site Contoh' })
-  await sysCreate('cash-accounts', { company: M, name: 'Kas kecil site', kind: 'cash', openingBalance: 40 * JT, openingBalanceDate: '2020-01-01', site })
+  // DRMS 24/10: a site flag (legacy, written after 20261024_500000 cleared the old ones) no longer excludes the account
+  accSiteM = await sysCreate('cash-accounts', { company: M, name: 'Kas kecil site', kind: 'cash', openingBalance: 0, openingBalanceDate: '2020-01-01', site })
   await sysCreate('cash-accounts', { company: N, name: 'Kas N', kind: 'cash', openingBalance: 900 * JT, openingBalanceDate: '2020-01-01' })
   cat = await sysCreate('expense-categories', { company: M, code: 'MAT', name: 'Material' })
   srcM = await sysCreate('cash-in-sources', { company: M, code: 'MODAL', name: 'Modal owner' })
@@ -167,11 +169,11 @@ let r1 = 0
 let r2 = 0
 
 describe('0. switch OFF (default): today\'s behaviour, the panel is information only', () => {
-  it('availability: only active accounts WITHOUT a site; Kas roles of the PT only', async () => {
+  it('availability: every active account (DRMS 24/10: a site-flagged one too); Kas roles of the PT only', async () => {
     expect(await figures(M)).toEqual({ balance: 100 * JT, commitments: 0, available: 100 * JT })
     const a = await ok(api('GET', `/api/v1/fund-availability?company=${M}`, financeM))
-    expect(a).toMatchObject({ companyId: M, enabled: false, balance: 100 * JT, commitments: 0, available: 100 * JT, excludedSiteAccounts: { count: 1, balance: 40 * JT } })
-    expect(a.accounts.map((x: { id: number }) => x.id)).toEqual([accM])
+    expect(a).toMatchObject({ companyId: M, enabled: false, balance: 100 * JT, commitments: 0, available: 100 * JT, excludedSiteAccounts: { count: 0, balance: 0 } })
+    expect(a.accounts.map((x: { id: number }) => x.id)).toEqual([accM, accSiteM])
     expect((await api('GET', `/api/v1/fund-availability?company=${M}`, staffM)).status).toBe(403)
     expect((await api('GET', `/api/v1/fund-availability?company=${M}`, financeL)).status).toBe(403) // not a member of M
   })
@@ -221,7 +223,7 @@ describe('2. the block at the Owner approval (hard, 409 FUND_INSUFFICIENT)', () 
     const audit = await sqlAs('app', "SELECT field, new_value FROM audit_logs WHERE action = 'fund_insufficient' AND doc_type = 'expense_request' AND doc_id = $1", [String(r1)])
     expect(audit.rows).toEqual([expect.objectContaining({ field: 'approve', new_value: { v: expect.objectContaining({ needed: 120 * JT, available: 100 * JT, gap: 20 * JT }) } })])
     const d = await ok(api('GET', `${E}/${r1}`, owner))
-    expect(d.fundCheck).toMatchObject({ enabled: true, applies: true, status: 'insufficient', blocked: true, needed: 120 * JT, gap: 20 * JT, accountCount: 1 })
+    expect(d.fundCheck).toMatchObject({ enabled: true, applies: true, status: 'insufficient', blocked: true, needed: 120 * JT, gap: 20 * JT, accountCount: 2 }) // DRMS 24/10: the (empty) site-flagged account counts too
     expect(d.fundCheck.blockedText).toContain('kurang Rp 20.000.000')
     expect(d.allowedActions).toEqual(expect.arrayContaining(['approve', 'reject', 'instruct_loan']))
     // the Direktur reads the panel (no loan action); Finance of the PT too
@@ -238,7 +240,7 @@ describe('2. the block at the Owner approval (hard, 409 FUND_INSUFFICIENT)', () 
   })
 })
 
-describe('3. commitments: approved-not-transferred, LPJ shortfall, instructed loans; the site account never counts', () => {
+describe('3. commitments: approved-not-transferred, LPJ shortfall, instructed loans', () => {
   it('an approval reserves the money: Rp 60 jt passes, the decision row keeps the figures; the next request sees the commitment', async () => {
     r2 = await request(pOwner, 60 * JT, { atOwner: true })
     expect((await ok(api('POST', `${E}/${r2}/approve`, owner, {}, key()))).status).toBe('approved')

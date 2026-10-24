@@ -143,6 +143,17 @@ class ExpenseApi {
   Future<ExpenseDetail> cancel(int requestId, String reason, {required String idempotencyKey}) =>
       _reasonAction(requestId, 'cancel', reason, idempotencyKey);
 
+  /// D2410 "Hapus draft": `POST …/delete-draft` — soft delete of an own server Draft nobody ever decided on (reason
+  /// optional; the number of a withdrawn draft is never reused). Returns the (deleted) request.
+  Future<ExpenseDetail> deleteDraft(int requestId, {String? reason, required String idempotencyKey}) => client.run(
+    (d) => d.post<dynamic>(
+      '/expense-requests/$requestId/delete-draft',
+      data: {if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim()},
+      options: _idem(idempotencyKey),
+    ),
+    (data) => detailFromJson(data as Map<String, dynamic>),
+  );
+
   Future<ExpenseDetail> _reasonAction(int requestId, String path, String reason, String idempotencyKey) => client.run(
     (d) =>
         d.post<dynamic>('/expense-requests/$requestId/$path', data: {'reason': reason}, options: _idem(idempotencyKey)),
@@ -181,6 +192,15 @@ class ExpenseApi {
       for (final i in ((data as Map<String, dynamic>)['items'] as List<dynamic>? ?? const []))
         if (i is Map<String, dynamic>) ?IntercompanyPayee.fromApiJson(i),
     ],
+  );
+
+  /// D2410 (point 6): a general attachment of a request (photo / PDF) via the authorized file endpoint.
+  Future<Uint8List> attachmentFile(int id) => client.run(
+    (d) => d.get<dynamic>(
+      '/media/attachments/$id/file',
+      options: ApiClient.allCompanies(Options(responseType: ResponseType.bytes)),
+    ),
+    (data) => Uint8List.fromList(data as List<int>),
   );
 
   /// Receipt image (thumbnail variant) via the authorized file endpoint (ADR 0004 §4a).

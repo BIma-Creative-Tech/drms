@@ -8,6 +8,8 @@ import { REJECT_PROMPT } from '@/domain/expense/decision-texts'
 
 import { ActionButton, postJson, problemText } from '../ActionButton'
 import { ActionDialog } from '../ActionDialog'
+import { useDocSummary } from '../feedback/DocContext'
+import { confirmLabel, confirmTitle, successTitle } from '../feedback/feedback'
 import type { RequestActionsProps } from './action-bar'
 import { setRequestMode, useRequestMode } from './mode'
 
@@ -173,16 +175,19 @@ function PrintMenu({ pdfs }: { pdfs: Array<{ href: string; label: string }> }) {
   )
 }
 
-/** "Duplikat" (Persetujuan #12): confirm → POST …/duplicate → open the new Draft. */
+/** "Duplikat" (Persetujuan #12): confirm → POST …/duplicate → open the new Draft. DRMS 24/10: popups name the request. */
 function DuplicateButton({ id }: { id: number }) {
   const router = useRouter()
   const key = useRef<string | undefined>(undefined)
+  const doc = useDocSummary()
   return (
     <ActionDialog
       label="Duplikat"
-      title="Duplikat pengajuan"
+      title={confirmTitle('Duplikat pengajuan', doc.object)}
       description="Buat Draft baru dengan PT, project, pemohon dan baris item yang sama. Nomor, persetujuan, transfer, nota, flag dan lampiran tidak ikut disalin."
-      confirmLabel="Buat draft salinan"
+      summary={doc.summary}
+      confirmLabel={confirmLabel('duplikat')}
+      result={{ title: successTitle('Duplikat pengajuan', doc.object), message: 'Draft salinan dibuat dan dibuka.' }}
       rotateKey={() => {
         key.current = idemKey()
       }}

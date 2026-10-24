@@ -7,6 +7,7 @@ import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
 import '../../../shared/widgets/reason_dialog.dart';
@@ -70,7 +71,7 @@ class _VoidableTransfersViewState extends ConsumerState<VoidableTransfersView> {
     try {
       final key = _keys.putIfAbsent(x.transferId, () => const Uuid().v4());
       await ref.read(cashApiProvider).voidTransfer(x.requestId, x.transferId, reason, idempotencyKey: key);
-      if (mounted) showSnack(context, t.voidTransferDone(x.transferNo));
+      if (!mounted) return;
       setState(() {
         _more.clear();
         _page = 1;
@@ -80,8 +81,9 @@ class _VoidableTransfersViewState extends ConsumerState<VoidableTransfersView> {
       ref.invalidate(requestDetailProvider(x.requestId));
       ref.invalidate(inboxProvider);
       ref.invalidate(cashBookProvider);
+      await showActionResult(context, message: t.voidTransferDone(x.transferNo), action: t.voidTransfer);
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: t.voidTransfer);
     } finally {
       if (mounted) setState(() => _busy = null);
     }

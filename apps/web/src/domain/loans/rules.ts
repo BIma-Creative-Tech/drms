@@ -8,6 +8,11 @@
  * Finance's "Cairkan" (KK lender account + KM borrower account) and every repayment (the mirror pair). Goods, or two
  * projects of the same account, stay a notional claim. Origin `transfer`: the automatic loan of a transfer paid from
  * another account (lender = that account, approved and disbursed with the transfer).
+ * ADR 0022/0031 amendment 2026-10-24 (DRMS 24/10 #10–#12): submitted by the borrower PM OR Finance of the PT; two
+ * levels — Direktur (1) then Owner (2); money (`dana`) between two KNOWN accounts is cash-backed even when both projects
+ * share ONE account (the pair is posted on it, tagged with each project). After the Owner's approval the loan is a
+ * TRANSFER ORDER in Finance's "Antrian Transfer"; a repayment of a cash-backed loan is a request with the same path
+ * (Direktur → Owner → transfer order → executed). A claim (`barang`) is repaid by a plain record as before.
  */
 
 import { formatRupiah } from '@/lib/money'
@@ -32,20 +37,51 @@ export const LOAN_KINDS = ['dana', 'barang'] as const
 export type LoanKind = (typeof LOAN_KINDS)[number]
 export const LOAN_KIND_LABELS: Record<LoanKind, string> = { dana: 'Dana', barang: 'Barang/material' }
 
-/** ADR 0031: `manual` = PM submits, Direktur approves (ADR 0022); `transfer` = automatic, from a transfer paid from another account. */
+/** ADR 0031: `manual` = PM / Finance submits, Direktur → Owner approve (ADR 0022, amended 2026-10-24); `transfer` = automatic, from a transfer paid from another account. */
 export const LOAN_ORIGINS = ['manual', 'transfer'] as const
 export type LoanOrigin = (typeof LOAN_ORIGINS)[number]
-export const LOAN_ORIGIN_LABELS: Record<LoanOrigin, string> = { manual: 'Diajukan PM', transfer: 'Otomatis dari transfer' }
+export const LOAN_ORIGIN_LABELS: Record<LoanOrigin, string> = { manual: 'Diajukan PM / Finance', transfer: 'Otomatis dari transfer' }
 
-/** ADR 0031: an approved cash-backed loan not yet disbursed by Finance. */
-export const AWAITING_DISBURSEMENT_LABEL = 'Disetujui – menunggu pencairan'
+/** 2026-10-24 (#10): who filed a manual loan — the borrower project's PM or a Finance user of the PT (frozen at create). */
+export const LOAN_SUBMITTER_ROLES = ['pm', 'finance'] as const
+export type LoanSubmitterRole = (typeof LOAN_SUBMITTER_ROLES)[number]
+
+/** "Asal" of one loan: an automatic loan, else who submitted it (a legacy manual loan without role = the PM). */
+export function loanOriginLabel(origin: LoanOrigin | null | undefined, submitterRole: LoanSubmitterRole | null | undefined): string {
+  if (origin === 'transfer') return LOAN_ORIGIN_LABELS.transfer
+  return submitterRole === 'finance' ? 'Diajukan Finance' : 'Diajukan PM'
+}
+
+/** ADR 0031 + 2026-10-24 (#11): an approved cash-backed loan whose transfer order Finance has not executed yet. */
+export const AWAITING_DISBURSEMENT_LABEL = 'Disetujui – menunggu transfer Finance'
 
 /**
- * ADR 0031: does a loan move cash? Money (`dana`) between two DIFFERENT, known Pusat Biaya accounts. Goods, or both
- * projects on the same account (or a project without one), stay a notional claim (ADR 0022 §5 option B).
+ * 2026-10-24 (#10): approval levels of a manual loan and of a repayment request — 1 Direktur (`pk-owner`), 2 Owner
+ * (`pk-principal`), both as STORED roles (the Owner's implied Direktur role never decides level 1).
+ */
+export const LOAN_APPROVAL_LEVELS = [1, 2] as const
+export type LoanApprovalLevel = (typeof LOAN_APPROVAL_LEVELS)[number]
+export const LOAN_LAST_LEVEL: LoanApprovalLevel = 2
+export const LOAN_LEVEL_LABELS: Record<LoanApprovalLevel, string> = { 1: 'Direktur', 2: 'Owner' }
+export const levelOf = (v: unknown): LoanApprovalLevel => (Number(v) === 2 ? 2 : 1)
+
+/** "Menunggu persetujuan Direktur" / "Menunggu persetujuan Owner". */
+export const pendingLabel = (level: unknown): string => `Menunggu persetujuan ${LOAN_LEVEL_LABELS[levelOf(level)]}`
+
+/** Status text of a loan: the level while pending, "menunggu transfer Finance" while its transfer order waits. */
+export function loanStatusLabel(l: { status: LoanStatus; approvalLevel?: unknown; awaitingDisbursement?: boolean }): string {
+  if (l.status === 'pending_approval') return pendingLabel(l.approvalLevel)
+  if (l.status === 'approved' && l.awaitingDisbursement) return AWAITING_DISBURSEMENT_LABEL
+  return LOAN_STATUS_LABELS[l.status]
+}
+
+/**
+ * ADR 0031, amended 2026-10-24 (#11): does a loan move cash? Money (`dana`) between two KNOWN Pusat Biaya accounts —
+ * also when both projects share the SAME account (the KK / KM pair is posted on it, tagged with each project, so every
+ * project cash book shows the loan). Goods, or a project without an account, stay a notional claim (ADR 0022 §5 option B).
  */
 export function isCashBacked(l: { kind: LoanKind; lenderCashAccountId: number | null | undefined; borrowerCashAccountId: number | null | undefined }): boolean {
-  return l.kind === 'dana' && typeof l.lenderCashAccountId === 'number' && typeof l.borrowerCashAccountId === 'number' && l.lenderCashAccountId !== l.borrowerCashAccountId
+  return l.kind === 'dana' && typeof l.lenderCashAccountId === 'number' && typeof l.borrowerCashAccountId === 'number'
 }
 
 /** Default due date of an automatic loan: loan date + 30 days (Q-L4: a due date is always set). */
@@ -60,7 +96,7 @@ export function addDays(date: string, days: number): string {
 export const LOAN_ACTIONS = ['edit', 'submit', 'cancel', 'approve', 'reject', 'disburse', 'repay'] as const
 export type LoanAction = (typeof LOAN_ACTIONS)[number]
 
-/** G1 exception recorded on the loan (ADR 0022 §4, Q-L5): the creator PM is the PT's only Direktur. */
+/** G1 exception recorded on the loan (ADR 0022 §4, Q-L5): the creator PM is the PT's only Direktur — level 1 only. */
 export const LOAN_G1_EXCEPTIONS = ['direktur_self'] as const
 export type LoanG1Exception = (typeof LOAN_G1_EXCEPTIONS)[number]
 export const DIREKTUR_SELF_NOTE = 'Disetujui Direktur pembuat karena satu-satunya Direktur PT'
@@ -184,6 +220,47 @@ export function mayDecide(c: { callerId: number; creatorId: number; callerIsDire
   return c.g1Exception === 'direktur_self'
 }
 
+export type PoolError = 'NO_DIREKTUR' | 'NO_OWNER' | 'SAME_PERSON'
+
+/**
+ * 2026-10-24 (#10, G1): both decision pools of a submit. Level 1 = `direkturPool` (the narrow `direktur_self` stays as
+ * it is); level 2 = the PT's active Owner minus the creator (never an exception: a PT without an Owner, or whose only
+ * Owner filed the loan, refuses the submit — like an expense request, ADR 0026). One person never holds both levels
+ * (one decision position per person, DB index): a single Direktur who is also the single Owner → `SAME_PERSON`.
+ */
+export function decisionPools(creatorId: number, direkturIds: readonly number[], ownerIds: readonly number[]): { direktur: number[]; owner: number[]; exception: LoanG1Exception | null; error: PoolError | null } {
+  const d = direkturPool(creatorId, direkturIds)
+  const owner = [...new Set(ownerIds)].filter((x) => x !== creatorId).sort((a, b) => a - b)
+  const error: PoolError | null = d.pool.length === 0 ? 'NO_DIREKTUR' : owner.length === 0 ? 'NO_OWNER' : d.pool.every((x) => owner.every((o) => o === x)) ? 'SAME_PERSON' : null
+  return { direktur: d.pool, owner, exception: d.exception, error }
+}
+
+export const POOL_ERROR_MESSAGES: Record<PoolError, string> = {
+  NO_DIREKTUR: 'PT ini belum punya Direktur aktif untuk menyetujui pinjaman. Hubungi Admin.',
+  NO_OWNER: 'PT ini belum punya Owner aktif untuk persetujuan level Owner (Direktur → Owner). Pengajuan tidak dapat dikirim. Hubungi Admin.',
+  SAME_PERSON: 'Persetujuan Direktur dan Owner harus oleh dua orang berbeda: Direktur satu-satunya juga Owner satu-satunya PT ini. Hubungi Admin.',
+}
+
+/**
+ * 2026-10-24 (#10): may the caller decide the CURRENT level? Level 1 = `mayDecide` (stored Direktur, G1 incl.
+ * `direktur_self`) — but not when the caller is the last Owner who could still take level 2 (`ownerPool` given);
+ * level 2 = a stored Owner who is neither the creator (G1, no exception) nor the decider of level 1 (`priorDeciders`).
+ */
+export function mayDecideLevel(c: {
+  level: LoanApprovalLevel
+  callerId: number
+  creatorId: number
+  callerIsDirektur: boolean
+  callerIsOwner: boolean
+  g1Exception?: LoanG1Exception | null
+  priorDeciders?: readonly number[]
+  ownerPool?: readonly number[]
+}): boolean {
+  if (c.level === 2) return c.callerIsOwner && c.callerId !== c.creatorId && !(c.priorDeciders ?? []).includes(c.callerId)
+  if (!mayDecide({ callerId: c.callerId, creatorId: c.creatorId, callerIsDirektur: c.callerIsDirektur, g1Exception: c.g1Exception })) return false
+  return c.ownerPool === undefined || c.ownerPool.some((x) => x !== c.callerId && x !== c.creatorId)
+}
+
 export type LoanActorContext = {
   status: LoanStatus
   isCreator: boolean
@@ -203,20 +280,26 @@ export type LoanActorContext = {
   disbursed?: boolean
   /** ADR 0031: `transfer` = automatic loan (cancelled only through its transfer's void). */
   origin?: LoanOrigin
+  /** 2026-10-24 (#12): outstanding minus the repayment requests not executed yet (undefined = no reservation known). */
+  repayableAmount?: number
 }
 
 /** Actions the caller may take now (UI + service guard; the DB re-checks G1 and the transitions). */
 export function loanAllowedActions(c: LoanActorContext): LoanAction[] {
   const out: LoanAction[] = []
   const auto = c.origin === 'transfer'
-  if (c.status === 'draft' && c.isCreator && c.isBorrowerPm) out.push('edit', 'submit')
+  // 2026-10-24 (#10): the creator files while still borrower PM or Finance of the PT
+  if (c.status === 'draft' && c.isCreator && (c.isBorrowerPm || c.isFinance)) out.push('edit', 'submit')
   if (c.isCreator && (c.status === 'draft' || c.status === 'pending_approval')) out.push('cancel')
   // ADR 0031: a disbursed loan is settled by repayments (its cash cannot be "un-lent"); an automatic one goes with its transfer
   else if (c.isDirektur && c.status === 'approved' && !c.hasRepayment && !auto && !(c.cashBacked && c.disbursed)) out.push('cancel')
   if (c.status === 'pending_approval' && c.mayDecide) out.push('approve', 'reject')
+  // 2026-10-24 (#11): Finance executes the transfer order (Antrian Transfer; `disburse` kept for older APKs)
   if (c.status === 'approved' && c.cashBacked && !c.disbursed && c.isFinance) out.push('disburse')
-  // ADR 0031: a cash-backed loan is repaid in cash → Finance only, after the disbursement; a claim as before (Q-L7)
-  if (LOAN_REPAYABLE.includes(c.status) && (c.cashBacked ? c.disbursed && c.isFinance : c.isBorrowerPm || c.isFinance)) out.push('repay')
+  // #12: a cash-backed loan is repaid by a REQUEST (borrower PM / Finance → Direktur → Owner → transfer order), after the
+  // disbursement and while something is not yet requested; a claim is recorded as before (Q-L7)
+  const room = c.repayableAmount === undefined || c.repayableAmount > 0
+  if (LOAN_REPAYABLE.includes(c.status) && (c.isBorrowerPm || c.isFinance) && (!c.cashBacked || (c.disbursed && room))) out.push('repay')
   return out
 }
 
@@ -225,3 +308,93 @@ export function loanAllowedActions(c: LoanActorContext): LoanAction[] {
  * moved cash is reversed in the cash book → Finance only.
  */
 export const mayVoidRepayment = (c: Pick<LoanActorContext, 'isDirektur' | 'isFinance' | 'cashBacked'>): boolean => (c.cashBacked ? c.isFinance : c.isDirektur || c.isFinance)
+
+// ---------------------------------------------------------------- 2026-10-24 (#12): repayment requests of a cash-backed loan
+
+/**
+ * `posted` = executed (cash moved) or, for a claim, recorded — the code every existing row and report already uses
+ * (existing rows ARE executed repayments: no data change). A cash-backed repayment is inserted `pending_approval`.
+ */
+export const REPAYMENT_STATUSES = ['pending_approval', 'approved', 'posted', 'void', 'rejected', 'cancelled'] as const
+export type RepaymentStatus = (typeof REPAYMENT_STATUSES)[number]
+
+export const REPAYMENT_STATUS_LABELS: Record<RepaymentStatus, string> = {
+  pending_approval: 'Menunggu persetujuan',
+  approved: 'Disetujui – menunggu transfer Finance',
+  posted: 'Tercatat',
+  void: 'Dibatalkan (void)',
+  rejected: 'Ditolak',
+  cancelled: 'Dibatalkan',
+}
+
+/** Status text of a repayment (the level while pending). */
+export const repaymentStatusLabel = (status: RepaymentStatus, level?: unknown): string => (status === 'pending_approval' ? pendingLabel(level) : REPAYMENT_STATUS_LABELS[status])
+
+/** Transitions of a repayment (DB trigger `pk_project_loan_repayments_guard` mirrors them). */
+export const REPAYMENT_TRANSITIONS: Readonly<Record<RepaymentStatus, readonly RepaymentStatus[]>> = {
+  pending_approval: ['approved', 'rejected', 'cancelled'],
+  approved: ['posted', 'cancelled'],
+  posted: ['void'],
+  void: [],
+  rejected: [],
+  cancelled: [],
+}
+
+/** Requests that reserve part of the outstanding amount (not executed yet). */
+export const REPAYMENT_OPEN: readonly RepaymentStatus[] = ['pending_approval', 'approved']
+
+export const REPAYMENT_ACTIONS = ['approve', 'reject', 'cancel', 'execute', 'void'] as const
+export type RepaymentAction = (typeof REPAYMENT_ACTIONS)[number]
+
+export type RepaymentActorContext = {
+  status: RepaymentStatus
+  /** Caller recorded / submitted the repayment. */
+  isCreator: boolean
+  isDirektur: boolean
+  isFinance: boolean
+  /** Caller may decide the current level (`mayDecideLevel`). */
+  mayDecide: boolean
+  cashBacked: boolean
+}
+
+/**
+ * Row actions of a repayment: decide the current level; the submitter cancels while pending; an approved order is
+ * executed by Finance (the submitter may execute his own: no Finance self-guard on loans, audited) or cancelled by
+ * Finance / the submitter; a posted one is voided (`mayVoidRepayment`).
+ */
+export function repaymentAllowedActions(c: RepaymentActorContext): RepaymentAction[] {
+  const out: RepaymentAction[] = []
+  if (c.status === 'pending_approval') {
+    if (c.mayDecide) out.push('approve', 'reject')
+    if (c.isCreator) out.push('cancel')
+  } else if (c.status === 'approved') {
+    if (c.isFinance) out.push('execute')
+    if (c.isFinance || c.isCreator) out.push('cancel')
+  } else if (c.status === 'posted' && mayVoidRepayment(c)) out.push('void')
+  return out
+}
+
+/** Σ of the requests not executed yet (they reserve the outstanding amount). */
+export const reservedOf = (rows: ReadonlyArray<{ status: RepaymentStatus; amount: number | string }>): number =>
+  rows.filter((r) => REPAYMENT_OPEN.includes(r.status)).reduce((s, r) => s + Math.round(Number(r.amount)), 0)
+
+/** #12: a repayment REQUEST — amount ≤ outstanding not yet requested, planned date ≥ the loan date (may be in the future). */
+export function repaymentRequestErrors(input: { amount?: unknown; repayDate?: unknown; note?: unknown }, loan: { loanDate: string; repayable: number }): FieldError[] {
+  const errors: FieldError[] = []
+  const a = input.amount
+  if (typeof a !== 'number' || !Number.isSafeInteger(a) || a <= 0) errors.push({ path: 'amount', message: 'Nominal pengembalian wajib diisi (bilangan bulat Rupiah > 0).' })
+  else if (a > loan.repayable) errors.push({ path: 'amount', message: `Nominal pengembalian melebihi sisa pinjaman yang belum diajukan (${formatRupiah(loan.repayable)}).` })
+  const d = input.repayDate
+  if (!isDate(d)) errors.push({ path: 'repayDate', message: 'Rencana tanggal pengembalian wajib diisi (YYYY-MM-DD).' })
+  else if (d < loan.loanDate) errors.push({ path: 'repayDate', message: 'Rencana tanggal pengembalian tidak boleh sebelum tanggal pinjaman.' })
+  if (input.note !== undefined && input.note !== null && (typeof input.note !== 'string' || input.note.trim().length > NOTE_MAX)) errors.push({ path: 'note', message: `Catatan maks. ${NOTE_MAX} karakter.` })
+  return errors
+}
+
+/** #11 / #12: execution date of a transfer order — not before the loan date, not in the future. */
+export function executeDateError(date: unknown, c: { minDate: string; today: string }): FieldError | null {
+  if (!isDate(date)) return { path: 'executeDate', message: 'Tanggal transfer harus YYYY-MM-DD.' }
+  if (date > c.today) return { path: 'executeDate', message: 'Tanggal transfer tidak boleh di masa depan.' }
+  if (date < c.minDate) return { path: 'executeDate', message: 'Tanggal transfer tidak boleh sebelum tanggal pinjaman.' }
+  return null
+}

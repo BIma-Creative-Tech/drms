@@ -3,19 +3,21 @@ import type { AdminViewServerProps, DocumentViewServerProps, PayloadRequest } fr
 import Link from 'next/link'
 import React from 'react'
 
-import { hasRoleAny, relId, userId } from '@/access/roles'
+import { companiesWithRole, hasRole, hasRoleAny, relId, userId } from '@/access/roles'
 import { DecisionBar } from '@/admin/components/DecisionBar'
+import { DocSummaryProvider } from '@/admin/components/feedback/DocContext'
 import { ConfirmAction } from '@/admin/components/addendum/ConfirmAction'
 import { ReasonAction } from '@/admin/components/kas/ReasonAction'
 import { KAS_STYLE } from '@/admin/components/kas/style'
 import { ListToolbar, Pager } from '@/admin/components/list/ListToolbar'
+import { LoanExecuteForm } from '@/admin/components/loans/LoanExecuteForm'
 import { LoanForm } from '@/admin/components/loans/LoanForm'
 import { RepaymentAction } from '@/admin/components/loans/RepaymentAction'
 import { allowedValues, idValues, pageOfFind, parseListQuery, type ListQuery } from '@/admin/list-query'
 import { settings, today } from '@/domain/expense/common'
 import { loanScope, loanTotals, projectLoanFigures } from '@/domain/loans/report'
 import { LOAN_STATUS_LABELS, LOAN_STATUSES, OVERDUE_LABEL, type LoanStatus } from '@/domain/loans/rules'
-import { listLoans, loadVisibleLoan, loanDetail, loanInbox, loanProjectOptions, type LoanDetail as Detail, type LoanSummary } from '@/domain/loans/service'
+import { listLoans, loadVisibleLoan, loanDetail, loanInbox, loanProjectOptions, loanTransferOrders, type LoanDetail as Detail, type LoanSummary, type RepaymentInboxItem } from '@/domain/loans/service'
 import type { PillTone } from '@/domain/reports/viz'
 import { withReqTransaction, withSystemTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
@@ -34,6 +36,10 @@ import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, Meter, r
  * edit by the PM, Setujui / Tolak by the Direktur in the fixed decision bar, repayment by the borrower PM / Finance,
  * void by Direktur / Finance), the project tab "Pinjaman" and the section of the "Persetujuan" inbox. Every action goes
  * to /api/v1/project-loans (role, step and state re-checked, audited). No cash entry is ever created (§5).
+ * 2026-10-24 (DRMS 24/10 #10–#12): borrower PM or Finance files; Direktur (level 1) → Owner (level 2) decide — in the
+ * decision bar and the "Persetujuan" section, loans and repayment requests; a cash-backed loan / approved repayment is a
+ * transfer order executed in "Antrian Transfer" (`LoanTransferOrderSection`; the loan page links to it instead of
+ * "Cairkan").
  */
 const READERS = ['pk-owner', 'pk-admin', 'pk-finance', 'pk-pm'] as const
 export const loanHref = (id: number) => `/admin/pinjaman/detail/${id}`
@@ -66,6 +72,22 @@ function StatusCell({ l }: { l: Pick<LoanSummary, 'status' | 'statusLabel' | 'ov
 const projectText = (p: LoanSummary['borrowerProject']) => `${p.code ?? ''} ${p.name ?? ''}`.trim()
 /** ADR 0031: an automatic loan's lender is a Pusat Biaya account (no lender project). */
 const lenderText = (l: Pick<LoanSummary, 'lenderProject' | 'lenderCashAccount'>) => (l.lenderProject ? projectText(l.lenderProject) : `Akun ${l.lenderCashAccount?.name ?? '—'}`)
+/** DRMS 24/10: the loan as named in the popups (submit, disburse, repay, cancel, approve / reject, void). */
+const loanDoc = (l: Pick<LoanSummary, 'id' | 'docNo' | 'kindLabel' | 'amount' | 'dueDate' | 'borrowerProject' | 'lenderProject' | 'lenderCashAccount'>) => {
+  const docNo = l.docNo ?? `Draft pinjaman #${l.id}`
+  return { object: docNo, summary: [['Pinjaman', docNo], ['Jenis', l.kindLabel], ['Peminjam', projectText(l.borrowerProject)], ['Pemberi', lenderText(l)], ['Nilai', rp(l.amount)], ['Jatuh tempo', dateId(l.dueDate)]] as const }
+}
+
+/** DRMS 24/10: a repayment request of the approval inbox as named in the approve / reject popups. */
+const repayInboxSummary = (r: RepaymentInboxItem) =>
+  [
+    ['Pinjaman', r.loanDocNo ?? `#${r.loanId}`],
+    ['Peminjam', projectText(r.borrowerProject)],
+    ['Pemberi', r.lenderProject ? projectText(r.lenderProject) : `Akun ${r.lenderCashAccount?.name ?? '—'}`],
+    ['Nominal pengembalian', rp(r.amount)],
+    ['Rencana tanggal', dateId(r.plannedDate)],
+    ['Diajukan', r.submittedBy?.name ?? null],
+  ] as const
 
 /** Columns of a loan table (list, project tab). `focus` = the project of the tab (shows the direction). */
 function loanCols(pt: PtView, focus?: number): Col<LoanSummary>[] {
@@ -175,7 +197,7 @@ export async function LoanList(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="pinjaman">
       <style>{STYLE}</style>
-      <DashHead title="Pinjaman antar project" note="Diajukan PM project peminjam · disetujui Direktur · dana antar pusat biaya berbeda dicairkan Finance (kas keluar/masuk) · otomatis bila transfer dibayar dari akun lain">
+      <DashHead title="Pinjaman antar project" note="Diajukan PM project peminjam atau Finance · disetujui Direktur lalu Owner · dana ditransfer Finance lewat Antrian Transfer (kas keluar/masuk) · otomatis bila transfer dibayar dari akun lain">
         <div className="pk-kact">
           {d.canCreate ? (
             <Link className="pk-kbtn primary" href="/admin/pinjaman/baru" data-pk-link="pinjaman-baru">
@@ -238,12 +260,12 @@ function LoanFlowHelp() {
   return (
     <Card id="loan-help" title="Alur" span={4}>
       <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.7 }}>
-        <li>PM project peminjam mengajukan nilai, jatuh tempo dan alasan.</li>
-        <li>Direktur menyetujui atau menolak dengan alasan. PM project pemberi diberi tahu.</li>
-        <li>Dana antar pusat biaya (akun kas) berbeda: setelah disetujui, Finance mencairkan — kas keluar dari pusat biaya pemberi, kas masuk ke pusat biaya peminjam. Pengembalian membalikkan arahnya.</li>
-        <li>Barang/material, atau kedua project memakai pusat biaya yang sama: tanpa transaksi kas (klaim tercatat, sisa dipantau).</li>
-        <li>Transfer pengajuan yang dibayar dari akun selain pusat biaya project tercatat otomatis sebagai pinjaman (pemberi = akun pembayar).</li>
-        <li>Pengembalian dicatat PM peminjam atau Finance sampai Lunas; lewat jatuh tempo = Terlambat.</li>
+        <li>PM project peminjam atau Finance PT mengajukan nilai, jatuh tempo dan alasan.</li>
+        <li>Direktur menyetujui (level 1), lalu Owner (level 2); penolakan dengan alasan di level mana pun. Pengaju tidak memutuskan pengajuannya sendiri. PM project pemberi diberi tahu.</li>
+        <li>Dana: setelah disetujui Owner, pinjaman masuk Antrian Transfer Finance. Finance mengeksekusi transfer — kas keluar dari pusat biaya pemberi (project pemberi), kas masuk ke pusat biaya peminjam (project peminjam); juga bila kedua project memakai pusat biaya yang sama.</li>
+        <li>Pengembalian dana diajukan PM peminjam atau Finance, disetujui Direktur lalu Owner, lalu ditransfer Finance (arah kas dibalik).</li>
+        <li>Barang/material: tanpa transaksi kas (klaim tercatat, sisa dipantau); pengembalian dicatat PM peminjam atau Finance.</li>
+        <li>Transfer pengajuan yang dibayar dari akun selain pusat biaya project tercatat otomatis sebagai pinjaman (pemberi = akun pembayar). Lewat jatuh tempo = Terlambat.</li>
       </ol>
     </Card>
   )
@@ -251,7 +273,7 @@ function LoanFlowHelp() {
 
 export async function LoanNew(props: AdminViewServerProps) {
   const req = props.initPageResult.req
-  const d = hasRoleAny(req, 'pk-pm') ? await withReqTransaction(req, async () => ({ options: await loanProjectOptions(req), today: await today(req) })) : null
+  const d = hasRoleAny(req, 'pk-pm', 'pk-finance') ? await withReqTransaction(req, async () => ({ options: await loanProjectOptions(req), today: await today(req) })) : null
   const back = (
     <Link className="pk-kbtn" href="/admin/pinjaman">
       ← Pinjaman antar project
@@ -262,7 +284,7 @@ export async function LoanNew(props: AdminViewServerProps) {
       <Frame props={props} name="pinjaman-baru">
         <DashHead title="Ajukan pinjaman antar project">{back}</DashHead>
         <Alert tone="bad" attr="denied">
-          <p>Pinjaman antar project diajukan oleh PM project peminjam. Anda belum menjadi PM project yang aktif.</p>
+          <p>Pinjaman antar project diajukan oleh PM project peminjam atau Finance PT. Anda belum menjadi PM project yang aktif dan bukan Finance.</p>
         </Alert>
       </Frame>
     )
@@ -271,7 +293,7 @@ export async function LoanNew(props: AdminViewServerProps) {
   const initial = sp.project && /^\d{1,10}$/.test(sp.project) ? Number(sp.project) : undefined
   return (
     <Frame props={props} name="pinjaman-baru">
-      <DashHead title="Ajukan pinjaman antar project" note="Nomor PJ diberikan saat diajukan. Direktur menyetujui; PM project pemberi diberi tahu.">
+      <DashHead title="Ajukan pinjaman antar project" note="Nomor PJ diberikan saat diajukan. Direktur lalu Owner menyetujui; PM project pemberi diberi tahu.">
         {back}
       </DashHead>
       <Bento>
@@ -327,7 +349,8 @@ export async function LoanDetail(props: AdminViewServerProps) {
   const sp = (props.searchParams ?? {}) as Record<string, string | undefined>
   const acts = new Set(l.allowedActions)
   const title = l.docNo ?? `Draft pinjaman #${l.id}`
-  const decision = l.decisions.at(-1)
+  // 2026-10-24 (#10): one row per level (legacy loans: the single Direktur row is level 1)
+  const decisionAt = (level: 1 | 2) => l.decisions.filter((x) => x.level === level).at(-1)
   const pending = l.status === 'pending_approval'
   const active = l.status === 'approved' || l.status === 'partially_repaid' || l.status === 'repaid'
   // ADR 0031: an automatic loan has one step (the transfer); a cash-backed manual loan adds Finance's disbursement
@@ -335,18 +358,49 @@ export async function LoanDetail(props: AdminViewServerProps) {
     l.origin === 'transfer'
       ? [{ key: 'transfer', label: `Otomatis dari transfer ${l.transfer?.docNo ?? ''}`.trim(), when: l.submittedAt, who: l.createdBy.name, tone: (l.status === 'cancelled' ? 'none' : 'ok') as PillTone, state: l.status === 'cancelled' ? 'Dibatalkan' : 'Dicatat & dicairkan' }]
       : [
-          { key: 'submit', label: 'Diajukan PM peminjam', when: l.submittedAt, who: l.createdBy.name, tone: (l.submittedAt ? 'ok' : 'none') as PillTone, state: l.submittedAt ? 'Selesai' : 'Belum' },
-          decision
-            ? { key: 'direktur', label: 'Persetujuan Direktur', when: decision.decidedAt, who: decision.actor.name, tone: (decision.decision === 'approved' ? 'ok' : 'bad') as PillTone, state: decision.decision === 'approved' ? 'Disetujui' : 'Ditolak', reason: decision.reason }
-            : { key: 'direktur', label: 'Persetujuan Direktur', when: null, who: null, tone: (pending ? 'wait' : 'none') as PillTone, state: pending ? 'Menunggu' : l.status === 'cancelled' ? 'Dibatalkan' : 'Belum' },
+          { key: 'submit', label: l.submitterRole === 'finance' ? 'Diajukan Finance' : 'Diajukan PM peminjam', when: l.submittedAt, who: l.createdBy.name, tone: (l.submittedAt ? 'ok' : 'none') as PillTone, state: l.submittedAt ? 'Selesai' : 'Belum' },
+          ...([1, 2] as const).map((level) => {
+            const key = level === 1 ? 'direktur' : 'owner'
+            const label = level === 1 ? 'Persetujuan Direktur' : 'Persetujuan Owner'
+            const dec = decisionAt(level)
+            if (dec) return { key, label, when: dec.decidedAt, who: dec.actor.name, tone: (dec.decision === 'approved' ? 'ok' : 'bad') as PillTone, state: dec.decision === 'approved' ? 'Disetujui' : 'Ditolak', reason: dec.reason }
+            const waiting = pending && l.approvalLevel === level
+            // a loan approved before 2026-10-24 had one level (the Direktur's approval was final)
+            const legacy = level === 2 && (active || l.status === 'rejected') && l.decisions.every((x) => x.level === 1)
+            return { key, label, when: null, who: null, tone: (waiting ? 'wait' : 'none') as PillTone, state: waiting ? 'Menunggu' : legacy ? (active ? 'Tidak diperlukan (sebelum 24/10)' : '—') : l.status === 'cancelled' ? 'Dibatalkan' : 'Belum' }
+          }),
           ...(l.cashBacked
-            ? [{ key: 'cair', label: 'Pencairan Finance', when: l.disbursedAt, who: l.disbursedBy?.name ?? null, tone: (l.disbursedAt ? 'ok' : l.awaitingDisbursement ? 'wait' : 'none') as PillTone, state: l.disbursedAt ? 'Dicairkan' : l.awaitingDisbursement ? 'Menunggu' : 'Belum' }]
+            ? [{ key: 'cair', label: 'Transfer Finance', when: l.disbursedAt, who: l.disbursedBy?.name ?? null, tone: (l.disbursedAt ? 'ok' : l.awaitingDisbursement ? 'wait' : 'none') as PillTone, state: l.disbursedAt ? 'Ditransfer' : l.awaitingDisbursement ? 'Menunggu (Antrian Transfer)' : 'Belum' }]
             : []),
         ]
   const amountText = `${projectText(l.borrowerProject)} meminjam ${rp(l.amount)} dari ${lenderText(l)}.`
-  const repayCols: Col<Detail['repayments'][number]>[] = [
-    { key: 'n', label: 'Pengembalian', cell: (r) => (r.seq ? `Pengembalian ke-${r.seq}` : <StatusPill tone="none" label={r.statusLabel} />) },
-    { key: 'd', label: 'Tanggal', cell: (r) => <span className="nw">{dateId(r.repayDate)}</span> },
+  type Rep = Detail['repayments'][number]
+  const repTone = (r: Rep): PillTone => (r.status === 'posted' ? 'ok' : r.status === 'pending_approval' || r.status === 'approved' ? 'wait' : r.status === 'rejected' ? 'bad' : 'none')
+  const repayCols: Col<Rep>[] = [
+    {
+      key: 'n',
+      label: 'Pengembalian',
+      cell: (r) => (
+        <>
+          {r.seq ? `Pengembalian ke-${r.seq}` : null}
+          {r.status !== 'posted' || l.cashBacked ? (
+            <span className="sub">
+              <StatusPill tone={repTone(r)} label={r.status === 'posted' ? (l.cashBacked ? 'Ditransfer' : r.statusLabel) : r.statusLabel} />
+            </span>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      key: 'd',
+      label: 'Tanggal',
+      cell: (r) => (
+        <>
+          <span className="nw">{dateId(r.repayDate)}</span>
+          {r.status === 'pending_approval' || r.status === 'approved' ? <span className="sub">rencana</span> : null}
+        </>
+      ),
+    },
     { key: 'a', label: 'Nominal', num: true, cell: (r) => rp(r.amount) },
     // ADR 0031: the repayment's KK (borrower account) / KM (lender account) when the loan moves cash
     ...(l.cashBacked ? [{ key: 'kas', label: 'Kas', sec: true, cell: (r: Detail['repayments'][number]) => (r.cash ? <span className="sub">KK {r.cash.kk ?? '—'} · KM {r.cash.km ?? '—'}</span> : '—') }] : []),
@@ -358,31 +412,63 @@ export async function LoanDetail(props: AdminViewServerProps) {
         <>
           {r.recordedBy.name ?? '—'}
           {r.note ? <span className="sub">{r.note}</span> : null}
+          {r.decisions.map((x) => (
+            <span key={x.id} className="sub">
+              {x.levelLabel}: {x.decision === 'approved' ? 'disetujui' : 'ditolak'} {x.actor.name ?? ''}
+              {x.reason ? ` — ${x.reason}` : ''}
+            </span>
+          ))}
+          {r.executedBy ? <span className="sub">Ditransfer {r.executedBy.name ?? ''}</span> : null}
           {r.status === 'void' ? <span className="sub">Void: {r.voidReason}</span> : null}
+          {r.status === 'cancelled' ? <span className="sub">Dibatalkan: {r.cancelReason}</span> : null}
         </>
       ),
     },
     {
       key: 'x',
       label: 'Aksi',
-      cell: (r) =>
-        r.status === 'posted' && l.mayVoidRepayment ? (
-          <ReasonAction
-            url={`/api/v1/project-loans/${l.id}/repayments/${r.id}/void`}
-            label="Void"
-            title={`Void pengembalian ke-${r.seq}?`}
-            description={<>Pengembalian {rp(r.amount)} dibatalkan (tidak dihapus); sisa pinjaman bertambah lagi.{l.cashBacked ? ' Kas keluar/masuknya dibuatkan jurnal balik.' : ''} Alasan wajib.</>}
-            confirmLabel="Void pengembalian"
-            testId={`loan-void-${r.id}`}
-          />
-        ) : r.status === 'void' ? (
-          <StatusPill tone="none" label="Dibatalkan (void)" />
-        ) : (
-          '—'
-        ),
+      cell: (r) => {
+        const a = new Set(r.allowedActions)
+        if (a.size === 0) return r.status === 'void' ? <StatusPill tone="none" label="Dibatalkan (void)" /> : '—'
+        const what = `pengembalian ${rp(r.amount)}`
+        const repaySummary = [...loanDoc(l).summary, ['Pengembalian', `ke-${r.seq} · ${dateId(r.repayDate)}`], ['Nominal pengembalian', rp(r.amount)]] as const
+        return (
+          <div className="pk-kact" data-pk-repayment-actions={[...a].join(',')}>
+            {a.has('approve') ? (
+              <ConfirmAction
+                url={`/api/v1/project-loans/${l.id}/repayments/${r.id}/approve`}
+                label="Setujui"
+                title={`Setujui ${what}?`}
+                description={<>{r.approvalLevel === 2 ? 'Persetujuan Owner: pengembalian masuk Antrian Transfer Finance (kas keluar dari pusat biaya peminjam, kas masuk ke pemberi).' : 'Persetujuan Direktur: lalu menunggu persetujuan Owner.'}</>}
+                confirmLabel="Setujui pengembalian"
+                summary={repaySummary}
+                testId={`loan-repay-approve-${r.id}`}
+              />
+            ) : null}
+            {a.has('reject') ? <ReasonAction url={`/api/v1/project-loans/${l.id}/repayments/${r.id}/reject`} label="Tolak" title={`Tolak ${what}?`} description={<>Alasan penolakan dikirim ke pengaju.</>} confirmLabel="Tolak pengembalian" summary={repaySummary} testId={`loan-repay-reject-${r.id}`} /> : null}
+            {a.has('execute') && r.transferQueueHref ? (
+              <Link className="pk-kbtn primary" href={r.transferQueueHref} data-pk-link={`loan-repay-queue-${r.id}`}>
+                Eksekusi di Antrian Transfer
+              </Link>
+            ) : null}
+            {a.has('cancel') ? <ReasonAction url={`/api/v1/project-loans/${l.id}/repayments/${r.id}/cancel`} label="Batalkan" variant="secondary" title={`Batalkan ${what}?`} description={<>Pengajuan pengembalian dibatalkan (tidak dihapus). Alasan wajib.</>} confirmLabel="Batalkan pengembalian" summary={repaySummary} testId={`loan-repay-cancel-${r.id}`} /> : null}
+            {a.has('void') ? (
+              <ReasonAction
+                url={`/api/v1/project-loans/${l.id}/repayments/${r.id}/void`}
+                label="Void"
+                title={`Void pengembalian ke-${r.seq}?`}
+                description={<>Pengembalian {rp(r.amount)} dibatalkan (tidak dihapus); sisa pinjaman bertambah lagi.{l.cashBacked ? ' Kas keluar/masuknya dibuatkan jurnal balik.' : ''} Alasan wajib.</>}
+                confirmLabel="Void pengembalian"
+                summary={repaySummary}
+                testId={`loan-void-${r.id}`}
+              />
+            ) : null}
+          </div>
+        )
+      },
     },
   ]
-  return (
+  const page = (
     <Frame props={props} name="pinjaman-detail">
       <style>{STYLE}</style>
       <DashHead title={title} note={`${l.kindLabel} · ${l.originLabel} · ${lenderText(l)} → ${projectText(l.borrowerProject)} · ${l.origin === 'transfer' ? 'dicatat' : 'diajukan'} ${l.createdBy.name ?? '—'}`}>
@@ -402,7 +488,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
       {sp.diajukan ? (
         <Alert tone="ok" attr="submitted">
           <p>
-            <strong>{l.docNo}</strong> diajukan · menunggu persetujuan Direktur.
+            <strong>{l.docNo}</strong> diajukan · menunggu persetujuan Direktur, lalu Owner.
           </p>
         </Alert>
       ) : sp.tersimpan ? (
@@ -429,32 +515,23 @@ export async function LoanDetail(props: AdminViewServerProps) {
       {l.awaitingDisbursement ? (
         <Alert tone="info" attr="awaiting-disbursement">
           <p>
-            Disetujui — menunggu Finance mencairkan dana dari <b>{l.lenderCashAccount?.name ?? '—'}</b> ke <b>{l.borrowerCashAccount?.name ?? '—'}</b>.
+            Disetujui — menunggu Finance mentransfer dana dari <b>{l.lenderCashAccount?.name ?? '—'}</b> ke <b>{l.borrowerCashAccount?.name ?? '—'}</b> lewat{' '}
+            {l.transferQueueHref ? <a href={l.transferQueueHref}>Antrian Transfer</a> : 'Antrian Transfer'}.
           </p>
         </Alert>
       ) : null}
       {acts.has('submit') || acts.has('cancel') || acts.has('repay') || acts.has('disburse') ? (
         <div className="pk-actions" data-pk-actions={[...acts].join(',')} style={{ gap: 8 }}>
           {acts.has('submit') ? (
-            <ConfirmAction url={`/api/v1/project-loans/${l.id}/submit`} label="Ajukan ke Direktur" size="md" title="Ajukan pinjaman?" description={<>Nomor PJ diberikan dan Direktur diberi tahu. Isi pinjaman tidak dapat diubah lagi.</>} confirmLabel="Ajukan" testId="loan-submit" />
+            <ConfirmAction url={`/api/v1/project-loans/${l.id}/submit`} label="Ajukan ke Direktur" size="md" title="Ajukan pinjaman?" description={<>Nomor PJ diberikan dan Direktur diberi tahu (lalu Owner). Isi pinjaman tidak dapat diubah lagi.</>} confirmLabel="Ajukan" testId="loan-submit" />
           ) : null}
-          {acts.has('disburse') ? (
-            // ADR 0031 "Cairkan": KK on the lender's Pusat Biaya + KM on the borrower's, dated today
-            <ConfirmAction
-              url={`/api/v1/project-loans/${l.id}/disburse`}
-              label="Cairkan"
-              size="md"
-              title={`Cairkan ${title}?`}
-              description={
-                <>
-                  Dicatat hari ini: kas keluar {rp(l.amount)} dari <b>{l.lenderCashAccount?.name ?? '—'}</b> dan kas masuk ke <b>{l.borrowerCashAccount?.name ?? '—'}</b>. Pastikan dana sudah dipindahkan di bank.
-                </>
-              }
-              confirmLabel="Cairkan"
-              testId="loan-disburse"
-            />
+          {acts.has('disburse') && l.transferQueueHref ? (
+            // 2026-10-24 (#11): the transfer order is executed in "Antrian Transfer" (no "Cairkan" on the loan page)
+            <Link className="pk-kbtn primary" href={l.transferQueueHref} data-pk-link="loan-transfer-queue">
+              Eksekusi di Antrian Transfer
+            </Link>
           ) : null}
-          {acts.has('repay') ? <RepaymentAction loanId={l.id} outstanding={l.outstanding} loanDate={l.loanDate} today={d.today} /> : null}
+          {acts.has('repay') ? <RepaymentAction loanId={l.id} outstanding={l.repayableAmount} loanDate={l.loanDate} today={d.today} request={l.repaymentNeedsApproval} /> : null}
           {acts.has('cancel') ? (
             <ReasonAction
               url={`/api/v1/project-loans/${l.id}/cancel`}
@@ -479,7 +556,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
           </KpiTile>
           <KpiTile id="l-repaid" icon="check" label="Sudah kembali" value={active ? rp(l.repaidTotal) : '—'} title={rp(l.repaidTotal)} kpi="loan-repaid" i={1}>
             {active ? <Meter value={l.repaidTotal} max={Math.max(1, l.amount)} tone={l.status === 'repaid' ? 'ok' : l.overdue ? 'over' : 'warn'} /> : null}
-            <p className="pk-kpi-x">{active ? `${l.repayments.filter((r) => r.status === 'posted').length} pengembalian` : 'Dicatat setelah disetujui'}</p>
+            <p className="pk-kpi-x">{active ? `${l.repayments.filter((r) => r.status === 'posted').length} pengembalian${l.repayableAmount < l.outstanding ? ` · ${rp(l.outstanding - l.repayableAmount)} sedang diajukan` : ''}` : 'Dicatat setelah disetujui'}</p>
           </KpiTile>
           <KpiTile id="l-outstanding" icon="target" label="Sisa pinjaman" value={active ? rp(l.outstanding) : '—'} title={rp(l.outstanding)} kpi="loan-outstanding" i={2}>
             <p className="pk-kpi-x">{active ? `dari ${rp(l.amount)}` : pending ? 'Diajukan, belum disetujui' : 'Tidak ada'}</p>
@@ -524,13 +601,13 @@ export async function LoanDetail(props: AdminViewServerProps) {
             <dd data-pk-field="loan-cash">
               {l.cashBacked
                 ? l.disbursement
-                  ? `Dicairkan ${l.disbursedAt ? dateTimeId(l.disbursedAt, tz) : ''} · KK ${l.disbursement.kk ?? '—'} · KM ${l.disbursement.km ?? '—'}`
+                  ? `Ditransfer ${l.disbursedAt ? dateTimeId(l.disbursedAt, tz) : ''} · KK ${l.disbursement.kk ?? '—'} · KM ${l.disbursement.km ?? '—'}`
                   : l.status === 'cancelled'
                     ? 'Dibatalkan (jurnal balik)'
-                    : 'Menunggu pencairan Finance'
+                    : 'Menunggu transfer Finance (Antrian Transfer)'
                 : l.status === 'draft' || l.status === 'pending_approval'
-                  ? 'Ditentukan saat disetujui (dana antar pusat biaya berbeda → dicairkan Finance)'
-                  : 'Tanpa transaksi kas (barang, atau pusat biaya sama)'}
+                  ? 'Ditentukan saat disetujui Owner (dana → transfer Finance lewat Antrian Transfer)'
+                  : 'Tanpa transaksi kas (barang/material, atau disetujui sebelum 24/10 dengan pusat biaya sama)'}
             </dd>
             <dt>Alasan</dt>
             <dd className="pk-pre" data-pk-field="reason">
@@ -539,7 +616,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
           </dl>
           <Notes l={l} />
         </Card>
-        <Card id="loan-flow" title="Alur persetujuan" sub={l.origin === 'transfer' ? 'Finance membayar dari akun lain · tercatat otomatis' : 'PM peminjam mengajukan · Direktur memutuskan · Finance mencairkan bila pusat biaya berbeda'} span={5} i={5}>
+        <Card id="loan-flow" title="Alur persetujuan" sub={l.origin === 'transfer' ? 'Finance membayar dari akun lain · tercatat otomatis' : 'PM peminjam / Finance mengajukan · Direktur lalu Owner memutuskan · Finance mentransfer dana lewat Antrian Transfer'} span={5} i={5}>
           <ol className="pk-tl" data-pk-flow>
             {steps.map((s) => (
               <li key={s.key} data-pk-step={s.key} data-pk-done={s.when ? 'yes' : 'no'}>
@@ -555,7 +632,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
             ))}
           </ol>
         </Card>
-        <Card id="loan-repayments" title="Pengembalian" sub={active ? `Sisa ${rp(l.outstanding)} · ${l.cashBacked ? 'dicatat Finance (kas keluar dari pusat biaya peminjam, kas masuk ke pemberi)' : 'dicatat PM peminjam atau Finance tanpa persetujuan Direktur'}` : 'Dicatat setelah pinjaman disetujui'} i={6}>
+        <Card id="loan-repayments" title="Pengembalian" sub={active ? `Sisa ${rp(l.outstanding)} · ${l.cashBacked ? 'diajukan PM peminjam / Finance → Direktur → Owner → transfer Finance (kas keluar dari pusat biaya peminjam, kas masuk ke pemberi)' : 'dicatat PM peminjam atau Finance tanpa persetujuan'}` : 'Dicatat setelah pinjaman disetujui'} i={6}>
           <DataTable
             id="loan-repayments"
             caption="Pengembalian pinjaman"
@@ -574,14 +651,20 @@ export async function LoanDetail(props: AdminViewServerProps) {
           regionLabel="Keputusan pinjaman"
           step={acts.has('approve') ? 'approve' : null}
           label="Setujui"
-          confirm={`Setujui ${title}? ${amountText} Bila pusat biaya kedua project berbeda (dana), Finance mencairkan dana: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat biaya peminjam.`}
+          confirm={
+            l.approvalLevel === 2
+              ? `Setujui ${title} sebagai Owner? ${amountText} Dana (pinjaman uang) lalu masuk Antrian Transfer Finance: kas keluar dari pusat biaya pemberi, kas masuk ke pusat biaya peminjam.`
+              : `Setujui ${title} sebagai Direktur? ${amountText} Setelah itu menunggu persetujuan Owner.`
+          }
           canReject={acts.has('reject')}
-          stepLabel={`Persetujuan Direktur — ${title}`}
-          rejectPrompt={{ field: 'reason', message: 'Alasan penolakan dikirim ke PM peminjam (wajib, minimal 3 karakter):', minLength: 3 }}
+          stepLabel={`${l.approvalLevel === 2 ? 'Persetujuan Owner' : 'Persetujuan Direktur'} — ${title}`}
+          rejectPrompt={{ field: 'reason', message: 'Alasan penolakan dikirim ke pengaju (wajib, minimal 3 karakter):', minLength: 3 }}
         />
       ) : null}
     </Frame>
   )
+  // DRMS 24/10: every action of the page names the loan in its popups
+  return <DocSummaryProvider {...loanDoc(l)}>{page}</DocSummaryProvider>
 }
 
 // ================================================================ project tab "Pinjaman"
@@ -603,7 +686,8 @@ export async function ProjectLoansTab(props: DocumentViewServerProps) {
           const role = loanRole(lq)
           const page = await listLoans(req, { projectId: id, role, status, overdue: lq.filters.terlambat === 'ya', q: lq.q, page: lq.page, limit: lq.per })
           const fig = (await projectLoanFigures(req, await loanScope(req), { projectId: id }))[0] ?? null
-          return { page, fig, canCreate: relId(p.pm) === userId(req) && hasRoleAny(req, 'pk-pm') }
+          // 2026-10-24 (#10): the project's PM or Finance of its PT files a loan
+          return { page, fig, canCreate: (relId(p.pm) === userId(req) && hasRoleAny(req, 'pk-pm')) || hasRole(req, 'pk-finance', relId(p.company)) }
         }).catch(() => null)
       : null
   const pt = await ptView(req)
@@ -659,20 +743,22 @@ export async function ProjectLoansTab(props: DocumentViewServerProps) {
 
 // ================================================================ approval inbox section
 
-/** Section of the "Persetujuan" view: loans waiting for the caller (Direktur pool, G1). */
+/** Section of the "Persetujuan" view: loans and repayment requests waiting for the caller (Direktur level 1 / Owner level 2, G1). */
 export async function LoanInboxSection({ req }: { req: PayloadRequest }) {
   if (!hasRoleAny(req, 'pk-owner')) return null
   // own transaction: the inbox sections render concurrently (a shared req transaction would be committed under us)
-  const { items } = await withSystemTransaction(req.payload, req.user, (r) => loanInbox(r))
+  const { items, repayments } = await withSystemTransaction(req.payload, req.user, (r) => loanInbox(r))
+  const levelText = (level: number | null) => (level === 2 ? 'Owner' : 'Direktur')
   return (
     <F3Root name="loan-inbox">
       <style>{VIZ_STYLE}</style>
       <style>{KAS_STYLE}</style>
       <section id="pinjaman" style={{ marginTop: 32 }} data-pk-inbox="pinjaman">
         <h2 style={{ margin: '0 0 8px' }}>Pinjaman antar project</h2>
-        {items.length === 0 ? (
+        {items.length === 0 && repayments.length === 0 ? (
           <EmptyState text="Tidak ada pinjaman antar project yang menunggu keputusan Anda." />
-        ) : (
+        ) : null}
+        {items.length > 0 ? (
           <DataTable
             id="loan-inbox"
             caption="Pinjaman antar project yang menunggu keputusan saya"
@@ -701,7 +787,8 @@ export async function LoanInboxSection({ req }: { req: PayloadRequest }) {
                   </>
                 ),
               },
-              { key: 'by', label: 'Diajukan', sec: true, cell: (r) => r.createdBy.name ?? '—' },
+              { key: 'lvl', label: 'Langkah', sec: true, cell: (r) => <StatusPill tone="wait" label={`Persetujuan ${levelText(r.approvalLevel)}`} /> },
+              { key: 'by', label: 'Diajukan', sec: true, cell: (r) => `${r.createdBy.name ?? '—'}${r.submitterRole === 'finance' ? ' (Finance)' : ''}` },
               { key: 'due', label: 'Jatuh tempo', sec: true, cell: (r) => dateId(r.dueDate) },
               { key: 'amt', label: 'Nilai', num: true, cell: (r) => <b>{rp(r.amount)}</b> },
               {
@@ -712,26 +799,149 @@ export async function LoanInboxSection({ req }: { req: PayloadRequest }) {
                     <ConfirmAction
                       url={`/api/v1/project-loans/${r.id}/approve`}
                       label="Setujui"
-                      title={`Setujui ${r.docNo}?`}
+                      title={`Setujui ${r.docNo} sebagai ${levelText(r.approvalLevel)}?`}
                       description={
                         <>
-                          {projectText(r.borrowerProject)} meminjam {rp(r.amount)} dari {lenderText(r)}. Bila pusat biaya kedua project berbeda (dana), Finance mencairkan dana setelah disetujui: kas keluar dari pusat biaya pemberi, kas masuk ke pusat biaya peminjam.
+                          {projectText(r.borrowerProject)} meminjam {rp(r.amount)} dari {lenderText(r)}.{' '}
+                          {r.approvalLevel === 2 ? 'Setelah disetujui Owner, pinjaman dana masuk Antrian Transfer Finance: kas keluar dari pusat biaya pemberi, kas masuk ke pusat biaya peminjam.' : 'Setelah disetujui Direktur, menunggu persetujuan Owner.'}
                           {r.samePmNote ? ` ${r.samePmNote}.` : ''}
                         </>
                       }
                       confirmLabel="Setujui"
+                      summary={loanDoc(r).summary}
                       testId={`loan-inbox-approve-${r.id}`}
                     />
-                    <ReasonAction url={`/api/v1/project-loans/${r.id}/reject`} label="Tolak" title={`Tolak ${r.docNo}?`} description={<>Alasan penolakan dikirim ke PM peminjam.</>} confirmLabel="Tolak pinjaman" testId={`loan-inbox-reject-${r.id}`} />
+                    <ReasonAction url={`/api/v1/project-loans/${r.id}/reject`} label="Tolak" title={`Tolak ${r.docNo}?`} description={<>Alasan penolakan dikirim ke pengaju.</>} confirmLabel="Tolak pinjaman" summary={loanDoc(r).summary} testId={`loan-inbox-reject-${r.id}`} />
                   </div>
                 ),
               },
             ]}
             empty={null}
           />
-        )}
+        ) : null}
+        {repayments.length > 0 ? (
+          <div style={{ marginTop: 16 }} data-pk-inbox="pinjaman-pengembalian">
+            <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>Pengembalian pinjaman ({repayments.length})</h3>
+            <DataTable
+              id="loan-repayment-inbox"
+              caption="Pengembalian pinjaman yang menunggu keputusan saya"
+              rows={repayments}
+              rowKey={(r: RepaymentInboxItem) => r.id}
+              cols={[
+                {
+                  key: 'no',
+                  label: 'Pinjaman',
+                  cell: (r: RepaymentInboxItem) => (
+                    <>
+                      <a href={loanHref(r.loanId)}>{r.loanDocNo ?? `#${r.loanId}`}</a>
+                      {r.note ? <span className="sub">{r.note}</span> : null}
+                    </>
+                  ),
+                },
+                {
+                  key: 'p',
+                  label: 'Peminjam → pemberi',
+                  cell: (r: RepaymentInboxItem) => (
+                    <>
+                      {projectText(r.borrowerProject)}
+                      <span className="sub">→ {r.lenderProject ? projectText(r.lenderProject) : `Akun ${r.lenderCashAccount?.name ?? '—'}`}</span>
+                    </>
+                  ),
+                },
+                { key: 'lvl', label: 'Langkah', sec: true, cell: (r: RepaymentInboxItem) => <StatusPill tone="wait" label={`Persetujuan ${levelText(r.approvalLevel)}`} /> },
+                { key: 'by', label: 'Diajukan', sec: true, cell: (r: RepaymentInboxItem) => r.submittedBy?.name ?? '—' },
+                { key: 'plan', label: 'Rencana', sec: true, cell: (r: RepaymentInboxItem) => dateId(r.plannedDate) },
+                { key: 'amt', label: 'Nominal', num: true, cell: (r: RepaymentInboxItem) => <b>{rp(r.amount)}</b> },
+                {
+                  key: 'act',
+                  label: 'Aksi',
+                  cell: (r: RepaymentInboxItem) => (
+                    <div className="pk-kact">
+                      <ConfirmAction
+                        url={`/api/v1/project-loans/${r.loanId}/repayments/${r.id}/approve`}
+                        label="Setujui"
+                        title={`Setujui pengembalian ${rp(r.amount)} (${r.loanDocNo ?? ''}) sebagai ${levelText(r.approvalLevel)}?`}
+                        description={<>{r.approvalLevel === 2 ? 'Setelah disetujui Owner, pengembalian masuk Antrian Transfer Finance: kas keluar dari pusat biaya peminjam, kas masuk ke pemberi.' : 'Setelah disetujui Direktur, menunggu persetujuan Owner.'}</>}
+                        confirmLabel="Setujui pengembalian"
+                        summary={repayInboxSummary(r)}
+                        testId={`loan-repay-inbox-approve-${r.id}`}
+                      />
+                      <ReasonAction url={`/api/v1/project-loans/${r.loanId}/repayments/${r.id}/reject`} label="Tolak" title={`Tolak pengembalian ${rp(r.amount)}?`} description={<>Alasan penolakan dikirim ke pengaju.</>} confirmLabel="Tolak pengembalian" summary={repayInboxSummary(r)} testId={`loan-repay-inbox-reject-${r.id}`} />
+                    </div>
+                  ),
+                },
+              ]}
+              empty={null}
+            />
+          </div>
+        ) : null}
       </section>
     </F3Root>
+  )
+}
+
+// ================================================================ "Antrian Transfer" section (2026-10-24 #11/#12)
+
+/**
+ * "Transfer pinjaman antar project" next to the request queue: approved cash-backed loans not transferred yet and
+ * approved repayment requests (PTs where the caller is Finance / Direktur). Finance of the PT executes each order with
+ * `LoanExecuteForm` (date, optional proof; fixed accounts). The Finance user who submitted an order may execute it
+ * (no self-guard on loans, audited) — a note says so.
+ */
+export async function LoanTransferOrderSection({ req, companyIds }: { req: PayloadRequest; companyIds?: readonly number[] }) {
+  if (companiesWithRole(req, ['pk-finance', 'pk-owner']).length === 0) return null
+  // own transaction: rendered next to the request queue
+  const { items, count } = await withSystemTransaction(req.payload, req.user, (r) => loanTransferOrders(r, { companyIds: companyIds ?? null }))
+  const projectName = (p: { code: string | null; name: string | null } | null) => (p ? `${p.code ?? ''} ${p.name ?? ''}`.trim() : '—')
+  return (
+    <section id="pinjaman-antar-project" style={{ marginTop: 32 }} data-pk-queue="project-loan">
+      <h2 style={{ margin: '0 0 8px' }}>Transfer pinjaman antar project ({count})</h2>
+      <p style={{ fontSize: 13, color: 'var(--pk-muted-fg)', margin: '0 0 8px' }}>
+        Pinjaman dana dan pengembalian yang sudah disetujui Direktur dan Owner. Eksekusi transfer mencatat kas keluar di akun asal (project asal) dan kas masuk di akun tujuan (project tujuan) sekaligus. Akun mengikuti pusat biaya saat disetujui.
+      </p>
+      {items.length === 0 ? (
+        <p style={{ fontSize: 13 }}>Tidak ada transfer pinjaman antar project yang menunggu.</p>
+      ) : (
+        items.map((it) => (
+          <article key={it.key} id={it.anchor} data-pk-loan-order={it.key} style={{ border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 12 }}>
+            <p style={{ margin: '0 0 6px' }}>
+              <StatusPill tone="wait" label={it.title} />{' '}
+              <a href={it.href}>
+                <strong>{it.docNo ?? `#${it.loanId}`}</strong>
+              </a>{' '}
+              · {projectName(it.fromProject)} → {projectName(it.toProject)} · <b>{rp(it.amount)}</b> · {it.kind === 'loan' ? 'tanggal pinjaman' : 'rencana'} {dateId(it.date)} · diajukan {it.submittedBy.name ?? '—'}
+            </p>
+            <p style={{ margin: '0 0 6px', fontSize: 13 }}>
+              Dari <b>{it.fromAccount?.name ?? '—'}</b> ke <b>{it.toAccount?.name ?? '—'}</b> · {it.note ?? it.reason}
+            </p>
+            {it.selfSubmitted && it.canExecute ? (
+              <p className="pk-note" style={{ margin: '0 0 6px', fontSize: 13 }} data-pk-loan-order-self={it.key}>
+                <StatusPill tone="warn" label="Catatan" /> Anda yang mengajukan; boleh dieksekusi sendiri (tercatat di audit).
+              </p>
+            ) : null}
+            {it.canExecute && hasRole(req, 'pk-finance', it.companyId) ? (
+              <LoanExecuteForm
+                url={it.kind === 'loan' ? `/api/v1/project-loans/${it.loanId}/execute` : `/api/v1/project-loans/${it.loanId}/repayments/${it.id}/execute`}
+                amountText={`Transfer ${rp(it.amount)}`}
+                accountsText={`Kas keluar: ${it.fromAccount?.name ?? '—'} (${projectName(it.fromProject)}) · kas masuk: ${it.toAccount?.name ?? '—'} (${projectName(it.toProject)})`}
+                minDate={it.minDate}
+                today={it.today}
+                docText={it.kind === 'loan' ? (it.docNo ?? `pinjaman #${it.loanId}`) : `pengembalian ${it.docNo ?? `pinjaman #${it.loanId}`}`}
+                summary={[
+                  ['Transfer', it.title],
+                  ['Pinjaman', it.docNo ?? `#${it.loanId}`],
+                  ['Dari', projectName(it.fromProject)],
+                  ['Ke', projectName(it.toProject)],
+                ]}
+                testId={`loan-execute-${it.key}`}
+              />
+            ) : (
+              <p style={{ margin: 0, fontSize: 12 }}>Dieksekusi oleh Finance PT ini.</p>
+            )}
+          </article>
+        ))
+      )}
+    </section>
   )
 }
 
@@ -775,14 +985,14 @@ export async function LoanEdit(props: AdminViewServerProps) {
       <Frame props={props} name="pinjaman-ubah">
         <DashHead title={`Ubah ${l.docNo ?? `draft pinjaman #${l.id}`}`}>{back}</DashHead>
         <Alert tone="bad" attr="not-editable">
-          <p>Hanya draft milik PM project peminjam yang dapat diubah. Pinjaman yang sudah diajukan tidak dapat diubah lagi.</p>
+          <p>Hanya draft milik pembuatnya (PM project peminjam atau Finance) yang dapat diubah. Pinjaman yang sudah diajukan tidak dapat diubah lagi.</p>
         </Alert>
       </Frame>
     )
   }
   return (
     <Frame props={props} name="pinjaman-ubah">
-      <DashHead title={`Ubah draft pinjaman #${l.id}`} note="Nomor PJ diberikan saat diajukan. Direktur menyetujui; PM project pemberi diberi tahu.">
+      <DashHead title={`Ubah draft pinjaman #${l.id}`} note="Nomor PJ diberikan saat diajukan. Direktur lalu Owner menyetujui; PM project pemberi diberi tahu.">
         {back}
       </DashHead>
       <Bento>

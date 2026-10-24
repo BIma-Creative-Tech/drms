@@ -65,10 +65,11 @@ export type OnboardingCompany = {
   employeeChoices: Array<{ id: number; code: string; name: string; active: boolean }>
   canManageAssignments: boolean
   assignments: Array<{ id: number; kind: LocationKind | null; label: string; roleInProject: string; startDate: string | null; endDate: string | null }>
-  /** Locations of a NEW assignment: active records of this PT the caller can read. */
+  /** Locations of a NEW assignment: active records of this PT the caller can read. ADR 0032: `sites` always empty (kept for APK ≤ 0.11.1). */
   assignmentChoices: Record<'projects' | 'costCenters' | 'sites', LocationChoice[]>
 }
 
+/** `site` = a legacy ADR 0023 assignment (ADR 0032: shown, never created). */
 export type LocationKind = 'project' | 'costCenter' | 'site'
 export type LocationChoice = { id: number; code: string; name: string }
 
@@ -81,7 +82,7 @@ export type OnboardingDetail = {
 /** Project statuses that take no new assignment (the picker and the save agree). */
 const CLOSED_PROJECT = ['selesai', 'arsip', 'dibatalkan'] as const
 
-/** The three locations of a team assignment (exactly one per row — TeamAssignments guard + DB CHECK). */
+/** The locations of a team assignment (exactly one per row — TeamAssignments guard + DB CHECK; `site` = legacy rows only). */
 const LOCATIONS = [
   { key: 'project', collection: 'projects', label: 'Project' },
   { key: 'costCenter', collection: 'cost-centers', label: 'Pusat biaya' },
@@ -179,13 +180,12 @@ export async function loadUserOnboarding(req: PayloadRequest, userId: number | n
 
   const mine = cells.filter((c) => userId !== null && c.user === userId)
   const linked = mine.map((c) => c.employee).filter((e): e is number => e !== null)
-  const [accountsRes, assignRes, projectsRes, costCentersRes, sitesRes] = await Promise.all([
+  const [accountsRes, assignRes, projectsRes, costCentersRes] = await Promise.all([
     linked.length ? req.payload.find({ collection: 'employee-bank-accounts', where: { employee: { in: linked } }, sort: 'id', pagination: false, select: { employee: true, bank: true, accountNo: true, accountHolder: true, isDefault: true, verificationStatus: true, active: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
     linked.length ? req.payload.find({ collection: 'team-assignments', where: { employee: { in: linked } }, sort: '-startDate', pagination: false, ...asCaller, overrideAccess: false, depth: 1 }) : { docs: [] },
     // DRMS 15/10: locations of a new assignment — the caller's own read access (a PM reads its team's only)
     colIds.length ? req.payload.find({ collection: 'projects', where: { and: [{ company: { in: colIds } }, { status: { not_in: [...CLOSED_PROJECT] } }] }, sort: 'code', pagination: false, select: { code: true, name: true, company: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
     colIds.length ? req.payload.find({ collection: 'cost-centers', where: { and: [{ company: { in: colIds } }, { active: { not_equals: false } }] }, sort: 'code', pagination: false, select: { code: true, name: true, company: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
-    colIds.length ? req.payload.find({ collection: 'sites', where: { and: [{ company: { in: colIds } }, { active: { not_equals: false } }] }, sort: 'code', pagination: false, select: { code: true, name: true, company: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
   ])
   const choicesOf = (docs: unknown[], company: number): LocationChoice[] =>
     (docs as Row[]).filter((d) => relId(d.company) === company).map((d) => ({ id: d.id as number, code: str(d.code), name: str(d.name) }))
@@ -233,7 +233,7 @@ export async function loadUserOnboarding(req: PayloadRequest, userId: number | n
               }))
           : [],
         assignmentChoices: canManageAssignments
-          ? { projects: choicesOf(projectsRes.docs, c.id), costCenters: choicesOf(costCentersRes.docs, c.id), sites: choicesOf(sitesRes.docs, c.id) }
+          ? { projects: choicesOf(projectsRes.docs, c.id), costCenters: choicesOf(costCentersRes.docs, c.id), sites: [] }
           : { projects: [], costCenters: [], sites: [] },
       }
     }),

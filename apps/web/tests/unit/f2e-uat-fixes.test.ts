@@ -96,12 +96,12 @@ describe('Finance self-involvement (receipt verification)', () => {
   })
   const verification = ['receipt_verify', 'receipt_reject', 'verify_receipts', 'review_flag']
 
-  it('Finance on someone else\'s request may verify; as creator or requester it may not', () => {
+  it('Finance may verify on someone else\'s request — D2410 (user 2026-10-24): also as creator or requester (audited)', () => {
     expect(allowedActions(ctx({}))).toEqual(expect.arrayContaining(verification))
     for (const self of [{ isCreator: true }, { isRequester: true }]) {
       const acts = allowedActions(ctx(self))
-      for (const a of verification) expect(acts, a).not.toContain(a)
-      expect(allowedActions(ctx({ ...self, status: 'lpj_submitted', type: 'advance' }))).not.toContain('lpj_verify')
+      for (const a of verification) expect(acts, a).toContain(a)
+      expect(allowedActions(ctx({ ...self, status: 'lpj_submitted', type: 'advance' }))).toContain('lpj_verify')
     }
   })
 })

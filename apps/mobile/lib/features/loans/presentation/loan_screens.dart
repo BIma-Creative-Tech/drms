@@ -10,6 +10,7 @@ import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/doc_no_chip.dart';
 import '../../../shared/widgets/form_grid.dart';
@@ -19,15 +20,16 @@ import '../../../shared/widgets/reason_dialog.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../finance/application/finance_providers.dart';
-import '../../finance/presentation/transfer_form_screen.dart' show transferOverridePrompt;
 import '../domain/loan.dart';
 import 'loan_providers.dart';
+import 'loan_transfer_orders.dart';
 import 'loan_widgets.dart';
 
-/// ADR 0022 on the APK (online only): the "Pinjaman" tab of a project, the Draft form of the borrower PM and the
-/// detail with the Direktur decision bar. Phase 3 (user 2026-10-19): "Catat pengembalian" (borrower PM / Finance) and
-/// the void of a repayment (Direktur / Finance) as on the web. ADR 0031: Finance "Cairkan" of a cash-backed loan, the
-/// KK / KM numbers, automatic loans of a transfer (lender = the paying account).
+/// ADR 0022 on the APK (online only): the "Pinjaman" tab of a project, the Draft form of the borrower PM (user decision
+/// 2026-10-24: or Finance) and the detail with the decision bar (Direktur, then Owner). Phase 3 (user 2026-10-19):
+/// "Catat pengembalian" (borrower PM / Finance) and the void of a repayment (Direktur / Finance) as on the web. ADR
+/// 0031: the KK / KM numbers, automatic loans of a transfer (lender = the paying account). User decision 2026-10-24:
+/// the approved cash-backed loan / repayment request is executed by Finance in the "Antrian Transfer" (no "Cairkan").
 
 String _today() => toYmd(DateTime.now());
 
@@ -118,7 +120,8 @@ class _LoanEditRouteState extends ConsumerState<LoanEditRoute> {
   }
 }
 
-/// Create (PM of the borrower project) or edit a Draft. "Simpan draft" or "Ajukan ke Direktur" (confirmed).
+/// Create (PM of the borrower project or Finance) or edit a Draft. "Simpan draft" or "Ajukan ke Direktur"
+/// (confirmed).
 class LoanFormScreen extends ConsumerStatefulWidget {
   const LoanFormScreen({super.key, this.initial, this.projectId});
   final Loan? initial;
@@ -154,24 +157,16 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
     super.dispose();
   }
 
-  Future<bool> _confirmSubmit() async {
+  /// D2410: "Yakin ingin ajukan ke Direktur?" / "Yakin ingin simpan draft?" with the loan's figures.
+  Future<bool> _confirmSave(String label, {required bool submit, int? amount}) {
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t.loanSubmitConfirmTitle),
-        content: Text(t.loanSubmitConfirmBody),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-          FilledButton(
-            key: const Key('loan-submit-confirm'),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(t.loanSubmit),
-          ),
-        ],
-      ),
+    return confirmAction(
+      context,
+      action: label,
+      summary: [widget.initial?.docNo, amount == null ? null : formatRupiah(amount), _reason.text.trim()],
+      note: submit ? t.loanSubmitConfirmBody : null,
+      confirmKey: Key(submit ? 'loan-submit-confirm' : 'loan-draft-confirm'),
     );
-    return ok == true;
   }
 
   Future<void> _save({required bool submit}) async {
@@ -191,7 +186,8 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
       _error = null;
     });
     if (errors.isNotEmpty) return;
-    if (submit && !await _confirmSubmit()) return;
+    final label = submit ? t.loanSubmit : (_editing ? t.loanSaveChanges : t.loanSaveDraft);
+    if (!await _confirmSave(label, submit: submit, amount: amount) || !mounted) return;
     final api = ref.read(loansApiProvider);
     setState(() => _busy = true);
     try {
@@ -226,7 +222,8 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
       }
       if (_borrowerId != null) ref.invalidate(projectLoansProvider(_borrowerId!));
       if (!mounted) return;
-      showSnack(context, submit ? t.loanSubmitted : t.loanSavedDraft);
+      await showActionResult(context, message: submit ? t.loanSubmitted : t.loanSavedDraft, action: label);
+      if (!mounted) return;
       final router = GoRouter.maybeOf(context);
       if (_editing) {
         if (router != null && router.canPop()) {
@@ -240,7 +237,9 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
         await Navigator.of(context).maybePop();
       }
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (!mounted) return;
+      setState(() => _error = e.message);
+      await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -468,9 +467,10 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
   }
 }
 
-/// Loan detail: figures, notes, approval timeline, repayments (read-only) and the actions the server allows —
-/// PM: Ubah draft / Ajukan ke Direktur / Batalkan; Direktur: the decision bar (Tolak · Setujui); Finance: Cairkan
-/// (ADR 0031).
+/// Loan detail: figures, notes, approval timeline, repayments and the actions the server allows — PM / Finance:
+/// Ubah draft / Ajukan ke Direktur / Batalkan; Direktur then Owner: the decision bar (Tolak · Setujui); Finance: "Buka
+/// Antrian Transfer" (user decision 2026-10-24: the approved cash-backed loan is a transfer order executed there);
+/// repayment requests with their row actions (Setujui / Tolak / Batalkan / Void).
 class LoanDetailScreen extends ConsumerStatefulWidget {
   const LoanDetailScreen({super.key, required this.id});
   final int id;
@@ -490,7 +490,7 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
       return;
     }
     if (action == LoanAction.disburse) {
-      await _disburse(l);
+      await _openTransferQueue(l);
       return;
     }
     if (action == LoanAction.edit) {
@@ -499,38 +499,36 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
       return;
     }
     String? reason;
+    final label = switch (action) {
+      LoanAction.reject => t.loanReject,
+      LoanAction.cancel => t.loanCancel,
+      LoanAction.approve => t.loanApprove,
+      _ => t.loanSubmit,
+    };
+    final summary = [l.title, '${l.borrower.label} ← ${l.lenderLabel}', formatRupiah(l.amount)];
     if (action == LoanAction.reject || action == LoanAction.cancel) {
       reason = await showDialog<String>(
         context: context,
         builder: (_) => _ReasonDialog(
           title: action == LoanAction.reject ? t.loanRejectTitle(l.title) : t.loanCancelTitle,
+          summary: summary,
           prompt: action == LoanAction.reject ? t.loanRejectPrompt : t.loanCancelPrompt,
-          confirm: action == LoanAction.reject ? t.loanReject : t.loanCancel,
+          confirm: label,
         ),
       );
       if (reason == null) return;
     } else {
       final approve = action == LoanAction.approve;
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(approve ? t.loanApproveTitle(l.title) : t.loanSubmitConfirmTitle),
-          content: Text(
-            approve
-                ? t.loanApproveBody(l.borrower.label, formatRupiah(l.amount), l.lenderLabel)
-                : t.loanSubmitConfirmBody,
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-            FilledButton(
-              key: const Key('loan-confirm'),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(approve ? t.loanApprove : t.loanSubmit),
-            ),
-          ],
-        ),
+      final ok = await confirmAction(
+        context,
+        action: label,
+        summary: summary,
+        note: approve
+            ? t.loanApproveBody(l.borrower.label, formatRupiah(l.amount), l.lenderLabel)
+            : t.loanSubmitConfirmBody,
+        confirmKey: const Key('loan-confirm'),
       );
-      if (ok != true) return;
+      if (!ok) return;
     }
     final key = _keys.putIfAbsent(action, () => const Uuid().v7());
     final api = ref.read(loansApiProvider);
@@ -543,9 +541,10 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
         LoanAction.submit => api.submit(l.id, idempotencyKey: key),
         LoanAction.edit || LoanAction.repay || LoanAction.disburse => throw StateError('handled above'),
       };
-      if (mounted) showSnack(context, action == LoanAction.submit ? t.loanSubmitted : t.loanDone);
+      final done = action == LoanAction.submit ? t.loanSubmitted : t.loanDone;
+      if (mounted) await showActionResult(context, message: '${l.title}: $done', action: label);
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       // Also after a refusal (403/409): the buttons must follow the server's current allowedActions.
       ref.invalidate(loanDetailProvider(l.id));
@@ -565,39 +564,17 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
     if (l.cashBacked) ref.invalidate(cashAccountsProvider);
   }
 
-  /// ADR 0031: a cash move that takes the paying account below 0 (409 `CASH_OVERDRAFT_CONFIRM_REQUIRED`) asks
-  /// "Tetap simpan" (same dialog as the transfer, QA-04) and is re-sent with `confirmOverdraft` (another body →
-  /// another key, see [send]); null when the user keeps the refusal.
-  Future<Loan?> _withOverdraftConfirm(Future<Loan> Function({bool confirm}) send) async {
-    try {
-      return await send();
-    } on ProblemException catch (e) {
-      if (!mounted) rethrow;
-      final t = AppLocalizations.of(context);
-      final prompt = transferOverridePrompt(t, e);
-      if (prompt == null || prompt.flag != 'confirmOverdraft') rethrow;
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (c) => AlertDialog(
-          title: Text(prompt.title),
-          content: Text(prompt.lines.join('\n\n')),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
-            FilledButton(
-              key: const Key('loan-override-confirm'),
-              onPressed: () => Navigator.pop(c, true),
-              child: Text(t.overrideConfirm),
-            ),
-          ],
-        ),
-      );
-      if (ok != true) return null;
-      return send(confirm: true);
-    }
+  /// User decision 2026-10-24: Finance executes a loan's / repayment's transfer order in the "Antrian Transfer"
+  /// (no "Cairkan" on the loan page any more).
+  Future<void> _openTransferQueue(Loan l) async {
+    await GoRouter.maybeOf(context)?.push('/finance');
+    ref.invalidate(loanTransferOrdersProvider);
+    _refreshAll(l);
   }
 
-  /// "Catat pengembalian" (web RepaymentAction): nominal (≤ sisa), tanggal (loan date … today), catatan. ADR 0031: a
-  /// cash-backed loan's repayment posts KK / KM (Finance) — an overdraft asks for the confirmation.
+  /// "Catat pengembalian" of a claim (web RepaymentAction): nominal (≤ sisa), tanggal (loan date … today), catatan.
+  /// User decision 2026-10-24: a cash-backed loan's repayment is a request ("Ajukan pengembalian": nominal ≤ the
+  /// repayable amount, planned date) — Direktur → Owner → Antrian Transfer; no cash moves before Finance executes it.
   Future<void> _repay(Loan l) async {
     final t = AppLocalizations.of(context);
     final input = await showModalBottomSheet<({int amount, String date, String note})>(
@@ -607,6 +584,10 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
       builder: (_) => _RepaymentSheet(loan: l),
     );
     if (input == null || !mounted) return;
+    final summary = [l.title, formatRupiah(input.amount), formatDateOnly(input.date), input.note];
+    // DRMS 24/10: a cash-backed loan's repayment is a request ("Ajukan pengembalian"), a claim's is recorded
+    final repayLabel = l.repaymentNeedsApproval ? t.loanRepayRequest : t.loanRepaySave;
+    if (!await confirmAction(context, action: repayLabel, summary: summary) || !mounted) return;
     final key = _keys.putIfAbsent(LoanAction.repay, () => const Uuid().v7());
     final api = ref.read(loansApiProvider);
     Future<Loan> send({bool confirm = false}) => api.addRepayment(
@@ -619,65 +600,74 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
     );
     setState(() => _busy = true);
     try {
-      if (await _withOverdraftConfirm(send) == null) {
+      if (await withLoanOverdraftConfirm(context, send) == null) {
         if (mounted) showSnack(context, t.overrideCancelled);
         return;
       }
       _keys.remove(LoanAction.repay); // the next repayment is a new one
-      if (mounted) showSnack(context, t.loanRepayDone(formatRupiah(input.amount)));
+      final amount = formatRupiah(input.amount);
+      final done = l.repaymentNeedsApproval ? t.loanRepayRequested(amount) : t.loanRepayDone(amount);
+      if (mounted) await showActionResult(context, message: done, action: repayLabel);
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: repayLabel);
     } finally {
       _refreshAll(l);
+      ref.invalidate(loanInboxProvider);
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  /// ADR 0031 "Cairkan" (Finance, web ConfirmAction): KK on the lender's Pusat Biaya + KM on the borrower's for the
-  /// loan amount, dated today (PT zone), once.
-  Future<void> _disburse(Loan l) async {
+  /// Row actions of a repayment: Setujui (confirmed) / Tolak / Batalkan (reason) of a request, Void of a posted one,
+  /// execute → the "Antrian Transfer" (Finance).
+  Future<void> _repaymentAction(Loan l, LoanRepayment r, LoanRepaymentAction a) async {
+    if (a == LoanRepaymentAction.voidRepayment) return _voidRepayment(l, r);
+    if (a == LoanRepaymentAction.execute) return _openTransferQueue(l);
     final t = AppLocalizations.of(context);
-    final lenderAccount = l.lenderCashAccount?.label ?? '—';
-    final borrowerAccount = l.borrowerCashAccount?.label ?? '—';
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t.loanDisburseTitle(l.title)),
-        content: Text(t.loanDisburseBody(formatRupiah(l.amount), lenderAccount, borrowerAccount)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-          FilledButton(
-            key: const Key('loan-disburse-confirm'),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(t.loanDisburse),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
-    final key = _keys.putIfAbsent(LoanAction.disburse, () => const Uuid().v7());
+    final amount = formatRupiah(r.amount);
+    final reject = a == LoanRepaymentAction.reject;
+    final label = switch (a) {
+      LoanRepaymentAction.approve => t.loanApprove,
+      LoanRepaymentAction.reject => t.loanReject,
+      _ => t.loanCancel,
+    };
+    String? reason;
+    if (a == LoanRepaymentAction.approve) {
+      final ok = await confirmAction(
+        context,
+        action: label,
+        summary: [l.title, t.loanRepaymentApproveTitle(amount)],
+        note: t.loanRepaymentApproveBody,
+        confirmKey: const Key('loan-repayment-approve-confirm'),
+      );
+      if (!ok) return;
+    } else {
+      reason = await showReasonDialog(
+        context,
+        title: reject ? t.loanRepaymentRejectTitle(amount) : t.loanRepaymentCancelTitle(amount),
+        description: reject ? t.loanRejectPrompt : t.loanRepaymentCancelBody,
+        confirm: reject ? t.loanReject : t.loanCancel,
+        keyPrefix: 'loan-repayment-${a.code}',
+      );
+      if (reason == null) return;
+    }
+    if (!mounted) return;
     final api = ref.read(loansApiProvider);
-    Future<Loan> send({bool confirm = false}) =>
-        api.disburse(l.id, confirmOverdraft: confirm, idempotencyKey: confirm ? '$key-c' : key);
+    final key = const Uuid().v7();
     setState(() => _busy = true);
     try {
-      final out = await _withOverdraftConfirm(send);
-      if (!mounted) return;
-      if (out == null) {
-        showSnack(context, t.overrideCancelled);
-        return;
-      }
-      final kk = out.disbursement?.kk;
-      final km = out.disbursement?.km;
-      showSnack(
-        context,
-        kk != null && km != null ? t.loanDisbursed(out.title, kk, km) : t.loanDisbursedShort(out.title),
-      );
+      await switch (a) {
+        LoanRepaymentAction.approve => api.approveRepayment(l.id, r.id, idempotencyKey: key),
+        LoanRepaymentAction.reject => api.rejectRepayment(l.id, r.id, reason: reason!, idempotencyKey: key),
+        LoanRepaymentAction.cancel => api.cancelRepayment(l.id, r.id, reason: reason!, idempotencyKey: key),
+        LoanRepaymentAction.execute || LoanRepaymentAction.voidRepayment => throw StateError('handled above'),
+      };
+      if (mounted) await showActionResult(context, message: '${l.title}: ${t.loanDone}', action: label);
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       _refreshAll(l);
-      ref.invalidate(cashAccountsProvider);
+      ref.invalidate(loanInboxProvider);
+      ref.invalidate(inboxProvider);
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -695,9 +685,9 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
     setState(() => _busy = true);
     try {
       await ref.read(loansApiProvider).voidRepayment(l.id, r.id, reason: reason, idempotencyKey: const Uuid().v7());
-      if (mounted) showSnack(context, t.loanRepaymentVoided);
+      if (mounted) await showActionResult(context, message: t.loanRepaymentVoided, action: t.loanRepaymentVoidConfirm);
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: t.loanRepaymentVoidConfirm);
     } finally {
       _refreshAll(l);
       if (mounted) setState(() => _busy = false);
@@ -719,7 +709,7 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
             loan: l,
             busy: _busy,
             onAction: (a) => _run(l, a),
-            onVoidRepayment: (r) => _voidRepayment(l, r),
+            onRepaymentAction: (r, a) => _repaymentAction(l, r, a),
           ),
         ),
       ),
@@ -732,11 +722,11 @@ class _LoanDetailScreenState extends ConsumerState<LoanDetailScreen> {
 }
 
 class _LoanBody extends ConsumerWidget {
-  const _LoanBody({required this.loan, required this.busy, required this.onAction, required this.onVoidRepayment});
+  const _LoanBody({required this.loan, required this.busy, required this.onAction, required this.onRepaymentAction});
   final Loan loan;
   final bool busy;
   final void Function(LoanAction) onAction;
-  final void Function(LoanRepayment) onVoidRepayment;
+  final void Function(LoanRepayment, LoanRepaymentAction) onRepaymentAction;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -780,11 +770,15 @@ class _LoanBody extends ConsumerWidget {
       fontFeatures: const [FontFeature.tabularFigures()],
     );
     final submitted = l.submittedAt != null;
-    final decision = l.decisions.lastOrNull;
     final waiting = l.status == LoanStatus.pendingApproval;
+    // user decision 2026-10-24: Direktur (level 1) then Owner (level 2); an older server's single decision is level 1
+    final direktur = l.decisions.where((d) => d.level == 1).lastOrNull;
+    final owner = l.decisions.where((d) => d.level == 2).lastOrNull;
+    // a loan decided under the former one-level flow has no Owner step
+    final ownerStep = owner != null || waiting || l.status == LoanStatus.draft;
     final active = const {LoanStatus.approved, LoanStatus.partiallyRepaid, LoanStatus.repaid}.contains(l.status);
     final cancelled = l.status == LoanStatus.cancelled;
-    // ADR 0031 (web "Kas"): the disbursement's KK / KM when the loan moves cash between two different Pusat Biaya
+    // ADR 0031 (web "Kas"): the disbursement's KK / KM when the loan moves cash between two Pusat Biaya
     String cashText() {
       final d = l.disbursement;
       if (!l.cashBacked) return l.status == LoanStatus.draft || waiting ? t.loanCashTbd : t.loanCashNone;
@@ -792,6 +786,12 @@ class _LoanBody extends ConsumerWidget {
       final at = l.disbursedAt == null ? '-' : formatServerDateTime(l.disbursedAt, zone: zone);
       return t.loanCashDisbursed(at, d.kk ?? '—', d.km ?? '—');
     }
+
+    String decisionText(LoanDecision d) => [
+      d.approved ? t.loanDecApproved : t.loanDecRejected,
+      if (d.actorName != null) d.actorName!,
+      formatServerDateTime(d.decidedAt, zone: zone),
+    ].join(' · ');
 
     return ListView(
       key: const Key('loan-detail'),
@@ -826,7 +826,7 @@ class _LoanBody extends ConsumerWidget {
         if (l.borrowerCashAccount != null)
           row(t.loanBorrowerPusatBiaya, l.borrowerCashAccount!.label, key: const Key('loan-borrower-pb-value')),
         row(t.loanAmount, formatRupiah(l.amount), key: const Key('loan-amount-value'), style: money),
-        // Repaid / outstanding count from the Direktur's approval on (Draft / Menunggu: nothing is owed yet).
+        // Repaid / outstanding count from the final approval on (Draft / Menunggu: nothing is owed yet).
         if (active) ...[
           row(t.loanRepaid, formatRupiah(l.repaidTotal), key: const Key('loan-repaid-value'), style: money),
           row(
@@ -852,7 +852,7 @@ class _LoanBody extends ConsumerWidget {
           note(t.addendumRejectedBecause(l.rejectReason!), key: const Key('loan-rejected'), color: context.pk.badText),
         if (l.cancelReason != null) note(t.addendumCancelledBecause(l.cancelReason!), key: const Key('loan-cancelled')),
         section(t.loanTimeline),
-        // ADR 0031: an automatic loan has one step (the transfer); a cash-backed manual loan adds the disbursement
+        // ADR 0031: an automatic loan has one step (the transfer); a cash-backed manual loan adds Finance's transfer
         if (l.automatic)
           _Step(
             key: const Key('loan-step-transfer'),
@@ -869,7 +869,7 @@ class _LoanBody extends ConsumerWidget {
           _Step(
             key: const Key('loan-step-submit'),
             done: submitted,
-            title: t.loanStepSubmitted,
+            title: l.submitterRole == 'finance' ? t.loanStepSubmittedFinance : t.loanStepSubmitted,
             subtitle: [
               if (l.createdBy?.name != null) l.createdBy!.name!,
               if (submitted) formatServerDateTime(l.submittedAt, zone: zone) else t.loanStepNotYet,
@@ -877,19 +877,25 @@ class _LoanBody extends ConsumerWidget {
           ),
           _Step(
             key: const Key('loan-step-direktur'),
-            done: decision != null,
-            bad: decision != null && !decision.approved,
-            waiting: waiting,
+            done: direktur != null,
+            bad: direktur != null && !direktur.approved,
+            waiting: waiting && !l.waitingOwner,
             title: t.loanStepDirektur,
-            subtitle: decision != null
-                ? [
-                    decision.approved ? t.loanDecApproved : t.loanDecRejected,
-                    if (decision.actorName != null) decision.actorName!,
-                    formatServerDateTime(decision.decidedAt, zone: zone),
-                  ].join(' · ')
-                : (waiting ? t.loanStepWaiting : t.loanStepNotYet),
-            last: !l.cashBacked,
+            subtitle: direktur != null
+                ? decisionText(direktur)
+                : (waiting && !l.waitingOwner ? t.loanStepWaiting : t.loanStepNotYet),
+            last: !ownerStep && !l.cashBacked,
           ),
+          if (ownerStep)
+            _Step(
+              key: const Key('loan-step-owner'),
+              done: owner != null,
+              bad: owner != null && !owner.approved,
+              waiting: l.waitingOwner,
+              title: t.loanStepOwner,
+              subtitle: owner != null ? decisionText(owner) : (l.waitingOwner ? t.loanStepWaiting : t.loanStepNotYet),
+              last: !l.cashBacked,
+            ),
           if (l.cashBacked)
             _Step(
               key: const Key('loan-step-disburse'),
@@ -912,11 +918,22 @@ class _LoanBody extends ConsumerWidget {
             Text(t.loanRepaymentsEmpty, style: theme.textTheme.bodySmall)
           else
             for (final r in l.repayments)
-              _RepaymentTile(r: r, onVoid: l.mayVoidRepayment && r.posted && !busy ? () => onVoidRepayment(r) : null),
+              _RepaymentTile(
+                r: r,
+                // an older server offers the void on the loan only (`mayVoidRepayment`)
+                actions: {...r.allowedActions, if (l.mayVoidRepayment && r.posted) LoanRepaymentAction.voidRepayment},
+                onAction: busy ? null : (a) => onRepaymentAction(r, a),
+              ),
         ],
         const SizedBox(height: 16),
-        if (acts.contains(LoanAction.disburse)) _action(LoanAction.disburse, t.loanDisburse, Icons.account_balance),
-        if (acts.contains(LoanAction.repay)) _action(LoanAction.repay, t.loanRepay, Icons.payments_outlined),
+        if (acts.contains(LoanAction.disburse))
+          _action(LoanAction.disburse, t.loanOpenTransferQueue, Icons.account_balance),
+        if (acts.contains(LoanAction.repay))
+          _action(
+            LoanAction.repay,
+            l.repaymentNeedsApproval ? t.loanRepayRequest : t.loanRepay,
+            Icons.payments_outlined,
+          ),
         if (acts.contains(LoanAction.submit)) _action(LoanAction.submit, t.loanSubmit, Icons.send),
         if (acts.contains(LoanAction.edit)) _action(LoanAction.edit, t.loanEdit, Icons.edit_outlined, outlined: true),
         if (acts.contains(LoanAction.cancel)) _action(LoanAction.cancel, t.loanCancel, Icons.block, outlined: true),
@@ -993,17 +1010,30 @@ class _Step extends StatelessWidget {
 }
 
 class _RepaymentTile extends StatelessWidget {
-  const _RepaymentTile({required this.r, this.onVoid});
+  const _RepaymentTile({required this.r, required this.actions, this.onAction});
   final LoanRepayment r;
 
-  /// "Void" (Direktur / Finance, posted repayments only).
-  final VoidCallback? onVoid;
+  /// Row actions offered (the server's `allowedActions`, plus the loan-level void of an older server).
+  final Set<LoanRepaymentAction> actions;
+
+  /// Null while an action runs.
+  final void Function(LoanRepaymentAction)? onAction;
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final strike = r.posted ? null : const TextStyle(decoration: TextDecoration.lineThrough);
+    final strike = r.status.closed ? const TextStyle(decoration: TextDecoration.lineThrough) : null;
+    final by = r.recordedByName;
+    // a request names its submitter; a claim's repayment (no decision) its recorder
+    final submitted = r.decisions.isNotEmpty || !(r.posted || r.status == LoanRepaymentStatus.voided);
+    (IconData, String) button(LoanRepaymentAction a) => switch (a) {
+      LoanRepaymentAction.approve => (Icons.check, t.loanApprove),
+      LoanRepaymentAction.reject => (Icons.close, t.loanReject),
+      LoanRepaymentAction.cancel => (Icons.block_outlined, t.loanCancel),
+      LoanRepaymentAction.execute => (Icons.account_balance, t.loanOpenTransferQueue),
+      LoanRepaymentAction.voidRepayment => (Icons.block, t.cashVoid),
+    };
     return Card(
       key: Key('loan-repayment-${r.id}'),
       margin: const EdgeInsets.only(bottom: 8),
@@ -1026,14 +1056,33 @@ class _RepaymentTile extends StatelessWidget {
                 ),
               ],
             ),
+            // user decision 2026-10-24: a request waits for the Direktur / Owner, then for Finance's transfer
+            if (r.open)
+              Text(
+                r.statusLabel.isEmpty ? r.status.code : r.statusLabel,
+                key: Key('loan-repayment-status-${r.id}'),
+                style: theme.textTheme.bodySmall?.copyWith(color: context.pk.warnText, fontWeight: FontWeight.w600),
+              ),
             Text(
               [
-                formatDateOnly(r.repayDate),
-                if (r.recordedByName != null) t.loanRecordedBy(r.recordedByName!),
+                if (r.open) t.loanRepayPlannedOn(formatDateOnly(r.plannedDate ?? r.repayDate)),
+                if (!r.open) formatDateOnly(r.repayDate),
+                if (by != null) submitted ? t.loanSubmittedBy(by) : t.loanRecordedBy(by),
+                if (r.executedByName != null) t.loanRepaymentExecutedBy(r.executedByName!),
               ].join(' · '),
               style: theme.textTheme.bodySmall?.merge(strike),
             ),
             if ((r.note ?? '').isNotEmpty) Text(r.note!, style: theme.textTheme.bodySmall?.merge(strike)),
+            for (final d in r.decisions)
+              Text(
+                [
+                  d.levelLabel ?? (d.level == 2 ? t.loanStepOwner : t.loanStepDirektur),
+                  d.approved ? t.loanDecApproved : t.loanDecRejected,
+                  if (d.actorName != null) d.actorName!,
+                ].join(' · '),
+                key: Key('loan-repayment-${r.id}-decision-${d.level}'),
+                style: theme.textTheme.bodySmall,
+              ),
             // ADR 0031: KK (borrower) / KM (lender) of a cash-backed loan's repayment
             if (r.cash case final c?)
               Text(
@@ -1041,20 +1090,39 @@ class _RepaymentTile extends StatelessWidget {
                 key: Key('loan-repayment-cash-${r.id}'),
                 style: theme.textTheme.bodySmall?.merge(strike),
               ),
-            if (!r.posted)
+            if (r.status == LoanRepaymentStatus.voided)
               Text(
                 r.voidReason == null ? t.loanRepaymentVoid : t.loanRepaymentVoidReason(r.voidReason!),
                 key: Key('loan-repayment-void-${r.id}'),
                 style: theme.textTheme.bodySmall?.copyWith(color: context.pk.badText),
               ),
-            if (onVoid != null)
+            if (r.status == LoanRepaymentStatus.rejected)
+              Text(
+                t.loanRepaymentRejected(r.rejectReason ?? '—'),
+                key: Key('loan-repayment-rejected-${r.id}'),
+                style: theme.textTheme.bodySmall?.copyWith(color: context.pk.badText),
+              ),
+            if (r.status == LoanRepaymentStatus.cancelled)
+              Text(
+                t.loanRepaymentCancelled(r.cancelReason ?? '—'),
+                key: Key('loan-repayment-cancelled-${r.id}'),
+                style: theme.textTheme.bodySmall,
+              ),
+            if (actions.isNotEmpty && onAction != null)
               Align(
                 alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  key: Key('loan-repayment-${r.id}-void'),
-                  onPressed: onVoid,
-                  icon: const Icon(Icons.block, size: 18),
-                  label: Text(t.cashVoid),
+                child: Wrap(
+                  spacing: 4,
+                  children: [
+                    for (final a in LoanRepaymentAction.values)
+                      if (actions.contains(a))
+                        TextButton.icon(
+                          key: Key('loan-repayment-${r.id}-${a.code}'),
+                          onPressed: () => onAction!(a),
+                          icon: Icon(button(a).$1, size: 18),
+                          label: Text(button(a).$2),
+                        ),
+                  ],
                 ),
               ),
           ],
@@ -1064,7 +1132,8 @@ class _RepaymentTile extends StatelessWidget {
   }
 }
 
-/// Direktur decision bar (same layout as the request detail): Tolak (outlined) · Setujui (filled). Server-driven.
+/// Decision bar of the caller's level (same layout as the request detail): "Persetujuan Direktur" / "Persetujuan
+/// Owner", then Tolak (outlined) · Setujui (filled). Server-driven.
 class _LoanDecisionBar extends ConsumerWidget {
   const _LoanDecisionBar({required this.loan, required this.busy, required this.onAction});
   final Loan loan;
@@ -1081,28 +1150,40 @@ class _LoanDecisionBar extends ConsumerWidget {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (canReject)
-              Expanded(
-                child: OnlineOnlyButton(
-                  key: const Key('loan-action-reject'),
-                  label: t.loanReject,
-                  icon: Icons.close,
-                  outlined: true,
-                  onPressed: busy ? null : () => onAction(LoanAction.reject),
-                ),
-              ),
-            if (canReject && canApprove) const SizedBox(width: 12),
-            if (canApprove)
-              Expanded(
-                child: OnlineOnlyButton(
-                  key: const Key('loan-action-approve'),
-                  label: t.loanApprove,
-                  icon: Icons.check,
-                  onPressed: busy ? null : () => onAction(LoanAction.approve),
-                ),
-              ),
+            Text(
+              loan.waitingOwner ? t.loanStepOwner : t.loanStepDirektur,
+              key: const Key('loan-decision-step'),
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                if (canReject)
+                  Expanded(
+                    child: OnlineOnlyButton(
+                      key: const Key('loan-action-reject'),
+                      label: t.loanReject,
+                      icon: Icons.close,
+                      outlined: true,
+                      onPressed: busy ? null : () => onAction(LoanAction.reject),
+                    ),
+                  ),
+                if (canReject && canApprove) const SizedBox(width: 12),
+                if (canApprove)
+                  Expanded(
+                    child: OnlineOnlyButton(
+                      key: const Key('loan-action-approve'),
+                      label: t.loanApprove,
+                      icon: Icons.check,
+                      onPressed: busy ? null : () => onAction(LoanAction.approve),
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -1111,8 +1192,9 @@ class _LoanDecisionBar extends ConsumerWidget {
 }
 
 class _ReasonDialog extends StatefulWidget {
-  const _ReasonDialog({required this.title, required this.prompt, required this.confirm});
+  const _ReasonDialog({required this.title, required this.prompt, required this.confirm, this.summary = const []});
   final String title;
+  final List<String> summary;
   final String prompt;
   final String confirm;
   @override
@@ -1132,12 +1214,18 @@ class _ReasonDialogState extends State<_ReasonDialog> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final style = isDestructiveAction(widget.confirm)
+        ? FilledButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError)
+        : null;
     return AlertDialog(
       title: Text(widget.title),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          for (final s in widget.summary) Text(s, style: const TextStyle(fontWeight: FontWeight.w600)),
+          if (widget.summary.isNotEmpty) const SizedBox(height: 8),
           Text(widget.prompt),
           const SizedBox(height: 8),
           TextField(
@@ -1153,6 +1241,7 @@ class _ReasonDialogState extends State<_ReasonDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
         FilledButton(
           key: const Key('loan-reason-ok'),
+          style: style,
           onPressed: () {
             final v = _c.text.trim();
             if (v.length < 3) {
@@ -1161,14 +1250,16 @@ class _ReasonDialogState extends State<_ReasonDialog> {
             }
             Navigator.pop(context, v);
           },
-          child: Text(widget.confirm),
+          child: Text(t.confirmActionYes(actionPhrase(widget.confirm))),
         ),
       ],
     );
   }
 }
 
-/// The web RepaymentAction dialog as a sheet: Nominal (default = sisa), Tanggal (loan date … today), Catatan.
+/// The web RepaymentAction dialog as a sheet: Nominal (default = what may still be repaid), Tanggal, Catatan. A claim
+/// records the repayment (date loan date … today); a cash-backed loan submits a request with a PLANNED date (loan date
+/// … one year ahead) — user decision 2026-10-24.
 class _RepaymentSheet extends StatefulWidget {
   const _RepaymentSheet({required this.loan});
   final Loan loan;
@@ -1178,11 +1269,13 @@ class _RepaymentSheet extends StatefulWidget {
 }
 
 class _RepaymentSheetState extends State<_RepaymentSheet> {
-  late final _amount = TextEditingController(text: groupRupiah(widget.loan.outstanding));
+  late final _amount = TextEditingController(text: groupRupiah(widget.loan.repayableAmount));
   final _note = TextEditingController();
   late final String _today = widget.loan.today ?? toYmd(DateTime.now());
   late String _date = _today;
   Map<String, String> _errors = const {};
+
+  bool get _request => widget.loan.repaymentNeedsApproval;
 
   @override
   void dispose() {
@@ -1192,12 +1285,13 @@ class _RepaymentSheetState extends State<_RepaymentSheet> {
   }
 
   Future<void> _pickDate() async {
-    final last = DateTime.parse(_today);
-    final first = DateTime.tryParse(widget.loan.loanDate) ?? DateTime(last.year - 1);
+    final today = DateTime.parse(_today);
+    final last = _request ? today.add(const Duration(days: 365)) : today;
+    final first = DateTime.tryParse(widget.loan.loanDate) ?? DateTime(today.year - 1);
     final d = await showDatePicker(
       context: context,
       initialDate: DateTime.parse(_date),
-      firstDate: first.isAfter(last) ? last : first,
+      firstDate: first.isAfter(today) ? today : first,
       lastDate: last,
     );
     if (d != null && mounted) setState(() => _date = toYmd(d));
@@ -1206,6 +1300,7 @@ class _RepaymentSheetState extends State<_RepaymentSheet> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final l = widget.loan;
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
@@ -1213,8 +1308,18 @@ class _RepaymentSheetState extends State<_RepaymentSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(t.loanRepayTitle(l.title), style: Theme.of(context).textTheme.titleMedium),
-          Text(t.loanRepayOutstanding(formatRupiah(l.outstanding)), style: Theme.of(context).textTheme.bodySmall),
+          Text(
+            _request ? t.loanRepayRequestTitle(l.title) : t.loanRepayTitle(l.title),
+            style: theme.textTheme.titleMedium,
+          ),
+          Text(
+            _request
+                ? t.loanRepayable(formatRupiah(l.repayableAmount))
+                : t.loanRepayOutstanding(formatRupiah(l.outstanding)),
+            style: theme.textTheme.bodySmall,
+          ),
+          if (_request)
+            Text(t.loanRepayRequestHint, key: const Key('loan-repay-request-hint'), style: theme.textTheme.bodySmall),
           const SizedBox(height: 12),
           TextField(
             key: const Key('loan-repay-amount'),
@@ -1229,7 +1334,7 @@ class _RepaymentSheetState extends State<_RepaymentSheet> {
             onTap: _pickDate,
             child: InputDecorator(
               decoration: InputDecoration(
-                labelText: t.loanRepayDate,
+                labelText: _request ? t.loanRepayPlannedDate : t.loanRepayDate,
                 errorText: _errors['repayDate'],
                 suffixIcon: const Icon(Icons.event),
               ),
@@ -1248,14 +1353,14 @@ class _RepaymentSheetState extends State<_RepaymentSheet> {
             key: const Key('loan-repay-save'),
             onPressed: () {
               final amount = parseRupiah(_amount.text);
-              final errors = validateRepayment(amount: amount, outstanding: l.outstanding, repayDate: _date);
+              final errors = validateRepayment(amount: amount, outstanding: l.repayableAmount, repayDate: _date);
               if (errors.isNotEmpty) {
                 setState(() => _errors = errors);
                 return;
               }
               Navigator.pop(context, (amount: amount!, date: _date, note: _note.text));
             },
-            child: Text(t.loanRepaySave),
+            child: Text(_request ? t.loanRepayRequest : t.loanRepaySave),
           ),
           TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
         ],

@@ -121,7 +121,7 @@ class DraftRepository {
             notes: Value(d.notes),
             requesterIdsJson: Value(jsonEncode(d.requesterIds)),
             bankAccountId: Value(d.isDirectPayment ? null : d.bankAccountId),
-            // ADR 0027 / 0028: vendor / PT grup payment data (null = paid to an employee account)
+            // ADR 0027 / 0028: vendor / PT grup payment data (null = paid to an employee account); D2410: + attachments
             vendorJson: Value(vendorToJson(d)),
             serverId: Value(d.serverId),
             serverRev: Value(d.serverRev),
@@ -139,6 +139,14 @@ class DraftRepository {
     if (oldInvoice != null && oldInvoice != (d.isDirectPayment ? d.invoiceMediaUuid : null)) {
       await (db.delete(db.mediaBlobs)..where((t) => t.clientUuid.equals(oldInvoice))).go();
     }
+    // D2410 (point 6): local attachment files dropped from this draft are removed as well
+    final kept = {for (final a in d.attachments) ?a.mediaUuid};
+    final before = existing == null ? null : withVendorJson(_blank(existing), existing.vendorJson);
+    final dropped = [
+      for (final a in before?.attachments ?? const <DraftAttachment>[])
+        if (a.mediaUuid != null && !kept.contains(a.mediaUuid)) a.mediaUuid!,
+    ];
+    if (dropped.isNotEmpty) await (db.delete(db.mediaBlobs)..where((t) => t.clientUuid.isIn(dropped))).go();
     await (db.delete(db.localReceipts)..where((t) => t.draftUuid.equals(d.clientUuid))).go();
     await (db.delete(db.localLines)..where((t) => t.draftUuid.equals(d.clientUuid))).go();
     for (final l in d.lines) {
@@ -277,20 +285,24 @@ class DraftRepository {
 
 /// ADR 0027 / 0028: payee fields of a vendor / PT grup payment → `local_drafts.vendor_json` (null for an employee
 /// payment). ADR 0028 adds `payeeCompanyId` to the same JSON — no drift schema change: the column already holds the
-/// payee type, and a draft without the key reads as before.
-String? vendorToJson(DraftRequest d) => d.isDirectPayment
-    ? jsonEncode({
-        'payeeType': d.payeeType.code,
-        'vendorId': d.vendorId,
-        'vendorBankAccountId': d.vendorBankAccountId,
-        if (d.isPtGrup) 'payeeCompanyId': d.payeeCompanyId,
-        'invoiceNo': d.invoiceNo,
-        'invoiceDate': d.invoiceDate,
-        'invoiceDueDate': d.invoiceDueDate,
-        'invoiceMediaUuid': d.invoiceMediaUuid,
-        'invoiceFileId': d.invoiceFileId,
-      })
-    : null;
+/// payee type, and a draft without the key reads as before. D2410 (point 6): the general attachments go into the same
+/// JSON (`attachments`, any payee type; an employee draft without attachments stays null).
+String? vendorToJson(DraftRequest d) {
+  final attachments = [for (final a in d.attachments) a.toJson()];
+  if (!d.isDirectPayment) return attachments.isEmpty ? null : jsonEncode({'attachments': attachments});
+  return jsonEncode({
+    'payeeType': d.payeeType.code,
+    'vendorId': d.vendorId,
+    'vendorBankAccountId': d.vendorBankAccountId,
+    if (d.isPtGrup) 'payeeCompanyId': d.payeeCompanyId,
+    'invoiceNo': d.invoiceNo,
+    'invoiceDate': d.invoiceDate,
+    'invoiceDueDate': d.invoiceDueDate,
+    'invoiceMediaUuid': d.invoiceMediaUuid,
+    'invoiceFileId': d.invoiceFileId,
+    if (attachments.isNotEmpty) 'attachments': attachments,
+  });
+}
 
 /// ADR 0027 / 0028: `local_drafts.vendor_json` back onto [d] (null / unreadable = employee payment, as before v10).
 DraftRequest withVendorJson(DraftRequest d, String? json) {
@@ -305,6 +317,7 @@ DraftRequest withVendorJson(DraftRequest d, String? json) {
   final m = decoded;
   int? n(String k) => m[k] is num ? (m[k] as num).toInt() : null;
   String? s(String k) => m[k] is String ? m[k] as String : null;
+  final attachments = m['attachments'];
   return d.copyWith(
     payeeType: PayeeType.fromCode(s('payeeType')),
     vendorId: n('vendorId'),
@@ -315,5 +328,9 @@ DraftRequest withVendorJson(DraftRequest d, String? json) {
     invoiceDueDate: s('invoiceDueDate'),
     invoiceMediaUuid: s('invoiceMediaUuid'),
     invoiceFileId: n('invoiceFileId'),
+    attachments: [
+      if (attachments is List)
+        for (final a in attachments) ?DraftAttachment.fromJson(a),
+    ],
   );
 }

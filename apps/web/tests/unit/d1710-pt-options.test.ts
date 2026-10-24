@@ -159,17 +159,17 @@ describe('Payload pickers: no every-PT list before the PT is known', () => {
       ['approval-rules', 'category'],
       ['approval-rules', 'project'],
       ['approval-rules', 'costCenter'],
-      ['projects', 'site'],
       ['projects', 'costCenter'],
       ['sites', 'defaultWorkSchedule'],
       ['sites', 'costCenter'],
       ['employees', 'workSchedule'],
-      ['employees', 'homeSite'],
-      ['cash-accounts', 'site'],
       ['team-assignments', 'project'],
       ['team-assignments', 'costCenter'],
-      ['team-assignments', 'site'],
     ] as const
+    // ADR 0032: the site columns of projects / employees / cash accounts / team assignments are hidden legacy columns
+    for (const [slug, name] of [['projects', 'site'], ['employees', 'homeSite'], ['cash-accounts', 'site'], ['team-assignments', 'site']] as const) {
+      expect((field(slug, name) as { admin?: { hidden?: boolean } }).admin?.hidden, `${slug}.${name}`).toBe(true)
+    }
     for (const [slug, name] of locked) {
       const f = field(slug, name)
       expect(f.admin?.components?.Field, `${slug}.${name}`).toBe(COMPANY_LOCKED_FIELD)

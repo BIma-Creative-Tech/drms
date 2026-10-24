@@ -31,10 +31,9 @@ import '../support/mock_server.dart';
 import '../support/schema_v2.dart';
 import '../support/widget_harness.dart';
 
-/// ADR 0023 (DRMS 10/10 Phase D): sites (kantor cabang) per PT on the APK — drift v9 `outbox.site_id`, the `sites`
-/// masters with the caller's flags (home / assigned / team), the location picker (home site first), the
-/// "diabsenkan PM" candidates of a site, the sync payload (exactly one of project_id / cost_center_id / site_id) and
-/// the site on the project detail / employee profile.
+/// ADR 0023 (DRMS 10/10 Phase D) sites on the APK — ADR 0032: removed from the product. What stays (old caches and
+/// queued items): drift v9 `outbox.site_id`, the parse of a cached `sites` master row, the sync payload of a legacy site
+/// item. Sites are no longer requested, offered as own locations nor as on-behalf locations.
 const sub = 'kc-sub-v9';
 const _site = ProjectSite(
   id: 2,
@@ -67,7 +66,7 @@ void main() {
       );
     });
     addTearDown(db.close);
-    expect(db.schemaVersion, 11);
+    expect(db.schemaVersion, 12);
     final outbox = OutboxRepository(db);
     final old = (await outbox.all(sub)).single;
     expect((old.opUuid, old.siteId, old.status, old.companyId), ('op-old', null, 'pending', 1));
@@ -128,7 +127,8 @@ void main() {
     );
     final bare = ProjectSite.fromMaster(const MasterItem(3, 'x'), kind: SiteKind.site);
     expect((bare.home, bare.assigned, bare.team, bare.hasGeofence), (false, false, false, false));
-    expect(MasterTypes.forApp, contains(MasterTypes.sites));
+    // ADR 0032: the APK no longer asks for sites
+    expect(MasterTypes.forApp, isNot(contains(MasterTypes.sites)));
   });
 
   group('providers from the cached masters', () {
@@ -154,7 +154,7 @@ void main() {
       await db.close();
     });
 
-    test('own picker: home site first, then assigned sites, projects, cost centers; other sites hidden', () async {
+    test('ADR 0032: own picker = projects and cost centers; cached sites are no longer offered', () async {
       await seed({
         'projects': _items([
           {
@@ -206,16 +206,10 @@ void main() {
         ]),
       });
       final list = await c.read(attendanceSitesProvider.future);
-      expect(list.map((s) => s.key), [
-        's2',
-        's5',
-        'p7',
-        'c3',
-      ], reason: 'team-only and inactive sites are not own locations');
-      expect(list.first.home, isTrue);
+      expect(list.map((s) => s.key), ['p7', 'c3'], reason: 'sites of an old cache are ignored');
     });
 
-    test('on-behalf: a team site lists its stationed employees and site assignments (never the PM self)', () async {
+    test('ADR 0032: on-behalf lists project / cost-center team members only (no site, no home site)', () async {
       await seed({
         'projects': _items([
           {
@@ -254,9 +248,8 @@ void main() {
         ]),
       });
       final list = await c.read(onBehalfCandidatesProvider.future);
-      expect(list.map((e) => e.employeeId), [44, 45]);
-      expect(list.first.sites.map((s) => s.key), ['p7', 's6']);
-      expect(list.last.sites.single.kind, SiteKind.site);
+      expect(list.map((e) => e.employeeId), [44]);
+      expect(list.single.sites.map((s) => s.key), ['p7']);
     });
   });
 

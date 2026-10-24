@@ -22,6 +22,8 @@ const onboardingRoles = [
   ('pk-principal', 'Owner'),
   ('pk-admin', 'Admin'),
   ('pk-operator', 'Operator / Anggota'),
+  // ADR 0032: attendance administration of the PT
+  ('pk-admin-staff', 'Admin Staff'),
 ];
 
 class OnbEmployee {

@@ -13,8 +13,8 @@ import '../support/d1010_c_fixtures.dart';
 import 'd1010_c_menus_test.dart' show pumpRouted;
 import '../support/widget_harness.dart';
 
-/// ADR 0023 on the APK screens: the project detail shows its site (kantor cabang) when set, the profile shows the
-/// employee's "Site penempatan"; both rows are absent without a site (older servers / PTs without sites).
+/// ADR 0023 sites on the APK screens — ADR 0032: removed from the product. Neither the project detail nor the profile
+/// shows a site any more, even when an older server (or an old cache) still sends one.
 class _SiteProjectsApi extends FakeProjectsApi {
   _SiteProjectsApi(this.site);
   final Map<String, dynamic>? site;
@@ -24,7 +24,7 @@ class _SiteProjectsApi extends FakeProjectsApi {
 }
 
 void main() {
-  testWidgets('project detail: "Site" row with code and name', (tester) async {
+  testWidgets('project detail: no "Site" row, even when the server sends one', (tester) async {
     await pumpRouted(
       tester,
       '/projects/9',
@@ -33,20 +33,11 @@ void main() {
         projectsApiProvider.overrideWithValue(_SiteProjectsApi({'id': 2, 'code': 'BPN', 'name': 'Cabang Balikpapan'})),
       ],
     );
-    expect(tester.widget<Text>(find.byKey(const Key('project-site'))).data, 'BPN Cabang Balikpapan');
-  });
-
-  testWidgets('project detail without a site: no row', (tester) async {
-    await pumpRouted(
-      tester,
-      '/projects/9',
-      roles: {Role.pm},
-      overrides: [projectsApiProvider.overrideWithValue(_SiteProjectsApi(null))],
-    );
     expect(find.byKey(const Key('project-site')), findsNothing);
+    expect(find.text('BPN Cabang Balikpapan'), findsNothing);
   });
 
-  testWidgets('profile: "Site penempatan" of the employee', (tester) async {
+  testWidgets('profile: no "Site penempatan" row, even with a home site from an older server', (tester) async {
     final p = profile({Role.staff}).copyWith(
       employee: const Employee(
         id: 12,
@@ -62,17 +53,7 @@ void main() {
       auth: AuthSignedIn(profile: p, sub: 'user-sub-1'),
       overrides: [outboxCountsProvider.overrideWith((ref) => Stream.value(const OutboxCounts()))],
     );
-    expect(find.byKey(const Key('profile-home-site')), findsOneWidget);
-    expect(find.text('Site penempatan'), findsOneWidget);
-    expect(find.text('BPN — Cabang Balikpapan'), findsOneWidget);
-  });
-
-  testWidgets('profile without a home site: no row', (tester) async {
-    await pumpScreen(
-      tester,
-      const ProfileScreen(),
-      overrides: [outboxCountsProvider.overrideWith((ref) => Stream.value(const OutboxCounts()))],
-    );
     expect(find.byKey(const Key('profile-home-site')), findsNothing);
+    expect(find.text('Site penempatan'), findsNothing);
   });
 }

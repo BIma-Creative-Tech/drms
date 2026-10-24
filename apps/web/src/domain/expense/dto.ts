@@ -215,6 +215,13 @@ export async function detail(req: PayloadRequest, id: number) {
           mimeType: doc.invoiceFile && typeof doc.invoiceFile === 'object' ? String((doc.invoiceFile as { mimeType?: string }).mimeType ?? '') || null : null,
         }
       : null,
+    // D2410 (point 6): general attachments ("Lampiran", photo / PDF) — the APK lists and opens them like the web summary
+    attachments: (doc.attachments ?? []).flatMap((a) => {
+      const fileId = relId(a)
+      if (fileId === undefined) return []
+      const m = (a && typeof a === 'object' ? a : {}) as { filename?: string | null; mimeType?: string | null }
+      return [{ id: fileId, fileName: m.filename || null, mimeType: m.mimeType || null }]
+    }),
     bank: doc.bankSnapshot?.accountNo
       ? { bankName: doc.bankSnapshot.bankName ?? null, accountNo: maskAccountNo(doc.bankSnapshot.accountNo, fullBank), accountHolder: doc.bankSnapshot.accountHolder ?? null }
       : null,

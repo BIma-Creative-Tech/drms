@@ -11,7 +11,7 @@ import { RecordReason } from '../schemas-records'
 /**
  * D1610 (ADR 0030, owner 2026-10-16): the row actions of the admin tables.
  * - GET  /records/{collection}/{id}/delete-check — what "Hapus" would do (usage lines, the action for the caller);
- * - POST /records/{collection}/{id}/delete       — soft delete (reason; unused rows / never-submitted drafts only);
+ * - POST /records/{collection}/{id}/delete       — soft delete (reason; unused rows / undecided drafts only, D2410);
  * - POST /records/{collection}/{id}/restore      — Admin "Pulihkan" (reason);
  * - GET  /projects/{id}/cancel-plan               — dry run of "Batalkan proyek" (what is cancelled / what blocks);
  * - POST /projects/{id}/cancel                    — status Dibatalkan + cascade, ONE transaction (409 + list when blocked).

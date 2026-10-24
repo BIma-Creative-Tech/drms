@@ -1,5 +1,9 @@
 # ADR 0023 — Multiple sites per PT: a `sites` master (branch offices), not a new company
 
+> **Amended 2026-10-24 by [ADR 0032](0032-hapus-site-absensi-lokasi-project-admin-staff.md):** sites are removed from
+> the product (hidden legacy columns, site assignments migrated to project assignments), attendance locations are
+> projects, and Karyawan Non-OnSite may check in only inside a registered location ("Di luar area" withdrawn).
+
 - **Status:** accepted (owner answers 2026-10-11, see "Decisions"; DRMS 10/10 Phase D, owner point 16 "multi-site per
   PT"). Staging first, no production deploy without separate owner approval.
 - **Date:** 2026-10-11

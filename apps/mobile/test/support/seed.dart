@@ -14,6 +14,11 @@ DraftRequest seedDraft({RequestType type = RequestType.reimburse, bool withRecei
   neededDate: '2026-09-22',
   requesterIds: const [11, 12],
   bankAccountId: 21,
+  // D2410 (point 6): a Reimburse is submitted with at least one general attachment (already on the server here)
+  attachments: [
+    if (type == RequestType.reimburse)
+      const DraftAttachment(fileName: 'rekap-nota.pdf', mimeType: 'application/pdf', serverFileId: 990),
+  ],
   lines: [
     DraftLine(
       clientUuid: '0192f6d0-aaaa-7bbb-8ccc-000000000011',

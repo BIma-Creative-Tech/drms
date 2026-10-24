@@ -9,6 +9,7 @@ import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/online_only_button.dart';
 import '../data/records_providers.dart';
@@ -152,6 +153,9 @@ class _RecordFormState extends ConsumerState<_RecordForm> {
       setState(() => _summary = t.recordNoChanges);
       return;
     }
+    final heading = edit || widget.global ? t.recordEditTitle(widget.def.label) : t.recordNewTitle(widget.def.label);
+    final name = _values['name'] ?? _values['title'];
+    if (!await confirmAction(context, action: t.save, summary: [heading, name?.toString()]) || !mounted) return;
     setState(() => _busy = true);
     final api = ref.read(recordsApiProvider);
     try {
@@ -167,21 +171,22 @@ class _RecordFormState extends ConsumerState<_RecordForm> {
       ref.invalidate(recordFormProvider);
       ref.invalidate(recordGlobalFormProvider);
       if (!mounted) return;
-      showSnack(context, t.recordSaved(saved.title.isEmpty ? widget.def.label : saved.title));
-      if (widget.global) {
-        // one document: stay on the form, its values reload
-        return;
-      }
+      final done = t.recordSaved(saved.title.isEmpty ? widget.def.label : saved.title);
+      await showActionResult(context, message: done, action: t.save);
+      // one document (global): stay on the form, its values reload
+      if (widget.global || !mounted) return;
       context.pop(saved.id);
     } on ProblemException catch (e) {
-      if (mounted) {
-        setState(() {
-          _errors = {for (final x in e.errors) x.path: x.message};
-          _summary = e.message;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _errors = {for (final x in e.errors) x.path: x.message};
+        _summary = e.message;
+      });
+      await showActionError(context, e, action: t.save);
     } on Object catch (e) {
-      if (mounted) setState(() => _summary = errorText(e));
+      if (!mounted) return;
+      setState(() => _summary = errorText(e));
+      await showActionError(context, e, action: t.save);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -9,6 +9,7 @@ import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/platform/report_files.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
 import '../../../shared/widgets/reason_dialog.dart';
@@ -42,14 +43,14 @@ class _RapManageScreenState extends ConsumerState<RapManageScreen> {
     ref.invalidate(projectDetailProvider(widget.projectId));
   }
 
-  Future<void> _run(Future<void> Function() action, String done) async {
+  Future<void> _run(Future<void> Function() action, String done, String label) async {
     setState(() => _busy = true);
     try {
       await action();
-      if (mounted) showSnack(context, done);
       _refresh();
+      if (mounted) await showActionResult(context, message: done, action: label);
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -95,6 +96,7 @@ class _RapManageScreenState extends ConsumerState<RapManageScreen> {
     await _run(
       () => api.commit(widget.projectId, bytes, picked.name, fileHash: p.fileHash, reason: reason),
       t.rapImported,
+      t.rapImportCommit,
     );
   }
 
@@ -145,8 +147,14 @@ class _RapManageScreenState extends ConsumerState<RapManageScreen> {
         ),
       ),
     );
-    if (id == null) return;
-    await _run(() => api.applyTemplate(widget.projectId, id, idempotencyKey: const Uuid().v4()), t.rapTemplateApplied);
+    if (id == null || !mounted) return;
+    final name = list.where((e) => e.$1 == id).firstOrNull?.$2;
+    if (!await confirmAction(context, action: t.rapApplyTemplate, summary: [name]) || !mounted) return;
+    await _run(
+      () => api.applyTemplate(widget.projectId, id, idempotencyKey: const Uuid().v4()),
+      t.rapTemplateApplied,
+      t.rapApplyTemplate,
+    );
   }
 
   Future<void> _saveTemplate() async {
@@ -155,7 +163,7 @@ class _RapManageScreenState extends ConsumerState<RapManageScreen> {
       context,
       title: t.rapSaveTemplate,
       description: t.rapSaveTemplateHint,
-      confirm: t.save,
+      confirm: t.rapSaveTemplate,
       fieldLabel: t.rapTemplateName,
       keyPrefix: 'rap-template-name',
     );
@@ -163,6 +171,7 @@ class _RapManageScreenState extends ConsumerState<RapManageScreen> {
     await _run(
       () => ref.read(rapApiProvider).saveTemplate(widget.projectId, name, idempotencyKey: const Uuid().v4()),
       t.rapTemplateSaved(name),
+      t.rapSaveTemplate,
     );
   }
 
@@ -378,6 +387,9 @@ class _ItemSheetState extends ConsumerState<_ItemSheet> {
       if (_i != null && _active != _i.active) 'active': _active,
       if (_reason.text.trim().isNotEmpty) 'reason': _reason.text.trim(),
     };
+    final label = _i == null ? t.rapAddItem : t.rapEditItem(_code.text.trim());
+    final summary = [_code.text.trim(), _desc.text.trim(), _volume.text.trim()];
+    if (!await confirmAction(context, action: label, summary: summary) || !mounted) return;
     setState(() => _busy = true);
     final api = ref.read(rapApiProvider);
     try {
@@ -388,17 +400,19 @@ class _ItemSheetState extends ConsumerState<_ItemSheet> {
         await api.updateItem(_i.id, body, idempotencyKey: key);
       }
       if (!mounted) return;
-      showSnack(context, t.rapItemSaved(_code.text.trim()));
-      Navigator.pop(context, true);
+      await showActionResult(context, message: t.rapItemSaved(_code.text.trim()), action: label);
+      if (mounted) Navigator.pop(context, true);
     } on ProblemException catch (e) {
-      if (mounted) {
-        setState(() {
-          _errors = {for (final x in e.errors) x.path: x.message};
-          _summary = e.message;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _errors = {for (final x in e.errors) x.path: x.message};
+        _summary = e.message;
+      });
+      await showActionError(context, e, action: label);
     } on Object catch (e) {
-      if (mounted) setState(() => _summary = errorText(e));
+      if (!mounted) return;
+      setState(() => _summary = errorText(e));
+      await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

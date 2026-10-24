@@ -6,6 +6,7 @@ import { formatRupiah } from '@/lib/money'
 
 import { problemText } from '../ActionButton'
 import { DateInput } from '../DateInput'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle } from '../feedback/feedback'
 import { KAS_STYLE } from '../kas/style'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 import { RupiahInput, useRupiah } from '../RupiahInput'
@@ -17,6 +18,7 @@ import { WrapSelect } from '../WrapSelect'
  * the amount to Σ needed − available), the lender list from GET /api/v1/intercompany-loans/lenders (Dana tersedia per
  * PT, short PTs disabled, a PT without a receiving account warned), amount (default = the gap), due date (default + 30
  * days) and reason. POST /api/v1/intercompany-loans (one Idempotency-Key per body) → the loan detail.
+ * DRMS 24/10: confirmation popup (peminjam, pemberi, nilai, jatuh tempo, alasan) before, result popup after.
  */
 type CompanyRef = { id: number; shortCode: string; name: string }
 type Lenders = {
@@ -90,6 +92,21 @@ export function IcLoanInstructForm({ borrowers, initialBorrower, initialRequestI
     setErrs(fe)
     setError(null)
     if (Object.keys(fe).length) return
+    const action = 'Perintahkan pinjaman'
+    const ptOf = (c: CompanyRef | null | undefined) => (c ? `${c.shortCode} — ${c.name}` : null)
+    const yes = await confirmAction({
+      title: confirmTitle(action, 'antar-PT'),
+      summary: [
+        ['PT peminjam', ptOf(borrowers.find((c) => c.id === borrower))],
+        ['PT pemberi', ptOf(data?.lenders.find((x) => x.company.id === lender)?.company)],
+        ['Nilai pinjaman', formatRupiah(v)],
+        ['Jatuh tempo', due],
+        ['Pengajuan terkait', requestIds.length ? `${requestIds.length} pengajuan` : null],
+        ['Alasan', reason.trim()],
+      ],
+      confirmLabel: confirmLabel(action),
+    })
+    if (!yes) return
     setBusy(true)
     key.current ??= newIdemKey()
     try {
@@ -97,12 +114,16 @@ export function IcLoanInstructForm({ borrowers, initialBorrower, initialRequestI
       if (!r.ok) {
         setError(r.error)
         setErrs(fieldErrors(r.data))
+        showResult({ ok: false, title: failureTitle(action), message: r.error })
         return
       }
-      const id = (r.data as { id?: number } | null)?.id
-      if (typeof id === 'number') router.push(`/admin/pinjaman-antar-pt/detail/${id}?baru=1`)
+      const saved = r.data as { id?: number; docNo?: string | null } | null
+      showResult({ ok: true, title: successTitle(action, saved?.docNo ?? 'antar-PT'), message: 'Pinjaman antar-PT tercatat; PT pemberi melanjutkan pencairan.' })
+      if (typeof saved?.id === 'number') router.push(`/admin/pinjaman-antar-pt/detail/${saved.id}?baru=1`)
     } catch {
-      setError('Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+      const msg = 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.'
+      setError(msg)
+      showResult({ ok: false, title: failureTitle(action), message: msg })
     } finally {
       setBusy(false)
     }

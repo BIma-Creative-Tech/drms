@@ -146,6 +146,14 @@ export const openapiDocument = {
                 "type": "boolean",
                 "description": "ADR 0029: Finance (stored) — the \"Pencairan pinjaman antar-PT\" queue (GET /intercompany-loans/queue) and the disbursement of loans whose LENDER is this PT (never one the caller instructed, G1)."
               },
+              "attendanceOnBehalf": {
+                "type": "boolean",
+                "description": "ADR 0032: may record check-in / check-out on behalf of an employee — PM (team members at team locations, APK and — DRMS 24/10 — web) or Admin Staff (any employee of the PT incl. those without an account; web POST /attendance/on-behalf and APK). The server re-checks."
+              },
+              "attendanceAdminStaff": {
+                "type": "boolean",
+                "description": "ADR 0032: holds pk-admin-staff (\"Admin Staff\") — reads every attendance + correction of the PT, corrects (never own), on-behalf for any employee (GET /attendance/on-behalf/options)."
+              },
               "fundCheckEnabled": {
                 "type": "boolean",
                 "description": "ADR 0029: companies.fundCheckEnabled of this PT (top level: any selected PT) — the final approval / the Owner's own submit is refused (409 FUND_INSUFFICIENT) when the PT's available funds are short. Off = the fund panel is information only."
@@ -162,6 +170,8 @@ export const openapiDocument = {
               "intercompanyPayment",
               "instructIntercompanyLoan",
               "disburseIntercompanyLoan",
+              "attendanceOnBehalf",
+              "attendanceAdminStaff",
               "fundCheckEnabled"
             ],
             "description": "DEPRECATED (MC3): derived from the top-level `roles` (union over the selected PTs). Use companies[].capabilities."
@@ -180,29 +190,6 @@ export const openapiDocument = {
               },
               "name": {
                 "type": "string"
-              },
-              "homeSite": {
-                "type": [
-                  "object",
-                  "null"
-                ],
-                "properties": {
-                  "id": {
-                    "type": "integer"
-                  },
-                  "code": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "id",
-                  "code",
-                  "name"
-                ],
-                "description": "ADR 0023: \"Site penempatan\" (kantor cabang) of the employee, null when none."
               }
             },
             "required": [
@@ -369,9 +356,11 @@ export const openapiDocument = {
           "pk-finance",
           "pk-owner",
           "pk-principal",
-          "pk-admin"
+          "pk-admin",
+          "pk-operator",
+          "pk-admin-staff"
         ],
-        "description": "pk-owner = \"Direktur\"; pk-principal = \"Owner\" (ADR 0026: the approval level above the Direktur). Effective roles: an Owner is also listed with pk-owner (same view and permissions as the Direktur); only the approval flow differs."
+        "description": "pk-owner = \"Direktur\"; pk-principal = \"Owner\" (ADR 0026: the approval level above the Direktur); pk-operator = \"Operator/Anggota\"; pk-admin-staff = \"Admin Staff\" (ADR 0032). Effective roles: an Owner is also listed with pk-owner (same view and permissions as the Direktur); only the approval flow differs."
       },
       "ImageTargets": {
         "type": "object",
@@ -515,36 +504,14 @@ export const openapiDocument = {
           },
           "name": {
             "type": "string"
-          },
-          "homeSite": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "integer"
-              },
-              "code": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "code",
-              "name"
-            ],
-            "description": "ADR 0023: \"Site penempatan\" (kantor cabang) of the employee, null when none."
           }
         },
         "required": [
           "id",
           "code",
           "name"
-        ]
+        ],
+        "description": "ADR 0032: no `homeSite` any more (sites removed from the product)."
       },
       "Capabilities": {
         "type": "object",
@@ -589,6 +556,14 @@ export const openapiDocument = {
             "type": "boolean",
             "description": "ADR 0029: Finance (stored) — the \"Pencairan pinjaman antar-PT\" queue (GET /intercompany-loans/queue) and the disbursement of loans whose LENDER is this PT (never one the caller instructed, G1)."
           },
+          "attendanceOnBehalf": {
+            "type": "boolean",
+            "description": "ADR 0032: may record check-in / check-out on behalf of an employee — PM (team members at team locations, APK and — DRMS 24/10 — web) or Admin Staff (any employee of the PT incl. those without an account; web POST /attendance/on-behalf and APK). The server re-checks."
+          },
+          "attendanceAdminStaff": {
+            "type": "boolean",
+            "description": "ADR 0032: holds pk-admin-staff (\"Admin Staff\") — reads every attendance + correction of the PT, corrects (never own), on-behalf for any employee (GET /attendance/on-behalf/options)."
+          },
           "fundCheckEnabled": {
             "type": "boolean",
             "description": "ADR 0029: companies.fundCheckEnabled of this PT (top level: any selected PT) — the final approval / the Owner's own submit is refused (409 FUND_INSUFFICIENT) when the PT's available funds are short. Off = the fund panel is information only."
@@ -605,6 +580,8 @@ export const openapiDocument = {
           "intercompanyPayment",
           "instructIntercompanyLoan",
           "disburseIntercompanyLoan",
+          "attendanceOnBehalf",
+          "attendanceAdminStaff",
           "fundCheckEnabled"
         ],
         "description": "UI hints for the APK (E1); the server guards stay authoritative."
@@ -1443,6 +1420,36 @@ export const openapiDocument = {
           },
           "invoice": {
             "$ref": "#/components/schemas/VendorInvoice"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "fileName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "mimeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "fileName",
+                "mimeType"
+              ]
+            },
+            "description": "D2410: general attachments (\"Lampiran\", photo / PDF; GET /api/v1/media/attachments/{id}/file). A Reimburse is submitted with at least one."
           },
           "payeeCompany": {
             "type": [
@@ -2447,7 +2454,7 @@ export const openapiDocument = {
               },
               "balance": {
                 "type": "integer",
-                "description": "Saldo dana: Σ balance of the PT's active accounts WITHOUT a site."
+                "description": "Saldo dana: Σ balance of the PT's active accounts (no site exclusion since DRMS 24/10)."
               },
               "commitments": {
                 "type": "integer",
@@ -2568,7 +2575,7 @@ export const openapiDocument = {
               },
               "accountCount": {
                 "type": "integer",
-                "description": "\"n akun, tanpa akun site\"."
+                "description": "\"n akun\" (every active account)."
               },
               "excludedSiteAccounts": {
                 "type": "object",
@@ -2906,6 +2913,7 @@ export const openapiDocument = {
           "vendor",
           "vendorBankAccountId",
           "invoice",
+          "attachments",
           "payeeCompany",
           "intercompany",
           "bank",
@@ -3443,7 +3451,8 @@ export const openapiDocument = {
           "lpj_verify",
           "settle",
           "settle_reverse",
-          "instruct_loan"
+          "instruct_loan",
+          "delete_draft"
         ]
       },
       "ExpenseRequestCreate": {
@@ -4062,6 +4071,16 @@ export const openapiDocument = {
         "required": [
           "reason"
         ],
+        "additionalProperties": false
+      },
+      "OptionalReasonBody": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
         "additionalProperties": false
       },
       "EmptyBody": {
@@ -5576,7 +5595,8 @@ export const openapiDocument = {
                     "pk-owner",
                     "pk-principal",
                     "pk-admin",
-                    "pk-operator"
+                    "pk-operator",
+                    "pk-admin-staff"
                   ]
                 },
                 "label": {
@@ -5692,7 +5712,8 @@ export const openapiDocument = {
                       "pk-owner",
                       "pk-principal",
                       "pk-admin",
-                      "pk-operator"
+                      "pk-operator",
+                      "pk-admin-staff"
                     ]
                   }
                 },
@@ -5864,10 +5885,11 @@ export const openapiDocument = {
                       "pk-owner",
                       "pk-principal",
                       "pk-admin",
-                      "pk-operator"
+                      "pk-operator",
+                      "pk-admin-staff"
                     ]
                   },
-                  "maxItems": 7
+                  "maxItems": 8
                 },
                 "employee": {
                   "type": [
@@ -7553,10 +7575,17 @@ export const openapiDocument = {
             "type": "string"
           },
           "hm_start": {
-            "type": "number"
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "null = no HM reading (D2410)."
           },
           "hm_end": {
-            "type": "number"
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "work_hours": {
             "type": "number"
@@ -8196,6 +8225,15 @@ export const openapiDocument = {
             "exclusiveMinimum": 0,
             "description": "ADR 0027: media-attachments id of the invoice (POST /media/attachments)."
           },
+          "attachment_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 20,
+            "description": "D2410: general attachments (\"Lampiran\", media-attachments ids — POST /media/attachments; photo / PDF). Replaces the list; omitted = unchanged. A Reimburse needs at least one to be submitted."
+          },
           "client_grand_total": {
             "type": [
               "integer",
@@ -8403,7 +8441,7 @@ export const openapiDocument = {
           }
         },
         "additionalProperties": false,
-        "description": "Soft delete = the draft is cancelled (no hard delete)."
+        "description": "A never-submitted draft is cancelled (no hard delete). D2410 \"Hapus draft\": a draft submitted before (withdrawn, numbered) and never decided is soft-deleted (ADR 0030, flag DELETED; number never reused); a decided one → rejected."
       },
       "SyncAttendancePayload": {
         "type": "object",
@@ -8421,7 +8459,7 @@ export const openapiDocument = {
           "site_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "ADR 0023: site (kantor cabang) — allowed at the home site or with an active site assignment."
+            "description": "ADR 0023 site — ADR 0032: no longer a check-in location (OnSite → VALIDATION; Non-OnSite: a hint only, recorded at the registered location containing the fix)."
           },
           "lat": {
             "type": "number",
@@ -8803,19 +8841,27 @@ export const openapiDocument = {
             "description": "Required for a new timesheet."
           },
           "hm_start": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
-            "maximum": 10000000
+            "maximum": 10000000,
+            "description": "Optional (D2410), both hm_start and hm_end or none. On an edit: omitted = unchanged, null = cleared."
           },
           "hm_end": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 10000000
           },
           "work_hours": {
             "type": "number",
             "minimum": 0,
-            "maximum": 24
+            "maximum": 24,
+            "description": "Required for a new timesheet."
           },
           "standby_hours": {
             "type": "number",
@@ -8864,9 +8910,12 @@ export const openapiDocument = {
             "maxLength": 2000
           },
           "hm_photo_media_id": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "exclusiveMinimum": 0,
-            "description": "Required for a new timesheet (photo of the HM meter). Cannot change afterwards."
+            "description": "Photo of the HM meter — required when the timesheet has HM (D2410). Never replaced: on an edit it is only added to a timesheet without one (ignored otherwise)."
           },
           "reason": {
             "type": "string",
@@ -10117,7 +10166,7 @@ export const openapiDocument = {
           },
           "onBehalf": {
             "type": "boolean",
-            "description": "At least one row \"diabsenkan oleh PM\" (US-14)."
+            "description": "At least one row \"diabsenkan\" — by the PM (US-14) or an Admin Staff (ADR 0032); names in onBehalfBy."
           },
           "onBehalfBy": {
             "type": "array",
@@ -10186,8 +10235,10 @@ export const openapiDocument = {
                 "type": "string",
                 "enum": [
                   "self",
-                  "pm"
-                ]
+                  "pm",
+                  "admin"
+                ],
+                "description": "pm = diabsenkan PM, admin = diabsenkan Admin Staff (ADR 0032)."
               },
               "corrected": {
                 "type": "boolean"
@@ -10222,8 +10273,10 @@ export const openapiDocument = {
                 "type": "string",
                 "enum": [
                   "self",
-                  "pm"
-                ]
+                  "pm",
+                  "admin"
+                ],
+                "description": "pm = diabsenkan PM, admin = diabsenkan Admin Staff (ADR 0032)."
               },
               "corrected": {
                 "type": "boolean"
@@ -10519,14 +10572,15 @@ export const openapiDocument = {
                     "onsite",
                     "non_onsite"
                   ],
-                  "description": "onsite = inside a registered location of the PT (outside the radius refused); non_onsite = no location restriction (inside a registered location → that one, else \"Di luar area\")."
+                  "description": "onsite = inside the chosen registered location of the PT (outside the radius refused); non_onsite (ADR 0032) = inside ANY registered location of the PT (picked automatically; outside all → refused)."
                 },
                 "homeSiteId": {
                   "type": [
                     "integer",
                     "null"
                   ],
-                  "exclusiveMinimum": 0
+                  "exclusiveMinimum": 0,
+                  "description": "ADR 0032: always null (sites removed; kept for APK ≤ 0.11.1)."
                 },
                 "referenceSite": {
                   "type": [
@@ -10564,7 +10618,7 @@ export const openapiDocument = {
                     "lat",
                     "lng"
                   ],
-                  "description": "Non-OnSite only: the reference of a \"Di luar area\" check-in (home site, else the PT head office); null for OnSite or when neither is set (then an outside check-in is refused VALIDATION)."
+                  "description": "ADR 0032: always null — no \"Di luar area\" check-in any more (kept for APK ≤ 0.11.1)."
                 }
               },
               "required": [
@@ -10621,11 +10675,11 @@ export const openapiDocument = {
                 },
                 "isHeadOffice": {
                   "type": "boolean",
-                  "description": "Site flagged \"Kantor pusat\"."
+                  "description": "ADR 0032: always false (kept for APK ≤ 0.11.1)."
                 },
                 "home": {
                   "type": "boolean",
-                  "description": "\"Site penempatan\" of the employee."
+                  "description": "ADR 0032: always false (kept for APK ≤ 0.11.1)."
                 }
               },
               "required": [
@@ -10642,7 +10696,7 @@ export const openapiDocument = {
                 "home"
               ]
             },
-            "description": "Eligible locations with a point: home site first, then head office, sites, projects, cost centers (by code). Locations without a point are never listed."
+            "description": "Eligible locations with a point: projects, then cost centers (by code). Locations without a point are never listed."
           }
         },
         "required": [
@@ -10681,11 +10735,11 @@ export const openapiDocument = {
               "type",
               "id"
             ],
-            "description": "Where the record belongs (DRMS 13/10 A2: a Non-OnSite check-in may be recorded at the registered location containing the fix, or at the reference site when outside)."
+            "description": "Where the record belongs (a Non-OnSite check-in: the registered location containing the fix; a check-out: the open check-in of the day). `site` = history only (ADR 0032)."
           },
           "outsideArea": {
             "type": "boolean",
-            "description": "Non-OnSite \"Di luar area\": outside every registered location of the PT; `location` = the reference (home site, else head office; a check-out: the open check-in)."
+            "description": "DRMS 13/10 A2 \"Di luar area\" — ADR 0032: always false for a new record (Non-OnSite outside every location is refused)."
           },
           "distanceM": {
             "type": "integer",
@@ -10706,17 +10760,12 @@ export const openapiDocument = {
           "project_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Project (exactly one of project_id / cost_center_id / site_id)."
+            "description": "Project (exactly one of project_id / cost_center_id). OnSite: the fix must be inside it; Non-OnSite (ADR 0032): a hint — recorded at the registered location containing the fix (outside all → 409 OUTSIDE_GEOFENCE)."
           },
           "cost_center_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
             "description": "Cost center / operational location (E6, Q-40)."
-          },
-          "site_id": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "description": "ADR 0023: site (kantor pusat / kantor cabang). DRMS 13/10 A2: no assignment needed; OnSite must be inside the location; Non-OnSite has no location restriction (send the reference site when outside every registered location → \"Di luar area\")."
           },
           "lat": {
             "type": "number",
@@ -10747,6 +10796,193 @@ export const openapiDocument = {
           "lat",
           "lng",
           "selfie_media_id"
+        ],
+        "additionalProperties": false
+      },
+      "AttendanceOnBehalfOptions": {
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "attendanceEnabled": {
+                  "type": "boolean",
+                  "description": "company-settings.syncAttendanceEnabled of the PT."
+                }
+              },
+              "required": [
+                "id",
+                "attendanceEnabled"
+              ]
+            },
+            "description": "PTs (of the selection) where the caller is Admin Staff."
+          },
+          "employees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "company": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "attendanceType": {
+                  "type": "string",
+                  "enum": [
+                    "onsite",
+                    "non_onsite"
+                  ]
+                },
+                "hasAccount": {
+                  "type": "boolean",
+                  "description": "false = an employee without a user account (e.g. tukang harian)."
+                }
+              },
+              "required": [
+                "id",
+                "company",
+                "code",
+                "name",
+                "attendanceType",
+                "hasAccount"
+              ]
+            },
+            "description": "Active employees of those PTs, the caller's own excluded (by name)."
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "project",
+                    "cost_center"
+                  ]
+                },
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "company": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "lat": {
+                  "type": "number"
+                },
+                "lng": {
+                  "type": "number"
+                },
+                "radiusM": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "company",
+                "code",
+                "name",
+                "lat",
+                "lng",
+                "radiusM"
+              ]
+            },
+            "description": "Registered check-in locations of those PTs with a point (projects, cost centers)."
+          }
+        },
+        "required": [
+          "companies",
+          "employees",
+          "locations"
+        ],
+        "description": "ADR 0032: what an Admin Staff may record on behalf of. Names, codes and points only (no money, no bank data, no phone)."
+      },
+      "AttendanceOnBehalfBody": {
+        "type": "object",
+        "properties": {
+          "employee_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "employees id of the Admin Staff's PT (may have no user account); never the caller's own."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "check_in",
+              "check_out"
+            ]
+          },
+          "project_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Project (exactly one of project_id / cost_center_id; a Non-OnSite employee: a hint, the registered location containing the fix is used)."
+          },
+          "cost_center_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "lng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "accuracy_m": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "selfie_media_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "media-selfies id uploaded by the caller (photo of the employee)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500,
+            "description": "Why the Admin Staff records it (e.g. \"tukang harian tanpa HP\"). Required."
+          }
+        },
+        "required": [
+          "employee_id",
+          "kind",
+          "lat",
+          "lng",
+          "selfie_media_id",
+          "reason"
         ],
         "additionalProperties": false
       },
@@ -12425,37 +12661,6 @@ export const openapiDocument = {
                   ]
                 }
               },
-              "sites": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "integer",
-                      "exclusiveMinimum": 0
-                    },
-                    "label": {
-                      "type": "string"
-                    },
-                    "active": {
-                      "type": "boolean"
-                    },
-                    "companyId": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ],
-                      "exclusiveMinimum": 0
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "label",
-                    "active",
-                    "companyId"
-                  ]
-                }
-              },
               "projects": {
                 "type": "array",
                 "items": {
@@ -12618,7 +12823,6 @@ export const openapiDocument = {
             },
             "required": [
               "accounts",
-              "sites",
               "projects",
               "costCenters",
               "categories",
@@ -12691,7 +12895,7 @@ export const openapiDocument = {
                 "n"
               ]
             },
-            "description": "Balance tiles (active or non-zero accounts; site filter) + Σ in / out of flowPeriod."
+            "description": "Balance tiles (active or non-zero accounts) + Σ in / out of flowPeriod."
           },
           "page": {
             "type": "object",
@@ -15310,14 +15514,24 @@ export const openapiDocument = {
             ]
           },
           "hmStart": {
-            "type": "number"
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "null = no HM reading on this day (D2410)."
           },
           "hmEnd": {
-            "type": "number"
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "hmUsed": {
-            "type": "number",
-            "description": "hmEnd − hmStart."
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "hmEnd − hmStart (null without HM)."
           },
           "workHours": {
             "type": "number"
@@ -15521,19 +15735,26 @@ export const openapiDocument = {
           },
           "reportDate": {
             "type": "string",
-            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Not in the future; at most 14 days back — the PM of the project and the Direktur may use any date inside the contract unit's period (D2410)."
           },
           "hmStart": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 10000000,
-            "description": "HM awal; ≠ the previous timesheet's HM akhir → flag HM_GAP (not rejected)."
+            "description": "HM awal — optional since D2410 (HM is read about once a week): both hmStart and hmEnd or none. ≠ the HM akhir of the unit's previous timesheet WITH HM → flag HM_GAP (not rejected)."
           },
           "hmEnd": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 10000000,
-            "description": "HM akhir ≥ HM awal."
+            "description": "HM akhir ≥ HM awal; optional, both or none."
           },
           "workHours": {
             "type": "number",
@@ -15589,9 +15810,12 @@ export const openapiDocument = {
             "maxLength": 2000
           },
           "hmPhotoId": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "exclusiveMinimum": 0,
-            "description": "Photo of the HM meter (media-progress-photos, uploaded by the caller) — required, exactly one."
+            "description": "Photo of the HM meter (media-progress-photos, uploaded by the caller) — required when hmStart/hmEnd are given (D2410), at most one."
           },
           "clientUuid": {
             "type": "string",
@@ -15603,10 +15827,7 @@ export const openapiDocument = {
           "projectId",
           "unitId",
           "reportDate",
-          "hmStart",
-          "hmEnd",
-          "workHours",
-          "hmPhotoId"
+          "workHours"
         ],
         "additionalProperties": false,
         "description": "Σ work + standby + breakdown ≤ 24."
@@ -15615,16 +15836,27 @@ export const openapiDocument = {
         "type": "object",
         "properties": {
           "hmStart": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 10000000,
-            "description": "HM awal; ≠ the previous timesheet's HM akhir → flag HM_GAP (not rejected)."
+            "description": "Omitted = unchanged; null (with hmEnd null) clears the HM reading."
           },
           "hmEnd": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 10000000,
-            "description": "HM akhir ≥ HM awal."
+            "description": "HM akhir ≥ HM awal; optional, both or none."
+          },
+          "hmPhotoId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "D2410: adds the HM photo of a timesheet that has none (required when HM is added to it); a stored photo is never replaced (400 PHOTO_LIMIT)."
           },
           "workHours": {
             "type": "number",
@@ -15691,16 +15923,27 @@ export const openapiDocument = {
         "type": "object",
         "properties": {
           "hmStart": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 10000000,
-            "description": "HM awal; ≠ the previous timesheet's HM akhir → flag HM_GAP (not rejected)."
+            "description": "Omitted = unchanged; null (with hmEnd null) clears the HM reading."
           },
           "hmEnd": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 10000000,
-            "description": "HM akhir ≥ HM awal."
+            "description": "HM akhir ≥ HM awal; optional, both or none."
+          },
+          "hmPhotoId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "D2410: adds the HM photo of a timesheet that has none (required when HM is added to it); a stored photo is never replaced (400 PHOTO_LIMIT)."
           },
           "workHours": {
             "type": "number",
@@ -16667,11 +16910,16 @@ export const openapiDocument = {
             "items": {
               "$ref": "#/components/schemas/ContractUnit"
             }
+          },
+          "timesheetMinDate": {
+            "type": "string",
+            "description": "D2410: earliest report date the CALLER may use for a new timesheet on this project — today − 14 days for field reporters; for the PM of the project and the Direktur the earliest contract-unit start (any date inside a unit's contract period). Never a future date; each contract unit's own period still applies."
           }
         },
         "required": [
           "projectId",
-          "items"
+          "items",
+          "timesheetMinDate"
         ]
       },
       "ContractUnit": {
@@ -18675,30 +18923,6 @@ export const openapiDocument = {
             ],
             "description": "ADR 0031: the project's Pusat Biaya = a cash account of its PT (name only); null = not mapped yet (transfers refused)."
           },
-          "site": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              "code": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "code",
-              "name"
-            ],
-            "description": "ADR 0023: site (kantor cabang) that handles the project."
-          },
           "rapPlanned": {
             "type": [
               "number",
@@ -18753,7 +18977,6 @@ export const openapiDocument = {
           "progressPct",
           "costCenter",
           "pusatBiaya",
-          "site",
           "rapPlanned",
           "rapRealised",
           "rapPercent",
@@ -18872,30 +19095,6 @@ export const openapiDocument = {
             ],
             "description": "ADR 0031: the project's Pusat Biaya = a cash account of its PT (name only); null = not mapped yet (transfers refused)."
           },
-          "site": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              "code": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "code",
-              "name"
-            ],
-            "description": "ADR 0023: site (kantor cabang) that handles the project."
-          },
           "rapPlanned": {
             "type": [
               "number",
@@ -18990,7 +19189,6 @@ export const openapiDocument = {
           "progressPct",
           "costCenter",
           "pusatBiaya",
-          "site",
           "rapPlanned",
           "rapRealised",
           "rapPercent",
@@ -19251,7 +19449,7 @@ export const openapiDocument = {
           "docs",
           "totalDocs"
         ],
-        "description": "ADR 0023: sites (kantor cabang) of the selected PTs."
+        "description": "ADR 0023 sites — ADR 0032: removed from the product; always an empty list (kept for APK ≤ 0.11.1)."
       },
       "ProjectLoanList": {
         "type": "object",
@@ -19310,11 +19508,11 @@ export const openapiDocument = {
               },
               "inboxCount": {
                 "type": "integer",
-                "description": "Loans waiting for the caller's decision (Direktur)."
+                "description": "Loans waiting for the caller's decision (Direktur level 1 / Owner level 2)."
               },
               "canCreate": {
                 "type": "boolean",
-                "description": "The caller is PM of a borrower project (\"Ajukan pinjaman\")."
+                "description": "The caller is PM of a borrower project or Finance of a PT (\"Ajukan pinjaman\")."
               }
             },
             "required": [
@@ -19373,7 +19571,28 @@ export const openapiDocument = {
             ]
           },
           "statusLabel": {
-            "type": "string"
+            "type": "string",
+            "description": "2026-10-24: \"Menunggu persetujuan Direktur\" / \"Menunggu persetujuan Owner\" per level; \"Disetujui – menunggu transfer Finance\" while the transfer order waits."
+          },
+          "approvalLevel": {
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [
+                  1
+                ]
+              },
+              {
+                "type": "number",
+                "enum": [
+                  2
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "2026-10-24 (#10): level a pending loan waits at — 1 Direktur, 2 Owner; null otherwise."
           },
           "overdue": {
             "type": "boolean",
@@ -19404,10 +19623,23 @@ export const openapiDocument = {
               "manual",
               "transfer"
             ],
-            "description": "ADR 0031: manual = PM → Direktur; transfer = automatic (Finance paid a project request from another account)."
+            "description": "ADR 0031: manual = PM / Finance → Direktur → Owner; transfer = automatic (Finance paid a project request from another account)."
           },
           "originLabel": {
-            "type": "string"
+            "type": "string",
+            "description": "\"Diajukan PM\" / \"Diajukan Finance\" / \"Otomatis dari transfer\"."
+          },
+          "submitterRole": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "pm",
+              "finance",
+              null
+            ],
+            "description": "2026-10-24 (#10): the creator filed as borrower PM or as Finance (null for an automatic loan; legacy loans = pm)."
           },
           "lenderProject": {
             "type": [
@@ -19559,7 +19791,7 @@ export const openapiDocument = {
           },
           "cashBacked": {
             "type": "boolean",
-            "description": "ADR 0031: money between two different accounts — disbursement and repayments post KK / KM."
+            "description": "ADR 0031: money between two known accounts (2026-10-24: also one shared account) — the transfer orders post KK / KM."
           },
           "disbursedAt": {
             "type": [
@@ -19591,7 +19823,14 @@ export const openapiDocument = {
           },
           "awaitingDisbursement": {
             "type": "boolean",
-            "description": "Approved, cash-backed, not yet disbursed by Finance (\"Disetujui – menunggu pencairan\")."
+            "description": "Approved, cash-backed, transfer order not executed yet (\"Disetujui – menunggu transfer Finance\")."
+          },
+          "transferQueueHref": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "2026-10-24 (#11): web \"Antrian Transfer\" anchor of the loan's transfer order while it waits."
           },
           "transfer": {
             "type": [
@@ -19745,6 +19984,7 @@ export const openapiDocument = {
           "docNo",
           "status",
           "statusLabel",
+          "approvalLevel",
           "overdue",
           "overdueLabel",
           "daysOverdue",
@@ -19752,6 +19992,7 @@ export const openapiDocument = {
           "kindLabel",
           "origin",
           "originLabel",
+          "submitterRole",
           "lenderProject",
           "borrowerProject",
           "lenderCashAccount",
@@ -19760,6 +20001,7 @@ export const openapiDocument = {
           "disbursedAt",
           "disbursedBy",
           "awaitingDisbursement",
+          "transferQueueHref",
           "transfer",
           "amount",
           "repaidTotal",
@@ -19788,10 +20030,270 @@ export const openapiDocument = {
             "items": {
               "$ref": "#/components/schemas/ProjectLoanSummary"
             }
+          },
+          "repayments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectLoanRepaymentInboxItem"
+            },
+            "description": "2026-10-24 (#12): repayment requests waiting for the caller's decision at their level (absent on older servers)."
           }
         },
         "required": [
-          "items"
+          "items",
+          "repayments"
+        ]
+      },
+      "ProjectLoanRepaymentInboxItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Repayment id (decided on the loan: POST /project-loans/{loanId}/repayments/{id}/approve | reject)."
+          },
+          "loanId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "companyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "loanDocNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lenderProject": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "pm": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name",
+              "pm"
+            ]
+          },
+          "borrowerProject": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "pm": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name",
+              "pm"
+            ]
+          },
+          "lenderCashAccount": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "borrowerCashAccount": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "amount": {
+            "type": "integer"
+          },
+          "plannedDate": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "approvalLevel": {
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [
+                  1
+                ]
+              },
+              {
+                "type": "number",
+                "enum": [
+                  2
+                ]
+              }
+            ]
+          },
+          "statusLabel": {
+            "type": "string"
+          },
+          "outstanding": {
+            "type": "integer"
+          },
+          "submittedBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "submittedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "loanId",
+          "companyId",
+          "loanDocNo",
+          "lenderProject",
+          "borrowerProject",
+          "lenderCashAccount",
+          "borrowerCashAccount",
+          "amount",
+          "plannedDate",
+          "note",
+          "approvalLevel",
+          "statusLabel",
+          "outstanding",
+          "submittedBy",
+          "submittedAt"
         ]
       },
       "ProjectLoanOptions": {
@@ -19824,7 +20326,7 @@ export const openapiDocument = {
                 "companyId"
               ]
             },
-            "description": "Projects whose PM is the caller (pk-pm)."
+            "description": "Projects whose PM is the caller (pk-pm) and — 2026-10-24 — every open project of a PT where the caller is Finance."
           },
           "lenders": {
             "type": "array",
@@ -19859,6 +20361,257 @@ export const openapiDocument = {
         "required": [
           "borrowers",
           "lenders"
+        ]
+      },
+      "ProjectLoanTransferOrders": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "loan",
+                    "repayment"
+                  ],
+                  "description": "loan = \"Pencairan pinjaman\" (id = loan); repayment = \"Pengembalian pinjaman\" (id = repayment)."
+                },
+                "key": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "loanId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "companyId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "docNo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "integer"
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Loan date / planned repayment date (sort key, ascending)."
+                },
+                "minDate": {
+                  "type": "string",
+                  "description": "Earliest execution date (the loan date)."
+                },
+                "today": {
+                  "type": "string",
+                  "description": "Business date of the PT (latest execution date)."
+                },
+                "dueDate": {
+                  "type": "string"
+                },
+                "fromAccount": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "description": "Account the money leaves (KK) — frozen at the approval."
+                },
+                "toAccount": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "description": "Account the money arrives on (KM)."
+                },
+                "fromProject": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name"
+                  ]
+                },
+                "toProject": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name"
+                  ]
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "submittedBy": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                },
+                "approvedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "selfSubmitted": {
+                  "type": "boolean",
+                  "description": "The caller submitted it — a Finance user MAY execute his own order (no self-guard on loans; audited)."
+                },
+                "canExecute": {
+                  "type": "boolean",
+                  "description": "Finance of the PT."
+                },
+                "href": {
+                  "type": "string"
+                },
+                "anchor": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "key",
+                "id",
+                "loanId",
+                "companyId",
+                "docNo",
+                "title",
+                "amount",
+                "date",
+                "minDate",
+                "today",
+                "dueDate",
+                "fromAccount",
+                "toAccount",
+                "fromProject",
+                "toProject",
+                "note",
+                "reason",
+                "submittedBy",
+                "approvedAt",
+                "selfSubmitted",
+                "canExecute",
+                "href",
+                "anchor"
+              ]
+            }
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "count"
         ]
       },
       "ProjectLoanDetail": {
@@ -19901,7 +20654,28 @@ export const openapiDocument = {
             ]
           },
           "statusLabel": {
-            "type": "string"
+            "type": "string",
+            "description": "2026-10-24: \"Menunggu persetujuan Direktur\" / \"Menunggu persetujuan Owner\" per level; \"Disetujui – menunggu transfer Finance\" while the transfer order waits."
+          },
+          "approvalLevel": {
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [
+                  1
+                ]
+              },
+              {
+                "type": "number",
+                "enum": [
+                  2
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "2026-10-24 (#10): level a pending loan waits at — 1 Direktur, 2 Owner; null otherwise."
           },
           "overdue": {
             "type": "boolean",
@@ -19932,10 +20706,23 @@ export const openapiDocument = {
               "manual",
               "transfer"
             ],
-            "description": "ADR 0031: manual = PM → Direktur; transfer = automatic (Finance paid a project request from another account)."
+            "description": "ADR 0031: manual = PM / Finance → Direktur → Owner; transfer = automatic (Finance paid a project request from another account)."
           },
           "originLabel": {
-            "type": "string"
+            "type": "string",
+            "description": "\"Diajukan PM\" / \"Diajukan Finance\" / \"Otomatis dari transfer\"."
+          },
+          "submitterRole": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "pm",
+              "finance",
+              null
+            ],
+            "description": "2026-10-24 (#10): the creator filed as borrower PM or as Finance (null for an automatic loan; legacy loans = pm)."
           },
           "lenderProject": {
             "type": [
@@ -20087,7 +20874,7 @@ export const openapiDocument = {
           },
           "cashBacked": {
             "type": "boolean",
-            "description": "ADR 0031: money between two different accounts — disbursement and repayments post KK / KM."
+            "description": "ADR 0031: money between two known accounts (2026-10-24: also one shared account) — the transfer orders post KK / KM."
           },
           "disbursedAt": {
             "type": [
@@ -20119,7 +20906,14 @@ export const openapiDocument = {
           },
           "awaitingDisbursement": {
             "type": "boolean",
-            "description": "Approved, cash-backed, not yet disbursed by Finance (\"Disetujui – menunggu pencairan\")."
+            "description": "Approved, cash-backed, transfer order not executed yet (\"Disetujui – menunggu transfer Finance\")."
+          },
+          "transferQueueHref": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "2026-10-24 (#11): web \"Antrian Transfer\" anchor of the loan's transfer order while it waits."
           },
           "transfer": {
             "type": [
@@ -20279,7 +21073,7 @@ export const openapiDocument = {
                 "repay"
               ]
             },
-            "description": "edit/submit: creator PM (Draft); cancel: creator (Draft/Menunggu) or Direktur (Disetujui, no repayment, not disbursed, not automatic); approve/reject: Direktur pool (G1); disburse: Finance (approved cash-backed loan, once); repay: borrower PM / Finance — Finance only after the disbursement for a cash-backed loan."
+            "description": "edit/submit: creator (borrower PM / Finance, Draft); cancel: creator (Draft/Menunggu) or Direktur (Disetujui, no repayment, not transferred, not automatic); approve/reject: the pool of the CURRENT level (1 Direktur, 2 Owner; G1); disburse: Finance — execute the transfer order (web: in Antrian Transfer); repay: borrower PM / Finance — cash-backed: a repayment REQUEST after the transfer while `repayableAmount` > 0."
           },
           "disbursement": {
             "type": [
@@ -20309,6 +21103,14 @@ export const openapiDocument = {
           "mayVoidRepayment": {
             "type": "boolean"
           },
+          "repaymentNeedsApproval": {
+            "type": "boolean",
+            "description": "2026-10-24 (#12): cash-backed — a repayment is a request (Direktur → Owner → transfer order); else recorded at once."
+          },
+          "repayableAmount": {
+            "type": "integer",
+            "description": "Max of a new repayment: outstanding minus requests not executed yet."
+          },
           "today": {
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
@@ -20334,10 +21136,17 @@ export const openapiDocument = {
                     "integer",
                     "null"
                   ],
-                  "description": "\"Pengembalian ke-n\" among the posted repayments (null when void)."
+                  "description": "\"Pengembalian ke-n\" among the posted repayments (null otherwise)."
                 },
                 "repayDate": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Planned date while a request, the execution / record date once posted."
+                },
+                "plannedDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "amount": {
                   "type": "integer"
@@ -20351,14 +21160,50 @@ export const openapiDocument = {
                 "status": {
                   "type": "string",
                   "enum": [
+                    "pending_approval",
+                    "approved",
                     "posted",
-                    "void"
-                  ]
+                    "void",
+                    "rejected",
+                    "cancelled"
+                  ],
+                  "description": "posted = executed (cash-backed) / recorded (claim); pending_approval → approved → posted; rejected / cancelled / void final."
                 },
                 "statusLabel": {
                   "type": "string"
                 },
+                "approvalLevel": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "enum": [
+                        1
+                      ]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [
+                        2
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "voidReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "rejectReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "cancelReason": {
                   "type": [
                     "string",
                     "null"
@@ -20384,7 +21229,8 @@ export const openapiDocument = {
                   "required": [
                     "id",
                     "name"
-                  ]
+                  ],
+                  "description": "Recorded / submitted by."
                 },
                 "voidedBy": {
                   "type": [
@@ -20412,6 +21258,40 @@ export const openapiDocument = {
                   "type": [
                     "string",
                     "null"
+                  ]
+                },
+                "submittedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "executedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "executedBy": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
                   ]
                 },
                 "createdAt": {
@@ -20443,23 +21323,142 @@ export const openapiDocument = {
                     "kk",
                     "km"
                   ],
-                  "description": "ADR 0031: entry numbers of the repayment KK (borrower) / KM (lender); null for a claim or a voided repayment."
+                  "description": "ADR 0031: entry numbers of the repayment KK (borrower) / KM (lender); null for a claim, a request or a voided repayment."
+                },
+                "allowedActions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "approve",
+                      "reject",
+                      "cancel",
+                      "execute",
+                      "void"
+                    ]
+                  },
+                  "description": "approve/reject: the pool of the current level (G1: never the submitter); cancel: submitter (pending) or Finance / submitter (approved); execute: Finance (approved, in Antrian Transfer); void: posted (Direktur / Finance; Finance only when cash moved)."
+                },
+                "transferQueueHref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "decisions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "level": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "enum": [
+                              1
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      "levelLabel": {
+                        "type": "string",
+                        "description": "Direktur | Owner"
+                      },
+                      "actor": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "exclusiveMinimum": 0
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      },
+                      "decision": {
+                        "type": "string",
+                        "enum": [
+                          "approved",
+                          "rejected"
+                        ]
+                      },
+                      "reason": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "decidedAt": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "signatureSource": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "level",
+                      "levelLabel",
+                      "actor",
+                      "decision",
+                      "reason",
+                      "decidedAt",
+                      "signatureSource"
+                    ]
+                  }
                 }
               },
               "required": [
                 "id",
                 "seq",
                 "repayDate",
+                "plannedDate",
                 "amount",
                 "note",
                 "status",
                 "statusLabel",
+                "approvalLevel",
                 "voidReason",
+                "rejectReason",
+                "cancelReason",
                 "recordedBy",
                 "voidedBy",
                 "voidedAt",
+                "submittedAt",
+                "executedAt",
+                "executedBy",
                 "createdAt",
-                "cash"
+                "cash",
+                "allowedActions",
+                "transferQueueHref",
+                "decisions"
               ]
             }
           },
@@ -20471,6 +21470,26 @@ export const openapiDocument = {
                 "id": {
                   "type": "integer",
                   "exclusiveMinimum": 0
+                },
+                "level": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "enum": [
+                        1
+                      ]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [
+                        2
+                      ]
+                    }
+                  ]
+                },
+                "levelLabel": {
+                  "type": "string",
+                  "description": "Direktur | Owner"
                 },
                 "actor": {
                   "type": "object",
@@ -20522,6 +21541,8 @@ export const openapiDocument = {
               },
               "required": [
                 "id",
+                "level",
+                "levelLabel",
                 "actor",
                 "decision",
                 "reason",
@@ -20538,6 +21559,7 @@ export const openapiDocument = {
           "docNo",
           "status",
           "statusLabel",
+          "approvalLevel",
           "overdue",
           "overdueLabel",
           "daysOverdue",
@@ -20545,6 +21567,7 @@ export const openapiDocument = {
           "kindLabel",
           "origin",
           "originLabel",
+          "submitterRole",
           "lenderProject",
           "borrowerProject",
           "lenderCashAccount",
@@ -20553,6 +21576,7 @@ export const openapiDocument = {
           "disbursedAt",
           "disbursedBy",
           "awaitingDisbursement",
+          "transferQueueHref",
           "transfer",
           "amount",
           "repaidTotal",
@@ -20574,6 +21598,8 @@ export const openapiDocument = {
           "allowedActions",
           "disbursement",
           "mayVoidRepayment",
+          "repaymentNeedsApproval",
+          "repayableAmount",
           "today",
           "g1Note",
           "repayments",
@@ -20591,12 +21617,12 @@ export const openapiDocument = {
           "borrowerProjectId": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Project peminjam — the caller must be its PM (projects.pm, pk-pm)."
+            "description": "Project peminjam — the caller must be its PM (projects.pm, pk-pm) or Finance (pk-finance) of its PT (2026-10-24)."
           },
           "lenderProjectId": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Project pemberi pinjaman — same PT, ≠ borrower."
+            "description": "Project pemberi pinjaman — same PT, ≠ borrower (open project)."
           },
           "kind": {
             "type": "string",
@@ -20755,7 +21781,38 @@ export const openapiDocument = {
           }
         },
         "additionalProperties": false,
-        "description": "ADR 0031 \"Cairkan\" (Finance): KK on the lender's Pusat Biaya + KM on the borrower's, for the loan amount, once."
+        "description": "ADR 0031 \"Cairkan\" (Finance, kept for older APKs): the same execution as POST /project-loans/{id}/execute — KK on the lender's Pusat Biaya + KM on the borrower's, for the loan amount, once."
+      },
+      "ProjectLoanExecute": {
+        "type": "object",
+        "properties": {
+          "executeDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Date of the bank transfer = date of the KK / KM (default today, PT TZ; between the loan date and today)."
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "proofMediaId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "Optional transfer proof (media-attachments, an unclaimed upload of the caller) — stored on the KK."
+          },
+          "confirmOverdraft": {
+            "type": "boolean",
+            "description": "Confirm that the paying account goes below 0 (else 409 CASH_OVERDRAFT_CONFIRM_REQUIRED); audited."
+          }
+        },
+        "additionalProperties": false,
+        "description": "2026-10-24 (#11/#12): Finance executes a transfer order of \"Antrian Transfer\" — loan: KK lender account (lender project) + KM borrower account (borrower project); repayment: KK borrower + KM lender. One transaction."
       },
       "ProjectLoanRepaymentCreate": {
         "type": "object",
@@ -20764,12 +21821,12 @@ export const openapiDocument = {
             "type": "integer",
             "exclusiveMinimum": 0,
             "maximum": 1000000000000,
-            "description": "Nominal pengembalian (Rp, > 0, ≤ sisa pinjaman)."
+            "description": "Nominal pengembalian (Rp, > 0, ≤ sisa pinjaman; cash-backed: ≤ `repayableAmount`, the part not yet requested)."
           },
           "repayDate": {
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-            "description": "Default today (PT TZ); between the loan date and today."
+            "description": "Default today (PT TZ). Claim: between the loan date and today. Cash-backed loan (2026-10-24 #12): the PLANNED date of the request (≥ loan date, may be in the future)."
           },
           "note": {
             "type": [
@@ -20780,7 +21837,7 @@ export const openapiDocument = {
           },
           "confirmOverdraft": {
             "type": "boolean",
-            "description": "ADR 0031 (cash-backed loan): confirm that the borrower's account goes below 0 (else 409 CASH_OVERDRAFT_CONFIRM_REQUIRED); audited."
+            "description": "Ignored since 2026-10-24 (a cash-backed repayment is a request; the overdraft is confirmed at its execution). Kept for older APKs."
           }
         },
         "required": [
@@ -20853,7 +21910,7 @@ export const openapiDocument = {
                 "balance"
               ]
             },
-            "description": "The accounts behind \"Saldo dana\" (active, without a site)."
+            "description": "The accounts behind \"Saldo dana\" (every active account)."
           },
           "excludedSiteAccounts": {
             "type": "object",
@@ -22198,7 +23255,7 @@ export const openapiDocument = {
           "cashAccountId": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Source account of the PAYING PT: active, WITHOUT a site (the pool of the fund check)."
+            "description": "Source account of the PAYING PT: active (the pool of the fund check; no site exclusion since DRMS 24/10)."
           },
           "bankRef": {
             "type": "string",
@@ -22257,7 +23314,7 @@ export const openapiDocument = {
           "cashAccountId": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Source account of the PAYING PT: active, WITHOUT a site (the pool of the fund check)."
+            "description": "Source account of the PAYING PT: active (the pool of the fund check; no site exclusion since DRMS 24/10)."
           },
           "bankRef": {
             "type": "string",
@@ -22688,7 +23745,8 @@ export const openapiDocument = {
                           "code",
                           "name"
                         ]
-                      }
+                      },
+                      "description": "ADR 0032: always empty (sites removed; kept for APK ≤ 0.11.1)."
                     }
                   },
                   "required": [
@@ -22696,7 +23754,7 @@ export const openapiDocument = {
                     "costCenters",
                     "sites"
                   ],
-                  "description": "Selectable locations of a NEW assignment: active projects (not selesai / arsip), cost centers and sites of this PT, read with the caller's access."
+                  "description": "Selectable locations of a NEW assignment: active projects (not selesai / arsip) and cost centers of this PT, read with the caller's access."
                 }
               },
               "required": [
@@ -22749,9 +23807,10 @@ export const openapiDocument = {
           "pk-owner",
           "pk-principal",
           "pk-admin",
-          "pk-operator"
+          "pk-operator",
+          "pk-admin-staff"
         ],
-        "description": "Role in ONE PT (pk-owner = Direktur, pk-principal = Owner (ADR 0026), pk-operator = Operator/Anggota)."
+        "description": "Role in ONE PT (pk-owner = Direktur, pk-principal = Owner (ADR 0026), pk-operator = Operator/Anggota, pk-admin-staff = Admin Staff (ADR 0032))."
       },
       "UserOnboardingCreate": {
         "type": "object",
@@ -22850,7 +23909,7 @@ export const openapiDocument = {
                         "onsite",
                         "non_onsite"
                       ],
-                      "description": "DRMS 13/10 A2 \"Tipe absensi\": onsite (default for a new employee) = any registered location of the PT; non_onsite = head office + branch offices only."
+                      "description": "DRMS 13/10 A2 \"Tipe absensi\": onsite (default for a new employee) = inside the chosen registered location of the PT; non_onsite (ADR 0032) = inside any registered location of the PT (picked automatically, outside all refused)."
                     },
                     "active": {
                       "type": "boolean"
@@ -22910,7 +23969,7 @@ export const openapiDocument = {
                       "id": {
                         "type": "integer",
                         "exclusiveMinimum": 0,
-                        "description": "Existing assignment of this PT's employee: only roleInProject and endDate change (reason required). Omitted = a NEW assignment (exactly one of project / costCenter / site)."
+                        "description": "Existing assignment of this PT's employee: only roleInProject and endDate change (reason required). Omitted = a NEW assignment (exactly one of project / costCenter; ADR 0032: `site` is refused)."
                       },
                       "project": {
                         "type": "integer",
@@ -23073,7 +24132,7 @@ export const openapiDocument = {
                         "onsite",
                         "non_onsite"
                       ],
-                      "description": "DRMS 13/10 A2 \"Tipe absensi\": onsite (default for a new employee) = any registered location of the PT; non_onsite = head office + branch offices only."
+                      "description": "DRMS 13/10 A2 \"Tipe absensi\": onsite (default for a new employee) = inside the chosen registered location of the PT; non_onsite (ADR 0032) = inside any registered location of the PT (picked automatically, outside all refused)."
                     },
                     "active": {
                       "type": "boolean"
@@ -23133,7 +24192,7 @@ export const openapiDocument = {
                       "id": {
                         "type": "integer",
                         "exclusiveMinimum": 0,
-                        "description": "Existing assignment of this PT's employee: only roleInProject and endDate change (reason required). Omitted = a NEW assignment (exactly one of project / costCenter / site)."
+                        "description": "Existing assignment of this PT's employee: only roleInProject and endDate change (reason required). Omitted = a NEW assignment (exactly one of project / costCenter; ADR 0032: `site` is refused)."
                       },
                       "project": {
                         "type": "integer",
@@ -25841,7 +26900,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/submit": {
       "post": {
-        "summary": "Submit (number, rule snapshot, signatures Diajukan/Dibuat, flags). ADR 0029: the Owner's own request without approval goes straight to Finance — for a PT with the fund check on it is checked HERE: short → 409 code FUND_INSUFFICIENT (companyId, balance, commitments, available, needed, gap), the request stays Draft (audited fund_insufficient)",
+        "summary": "Submit (number, rule snapshot, signatures Diajukan/Dibuat, flags). D2410: a Reimburse needs at least one general attachment (attachmentIds) besides a receipt on every line → else 400 errors[attachmentIds]. ADR 0029: the Owner's own request without approval goes straight to Finance — for a PT with the fund check on it is checked HERE: short → 409 code FUND_INSUFFICIENT (companyId, balance, commitments, available, needed, gap), the request stays Draft (audited fund_insufficient)",
         "security": [
           {
             "bearer": []
@@ -26141,7 +27200,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/cancel": {
       "post": {
-        "summary": "Cancel (reason)",
+        "summary": "Cancel (reason, G7). D2410: only at the Finance stage (Pengajuan Baru / vendor / PT grup \"Disetujui\"; Reimburse \"Disetujui\" / \"Nota Terverifikasi\" / \"Revisi Nota\") and only by Finance / Direktur of the PT — also on their own request; anyone else → 403, other statuses (draft, waiting for approval: the requester withdraws instead) → 409",
         "security": [
           {
             "bearer": []
@@ -26191,6 +27250,156 @@ export const openapiDocument = {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ReasonBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Request after the action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseRequestDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/expense-requests/{id}/delete-draft": {
+      "post": {
+        "summary": "D2410 \"Hapus draft\": soft delete (ADR 0030 isDeleted, audit soft_delete) of an own Draft nobody ever decided on — never submitted, or withdrawn before any approval decision; reason optional. The number of a withdrawn draft is never reused; the deleted draft leaves every list and no longer blocks its vendor / PT grup invoice number. Not the creator / a requester → 403; a request in the flow or with a decision → 409",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptionalReasonBody"
               }
             }
           }
@@ -29769,17 +30978,6 @@ export const openapiDocument = {
             "required": false,
             "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
             "name": "company",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d{1,9}$",
-              "description": "ADR 0023: only the accounts flagged with this site."
-            },
-            "required": false,
-            "description": "ADR 0023: only the accounts flagged with this site.",
-            "name": "site",
             "in": "query"
           },
           {
@@ -33649,17 +34847,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "pattern": "^\\d{1,9}$",
-              "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card."
-            },
-            "required": false,
-            "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card.",
-            "name": "site",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -33718,154 +34905,6 @@ export const openapiDocument = {
                         ]
                       },
                       "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
-                    },
-                    "sites": {
-                      "type": "object",
-                      "properties": {
-                        "options": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "integer"
-                              },
-                              "companyId": {
-                                "type": "integer",
-                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
-                              },
-                              "code": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "active": {
-                                "type": "boolean"
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "companyId",
-                              "code",
-                              "name",
-                              "active"
-                            ]
-                          }
-                        },
-                        "selected": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        },
-                        "cash": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "siteId": {
-                                "type": [
-                                  "integer",
-                                  "null"
-                                ]
-                              },
-                              "companyId": {
-                                "type": [
-                                  "integer",
-                                  "null"
-                                ],
-                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
-                              },
-                              "code": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "balance": {
-                                "type": "integer",
-                                "description": "Rupiah (integer)"
-                              },
-                              "accounts": {
-                                "type": "integer"
-                              }
-                            },
-                            "required": [
-                              "siteId",
-                              "companyId",
-                              "code",
-                              "name",
-                              "balance",
-                              "accounts"
-                            ]
-                          }
-                        },
-                        "summary": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "siteId": {
-                                "type": [
-                                  "integer",
-                                  "null"
-                                ]
-                              },
-                              "companyId": {
-                                "type": [
-                                  "integer",
-                                  "null"
-                                ],
-                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
-                              },
-                              "code": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "balance": {
-                                "type": "integer",
-                                "description": "Rupiah (integer)"
-                              },
-                              "accounts": {
-                                "type": "integer"
-                              },
-                              "projectsRunning": {
-                                "type": "integer"
-                              },
-                              "attendanceToday": {
-                                "type": "integer",
-                                "description": "Employees with a check-in today at the site or a project of the site."
-                              },
-                              "disbursedMonth": {
-                                "type": "integer",
-                                "description": "K-05 net disbursed this month for the site's projects."
-                              }
-                            },
-                            "required": [
-                              "siteId",
-                              "companyId",
-                              "code",
-                              "name",
-                              "balance",
-                              "accounts",
-                              "projectsRunning",
-                              "attendanceToday",
-                              "disbursedMonth"
-                            ]
-                          },
-                          "description": "Per-site breakdown (only without a site filter)."
-                        }
-                      },
-                      "required": [
-                        "options",
-                        "selected",
-                        "cash",
-                        "summary"
-                      ],
-                      "description": "ADR 0023: empty lists when the PTs have no site."
                     },
                     "cash": {
                       "type": "object",
@@ -35477,7 +36516,6 @@ export const openapiDocument = {
                     "asOf",
                     "month",
                     "companies",
-                    "sites",
                     "cash",
                     "budget",
                     "completeness",
@@ -35565,17 +36603,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "pattern": "^\\d{1,9}$",
-              "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card."
-            },
-            "required": false,
-            "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card.",
-            "name": "site",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -35634,96 +36661,6 @@ export const openapiDocument = {
                         ]
                       },
                       "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
-                    },
-                    "sites": {
-                      "type": "object",
-                      "properties": {
-                        "options": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "integer"
-                              },
-                              "companyId": {
-                                "type": "integer",
-                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
-                              },
-                              "code": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "active": {
-                                "type": "boolean"
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "companyId",
-                              "code",
-                              "name",
-                              "active"
-                            ]
-                          }
-                        },
-                        "selected": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        },
-                        "cash": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "siteId": {
-                                "type": [
-                                  "integer",
-                                  "null"
-                                ]
-                              },
-                              "companyId": {
-                                "type": [
-                                  "integer",
-                                  "null"
-                                ],
-                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
-                              },
-                              "code": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "balance": {
-                                "type": "integer",
-                                "description": "Rupiah (integer)"
-                              },
-                              "accounts": {
-                                "type": "integer"
-                              }
-                            },
-                            "required": [
-                              "siteId",
-                              "companyId",
-                              "code",
-                              "name",
-                              "balance",
-                              "accounts"
-                            ]
-                          }
-                        }
-                      },
-                      "required": [
-                        "options",
-                        "selected",
-                        "cash"
-                      ],
-                      "description": "ADR 0023: per-site cash balance; empty without sites."
                     },
                     "transferQueue": {
                       "type": "object",
@@ -36748,7 +37685,6 @@ export const openapiDocument = {
                     "asOf",
                     "month",
                     "companies",
-                    "sites",
                     "transferQueue",
                     "reimburseToVerify",
                     "lpjToVerify",
@@ -36839,17 +37775,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "pattern": "^\\d{1,9}$",
-              "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card."
-            },
-            "required": false,
-            "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card.",
-            "name": "site",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -36908,53 +37833,6 @@ export const openapiDocument = {
                         ]
                       },
                       "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
-                    },
-                    "sites": {
-                      "type": "object",
-                      "properties": {
-                        "options": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "integer"
-                              },
-                              "companyId": {
-                                "type": "integer",
-                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
-                              },
-                              "code": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "active": {
-                                "type": "boolean"
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "companyId",
-                              "code",
-                              "name",
-                              "active"
-                            ]
-                          }
-                        },
-                        "selected": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "options",
-                        "selected"
-                      ],
-                      "description": "ADR 0023: site filter options (sites of the PM's PTs)."
                     },
                     "hasScope": {
                       "type": "boolean"
@@ -37973,7 +38851,6 @@ export const openapiDocument = {
                     "asOf",
                     "month",
                     "companies",
-                    "sites",
                     "hasScope",
                     "waitingForMe",
                     "teamWaiting",
@@ -38898,16 +39775,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "description": "ADR 0023: site id (kantor cabang) — narrows the scope (requests/projects through the project's site, cash through the account's site, attendance through the row's site); never widens."
-            },
-            "required": false,
-            "description": "ADR 0023: site id (kantor cabang) — narrows the scope (requests/projects through the project's site, cash through the account's site, attendance through the row's site); never widens.",
-            "name": "site",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -39662,16 +40529,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "description": "ADR 0023: site id (kantor cabang) — narrows the scope (requests/projects through the project's site, cash through the account's site, attendance through the row's site); never widens."
-            },
-            "required": false,
-            "description": "ADR 0023: site id (kantor cabang) — narrows the scope (requests/projects through the project's site, cash through the account's site, attendance through the row's site); never widens.",
-            "name": "site",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -40098,17 +40955,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "pattern": "^\\d{1,10}$",
-              "description": "ADR 0023: narrows to a site (its home-site employees and site assignments, attendance rows of the site)."
-            },
-            "required": false,
-            "description": "ADR 0023: narrows to a site (its home-site employees and site assignments, attendance rows of the site).",
-            "name": "site_id",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
               "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
             },
@@ -40208,7 +41054,7 @@ export const openapiDocument = {
     },
     "/attendance/locations": {
       "get": {
-        "summary": "DRMS 13/10 A2: registered check-in locations of the caller (own employee per selected PT): every location of the PT with a point (sites incl. head office, projects, cost centers; no assignment needed). OnSite must check in inside one; Non-OnSite has no location restriction (outside every location → \"Di luar area\" at employees[].referenceSite). Coordinates and radius only (no money). The APK matches the GPS fix against this list (auto-detect) and caches it for offline check-ins; the server re-validates each check-in",
+        "summary": "DRMS 13/10 A2: registered check-in locations of the caller (own employee per selected PT): every location of the PT with a point (projects, cost centers — ADR 0032: no site; no assignment needed). OnSite must check in inside the chosen one; Non-OnSite inside any of them (picked automatically; outside all → 409 OUTSIDE_GEOFENCE, no \"Di luar area\" any more). Coordinates and radius only (no money). The APK matches the GPS fix against this list (auto-detect) and caches it for offline check-ins; the server re-validates each check-in",
         "security": [
           {
             "bearer": []
@@ -40320,7 +41166,7 @@ export const openapiDocument = {
     },
     "/attendance/check-in": {
       "post": {
-        "summary": "Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED = location outside the PT of the employee, OUTSIDE_GEOFENCE (OnSite only; DRMS 13/10 A2: a Non-OnSite check-in outside every registered location is recorded \"Di luar area\", see the result), MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)",
+        "summary": "Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED = location outside the PT of the employee, OUTSIDE_GEOFENCE (OnSite: outside the chosen location; Non-OnSite, ADR 0032: outside every registered location of the PT), MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)",
         "security": [
           {
             "bearer": []
@@ -40578,9 +41424,251 @@ export const openapiDocument = {
         }
       }
     },
+    "/attendance/on-behalf/options": {
+      "get": {
+        "summary": "ADR 0032: Admin Staff (pk-admin-staff) — per PT of the selection where the caller holds the role: the active employees (own excluded; also those without an account, hasAccount false) and the registered check-in locations with their point. Names, codes and points only. The APK caches it for offline on-behalf items. DRMS 24/10: a PM (not Admin Staff of the PT) gets its TEAM only — employees assigned today to its team projects / cost centers and those team locations (web Absenkan karyawan)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "On-behalf options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceOnBehalfOptions"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attendance/on-behalf": {
+      "post": {
+        "summary": "ADR 0032: Admin Staff check-in / check-out ON BEHALF of an employee of its PT (also without an account) from the web. Photo of the employee first with POST /media/selfies (the caller's camera), GPS = the caller's; the employee's attendance-type rule is evaluated against that fix. Recorded with source admin (\"diabsenkan oleh Admin Staff\"), recorded_by = caller, reason. DRMS 24/10: a PM may record too, team-scoped (source pm; the employee assigned today to a team project / cost center, a team location — else FORBIDDEN). Gates and codes as /attendance/check-in, plus FORBIDDEN (no Admin Staff of the PT / own employee), COMPANY_MISMATCH (employee of another PT), NO_CHECK_IN, ALREADY_CHECKED_OUT",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceOnBehalfBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceCheckResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/attendance/{id}/correct": {
       "post": {
-        "summary": "US-15 T10 correction of one attendance time (PM of the team location or Admin; never own attendance; reason required; same local date). Creates an append-only correction; audit old → new",
+        "summary": "US-15 T10 correction of one attendance time (PM of the team location, Admin or — ADR 0032 — Admin Staff of the PT; never own attendance; reason required; same local date). Creates an append-only correction; audit old → new",
         "security": [
           {
             "bearer": []
@@ -42866,15 +43954,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "pattern": "^\\d+$"
-            },
-            "required": false,
-            "name": "site",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "maxLength": 100
             },
             "required": false,
@@ -44379,7 +45458,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/lpj/shortfall-approval": {
       "post": {
-        "summary": "Finance (not requester/creator): ask the re-approval of the NEW total of a verified LPJ whose shortfall exceeds approved + tolerance — approval rule of the request for that total (ADR 0013: Direktur \"Diketahui\" → Finance); within tolerance / running / already approved → 409",
+        "summary": "Finance (D2410: also the requester/creator — audited self_processed): ask the re-approval of the NEW total of a verified LPJ whose shortfall exceeds approved + tolerance — approval rule of the request for that total (ADR 0013: Direktur \"Diketahui\" → Finance); within tolerance / running / already approved → 409",
         "security": [
           {
             "bearer": []
@@ -46178,7 +47257,7 @@ export const openapiDocument = {
         }
       },
       "post": {
-        "summary": "FR1 Timesheet harian unit: one per unit and date (409 DUPLICATE_DATE), unit in an active contract unit of the kontrak_unit project on that date (409 NOT_IN_CONTRACT), HM photo required; HM start ≠ previous HM end → flag HM_GAP; updates the unit's last HM",
+        "summary": "FR1 Timesheet harian unit: one per unit and date (409 DUPLICATE_DATE), unit in an active contract unit of the kontrak_unit project on that date (409 NOT_IN_CONTRACT); report date at most 14 days back — the PM of the project / the Direktur any date of the contract period (D2410); HM optional, both or none, the HM photo required with HM (D2410); HM start ≠ the previous recorded HM end → flag HM_GAP; updates the unit's last HM",
         "security": [
           {
             "bearer": []
@@ -47736,7 +48815,7 @@ export const openapiDocument = {
     },
     "/projects/{id}/contract-units": {
       "get": {
-        "summary": "FR1 contract units of a project the caller may read; rate / minimum hours null unless Direktur, Finance or Admin of the PT",
+        "summary": "FR1 contract units of a project the caller may read; rate / minimum hours null unless Direktur, Finance or Admin of the PT; timesheetMinDate = the caller's earliest timesheet date on the project (D2410)",
         "security": [
           {
             "bearer": []
@@ -49715,17 +50794,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "pattern": "^\\d{1,10}$",
-              "description": "ADR 0023: only projects of this site (narrows the read scope)."
-            },
-            "required": false,
-            "description": "ADR 0023: only projects of this site (narrows the read scope).",
-            "name": "site",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -50019,7 +51087,7 @@ export const openapiDocument = {
     },
     "/sites": {
       "get": {
-        "summary": "ADR 0023: sites (kantor cabang) of the selected PTs (every member reads them; active only unless active=all) with the caller's flags home (Site penempatan), assigned (site assignment today) and team (PM on-behalf) — attendance location list",
+        "summary": "ADR 0023 sites — ADR 0032: sites are removed from the product; the endpoint stays for APK ≤ 0.11.1 and always answers an empty list",
         "security": [
           {
             "bearer": []
@@ -50337,7 +51405,7 @@ export const openapiDocument = {
         }
       },
       "post": {
-        "summary": "Create a Draft (PM of the borrower project only; others 403 + access_denied audit). Same PT only (400 COMPANY_MISMATCH); submit:true submits at once",
+        "summary": "Create a Draft (PM of the borrower project or Finance of its PT; others 403 + access_denied audit). Same PT only (400 COMPANY_MISMATCH); submit:true submits at once",
         "security": [
           {
             "bearer": []
@@ -50478,7 +51546,7 @@ export const openapiDocument = {
     },
     "/project-loans/inbox": {
       "get": {
-        "summary": "Loans waiting for the caller's decision (Direktur pool; the creator only under direktur_self); ?company= narrows",
+        "summary": "Loans waiting for the caller's decision at their level — Direktur (1) / Owner (2), G1 (the creator only under direktur_self, level 1) — plus repayment requests (`repayments`); ?company= narrows",
         "security": [
           {
             "bearer": []
@@ -50560,7 +51628,7 @@ export const openapiDocument = {
     },
     "/project-loans/options": {
       "get": {
-        "summary": "Create form options: borrower projects of the caller (PM) and lender projects of the same PT",
+        "summary": "Create form options: borrower projects of the caller (PM; Finance: every open project of its PTs) and lender projects of the same PT",
         "security": [
           {
             "bearer": []
@@ -50629,9 +51697,91 @@ export const openapiDocument = {
         }
       }
     },
+    "/project-loans/transfer-orders": {
+      "get": {
+        "summary": "2026-10-24 (#11/#12) \"Antrian Transfer\": approved cash-backed loans not transferred yet + approved repayment requests, in the selected PTs where the caller is Finance / Direktur (only Finance executes); ?company= narrows",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transfer orders",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLoanTransferOrders"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/project-loans/{id}": {
       "get": {
-        "summary": "Loan detail: repayments, Direktur decision, allowed actions, notes (PM peminjam = PM pemberi, direktur_self)",
+        "summary": "Loan detail: repayments (with their row actions), Direktur / Owner decisions, allowed actions, notes (PM peminjam = PM pemberi, direktur_self)",
         "security": [
           {
             "bearer": []
@@ -50719,7 +51869,7 @@ export const openapiDocument = {
         }
       },
       "patch": {
-        "summary": "Edit a Draft (creator PM)",
+        "summary": "Edit a Draft (creator: borrower PM / Finance)",
         "security": [
           {
             "bearer": []
@@ -50869,7 +52019,7 @@ export const openapiDocument = {
     },
     "/project-loans/{id}/submit": {
       "post": {
-        "summary": "Submit a Draft: number PJ/{COMPANY}/{YY}{MM}/#### issued, Direktur pool resolved (G1) → Menunggu persetujuan Direktur; 409 NO_DIREKTUR without an active Direktur",
+        "summary": "Submit a Draft: number PJ/{COMPANY}/{YY}{MM}/#### issued, both pools resolved (G1) → Menunggu persetujuan Direktur (level 1); 409 NO_DIREKTUR / NO_OWNER (no active Owner other than the creator) / SAME_PERSON",
         "security": [
           {
             "bearer": []
@@ -51160,7 +52310,7 @@ export const openapiDocument = {
     },
     "/project-loans/{id}/approve": {
       "post": {
-        "summary": "Direktur \"Setujui\" (one level). No cash entry is created (notional allocation, ADR 0022 §5)",
+        "summary": "\"Setujui\" at the current level: Direktur (level 1) → waits for the Owner; Owner (level 2) → Disetujui (a cash-backed loan becomes a transfer order). 403 wrong level / G1; 409 NO_OWNER at level 1 without an Owner left",
         "security": [
           {
             "bearer": []
@@ -51310,7 +52460,7 @@ export const openapiDocument = {
     },
     "/project-loans/{id}/reject": {
       "post": {
-        "summary": "Direktur \"Tolak\" (reason required)",
+        "summary": "\"Tolak\" at the current level (Direktur or Owner, reason required)",
         "security": [
           {
             "bearer": []
@@ -51460,7 +52610,7 @@ export const openapiDocument = {
     },
     "/project-loans/{id}/disburse": {
       "post": {
-        "summary": "ADR 0031 \"Cairkan\" (Finance): an approved cash-backed loan (money between two different Pusat Biaya) → KK on the lender account + KM on the borrower account, once",
+        "summary": "ADR 0031 \"Cairkan\" (Finance) — kept for older APKs: the same execution as /execute",
         "security": [
           {
             "bearer": []
@@ -51608,9 +52758,159 @@ export const openapiDocument = {
         }
       }
     },
+    "/project-loans/{id}/execute": {
+      "post": {
+        "summary": "2026-10-24 (#11) Finance executes the loan's transfer order: KK lender account (lender project) + KM borrower account (borrower project), one transaction, once; the submitter (Finance) may execute it (audited)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectLoanExecute"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/project-loans/{id}/repayments": {
       "post": {
-        "summary": "Record a repayment (borrower PM or Finance; Finance only — after the disbursement — when the loan moves cash; no approval; amount ≤ outstanding) → Sebagian kembali / Lunas",
+        "summary": "Repayment (borrower PM or Finance). Claim: recorded at once (no approval, ≤ outstanding) → Sebagian kembali / Lunas. Cash-backed (2026-10-24 #12): a REQUEST (≤ repayableAmount, planned date) → Direktur → Owner → transfer order",
         "security": [
           {
             "bearer": []
@@ -51917,9 +53217,645 @@ export const openapiDocument = {
         }
       }
     },
+    "/project-loans/{id}/repayments/{rid}/approve": {
+      "post": {
+        "summary": "2026-10-24 (#12) \"Setujui\" a repayment request at its level (Direktur 1 → Owner 2; G1: never the submitter); the Owner's approval makes it a transfer order",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "rid",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectLoanDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/project-loans/{id}/repayments/{rid}/reject": {
+      "post": {
+        "summary": "\"Tolak\" a repayment request at its level (reason required)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "rid",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectLoanReject"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/project-loans/{id}/repayments/{rid}/cancel": {
+      "post": {
+        "summary": "Cancel a repayment request (reason): the submitter while pending; Finance / the submitter once approved, before its execution",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "rid",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectLoanReason"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/project-loans/{id}/repayments/{rid}/execute": {
+      "post": {
+        "summary": "Finance executes an approved repayment order: KK borrower account (borrower project) + KM lender account (lender project); the repayment is posted and the loan Sebagian kembali / Lunas",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "rid",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectLoanExecute"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/fund-availability": {
       "get": {
-        "summary": "ADR 0029 §1 \"Dana tersedia\" of one PT = Σ balance of its ACTIVE accounts WITHOUT a site − commitments (approved-not-transferred requests, unpaid LPJ shortfalls, loans instructed with this PT as lender). Finance / Direktur / Owner of that PT within the selection (else 403 / COMPANY_NOT_ALLOWED)",
+        "summary": "ADR 0029 §1 \"Dana tersedia\" of one PT = Σ balance of its ACTIVE accounts − commitments (approved-not-transferred requests, unpaid LPJ shortfalls, loans instructed with this PT as lender). Finance / Direktur / Owner of that PT within the selection (else 403 / COMPANY_NOT_ALLOWED)",
         "security": [
           {
             "bearer": []
@@ -52824,7 +54760,7 @@ export const openapiDocument = {
     },
     "/intercompany-loans/{id}/disburse": {
       "post": {
-        "summary": "Finance of the LENDER executes the disbursement (never the instruction's creator: 403, G1; DB-checked). Re-check of the lender: \"Dana tersedia\" + this loan's reservation ≥ amount, else 409 code LOAN_LENDER_INSUFFICIENT (the instruction stays, the Owner gets icloan.lender_insufficient). Source account of the lender: active, without site, opening date, lock date (409 \"Periode … sudah ditutup\"), overdraft → 409 CASH_OVERDRAFT_CONFIRM_REQUIRED unless confirmOverdraft. Borrower: designated account (409 INTERCOMPANY_NO_ACCOUNT), its period of the date closed → 409 INTERCOMPANY_PERIOD_CLOSED. Writes KK (source intercompany) in the lender + automatic KM \"Antar PT\" in the borrower, paired in intercompany_links; status disbursed; icloan.disbursed to the Owner and the borrower's Finance + Direktur (the Owner then approves the short requests again — no automatic approval)",
+        "summary": "Finance of the LENDER executes the disbursement (never the instruction's creator: 403, G1; DB-checked). Re-check of the lender: \"Dana tersedia\" + this loan's reservation ≥ amount, else 409 code LOAN_LENDER_INSUFFICIENT (the instruction stays, the Owner gets icloan.lender_insufficient). Source account of the lender: active, opening date, lock date (409 \"Periode … sudah ditutup\"), overdraft → 409 CASH_OVERDRAFT_CONFIRM_REQUIRED unless confirmOverdraft. Borrower: designated account (409 INTERCOMPANY_NO_ACCOUNT), its period of the date closed → 409 INTERCOMPANY_PERIOD_CLOSED. Writes KK (source intercompany) in the lender + automatic KM \"Antar PT\" in the borrower, paired in intercompany_links; status disbursed; icloan.disbursed to the Owner and the borrower's Finance + Direktur (the Owner then approves the short requests again — no automatic approval)",
         "security": [
           {
             "bearer": []
@@ -54530,7 +56466,7 @@ export const openapiDocument = {
     },
     "/records/{collection}/{id}/delete": {
       "post": {
-        "summary": "Soft delete (isDeleted = true, reason, audit `soft_delete`): masters / projects nobody references (409 IN_USE / PROJECT_IN_USE + usage), requests only as a never-submitted Draft (409 NOT_A_DRAFT). Whoever may update the row; hard delete stays denied",
+        "summary": "Soft delete (isDeleted = true, reason, audit `soft_delete`): masters / projects nobody references (409 IN_USE / PROJECT_IN_USE + usage), requests only as a Draft nobody ever decided on (never submitted, or withdrawn before any decision — D2410; else 409 NOT_A_DRAFT). Whoever may update the row; hard delete stays denied",
         "security": [
           {
             "bearer": []

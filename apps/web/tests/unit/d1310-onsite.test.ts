@@ -5,12 +5,14 @@ import {
   ATTENDANCE_TYPE_LABEL,
   ATTENDANCE_TYPES,
   attendanceTypeOf,
+  CHECK_OUT_ELSEWHERE_FLAG,
   compareEligible,
   DEFAULT_ATTENDANCE_TYPE,
   detectArea,
   geofenceRequired,
   haversineM,
   insideGeofence,
+  NON_ONSITE_OUTSIDE,
   OUTSIDE_AREA_FLAG,
   OUTSIDE_AREA_LABEL,
   pickContaining,
@@ -34,28 +36,31 @@ describe('attendance type', () => {
     for (const v of ['onsite', null, undefined, '', 'x']) expect(attendanceTypeOf(v)).toBe('onsite')
   })
 
-  it('OnSite needs the fix inside the location; Non-OnSite has no location restriction', () => {
+  it('OnSite needs the fix inside the CHOSEN location; Non-OnSite inside any registered one (ADR 0032)', () => {
     expect(geofenceRequired('onsite')).toBe(true)
     expect(geofenceRequired('non_onsite')).toBe(false)
+    // history label of the 14–24/10 rows; a new Non-OnSite attendance outside every location is refused
     expect(OUTSIDE_AREA_LABEL).toBe('Di luar area')
+    expect(NON_ONSITE_OUTSIDE).toMatch(/Non-OnSite hanya bisa absen masuk \/ pulang di dalam area lokasi/)
+    expect(CHECK_OUT_ELSEWHERE_FLAG).toBe('CHECK_OUT_ELSEWHERE')
   })
 })
 
 describe('Non-OnSite resolution (pickContaining)', () => {
   const cands = [
-    { key: 'site:1', lat: P.lat, lng: P.lng, radiusM: 100 },
+    { key: 'project:1', lat: P.lat, lng: P.lng, radiusM: 100 },
     { key: 'project:7', lat: P.lat - 0.0004, lng: P.lng, radiusM: 120 },
   ]
   it('the requested location when the fix is inside it, even if another one is nearer', () => {
-    expect(pickContaining('site:1', cands, { lat: P.lat - 0.0003, lng: P.lng })!.key).toBe('site:1')
+    expect(pickContaining('project:1', cands, { lat: P.lat - 0.0003, lng: P.lng })!.key).toBe('project:1')
   })
   it('else the nearest registered location containing the fix (the request named another / none)', () => {
     expect(pickContaining('cost_center:9', cands, { lat: P.lat - 0.0003, lng: P.lng })!.key).toBe('project:7')
-    expect(pickContaining(null, cands, { lat: P.lat - 0.0001, lng: P.lng })!.key).toBe('site:1')
+    expect(pickContaining(null, cands, { lat: P.lat - 0.0001, lng: P.lng })!.key).toBe('project:1')
   })
-  it('outside every registered location → null ("Di luar area")', () => {
-    expect(pickContaining('site:1', cands, { lat: P.lat + 0.05, lng: P.lng })).toBeNull()
-    expect(pickContaining('site:1', [], { lat: P.lat, lng: P.lng })).toBeNull()
+  it('outside every registered location → null (ADR 0032: refused OUTSIDE_GEOFENCE)', () => {
+    expect(pickContaining('project:1', cands, { lat: P.lat + 0.05, lng: P.lng })).toBeNull()
+    expect(pickContaining('project:1', [], { lat: P.lat, lng: P.lng })).toBeNull()
   })
 })
 
@@ -111,15 +116,13 @@ describe('detectArea (auto-detect, nearest match)', () => {
 })
 
 describe('eligible list order', () => {
-  it('home site, head office, other sites, projects, cost centers; then by code', () => {
+  it('ADR 0032: projects, then cost centers; then by code (no site any more)', () => {
     const rows = [
       { kind: 'cost_center' as const, code: 'CC-1' },
       { kind: 'project' as const, code: 'P-2' },
-      { kind: 'site' as const, code: 'CAB-2' },
+      { kind: 'cost_center' as const, code: 'CC-0' },
       { kind: 'project' as const, code: 'P-1' },
-      { kind: 'site' as const, code: 'HO', isHeadOffice: true },
-      { kind: 'site' as const, code: 'CAB-9', home: true },
     ]
-    expect([...rows].sort(compareEligible).map((r) => r.code)).toEqual(['CAB-9', 'HO', 'CAB-2', 'P-1', 'P-2', 'CC-1'])
+    expect([...rows].sort(compareEligible).map((r) => r.code)).toEqual(['P-1', 'P-2', 'CC-0', 'CC-1'])
   })
 })

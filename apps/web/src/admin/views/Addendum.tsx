@@ -5,6 +5,7 @@ import React from 'react'
 import { hasRoleAny, relId } from '@/access/roles'
 import { AddendumForm } from '@/admin/components/addendum/AddendumForm'
 import { ConfirmAction } from '@/admin/components/addendum/ConfirmAction'
+import { DocSummaryProvider } from '@/admin/components/feedback/DocContext'
 import { ReasonAction } from '@/admin/components/kas/ReasonAction'
 import { ADDENDUM_STATUSES, ADDENDUM_STATUS_LABELS, type AddendumStatus } from '@/domain/addendum/rules'
 import { addendumDetail, addendumInbox, addendumProjectOptions, listAddenda, loadVisibleAddendum, type AddendumSummary } from '@/domain/addendum/service'
@@ -33,6 +34,11 @@ import { NoAccess } from './NoAccess'
 const READERS = ['pk-owner', 'pk-finance', 'pk-pm'] as const
 export const addendumHref = (id: number) => `/admin/addendum/detail/${id}`
 const addendumEditHref = (id: number) => `/admin/addendum/${id}/ubah`
+/** DRMS 24/10: the addendum as named in the popups (submit, approve, reject, cancel). */
+const addendumDoc = (a: Pick<AddendumSummary, 'id' | 'docNo' | 'project' | 'addition' | 'reason' | 'createdBy'>) => {
+  const docNo = a.docNo ?? `Draft addendum #${a.id}`
+  return { object: docNo, summary: [['Addendum RAB', docNo], ['Project', `${a.project.code} ${a.project.name}`], ['Tambahan', `+${rp(a.addition)}`], ['Diajukan', a.createdBy.name], ['Alasan', a.reason]] as const }
+}
 
 export const ADDENDUM_TONE: Record<AddendumStatus, PillTone> = { draft: 'none', pending_ack: 'wait', pending_approval: 'progress', approved: 'ok', rejected: 'bad', cancelled: 'none' }
 
@@ -318,7 +324,7 @@ export async function AddendumDetail(props: AdminViewServerProps) {
     ...(a.approvalRule?.skipped.some((s) => s.position === 'diketahui') ? [] : [{ key: 'ack', label: 'Direktur (Diketahui)', ...decided(a, 'diketahui') }]),
     ...Array.from({ length: a.approvalRule?.levels ?? 1 }, (_, i) => ({ key: `ap${i + 1}`, label: (a.approvalRule?.levels ?? 1) > 1 ? `Finance level ${i + 1}` : 'Finance', ...decided(a, 'approval', i + 1) })),
   ]
-  return (
+  const page = (
     <Frame props={props} name="addendum-detail">
       <DashHead title={title} note={`${a.project.code} ${a.project.name} · diajukan ${a.createdBy.name ?? '—'}`}>
         <div className="pk-kact">
@@ -454,6 +460,8 @@ export async function AddendumDetail(props: AdminViewServerProps) {
       </Bento>
     </Frame>
   )
+  // DRMS 24/10: every action of the page names the addendum in its popups
+  return <DocSummaryProvider {...addendumDoc(a)}>{page}</DocSummaryProvider>
 }
 
 type Detail = Awaited<ReturnType<typeof addendumDetail>>
@@ -526,9 +534,10 @@ export async function AddendumInboxSection({ req }: { req: PayloadRequest }) {
                     title={`Setujui ${r.docNo}?`}
                     description={r.step === 'approve' ? <>RAB {r.project.code} bertambah {rp(r.addition)} (sekarang {rp(r.budget.current)}).</> : <>Tambahan {rp(r.addition)} untuk {r.project.code}; berikutnya approval Finance.</>}
                     confirmLabel="Setujui"
+                    summary={addendumDoc(r).summary}
                     testId={`addendum-inbox-${r.step}-${r.id}`}
                   />
-                  <ReasonAction url={`/api/v1/budget-addenda/${r.id}/reject`} label="Tolak" title={`Tolak ${r.docNo}?`} description={<>Alasan dikirim ke PM pengaju.</>} confirmLabel="Tolak addendum" testId={`addendum-inbox-reject-${r.id}`} />
+                  <ReasonAction url={`/api/v1/budget-addenda/${r.id}/reject`} label="Tolak" title={`Tolak ${r.docNo}?`} description={<>Alasan dikirim ke PM pengaju.</>} confirmLabel="Tolak addendum" summary={addendumDoc(r).summary} testId={`addendum-inbox-reject-${r.id}`} />
                 </div>
               ),
             },

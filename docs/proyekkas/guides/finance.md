@@ -52,6 +52,10 @@ Direktur yang dibuat Admin/Finance atas namanya ditolak saat dikirim — minta D
   di layar** → Konfirmasi.
 - Anda tidak bisa memutuskan pengajuan yang Anda buat/ajukan sendiri; bila Anda satu-satunya Finance, posisi
   Approval otomatis dilewati dan tercatat "(tidak berlaku — pemohon)".
+- **Sejak 24 Okt 2026:** verifikasi nota, flag, LPJ dan penyelesaian selisih **boleh** Anda lakukan juga pada
+  pengajuan yang Anda buat/ajukan sendiri (sebelumnya harus Finance lain). Setiap tindakan itu tercatat di Log
+  perubahan / Riwayat sebagai **"diproses oleh pemohon sendiri"**. Persetujuan (PM/Direktur/Owner) tetap tidak boleh
+  oleh pemohon/pembuat.
 - Beberapa PT: keputusan memakai peran Anda **di PT pengajuan**; warna merah Dampak anggaran memakai ambang PT itu.
 
 ## 2. Reimburse: verifikasi nota
@@ -94,6 +98,10 @@ tanggalnya menentukan periode (tutup buku) — **No. referensi bank**, **Bukti**
   bila dana memang ada (tercatat di Audit Log).
 - Salah catat? **Void transfer** (di bagian "Transfer tercatat — dapat dibatalkan" atau di detail pengajuan) + alasan:
   KK dibalik, pengajuan kembali ke antrian.
+- **Batalkan pengajuan** (alasan wajib) hanya ada pada **tahap Finance** (sejak 24 Okt 2026): Pengajuan Baru /
+  pembayaran vendor / antar-PT **Disetujui**; Reimburse **Disetujui**, **Nota Terverifikasi** atau **Revisi Nota** —
+  di Antrian Transfer atau di bar aksi detail pengajuan (juga bila Anda sendiri pemohonnya; satu tombol). Sebelum itu
+  tidak ada pembatalan oleh siapa pun; pemohon menarik kembali ke Draft.
 - Reimburse **Ditransfer**: bila pemohon sudah menerima dana tetapi belum menekan **Konfirmasi selesai**, Anda bisa
   menekannya di detail pengajuan (di bawah "Tahapan saat ini: Pemohon … atau Finance"). Tanpa itu pengajuan ditutup otomatis
   setelah batas hari di Setting perusahaan.
@@ -160,7 +168,7 @@ Owner memerintahkan pinjaman dari PT yang punya dana ke PT yang kurang (nomor `P
 KK di PT pembayar, **KM "Antar PT" otomatis** di rekening penerimaan antar-PT PT penerima — keduanya bukan biaya.
 
 1. **Pencairan (Finance PT pemberi):** **Antrian Transfer** → bagian **"Pencairan pinjaman antar-PT"** (atau Keuangan →
-   Pinjaman antar-PT → detail) → pilih akun sumber (rekening kantor pusat, **bukan** akun site), tanggal & jam sesuai
+   Pinjaman antar-PT → detail) → pilih akun sumber (rekening kantor pusat, **bukan** akun kas cabang lama yang ditandai site), tanggal & jam sesuai
    bukti, no. referensi, bukti → **Catat pencairan**. Nilai = nilai perintah. Ditolak bila:
    - Anda sendiri yang memerintahkan (G1) — minta Finance lain;
    - dana tersedia PT Anda kini kurang (*"Dana tersedia PT … kurang untuk pencairan"*) — perintah tetap menunggu, Owner
@@ -179,7 +187,7 @@ KK di PT pembayar, **KM "Antar PT" otomatis** di rekening penerimaan antar-PT PT
    "Pinjaman antar-PT diberikan / diterima", "Pengembalian pinjaman antar-PT diterima", "Pembayaran hutang antar-PT";
    baris Kas menampilkan nomor PJA dan PT lawannya.
 5. **Cek dana di persetujuan:** bila PT Anda menyalakan "Cek dana saat persetujuan", panel **Ketersediaan dana PT** di
-   pengajuan menunjukkan saldo (tanpa akun site), komitmen dan dana tersedia; pengajuan disetujui yang lama tidak
+   pengajuan menunjukkan saldo (tanpa akun kas cabang lama bertanda site), komitmen dan dana tersedia; pengajuan disetujui yang lama tidak
    ditransfer tetap menahan dana — transfer atau batalkan. Sejak 0.19.1 panel juga menampilkan **pusat biaya**
    project (dana bebas akun itu). Pengajuan lolos bila pusat biaya **atau** PT cukup. Baris di bawah angka
    menyebut dari akun mana Anda membayar: pusat biaya sendiri, atau akun lain (pinjaman antar project otomatis).
@@ -264,6 +272,11 @@ TOTAL). **Kop** laporan dan file unduhan: satu PT = kop PT itu; beberapa PT = ko
 
 ## 8. Lain-lain
 
+- **Filter daftar (sejak 24 Okt 2026):** tanpa filter semua pilihan tampil **dicentang**; kotak **Semua** di atas daftar
+  pilihan mencentang semuanya (atau mengosongkan); semua dicentang = tanpa filter. Status **Menunggu persetujuan Owner**
+  tersedia di Keuangan › Pengajuan Biaya dan Laporan › Rekap Pengajuan; **Menunggu persetujuan Direktur** berarti
+  pengajuan menunggu langkah lain (Direktur / alur lama). Tautan Beranda "Pengajuan menunggu" mencentang keduanya.
+
 - **Pengajuan atas nama karyawan:** **+ Buat pengajuan** → Diajukan Oleh = karyawan tersebut (Anda tercatat
   sebagai "Dibuat Oleh"). Beri tahu karyawan secara langsung (tidak ada notifikasi otomatis).
 - **Addendum RAB:** setelah Direktur setuju, addendum masuk **Persetujuan** Anda → **Setujui (Finance)** / Tolak.
@@ -279,9 +292,31 @@ TOTAL). **Kop** laporan dan file unduhan: satu PT = kop PT itu; beberapa PT = ko
   pusat biaya project, lalu kas keluar transfer dari pusat biaya. PM project dan Direktur diberi tahu.
 - Project yang **belum dipetakan** ke pusat biaya tidak bisa ditransfer (*project belum dipetakan* di antrian) — minta
   Direktur / Admin / PM mengisi pusat biaya di data project.
-- **Pinjaman antar project (PJ) dana** antara dua pusat biaya berbeda: setelah Direktur menyetujui, buka pinjaman →
-  **Cairkan** (kas keluar dari pusat biaya pemberi, kas masuk ke pusat biaya peminjam). Pengembaliannya dicatat Finance
-  (kas keluar dari peminjam, kas masuk ke pemberi); *Void* pengembalian membuat jurnal baliknya. Pinjaman barang, atau
-  dua project dengan pusat biaya sama, tetap tanpa transaksi kas.
+- **Pinjaman antar project (PJ) dana:** lihat bagian berikut (sejak 24 Okt 2026 lewat Antrian Transfer; tombol
+  *Cairkan* di halaman pinjaman diganti tautan ke antrian). Pinjaman barang tetap tanpa transaksi kas.
 - **Batalkan transfer** yang dibayar dari akun lain ikut membatalkan pinjaman otomatisnya (kas keluar/masuknya dibalik);
-  tidak bisa selama pinjaman itu sudah punya pengembalian (void pengembaliannya dulu).
+  tidak bisa selama pinjaman itu sudah punya pengembalian (void pengembaliannya dulu) atau pengajuan pengembalian yang
+  belum selesai.
+
+## Pinjaman antar project: ajukan, Antrian Transfer, pengembalian (sejak 24 Okt 2026)
+
+- **Mengajukan:** Finance boleh mengajukan pinjaman antar project (selain PM project peminjam): **Keuangan → Pinjaman
+  antar project → + Ajukan pinjaman** (web) atau menu Pinjaman di APK. Pilih project peminjam dan project pemberi (semua
+  project aktif PT Anda), jenis, nilai, jatuh tempo, alasan → **Ajukan ke Direktur**. PM project peminjam diberi tahu.
+- **Persetujuan:** Direktur (level 1) lalu **Owner** (level 2); penolakan dengan alasan di level mana pun. Pengaju
+  tidak pernah memutuskan. PT tanpa Owner aktif: pengajuan ditolak ("belum punya Owner aktif").
+- **Antrian Transfer → "Transfer pinjaman antar project":** setelah Owner menyetujui, pinjaman **dana** muncul sebagai
+  perintah transfer. Isi **Tanggal transfer** (antara tanggal pinjaman dan hari ini), catatan dan bukti (opsional) →
+  **Eksekusi transfer**. Tercatat sekaligus: **kas keluar** di pusat biaya pemberi (ditandai project pemberi) dan **kas
+  masuk** di pusat biaya peminjam (ditandai project peminjam). Akun mengikuti pusat biaya saat disetujui. Bila kedua
+  project memakai pusat biaya yang sama, keduanya tercatat di akun itu (saldo akun tetap; buku kas tiap project
+  menampilkannya). Saldo akun jadi minus → konfirmasi seperti biasa.
+- **Pengajuan Anda sendiri boleh Anda eksekusi** (tidak ada larangan Finance yang sama untuk pinjaman; tercatat di
+  audit, ada catatan "Anda yang mengajukan").
+- **Pengembalian pinjaman dana** = pengajuan: PM project peminjam atau Finance → detail pinjaman → **Ajukan
+  pengembalian** (nominal ≤ sisa yang belum diajukan, rencana tanggal, catatan) → Direktur → Owner → muncul di Antrian
+  Transfer → **Eksekusi transfer**: kas keluar di pusat biaya peminjam, kas masuk di pemberi; status pinjaman Sebagian
+  kembali / Lunas. Pengajuan yang menunggu dibatalkan pengajunya; yang sudah disetujui dapat Anda **Batalkan** (alasan)
+  sebelum dieksekusi. *Void* pengembalian yang sudah ditransfer membuat jurnal baliknya (Finance).
+- **Pinjaman barang/material:** tetap tanpa kas; pengembalian dicatat langsung (PM peminjam atau Finance).
+- APK: bagian yang sama di **Antrian Transfer** (eksekusi tanpa unggah bukti — bukti dapat ditambahkan lewat web).

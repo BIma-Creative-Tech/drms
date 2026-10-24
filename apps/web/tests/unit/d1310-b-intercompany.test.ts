@@ -356,7 +356,8 @@ describe('GET /me capability intercompanyPayment (gap: /me lists EFFECTIVE roles
   it('per PT: Finance / PM / Direktur (stored) → true; Owner-only → false although his effective roles hold pk-owner', () => {
     expect(rolesIn(req, 1)).toContain('pk-owner')
     // ADR 0029: + instructIntercompanyLoan (stored Owner), disburseIntercompanyLoan (stored Finance), fundCheckEnabled
-    expect(cap(1)).toEqual({ ...capabilitiesOf(rolesIn(req, 1)), intercompanyPayment: false, instructIntercompanyLoan: true, disburseIntercompanyLoan: false, fundCheckEnabled: false })
+    // ADR 0032: + attendanceOnBehalf / attendanceAdminStaff (PM or Admin Staff)
+    expect(cap(1)).toEqual({ ...capabilitiesOf(rolesIn(req, 1)), intercompanyPayment: false, instructIntercompanyLoan: true, disburseIntercompanyLoan: false, fundCheckEnabled: false, attendanceOnBehalf: false, attendanceAdminStaff: false })
     expect(cap(1).approvalInbox).toBe(true) // every other Direktur hint stays
     expect([2, 3, 4, 6].map((c) => cap(c).intercompanyPayment)).toEqual([true, true, true, true])
     expect(cap(5).intercompanyPayment).toBe(false) // Staff + Admin

@@ -29,6 +29,8 @@ const fundRead = kasFigureRead('approvals')
  * settlement's request. Office roles read them through the `company` predicate of byVisibleRequest.
  * ADR 0022: rows of an inter-project loan carry docType `project_loan` + `loan` (one Direktur decision; G1 = the
  * loan's creator, except the recorded `direktur_self` case).
+ * 2026-10-24 (DRMS 24/10 #10/#12): a loan has TWO levels (1 Direktur, 2 Owner); a repayment request of a cash-backed
+ * loan carries docType `project_loan_repayment` + `loanRepayment` (same two levels, G1 = its submitter, no exception).
  * ADR 0025: a designated representative deciding a Direktur step signs with the PT's definitive Direktur signature
  * (`signatureSource = company`, `representedDirektur` snapshot, `actorName` = the Direktur); `actor` = the real user.
  */
@@ -38,8 +40,10 @@ const readAccess: Access = async (args) => {
   // office roles: rows of their PTs (inside byVisibleRequest); others: visible requests / addenda
   const byRequest = await byVisibleRequest('request')(args)
   const byAddendum = inIds('addendum', await visibleAddendumIds(req))
-  const byLoan = inIds('loan', await visibleLoanIds(req)) // ADR 0022: Direktur decisions on inter-project loans
-  const or = [byRequest, byAddendum, byLoan].filter((w): w is Where => typeof w === 'object' && w !== null)
+  const loans = await visibleLoanIds(req)
+  const byLoan = inIds('loan', loans) // ADR 0022: Direktur decisions on inter-project loans
+  const byRepayment = inIds('loanRepayment.loan', loans) // 2026-10-24 (#12): decisions on repayment requests of those loans
+  const or = [byRequest, byAddendum, byLoan, byRepayment].filter((w): w is Where => typeof w === 'object' && w !== null)
   if (byRequest === true) return true
   return or.length === 0 ? false : or.length === 1 ? or[0]! : { or }
 }
@@ -50,14 +54,15 @@ export const Approvals: CollectionConfig = {
   admin: { group: 'Keuangan', defaultColumns: ['request', 'position', 'level', 'actorName', 'decision', 'decidedAt'] },
   access: { read: readAccess, create: denyAll, update: denyAll, delete: denyDeleteLogged('approval') },
   lockDocuments: false,
-  hooks: { beforeChange: [companyHook('approvals', { derive: [{ field: 'request', collection: 'expense-requests' }, { field: 'addendum', collection: 'budget-addenda' }, { field: 'settlement', collection: 'settlements' }, { field: 'loan', collection: 'project-loans' }] })] },
+  hooks: { beforeChange: [companyHook('approvals', { derive: [{ field: 'request', collection: 'expense-requests' }, { field: 'addendum', collection: 'budget-addenda' }, { field: 'settlement', collection: 'settlements' }, { field: 'loan', collection: 'project-loans' }, { field: 'loanRepayment', collection: 'project-loan-repayments' }] })] },
   fields: [
     companyField({ derived: true }),
-    { name: 'docType', type: 'select', required: true, defaultValue: 'expense_request', options: ['expense_request', 'budget_addendum', 'expense_shortfall', 'project_loan'].map((v) => ({ label: v, value: v })), admin: ro },
+    { name: 'docType', type: 'select', required: true, defaultValue: 'expense_request', options: ['expense_request', 'budget_addendum', 'expense_shortfall', 'project_loan', 'project_loan_repayment'].map((v) => ({ label: v, value: v })), admin: ro },
     { name: 'request', type: 'relationship', relationTo: 'expense-requests', label: 'Pengajuan', index: true, admin: ro },
     { name: 'addendum', type: 'relationship', relationTo: 'budget-addenda', label: 'Addendum RAB', index: true, admin: ro },
     { name: 'settlement', type: 'relationship', relationTo: 'settlements', label: 'LPJ (persetujuan kekurangan)', index: true, admin: ro },
     { name: 'loan', type: 'relationship', relationTo: 'project-loans', label: 'Pinjaman antar project', index: true, admin: ro },
+    { name: 'loanRepayment', type: 'relationship', relationTo: 'project-loan-repayments', label: 'Pengembalian pinjaman', index: true, admin: ro },
     { name: 'cycle', type: 'number', label: 'Siklus', required: true, admin: ro },
     { name: 'position', type: 'select', label: 'Posisi', required: true, options: APPROVAL_POSITIONS.map((v) => ({ label: v, value: v })), admin: ro },
     { name: 'level', type: 'number', label: 'Level', required: true, defaultValue: 0, admin: ro },

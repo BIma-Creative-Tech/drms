@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation'
 import React, { useId, useRef, useState } from 'react'
 
 import { postJson, problemText } from './ActionButton'
+import { asConfirmLabel, asConfirmTitle, failureTitle, showResult, successTitle } from './feedback/feedback'
 import { KAS_STYLE } from './kas/style'
 
 /**
@@ -12,6 +13,7 @@ import { KAS_STYLE } from './kas/style'
  * row). The state comes from the server (PkListView → `rowData._pkRow`); every endpoint re-checks. Native modal
  * <dialog> like ActionDialog (focus trap, Esc, focus back), reason required where something changes, one
  * Idempotency-Key per opened dialog + body. Clicks inside do not open the row (ClickableRow ignores buttons/dialogs).
+ * DRMS 24/10: the dialog is the confirmation ("Yakin ingin hapus …?", [Ya, hapus]); the result popup follows.
  */
 export type RowRecordActionKind = 'hapus' | 'batalkan' | 'nonaktifkan' | 'pulihkan'
 
@@ -104,15 +106,20 @@ export function RowRecordAction({ collection, id, name, action, editHref }: Prop
     try {
       const r = await postJson(url, { reason: v }, { idempotencyKey: key.current })
       if (!r.ok) {
-        setError(problemText(r.data, r.status))
+        const msg = problemText(r.data, r.status)
+        setError(msg)
+        showResult({ ok: false, title: failureTitle(confirmLabel), message: msg, testId: `row-${action}` })
         const blocking = (r.data as { blocking?: PlanItem[] } | null)?.blocking
         if (isProjectCancel && Array.isArray(blocking) && plan) setPlan({ ...plan, blocking })
         return
       }
       ref.current?.close()
+      showResult({ ok: true, title: successTitle(confirmLabel, name), message: action === 'pulihkan' ? 'Data kembali tampil di daftar dan pemilih.' : null, testId: `row-${action}` })
       router.refresh()
     } catch {
-      setError('Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+      const msg = 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.'
+      setError(msg)
+      showResult({ ok: false, title: failureTitle(confirmLabel), message: msg, testId: `row-${action}` })
     } finally {
       setBusy(false)
     }
@@ -182,7 +189,7 @@ export function RowRecordAction({ collection, id, name, action, editHref }: Prop
       <dialog ref={ref} className="pk-dlg" aria-labelledby={`${uid}-t`} onCancel={(e) => busy && e.preventDefault()} data-pk-dialog={`row-${action}`}>
         <div style={{ display: 'grid', gap: 14, padding: 20, whiteSpace: 'normal', textAlign: 'left' }}>
           <h2 id={`${uid}-t`} style={{ margin: 0, fontSize: 18, lineHeight: 1.3 }}>
-            {title}
+            {action === 'nonaktifkan' ? title : asConfirmTitle(title)}
           </h2>
           {body}
           {canConfirm ? (
@@ -225,7 +232,7 @@ export function RowRecordAction({ collection, id, name, action, editHref }: Prop
             ) : null}
             {canConfirm ? (
               <button type="button" className={`pk-kbtn ${action === 'pulihkan' ? 'primary' : 'danger-solid'}`} onClick={() => void confirm()} disabled={busy} data-pk-confirm={`row-${action}`}>
-                {busy ? 'Memproses…' : confirmLabel}
+                {busy ? 'Memproses…' : asConfirmLabel(confirmLabel)}
               </button>
             ) : null}
           </div>

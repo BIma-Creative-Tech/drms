@@ -144,6 +144,17 @@ final fieldContractUnitsProvider = FutureProvider.autoDispose.family<List<FieldC
   return ref.watch(fieldRepositoryProvider).contractUnits(sub, projectId);
 });
 
+/// Earliest date of a new timesheet on a project for the signed-in user (user 2026-10-24): the server's
+/// `timesheetMinDate` of the last contract-units pull — PM project / Direktur: the whole contract period — else
+/// today − 14 (`timesheetMinDate` of field_rules; also when the server is older or the cache was never filled).
+final fieldTimesheetMinDateProvider = FutureProvider.autoDispose.family<String, int>((ref, projectId) async {
+  final today = ref.watch(fieldTodayProvider);
+  final sub = ref.watch(currentSubProvider);
+  if (sub == null) return timesheetMinDate(today, null);
+  ref.watch(fieldCacheRevisionProvider);
+  return timesheetMinDate(today, await ref.watch(fieldRepositoryProvider).timesheetMinDate(sub, projectId));
+});
+
 /// Open POs of a customer in an aftersales project (cache; value never shown here).
 final fieldOpenPosProvider = FutureProvider.autoDispose.family<List<FieldOpenPo>, (int, int?)>((ref, key) async {
   final sub = ref.watch(currentSubProvider);

@@ -9,6 +9,7 @@ import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../companies/presentation/company_chip.dart';
@@ -341,10 +342,12 @@ class _CorrectionDialogState extends ConsumerState<CorrectionDialog> {
             idempotencyKey: _key,
           );
       if (!mounted) return;
-      showSnack(context, t.correctionSaved);
-      Navigator.of(context).pop(true);
+      await showActionResult(context, message: t.correctionSaved, action: t.correctionSaveAction);
+      if (mounted) Navigator.of(context).pop(true);
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (!mounted) return;
+      setState(() => _error = e.message);
+      await showActionError(context, e, action: t.correctionSaveAction);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -398,7 +401,7 @@ class _CorrectionDialogState extends ConsumerState<CorrectionDialog> {
         FilledButton(
           key: const Key('correction-save'),
           onPressed: _busy || !online ? null : _submit,
-          child: Text(t.save),
+          child: Text(t.confirmActionYes(actionPhrase(t.correctionSaveAction))),
         ),
       ],
     );

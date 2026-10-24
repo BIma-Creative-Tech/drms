@@ -6,6 +6,217 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**Client feedback 24/10 (D2410): five streams integrated in one release on top of 0.19.3** (0.19.2/0.19.3 = security releases,
+already released). Ten stream migrations (+ two follow-ups below), run in timestamp order:
+`20261024_100000_d2410_timesheet_hm_optional`, `_200000_d2410_site_assignments`, `_210000_d2410_admin_staff_enums`,
+`_210100_d2410_admin_staff_guard`, `_300000_d2410_self_processed_enum`, `_300100_d2410_finance_self_lpj`,
+`_400000_d2410_loan_enums`, `_400100_d2410_loan_schema`, `_400200_d2410_loan_data`, `_400300_d2410_loan_guard`. The
+latest snapshot (`20261024_400100_d2410_loan_schema.json`) carries every schema change of the five streams. API contract
+version stays 0.19.3 until the release (additive / relaxed changes only). APK: drift schema 12; new APK needed for
+Lampiran, HM optional, Admin Staff on-behalf, loan transfer orders and the popups (older APKs keep working, see each
+stream).
+
+### Follow-up decisions (user, 2026-10-24)
+
+Two more migrations: `20261024_500000_d2410_site_accounts_fund` (data + functions) and
+`20261024_510000_d2410_delete_draft_invoice` (indexes); no schema snapshot change.
+
+- **Funds without the site exclusion** (every project is mapped to a cash account): `pk_fund_balance` and the inter-PT
+  loan transfer guard count / accept every active account of the PT; the migration clears every legacy
+  `cash_accounts.site_id` (one audit row per account, source `system`, NOTICE; `down()` restores them). Service,
+  inter-PT loan source lists (web + APK) and the fund panel ("akun kas cabang (site lama) … tidak dihitung" removed, web
+  and APK) follow; `excludedSiteAccounts` stays in the API, always 0. ADR 0029 / 0031 amendments, ADR 0032 §4 decided.
+- **"Hapus draft"**: the creator / requester soft-deletes (ADR 0030) a Draft nobody ever decided on — never submitted or
+  withdrawn before any decision — with `POST /expense-requests/{id}/delete-draft` (reason optional, audited
+  `soft_delete`, action `delete_draft`); the number is never reused; the draft leaves every list and no longer blocks
+  its vendor / PT grup invoice number (duplicate checks + partial unique indexes skip deleted rows). Web button in the
+  requester panel (confirm popup, danger), APK button on a server draft; sync `draft_delete` of a numbered draft
+  soft-deletes it (flag `DELETED`) instead of `NOT_EDITABLE`. ADR 0030 amendment.
+- **Web "Absensi → Absenkan karyawan" for the PM**, team-scoped like the APK PM on-behalf: options = employees assigned
+  today to the PM's team projects / cost centers and those team locations; `POST /attendance/on-behalf` records source
+  `pm` and refuses a non-member (403); the Admin Staff stays PT-wide. ADR 0032 open question 3 decided.
+- `npm run check:openapi` prints the first differing line on drift.
+
+### Timesheet unit
+
+**Timesheet unit: backdate for PM / Direktur, HM weekly (client feedback 24/10, ADR 0020 amendment 2026-10-24).** One
+migration (`20261024_100000_d2410_timesheet_hm_optional`: `unit_timesheets.hm_start` / `hm_end` nullable + CHECK
+`unit_timesheets_hm_pair`; additive for the 0.19 image). API contract: additive / relaxed (nullable HM, new
+`timesheetMinDate`). Old APKs (always HM + photo) keep working; the APK changes ship with the next APK.
+
+#### Added
+- `GET /projects/{id}/contract-units` returns the caller's `timesheetMinDate` (APK date picker).
+- Weekly HM per unit (weeks Monday–Sunday overlapping the month): HM awal, HM akhir, total HM, days with HM — web
+  contract tab **Rekap** (card "HM mingguan") and report `rekap-timesheet-kontrak` (sheet "HM mingguan per unit").
+- `PATCH /unit-timesheets/{id}`, `POST …/corrections` and the sync edit accept the HM photo (`hmPhotoId` /
+  `hm_photo_media_id`) for a timesheet that has none; a stored photo is never replaced (REST 400 `PHOTO_LIMIT`, sync
+  ignores it).
+
+#### Changed
+- The PM of the project (`projects.pm`) and the Direktur may file a timesheet for any past date inside the contract
+  unit's period (REST + sync); field reporters keep 14 days. Web matrix: "+" only on days the caller may fill, older
+  missing days show "!" with the reason; the timesheet form keeps `?tanggal=` (visible notice when not allowed, no
+  silent switch to today) and preselects `?unit=` when active on that date.
+- HM awal / HM akhir and the HM photo are optional on the daily timesheet (HM read about once a week): both or none,
+  HM akhir ≥ HM awal, photo only with HM; work hours stay required. An edit / correction may clear the HM (null).
+- HM_GAP compares with the previous timesheet **with HM**; the unit's last HM and the service-report HM reference skip
+  timesheets without HM; HM awal prefill = last recorded HM akhir (web lookup 60 days, else the unit's last HM).
+- Monthly "HM awal → akhir" = first / last recorded reading; report **Total HM** is empty (not 0) without readings;
+  the daily detail shows empty HM cells for days without HM.
+- `UnitTimesheet.hmStart/hmEnd/hmUsed` and sync copy `hm_start/hm_end` are nullable.
+- APK: date picker window from `timesheetMinDate`; HM optional (both or none, photo only with HM, untouched prefill not
+  sent); edit may add the missing HM photo; drift schema 12 (`field_recent_timesheets` HM nullable, cache rebuilt);
+  l10n `fieldHmOptional`, `fieldTimesheetBackdateWide`.
+
+### Absensi and Admin Staff
+
+**Absensi: site dihapus, Non-OnSite hanya di lokasi terdaftar, role Admin Staff (ADR 0032, user 2026-10-24).** Four
+migrations (`20261024_200000_d2410_site_assignments` data, `_210000_d2410_admin_staff_enums` + snapshot,
+`_210100_d2410_admin_staff_guard`). No table or column is dropped. API: `/api/v1/sites` and masters `sites` stay for
+APK ≤ 0.11.1 (empty / tombstones).
+
+#### Removed
+- Sites (ADR 0023) from the product: Site master menu / form / create, "Buat site dari pusat biaya", "Site penempatan"
+  on Data Karyawan, Site on Project / Akun kas / Penugasan tim (form, list column, filter), the Site filter on Tim hari
+  ini, rekap, reports and Kas, the dashboard Site filter and the cards "Saldo kas per site" / "Ringkasan per site",
+  `/me` `employee.homeSite`, `ProjectListItem.site`, `?site=` on reports, dashboards, `/projects`,
+  `/cash-accounts/balances` and Kas, `lookups.sites`. APK: site in profile, project detail, onboarding, masters.
+- The "Di luar area" check-in of Karyawan Non-OnSite (new records only; the label stays for existing rows).
+
+#### Changed
+- Attendance locations are projects (and cost centers with a point); a site check-in from an old APK is refused for
+  OnSite ("Site tidak lagi dipakai sebagai lokasi absen"). Work-schedule fallback employee → PT; the PM team scope has
+  no team sites.
+- Karyawan Non-OnSite checks in and out only inside the geofence of any registered location of the own PT (picked
+  automatically, nearest when several); outside every location → 409 `OUTSIDE_GEOFENCE` with an Indonesian message. A
+  check-out closes the day's open check-in (flag `CHECK_OUT_ELSEWHERE` when the fix is inside another location).
+  `GET /attendance/locations` returns `homeSiteId` / `referenceSite` null and `isHeadOffice` / `home` false.
+- Data migration: every team assignment to a site becomes an assignment to each active project of that site (first
+  project on the row, one new row per further project, same employee / role / dates); without such a project a running
+  site assignment is ended. Each change is audited (`audit_logs` source `system`) and logged.
+- Help texts of "Tipe absensi" (Data Karyawan, Pengguna form, APK) describe the new rule.
+- On-behalf labels: "Diabsenkan" (PM or Admin Staff, with the recorder's name) in recap, report and selfie stamp.
+
+#### Added
+- Role `pk-admin-staff` "Admin Staff" (per PT): reads every attendance (selfies audited) and correction of the PT,
+  records check-in / check-out on behalf of any employee of the PT (also without an account), corrects attendance
+  (never own, reason required), reads Data Karyawan (no bank accounts), Tim hari ini, Rekap, Jadwal (read), Laporan
+  Absensi. No finance / request access. Restricted panel, dashboard layout "Admin Staff", role pickers / matrix (AdmS),
+  APK `Role.adminStaff` (Operator bottom bar + team tab).
+- Web **Absensi → Absenkan karyawan** (`/admin/absensi/absenkan`): camera selfie + GPS of the Admin Staff, reason;
+  `GET /api/v1/attendance/on-behalf/options`, `POST /api/v1/attendance/on-behalf`. Attendance source `admin`
+  ("Diabsenkan oleh Admin Staff"). APK on-behalf screen lists the Admin Staff candidates (cached offline).
+- `/me` capabilities `attendanceOnBehalf`, `attendanceAdminStaff`.
+
+#### Open questions
+- Cash accounts already flagged with a site stay outside the fund pool (ADR 0029) until the owner decides (ADR 0032 §4).
+- The go-live import workbook still carries the Site sheet / `kode_site` columns (CLI writes the hidden legacy columns).
+
+### Pengajuan biaya
+
+**Pengajuan biaya — client feedback 24/10 (D2410, user decisions 2026-10-24).** Two migrations
+(`20261024_300000_d2410_self_processed_enum`: audit action `self_processed`; `20261024_300100_d2410_finance_self_lpj`:
+drops the F2e triggers `receipts_self_verify_guard` / `receipt_flags_self_review_guard`). No data change. API contract:
+additive (`ExpenseRequestDetail.attachments`, `SyncDraftUpsertPayload.attachment_ids`), plus the behaviour changes
+below. **APK:** a new APK with "Lampiran" needs this server (the old sync schema refuses `attachment_ids`); older APKs
+keep working but cannot add a Lampiran, so their Reimburse submit gets the 400 below — raise `minAppVersion` once the
+APK is released.
+
+#### Changed
+- **Batalkan pengajuan only at the Finance stage, absolute** (point 13): `cancel` only from Pengajuan Baru / vendor /
+  PT grup "Disetujui" and Reimburse "Disetujui" / "Nota Terverifikasi" / "Revisi Nota", only by Finance / Direktur of
+  the PT (also on their own request), reason required. No cancel on Draft or while waiting for approval (requester:
+  "Tarik kembali ke Draft"; others 403, office roles 409). Web: one "Batalkan pengajuan" button in the action bar (the
+  requester panel has none); row action "Batalkan" for the office roles at the Finance stage only. APK: driven by
+  `allowedActions` (no change). APK "hapus draft" (sync `draft_delete`): a never-submitted draft is still cancelled; a
+  numbered (withdrawn) draft → `NOT_EDITABLE` with the server copy. "Batalkan proyek" still cancels the project's
+  drafts / pending requests (system cascade, ADR 0030).
+- **Finance may process its own request's receipts and LPJ** (user decision): verify / reject receipts, review flags,
+  verify all receipts, LPJ revision / verification, settle and settlement reversal are allowed when the Finance user is
+  the requester or creator; each is recorded as audit `self_processed` ("diproses oleh pemohon sendiri",
+  `newValue.selfProcessed = true`) in "Log perubahan" / "Riwayat". Approvals (G1) and the transfer rule are unchanged.
+- **Reimburse needs at least one Lampiran to be sent** (point 6): submit without a general attachment → 400
+  `errors[attachmentIds]` "Lampiran wajib untuk Reimburse: unggah minimal 1 lampiran (foto/PDF)." (besides a receipt on
+  every line). Optional for Pengajuan Baru; the vendor / PT grup invoice file is unchanged. Web form: hint on the
+  Lampiran field, "Kirim pengajuan" disabled with the reason.
+- **List filters: "Semua" = every option ticked** (point 7): without a filter every option shows ticked; a tri-state
+  "Semua" box ticks (or clears) all; every option ticked — or none — applies as no filter. Form mode unchanged.
+- **Status filter "Menunggu persetujuan Owner"** (point 8) in Keuangan › Pengajuan Biaya and Laporan › Rekap Pengajuan
+  (virtual value `pending_owner`: waiting rows whose current level is the Owner's); "Menunggu persetujuan Direktur" now
+  means the other waiting rows. Dashboard "menunggu" links tick both.
+
+#### Added
+- APK: "Lampiran" (photo / PDF, max. 20) in the draft editor — required for Reimburse, optional for Pengajuan Baru; sent
+  with the sync / Ajukan; the request detail lists the attachments and opens them.
+- API: `SyncDraftUpsertPayload.attachment_ids` (replaces the list; omitted = unchanged) and
+  `ExpenseRequestDetail.attachments[] {id, fileName, mimeType}`.
+
+### Pinjaman antar project
+
+**Pinjaman antar project: PM / Finance file, Direktur → Owner, transfer orders, repayment requests (DRMS 24/10
+#10–#12; ADR 0022 + ADR 0031 amendments 2026-10-24).** Four migrations (`20261024_400000_d2410_loan_enums`,
+`_400100_d2410_loan_schema`, `_400200_d2410_loan_data`, `_400300_d2410_loan_guard`). API contract: additive (new
+fields, endpoints, statuses); `POST /project-loans/:id/disburse` kept. APK: see below.
+
+#### Changed
+- A manual inter-project loan is filed by the borrower project's PM **or Finance** of the PT (`submitterRole`; Finance
+  picks both projects). Approval is **Direktur (level 1) → Owner (level 2)**, reject with reason at either level; status
+  "Menunggu persetujuan Direktur / Owner". G1: the creator never decides (`direktur_self` stays, level 1 only). A PT
+  without an active Owner refuses the submit (409 `NO_OWNER`).
+- After the Owner's approval a cash-backed loan is a **transfer order in Antrian Transfer** (new section "Transfer
+  pinjaman antar project"): Finance executes it (date, optional proof) → KK on the lender account tagged with the lender
+  project + KM on the borrower account tagged with the borrower project, one transaction. The loan page links to the
+  queue instead of "Cairkan". The Finance user who filed it may execute it (audited `selfExecuted`).
+- Money between two projects of the **same** Pusat Biaya is cash-backed too: the pair is posted on that account, tagged
+  with each project. Goods stay a claim.
+- A repayment of a cash-backed loan is a **request** (PM / Finance, planned date, ≤ the part not yet requested) →
+  Direktur → Owner → transfer order → executed by Finance (KK borrower / KM lender, tagged). Statuses `pending_approval`,
+  `approved`, `posted` (= executed, every existing row), `rejected`, `cancelled`. Claims are recorded as before.
+- Persetujuan: loans and repayment requests at the caller's level (the Owner gets the loan section); nav badge and
+  dashboard "menunggu saya" count both.
+- Fund check: an approved repayment order is a commitment of the borrower account; a same-account loan is no
+  commitment.
+
+#### Added
+- API: `GET /project-loans/transfer-orders`, `POST /project-loans/:id/execute`,
+  `POST /project-loans/:id/repayments/:rid/{approve,reject,cancel,execute}`; loan fields `approvalLevel`,
+  `submitterRole`, `transferQueueHref`, `repaymentNeedsApproval`, `repayableAmount`, decision `level` / `levelLabel`,
+  repayment `status` / `approvalLevel` / `plannedDate` / `allowedActions` / `decisions` / execution fields; inbox
+  `repayments`.
+- DB guards: two-level order and stored roles on loan / repayment decision rows; repayment lifecycle; Finance executes.
+- APK: Finance files a loan; Direktur and Owner decide loans and repayment requests (Persetujuan); repayment request +
+  row actions on the loan; "Buka Antrian Transfer" replaces "Cairkan"; transfer orders executed in the APK Antrian
+  Transfer (without proof upload — optional on the server).
+- **"Antrian Transfer" badge counts loan transfer orders** (pinjaman open item): for Finance the nav badge (web
+  launcher and `GET /me/modules`, i.e. the APK menu) adds the approved loan disbursements and approved repayment orders
+  of its PTs (`loanTransferOrderCount`), next to the expense transfer queue.
+
+#### Data (in-flight)
+- Loans pending at the Direktur get `approval_level = 1` and now also need the Owner (audited). Approved loans keep
+  their approval; an approved cash-backed loan not yet disbursed appears as a transfer order. No other data change.
+
+### Confirm and result popups
+
+#### Added
+- **Popup before and after every data-changing action, web and APK (user decision 2026-10-24).**
+  - Before: a modal "Yakin ingin <aksi> …?" with a short summary of what is affected (document number, amount,
+    person, unit, date) and **[Ya, <aksi>] / [Batal]**. Tolak, Batalkan, Hapus, Nonaktifkan and Void use the danger
+    style. A reason dialog is the confirmation itself (no second dialog); it now shows the same summary.
+  - After: a result modal "Berhasil: <aksi> <dokumen>", or the server's error, with an **OK** button. Navigation or
+    refresh happens behind it as before. On the APK, an action saved to the offline queue says "Tersimpan di antrian,
+    akan dikirim saat online".
+  - Web: one shared host (`src/admin/components/feedback`: `confirmAction`, `showResult`, `DocSummaryProvider`),
+    mounted on every admin page. `ActionButton`, `ActionDialog`, `ReasonAction`, `ConfirmAction`, `MoneyForm` and
+    `RowRecordAction` use it, so new buttons built from them get both popups. Payload's document **Simpan** asks
+    first and shows the result on every collection and global, the relationship "+" drawer included
+    (`withConfirmSave`).
+  - APK: one helper (`lib/shared/widgets/action_feedback.dart`: `confirmAction`, `showActionResult`) used by every
+    action screen.
+- The new actions of the other streams use the popups too: web **Absensi → Absenkan karyawan**, loan transfer order
+  execution in Antrian Transfer (`LoanExecuteForm`), "Ajukan pengembalian", repayment approve / reject / cancel; APK
+  Antrian Transfer "Catat transfer", Admin Staff on-behalf, repayment decisions.
+- No migration. No API change.
+
 ## [0.19.3] - 2026-10-24
 
 **Security release: Node.js runtime bump only.** No code change, no migration, APK unchanged (0.11.1).

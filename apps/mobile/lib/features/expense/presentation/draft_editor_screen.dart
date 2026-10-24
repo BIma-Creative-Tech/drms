@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,8 +11,10 @@ import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/platform/report_files.dart';
 import '../../auth/domain/user_profile.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/online_only_button.dart';
@@ -27,6 +32,7 @@ import '../domain/request_status.dart';
 import 'line_editor_screen.dart';
 import 'receipt_capture.dart';
 import 'requests_screen.dart' show syncStateLabel;
+import 'widgets/attachments.dart';
 import 'widgets/master_picker.dart';
 import 'widgets/rap_item_picker.dart';
 import 'widgets/receipt_mismatch_chip.dart';
@@ -253,6 +259,79 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     }
   }
 
+  /// D2410 (point 6): a general attachment ("Lampiran") — a camera / gallery photo (compressed like a receipt photo) or
+  /// a JPG / PNG / PDF file from the phone (system picker; a PDF stays as it is, ≤ 5 MB). Stored as media blob
+  /// `attachment` and uploaded to `POST /media/attachments` by the sync / at "Ajukan".
+  Future<void> _addAttachment(AttachmentSource source) async {
+    final t = AppLocalizations.of(context);
+    final sub = ref.read(currentSubProvider);
+    if (sub == null) return;
+    if (_d.attachments.length >= maxDraftAttachments) {
+      showSnack(context, t.attachmentsLimit(maxDraftAttachments));
+      return;
+    }
+    Uint8List? raw;
+    var name = 'foto-lampiran-${_d.attachments.length + 1}.jpg';
+    String? mime = 'image/jpeg';
+    if (source == AttachmentSource.file) {
+      const maxRaw = 15 * 1024 * 1024; // photos are compressed after picking (PDF: ≤ 5 MB, checked below)
+      final picked = await ref.read(filePickerProvider).pick(mimeTypes: attachmentMimeTypes, maxBytes: maxRaw);
+      if (picked == null || !mounted) return;
+      if (picked.tooLarge || picked.bytes == null) {
+        showSnack(context, t.attachmentTooLarge);
+        return;
+      }
+      raw = picked.bytes;
+      name = picked.name;
+      mime = attachmentMimeOf(picked.name);
+    } else {
+      raw = await pickReceiptImage(context, fromCamera: source == AttachmentSource.camera);
+    }
+    if (raw == null || !mounted) return;
+    if (mime == null) {
+      showSnack(context, t.attachmentTypeInvalid);
+      return;
+    }
+    final pdf = mime == 'application/pdf';
+    if (pdf && raw.length > maxAttachmentPdfBytes) {
+      showSnack(context, t.attachmentPdfTooLarge);
+      return;
+    }
+    if (pdf && !isPdfFile(raw)) {
+      showSnack(context, t.attachmentPdfInvalid);
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      var bytes = raw;
+      final String sha;
+      if (pdf) {
+        sha = sha256.convert(raw).toString();
+      } else {
+        // a photo is re-encoded as JPEG (EXIF dropped); a PDF is stored as picked
+        final target = receiptTargetFor(ref.read(currentProfileProvider));
+        final photo = await ref.read(photoCompressorProvider).compress(raw, target);
+        bytes = photo.bytes;
+        sha = photo.sha256Hex;
+      }
+      final type = pdf ? mime : 'image/jpeg';
+      final uuid = ref.read(draftServiceProvider).newId();
+      final repo = ref.read(draftRepositoryProvider);
+      await repo.addMedia(sub, uuid: uuid, kind: 'attachment', bytes: bytes, sha256: sha, mime: type);
+      final added = DraftAttachment(fileName: name, mimeType: type, mediaUuid: uuid);
+      if (mounted) setState(() => _d = _d.copyWith(attachments: [..._d.attachments, added]));
+    } on Object catch (e) {
+      if (mounted) showSnack(context, errorText(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// D2410: the file of a removed local attachment is deleted when the draft is saved (DraftRepository.save).
+  void _removeAttachment(DraftAttachment a) {
+    setState(() => _d = _d.copyWith(attachments: [..._d.attachments]..remove(a)));
+  }
+
   /// D4: RAP items belong to the project — a new project clears the RAP item of every line (after a confirm).
   Future<void> _setProject(int? id) async {
     if (id == _d.projectId) return;
@@ -297,6 +376,17 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     });
   }
 
+  /// D2410: "Simpan draft" asks first and reports after; the submit path saves quietly (its own popups).
+  Future<void> _saveDraft() async {
+    final t = AppLocalizations.of(context);
+    final draft = _collect();
+    setState(() => _issues = validateForSave(draft));
+    if (_issues.isNotEmpty) return;
+    final summary = [draft.title, formatRupiah(draft.previewGrandTotal)];
+    if (!await confirmAction(context, action: t.saveDraft, summary: summary) || !mounted) return;
+    await _save();
+  }
+
   Future<bool> _save({bool quiet = false}) async {
     final t = AppLocalizations.of(context);
     final sub = ref.read(currentSubProvider);
@@ -318,13 +408,19 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
           );
       _d = saved;
       ref.read(syncCoordinatorProvider.notifier).requestSync();
-      if (mounted && !quiet) showSnack(context, online ? t.draftSaved : t.draftSavedQueued);
+      if (mounted && !quiet) {
+        if (online) {
+          await showActionResult(context, message: t.draftSaved, action: t.saveDraft);
+        } else {
+          await showActionQueued(context, action: t.saveDraft, message: t.draftSavedQueued);
+        }
+      }
       return true;
     } on DraftValidationException catch (e) {
       setState(() => _issues = e.issues);
       return false;
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: quiet ? t.submit : t.saveDraft);
       return false;
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -355,31 +451,24 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     final issues = validateForSubmit(draft, selfOnlyEmployee: _selfOnlyEmployee(), rap: _rapCheck());
     setState(() => _issues = issues);
     if (issues.isNotEmpty) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        content: Text(t.submitConfirm),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
-          FilledButton(
-            key: const Key('submit-confirm'),
-            onPressed: () => Navigator.pop(c, true),
-            child: Text(t.submit),
-          ),
-        ],
-      ),
+    final ok = await confirmAction(
+      context,
+      action: t.submit,
+      summary: [draft.title, formatRupiah(draft.previewGrandTotal)],
+      note: t.submitConfirm,
+      confirmKey: const Key('submit-confirm'),
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     if (!await _save(quiet: true)) return;
     final sub = ref.read(currentSubProvider);
     if (sub == null) return;
     setState(() => _busy = true);
     try {
       final detail = await ref.read(draftServiceProvider).submit(sub, _d, rap: _rapCheck());
-      if (!mounted) return;
-      showSnack(context, t.submitted);
       ref.invalidate(requestListProvider('mine'));
-      context.pushReplacement('/requests/${detail.id}');
+      if (!mounted) return;
+      await showActionResult(context, message: '${detail.docNo ?? ''} ${t.submitted}'.trim(), action: t.submit);
+      if (mounted) context.pushReplacement('/requests/${detail.id}');
     } on DraftValidationException catch (e) {
       setState(() => _issues = e.issues);
     } on ProblemException catch (e) {
@@ -394,12 +483,13 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
       // message offers "Perintahkan pinjaman antar-PT" to the Owner of the PT
       final fund = fundProblemMessage(e, draft: true);
       if (mounted && fund != null) {
-        _showFundShortSnack(fund, e);
+        await showActionFailure(context, fund, action: t.submit);
+        if (mounted) _showFundShortSnack(fund, e);
       } else if (mounted) {
-        showSnack(context, intercompanyAwareError(e, errorText));
+        await showActionFailure(context, intercompanyAwareError(e, errorText), action: t.submit);
       }
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: t.submit);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -440,25 +530,25 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     'invoiceDate' || 'invoice_date' => 'invoiceDate',
     'invoiceFileId' || 'invoice_file_id' => 'invoiceFile',
     'payeeCompanyId' || 'payee_company_id' => 'payeeCompanyId',
+    // D2410 (point 6): "Lampiran wajib untuk Reimburse" (server rule at submit)
+    'attachmentIds' || 'attachment_ids' => 'attachments',
     _ => null,
   };
 
   Future<void> _delete() async {
     final t = AppLocalizations.of(context);
     final sub = ref.read(currentSubProvider);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        content: Text(t.deleteDraftConfirm),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(t.delete)),
-        ],
-      ),
+    final ok = await confirmAction(
+      context,
+      action: t.fieldDiscardAction,
+      summary: [_d.title],
+      note: t.deleteDraftConfirm,
     );
-    if (ok != true || sub == null) return;
+    if (!ok || sub == null) return;
     await ref.read(draftServiceProvider).delete(sub, _d, online: ref.read(connectivityProvider));
     ref.read(syncCoordinatorProvider.notifier).requestSync();
+    if (!mounted) return;
+    await showActionResult(context, message: t.fieldDiscarded, action: t.fieldDiscardAction);
     if (mounted) context.pop();
   }
 
@@ -953,6 +1043,16 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                 ),
               ],
             ),
+            // D2410 (point 6): general attachments — required for a Reimburse, optional for Pengajuan Baru
+            const SizedBox(height: 8),
+            DraftAttachmentsSection(
+              attachments: _d.attachments,
+              mandatory: _d.type == RequestType.reimburse && !_d.isDirectPayment,
+              enabled: !_busy,
+              onAdd: _addAttachment,
+              onRemove: _removeAttachment,
+              error: issueFor('attachments'),
+            ),
             const Divider(height: 24),
             Row(
               children: [
@@ -1073,7 +1173,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
             const SizedBox(height: 16),
             OutlinedButton.icon(
               key: const Key('save-draft'),
-              onPressed: _busy ? null : _save,
+              onPressed: _busy ? null : _saveDraft,
               icon: const Icon(Icons.save),
               label: Text(t.saveDraft),
             ),

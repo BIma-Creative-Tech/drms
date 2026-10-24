@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { setKeycloakAdmin } from '@/auth/keycloak-admin'
 import { SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
-import { ASSIGNMENT_REASON_MESSAGE, ONE_LOCATION_MESSAGE } from '@/domain/user-onboarding/rules'
+import { ASSIGNMENT_REASON_MESSAGE, ONE_LOCATION_MESSAGE, SITE_ASSIGNMENT_MESSAGE } from '@/domain/user-onboarding/rules'
 
 import { api, makeFlowUser, sysCreate, type FlowUser } from './flow-world'
 import { addMembership, auditRows, companyId, fixturePm, getTestPayload, installFakeKeycloak, makeUser } from './helpers'
@@ -29,7 +29,7 @@ let pmGroup: FlowUser
 let fake: ReturnType<typeof installFakeKeycloak>
 type Body = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 
-const loc = { projectA: 0, closedA: 0, ccA: 0, siteA: 0, projectB: 0, teamB: 0 }
+const loc = { projectA: 0, closedA: 0, ccA: 0, ccA2: 0, siteA: 0, projectB: 0, teamB: 0 }
 let seq = 0
 const email = (label: string) => `pa-${label}-${tag.toLowerCase()}-${++seq}@example.test`
 const code = () => `PA-${tag}-${++seq}`
@@ -62,6 +62,8 @@ beforeAll(async () => {
   loc.projectA = await sysCreate('projects', { company: A, code: code(), name: `PA Gedung ${tag}`, pm: await fixturePm(A), status: 'berjalan' })
   loc.closedA = await sysCreate('projects', { company: A, code: code(), name: `PA Selesai ${tag}`, pm: await fixturePm(A), status: 'selesai' })
   loc.ccA = await sysCreate('cost-centers', { company: A, code: code(), name: `PA Ops ${tag}` })
+  loc.ccA2 = await sysCreate('cost-centers', { company: A, code: code(), name: `PA Gudang ${tag}` })
+  // ADR 0032: a legacy site (no new site assignment any more)
   loc.siteA = await sysCreate('sites', { company: A, code: code(), name: `PA Cabang ${tag}` })
   loc.projectB = await sysCreate('projects', { company: B, code: code(), name: `PB Lain ${tag}`, pm: await fixturePm(B), status: 'berjalan' })
   loc.teamB = await sysCreate('projects', { company: B, code: code(), name: `PB Tim ${tag}`, pm: pmGroup.id, status: 'berjalan' })
@@ -75,7 +77,7 @@ afterAll(async () => {
 })
 
 /** State shared by the create → edit flow below. */
-const flow = { userId: 0, employee: 0, asgProject: 0, asgSite: 0 }
+const flow = { userId: 0, employee: 0, asgProject: 0, asgSecond: 0 }
 
 describe('POST /api/v1/user-onboarding — account + employee + assignments in one save', () => {
   it('a NEW employee gets its assignments in the same transaction; detail lists them and the PT\'s active locations', async () => {
@@ -90,7 +92,7 @@ describe('POST /api/v1/user-onboarding — account + employee + assignments in o
           employee: { code: empCode, name: 'Rina Penugasan' },
           assignments: [
             { project: loc.projectA, roleInProject: 'staff', startDate: '2026-10-15' },
-            { site: loc.siteA, roleInProject: 'mandor' },
+            { costCenter: loc.ccA2, roleInProject: 'mandor' },
           ],
         },
       ],
@@ -101,21 +103,22 @@ describe('POST /api/v1/user-onboarding — account + employee + assignments in o
     const m = (await membership(u.id, A))!
     expect(m.employee).toBeTruthy()
     const rows = await assignmentsOf(m.employee)
-    expect(rows.map((x) => [x.project ?? null, x.site ?? null, x.roleInProject, x.company])).toEqual([
+    expect(rows.map((x) => [x.project ?? null, x.costCenter ?? null, x.roleInProject, x.company])).toEqual([
       [loc.projectA, null, 'staff', A],
-      [null, loc.siteA, 'mandor', A],
+      [null, loc.ccA2, 'mandor', A],
     ])
     expect(String(rows[0]!.startDate).slice(0, 10)).toBe('2026-10-15')
 
     const cA = (b.detail.companies as Body[]).find((c) => c.id === A)!
     expect(cA.canManageAssignments).toBe(true)
-    expect((cA.assignments as Body[]).map((x) => x.kind).sort()).toEqual(['project', 'site'])
+    expect((cA.assignments as Body[]).map((x) => x.kind).sort()).toEqual(['costCenter', 'project'])
     const projects = (cA.assignmentChoices.projects as Body[]).map((x) => x.id)
     expect(projects).toContain(loc.projectA)
     expect(projects).not.toContain(loc.closedA) // selesai / arsip: no new assignment
     expect(projects).not.toContain(loc.projectB) // another PT
     expect((cA.assignmentChoices.costCenters as Body[]).map((x) => x.id)).toContain(loc.ccA)
-    expect((cA.assignmentChoices.sites as Body[]).map((x) => x.id)).toContain(loc.siteA)
+    // ADR 0032: no site choice any more (the key stays for APK ≤ 0.11.1)
+    expect(cA.assignmentChoices.sites).toEqual([])
 
     // audit by the collection (withAudit), by the Admin, in the SAME transaction as the account
     const userRows = await auditRows('user', u.id)
@@ -124,7 +127,7 @@ describe('POST /api/v1/user-onboarding — account + employee + assignments in o
     expect(asgRows.every((x) => x.user_id === String(adminA.id))).toBe(true)
     expect(new Set([...userRows, ...asgRows].map((x) => x.tx_id)).size).toBe(1)
 
-    Object.assign(flow, { userId: u.id as number, employee: m.employee as number, asgProject: rows[0]!.id as number, asgSite: rows[1]!.id as number })
+    Object.assign(flow, { userId: u.id as number, employee: m.employee as number, asgProject: rows[0]!.id as number, asgSecond: rows[1]!.id as number })
   })
 
   it('two locations in one row → 400 on the location, nothing written, Keycloak untouched', async () => {
@@ -132,12 +135,19 @@ describe('POST /api/v1/user-onboarding — account + employee + assignments in o
     const before = fake.calls.length
     const r = await api('POST', '/api/v1/user-onboarding', adminA, {
       user: { email: e, name: 'Dua Lokasi' },
-      companies: [{ company: A, roles: ['pk-staff'], employee: { code: code(), name: 'Dua Lokasi' }, assignments: [{ project: loc.projectA, site: loc.siteA, roleInProject: 'staff' }] }],
+      companies: [{ company: A, roles: ['pk-staff'], employee: { code: code(), name: 'Dua Lokasi' }, assignments: [{ project: loc.projectA, costCenter: loc.ccA, roleInProject: 'staff' }] }],
     })
     expect(r.status).toBe(400)
     expect((r.body as Body).errors).toEqual([{ path: 'companies.0.assignments.0.location', message: ONE_LOCATION_MESSAGE }])
     expect(await userByEmail(e)).toBeNull()
     expect(fake.calls.length).toBe(before)
+    // ADR 0032: a site (old APK) → refused on the location
+    const s = await api('POST', '/api/v1/user-onboarding', adminA, {
+      user: { email: email('site'), name: 'Site Lama' },
+      companies: [{ company: A, roles: ['pk-staff'], employee: { code: code(), name: 'Site Lama' }, assignments: [{ site: loc.siteA, roleInProject: 'staff' }] }],
+    })
+    expect(s.status).toBe(400)
+    expect((s.body as Body).errors).toEqual([{ path: 'companies.0.assignments.0.location', message: SITE_ASSIGNMENT_MESSAGE }])
   })
 
   it('a project of another PT (or unknown, or closed) → refused on the project; account + employee rolled back, Keycloak compensated', async () => {
@@ -200,14 +210,14 @@ describe('PATCH /api/v1/user-onboarding/{id} — add and end assignments', () =>
   it('changing a role without a reason → 400 on reason, nothing of the save written (all-or-nothing)', async () => {
     const before = await assignmentsOf(flow.employee)
     const r = await api('PATCH', `/api/v1/user-onboarding/${flow.userId}`, adminA, {
-      companies: [{ company: A, roles: ['pk-staff', 'pk-finance'], assignments: [{ id: flow.asgSite, roleInProject: 'staff' }, { project: loc.projectA, roleInProject: 'staff' }] }],
+      companies: [{ company: A, roles: ['pk-staff', 'pk-finance'], assignments: [{ id: flow.asgSecond, roleInProject: 'staff' }, { project: loc.projectA, roleInProject: 'staff' }] }],
     })
     expect(r.status).toBe(400)
     expect((r.body as Body).errors).toEqual([{ path: 'reason', message: ASSIGNMENT_REASON_MESSAGE }])
     expect((await membership(flow.userId, A))!.roles).toEqual(['pk-staff'])
     const after = await assignmentsOf(flow.employee)
     expect(after).toHaveLength(before.length)
-    expect(after.find((x) => x.id === flow.asgSite)?.roleInProject).toBe('mandor')
+    expect(after.find((x) => x.id === flow.asgSecond)?.roleInProject).toBe('mandor')
   })
 
   it('saved rows: unknown id → 404; another employee\'s row → 400; location / start cannot change; no delete through here', async () => {
@@ -217,16 +227,16 @@ describe('PATCH /api/v1/user-onboarding/{id} — add and end assignments', () =>
 
     const other = await api('POST', '/api/v1/user-onboarding', adminA, { user: { email: email('other'), name: 'Lain' }, companies: [{ company: A, roles: ['pk-staff'], employee: { code: code(), name: 'Lain' } }] })
     expect(other.status, JSON.stringify(other.body)).toBe(201)
-    const foreignRow = await api('PATCH', `/api/v1/user-onboarding/${(other.body as Body).userId}`, adminA, { reason: 'uji', companies: [{ company: A, roles: ['pk-staff'], assignments: [{ id: flow.asgSite, roleInProject: 'staff', endDate: '2026-12-31' }] }] })
+    const foreignRow = await api('PATCH', `/api/v1/user-onboarding/${(other.body as Body).userId}`, adminA, { reason: 'uji', companies: [{ company: A, roles: ['pk-staff'], assignments: [{ id: flow.asgSecond, roleInProject: 'staff', endDate: '2026-12-31' }] }] })
     expect(foreignRow.status).toBe(400)
     expect((foreignRow.body as Body).errors).toEqual([{ path: 'companies.0.assignments.0', message: 'Penugasan ini bukan milik karyawan PT ini.' }])
 
-    const move = await api('PATCH', `/api/v1/user-onboarding/${flow.userId}`, adminA, { reason: 'uji', companies: [{ company: A, roles: ['pk-staff'], assignments: [{ id: flow.asgSite, project: loc.projectA, roleInProject: 'mandor' }] }] })
+    const move = await api('PATCH', `/api/v1/user-onboarding/${flow.userId}`, adminA, { reason: 'uji', companies: [{ company: A, roles: ['pk-staff'], assignments: [{ id: flow.asgSecond, project: loc.projectA, roleInProject: 'mandor' }] }] })
     expect(move.status).toBe(400)
     expect(((move.body as Body).errors as Body[])[0]?.path).toBe('companies.0.assignments.0')
-    const site = (await assignmentsOf(flow.employee)).find((x) => x.id === flow.asgSite)!
-    expect(site).toMatchObject({ site: loc.siteA, roleInProject: 'mandor' })
-    expect(site.endDate ?? null).toBeNull()
+    const second = (await assignmentsOf(flow.employee)).find((x) => x.id === flow.asgSecond)!
+    expect(second).toMatchObject({ costCenter: loc.ccA2, roleInProject: 'mandor' })
+    expect(second.endDate ?? null).toBeNull()
   })
 })
 

@@ -26,7 +26,7 @@ export function registerShortfallPaths(registry: OpenAPIRegistry, h: Helpers): v
     })
   post(
     '/expense-requests/{id}/lpj/shortfall-approval',
-    'Finance (not requester/creator): ask the re-approval of the NEW total of a verified LPJ whose shortfall exceeds approved + tolerance — approval rule of the request for that total (ADR 0013: Direktur "Diketahui" → Finance); within tolerance / running / already approved → 409',
+    'Finance (D2410: also the requester/creator — audited self_processed): ask the re-approval of the NEW total of a verified LPJ whose shortfall exceeds approved + tolerance — approval rule of the request for that total (ADR 0013: Direktur "Diketahui" → Finance); within tolerance / running / already approved → 409',
     S.ShortfallApprovalRequestBody,
   )
   post('/expense-requests/{id}/lpj/shortfall-approval/acknowledge', 'Direktur: approve the shortfall ("Diketahui", signature required); G1/G2 as request decisions', S.ShortfallDecisionBody)

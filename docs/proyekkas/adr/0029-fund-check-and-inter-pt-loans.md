@@ -718,6 +718,15 @@ Ringkas, masing-masing dengan usulan default (dipakai bila owner setuju / tidak 
 The draft texts of "Proposed amendments" above were added as sections "Amendment 2026-10-14 (ADR 0029)" to the
 respective ADRs.
 
+## Amendment 2026-10-24 (DRMS 24/10, user decision) — no site exclusion
+
+§1 "Saldo dana = active accounts WITHOUT a site" no longer holds: every project is mapped to a cash account (ADR 0031),
+so **every active account of the PT** counts (`pk_fund_balance`), and an inter-PT loan may be paid from any active
+account of the paying PT (`pk_icl_transfer_guard`, service, web / APK source lists). Migration
+`20261024_500000_d2410_site_accounts_fund` also clears the legacy `cash_accounts.site_id` flags (audited, reversible).
+The fund panel drops "akun kas cabang (site lama) … tidak dihitung"; the API field `excludedSiteAccounts` stays (always
+0). See ADR 0032 §4.
+
 ## Revision history
 
 - **2026-10-14:** proposed (draft for owner review).

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../l10n/gen/app_localizations.dart';
+import 'action_feedback.dart';
 
 /// The web `ReasonAction` dialog (Void, Tutup buku, Buka kembali): title, what happens, a reason (min. 3 characters,
 /// or optional with [required] false — e.g. "Catatan (opsional)") and the confirm button. Pops the trimmed text, null
-/// when cancelled. Keys: `<keyPrefix>-field`, `<keyPrefix>-ok`.
+/// when cancelled. Keys: `<keyPrefix>-field`, `<keyPrefix>-ok`. D2410: this dialog IS the confirmation of its action
+/// (title + summary in [description]); a destructive [confirm] (Void, Tolak, Batalkan…) gets the error colour.
 Future<String?> showReasonDialog(
   BuildContext context, {
   required String title,
@@ -58,6 +60,10 @@ class _ReasonDialogState extends State<_ReasonDialog> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final style = isDestructiveAction(widget.confirm)
+        ? FilledButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError)
+        : null;
     return AlertDialog(
       title: Text(widget.title),
       content: SingleChildScrollView(
@@ -83,6 +89,7 @@ class _ReasonDialogState extends State<_ReasonDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
         FilledButton(
           key: Key('${widget.keyPrefix}-ok'),
+          style: style,
           onPressed: () {
             final v = _c.text.trim();
             if (widget.required && v.length < 3) {

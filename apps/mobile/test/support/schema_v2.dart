@@ -61,7 +61,13 @@ final schemaV9 = [...schemaV8, 'ALTER TABLE "outbox" ADD COLUMN "site_id" INTEGE
 /// v10 (ADR 0027 vendor payments, mobile-v0.6.x / 0.7.0): vendor data of a draft, as drift's `addColumn` added it.
 final schemaV10 = [...schemaV9, 'ALTER TABLE "local_drafts" ADD COLUMN "vendor_json" TEXT NULL'];
 
-/// An in-memory database that starts as schema [version] (1 … 10) with rows from [seed], then is opened by
+/// v11 (owner 2026-10-17, mobile-v0.8.x … 0.11.x): v10 + the service-types cache as drift created it.
+final schemaV11 = [
+  ...schemaV10,
+  r'''CREATE TABLE "field_service_types" ("user_sub" TEXT NOT NULL, "id" INTEGER NOT NULL, "company_id" INTEGER NOT NULL, "code" TEXT NOT NULL DEFAULT '', "name" TEXT NOT NULL DEFAULT '', "active" INTEGER NOT NULL DEFAULT 1 CHECK ("active" IN (0, 1)), "sort_order" INTEGER NOT NULL DEFAULT 0, PRIMARY KEY ("user_sub", "id"))''',
+];
+
+/// An in-memory database that starts as schema [version] (1 … 11) with rows from [seed], then is opened by
 /// the current `AppDatabase` (runs the drift migration to the current schema version).
 AppDatabase oldPhoneDb(int version, void Function(CommonDatabase raw) seed) => AppDatabase(
   NativeDatabase.memory(
@@ -77,7 +83,8 @@ AppDatabase oldPhoneDb(int version, void Function(CommonDatabase raw) seed) => A
           7 => schemaV7,
           8 => schemaV8,
           9 => schemaV9,
-          _ => schemaV10,
+          10 => schemaV10,
+          _ => schemaV11,
         }) {
           raw.execute(s);
         }

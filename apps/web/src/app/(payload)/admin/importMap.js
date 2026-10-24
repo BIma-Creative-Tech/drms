@@ -20,7 +20,6 @@ import { ProjectLoansTab as ProjectLoansTab_e5d452935824a68d96fdc373e55d7f95 } f
 import { BusinessDateField as BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f } from '@/admin/components/BusinessDateField'
 import { IntercompanyReceivingCell as IntercompanyReceivingCell_9d714d06e18fcaca14fd7fd6bd195f83 } from '@/admin/components/IntercompanyReceivingCell'
 import { ApprovalRulePreview as ApprovalRulePreview_d1fda995effefe011ec359f37cc8493e } from '@/admin/components/ApprovalRulePreview'
-import { SiteFromCostCenterLink as SiteFromCostCenterLink_57dfe94c9146c60f785b1649b36e1df1 } from '@/admin/components/SiteFromCostCenterLink'
 import { WorkflowPanel as WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e } from '@/admin/components/WorkflowPanel'
 import { StepperField as StepperField_6be3f0fd04aad5a2714b7b6cfd3f6a9e } from '@/admin/components/request/StepperField'
 import { PayeeTypeField as PayeeTypeField_a356a4ed347478242de628aded3440b3 } from '@/admin/components/EditableOnlyFields'
@@ -41,6 +40,7 @@ import { UserNameField as UserNameField_578d1739bee7e5d282b9062a1999065a } from 
 import { ResubmitOfField as ResubmitOfField_c0f3cc59bdb1242c0f258beab78a7cba } from '@/admin/components/ResubmitOfField'
 import { RequestActionBar as RequestActionBar_85900a638080fee44471b0570ef0ae6e } from '@/admin/components/request/RequestActionBar'
 import { RequestSaveButton as RequestSaveButton_9e183711f74532522cef1d85bd571903 } from '@/admin/components/RequestSaveButton'
+import { ConfirmSaveButton as ConfirmSaveButton_430cf5c87ad0d7c8704494363724713c } from '@/admin/components/feedback/ConfirmSaveButton'
 import { RiwayatView as RiwayatView_5fd51ea07b7ad6c5f81167eb6f8e8f96 } from '@/admin/views/RiwayatView'
 import { ReadOnlyJson as ReadOnlyJson_08329374a86bb7164f48836797d5c216 } from '@/components/ReadOnlyJson'
 import { LpjPhotosField as LpjPhotosField_da4aadc1a83b594722baeb7300b4761c } from '@/admin/components/LpjPhotosField'
@@ -50,6 +50,7 @@ import { Icon as Icon_bbc58174e2e54453bd848c29fea2f58a } from '@/theme/graphics'
 import { Logo as Logo_bbc58174e2e54453bd848c29fea2f58a } from '@/theme/graphics'
 import { SsoLoginButton as SsoLoginButton_e910a89f6cf03666cb4ab2594dae916d } from '@/components/SsoLoginButton'
 import { LoadingProvider as LoadingProvider_102ab52fcb0bfaca8f09b2ac251085a9 } from '@/admin/loading/LoadingProvider'
+import { FeedbackHost as FeedbackHost_1a26d2215cbf7fb7955a47711cea01fe } from '@/admin/components/feedback/FeedbackHost'
 import { LightboxProvider as LightboxProvider_9e2cf7dbd1ec819b046a1110cd1942a3 } from '@/admin/components/lightbox/LightboxProvider'
 import { ApprovalInbox as ApprovalInbox_38358c8fa3c2f08f616ef2728997b5dc } from '@/admin/views/ApprovalInbox'
 import { TransferQueue as TransferQueue_8a6e0f53c8f086ccf31fb1d3d209ace9 } from '@/admin/views/TransferQueue'
@@ -65,6 +66,7 @@ import { KasEdit as KasEdit_38163a8a76a60c5684b51059a76858a2 } from '@/admin/vie
 import { TutupBuku as TutupBuku_38163a8a76a60c5684b51059a76858a2 } from '@/admin/views/Kas'
 import { AbsensiToday as AbsensiToday_eee5013ba73a2fec203c62622a245848 } from '@/admin/views/Absensi'
 import { AbsensiAbsen as AbsensiAbsen_eee5013ba73a2fec203c62622a245848 } from '@/admin/views/Absensi'
+import { AbsensiAbsenkan as AbsensiAbsenkan_eee5013ba73a2fec203c62622a245848 } from '@/admin/views/Absensi'
 import { AbsensiRekap as AbsensiRekap_eee5013ba73a2fec203c62622a245848 } from '@/admin/views/Absensi'
 import { AbsensiJadwal as AbsensiJadwal_eee5013ba73a2fec203c62622a245848 } from '@/admin/views/Absensi'
 import { ProgressOverview as ProgressOverview_a083428db0b5e65b9a4db721d5c49175 } from '@/admin/views/Progress'
@@ -137,7 +139,6 @@ export const importMap = {
   "@/admin/components/BusinessDateField#BusinessDateField": BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f,
   "@/admin/components/IntercompanyReceivingCell#IntercompanyReceivingCell": IntercompanyReceivingCell_9d714d06e18fcaca14fd7fd6bd195f83,
   "@/admin/components/ApprovalRulePreview#ApprovalRulePreview": ApprovalRulePreview_d1fda995effefe011ec359f37cc8493e,
-  "@/admin/components/SiteFromCostCenterLink#SiteFromCostCenterLink": SiteFromCostCenterLink_57dfe94c9146c60f785b1649b36e1df1,
   "@/admin/components/WorkflowPanel#WorkflowPanel": WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e,
   "@/admin/components/request/StepperField#StepperField": StepperField_6be3f0fd04aad5a2714b7b6cfd3f6a9e,
   "@/admin/components/EditableOnlyFields#PayeeTypeField": PayeeTypeField_a356a4ed347478242de628aded3440b3,
@@ -158,6 +159,7 @@ export const importMap = {
   "@/admin/components/ResubmitOfField#ResubmitOfField": ResubmitOfField_c0f3cc59bdb1242c0f258beab78a7cba,
   "@/admin/components/request/RequestActionBar#RequestActionBar": RequestActionBar_85900a638080fee44471b0570ef0ae6e,
   "@/admin/components/RequestSaveButton#RequestSaveButton": RequestSaveButton_9e183711f74532522cef1d85bd571903,
+  "@/admin/components/feedback/ConfirmSaveButton#ConfirmSaveButton": ConfirmSaveButton_430cf5c87ad0d7c8704494363724713c,
   "@/admin/views/RiwayatView#RiwayatView": RiwayatView_5fd51ea07b7ad6c5f81167eb6f8e8f96,
   "@/components/ReadOnlyJson#ReadOnlyJson": ReadOnlyJson_08329374a86bb7164f48836797d5c216,
   "@/admin/components/LpjPhotosField#LpjPhotosField": LpjPhotosField_da4aadc1a83b594722baeb7300b4761c,
@@ -167,6 +169,7 @@ export const importMap = {
   "@/theme/graphics#Logo": Logo_bbc58174e2e54453bd848c29fea2f58a,
   "@/components/SsoLoginButton#SsoLoginButton": SsoLoginButton_e910a89f6cf03666cb4ab2594dae916d,
   "@/admin/loading/LoadingProvider#LoadingProvider": LoadingProvider_102ab52fcb0bfaca8f09b2ac251085a9,
+  "@/admin/components/feedback/FeedbackHost#FeedbackHost": FeedbackHost_1a26d2215cbf7fb7955a47711cea01fe,
   "@/admin/components/lightbox/LightboxProvider#LightboxProvider": LightboxProvider_9e2cf7dbd1ec819b046a1110cd1942a3,
   "@/admin/views/ApprovalInbox#ApprovalInbox": ApprovalInbox_38358c8fa3c2f08f616ef2728997b5dc,
   "@/admin/views/TransferQueue#TransferQueue": TransferQueue_8a6e0f53c8f086ccf31fb1d3d209ace9,
@@ -182,6 +185,7 @@ export const importMap = {
   "@/admin/views/Kas#TutupBuku": TutupBuku_38163a8a76a60c5684b51059a76858a2,
   "@/admin/views/Absensi#AbsensiToday": AbsensiToday_eee5013ba73a2fec203c62622a245848,
   "@/admin/views/Absensi#AbsensiAbsen": AbsensiAbsen_eee5013ba73a2fec203c62622a245848,
+  "@/admin/views/Absensi#AbsensiAbsenkan": AbsensiAbsenkan_eee5013ba73a2fec203c62622a245848,
   "@/admin/views/Absensi#AbsensiRekap": AbsensiRekap_eee5013ba73a2fec203c62622a245848,
   "@/admin/views/Absensi#AbsensiJadwal": AbsensiJadwal_eee5013ba73a2fec203c62622a245848,
   "@/admin/views/Progress#ProgressOverview": ProgressOverview_a083428db0b5e65b9a4db721d5c49175,

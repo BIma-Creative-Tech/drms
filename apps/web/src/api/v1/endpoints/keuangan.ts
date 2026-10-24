@@ -72,11 +72,8 @@ export const kasBookEndpoint = v1({
     const flowPeriod = q.periode ?? today.slice(0, 7)
     const flows = await accountFlows(req, flowPeriod, shown)
     const accounts = q.pt !== undefined ? lk.accounts.filter((a) => a.companyId === q.pt) : lk.accounts
-    // ADR 0023 (Q-S7): with a site filter the totals / tiles cover the accounts flagged with that site
-    const siteAccounts = q.site ? new Set(lk.accounts.filter((a) => a.siteId === q.site).map((a) => a.id)) : null
-    const inSite = (a: { cashAccountId: number }) => !siteAccounts || siteAccounts.has(a.cashAccountId)
     const activeIds = new Set(accounts.filter((a) => a.active).map((a) => a.id))
-    const tiles = bal.filter((a) => (activeIds.has(a.cashAccountId) || a.balance !== 0) && inSite(a))
+    const tiles = bal.filter((a) => activeIds.has(a.cashAccountId) || a.balance !== 0)
     return json({
       today,
       canWrite: acc.write.some((c) => shown.includes(c)),
@@ -87,15 +84,14 @@ export const kasBookEndpoint = v1({
       }),
       lookups: {
         accounts: inPts(lk.accounts, shown).map((a) => ({ ...opt(a), openingDate: a.openingDate ?? null, siteId: a.siteId ?? null, intercompanyReceiving: a.intercompanyReceiving === true })),
-        sites: inPts(lk.sites, shown).map(opt),
         projects: inPts(lk.projects, shown).map(opt),
         costCenters: inPts(lk.costCenters, shown).map(opt),
         categories: inPts(lk.categories, shown).map((c) => ({ ...opt(c), requiresVehicle: c.requiresVehicle })),
         sources: inPts(lk.sources, shown).map(opt),
         vehicles: inPts(lk.vehicles, shown).map(opt),
       },
-      total: bal.filter(inSite).reduce((s, a) => s + a.balance, 0),
-      byPt: shown.map((c) => ({ companyId: c, total: bal.filter((a) => a.companyId === c && inSite(a)).reduce((s, a) => s + a.balance, 0) })),
+      total: bal.reduce((s, a) => s + a.balance, 0),
+      byPt: shown.map((c) => ({ companyId: c, total: bal.filter((a) => a.companyId === c).reduce((s, a) => s + a.balance, 0) })),
       flowPeriod,
       accounts: tiles.map((a) => {
         const f = flows.get(a.cashAccountId) ?? { n: 0, tin: 0, tout: 0 }

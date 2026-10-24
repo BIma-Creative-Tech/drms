@@ -56,6 +56,8 @@ class ReportFileProvider : ContentProvider() {
 
         fun mimeOf(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {
             "pdf" -> "application/pdf"
+            "jpg", "jpeg" -> "image/jpeg" // D2410: request attachments (photo)
+            "png" -> "image/png"
             "csv" -> "text/csv"
             "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             else -> "application/octet-stream"
