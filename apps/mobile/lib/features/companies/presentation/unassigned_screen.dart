@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/format/dates.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../sync/application/sync_coordinator.dart';
@@ -62,7 +63,7 @@ class UnassignedScreen extends ConsumerWidget {
     await ref.read(companyBackfillProvider).assign(sub, it.kind, it.targetUuid, chosen.id);
     ref.invalidate(unassignedItemsProvider);
     ref.read(syncCoordinatorProvider.notifier).requestSync();
-    if (context.mounted) showSnack(context, t.companyAssigned);
+    if (context.mounted) await showActionResult(context, message: t.companyAssigned);
   }
 }
 

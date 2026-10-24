@@ -11,6 +11,7 @@ import '../../../core/location/location_service.dart';
 import '../../../core/logging/log.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
@@ -258,6 +259,8 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
         at = fix == null ? null : (fix: fix, site: site);
       }
       if (at == null || !mounted) return;
+      final label = kind == AttendanceKind.checkIn ? t.attendanceCheckIn : t.attendanceCheckOut;
+      if (!await confirmAction(context, action: label, summary: [at.site.label]) || !mounted) return;
       final raw = await ref.read(selfieCaptureProvider)(context, t.attendanceSelfieTitle);
       if (raw == null || !mounted) return;
       final online = ref.read(connectivityProvider);
@@ -265,13 +268,18 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
           .read(attendanceServiceProvider)
           .record(sub: sub, kind: kind, site: at.site, fix: at.fix, rawSelfie: raw, online: online);
       ref.read(syncCoordinatorProvider.notifier).requestSync(delay: Duration.zero);
-      if (mounted) showSnack(context, online ? t.attendanceSavedOnline : t.attendanceSavedOffline);
+      if (!mounted) return;
+      if (online) {
+        await showActionResult(context, message: t.attendanceSavedOnline, action: label);
+      } else {
+        await showActionQueued(context, action: label, message: t.attendanceSavedOffline);
+      }
     } on PrivacyNoticeRequiredException {
-      if (mounted) showSnack(context, t.privacyAttendanceBlocked);
+      if (mounted) await showActionFailure(context, t.privacyAttendanceBlocked);
     } on PhotoTooLargeException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionFailure(context, e.message);
     } on QueueFullException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionFailure(context, e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

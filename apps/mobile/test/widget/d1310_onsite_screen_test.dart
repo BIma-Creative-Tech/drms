@@ -84,6 +84,7 @@ void main() {
       expect(find.textContaining('Lokasi terdeteksi otomatis: P-07 — Proyek Contoh (22 m dari titik)'), findsOneWidget);
       await tester.tap(find.byKey(const Key('attendance-checkIn')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       expect(service.calls.single, (AttendanceKind.checkIn, 'p7'));
     });
 
@@ -98,6 +99,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('attendance-checkIn')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       expect(service.calls.single, (AttendanceKind.checkIn, 'p7'));
     });
 
@@ -174,6 +176,7 @@ void main() {
         location.fix = _at(-1.2501, 116.85);
         await tester.tap(find.byKey(const Key('attendance-checkIn')));
         await tester.pumpAndSettle();
+        await confirmPopup(tester);
         expect(service.calls.single, (AttendanceKind.checkIn, 'c1'));
         expect(find.textContaining('Di dalam radius lokasi'), findsOneWidget);
       });

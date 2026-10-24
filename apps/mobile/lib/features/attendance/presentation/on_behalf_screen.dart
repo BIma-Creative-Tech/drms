@@ -5,6 +5,7 @@ import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/location/location_service.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
@@ -47,6 +48,9 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
     _reason.dispose();
     super.dispose();
   }
+
+  /// D2410: "Absen masuk Budi" / "Absen pulang Budi" in the confirmation and result popups.
+  String _label(AppLocalizations t) => _kind == AttendanceKind.checkIn ? t.attendanceCheckIn : t.attendanceCheckOut;
 
   Future<void> _record(OnBehalfCandidate who, ProjectSite picked) async {
     final t = AppLocalizations.of(context);
@@ -97,6 +101,8 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
         setState(() => _notice = t.attendanceInside(res.distanceM ?? 0, site.radiusM?.round() ?? 0));
       }
       if (!mounted) return;
+      final summary = [who.name, site.label, reason];
+      if (!await confirmAction(context, action: _label(t), summary: summary) || !mounted) return;
       final raw = await ref.read(onBehalfCaptureProvider)(context, t.onBehalfPhotoTitle(who.name), _lens);
       if (raw == null || !mounted) return;
       final online = ref.read(connectivityProvider);
@@ -115,19 +121,23 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
           );
       ref.read(syncCoordinatorProvider.notifier).requestSync(delay: Duration.zero);
       if (!mounted) return;
-      showSnack(context, online ? t.onBehalfSavedOnline(who.name) : t.onBehalfSavedOffline(who.name));
-      Navigator.of(context).maybePop();
+      if (online) {
+        await showActionResult(context, message: t.onBehalfSavedOnline(who.name), action: _label(t));
+      } else {
+        await showActionQueued(context, action: _label(t), message: t.onBehalfSavedOffline(who.name));
+      }
+      if (mounted) Navigator.of(context).maybePop();
     } on LocationException catch (e) {
       setState(() {
         _notice = e.message;
         _noticeError = true;
       });
     } on PrivacyNoticeRequiredException {
-      if (mounted) showSnack(context, t.privacyAttendanceBlocked);
+      if (mounted) await showActionFailure(context, t.privacyAttendanceBlocked);
     } on PhotoTooLargeException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionFailure(context, e.message);
     } on QueueFullException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionFailure(context, e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

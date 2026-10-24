@@ -10680,6 +10680,114 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Transfer {no} tercatat.'**
   String loanTransferOrderDone(String no);
+
+  /// No description provided for @confirmActionTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Yakin ingin {action}?'**
+  String confirmActionTitle(String action);
+
+  /// No description provided for @confirmActionYes.
+  ///
+  /// In id, this message translates to:
+  /// **'Ya, {action}'**
+  String confirmActionYes(String action);
+
+  /// No description provided for @resultOk.
+  ///
+  /// In id, this message translates to:
+  /// **'OK'**
+  String get resultOk;
+
+  /// No description provided for @resultSuccessTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Berhasil'**
+  String get resultSuccessTitle;
+
+  /// No description provided for @resultSuccessAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Berhasil: {action}'**
+  String resultSuccessAction(String action);
+
+  /// No description provided for @resultFailedTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Gagal'**
+  String get resultFailedTitle;
+
+  /// No description provided for @resultFailedAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Gagal: {action}'**
+  String resultFailedAction(String action);
+
+  /// No description provided for @resultQueuedTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tersimpan di antrian'**
+  String get resultQueuedTitle;
+
+  /// No description provided for @resultQueuedBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Tersimpan di antrian, akan dikirim saat online.'**
+  String get resultQueuedBody;
+
+  /// No description provided for @actionReceiptsCompleteVerb.
+  ///
+  /// In id, this message translates to:
+  /// **'Tandai nota lengkap'**
+  String get actionReceiptsCompleteVerb;
+
+  /// No description provided for @receiptSaveAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan nota'**
+  String get receiptSaveAction;
+
+  /// No description provided for @correctionSaveAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan koreksi'**
+  String get correctionSaveAction;
+
+  /// No description provided for @scheduleAssignAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah jadwal karyawan'**
+  String get scheduleAssignAction;
+
+  /// No description provided for @fieldDiscardAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus draft'**
+  String get fieldDiscardAction;
+
+  /// No description provided for @progressDiscardAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus laporan'**
+  String get progressDiscardAction;
+
+  /// No description provided for @progressResendAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Kirim versi HP'**
+  String get progressResendAction;
+
+  /// No description provided for @accountSignatureSaveAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan tanda tangan'**
+  String get accountSignatureSaveAction;
+
+  /// No description provided for @accountSignatureRemoveAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus tanda tangan'**
+  String get accountSignatureRemoveAction;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

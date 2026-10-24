@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/network/api_exception.dart';
 import '../../l10n/gen/app_localizations.dart';
+import '../../shared/widgets/action_feedback.dart';
 import '../../shared/widgets/async_body.dart';
 import '../../shared/widgets/online_only_button.dart';
 import '../records/data/records_providers.dart';
@@ -101,6 +102,8 @@ class _ClientFormState extends ConsumerState<_ClientForm> {
       'contacts': [for (final c in _contacts) c.toJson()],
       if (_reason.text.trim().isNotEmpty) 'reason': _reason.text.trim(),
     };
+    final summary = [_name.text.trim(), _address.text.trim()];
+    if (!await confirmAction(context, action: t.save, summary: summary) || !mounted) return;
     setState(() => _busy = true);
     try {
       final key = _keys.putIfAbsent(jsonEncode(body), () => const Uuid().v4());
@@ -109,17 +112,19 @@ class _ClientFormState extends ConsumerState<_ClientForm> {
       ref.invalidate(recordPageProvider);
       ref.invalidate(recordDetailProvider);
       if (!mounted) return;
-      showSnack(context, t.recordSaved(_name.text.trim()));
-      context.pop('$id');
+      await showActionResult(context, message: t.recordSaved(_name.text.trim()), action: t.save);
+      if (mounted) context.pop('$id');
     } on ProblemException catch (e) {
-      if (mounted) {
-        setState(() {
-          _errors = {for (final x in e.errors) x.path: x.message};
-          _summary = e.message;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _errors = {for (final x in e.errors) x.path: x.message};
+        _summary = e.message;
+      });
+      await showActionError(context, e, action: t.save);
     } on Object catch (e) {
-      if (mounted) setState(() => _summary = errorText(e));
+      if (!mounted) return;
+      setState(() => _summary = errorText(e));
+      await showActionError(context, e, action: t.save);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

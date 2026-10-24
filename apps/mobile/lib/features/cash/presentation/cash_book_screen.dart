@@ -7,6 +7,7 @@ import '../../../app/theme.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
 import '../../../shared/widgets/photo_viewer.dart';
@@ -656,14 +657,13 @@ class _CashEntrySheetState extends ConsumerState<_CashEntrySheet> {
       _key ??= const Uuid().v4();
       final no = await ref.read(cashApiProvider).voidEntry(r.id, reason, idempotencyKey: _key!);
       if (!mounted) return;
-      final messenger = ScaffoldMessenger.of(context);
+      final done = no == null ? t.cashVoided(r.entryNo) : t.cashVoidedWith(r.entryNo, no);
+      await showActionResult(context, message: done, action: t.cashVoidConfirm);
+      if (!mounted) return;
       Navigator.pop(context);
-      messenger.showSnackBar(
-        SnackBar(content: Text(no == null ? t.cashVoided(r.entryNo) : t.cashVoidedWith(r.entryNo, no))),
-      );
       await widget.onChanged();
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: t.cashVoidConfirm);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -5,6 +5,8 @@ import React, { useId, useRef, useState } from 'react'
 import { formatRupiah } from '@/lib/money'
 
 import { DateInput } from '../DateInput'
+import { useDocSummary } from '../feedback/DocContext'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle } from '../feedback/feedback'
 import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 
@@ -15,6 +17,8 @@ import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
  * approval (Q-L7); the server re-checks role (borrower PM / Finance), status and amount. Styles: KAS_STYLE.
  * DRMS 24/10 #12 (`request`): a cash-backed loan — "Ajukan pengembalian": nominal ≤ the part not yet requested,
  * RENCANA tanggal (≥ loan date, may be in the future); then Direktur → Owner → Antrian Transfer Finance.
+ * DRMS 24/10: "Yakin ingin catat / ajukan pengembalian …?" (nominal, tanggal, sisa) on top of the dialog, result popup
+ * after.
  */
 export function RepaymentAction({ loanId, outstanding, loanDate, today, request = false }: { loanId: number; outstanding: number; loanDate: string; today: string; request?: boolean }) {
   const router = useRouter()
@@ -27,6 +31,7 @@ export function RepaymentAction({ loanId, outstanding, loanDate, today, request 
   const [errs, setErrs] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const doc = useDocSummary()
   const touch = () => {
     key.current = newIdemKey()
   }
@@ -52,18 +57,40 @@ export function RepaymentAction({ loanId, outstanding, loanDate, today, request 
     setErrs(e)
     setError(null)
     if (Object.keys(e).length > 0) return
+    const action = request ? 'Ajukan pengembalian' : 'Catat pengembalian'
+    const yes = await confirmAction({
+      title: confirmTitle(action, doc.object),
+      summary: [
+        ...(doc.summary ?? []),
+        ['Nominal pengembalian', formatRupiah(v)],
+        [request ? 'Rencana tanggal' : 'Tanggal', date],
+        [request ? 'Sisa yang belum diajukan setelah ini' : 'Sisa setelah ini', formatRupiah(outstanding - v)],
+        ['Catatan', note.trim() || null],
+      ],
+      description: request ? 'Disetujui Direktur lalu Owner, kemudian ditransfer Finance lewat Antrian Transfer.' : undefined,
+      confirmLabel: confirmLabel(action),
+    })
+    if (!yes) return
     setBusy(true)
     try {
       const r = await sendJson('POST', `/api/v1/project-loans/${loanId}/repayments`, { amount: v, repayDate: date, note: note.trim() || null }, key.current)
       if (!r.ok) {
         setError(r.error)
         setErrs(fieldErrors(r.data))
+        showResult({ ok: false, title: failureTitle(action), message: r.error })
         return
       }
       ref.current?.close()
+      showResult({
+        ok: true,
+        title: successTitle(action, doc.object),
+        message: request ? `Pengembalian ${formatRupiah(v)} diajukan ke Direktur.` : `Pengembalian ${formatRupiah(v)} tercatat; Direktur dan PM pemberi diberi tahu.`,
+      })
       router.refresh()
     } catch {
-      setError('Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+      const msg = 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.'
+      setError(msg)
+      showResult({ ok: false, title: failureTitle(action), message: msg })
     } finally {
       setBusy(false)
     }

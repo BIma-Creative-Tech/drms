@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/expense_mappers.dart' show Json;
@@ -32,12 +33,13 @@ class _FieldConflictScreenState extends ConsumerState<FieldConflictScreen> {
     final t = AppLocalizations.of(context);
     final sub = ref.read(currentSubProvider);
     if (sub == null) return;
+    if (!await confirmAction(context, action: t.fieldUseServer, note: t.fieldUsedServer) || !mounted) return;
     setState(() => _busy = true);
     await ref.read(fieldServiceProvider).useServerVersion(sub, widget.uuid);
     ref.invalidate(myFieldRecordsProvider);
     if (!mounted) return;
-    showSnack(context, t.fieldUsedServer);
-    Navigator.of(context).maybePop();
+    await showActionResult(context, message: t.fieldUsedServer, action: t.fieldUseServer);
+    if (mounted) Navigator.of(context).maybePop();
   }
 
   Future<void> _resend() async {
@@ -53,10 +55,10 @@ class _FieldConflictScreenState extends ConsumerState<FieldConflictScreen> {
           .resendMine(sub, widget.uuid, reason: reason, online: ref.read(connectivityProvider));
       ref.read(syncCoordinatorProvider.notifier).requestSync(delay: Duration.zero);
       if (!mounted) return;
-      showSnack(context, t.fieldResent);
-      Navigator.of(context).maybePop();
+      await showActionResult(context, message: t.fieldResent, action: t.fieldResendMine);
+      if (mounted) Navigator.of(context).maybePop();
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: t.fieldResendMine);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -270,7 +272,7 @@ class _ReasonDialogState extends State<_ReasonDialog> {
             }
             Navigator.pop(context, v);
           },
-          child: Text(t.next),
+          child: Text(t.confirmActionYes(actionPhrase(t.fieldResendMine))),
         ),
       ],
     );

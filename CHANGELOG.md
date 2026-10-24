@@ -161,6 +161,22 @@ fields, endpoints, statuses); `POST /project-loans/:id/disburse` kept. APK: see 
 ### Data (in-flight)
 - Loans pending at the Direktur get `approval_level = 1` and now also need the Owner (audited). Approved loans keep
   their approval; an approved cash-backed loan not yet disbursed appears as a transfer order. No other data change.
+### Added
+- **Popup before and after every data-changing action, web and APK (user decision 2026-10-24).**
+  - Before: a modal "Yakin ingin <aksi> …?" with a short summary of what is affected (document number, amount,
+    person, unit, date) and **[Ya, <aksi>] / [Batal]**. Tolak, Batalkan, Hapus, Nonaktifkan and Void use the danger
+    style. A reason dialog is the confirmation itself (no second dialog); it now shows the same summary.
+  - After: a result modal "Berhasil: <aksi> <dokumen>", or the server's error, with an **OK** button. Navigation or
+    refresh happens behind it as before. On the APK, an action saved to the offline queue says "Tersimpan di antrian,
+    akan dikirim saat online".
+  - Web: one shared host (`src/admin/components/feedback`: `confirmAction`, `showResult`, `DocSummaryProvider`),
+    mounted on every admin page. `ActionButton`, `ActionDialog`, `ReasonAction`, `ConfirmAction`, `MoneyForm` and
+    `RowRecordAction` use it, so new buttons built from them get both popups. Payload's document **Simpan** asks
+    first and shows the result on every collection and global, the relationship "+" drawer included
+    (`withConfirmSave`).
+  - APK: one helper (`lib/shared/widgets/action_feedback.dart`: `confirmAction`, `showActionResult`) used by every
+    action screen.
+- No migration. No API change.
 
 ## [0.19.1] - 2026-10-22
 

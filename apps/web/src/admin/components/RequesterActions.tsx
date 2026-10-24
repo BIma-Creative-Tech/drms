@@ -1,11 +1,13 @@
 'use client'
-import React, { useRef, useState, useSyncExternalStore } from 'react'
+import React, { useRef, useState } from 'react'
 
 import { formatRupiah } from '@/lib/money'
 import { parseRupiah } from '@/lib/rupiah-input'
 
 import { ActionDialog } from './ActionDialog'
 import { postJson, problemText, promptLabel } from './ActionButton'
+import { useDocSummary } from './feedback/DocContext'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, isDangerAction, showResult, successTitle, type Summary } from './feedback/feedback'
 import { TableScroll } from './TableScroll'
 import { DateInput } from './DateInput'
 import { LpjPhotoGrid } from './lpj/LpjPhotoGrid'
@@ -20,7 +22,8 @@ import { isMultilineText, WrapText } from './WrapText'
  * goes to the existing /api/v1 endpoints with the cookie session and an Idempotency-Key — the
  * server re-checks everything; the buttons shown are only the DTO's `allowedActions` hint.
  * After a success the page reloads (the Payload form state must reflect the new status) and the
- * result message is carried over in sessionStorage (text only, rendered escaped).
+ * result popup (feedback.ts, kept in sessionStorage until OK) shows on the reloaded page.
+ * DRMS 24/10: every action asks first ("Yakin ingin …?" with the request number / amount) and ends in the result popup.
  */
 type Action = 'submit' | 'withdraw' | 'resubmit' | 'add_receipt' | 'receipts_resubmit' | 'receipts_complete' | 'lpj_submit' | 'complete'
 
@@ -65,32 +68,13 @@ export type RequesterActionsProps = {
   } | null
 }
 
-const FLASH_KEY = 'pk-flash'
-
-/** Flash message of the previous action, read (and removed) once per page load on the client. */
-let flashOnce: string | null | undefined
-function readFlashOnce(): string | null {
-  if (flashOnce === undefined) {
-    try {
-      flashOnce = sessionStorage.getItem(FLASH_KEY)
-      sessionStorage.removeItem(FLASH_KEY)
-    } catch {
-      flashOnce = null
-    }
-  }
-  return flashOnce
-}
-const noSubscribe = () => () => {}
 // QA-25: same text on the server and in every browser (Intl/ICU grouping differed → hydration #418)
 const rp = (v: number | null | undefined) => (v === null || v === undefined ? '—' : formatRupiah(v))
 const idemKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined)
 
-function flashAndGo(text: string, href?: string) {
-  try {
-    sessionStorage.setItem(FLASH_KEY, text)
-  } catch {
-    /* storage disabled: the reload still shows the new state */
-  }
+/** DRMS 24/10: result popup (survives the reload: feedback.ts keeps it until OK), then reload / go to `href`. */
+function flashAndGo(title: string, text: string, href?: string) {
+  showResult({ ok: true, title, message: text })
   if (href) window.location.assign(href)
   else window.location.reload()
 }
@@ -110,16 +94,25 @@ const box: React.CSSProperties = { border: '1px solid var(--theme-elevation-150)
 const field: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2, fontSize: 12 }
 const btn = (primary = false) => `btn btn--style-${primary ? 'primary' : 'secondary'} btn--size-small pk-pbtn`
 
+/** DRMS 24/10: asks "Yakin ingin <aksi>?" with the summary; false = Batal. */
+const ask = (action: string, summary?: Summary, description?: string) => confirmAction({ title: confirmTitle(action), summary, description, confirmLabel: confirmLabel(action), danger: isDangerAction(action) })
+
+/**
+ * `run(action, fn)`: `fn` validates, asks (`ask`, returns false on Batal) and sends; a failure shows the inline error
+ * and the result popup "Gagal: <aksi>" (DRMS 24/10). Success reloads the page (busy stays on).
+ */
 function useAction() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const run = async (fn: () => Promise<void>) => {
+  const run = async (action: string, fn: () => Promise<boolean | void>) => {
     setError(null)
     setBusy(true)
     try {
-      await fn()
+      if ((await fn()) === false) setBusy(false)
     } catch (err) {
-      setError((err as Error).message || 'Gagal menghubungi server.')
+      const msg = (err as Error).message || 'Gagal menghubungi server.'
+      setError(msg)
+      showResult({ ok: false, title: failureTitle(action), message: msg })
       setBusy(false)
     }
   }
@@ -136,46 +129,41 @@ async function post(url: string, body: unknown): Promise<Record<string, unknown>
  * One button; optional required reason (≥ 3 chars, G7) or confirmation — QA-22/QA-23: in the app
  * dialog (inline validation, stays open on a short reason or a server error), never prompt/confirm/alert.
  * Exported for the office side of the workflow panel (QA-19: Finance confirms a Reimburse "selesai").
+ * DRMS 24/10: always asks first ("Yakin ingin <aksi> <dokumen>?" + `summary`); the result popup follows (the page
+ * reloads behind it).
  */
-export function Act(props: { label: string; url: string; success: string; primary?: boolean; reason?: string; confirm?: string; gotoNew?: boolean; testId: string }) {
-  const { busy, error, run } = useAction()
+export function Act(props: { label: string; url: string; success: string; primary?: boolean; reason?: string; confirm?: string; gotoNew?: boolean; testId: string; object?: string | null; summary?: Summary }) {
   const key = useRef<string | undefined>(undefined)
+  const doc = useDocSummary()
+  const object = props.object === undefined ? doc.object : props.object
+  const summary = props.summary ?? doc.summary
   const done = (data: Record<string, unknown>) => {
     const newId = typeof data.id === 'number' ? data.id : undefined
-    flashAndGo(props.success, props.gotoNew && newId ? `/admin/collections/expense-requests/${newId}` : undefined)
+    flashAndGo(successTitle(props.label, object), props.success, props.gotoNew && newId ? `/admin/collections/expense-requests/${newId}` : undefined)
   }
-  if (props.reason || props.confirm) {
-    return (
-      <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, marginRight: 6, marginBottom: 6 }}>
-        <ActionDialog
-          label={props.label}
-          title={props.label}
-          description={props.confirm}
-          confirmLabel={props.label}
-          field={props.reason ? { label: promptLabel(props.reason), minLength: 3 } : undefined}
-          rotateKey={() => {
-            key.current = idemKey()
-          }}
-          onConfirm={async (v) => {
-            const r = await postJson(props.url, props.reason ? { reason: v } : {}, { idempotencyKey: key.current })
-            if (!r.ok) return problemText(r.data, r.status)
-            done((r.data ?? {}) as Record<string, unknown>)
-            return null
-          }}
-          buttonClassName={btn(props.primary)}
-          danger={Boolean(props.reason)}
-          testId={props.testId}
-        />
-      </span>
-    )
-  }
-  const onClick = () => void run(async () => done(await post(props.url, {})))
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, marginRight: 6, marginBottom: 6 }}>
-      <button type="button" className={btn(props.primary)} style={{ margin: 0 }} disabled={busy} onClick={onClick} data-pk-action={props.testId}>
-        {busy ? 'Memproses…' : props.label}
-      </button>
-      {error ? <span style={{ ...errStyle, maxWidth: 360 }}>{error}</span> : null}
+      <ActionDialog
+        label={props.label}
+        title={confirmTitle(props.label, object)}
+        description={props.confirm}
+        summary={summary}
+        confirmLabel={confirmLabel(props.label)}
+        result={false}
+        field={props.reason ? { label: promptLabel(props.reason), minLength: 3 } : undefined}
+        rotateKey={() => {
+          key.current = idemKey()
+        }}
+        onConfirm={async (v) => {
+          const r = await postJson(props.url, props.reason ? { reason: v } : {}, { idempotencyKey: key.current })
+          if (!r.ok) return problemText(r.data, r.status)
+          done((r.data ?? {}) as Record<string, unknown>)
+          return null
+        }}
+        buttonClassName={btn(props.primary)}
+        danger={isDangerAction(props.label)}
+        testId={props.testId}
+      />
     </span>
   )
 }
@@ -201,7 +189,7 @@ function ReceiptForm({ requestId, lines, today }: { requestId: number; lines: Re
   const { busy, error, run } = useAction()
   const { ref, text, file } = useFields()
   const onSubmit = () =>
-    void run(async () => {
+    void run('Upload nota', async () => {
       const image = file('image')
       if (!image || image.size === 0) throw new Error('Foto nota wajib diunggah.')
       const vendorName = text('vendorName')
@@ -215,9 +203,18 @@ function ReceiptForm({ requestId, lines, today }: { requestId: number; lines: Re
       const amount = parsed.value
       // QA-07: checked before the upload (no orphan photo); the server refuses it anyway (400)
       if (today && receiptDate > today) throw new Error('Tanggal nota tidak boleh di masa depan.')
+      const line = lines.find((l) => l.id === text('lineId'))
+      const summary: Summary = [
+        ['Baris item', line ? `${line.no}. ${line.description || '(tanpa uraian)'}` : null],
+        ['No. nota', text('receiptNo') || null],
+        ['Vendor / toko', vendorName],
+        ['Tanggal nota', receiptDate],
+        ['Nominal', rp(amount)],
+      ]
+      if (!(await ask('Upload nota', summary))) return false
       const imageId = await uploadReceiptImage(image)
       await post(`${base(requestId)}/receipts`, { lineId: text('lineId'), receiptNo: text('receiptNo') || null, vendorName, receiptDate, amount, imageId })
-      flashAndGo('Nota tersimpan. Periksa flag validasi pada daftar nota (bila ada).')
+      flashAndGo(successTitle('Upload nota', text('receiptNo') || vendorName), 'Nota tersimpan. Periksa flag validasi pada daftar nota (bila ada).')
     })
   return (
     <div ref={ref} onKeyDown={noEnter} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end', marginTop: 8 }} data-pk-form="receipt">
@@ -262,11 +259,18 @@ function ReceiptForm({ requestId, lines, today }: { requestId: number; lines: Re
 function LpjForm({ requestId, settlement, resubmit }: { requestId: number; settlement: RequesterActionsProps['settlement']; resubmit: boolean }) {
   const { busy, error, run } = useAction()
   const { ref, text } = useFields()
+  const action = resubmit ? 'Kirim ulang LPJ' : 'Kirim LPJ'
   const onSubmit = () =>
-    void run(async () => {
+    void run(action, async () => {
       const notes = text('usageNotes')
+      const summary: Summary = [
+        ['LPJ', settlement?.docNo ?? null],
+        ['Total nota', settlement?.receiptsTotal != null ? rp(settlement.receiptsTotal) : null],
+        ['Selisih (ditransfer − nota)', settlement?.difference != null ? rp(settlement.difference) : null],
+      ]
+      if (!(await ask(action, summary, 'LPJ dikirim ke Finance untuk diverifikasi.'))) return false
       await post(`${base(requestId)}/lpj/submit`, notes ? { usageNotes: notes } : {})
-      flashAndGo(resubmit ? 'LPJ dikirim ulang ke Finance.' : 'LPJ terkirim ke Finance.')
+      flashAndGo(successTitle(action, settlement?.docNo), resubmit ? 'LPJ dikirim ulang ke Finance.' : 'LPJ terkirim ke Finance.')
     })
   return (
     <div ref={ref} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }} data-pk-form="lpj">
@@ -313,7 +317,6 @@ function Blocked({ label, testId, describedBy = 'pk-lines-incomplete' }: { label
 }
 
 export function RequesterActions(p: RequesterActionsProps) {
-  const flash = useSyncExternalStore(noSubscribe, readFlashOnce, () => null)
   const has = (a: Action) => p.actions.includes(a)
   const url = base(p.id)
   const showReceipts = p.type === 'reimburse' || p.receipts.length > 0 || has('add_receipt')
@@ -323,11 +326,6 @@ export function RequesterActions(p: RequesterActionsProps) {
   const noAttachment = !!p.missingAttachment && has('submit')
   return (
     <div data-pk-panel="requester">
-      {flash ? (
-        <div role="status" style={{ ...box, borderColor: 'var(--theme-success-500)', background: 'var(--theme-success-50)' }}>
-          {flash}
-        </div>
-      ) : null}
       <section style={box}>
         <strong>Aksi pemohon</strong>
         {!p.hasSignature && (has('submit') || has('lpj_submit')) ? (
@@ -418,7 +416,7 @@ export function RequesterActions(p: RequesterActionsProps) {
                       <td style={{ padding: 4, verticalAlign: 'top' }}>
                         {/* QA-27 (owner decision 2026-10-08): a receipt Finance marked valid is locked */}
                         {has('add_receipt') && r.status !== 'removed' && r.status !== 'valid' ? (
-                          <Act testId={`remove-receipt-${r.id}`} label="Hapus" url={`${url}/receipts/${r.id}/remove`} reason="Alasan menghapus nota (wajib):" success="Nota dihapus (tercatat di riwayat)." />
+                          <Act testId={`remove-receipt-${r.id}`} label="Hapus" object={`nota ${r.receiptNo ?? r.vendorName}`} summary={[['Nota', r.receiptNo], ['Vendor / toko', r.vendorName], ['Tanggal', r.receiptDate], ['Nominal', rp(r.amount)]]} url={`${url}/receipts/${r.id}/remove`} reason="Alasan menghapus nota (wajib):" success="Nota dihapus (tercatat di riwayat)." />
                         ) : null}
                       </td>
                     </tr>

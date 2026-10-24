@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
@@ -148,6 +149,8 @@ class _DailyReportScreenState extends ConsumerState<DailyReportScreen> {
       showSnack(context, t.fieldFixErrors);
       return;
     }
+    final label = _isEdit ? t.fieldSaveEdit : t.dailySubmit;
+    if (!await confirmFieldSubmit(context, label, project: _projectLabel, date: _date) || !mounted) return;
     final online = ref.read(connectivityProvider);
     setState(() => _busy = true);
     _autosave?.cancel();
@@ -155,10 +158,10 @@ class _DailyReportScreenState extends ConsumerState<DailyReportScreen> {
       await ref.read(fieldServiceProvider).submit(sub, d, online: online);
       ref.read(syncCoordinatorProvider.notifier).requestSync(delay: Duration.zero);
       if (!mounted) return;
-      showSnack(context, online ? t.fieldQueuedOnline : t.fieldQueuedOffline);
-      Navigator.of(context).maybePop();
+      await showFieldSubmitted(context, label, online: online);
+      if (mounted) Navigator.of(context).maybePop();
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -5,6 +5,8 @@ import { detail } from '@/domain/expense/dto'
 import { formatRupiah } from '@/lib/money'
 
 import { ActionButton } from './ActionButton'
+import { DocSummaryProvider } from './feedback/DocContext'
+import { expenseRequestSummary } from './feedback/summaries'
 import { TableScroll } from './TableScroll'
 
 type Detail = Awaited<ReturnType<typeof detail>>
@@ -18,6 +20,7 @@ type Detail = Awaited<ReturnType<typeof detail>>
  * receipts_verified only). Buttons follow the DTO `allowedActions` (UI hint; the service guard
  * is authoritative) and call the existing /api/v1 endpoints with an Idempotency-Key.
  * No DefaultTemplate import here → server-renderable in integration tests.
+ * DRMS 24/10: the popups name the request (DocSummaryProvider per request) and, for Valid / Tolak, the receipt.
  */
 export type ReimburseReview = { review: Detail[]; revision: Detail[] }
 
@@ -90,7 +93,7 @@ function RequestReview({ d }: { d: Detail }) {
   const pending = active.filter((r) => r.status !== 'valid').length
   const openWarnings = d.flags.filter((f) => f.status === 'open' && f.level === 'warning').length
   const requestFlags = d.flags.filter((f) => f.receiptId === null)
-  return (
+  const body = (
     <section
       id={`reimburse-${d.id}`}
       data-pk-receipt-review={d.id}
@@ -144,6 +147,9 @@ function RequestReview({ d }: { d: Detail }) {
                     {rs.map((r) => {
                       const st = RECEIPT_STATUS[r.status] ?? RECEIPT_STATUS.pending!
                       const flags = d.flags.filter((f) => f.receiptId === r.id)
+                      // DRMS 24/10: Valid / Tolak name the receipt in their popups
+                      const receipt = `nota ${r.receiptNo ?? r.vendorName}`
+                      const receiptSummary = [['Pengajuan', d.docNo ?? `#${d.id}`], ['Baris', `${l.no}. ${l.description ?? '—'}`], ['Vendor / toko', r.vendorName], ['No. nota', r.receiptNo], ['Tanggal nota', r.receiptDate], ['Nominal', rp(r.amount)]] as const
                       return (
                         <tr key={r.id} data-pk-receipt={r.id}>
                           <td style={td}>
@@ -177,11 +183,13 @@ function RequestReview({ d }: { d: Detail }) {
                             )}
                           </td>
                           <td style={td}>
-                            {canVerify && r.status !== 'valid' ? <ActionButton url={`${base}/receipts/${r.id}/verify`} label="Valid" testId="receipt-valid" /> : null}
+                            {canVerify && r.status !== 'valid' ? <ActionButton url={`${base}/receipts/${r.id}/verify`} label="Valid" object={receipt} summary={receiptSummary} testId="receipt-valid" /> : null}
                             {canReject && r.status !== 'rejected' ? (
                               <ActionButton
                                 url={`${base}/receipts/${r.id}/reject`}
                                 label="Tolak"
+                                object={receipt}
+                                summary={receiptSummary}
                                 prompt={{ field: 'reason', message: 'Alasan nota ditolak (wajib). Pengajuan kembali ke pemohon sebagai "Revisi Nota":', minLength: 3 }}
                                 testId="receipt-reject"
                               />
@@ -215,6 +223,7 @@ function RequestReview({ d }: { d: Detail }) {
       ) : null}
     </section>
   )
+  return <DocSummaryProvider {...expenseRequestSummary(d)}>{body}</DocSummaryProvider>
 }
 
 export function ReimburseReceiptReview({ data }: { data: ReimburseReview }) {

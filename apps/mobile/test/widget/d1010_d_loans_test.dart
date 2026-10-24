@@ -136,7 +136,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('loan-submit')));
     await tester.pumpAndSettle();
-    expect(find.text('Ajukan pinjaman?'), findsOneWidget);
+    expect(find.text('Yakin ingin ajukan ke Direktur?'), findsOneWidget);
     expect(
       find.text('Nomor PJ diberikan dan Direktur diberi tahu. Isi pinjaman tidak dapat diubah lagi.'),
       findsOneWidget,
@@ -145,6 +145,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(api.calls.single, startsWith('create:10:9:barang:150000000:'));
     expect(api.calls.single, endsWith(':true'));
+    expect(find.text('Berhasil: ajukan ke Direktur'), findsOneWidget);
   });
 
   testWidgets('form: a user who is no PM of any project gets the notice', (tester) async {
@@ -180,6 +181,7 @@ void main() {
     await tester.tap(find.byKey(const Key('loan-confirm')));
     await tester.pumpAndSettle();
     expect(api.calls, ['submit:41']);
+    await dismissResult(tester);
     await tester.tap(find.byKey(const Key('loan-action-cancel')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('loan-reason-ok')));
@@ -213,7 +215,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<Text>(find.byKey(const Key('loan-decision-step'))).data, 'Persetujuan Direktur');
     expect(find.byKey(const Key('loan-step-owner')), findsOneWidget, reason: 'the Owner decides after the Direktur');
-    expect(find.text('Setujui PJ/DRMS/2610/0001?'), findsOneWidget);
+    expect(find.text('Yakin ingin setujui?'), findsOneWidget);
+    expect(find.text('PJ/DRMS/2610/0001'), findsWidgets);
     expect(
       find.text(
         'PRJ-B Jalan Tambang Blok B meminjam Rp 150.000.000 dari PRJ-A Gudang Balikpapan. Persetujuan Direktur lalu '
@@ -225,6 +228,7 @@ void main() {
     await tester.tap(find.byKey(const Key('loan-confirm')));
     await tester.pumpAndSettle();
     expect(api.calls, ['approve:41']);
+    await dismissResult(tester);
     await tester.tap(find.byKey(const Key('loan-action-reject')));
     await tester.pumpAndSettle();
     expect(find.text('Alasan penolakan dikirim ke PM peminjam.'), findsOneWidget);
@@ -345,6 +349,8 @@ void main() {
     await tester.enterText(find.byKey(const Key('loan-repay-amount')), '60000000');
     await tester.tap(find.byKey(const Key('loan-repay-save')));
     await tester.pumpAndSettle();
+    expect(find.text('Yakin ingin ajukan pengembalian?'), findsOneWidget);
+    await confirmPopup(tester);
     expect(api.calls, ['repay:45:60000000:2026-10-21:']);
     expect(find.text('Pengembalian Rp 60.000.000 diajukan ke Direktur.'), findsOneWidget);
   });
@@ -377,10 +383,12 @@ void main() {
 
     await tester.tap(find.byKey(const Key('loan-repayment-7-approve')));
     await tester.pumpAndSettle();
+    expect(find.text('Yakin ingin setujui?'), findsOneWidget);
     expect(find.text('Setujui pengembalian Rp 40.000.000?'), findsOneWidget);
     await tester.tap(find.byKey(const Key('loan-repayment-approve-confirm')));
     await tester.pumpAndSettle();
     expect(api.calls, ['approve-repayment:45:7']);
+    await dismissResult(tester);
 
     await tester.tap(find.byKey(const Key('loan-repayment-7-reject')));
     await tester.pumpAndSettle();
@@ -453,17 +461,23 @@ void main() {
     await tester.enterText(find.byKey(const Key('loan-order-execute-note')), 'BCA ref 123');
     await tester.tap(find.byKey(const Key('loan-order-execute-save')));
     await tester.pumpAndSettle();
+    expect(find.text('Yakin ingin catat transfer?'), findsOneWidget);
+    expect(find.text('Bank Mandiri Operasional → Bank BRI Blok B'), findsWidgets);
+    await confirmPopup(tester, key: const Key('loan-order-execute-confirm'));
     expect(find.text('Saldo akun kas akan minus'), findsOneWidget);
     await tester.tap(find.byKey(const Key('loan-override-confirm')));
     await tester.pumpAndSettle();
     expect(api.calls, ['execute:43:2026-10-21:BCA ref 123', 'execute:43:2026-10-21:BCA ref 123:confirm']);
     expect(api.keys.first, isNot(api.keys.last), reason: 'another body, another key');
     expect(find.text('Transfer PJ/DRMS/2610/0004 tercatat.'), findsOneWidget);
+    expect(find.text('Berhasil: catat transfer'), findsOneWidget);
+    await dismissResult(tester);
 
     await tester.tap(find.byKey(const Key('loan-order-repayment-7-execute')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('loan-order-execute-save')));
     await tester.pumpAndSettle();
+    await confirmAndAck(tester, key: const Key('loan-order-execute-confirm'));
     expect(api.calls.last, 'execute-repayment:45:7:2026-10-21');
   });
 
@@ -530,6 +544,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('loan-repay-save')));
     await tester.pumpAndSettle();
+    await confirmPopup(tester);
     await tester.tap(find.byKey(const Key('loan-override-confirm')));
     await tester.pumpAndSettle();
     expect(api.calls, ['repay:44:100000000:2026-10-21:', 'repay:44:100000000:2026-10-21::confirm']);

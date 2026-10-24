@@ -9,7 +9,7 @@ import { codeFrom, ptOptions } from '@/lib/pt-options'
 
 import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
-import { getJson } from './client'
+import { askField, fieldResult, getJson } from './client'
 import { Choice, LinesEditor, linesFrom, linesOut, PhotoPicker, ReasonField, usePhotos, type ExistingPhoto, type LineDraft } from './parts'
 import { DateInput } from '../DateInput'
 import { WrapSelect } from '../WrapSelect'
@@ -170,6 +170,10 @@ export function ActivityForm({
       summaryRef.current?.focus()
       return
     }
+    // DRMS 24/10: popup before (activity, changed fields) and after
+    const asAction = mode === 'correction' ? 'Simpan koreksi aktivitas' : 'Simpan perubahan aktivitas'
+    const asDoc = a.docNo ?? `${ACTIVITY_KIND_LABELS[a.kind]} ${a.activityDate}`
+    if (!(await askField(asAction, asDoc, [['Jenis', ACTIVITY_KIND_LABELS[a.kind]], ['No. dokumen', a.docNo], ['Tanggal', a.activityDate], ['Kolom diubah', Object.keys(body).length], ['Foto baru', photos.items.length || null], ['Alasan', reason.trim() || null]]))) return
     setSummary(null)
     try {
       if (photos.items.length) {
@@ -182,15 +186,18 @@ export function ActivityForm({
       if (!idem.current || idem.current.body !== json) idem.current = { body: json, key: newIdemKey() }
       const r = mode === 'correction' ? await sendJson('POST', `/api/v1/aftersales-activities/${a.id}/corrections`, body, idem.current.key) : await sendJson('PATCH', `/api/v1/aftersales-activities/${a.id}`, body, idem.current.key)
       if (!r.ok) {
+        fieldResult(asAction, asDoc, r.error)
         setErrors(fieldErrors(r.data))
         setSummary(r.error)
         summaryRef.current?.focus()
         return
       }
+      fieldResult(asAction, asDoc, null)
       router.push(`/admin/aftersales/aktivitas/detail/${a.id}?disimpan=1`)
       router.refresh()
     } catch (x) {
       setSummary(x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+      fieldResult(asAction, asDoc, x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi.')
       summaryRef.current?.focus()
     } finally {
       setBusy(null)
@@ -219,6 +226,9 @@ export function ActivityForm({
       await saveChanges(a0)
       return
     }
+    // DRMS 24/10: popup before (project, customer, kind, date, value) and after
+    const asDoc = docNo.trim() || `${kind ? ACTIVITY_KIND_LABELS[kind] : 'aktivitas'} ${date}`
+    if (!(await askField('Simpan aktivitas', asDoc, [['Project', project!.label], ['Pelanggan', client!.name], ['Jenis', kind ? ACTIVITY_KIND_LABELS[kind] : null], ['Tanggal', date], ['No. dokumen', docNo.trim() || null], ['Item', parts.lines.length || null], ['Foto', photos.items.length || null]]))) return
     setSummary(null)
     try {
       setBusy(photos.items.length ? 'Mengunggah foto…' : 'Menyimpan…')
@@ -244,15 +254,18 @@ export function ActivityForm({
       if (!idem.current || idem.current.body !== json) idem.current = { body: json, key: newIdemKey() }
       const r = await sendJson('POST', '/api/v1/aftersales-activities', body, idem.current.key)
       if (!r.ok) {
+        fieldResult('Simpan aktivitas', asDoc, r.error)
         setErrors(fieldErrors(r.data))
         setSummary(r.error)
         summaryRef.current?.focus()
         return
       }
+      fieldResult('Simpan aktivitas', asDoc, null)
       router.push(`/admin/aftersales/aktivitas/detail/${(r.data as { id: number }).id}?baru=1`)
       router.refresh()
     } catch (x) {
       setSummary(x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi — aktivitas yang sama tidak akan tercatat dua kali.')
+      fieldResult('Simpan aktivitas', asDoc, x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi.')
       summaryRef.current?.focus()
     } finally {
       setBusy(null)

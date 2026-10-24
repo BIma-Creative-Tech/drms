@@ -242,6 +242,7 @@ void main() {
       expect(find.text('Foto (1/5)'), findsOneWidget);
       await tester.tap(find.byKey(const Key('progress-save')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       final (d, online, queue) = service.saved.single;
       expect(d.projectId, 7);
       expect(d.stageId, 32);
@@ -252,6 +253,7 @@ void main() {
       expect(online, isFalse);
       expect(queue, isTrue);
       expect(find.textContaining('Laporan tersimpan di HP (offline)'), findsOneWidget);
+      expect(find.text('Tersimpan di antrian'), findsOneWidget);
     });
 
     testWidgets('queue disabled by the server + offline: send button disabled with "Butuh koneksi internet"', (
@@ -293,6 +295,7 @@ void main() {
       await tester.enterText(find.byKey(const Key('progress-reason')), 'Salah ketik volume');
       await tester.tap(find.byKey(const Key('progress-save')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       final d = service.saved.single.$1;
       expect(d.isEdit, isTrue);
       expect(d.reason, 'Salah ketik volume');
@@ -325,8 +328,10 @@ void main() {
       await tester.tap(find.byKey(const Key('reason-ok')));
       await tester.pumpAndSettle();
       expect(service.resent.single, ('l-2', 'Data lapangan'));
+      await dismissResult(tester);
       await tester.tap(find.byKey(const Key('conflict-use-server')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       expect(service.usedServer.single, 'l-2');
     });
 

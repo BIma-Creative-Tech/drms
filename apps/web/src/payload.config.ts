@@ -10,6 +10,7 @@ import { withStaffHiddenGlobals, withStaffPanelVisibility } from './access/panel
 import { withDisplayCells } from './admin/display-cells'
 import { withCompanyListUi } from './admin/company-list'
 import { withRowActions } from './admin/row-actions'
+import { withConfirmSave, withGlobalConfirmSave } from './admin/confirm-save'
 import { withoutApiTab, withoutGlobalApiTab } from './admin/edit-view'
 import { withListSearch } from './admin/list-search'
 import { withPkListView } from './admin/pk-list/wire'
@@ -158,7 +159,8 @@ export default buildConfig({
       // Loader (Uiverse "thin-lionfish-5" dots) on module navigation and every create/update/delete:
       // one client provider around every admin page (built-in views included), see src/admin/loading.
       // DRMS 10/10 12c: one image lightbox for every thumbnail link `a[data-pk-lightbox]` (src/admin/components/lightbox).
-      providers: ['@/admin/loading/LoadingProvider#LoadingProvider', '@/admin/components/lightbox/LightboxProvider#LightboxProvider'],
+      // DRMS 24/10: the confirmation + result popups of every data-changing action (src/admin/components/feedback).
+      providers: ['@/admin/loading/LoadingProvider#LoadingProvider', '@/admin/components/lightbox/LightboxProvider#LightboxProvider', '@/admin/components/feedback/FeedbackHost#FeedbackHost'],
       // F3: module launcher at /admin, role dashboards at /admin/dashboard, reports, global audit log.
       views: { ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS, ...ACCOUNT_ADMIN_VIEWS, ...MC2_ADMIN_VIEWS, ...FR1_ADMIN_VIEWS, ...D1010_ADMIN_VIEWS, ...LOAN_ADMIN_VIEWS, ...IC_LOAN_ADMIN_VIEWS, ...RAP_ADMIN_VIEWS, ...USER_ONBOARDING_ADMIN_VIEWS, ...PARTNER_ADMIN_VIEWS },
     },
@@ -175,8 +177,9 @@ export default buildConfig({
   // QA-29 / QA-25: boolean cells "Aktif/Nonaktif" / "Ya/Tidak", server timestamps as fixed WITA text.
   // DRMS 13/10 Umum #3–#8: the generic list view PkListView (filter bar, Kolom ▾, pager, clickable rows, no bulk edit).
   // D1610 (ADR 0030): soft delete (isDeleted + who/when/reason) and the central "hide deleted rows" read rule.
-  collections: withoutApiTab(withListSearch(withBodyGuard(withStaffPanelVisibility(withPkListView(withCompanyListUi(withRowActions(withDisplayCells(withSoftDelete([Users, Companies, CompanyMemberships, ...MASTER_COLLECTIONS, ...FLOW_COLLECTIONS, ...FIELD_COLLECTIONS, Attendances, AttendanceCorrections, ProgressReports, BudgetAddenda, ProjectLoans, ProjectLoanRepayments, Notifications, Devices, WebSessions, AuditLogs, ...MEDIA_COLLECTIONS]))))))))),
-  globals: withoutGlobalApiTab(withGlobalBodyGuard(withStaffHiddenGlobals([CompanySettings]))),
+  // DRMS 24/10: document "Simpan" asks first and shows the result popup after (src/admin/confirm-save.ts).
+  collections: withConfirmSave(withoutApiTab(withListSearch(withBodyGuard(withStaffPanelVisibility(withPkListView(withCompanyListUi(withRowActions(withDisplayCells(withSoftDelete([Users, Companies, CompanyMemberships, ...MASTER_COLLECTIONS, ...FLOW_COLLECTIONS, ...FIELD_COLLECTIONS, Attendances, AttendanceCorrections, ProgressReports, BudgetAddenda, ProjectLoans, ProjectLoanRepayments, Notifications, Devices, WebSessions, AuditLogs, ...MEDIA_COLLECTIONS])))))))))),
+  globals: withGlobalConfirmSave(withoutGlobalApiTab(withGlobalBodyGuard(withStaffHiddenGlobals([CompanySettings])))),
   // Admin UI in Bahasa Indonesia (ADR 0001 §5; @payloadcms/translations/languages/id @3.90.1).
   // empty list cells: "—" (as in the custom views) instead of Payload's "<Tidak ada Klien>" in every row
   // DRMS 10/10 8d (WA-15): neutral select fallback "Pilih…" instead of "Pilih nilai" (fields set their own admin.placeholder)

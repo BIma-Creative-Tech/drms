@@ -351,6 +351,8 @@ void main() {
         find.descendant(of: find.byKey(const Key('transfer-submit')), matching: find.bySubtype<FilledButton>()),
       );
       await tester.pumpAndSettle();
+      // D2410: "Yakin ingin catat transfer?" first
+      await confirmPopup(tester);
       // QA-17: unverified account → confirm, then re-sent with the flag (proof not re-uploaded)
       expect(find.text('Rekening tujuan belum diverifikasi'), findsOneWidget);
       await tester.tap(find.byKey(const Key('transfer-override-confirm')));
@@ -367,6 +369,8 @@ void main() {
       expect(body.containsKey('amount'), isFalse, reason: 'G3: the server sets the amount');
       expect(body['transferAt'], matches(RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}\+08:00$')));
       expect(api.transfers.first.key, isNot(api.transfers.last.key), reason: 'another body → another key');
+      expect(find.byKey(const Key('result-success')), findsOneWidget);
+      await dismissResult(tester);
       expect(find.byType(TransferFormScreen), findsNothing, reason: 'back to the queue');
     });
 
@@ -421,11 +425,13 @@ void main() {
       await tester.enterText(find.byKey(const Key('transfer-loan-reason')), ' saldo pusat biaya belum cukup ');
       await tester.tap(submit);
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       final body = api.transfers.single.body;
       expect(body['cashAccountId'], 4);
       expect(body['loanReason'], 'saldo pusat biaya belum cukup');
       expect(body.containsKey('loanDueDate'), isFalse, reason: 'empty = server default (+30 days)');
       expect(body.containsKey('costCenterId'), isFalse);
+      await dismissResult(tester);
       expect(find.byType(TransferFormScreen), findsNothing, reason: 'back to the queue');
     });
 

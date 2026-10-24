@@ -5,6 +5,7 @@ import React from 'react'
 
 import { companiesWithRole, hasRole, hasRoleAny, relId, userId } from '@/access/roles'
 import { DecisionBar } from '@/admin/components/DecisionBar'
+import { DocSummaryProvider } from '@/admin/components/feedback/DocContext'
 import { ConfirmAction } from '@/admin/components/addendum/ConfirmAction'
 import { ReasonAction } from '@/admin/components/kas/ReasonAction'
 import { KAS_STYLE } from '@/admin/components/kas/style'
@@ -71,6 +72,22 @@ function StatusCell({ l }: { l: Pick<LoanSummary, 'status' | 'statusLabel' | 'ov
 const projectText = (p: LoanSummary['borrowerProject']) => `${p.code ?? ''} ${p.name ?? ''}`.trim()
 /** ADR 0031: an automatic loan's lender is a Pusat Biaya account (no lender project). */
 const lenderText = (l: Pick<LoanSummary, 'lenderProject' | 'lenderCashAccount'>) => (l.lenderProject ? projectText(l.lenderProject) : `Akun ${l.lenderCashAccount?.name ?? '—'}`)
+/** DRMS 24/10: the loan as named in the popups (submit, disburse, repay, cancel, approve / reject, void). */
+const loanDoc = (l: Pick<LoanSummary, 'id' | 'docNo' | 'kindLabel' | 'amount' | 'dueDate' | 'borrowerProject' | 'lenderProject' | 'lenderCashAccount'>) => {
+  const docNo = l.docNo ?? `Draft pinjaman #${l.id}`
+  return { object: docNo, summary: [['Pinjaman', docNo], ['Jenis', l.kindLabel], ['Peminjam', projectText(l.borrowerProject)], ['Pemberi', lenderText(l)], ['Nilai', rp(l.amount)], ['Jatuh tempo', dateId(l.dueDate)]] as const }
+}
+
+/** DRMS 24/10: a repayment request of the approval inbox as named in the approve / reject popups. */
+const repayInboxSummary = (r: RepaymentInboxItem) =>
+  [
+    ['Pinjaman', r.loanDocNo ?? `#${r.loanId}`],
+    ['Peminjam', projectText(r.borrowerProject)],
+    ['Pemberi', r.lenderProject ? projectText(r.lenderProject) : `Akun ${r.lenderCashAccount?.name ?? '—'}`],
+    ['Nominal pengembalian', rp(r.amount)],
+    ['Rencana tanggal', dateId(r.plannedDate)],
+    ['Diajukan', r.submittedBy?.name ?? null],
+  ] as const
 
 /** Columns of a loan table (list, project tab). `focus` = the project of the tab (shows the direction). */
 function loanCols(pt: PtView, focus?: number): Col<LoanSummary>[] {
@@ -414,6 +431,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
         const a = new Set(r.allowedActions)
         if (a.size === 0) return r.status === 'void' ? <StatusPill tone="none" label="Dibatalkan (void)" /> : '—'
         const what = `pengembalian ${rp(r.amount)}`
+        const repaySummary = [...loanDoc(l).summary, ['Pengembalian', `ke-${r.seq} · ${dateId(r.repayDate)}`], ['Nominal pengembalian', rp(r.amount)]] as const
         return (
           <div className="pk-kact" data-pk-repayment-actions={[...a].join(',')}>
             {a.has('approve') ? (
@@ -422,17 +440,18 @@ export async function LoanDetail(props: AdminViewServerProps) {
                 label="Setujui"
                 title={`Setujui ${what}?`}
                 description={<>{r.approvalLevel === 2 ? 'Persetujuan Owner: pengembalian masuk Antrian Transfer Finance (kas keluar dari pusat biaya peminjam, kas masuk ke pemberi).' : 'Persetujuan Direktur: lalu menunggu persetujuan Owner.'}</>}
-                confirmLabel="Setujui"
+                confirmLabel="Setujui pengembalian"
+                summary={repaySummary}
                 testId={`loan-repay-approve-${r.id}`}
               />
             ) : null}
-            {a.has('reject') ? <ReasonAction url={`/api/v1/project-loans/${l.id}/repayments/${r.id}/reject`} label="Tolak" title={`Tolak ${what}?`} description={<>Alasan penolakan dikirim ke pengaju.</>} confirmLabel="Tolak pengembalian" testId={`loan-repay-reject-${r.id}`} /> : null}
+            {a.has('reject') ? <ReasonAction url={`/api/v1/project-loans/${l.id}/repayments/${r.id}/reject`} label="Tolak" title={`Tolak ${what}?`} description={<>Alasan penolakan dikirim ke pengaju.</>} confirmLabel="Tolak pengembalian" summary={repaySummary} testId={`loan-repay-reject-${r.id}`} /> : null}
             {a.has('execute') && r.transferQueueHref ? (
               <Link className="pk-kbtn primary" href={r.transferQueueHref} data-pk-link={`loan-repay-queue-${r.id}`}>
                 Eksekusi di Antrian Transfer
               </Link>
             ) : null}
-            {a.has('cancel') ? <ReasonAction url={`/api/v1/project-loans/${l.id}/repayments/${r.id}/cancel`} label="Batalkan" variant="secondary" title={`Batalkan ${what}?`} description={<>Pengajuan pengembalian dibatalkan (tidak dihapus). Alasan wajib.</>} confirmLabel="Batalkan pengembalian" testId={`loan-repay-cancel-${r.id}`} /> : null}
+            {a.has('cancel') ? <ReasonAction url={`/api/v1/project-loans/${l.id}/repayments/${r.id}/cancel`} label="Batalkan" variant="secondary" title={`Batalkan ${what}?`} description={<>Pengajuan pengembalian dibatalkan (tidak dihapus). Alasan wajib.</>} confirmLabel="Batalkan pengembalian" summary={repaySummary} testId={`loan-repay-cancel-${r.id}`} /> : null}
             {a.has('void') ? (
               <ReasonAction
                 url={`/api/v1/project-loans/${l.id}/repayments/${r.id}/void`}
@@ -440,6 +459,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
                 title={`Void pengembalian ke-${r.seq}?`}
                 description={<>Pengembalian {rp(r.amount)} dibatalkan (tidak dihapus); sisa pinjaman bertambah lagi.{l.cashBacked ? ' Kas keluar/masuknya dibuatkan jurnal balik.' : ''} Alasan wajib.</>}
                 confirmLabel="Void pengembalian"
+                summary={repaySummary}
                 testId={`loan-void-${r.id}`}
               />
             ) : null}
@@ -448,7 +468,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
       },
     },
   ]
-  return (
+  const page = (
     <Frame props={props} name="pinjaman-detail">
       <style>{STYLE}</style>
       <DashHead title={title} note={`${l.kindLabel} · ${l.originLabel} · ${lenderText(l)} → ${projectText(l.borrowerProject)} · ${l.origin === 'transfer' ? 'dicatat' : 'diajukan'} ${l.createdBy.name ?? '—'}`}>
@@ -643,6 +663,8 @@ export async function LoanDetail(props: AdminViewServerProps) {
       ) : null}
     </Frame>
   )
+  // DRMS 24/10: every action of the page names the loan in its popups
+  return <DocSummaryProvider {...loanDoc(l)}>{page}</DocSummaryProvider>
 }
 
 // ================================================================ project tab "Pinjaman"
@@ -786,9 +808,10 @@ export async function LoanInboxSection({ req }: { req: PayloadRequest }) {
                         </>
                       }
                       confirmLabel="Setujui"
+                      summary={loanDoc(r).summary}
                       testId={`loan-inbox-approve-${r.id}`}
                     />
-                    <ReasonAction url={`/api/v1/project-loans/${r.id}/reject`} label="Tolak" title={`Tolak ${r.docNo}?`} description={<>Alasan penolakan dikirim ke pengaju.</>} confirmLabel="Tolak pinjaman" testId={`loan-inbox-reject-${r.id}`} />
+                    <ReasonAction url={`/api/v1/project-loans/${r.id}/reject`} label="Tolak" title={`Tolak ${r.docNo}?`} description={<>Alasan penolakan dikirim ke pengaju.</>} confirmLabel="Tolak pinjaman" summary={loanDoc(r).summary} testId={`loan-inbox-reject-${r.id}`} />
                   </div>
                 ),
               },
@@ -839,10 +862,11 @@ export async function LoanInboxSection({ req }: { req: PayloadRequest }) {
                         label="Setujui"
                         title={`Setujui pengembalian ${rp(r.amount)} (${r.loanDocNo ?? ''}) sebagai ${levelText(r.approvalLevel)}?`}
                         description={<>{r.approvalLevel === 2 ? 'Setelah disetujui Owner, pengembalian masuk Antrian Transfer Finance: kas keluar dari pusat biaya peminjam, kas masuk ke pemberi.' : 'Setelah disetujui Direktur, menunggu persetujuan Owner.'}</>}
-                        confirmLabel="Setujui"
+                        confirmLabel="Setujui pengembalian"
+                        summary={repayInboxSummary(r)}
                         testId={`loan-repay-inbox-approve-${r.id}`}
                       />
-                      <ReasonAction url={`/api/v1/project-loans/${r.loanId}/repayments/${r.id}/reject`} label="Tolak" title={`Tolak pengembalian ${rp(r.amount)}?`} description={<>Alasan penolakan dikirim ke pengaju.</>} confirmLabel="Tolak pengembalian" testId={`loan-repay-inbox-reject-${r.id}`} />
+                      <ReasonAction url={`/api/v1/project-loans/${r.loanId}/repayments/${r.id}/reject`} label="Tolak" title={`Tolak pengembalian ${rp(r.amount)}?`} description={<>Alasan penolakan dikirim ke pengaju.</>} confirmLabel="Tolak pengembalian" summary={repayInboxSummary(r)} testId={`loan-repay-inbox-reject-${r.id}`} />
                     </div>
                   ),
                 },
@@ -902,6 +926,13 @@ export async function LoanTransferOrderSection({ req, companyIds }: { req: Paylo
                 accountsText={`Kas keluar: ${it.fromAccount?.name ?? '—'} (${projectName(it.fromProject)}) · kas masuk: ${it.toAccount?.name ?? '—'} (${projectName(it.toProject)})`}
                 minDate={it.minDate}
                 today={it.today}
+                docText={it.kind === 'loan' ? (it.docNo ?? `pinjaman #${it.loanId}`) : `pengembalian ${it.docNo ?? `pinjaman #${it.loanId}`}`}
+                summary={[
+                  ['Transfer', it.title],
+                  ['Pinjaman', it.docNo ?? `#${it.loanId}`],
+                  ['Dari', projectName(it.fromProject)],
+                  ['Ke', projectName(it.toProject)],
+                ]}
                 testId={`loan-execute-${it.key}`}
               />
             ) : (

@@ -14,6 +14,7 @@ import '../../../core/format/rupiah.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/doc_no_chip.dart';
 import '../../../shared/widgets/form_grid.dart';
@@ -162,22 +163,14 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
     });
     if (errors.isNotEmpty || lender == null || amount == null) return;
     final borrowerCode = o.borrower.company?.shortCode ?? '#${widget.borrowerId}';
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t.icLoanConfirmTitle),
-        content: Text(t.icLoanConfirmBody(lender.company.shortCode, formatRupiah(amount), borrowerCode)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-          FilledButton(
-            key: const Key('icloan-confirm'),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(t.icLoanSubmit),
-          ),
-        ],
-      ),
+    final ok = await confirmAction(
+      context,
+      action: t.icLoanSubmit,
+      summary: ['${lender.company.shortCode} → $borrowerCode', formatRupiah(amount), formatDateOnly(_dueDate)],
+      note: t.icLoanConfirmBody(lender.company.shortCode, formatRupiah(amount), borrowerCode),
+      confirmKey: const Key('icloan-confirm'),
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     final body = icLoanCreateBody(
       borrowerCompanyId: widget.borrowerId,
       lenderCompanyId: lender.company.id,
@@ -201,7 +194,8 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
       }
       ref.invalidate(inboxProvider);
       if (!mounted) return;
-      showSnack(context, t.icLoanInstructed(loan.docNo));
+      await showActionResult(context, message: t.icLoanInstructed(loan.docNo), action: t.icLoanSubmit);
+      if (!mounted) return;
       final router = GoRouter.maybeOf(context);
       if (router != null) {
         unawaited(router.pushReplacement(icLoanPath(loan.id)));
@@ -220,8 +214,12 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
       });
       // the lender's availability may have changed meanwhile (409 LOAN_LENDER_INSUFFICIENT)
       if (e.code == loanLenderInsufficientCode) ref.invalidate(icLenderOptionsProvider(_query));
+      final message = icLoanAwareError(e, errorText);
+      await showActionFailure(context, message, action: t.icLoanSubmit);
     } on Object catch (e) {
-      if (mounted) setState(() => _error = errorText(e));
+      if (!mounted) return;
+      setState(() => _error = errorText(e));
+      await showActionError(context, e, action: t.icLoanSubmit);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -679,6 +677,7 @@ class _IcLoanBody extends ConsumerWidget {
 /// tersedia" below 0 asks for the confirmation of the 409 `LOAN_VOID_BORROWER_SHORTFALL_CONFIRM_REQUIRED`).
 Future<void> _voidMovement(BuildContext context, WidgetRef ref, IcLoan l, IcLoanMovement m) async {
   final t = AppLocalizations.of(context);
+  final label = m.isDisbursement ? t.icLoanVoidDisbursement : t.loanRepaymentVoidConfirm;
   final reason = await showReasonDialog(
     context,
     title: m.isDisbursement
@@ -687,7 +686,7 @@ Future<void> _voidMovement(BuildContext context, WidgetRef ref, IcLoan l, IcLoan
     description: m.isDisbursement
         ? t.icLoanVoidDisbursementBody(l.lenderCode, l.borrowerCode)
         : t.icLoanVoidRepaymentBody(l.borrowerCode, l.lenderCode),
-    confirm: m.isDisbursement ? t.icLoanVoidDisbursement : t.loanRepaymentVoidConfirm,
+    confirm: label,
     keyPrefix: 'icloan-void',
   );
   if (reason == null || !context.mounted) return;
@@ -724,9 +723,11 @@ Future<void> _voidMovement(BuildContext context, WidgetRef ref, IcLoan l, IcLoan
       if (ok != true) return;
       await send(confirm: true);
     }
-    if (context.mounted) showSnack(context, m.isDisbursement ? t.icLoanVoidedDisbursement : t.loanRepaymentVoided);
+    final done = m.isDisbursement ? t.icLoanVoidedDisbursement : t.loanRepaymentVoided;
+    if (context.mounted) await showActionResult(context, message: done, action: label);
   } on ApiException catch (e) {
-    if (context.mounted) showSnack(context, icLoanAwareError(e, errorText));
+    final message = icLoanAwareError(e, errorText);
+    if (context.mounted) await showActionFailure(context, message, action: label);
   } finally {
     ref.invalidate(icLoanDetailProvider(l.id));
     ref.invalidate(icLoanQueueProvider);
@@ -973,8 +974,19 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
       _error = null;
     });
     if (_issues().isNotEmpty) return;
-    setState(() => _busy = true);
     final loan = widget.loan;
+    final label = widget.repay ? t.loanRepaySave : t.icLoanDisburse;
+    if (!confirmOverdraft) {
+      final amount = widget.repay ? parseRupiah(_amount.text) : loan.amount;
+      final summary = [
+        loan.docNo,
+        '${loan.lenderCode} → ${loan.borrowerCode}',
+        amount == null ? null : formatRupiah(amount),
+        _bankRef.text.trim(),
+      ];
+      if (!await confirmAction(context, action: label, summary: summary) || !mounted) return;
+    }
+    setState(() => _busy = true);
     try {
       _proofMediaId ??= await ref
           .read(financeApiProvider)
@@ -1006,14 +1018,13 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
       if (!mounted) return;
       final kk = out.disbursement?.kkNo;
       final km = out.disbursement?.kmNo;
-      showSnack(
-        context,
-        widget.repay
-            ? t.icLoanRepayDone(out.docNo, formatRupiah(parseRupiah(_amount.text) ?? 0))
-            : kk != null && km != null
-            ? t.icLoanDisbursed(out.docNo, kk, km)
-            : t.icLoanDisbursedShort(out.docNo),
-      );
+      final done = widget.repay
+          ? t.icLoanRepayDone(out.docNo, formatRupiah(parseRupiah(_amount.text) ?? 0))
+          : kk != null && km != null
+          ? t.icLoanDisbursed(out.docNo, kk, km)
+          : t.icLoanDisbursedShort(out.docNo);
+      await showActionResult(context, message: done, action: label);
+      if (!mounted) return;
       final router = GoRouter.maybeOf(context);
       if (router != null && router.canPop()) {
         router.pop(true);
@@ -1024,8 +1035,10 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
       final prompt = transferOverridePrompt(t, e);
       if (!mounted) return;
       if (prompt == null || prompt.flag != 'confirmOverdraft') {
-        setState(() => _error = icLoanAwareError(e, errorText));
+        final message = icLoanAwareError(e, errorText);
+        setState(() => _error = message);
         if (e.code == loanLenderInsufficientCode) ref.invalidate(icLoanQueueProvider);
+        await showActionFailure(context, message, action: label);
         return;
       }
       setState(() => _busy = false);

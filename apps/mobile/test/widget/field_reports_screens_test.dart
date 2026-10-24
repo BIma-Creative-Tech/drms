@@ -343,6 +343,8 @@ void main() {
       expect(find.text('EX-01 · HM 1.023 → 1.025 · 1 sparepart · 1 foto'), findsOneWidget);
       await tester.tap(find.byKey(const Key('service-submit')));
       await tester.pumpAndSettle();
+      expect(find.text('Yakin ingin kirim laporan servis?'), findsOneWidget);
+      await confirmPopup(tester);
       final (d, online) = service.submitted.single;
       expect(online, isTrue);
       final c = d.service;
@@ -420,6 +422,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.byKey(const Key('service-submit')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       final c = service.submitted.single.$1.service;
       expect(c.serviceTypeIds, [9, 7]);
       expect(c.serviceTypeNames, {9: 'Las', 7: 'Perbaikan'});
@@ -460,6 +463,7 @@ void main() {
       await pump(tester, ServiceReportScreen(initial: draft(old)));
       await tester.tap(find.byKey(const Key('service-submit')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       final mapped = service.submitted.single.$1.service;
       expect(mapped.serviceTypeIds, [7]);
       expect(mapped.legacyServiceType, isNull);
@@ -479,6 +483,7 @@ void main() {
       expect(find.byKey(const Key('service-type-pemasangan')), findsOneWidget);
       await tester.tap(find.byKey(const Key('service-submit')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       final c = service.submitted.single.$1.service;
       expect(c.serviceTypeIds, isEmpty);
       expect(c.legacyServiceType, 'pemasangan');
@@ -547,6 +552,7 @@ void main() {
       expect(find.text('Simpan & lanjut ke EX-02'), findsOneWidget);
       await tester.tap(find.byKey(const Key('timesheet-submit')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       final (d, _) = service.submitted.single;
       final c = d.timesheet;
       expect(
@@ -557,6 +563,7 @@ void main() {
         (c.breakdownReason, c.operatorName, c.hmPhoto, c.previousHmEnd),
         ('Hidrolik bocor', 'Slamet', 'ph-1', 1023.0),
       );
+      await dismissResult(tester);
       // next unit opened, empty, HM awal prefilled again
       expect(tester.widget<TextField>(find.byKey(const Key('timesheet-operator'))).controller!.text, '');
       await tester.pump(const Duration(seconds: 1));
@@ -639,6 +646,7 @@ void main() {
       await tester.ensureVisible(find.byKey(const Key('activity-submit')));
       await tester.tap(find.byKey(const Key('activity-submit')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       final (d, _) = service.submitted.single;
       final c = d.activity;
       expect(
@@ -648,6 +656,7 @@ void main() {
       expect((c.docNo, c.receiver, c.value), ('SJ-0441', 'Budi', 3100000));
       expect(c.photos, ['ph-1']);
       expect(c.filledItems.map((i) => i.summary), ['Seal kit 1 set', 'Filter 4 pcs']);
+      await dismissResult(tester);
       // ready for the next activity (customer kept)
       expect(tester.widget<TextField>(find.byKey(const Key('activity-doc'))).controller!.text, '');
       await tester.pump(const Duration(seconds: 1));
@@ -719,6 +728,7 @@ void main() {
       expect(tester.widget<OutlinedButton>(find.byKey(const Key('field-conflict-resend'))).onPressed, isNull);
       await tester.tap(find.byKey(const Key('field-conflict-use-server')));
       await tester.pumpAndSettle();
+      await confirmPopup(tester);
       expect(service.usedServer, ['c-2']);
     });
   });

@@ -6134,4 +6134,66 @@ class AppLocalizationsId extends AppLocalizations {
   String loanTransferOrderDone(String no) {
     return 'Transfer $no tercatat.';
   }
+
+  @override
+  String confirmActionTitle(String action) {
+    return 'Yakin ingin $action?';
+  }
+
+  @override
+  String confirmActionYes(String action) {
+    return 'Ya, $action';
+  }
+
+  @override
+  String get resultOk => 'OK';
+
+  @override
+  String get resultSuccessTitle => 'Berhasil';
+
+  @override
+  String resultSuccessAction(String action) {
+    return 'Berhasil: $action';
+  }
+
+  @override
+  String get resultFailedTitle => 'Gagal';
+
+  @override
+  String resultFailedAction(String action) {
+    return 'Gagal: $action';
+  }
+
+  @override
+  String get resultQueuedTitle => 'Tersimpan di antrian';
+
+  @override
+  String get resultQueuedBody => 'Tersimpan di antrian, akan dikirim saat online.';
+
+  @override
+  String get actionReceiptsCompleteVerb => 'Tandai nota lengkap';
+
+  @override
+  String get receiptSaveAction => 'Simpan nota';
+
+  @override
+  String get correctionSaveAction => 'Simpan koreksi';
+
+  @override
+  String get scheduleAssignAction => 'Ubah jadwal karyawan';
+
+  @override
+  String get fieldDiscardAction => 'Hapus draft';
+
+  @override
+  String get progressDiscardAction => 'Hapus laporan';
+
+  @override
+  String get progressResendAction => 'Kirim versi HP';
+
+  @override
+  String get accountSignatureSaveAction => 'Simpan tanda tangan';
+
+  @override
+  String get accountSignatureRemoveAction => 'Hapus tanda tangan';
 }

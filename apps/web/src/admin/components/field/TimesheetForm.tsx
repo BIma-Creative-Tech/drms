@@ -7,7 +7,7 @@ import { addDays, BACKDATE_LIMIT_TEXT, BREAKDOWN_SUGGEST_SERVICE_HOURS, HM_PHOTO
 import { fmtNum, hoursCheck, inPeriod, longDate } from '@/domain/field/views'
 
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
-import { getJson } from './client'
+import { askField, fieldResult, getJson } from './client'
 import { decOut, DecimalField, PhotoPicker, ReasonField, usePhotos, type ExistingPhoto } from './parts'
 import { DateInput } from '../DateInput'
 import { WrapSelect } from '../WrapSelect'
@@ -197,6 +197,10 @@ export function TimesheetForm({
       summaryRef.current?.focus()
       return
     }
+    // DRMS 24/10: popup before (unit, date, changed fields) and after
+    const tsAction = mode === 'correction' ? 'Simpan koreksi timesheet' : 'Simpan perubahan timesheet'
+    const tsDoc = `${unit?.label ?? 'unit'} ${t.reportDate}`
+    if (!(await askField(tsAction, tsDoc, [['Unit', unit?.label], ['Tanggal', t.reportDate], ['Kolom diubah', Object.keys(body).length], ['Alasan', why.trim() || null]]))) return
     setSummary(null)
     try {
       if (photos.items.length > 0) {
@@ -209,15 +213,18 @@ export function TimesheetForm({
       if (!idem.current || idem.current.body !== json) idem.current = { body: json, key: newIdemKey() }
       const r = mode === 'correction' ? await sendJson('POST', `/api/v1/unit-timesheets/${t.id}/corrections`, body, idem.current.key) : await sendJson('PATCH', `/api/v1/unit-timesheets/${t.id}`, body, idem.current.key)
       if (!r.ok) {
+        fieldResult(tsAction, tsDoc, r.error)
         setErrors(fieldErrors(r.data))
         setSummary(r.error)
         summaryRef.current?.focus()
         return
       }
+      fieldResult(tsAction, tsDoc, null)
       router.push(`/admin/unit-kontrak/timesheet/detail/${t.id}?disimpan=1`)
       router.refresh()
     } catch (x) {
       setSummary(x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+      fieldResult(tsAction, tsDoc, x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi.')
       summaryRef.current?.focus()
     } finally {
       setBusy(null)
@@ -254,6 +261,9 @@ export function TimesheetForm({
       await saveChanges(t0)
       return
     }
+    // DRMS 24/10: popup before (contract, unit, date, HM, hours) and after
+    const tsDoc = `${unit!.label} ${date}`
+    if (!(await askField('Simpan timesheet', tsDoc, [['Kontrak / project', project!.label], ['Unit', unit!.label], ['Tanggal', date], ['HM awal → akhir', `${num(hs)} → ${num(he)}`], ['Kerja / standby / breakdown (jam)', `${num(w)} / ${num(s ?? 0)} / ${num(b ?? 0)}`]]))) return
     setSummary(null)
     try {
       setBusy(photos.items.length ? 'Mengunggah foto HM…' : 'Menyimpan…')
@@ -281,15 +291,18 @@ export function TimesheetForm({
       if (!idem.current || idem.current.body !== json) idem.current = { body: json, key: newIdemKey() }
       const r = await sendJson('POST', '/api/v1/unit-timesheets', body, idem.current.key)
       if (!r.ok) {
+        fieldResult('Simpan timesheet', tsDoc, r.error)
         setErrors(fieldErrors(r.data))
         setSummary(r.error)
         summaryRef.current?.focus()
         return
       }
+      fieldResult('Simpan timesheet', tsDoc, null)
       router.push(`/admin/unit-kontrak/timesheet/detail/${(r.data as { id: number }).id}?baru=1`)
       router.refresh()
     } catch (x) {
       setSummary(x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi — timesheet yang sama tidak akan tercatat dua kali.')
+      fieldResult('Simpan timesheet', tsDoc, x instanceof Error && x.message ? x.message : 'Gagal menghubungi server. Coba lagi.')
       summaryRef.current?.focus()
     } finally {
       setBusy(null)

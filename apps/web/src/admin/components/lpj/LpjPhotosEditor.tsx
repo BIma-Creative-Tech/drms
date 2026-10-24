@@ -2,6 +2,8 @@
 import React, { useRef, useState } from 'react'
 
 import { problemText } from '../ActionButton'
+import { useDocSummary } from '../feedback/DocContext'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, isDangerAction, showResult, successTitle, type Summary } from '../feedback/feedback'
 import { KAS_STYLE } from '../kas/style'
 import { LpjPhotoGrid } from './LpjPhotoGrid'
 
@@ -13,6 +15,7 @@ const idemKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ?
  * LPJ photo picker). Each new image is uploaded to POST /api/v1/media/receipts (re-encoded, EXIF stripped —
  * same pipeline as receipt photos), then the whole set is saved with PUT …/lpj/photos (the server claims each
  * file for the request and re-checks role, status and the limit of 10). Read-only once the LPJ is sent.
+ * DRMS 24/10: "Yakin ingin tambah / hapus foto LPJ?" first, the result popup after (plus the inline note).
  */
 export function LpjPhotosEditor({ requestId, photos: initial }: { requestId: number; photos: number[] }) {
   const [photos, setPhotos] = useState<number[]>(initial)
@@ -20,6 +23,7 @@ export function LpjPhotosEditor({ requestId, photos: initial }: { requestId: num
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const input = useRef<HTMLInputElement>(null)
+  const doc = useDocSummary()
 
   const save = async (next: number[]) => {
     const key = idemKey()
@@ -33,15 +37,19 @@ export function LpjPhotosEditor({ requestId, photos: initial }: { requestId: num
     if (!r.ok) throw new Error(problemText(data, r.status))
     setPhotos(next)
   }
-  const run = async (fn: () => Promise<void>, done: string) => {
-    setBusy(true)
+  const run = async (action: string, summary: Summary, fn: () => Promise<void>, done: string) => {
     setError(null)
     setNote(null)
+    if (!(await confirmAction({ title: confirmTitle(action, doc.object ? `pada ${doc.object}` : null), summary: [...(doc.summary ?? []), ...summary], confirmLabel: confirmLabel(action), danger: isDangerAction(action) }))) return
+    setBusy(true)
     try {
       await fn()
       setNote(done)
+      showResult({ ok: true, title: successTitle(action, doc.object ? `pada ${doc.object}` : null), message: done })
     } catch (e) {
-      setError((e as Error).message || 'Gagal menghubungi server.')
+      const msg = (e as Error).message || 'Gagal menghubungi server.'
+      setError(msg)
+      showResult({ ok: false, title: failureTitle(action), message: msg })
     } finally {
       setBusy(false)
     }
@@ -54,7 +62,7 @@ export function LpjPhotosEditor({ requestId, photos: initial }: { requestId: num
       setError(`Maksimal ${MAX_LPJ_PHOTOS} foto LPJ (sisa ${MAX_LPJ_PHOTOS - photos.length}).`)
       return
     }
-    void run(async () => {
+    void run('Tambah foto LPJ', [['Foto baru', list.map((f) => f.name).join(', ')], ['Jumlah setelah disimpan', `${photos.length + list.length}/${MAX_LPJ_PHOTOS}`]], async () => {
       const added: number[] = []
       for (const f of list) {
         if (!/^image\/(jpeg|png|webp)$/.test(f.type)) throw new Error(`"${f.name}" bukan foto JPG/PNG/WebP.`)
@@ -83,7 +91,7 @@ export function LpjPhotosEditor({ requestId, photos: initial }: { requestId: num
             type="button"
             className="pk-kbtn sm danger"
             disabled={busy}
-            onClick={() => void run(() => save(photos.filter((p) => p !== id)), 'Foto LPJ dihapus.')}
+            onClick={() => void run('Hapus foto LPJ', [['Foto', `#${photos.indexOf(id) + 1} dari ${photos.length}`]], () => save(photos.filter((p) => p !== id)), 'Foto LPJ dihapus.')}
             data-pk-action={`lpj-photo-remove-${id}`}
             aria-label="Hapus foto LPJ ini"
           >

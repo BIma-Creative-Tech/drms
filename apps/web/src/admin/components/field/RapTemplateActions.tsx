@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation'
 import React, { useId, useState } from 'react'
 
 import { problemText } from '../ActionButton'
+import { askField, fieldResult } from './client'
 import { WrapSelect } from '../WrapSelect'
 import { WrapText } from '../WrapText'
 
@@ -37,15 +38,19 @@ export function RapTemplateActions({ projectId, templates, empty }: { projectId:
     return data
   }
 
-  const run = async (label: string, fn: () => Promise<string>) => {
+  /** DRMS 24/10: `action` is asked first ("Yakin ingin …?" + summary) and named in the result popup. */
+  const run = async (label: string, action: string, object: string | null, summary: Array<[string, string | number | null]>, fn: () => Promise<string>) => {
     setError(null)
     setDone(null)
+    if (!(await askField(action, object, summary))) return
     setBusy(label)
     try {
       setDone(await fn())
+      fieldResult(action, object, null)
       router.refresh()
     } catch (x) {
       setError((x as Error).message)
+      fieldResult(action, object, (x as Error).message || 'Gagal menghubungi server.')
     } finally {
       setBusy(null)
     }
@@ -53,7 +58,7 @@ export function RapTemplateActions({ projectId, templates, empty }: { projectId:
 
   const apply = () =>
     templateId
-      ? run('Memakai template…', async () => {
+      ? run('Memakai template…', 'Pakai template RAP', templates.find((t) => String(t.id) === templateId)?.name ?? null, [['Template', templates.find((t) => String(t.id) === templateId)?.name ?? null], ['Jumlah item', templates.find((t) => String(t.id) === templateId)?.items ?? null]], async () => {
           await post('apply-template', { templateId: Number(templateId) })
           return 'RAP terisi dari template.'
         })
@@ -61,7 +66,7 @@ export function RapTemplateActions({ projectId, templates, empty }: { projectId:
 
   const save = () =>
     name.trim().length >= 3
-      ? run('Menyimpan template…', async () => {
+      ? run('Menyimpan template…', 'Simpan sebagai template RAP', name.trim(), [['Nama template', name.trim()]], async () => {
           const t = (await post('save-template', { name: name.trim() })) as { name: string; items: number }
           setName('')
           return `Template "${t.name}" tersimpan (${t.items} item).`

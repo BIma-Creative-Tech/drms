@@ -195,6 +195,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('onb-save')));
     await tester.pumpAndSettle();
+    await confirmPopup(tester);
     expect(api.saved.single, {
       'user': {'email': 'baru@x.test', 'name': 'Pengguna Baru', 'phone': null},
       'companies': [

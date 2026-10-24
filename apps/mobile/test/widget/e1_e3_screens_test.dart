@@ -318,7 +318,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(api.decisions, 1);
-      expect(find.textContaining('Hanya PM project pengajuan ini, Direktur dan Finance'), findsOneWidget);
+      // D2410: inline in the sheet and in the "Gagal" popup
+      expect(find.textContaining('Hanya PM project pengajuan ini, Direktur dan Finance'), findsNWidgets(2));
+      expect(find.byKey(const Key('result-failed')), findsOneWidget);
     });
   });
 

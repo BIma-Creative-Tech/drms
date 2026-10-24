@@ -7,6 +7,7 @@ import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/doc_no_chip.dart';
 import '../../../shared/widgets/form_grid.dart';
@@ -587,10 +588,12 @@ class _DecisionBar extends ConsumerWidget {
 
     Future<void> open(Decision decision) async {
       final done = await showDecisionSheet(context, detail: detail, decision: decision);
-      if (done == true && context.mounted) showSnack(context, t.decisionDone);
       // Also after a refusal (403/409): the buttons must reflect the server's current allowedActions.
       ref.invalidate(requestDetailProvider(detail.id));
       ref.invalidate(inboxProvider);
+      if (done != true || !context.mounted) return;
+      final message = '${detail.docNo ?? detail.title}: ${t.decisionDone}';
+      await showActionResult(context, message: message, action: decisionActionLabel(t, decision));
     }
 
     final pm = detail.approvalRule?.pmApproval ?? false;

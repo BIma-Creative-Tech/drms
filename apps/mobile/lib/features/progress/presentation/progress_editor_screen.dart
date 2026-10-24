@@ -7,6 +7,7 @@ import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../app/providers.dart';
 import '../../auth/application/auth_controller.dart';
@@ -230,6 +231,9 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
     if (errors.isNotEmpty) return;
     final online = ref.read(connectivityProvider);
     final queue = ref.read(progressQueueEnabledForProvider(d.companyId));
+    final label = queue ? t.progressSaveQueue : t.progressSendOnline;
+    final summary = [_projectLabel, _stageLabel, fmtPct(d.pctAfter)];
+    if (!await confirmAction(context, action: label, summary: summary) || !mounted) return;
     setState(() => _busy = true);
     try {
       final outcome = await ref.read(progressServiceProvider).save(sub, d, online: online, queueEnabled: queue);
@@ -240,20 +244,20 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
         ref.invalidate(projectProgressProvider);
       }
       if (!mounted) return;
-      showSnack(
-        context,
-        outcome == ProgressSaveOutcome.sent
-            ? t.progressSent
-            : (online ? t.progressQueuedOnline : t.progressQueuedOffline),
-      );
-      Navigator.of(context).maybePop();
+      if (outcome == ProgressSaveOutcome.sent || online) {
+        final done = outcome == ProgressSaveOutcome.sent ? t.progressSent : t.progressQueuedOnline;
+        await showActionResult(context, message: done, action: label);
+      } else {
+        await showActionQueued(context, action: label, message: t.progressQueuedOffline);
+      }
+      if (mounted) Navigator.of(context).maybePop();
     } on NetworkException {
       if (mounted) {
-        showSnack(context, t.progressKeptLocal);
-        Navigator.of(context).maybePop();
+        await showActionQueued(context, action: label, message: t.progressKeptLocal);
+        if (mounted) Navigator.of(context).maybePop();
       }
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -263,19 +267,11 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
     final t = AppLocalizations.of(context);
     final sub = ref.read(currentSubProvider);
     if (sub == null) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t.progressDiscardTitle),
-        content: Text(t.progressDiscardBody),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.delete)),
-        ],
-      ),
-    );
-    if (ok != true) return;
+    final ok = await confirmAction(context, action: t.progressDiscardAction, note: t.progressDiscardBody);
+    if (!ok) return;
     await ref.read(progressServiceProvider).discard(sub, _uuid);
+    if (!mounted) return;
+    await showActionResult(context, message: t.fieldDiscarded, action: t.progressDiscardAction);
     if (mounted) Navigator.of(context).maybePop();
   }
 

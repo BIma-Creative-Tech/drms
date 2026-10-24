@@ -14,6 +14,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/platform/report_files.dart';
 import '../../auth/domain/user_profile.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/online_only_button.dart';
@@ -375,6 +376,17 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     });
   }
 
+  /// D2410: "Simpan draft" asks first and reports after; the submit path saves quietly (its own popups).
+  Future<void> _saveDraft() async {
+    final t = AppLocalizations.of(context);
+    final draft = _collect();
+    setState(() => _issues = validateForSave(draft));
+    if (_issues.isNotEmpty) return;
+    final summary = [draft.title, formatRupiah(draft.previewGrandTotal)];
+    if (!await confirmAction(context, action: t.saveDraft, summary: summary) || !mounted) return;
+    await _save();
+  }
+
   Future<bool> _save({bool quiet = false}) async {
     final t = AppLocalizations.of(context);
     final sub = ref.read(currentSubProvider);
@@ -396,13 +408,19 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
           );
       _d = saved;
       ref.read(syncCoordinatorProvider.notifier).requestSync();
-      if (mounted && !quiet) showSnack(context, online ? t.draftSaved : t.draftSavedQueued);
+      if (mounted && !quiet) {
+        if (online) {
+          await showActionResult(context, message: t.draftSaved, action: t.saveDraft);
+        } else {
+          await showActionQueued(context, action: t.saveDraft, message: t.draftSavedQueued);
+        }
+      }
       return true;
     } on DraftValidationException catch (e) {
       setState(() => _issues = e.issues);
       return false;
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: quiet ? t.submit : t.saveDraft);
       return false;
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -433,31 +451,24 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     final issues = validateForSubmit(draft, selfOnlyEmployee: _selfOnlyEmployee(), rap: _rapCheck());
     setState(() => _issues = issues);
     if (issues.isNotEmpty) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        content: Text(t.submitConfirm),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
-          FilledButton(
-            key: const Key('submit-confirm'),
-            onPressed: () => Navigator.pop(c, true),
-            child: Text(t.submit),
-          ),
-        ],
-      ),
+    final ok = await confirmAction(
+      context,
+      action: t.submit,
+      summary: [draft.title, formatRupiah(draft.previewGrandTotal)],
+      note: t.submitConfirm,
+      confirmKey: const Key('submit-confirm'),
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     if (!await _save(quiet: true)) return;
     final sub = ref.read(currentSubProvider);
     if (sub == null) return;
     setState(() => _busy = true);
     try {
       final detail = await ref.read(draftServiceProvider).submit(sub, _d, rap: _rapCheck());
-      if (!mounted) return;
-      showSnack(context, t.submitted);
       ref.invalidate(requestListProvider('mine'));
-      context.pushReplacement('/requests/${detail.id}');
+      if (!mounted) return;
+      await showActionResult(context, message: '${detail.docNo ?? ''} ${t.submitted}'.trim(), action: t.submit);
+      if (mounted) context.pushReplacement('/requests/${detail.id}');
     } on DraftValidationException catch (e) {
       setState(() => _issues = e.issues);
     } on ProblemException catch (e) {
@@ -472,12 +483,13 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
       // message offers "Perintahkan pinjaman antar-PT" to the Owner of the PT
       final fund = fundProblemMessage(e, draft: true);
       if (mounted && fund != null) {
-        _showFundShortSnack(fund, e);
+        await showActionFailure(context, fund, action: t.submit);
+        if (mounted) _showFundShortSnack(fund, e);
       } else if (mounted) {
-        showSnack(context, intercompanyAwareError(e, errorText));
+        await showActionFailure(context, intercompanyAwareError(e, errorText), action: t.submit);
       }
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: t.submit);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -526,19 +538,17 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
   Future<void> _delete() async {
     final t = AppLocalizations.of(context);
     final sub = ref.read(currentSubProvider);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        content: Text(t.deleteDraftConfirm),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(t.delete)),
-        ],
-      ),
+    final ok = await confirmAction(
+      context,
+      action: t.fieldDiscardAction,
+      summary: [_d.title],
+      note: t.deleteDraftConfirm,
     );
-    if (ok != true || sub == null) return;
+    if (!ok || sub == null) return;
     await ref.read(draftServiceProvider).delete(sub, _d, online: ref.read(connectivityProvider));
     ref.read(syncCoordinatorProvider.notifier).requestSync();
+    if (!mounted) return;
+    await showActionResult(context, message: t.fieldDiscarded, action: t.fieldDiscardAction);
     if (mounted) context.pop();
   }
 
@@ -1163,7 +1173,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
             const SizedBox(height: 16),
             OutlinedButton.icon(
               key: const Key('save-draft'),
-              onPressed: _busy ? null : _save,
+              onPressed: _busy ? null : _saveDraft,
               icon: const Icon(Icons.save),
               label: Text(t.saveDraft),
             ),

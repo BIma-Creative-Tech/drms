@@ -2,6 +2,9 @@
 import { useRouter } from 'next/navigation'
 import React, { useId, useRef, useState } from 'react'
 
+import { useDocSummary } from '../feedback/DocContext'
+import { asConfirmLabel, asConfirmTitle, failureTitle, showResult, successTitle, type Summary } from '../feedback/feedback'
+import { FeedbackStyle, SummaryList } from '../feedback/FeedbackHost'
 import { newIdemKey, sendJson } from './client'
 
 /**
@@ -14,6 +17,9 @@ import { newIdemKey, sendJson } from './client'
  * No <form>: the transfer void lives in the expense-request workflow panel, i.e. INSIDE Payload's document
  * <form> — a nested <form> is invalid HTML and broke hydration of the request detail (DRMS 10/10 int., g).
  * The confirm button submits by click; the textarea keeps Enter for new lines (same as ActionDialog).
+ * DRMS 24/10: this dialog IS the confirmation (no second popup) — it shows the `summary` of the surrounding
+ * DocSummaryProvider (number, amount, person) unless given, and the result popup follows (feedback.ts): "Berhasil:
+ * <aksi> <dokumen>" or the server's error on top of the still-open dialog.
  */
 export type ReasonActionProps = {
   url: string
@@ -37,12 +43,18 @@ export type ReasonActionProps = {
    * of a loan disbursement void — the server answers 409 with the figures while it is missing).
    */
   confirm?: { field: string; label: string }
+  /** DRMS 24/10: what is affected; default the surrounding DocSummaryProvider. */
+  summary?: Summary
+  /** DRMS 24/10: message of the success popup. */
+  success?: string
 }
 
 const MIN = 3
 
-export function ReasonAction({ url, label, title, description, confirmLabel, fieldLabel = 'Alasan', field = 'reason', body, required = true, variant = 'danger', size = 'sm', testId, redirectTo, confirm }: ReasonActionProps) {
+export function ReasonAction({ url, label, title, description, confirmLabel, fieldLabel = 'Alasan', field = 'reason', body, required = true, variant = 'danger', size = 'sm', testId, redirectTo, confirm, summary: summaryProp, success }: ReasonActionProps) {
   const router = useRouter()
+  const doc = useDocSummary()
+  const summary = summaryProp ?? doc.summary
   const ref = useRef<HTMLDialogElement>(null)
   const key = useRef<string | undefined>(undefined)
   const [value, setValue] = useState('')
@@ -73,14 +85,20 @@ export function ReasonAction({ url, label, title, description, confirmLabel, fie
       const r = await sendJson('POST', url, payload, key.current)
       if (!r.ok) {
         setError(r.error)
+        showResult({ ok: false, title: failureTitle(confirmLabel), message: r.error, testId })
         return
       }
       ref.current?.close()
       setValue('')
+      // "Void transfer TRF/…" (label) names its document; "Tolak" + "Tolak addendum" → the provider's number
+      const act = label.length > confirmLabel.length ? label : confirmLabel
+      showResult({ ok: true, title: successTitle(act, /\S\/\S/.test(act) ? null : doc.object), message: success ?? null, testId })
       if (redirectTo) router.push(redirectTo)
       router.refresh()
     } catch {
-      setError('Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+      const msg = 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.'
+      setError(msg)
+      showResult({ ok: false, title: failureTitle(confirmLabel), message: msg, testId })
     } finally {
       setBusy(false)
     }
@@ -88,12 +106,14 @@ export function ReasonAction({ url, label, title, description, confirmLabel, fie
   const btn = `pk-kbtn ${variant === 'secondary' ? '' : variant}${size === 'sm' ? ' sm' : ''}`
   return (
     <>
+      <FeedbackStyle />
       <button type="button" className={btn} onClick={open} data-pk-action={testId}>
         {label}
       </button>
       <dialog ref={ref} className="pk-dlg" aria-labelledby={`${uid}-t`} aria-describedby={`${uid}-d`} onCancel={(e) => busy && e.preventDefault()}>
         <div role="form" aria-labelledby={`${uid}-t`}>
-          <h2 id={`${uid}-t`}>{title}</h2>
+          <h2 id={`${uid}-t`}>{asConfirmTitle(title)}</h2>
+          <SummaryList summary={summary} />
           <div id={`${uid}-d`} className="desc">
             {description}
           </div>
@@ -147,7 +167,7 @@ export function ReasonAction({ url, label, title, description, confirmLabel, fie
               Batal
             </button>
             <button type="button" onClick={() => void submit()} className={`pk-kbtn ${variant === 'danger' ? 'danger-solid' : 'primary'}`} disabled={busy} data-pk-confirm={testId}>
-              {busy ? 'Memproses…' : confirmLabel}
+              {busy ? 'Memproses…' : asConfirmLabel(confirmLabel)}
             </button>
           </div>
         </div>

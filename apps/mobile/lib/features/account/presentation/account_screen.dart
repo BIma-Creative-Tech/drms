@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:signature/signature.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../application/account_providers.dart';
 import '../domain/account.dart';
@@ -84,24 +85,25 @@ class _SignatureSection extends ConsumerStatefulWidget {
 class _SignatureSectionState extends ConsumerState<_SignatureSection> {
   bool _busy = false;
 
-  Future<void> _run(Future<MeAccount> Function() action, String done) async {
+  Future<void> _run(Future<MeAccount> Function() action, String done, String label) async {
     setState(() => _busy = true);
-    final messenger = ScaffoldMessenger.of(context);
     try {
       await action();
       ref.invalidate(meAccountProvider);
-      messenger.showSnackBar(SnackBar(content: Text(done)));
+      if (mounted) await showActionResult(context, message: done, action: label);
     } on Object catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(errorText(e))));
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _save(Uint8List png) {
+  Future<void> _save(Uint8List png) async {
     final t = AppLocalizations.of(context);
     final api = ref.read(accountApiProvider);
-    return _run(() async => api.setSignature(await api.uploadSignature(png)), t.accountSignatureSaved);
+    final label = t.accountSignatureSaveAction;
+    if (!await confirmAction(context, action: label) || !mounted) return;
+    await _run(() async => api.setSignature(await api.uploadSignature(png)), t.accountSignatureSaved, label);
   }
 
   Future<void> _draw() async {
@@ -135,22 +137,15 @@ class _SignatureSectionState extends ConsumerState<_SignatureSection> {
 
   Future<void> _remove() async {
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        content: Text(t.accountSignatureRemoveConfirm),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
-          FilledButton(
-            key: const Key('account-signature-remove-confirm'),
-            onPressed: () => Navigator.pop(c, true),
-            child: Text(t.accountSignatureRemove),
-          ),
-        ],
-      ),
+    final label = t.accountSignatureRemoveAction;
+    final ok = await confirmAction(
+      context,
+      action: label,
+      note: t.accountSignatureRemoveConfirm,
+      confirmKey: const Key('account-signature-remove-confirm'),
     );
-    if (ok != true || !mounted) return;
-    await _run(() => ref.read(accountApiProvider).setSignature(null), t.accountSignatureRemoved);
+    if (!ok || !mounted) return;
+    await _run(() => ref.read(accountApiProvider).setSignature(null), t.accountSignatureRemoved, label);
   }
 
   @override
