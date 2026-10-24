@@ -67,6 +67,9 @@ export function meCapabilities(
     instructIntercompanyLoan: stored.includes('pk-principal'),
     disburseIntercompanyLoan: stored.includes('pk-finance'),
     fundCheckEnabled: opts.fundCheckEnabled === true,
+    // ADR 0032: "Absenkan karyawan" — PM (team members at team locations) or Admin Staff (any employee of the PT)
+    attendanceOnBehalf: roles.some((r) => r === 'pk-pm' || r === 'pk-admin-staff'),
+    attendanceAdminStaff: roles.includes('pk-admin-staff'),
   }
 }
 

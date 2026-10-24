@@ -119,6 +119,8 @@ export const Projects: CollectionConfig = withAudit(
         'pk-staff': assignedProjects('id'),
         // Operator/Anggota: its assigned projects only — the APK attendance location list (masters)
         'pk-operator': assignedProjects('id'),
+        // ADR 0032: Admin Staff reads the projects of its PT (attendance locations / names; money stays field-guarded)
+        'pk-admin-staff': true,
       }),
       create: rolesAllowed(...PROJECT_EDITOR_ROLES),
       update: byRole({

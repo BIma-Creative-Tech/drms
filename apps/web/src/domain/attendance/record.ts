@@ -29,7 +29,9 @@ import { closedProjectMessage, isClosedProjectStatus } from '@/domain/projects/s
  * MEDIA_MISSING / FORBIDDEN (selfie) → ALREADY_CHECKED_IN / NO_CHECK_IN / ALREADY_CHECKED_OUT.
  * On-behalf (source `pm`) additionally: caller holds pk-pm, the location is in the caller's TEAM
  * scope, the employee is not the caller, reason mandatory (schema) — the selfie and GPS come from
- * the PM's phone (plan fase1-golive E6).
+ * the PM's phone (plan fase1-golive E6). ADR 0032 (source `admin`, "diabsenkan oleh Admin Staff"): caller holds
+ * pk-admin-staff in the location's PT — ANY employee of that PT (also without an account), any registered location;
+ * the employee's own attendance-type rule is evaluated against the Admin Staff's GPS fix; never the own employee.
  */
 export class AttendanceReject extends Error {
   constructor(
@@ -85,7 +87,8 @@ export type RecordInput = {
   flags: string[]
   clientUuid: string
   device: number | null
-  source: 'self' | 'pm'
+  /** `pm` = diabsenkan PM (team), `admin` = diabsenkan Admin Staff (ADR 0032, any employee of the PT). */
+  source: 'self' | 'pm' | 'admin'
   recordedBy: number | null
   onBehalfReason: string | null
   timeZone: string
@@ -258,6 +261,8 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
     const team = input.location.type === 'project' ? scope.teamProjects : input.location.type === 'site' ? [] : scope.teamCostCenters
     if (!team.includes(input.location.id)) reject('FORBIDDEN', `Hanya untuk ${LABEL[input.location.type]} tim Anda.`, locField)
   }
+  // ADR 0032: Admin Staff IN THE LOCATION's PT (any location / employee of that PT; the PT match is checked below)
+  if (input.source === 'admin' && !hasRole(req, 'pk-admin-staff', company)) reject('FORBIDDEN', 'Hanya Admin Staff PT ini yang dapat mengabsenkan karyawan.', locField)
   // DRMS 13/10 A2: own PT only (normally caught earlier as NOT_FOUND / COMPANY_MISMATCH; the DB trigger too)
   if (!emp || emp.company !== company) reject('NOT_ASSIGNED', NOT_ELIGIBLE_OTHER_PT, locField)
   let resolved: Resolved
@@ -341,7 +346,7 @@ export type WebCheckInput = { location: Location; lat: number; lng: number; accu
  * syncAttendanceEnabled, ADR 0018 privacy ack) and the SAME single write path (recordAttendance
  * above). Unlike the APK: no offline queue (no replay/idempotency table needed — `clientUuid` is
  * generated here, one-shot), no mocked-location signal (browser geolocation has none to report),
- * no "diabsenkan PM" (web self-service only; PM on-behalf stays an APK/sync feature).
+ * no "diabsenkan PM" here (web self-service; the Admin Staff on-behalf of ADR 0032 is recordWebOnBehalf below).
  */
 export async function recordWebAttendance(req: PayloadRequest, kind: AttendanceKind, input: WebCheckInput): Promise<RecordResult> {
   const uid = userId(req)
@@ -389,5 +394,83 @@ export async function recordWebAttendance(req: PayloadRequest, kind: AttendanceK
     recordedBy: null,
     onBehalfReason: null,
     timeZone: s.timezone || DEFAULT_TZ,
+  })
+}
+
+export type OnBehalfActor = { employee: number; user: number | null; source: 'pm' | 'admin' }
+
+/**
+ * Who records an on-behalf attendance and for whom (sync item `attendance.on_behalf` and the web
+ * POST /attendance/on-behalf): Admin Staff of the PT (ADR 0032; any employee of the PT) wins over PM (US-14; team
+ * locations, checked in recordAttendance). Never the caller's own employee; the employee must exist in a mapped PT,
+ * be active and belong to the location's PT. `pmAllowed` false = Admin Staff only (web).
+ */
+export async function onBehalfActor(req: PayloadRequest, opts: { employeeId: number; locCompany: number | undefined; own: number | undefined; pmAllowed: boolean; field?: string }): Promise<OnBehalfActor> {
+  const field = opts.field ?? 'payload.employee_id'
+  const source: 'pm' | 'admin' | null = hasRole(req, 'pk-admin-staff', opts.locCompany) ? 'admin' : opts.pmAllowed && hasRole(req, 'pk-pm', opts.locCompany) ? 'pm' : null
+  if (!source) reject('FORBIDDEN', opts.pmAllowed ? 'Hanya PM atau Admin Staff yang dapat mengabsenkan karyawan.' : 'Hanya Admin Staff PT ini yang dapat mengabsenkan karyawan.')
+  if (opts.own !== undefined && opts.own === opts.employeeId) reject('FORBIDDEN', 'Absensi Anda sendiri dicatat lewat absen masuk/pulang biasa.', field)
+  const emp = (await req.payload.findByID({ collection: 'employees', id: opts.employeeId, depth: 0, overrideAccess: true /* SYSTEM-READ: target employee of on-behalf */, req, disableErrors: true })) as { active?: boolean | null; company?: unknown } | null
+  const mapped = mappedCompanies(req)
+  const empCompany = relId(emp?.company)
+  if (!emp || (mapped !== null && !mapped.includes(empCompany ?? -1))) reject('NOT_FOUND', 'Karyawan tidak ditemukan.', field)
+  if (empCompany !== opts.locCompany) reject('COMPANY_MISMATCH', 'Karyawan dan lokasi berada di PT yang berbeda.', field)
+  if (emp!.active === false) reject('VALIDATION', 'Karyawan sudah nonaktif.', field)
+  return { employee: opts.employeeId, user: await userOfEmployee(req, opts.employeeId), source: source! }
+}
+
+export type WebOnBehalfInput = WebCheckInput & { employeeId: number; kind: AttendanceKind; reason: string }
+
+/**
+ * ADR 0032 (DRMS 24/10): an Admin Staff records a check-in / check-out ON BEHALF of an employee of its PT from the web
+ * (Absensi · Absenkan karyawan) — also an employee without an account (tukang harian). The selfie is taken with the
+ * Admin Staff's device camera and uploaded by it; the location rules of the EMPLOYEE's attendance type are evaluated
+ * against the Admin Staff's GPS fix; the row carries source `admin`, recorded_by = the Admin Staff and the reason. Same
+ * gates as the web self check-in (syncAttendanceEnabled of the PT, ADR 0018 privacy ack of the caller) and the SAME
+ * write path (recordAttendance).
+ */
+export async function recordWebOnBehalf(req: PayloadRequest, input: WebOnBehalfInput): Promise<RecordResult> {
+  const uid = userId(req)
+  if (uid === undefined) reject('VALIDATION', 'Tidak terautentikasi.')
+  const locRaw = await companyOf(req, LOCATION_COLLECTION[input.location.type], input.location.id)
+  const mapped = mappedCompanies(req)
+  const locCompany = locRaw !== undefined && (mapped === null || mapped.includes(locRaw)) ? locRaw : undefined
+  if (locCompany === undefined) reject('NOT_FOUND', input.location.type === 'project' ? 'Project tidak ditemukan.' : 'Pusat biaya tidak ditemukan.', LOCATION_FIELD[input.location.type])
+  const actor = await onBehalfActor(req, { employeeId: input.employeeId, locCompany, own: employeeIn(req, locCompany!), pmAllowed: false, field: 'employee_id' })
+
+  const s = (await settings(req, locCompany)) as { syncAttendanceEnabled?: boolean | null; timezone?: string | null }
+  if (s.syncAttendanceEnabled !== true) reject('FEATURE_DISABLED', 'Absensi dari web belum diaktifkan server (Setting perusahaan).')
+  const check = await privacyAckCheck(req, uid!)
+  if (check.required) {
+    await auditPrivacyDenied(req, check, { docType: 'attendance', field: 'attendance.on_behalf', companyId: locCompany ?? null })
+    reject(PRIVACY_ACK_REQUIRED, PRIVACY_ACK_REQUIRED_DETAIL)
+  }
+
+  const now = new Date()
+  return recordAttendance(req, {
+    kind: input.kind,
+    employee: actor.employee,
+    user: actor.user,
+    location: input.location,
+    lat: input.lat,
+    lng: input.lng,
+    accuracyM: input.accuracyM,
+    isMocked: false,
+    selfieId: input.selfieId,
+    uploader: uid!,
+    time: now,
+    timeTrust: 'server',
+    estimatedTime: null,
+    receivedAt: now,
+    deviceTime: now.toISOString(),
+    offline: false,
+    flags: [],
+    clientUuid: randomUUID(),
+    device: null,
+    source: actor.source,
+    recordedBy: uid!,
+    onBehalfReason: input.reason.trim(),
+    timeZone: s.timezone || DEFAULT_TZ,
+    fieldPrefix: '',
   })
 }

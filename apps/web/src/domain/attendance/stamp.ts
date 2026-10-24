@@ -62,7 +62,7 @@ export function localStamp(at: Date, timeZone: string): string {
 /** The band's text: left lines (top → bottom) + the brand on the right of the first line. */
 export function stampLines(i: StampInfo): { lines: string[]; right: string } {
   const trust = i.timeTrust === 'estimated' ? ' (perkiraan server)' : i.timeTrust === 'device_only' ? ' (jam perangkat)' : ''
-  const who = `${i.kind === 'check_in' ? 'Masuk' : 'Pulang'} - ${i.employee}${i.onBehalfBy ? ` (diabsenkan PM ${i.onBehalfBy})` : ''}`
+  const who = `${i.kind === 'check_in' ? 'Masuk' : 'Pulang'} - ${i.employee}${i.onBehalfBy ? ` (diabsenkan ${i.onBehalfBy})` : ''}`
   const gps = `${i.lat.toFixed(5)}, ${i.lng.toFixed(5)}${i.accuracyM !== null && Number.isFinite(i.accuracyM) ? ` - akurasi ${Math.round(i.accuracyM)} m` : ''}`
   return { lines: [`${localStamp(i.time, i.timeZone)} ${tzLabel(i.timeZone, i.time)}${trust}`, who, i.location, gps], right: BRAND }
 }
@@ -185,7 +185,8 @@ export async function stampAttendanceSelfie(payload: Payload, attendanceId: numb
       timeTrust: row.time_trust,
       kind: row.kind,
       employee: row.employee ?? '-',
-      onBehalfBy: row.source === 'pm' ? (row.recorder ?? 'PM') : null,
+      // US-14 "diabsenkan PM <nama>"; ADR 0032 "diabsenkan Admin Staff <nama>"
+      onBehalfBy: row.source === 'pm' ? `PM ${row.recorder ?? ''}`.trim() : row.source === 'admin' ? `Admin Staff ${row.recorder ?? ''}`.trim() : null,
       location: row.location ?? '-',
       lat: Number(row.lat),
       lng: Number(row.lng),

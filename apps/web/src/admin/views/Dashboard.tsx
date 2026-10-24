@@ -65,16 +65,18 @@ import {
  * streams behind a skeleton (Suspense); every number links to the list/report that produces it
  * (C9); a failing layout shows its own error (wireframes §0).
  */
-type Layout = 'owner' | 'finance' | 'pm' | 'admin' | 'staff' | 'operator'
+type Layout = 'owner' | 'finance' | 'pm' | 'admin' | 'adminstaff' | 'staff' | 'operator'
 const ORDER: Array<[Layout, Role]> = [
   ['owner', 'pk-owner'],
   ['finance', 'pk-finance'],
   ['pm', 'pk-pm'],
   ['admin', 'pk-admin'],
+  // ADR 0032: Admin Staff (attendance administration of the PT)
+  ['adminstaff', 'pk-admin-staff'],
   ['staff', 'pk-staff'],
   ['operator', 'pk-operator'],
 ]
-const LABEL: Record<Layout, string> = { owner: 'Direktur', finance: 'Finance', pm: 'PM', admin: 'Admin', staff: 'Staff', operator: 'Operator/Anggota' }
+const LABEL: Record<Layout, string> = { owner: 'Direktur', finance: 'Finance', pm: 'PM', admin: 'Admin', adminstaff: 'Admin Staff', staff: 'Staff', operator: 'Operator/Anggota' }
 
 const ER = '/admin/collections/expense-requests'
 const where = (q: Record<string, string>) => new URLSearchParams(q).toString()
@@ -148,6 +150,8 @@ async function Body({ layout, req, months, withoutIc }: { layout: Layout; req: P
         return await Pm({ req })
       case 'admin':
         return await Admin({ req })
+      case 'adminstaff':
+        return AdminStaff()
       case 'operator':
         return await Operator({ req })
       default:
@@ -1361,6 +1365,33 @@ async function Operator({ req }: { req: PayloadRequest }) {
           <a className="pk-btn" href={`/admin/collections/users/${user?.id ?? ''}`}>
             Profil
           </a>
+        </div>
+      </Card>
+    </Bento>
+  )
+}
+
+/**
+ * ADR 0032: Admin Staff — attendance administration of the PT: the team board, on-behalf check-in / check-out (also for
+ * employees without an account), the monthly recap with corrections, the schedules (read).
+ */
+function AdminStaff() {
+  return (
+    <Bento label="Absensi">
+      <Card id="adminstaff-absensi" title="Absensi PT" sub="Admin Staff: kehadiran seluruh karyawan PT" span={12}>
+        <div className="pk-actions">
+          <Link className="pk-btn primary" href="/admin/absensi/absenkan">
+            Absenkan karyawan
+          </Link>
+          <Link className="pk-btn" href="/admin/absensi">
+            Tim hari ini
+          </Link>
+          <Link className="pk-btn" href="/admin/absensi/rekap">
+            Rekap bulanan
+          </Link>
+          <Link className="pk-btn" href="/admin/absensi/jadwal">
+            Jadwal & hari libur
+          </Link>
         </div>
       </Card>
     </Bento>

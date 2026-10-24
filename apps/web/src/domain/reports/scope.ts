@@ -133,13 +133,13 @@ export async function officeScope(req: PayloadRequest): Promise<ReportScope> {
 }
 
 /**
- * Attendance report scope (S3e, requirements §4 "Admin R/U absensi", S-23): Finance / Owner / Admin
- * of the PT → all, PM of the PT → team. Admin sees attendance only — never the finance reports.
+ * Attendance report scope (S3e, requirements §4 "Admin R/U absensi", S-23): Finance / Owner / Admin (ADR 0032: and
+ * Admin Staff) of the PT → all, PM of the PT → team. Admin sees attendance only — never the finance reports.
  */
 export async function attendanceOfficeScope(req: PayloadRequest): Promise<ReportScope> {
   const out: CompanyScope[] = []
   for (const m of selected(req)) {
-    if (holds(m, ['pk-admin', 'pk-finance', 'pk-owner'])) out.push({ company: m.company, kind: 'all' })
+    if (holds(m, ['pk-admin', 'pk-finance', 'pk-owner', 'pk-admin-staff'])) out.push({ company: m.company, kind: 'all' })
     else if (holds(m, ['pk-pm'])) out.push(await teamOf(req, m.company))
   }
   return fromCompanies(out)

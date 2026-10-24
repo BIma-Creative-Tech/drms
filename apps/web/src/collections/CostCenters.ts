@@ -29,6 +29,8 @@ export const CostCenters: CollectionConfig = withAudit(
         'pk-staff': async ({ scope }) => inIds('id', (await scope()).assignedCostCenters),
         // Operator/Anggota: assigned cost centers only (APK attendance location list)
         'pk-operator': async ({ scope }) => inIds('id', (await scope()).assignedCostCenters),
+        // ADR 0032: Admin Staff — attendance locations of its PT (cost centers with a point)
+        'pk-admin-staff': true,
       }),
       create: rolesAllowed('pk-admin', 'pk-owner'),
       update: byRole({ 'pk-admin': true, 'pk-owner': true }),

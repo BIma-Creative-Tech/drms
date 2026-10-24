@@ -2,7 +2,7 @@ import { type CollectionBeforeChangeHook, type CollectionConfig } from 'payload'
 import { relationship } from 'payload/shared'
 
 import { denyAll, hasRole, hasRoleAny, ownEmployees, relId, userId, type Role } from '@/access/roles'
-import { byRole, rolesAllowed, anyMember } from '@/access/policies'
+import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, codeField, odooRefField, uuidField } from '@/fields/common'
 
@@ -48,7 +48,8 @@ export const Employees: CollectionConfig = withAudit(
     labels: { singular: 'Karyawan', plural: 'Karyawan' },
     admin: { useAsTitle: 'name', group: 'Pengguna & Akses', defaultColumns: ['code', 'name', 'position', 'attendanceType', 'active'], listSearchableFields: ['code', 'name', 'nickname'] },
     access: {
-      read: anyMember,
+      // ADR 0032: Admin Staff reads the employees of its PT (on-behalf list; bank accounts stay closed to it)
+      read: byRole({ 'pk-staff': true, 'pk-pm': true, 'pk-finance': true, 'pk-owner': true, 'pk-admin': true, 'pk-admin-staff': true }),
       create: rolesAllowed('pk-admin'),
       update: byRole({ 'pk-admin': true, 'pk-owner': true }),
       delete: denyAll,

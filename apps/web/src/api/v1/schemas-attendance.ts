@@ -60,6 +60,53 @@ export const AttendanceCheckBody = z
   .refine(oneLocation, oneLocationError)
   .meta({ id: 'AttendanceCheckBody' })
 
+/**
+ * ADR 0032 (DRMS 24/10): web on-behalf check-in / check-out by an Admin Staff of the employee's PT (Absensi ·
+ * Absenkan karyawan) — any active employee of that PT, also one without an account. The selfie (photo of the employee)
+ * is taken with the Admin Staff's device camera and uploaded first (POST /media/selfies); the GPS fix is the Admin
+ * Staff's; the location rules of the EMPLOYEE's attendance type apply to that fix. Recorded with source `admin`,
+ * recorded_by = the caller and the reason.
+ */
+export const AttendanceOnBehalfBody = z
+  .object({
+    employee_id: id.meta({ description: 'employees id of the Admin Staff\'s PT (may have no user account); never the caller\'s own.' }),
+    kind: z.enum(['check_in', 'check_out']),
+    project_id: id.optional().meta({ description: 'Project (exactly one of project_id / cost_center_id; a Non-OnSite employee: a hint, the registered location containing the fix is used).' }),
+    cost_center_id: id.optional(),
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+    accuracy_m: z.number().min(0).max(10_000).nullable().optional(),
+    selfie_media_id: id.meta({ description: 'media-selfies id uploaded by the caller (photo of the employee).' }),
+    reason: z.string({ error: 'Alasan wajib diisi.' }).trim().min(3, 'Alasan wajib diisi, minimal 3 karakter.').max(500, 'Alasan maksimal 500 karakter.').meta({ description: 'Why the Admin Staff records it (e.g. "tukang harian tanpa HP"). Required.' }),
+  })
+  .strict()
+  .refine(oneLocation, oneLocationError)
+  .meta({ id: 'AttendanceOnBehalfBody' })
+
+/** ADR 0032: GET /attendance/on-behalf/options (`?company=` narrows, like the masters). */
+export const AttendanceOnBehalfOptionsQuery = z.object({ company: companyFilterParam }).meta({ id: 'AttendanceOnBehalfOptionsQuery' })
+
+export const AttendanceOnBehalfOptions = z
+  .object({
+    companies: z.array(z.object({ id, attendanceEnabled: z.boolean().meta({ description: 'company-settings.syncAttendanceEnabled of the PT.' }) })).meta({ description: 'PTs (of the selection) where the caller is Admin Staff.' }),
+    employees: z
+      .array(
+        z.object({
+          id,
+          company: id,
+          code: z.string(),
+          name: z.string(),
+          attendanceType: z.enum(['onsite', 'non_onsite']),
+          hasAccount: z.boolean().meta({ description: 'false = an employee without a user account (e.g. tukang harian).' }),
+        }),
+      )
+      .meta({ description: 'Active employees of those PTs, the caller\'s own excluded (by name).' }),
+    locations: z
+      .array(z.object({ kind: z.enum(['project', 'cost_center']), id, company: id, code: z.string(), name: z.string(), lat: z.number(), lng: z.number(), radiusM: z.number() }))
+      .meta({ description: 'Registered check-in locations of those PTs with a point (projects, cost centers).' }),
+  })
+  .meta({ id: 'AttendanceOnBehalfOptions', description: 'ADR 0032: what an Admin Staff may record on behalf of. Names, codes and points only (no money, no bank data, no phone).' })
+
 export const AttendanceCheckResult = z
   .object({
     id,
@@ -75,7 +122,7 @@ const LocationRef = z
   .meta({ id: 'AttendanceLocationRef' })
 
 const Stamp = z
-  .object({ id, time: iso, source: z.enum(['self', 'pm']), corrected: z.boolean(), outsideArea: z.boolean().optional().meta({ description: 'DRMS 13/10 A2: true = "Di luar area" (Non-OnSite outside every registered location; the location is the reference).' }) })
+  .object({ id, time: iso, source: z.enum(['self', 'pm', 'admin']).meta({ description: 'pm = diabsenkan PM, admin = diabsenkan Admin Staff (ADR 0032).' }), corrected: z.boolean(), outsideArea: z.boolean().optional().meta({ description: 'DRMS 13/10 A2: true = "Di luar area" (Non-OnSite outside every registered location; the location is the reference).' }) })
   .nullable()
 
 const LocationDay = z.object({ location: LocationRef, checkIn: Stamp, checkOut: Stamp }).meta({ id: 'AttendanceLocationDay' })
@@ -108,7 +155,7 @@ export const AttendanceDay = z
     workMinutes: z.number().int().nullable().meta({ description: 'Sum of closed check-in → check-out pairs.' }),
     lateMinutes: z.number().int().meta({ description: 'Minutes after the schedule start when above the tolerance; 0 on holidays/off days.' }),
     earlyLeaveMinutes: z.number().int(),
-    onBehalf: z.boolean().meta({ description: 'At least one row "diabsenkan oleh PM" (US-14).' }),
+    onBehalf: z.boolean().meta({ description: 'At least one row "diabsenkan" — by the PM (US-14) or an Admin Staff (ADR 0032); names in onBehalfBy.' }),
     onBehalfBy: z.array(z.string()),
     corrected: z.boolean().meta({ description: 'At least one row corrected (T10).' }),
     flags: z.array(z.string()),

@@ -245,9 +245,11 @@ export const MODULES: readonly ModuleDef[] = [
         items: [
           // Owner decision 2026-10-09: web self check-in/out for every role (incl. Operator/Anggota)
           { view: '/absensi/absen', label: 'Absen', navKey: 'absensi-absen' },
-          { view: '/absensi', label: 'Tim hari ini', roles: OFFICE_PM_ADMIN, navKey: 'absensi' },
+          // ADR 0032: Admin Staff = attendance administration of the PT (board, on-behalf, recap, schedules read)
+          { view: '/absensi', label: 'Tim hari ini', roles: [...OFFICE_PM_ADMIN, 'pk-admin-staff'], navKey: 'absensi' },
+          { view: '/absensi/absenkan', label: 'Absenkan karyawan', roles: ['pk-admin-staff'], navKey: 'absensi-absenkan' },
           { view: '/absensi/rekap', label: 'Rekap bulanan', staffLabel: 'Rekap absensi saya', navKey: 'absensi-saya' },
-          { view: '/absensi/jadwal', label: 'Jadwal & hari libur', roles: OFFICE_PM_ADMIN, navKey: 'absensi-jadwal' },
+          { view: '/absensi/jadwal', label: 'Jadwal & hari libur', roles: [...OFFICE_PM_ADMIN, 'pk-admin-staff'], navKey: 'absensi-jadwal' },
           { collection: 'attendances' },
           { collection: 'attendance-corrections' },
         ],
@@ -261,7 +263,8 @@ export const MODULES: readonly ModuleDef[] = [
     icon: 'report',
     hint: 'Laporan & ekspor',
     // S3e (S-23): Admin gets the attendance report (only report besides the audit log).
-    sections: [{ items: [{ view: '/laporan', label: 'Semua laporan', roles: OFFICE_PM_ADMIN, navKey: 'laporan' }] }],
+    // ADR 0032: Admin Staff reaches the attendance report (the list shows only the reports of its roles)
+    sections: [{ items: [{ view: '/laporan', label: 'Semua laporan', roles: [...OFFICE_PM_ADMIN, 'pk-admin-staff'], navKey: 'laporan' }] }],
   },
   {
     id: 'pengguna',
@@ -606,6 +609,7 @@ export const ITEM_ICONS: Readonly<Record<string, IconName>> = {
   '/collections/project-loan-repayments': 'tMoneyRecive',
   // Absensi
   '/absensi/absen': 'tCamera',
+  '/absensi/absenkan': 'tSecurityUser',
   '/absensi': 'tPeople',
   '/absensi/rekap': 'tCalendar2',
   '/absensi/jadwal': 'tCalendar1',

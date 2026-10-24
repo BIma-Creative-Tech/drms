@@ -17,7 +17,8 @@ import { dayRowsAt, type Location } from './record'
  * (fase1-golive E6) and the requirements define T10 as "oleh PM" with a mandatory reason, and ADR 0013
  * ("PM monitors only") is about expense approvals, not attendance.
  *
- * Who: the PM whose TEAM scope contains the attendance's project/cost center, or an Admin. Nobody
+ * Who: the PM whose TEAM scope contains the attendance's project/cost center, or an Admin / Admin Staff (ADR 0032) of
+ * the attendance's PT. Nobody
  * corrects their OWN attendance (403, audited `access_denied`). Owner/Finance: read only.
  * What: the time of ONE attendance row (check-in or check-out), on the same local date; a check-in
  * may not move after the effective check-out of that location/day and vice versa; not in the future.
@@ -74,14 +75,14 @@ export async function correctAttendance(req: PayloadRequest, attendanceId: numbe
 
   const project = relId(att.project)
   const costCenter = relId(att.costCenter)
-  // ADR 0023: a (legacy) site check-in has neither project nor cost center; ADR 0032: only the Admin corrects those
+  // ADR 0023: a (legacy) site check-in has neither project nor cost center; ADR 0032: only Admin / Admin Staff correct those
   const site = project === undefined && costCenter === undefined ? relId(att.site) : undefined
   // ADR 0016 §5: every role check IN THE ATTENDANCE's PT (Admin of PT A is nobody in PT B)
   const company = relId((att as { company?: unknown }).company)
   const emps = ownEmployees(req)
   const isOwn = relId(att.user) === uid || emps.includes(relId(att.employee) ?? -1)
   if (isOwn) await deny(req, attendanceId, 'Tidak dapat mengoreksi absensi Anda sendiri.')
-  if (!hasRole(req, 'pk-admin', company)) {
+  if (!hasRole(req, ['pk-admin', 'pk-admin-staff'], company)) {
     const scope = hasRole(req, 'pk-pm', company) ? await resolveScope(req, company ?? null) : null
     const inTeam =
       !!scope &&

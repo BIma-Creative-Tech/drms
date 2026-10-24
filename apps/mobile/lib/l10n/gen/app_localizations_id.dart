@@ -1827,11 +1827,11 @@ class AppLocalizationsId extends AppLocalizations {
       'Absen atas nama belum bisa: absensi dari aplikasi belum diaktifkan Admin (Setting perusahaan).';
 
   @override
-  String get onBehalfTitle => 'Diabsenkan PM';
+  String get onBehalfTitle => 'Absenkan karyawan';
 
   @override
   String get onBehalfIntro =>
-      'Untuk anggota tim yang tidak bisa absen sendiri. Lokasi diambil dari HP Anda, foto karyawan diambil dengan kamera HP Anda. Nama Anda dan alasannya tercatat.';
+      'Untuk karyawan yang tidak bisa absen sendiri (PM: anggota tim; Admin Staff: semua karyawan PT, juga tanpa akun). Lokasi diambil dari HP Anda, foto karyawan diambil dengan kamera HP Anda. Nama Anda dan alasannya tercatat.';
 
   @override
   String get onBehalfNoTeam =>
@@ -1839,6 +1839,9 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get onBehalfEmployee => 'Karyawan';
+
+  @override
+  String get onBehalfNoAccount => 'tanpa akun';
 
   @override
   String get onBehalfReason => 'Alasan (wajib)';

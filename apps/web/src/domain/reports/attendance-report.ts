@@ -96,12 +96,11 @@ const STATUS_LABEL: Record<string, string> = {
 
 export const absensiReport: ReportDef = {
   code: 'absensi',
-  siteFilter: true,
   title: 'Laporan Absensi',
   kpi: 'M13',
   description: 'Rekap absensi per karyawan per bulan: hari kerja, hadir, tidak hadir, terlambat, pulang cepat, jam kerja, hadir di hari libur, diabsenkan PM, koreksi.',
-  // S3e (S-23): Admin reads + exports attendance (requirements §4 matrix), scope all.
-  roles: ['pk-finance', 'pk-owner', 'pk-pm', 'pk-admin'],
+  // S3e (S-23): Admin reads + exports attendance (requirements §4 matrix), scope all. ADR 0032: Admin Staff too.
+  roles: ['pk-finance', 'pk-owner', 'pk-pm', 'pk-admin', 'pk-admin-staff'],
   scope: attendanceOfficeScope,
   formats: ['csv', 'xlsx'],
   paged: false,
@@ -147,7 +146,7 @@ export const absensiReport: ReportDef = {
               pulangCepat: d.earlyLeaveMinutes,
               ket: [
                 d.holidayName ? `Hari libur: ${d.holidayName}` : d.kind === 'off' && d.checkIn ? 'Hari non-kerja' : '',
-                d.onBehalf ? `Diabsenkan PM${d.onBehalfBy.length ? ` (${d.onBehalfBy.join(', ')})` : ''}` : '',
+                d.onBehalf ? `Diabsenkan${d.onBehalfBy.length ? ` (${d.onBehalfBy.join(', ')})` : ''}` : '',
                 d.corrected ? 'Dikoreksi' : '',
                 d.flags.includes(OUTSIDE_AREA_FLAG) ? OUTSIDE_AREA_LABEL : '',
               ]
@@ -175,7 +174,7 @@ export const absensiReport: ReportDef = {
           { key: 'hariLibur', label: 'Hadir hari libur', type: 'int' },
           { key: 'nonKerja', label: 'Hadir hari non-kerja', type: 'int' },
           { key: 'tanpaPulang', label: 'Tanpa absen pulang', type: 'int' },
-          { key: 'olehPm', label: 'Diabsenkan PM (hari)', type: 'int' },
+          { key: 'olehPm', label: 'Diabsenkan PM / Admin Staff (hari)', type: 'int' },
           { key: 'koreksi', label: 'Dikoreksi (hari)', type: 'int' },
         ],
         rows: list.map((e) => ({

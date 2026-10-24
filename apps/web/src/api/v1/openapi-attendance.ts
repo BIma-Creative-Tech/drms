@@ -64,9 +64,25 @@ export function registerAttendancePaths(registry: OpenAPIRegistry, h: Helpers): 
     responses: h.res(201, 'Recorded', A.AttendanceCheckResult, [400, 401, 403, 404, 409, 426, 429]),
   })
   registry.registerPath({
+    method: 'get',
+    path: '/attendance/on-behalf/options',
+    summary: 'ADR 0032: Admin Staff (pk-admin-staff) — per PT of the selection where the caller holds the role: the active employees (own excluded; also those without an account, hasAccount false) and the registered check-in locations with their point. Names, codes and points only. The APK caches it for offline on-behalf items',
+    security: h.security,
+    request: { headers: h.deviceHeader, query: A.AttendanceOnBehalfOptionsQuery },
+    responses: h.res(200, 'On-behalf options', A.AttendanceOnBehalfOptions, [400, 401, 403, 426, 429]),
+  })
+  registry.registerPath({
+    method: 'post',
+    path: '/attendance/on-behalf',
+    summary: 'ADR 0032: Admin Staff check-in / check-out ON BEHALF of an employee of its PT (also without an account) from the web. Photo of the employee first with POST /media/selfies (the caller\'s camera), GPS = the caller\'s; the employee\'s attendance-type rule is evaluated against that fix. Recorded with source admin ("diabsenkan oleh Admin Staff"), recorded_by = caller, reason. Gates and codes as /attendance/check-in, plus FORBIDDEN (no Admin Staff of the PT / own employee), COMPANY_MISMATCH (employee of another PT), NO_CHECK_IN, ALREADY_CHECKED_OUT',
+    security: h.security,
+    request: { headers: h.deviceHeader, body: { content: { 'application/json': { schema: A.AttendanceOnBehalfBody } } } },
+    responses: h.res(201, 'Recorded', A.AttendanceCheckResult, [400, 401, 403, 404, 409, 426, 429]),
+  })
+  registry.registerPath({
     method: 'post',
     path: '/attendance/{id}/correct',
-    summary: 'US-15 T10 correction of one attendance time (PM of the team location or Admin; never own attendance; reason required; same local date). Creates an append-only correction; audit old → new',
+    summary: 'US-15 T10 correction of one attendance time (PM of the team location, Admin or — ADR 0032 — Admin Staff of the PT; never own attendance; reason required; same local date). Creates an append-only correction; audit old → new',
     security: h.security,
     request: { headers: h.idem, params: idParam, body: { content: { 'application/json': { schema: A.AttendanceCorrectBody } } } },
     responses: h.res(201, 'Correction', A.AttendanceCorrection, [400, 401, 403, 404, 409, 422, 426, 429]),

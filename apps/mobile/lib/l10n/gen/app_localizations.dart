@@ -3316,13 +3316,13 @@ abstract class AppLocalizations {
   /// No description provided for @onBehalfTitle.
   ///
   /// In id, this message translates to:
-  /// **'Diabsenkan PM'**
+  /// **'Absenkan karyawan'**
   String get onBehalfTitle;
 
   /// No description provided for @onBehalfIntro.
   ///
   /// In id, this message translates to:
-  /// **'Untuk anggota tim yang tidak bisa absen sendiri. Lokasi diambil dari HP Anda, foto karyawan diambil dengan kamera HP Anda. Nama Anda dan alasannya tercatat.'**
+  /// **'Untuk karyawan yang tidak bisa absen sendiri (PM: anggota tim; Admin Staff: semua karyawan PT, juga tanpa akun). Lokasi diambil dari HP Anda, foto karyawan diambil dengan kamera HP Anda. Nama Anda dan alasannya tercatat.'**
   String get onBehalfIntro;
 
   /// No description provided for @onBehalfNoTeam.
@@ -3336,6 +3336,12 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Karyawan'**
   String get onBehalfEmployee;
+
+  /// No description provided for @onBehalfNoAccount.
+  ///
+  /// In id, this message translates to:
+  /// **'tanpa akun'**
+  String get onBehalfNoAccount;
 
   /// No description provided for @onBehalfReason.
   ///

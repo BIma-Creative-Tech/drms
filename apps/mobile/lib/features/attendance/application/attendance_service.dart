@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -11,9 +12,11 @@ import '../../../core/format/dates.dart';
 import '../../../core/location/location_service.dart';
 import '../../../core/media/compress_plan.dart';
 import '../../../core/media/photo_compressor.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/time/device_clock.dart';
 import '../../app_config/application/app_config_providers.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../auth/domain/user_profile.dart';
 import '../../expense/data/draft_repository.dart';
 import '../../expense/presentation/camera_capture_screen.dart';
 import '../../masters/domain/master_item.dart';
@@ -202,13 +205,64 @@ final _assignedLocationsProvider = FutureProvider<List<ProjectSite>>((ref) async
   ];
 });
 
-/// Candidate for "diabsenkan PM": an employee and the team locations they are assigned to today.
+/// Candidate for "diabsenkan PM": an employee and the team locations they are assigned to today. ADR 0032 (Admin
+/// Staff): any employee of the PT with every registered location of it; [hasAccount] false = no user account.
 class OnBehalfCandidate {
-  const OnBehalfCandidate({required this.employeeId, required this.name, required this.sites});
+  const OnBehalfCandidate({required this.employeeId, required this.name, required this.sites, this.hasAccount = true});
   final int employeeId;
   final String name;
   final List<ProjectSite> sites;
+  final bool hasAccount;
 }
+
+/// ADR 0032: candidates of an Admin Staff from `AttendanceOnBehalfOptions` — every listed employee (the server already
+/// left out the user's own) with the registered locations of its PT; each location carries the employee's attendance
+/// type (Non-OnSite: the location containing the fix is used).
+List<OnBehalfCandidate> onBehalfCandidatesFromOptions(Map<String, dynamic>? j, {Set<int> own = const {}}) {
+  if (j == null) return const [];
+  final locations = (j['locations'] as List<dynamic>? ?? const []).whereType<Map<String, dynamic>>().toList();
+  final out = <OnBehalfCandidate>[];
+  for (final e in (j['employees'] as List<dynamic>? ?? const []).whereType<Map<String, dynamic>>()) {
+    final id = (e['id'] as num?)?.toInt();
+    if (id == null || own.contains(id)) continue;
+    final company = (e['company'] as num?)?.toInt();
+    final type = AttendanceType.fromCode(e['attendanceType'] as String?);
+    final code = '${e['code'] ?? ''}';
+    final name = '${e['name'] ?? ''}';
+    out.add(
+      OnBehalfCandidate(
+        employeeId: id,
+        name: code.isEmpty ? name : '$name ($code)',
+        hasAccount: e['hasAccount'] != false,
+        sites: [
+          for (final l in locations)
+            if ((l['company'] as num?)?.toInt() == company) ProjectSite.fromEligible(l, type: type),
+        ],
+      ),
+    );
+  }
+  return out;
+}
+
+/// ADR 0032: the Admin Staff candidates — `GET /attendance/on-behalf/options` online (cached per user in the encrypted
+/// DB, `attendance-on-behalf:<sub>`), the cached copy offline; empty without the Admin Staff role.
+final adminStaffOnBehalfProvider = FutureProvider<List<OnBehalfCandidate>>((ref) async {
+  final sub = ref.watch(currentSubProvider);
+  final profile = ref.watch(currentProfileProvider);
+  if (sub == null || profile == null || !profile.has(Role.adminStaff)) return const [];
+  final db = ref.watch(databaseProvider);
+  final key = 'attendance-on-behalf:$sub';
+  Map<String, dynamic>? j;
+  try {
+    j = await ref.watch(attendanceApiProvider).onBehalfOptions();
+    await db.kvPut(key, jsonEncode(j));
+  } on NetworkException {
+    j = await db.kvGetJson(key);
+  } on ProblemException {
+    j = await db.kvGetJson(key);
+  }
+  return onBehalfCandidatesFromOptions(j, own: profile.employeeIds);
+});
 
 /// Team members of the PM from the cached `team-assignments` masters (works offline; the server
 /// re-checks the assignment on the local date). The PM's own employee is excluded (never own). ADR 0032: no site.
@@ -220,7 +274,7 @@ final onBehalfCandidatesProvider = FutureProvider<List<OnBehalfCandidate>>((ref)
   final own = profile?.employeeIds ?? const <int>{};
   final masters = await _scopedMasters(ref, sub);
   bool pmIn(ProjectSite s) =>
-      profile == null || profile.companies.isEmpty || profile.forCompany(s.companyId).canAttendOnBehalf;
+      profile == null || profile.companies.isEmpty || profile.forCompany(s.companyId).has(Role.pm);
   final sites = [
     for (final s in await ref.watch(_assignedLocationsProvider.future))
       if (pmIn(s)) s,
@@ -247,9 +301,14 @@ final onBehalfCandidatesProvider = FutureProvider<List<OnBehalfCandidate>>((ref)
     int? id(String k) => (a.extra[k] as num?)?.toInt();
     add(emp, find(SiteKind.project, id('project')) ?? find(SiteKind.costCenter, id('costCenter')));
   }
+  // ADR 0032: an Admin Staff records for every employee of its PT (its list wins for an employee in both)
+  final admin = await ref.watch(adminStaffOnBehalfProvider.future);
+  final adminIds = {for (final c in admin) c.employeeId};
   final out = [
+    ...admin,
     for (final e in byEmployee.entries)
-      OnBehalfCandidate(employeeId: e.key, name: names[e.key] ?? '#${e.key}', sites: e.value),
+      if (!adminIds.contains(e.key))
+        OnBehalfCandidate(employeeId: e.key, name: names[e.key] ?? '#${e.key}', sites: e.value),
   ]..sort((a, b) => a.name.compareTo(b.name));
   return out;
 });
