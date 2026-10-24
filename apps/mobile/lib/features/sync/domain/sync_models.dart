@@ -328,7 +328,14 @@ String mediaUploadPath(String localKind) => switch (localKind) {
   'selfie' => 'selfies',
   'progress' || 'field' => 'progress-photos',
   // ADR 0027 / 0028: the invoice of a vendor payment / document of a PT grup payment is a general attachment (photo;
-  // PDF from the web)
-  'invoice' => 'attachments',
+  // PDF from the web); D2410 (point 6): the draft's general attachments (photo / PDF)
+  'invoice' || 'attachment' => 'attachments',
   _ => 'receipts',
+};
+
+/// Upload file name of a local blob by its type (D2410: PDF attachments). The server stores its own name.
+String mediaFileName(String uuid, String mime) => switch (mime) {
+  'application/pdf' => '$uuid.pdf',
+  'image/png' => '$uuid.png',
+  _ => '$uuid.jpg',
 };

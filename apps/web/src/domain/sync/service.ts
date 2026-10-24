@@ -343,6 +343,8 @@ function toDraftInput(p: SyncDraftUpsert): DraftInput {
   if (p.invoice_date !== undefined) input.invoiceDate = p.invoice_date
   if (p.invoice_due_date !== undefined) input.invoiceDueDate = p.invoice_due_date
   if (p.invoice_file_id !== undefined) input.invoiceFileId = p.invoice_file_id
+  // D2410 (point 6): the general attachments ("Lampiran") — replaces the list; omitted (APK ≤ 0.11) = unchanged
+  if (p.attachment_ids !== undefined) input.attachmentIds = p.attachment_ids
   if (p.lines !== undefined) {
     input.lines = p.lines.map(
       (l): LineInputApi => ({

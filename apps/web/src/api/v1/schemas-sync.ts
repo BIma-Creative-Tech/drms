@@ -112,6 +112,7 @@ export const SyncDraftUpsertPayload = z
     invoice_date: businessDate.nullable().optional(),
     invoice_due_date: businessDate.nullable().optional(),
     invoice_file_id: id.nullable().optional().meta({ description: 'ADR 0027: media-attachments id of the invoice (POST /media/attachments).' }),
+    attachment_ids: z.array(id).max(20).optional().meta({ description: 'D2410: general attachments ("Lampiran", media-attachments ids — POST /media/attachments; photo / PDF). Replaces the list; omitted = unchanged. A Reimburse needs at least one to be submitted.' }),
     client_grand_total: rupiah.nullable().optional().meta({ description: 'Advisory; mismatch with the server total → flag CLIENT_TOTAL_MISMATCH.' }),
     lines: z.array(SyncLineInput).max(200).optional().meta({ description: 'Replaces ALL lines when present.' }),
   })

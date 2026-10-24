@@ -177,6 +177,8 @@ void main() {
       // D2/D4: project request, the line charged to a RAP item.
       'project': {'id': 9, 'code': 'PRJ-09', 'name': 'Jalan Tambang Blok B'},
       'costCenter': null,
+      // D2410 (point 6): a general attachment uploaded on the web
+      'attachments': [{'id': 77, 'fileName': 'rekap.pdf', 'mimeType': 'application/pdf'}],
       'lines': [
         {
           'id': '66f0a1b2c3d4e5f601234567', // web-created line: Payload row id, not a UUID
@@ -232,10 +234,12 @@ void main() {
       expect(line.receipts.single.isServerReceipt, isTrue);
       expect(line.receipts.single.serverReceiptId, 501);
       expect(d.mediaUuids, isEmpty, reason: 'no local photo to upload');
-      expect(validateForSubmit(d), isEmpty, reason: 'server receipts satisfy "min. 1 nota"');
+      expect(validateForSubmit(d), isEmpty, reason: 'server receipts / attachment satisfy "min. 1 nota" / "Lampiran"');
+      expect((d.attachments.single.serverFileId, d.attachments.single.isLocal), (77, false));
 
       final p = draftToSyncPayload(d);
       expect(p['request_id'], 42, reason: 'a web-created draft has no APK id; the server id identifies it');
+      expect(p['attachment_ids'], [77], reason: 'D2410: the web attachment stays on the draft');
       final l = (p['lines'] as List).single as Map<String, dynamic>;
       expect(l['id'], '66f0a1b2c3d4e5f601234567');
       expect(l.containsKey('client_uuid'), isFalse);

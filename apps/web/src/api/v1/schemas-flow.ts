@@ -380,6 +380,9 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
     })
     .nullable()
     .meta({ id: 'VendorInvoice', description: 'ADR 0027: the vendor invoice (the proof of a vendor payment — no LPJ); ADR 0028: the receiving PT\'s document (invoice / memo) of a PT grup payment. null for payeeType karyawan.' }),
+  attachments: z
+    .array(z.object({ id, fileName: z.string().nullable(), mimeType: z.string().nullable() }))
+    .meta({ description: 'D2410: general attachments ("Lampiran", photo / PDF; GET /api/v1/media/attachments/{id}/file). A Reimburse is submitted with at least one.' }),
   payeeCompany: z
     .object({ id, shortCode: z.string().nullish(), name: z.string().nullish() })
     .nullable()

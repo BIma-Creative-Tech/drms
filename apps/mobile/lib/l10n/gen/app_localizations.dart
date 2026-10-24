@@ -10416,6 +10416,84 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Project Anda belum dipetakan ke pusat biaya (akun kas).'**
   String get kpiCostCentersTeamEmpty;
+
+  /// No description provided for @sectionAttachments.
+  ///
+  /// In id, this message translates to:
+  /// **'Lampiran'**
+  String get sectionAttachments;
+
+  /// No description provided for @attachmentsOptional.
+  ///
+  /// In id, this message translates to:
+  /// **'Lampiran (opsional)'**
+  String get attachmentsOptional;
+
+  /// No description provided for @attachmentsRequired.
+  ///
+  /// In id, this message translates to:
+  /// **'Lampiran (wajib untuk Reimburse)'**
+  String get attachmentsRequired;
+
+  /// No description provided for @attachmentsHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto atau file JPG / PNG / PDF (PDF maks. 5 MB), maks. 20 lampiran.'**
+  String get attachmentsHint;
+
+  /// No description provided for @attachmentFile.
+  ///
+  /// In id, this message translates to:
+  /// **'File'**
+  String get attachmentFile;
+
+  /// No description provided for @attachmentLocal.
+  ///
+  /// In id, this message translates to:
+  /// **'Di HP — terkirim saat sinkron / Ajukan'**
+  String get attachmentLocal;
+
+  /// No description provided for @attachmentOnServer.
+  ///
+  /// In id, this message translates to:
+  /// **'Tersimpan di server'**
+  String get attachmentOnServer;
+
+  /// No description provided for @attachmentRemove.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus lampiran'**
+  String get attachmentRemove;
+
+  /// No description provided for @attachmentsLimit.
+  ///
+  /// In id, this message translates to:
+  /// **'Maksimal {count} lampiran.'**
+  String attachmentsLimit(int count);
+
+  /// No description provided for @attachmentTypeInvalid.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih file JPG, PNG atau PDF.'**
+  String get attachmentTypeInvalid;
+
+  /// No description provided for @attachmentPdfTooLarge.
+  ///
+  /// In id, this message translates to:
+  /// **'File PDF lebih dari 5 MB. Perkecil file-nya atau lampirkan sebagai foto.'**
+  String get attachmentPdfTooLarge;
+
+  /// No description provided for @attachmentPdfInvalid.
+  ///
+  /// In id, this message translates to:
+  /// **'File PDF tidak valid.'**
+  String get attachmentPdfInvalid;
+
+  /// No description provided for @attachmentTooLarge.
+  ///
+  /// In id, this message translates to:
+  /// **'File terlalu besar (maks. 15 MB).'**
+  String get attachmentTooLarge;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

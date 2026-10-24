@@ -1444,6 +1444,36 @@ export const openapiDocument = {
           "invoice": {
             "$ref": "#/components/schemas/VendorInvoice"
           },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "fileName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "mimeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "fileName",
+                "mimeType"
+              ]
+            },
+            "description": "D2410: general attachments (\"Lampiran\", photo / PDF; GET /api/v1/media/attachments/{id}/file). A Reimburse is submitted with at least one."
+          },
           "payeeCompany": {
             "type": [
               "object",
@@ -2906,6 +2936,7 @@ export const openapiDocument = {
           "vendor",
           "vendorBankAccountId",
           "invoice",
+          "attachments",
           "payeeCompany",
           "intercompany",
           "bank",
@@ -8195,6 +8226,15 @@ export const openapiDocument = {
             ],
             "exclusiveMinimum": 0,
             "description": "ADR 0027: media-attachments id of the invoice (POST /media/attachments)."
+          },
+          "attachment_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 20,
+            "description": "D2410: general attachments (\"Lampiran\", media-attachments ids — POST /media/attachments; photo / PDF). Replaces the list; omitted = unchanged. A Reimburse needs at least one to be submitted."
           },
           "client_grand_total": {
             "type": [
