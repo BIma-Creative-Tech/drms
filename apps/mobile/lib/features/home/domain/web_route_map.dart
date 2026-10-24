@@ -105,7 +105,6 @@ const Map<String, String> webToApk = {
   '/collections/vehicles': '/data/vehicles',
   '/collections/vendors': '/data/vendors',
   '/collections/vendor-bank-accounts': '/data/vendor-bank-accounts',
-  '/collections/sites': '/data/sites',
   '/collections/media-receipts': '/data/media-receipts',
   '/collections/media-transfer-proofs': '/data/media-transfer-proofs',
   '/collections/media-selfies': '/data/media-selfies',

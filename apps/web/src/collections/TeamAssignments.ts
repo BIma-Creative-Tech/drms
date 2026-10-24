@@ -2,14 +2,15 @@ import { APIError, type CollectionBeforeChangeHook, type CollectionConfig } from
 import { creatableRelationship } from '@/admin/relationship-create'
 
 import { denyAll, hasRole, relId } from '@/access/roles'
-import { anyOf, byRole, rolesAllowed, teamCostCenters, teamProjects, teamSites } from '@/access/policies'
+import { anyOf, byRole, rolesAllowed, teamCostCenters, teamProjects } from '@/access/policies'
 import { resolveScope } from '@/access/scope'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
-import { companyField, companyHook, lockedUntilCompany, pickerSameCompany, siteOptions } from '@/fields/company'
+import { companyField, companyHook, legacySiteField, lockedUntilCompany, pickerSameCompany } from '@/fields/company'
 
 /**
- * Penugasan tim: employee ↔ project XOR cost center XOR site (form item 9; ADR 0023 site = kantor cabang), role,
- * period.
+ * Penugasan tim: employee ↔ project XOR cost center (form item 9), role, period. ADR 0032: the site option
+ * (ADR 0023) is gone — no new site assignment and no change to a site; the migration 20261024_200000 turned the site
+ * rows into project rows (projects of that site) or ended them, the rest stays as history.
  * Admin C/R/U; Owner R/U; PM C/R/U only for team projects/cost centers and never with role
  * `pm` (would let a PM grant themselves new team scope — privilege escalation guard).
  */
@@ -18,9 +19,14 @@ const guard: CollectionBeforeChangeHook = async ({ data, originalDoc, operation,
   const project = relId(merged.project)
   const costCenter = relId(merged.costCenter)
   const site = relId(merged.site)
-  // ADR 0023: exactly one of project / cost center / site (DB CHECK team_assignments_location_one)
+  // ADR 0032: no new / changed site assignment by a user (a legacy site row may still get its end date). The go-live
+  // import CLI (system request, no user) still writes its workbook's legacy Site columns — follow-up in ADR 0032.
+  if (req.user && site !== undefined && (operation === 'create' || relId(originalDoc?.site) !== site)) {
+    throw new APIError('Penugasan ke site tidak tersedia lagi. Pilih project atau pusat biaya.', 400, null, true)
+  }
+  // exactly one location (DB CHECK team_assignments_location_one also counts the legacy site column)
   if ([project, costCenter, site].filter((x) => x !== undefined).length !== 1) {
-    throw new APIError('Isi salah satu: project, pusat biaya, ATAU site.', 400, null, true)
+    throw new APIError('Isi salah satu: project ATAU pusat biaya.', 400, null, true)
   }
   const start = merged.startDate ? new Date(String(merged.startDate)).getTime() : undefined
   const end = merged.endDate ? new Date(String(merged.endDate)).getTime() : undefined
@@ -33,11 +39,10 @@ const guard: CollectionBeforeChangeHook = async ({ data, originalDoc, operation,
     const scope = await resolveScope(req, company ?? null)
     const inTeam =
       (project !== undefined && scope.teamProjects.includes(project)) ||
-      (costCenter !== undefined && scope.teamCostCenters.includes(costCenter)) ||
-      (site !== undefined && scope.teamSites.includes(site))
-    if (!inTeam) throw new APIError('Hanya untuk project/pusat biaya/site tim Anda.', 403, null, true)
+      (costCenter !== undefined && scope.teamCostCenters.includes(costCenter))
+    if (!inTeam) throw new APIError('Hanya untuk project/pusat biaya tim Anda.', 403, null, true)
     if (merged.roleInProject === 'pm') throw new APIError('PM tidak dapat menetapkan peran PM.', 403, null, true)
-    if (operation === 'update' && originalDoc && (relId(originalDoc.project) !== project || relId(originalDoc.site) !== site)) {
+    if (operation === 'update' && originalDoc && relId(originalDoc.project) !== project) {
       throw new APIError('Project penugasan tidak dapat dipindah.', 403, null, true)
     }
   }
@@ -48,11 +53,11 @@ export const TeamAssignments: CollectionConfig = withAudit(
   {
     slug: 'team-assignments',
     labels: { singular: 'Penugasan tim', plural: 'Penugasan tim' },
-    admin: { group: 'Proyek', defaultColumns: ['employee', 'project', 'costCenter', 'site', 'roleInProject', 'startDate', 'endDate'] },
+    admin: { group: 'Proyek', defaultColumns: ['employee', 'project', 'costCenter', 'roleInProject', 'startDate', 'endDate'] },
     access: {
-      read: byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-pm': anyOf(teamProjects(), teamCostCenters(), teamSites()) }),
+      read: byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-pm': anyOf(teamProjects(), teamCostCenters()) }),
       create: rolesAllowed('pk-admin', 'pk-pm'),
-      update: byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-pm': anyOf(teamProjects(), teamCostCenters(), teamSites()) }),
+      update: byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-pm': anyOf(teamProjects(), teamCostCenters()) }),
       delete: denyAll,
     },
     hooks: { beforeChange: [companyHook('team-assignments', { derive: [{ field: 'employee', collection: 'employees' }], check: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'site', collection: 'sites' }], companyIsFilter: true }), guard] },
@@ -60,12 +65,12 @@ export const TeamAssignments: CollectionConfig = withAudit(
       // DRMS UI 17/10 #4 (owner 2026-10-17): PT picker that only filters the pickers below (the PT follows the employee)
       companyField({ derived: true, filter: true }),
       // DRMS 16/10 (b): "+ Karyawan baru" (plain employee form in a drawer, no user account); DRMS UI 17/10 #4: employees,
-      // projects, pusat biaya and sites of the chosen PT only — locked ("Pilih PT terlebih dahulu") until it has a value
+      // projects and pusat biaya of the chosen PT only — locked ("Pilih PT terlebih dahulu") until it has a value
       creatableRelationship({ name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true }), admin: { placeholder: 'Pilih karyawan…' } }, { company: 'form', lock: true }),
       lockedUntilCompany({ name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany(), admin: { placeholder: 'Pilih project…' } }),
       lockedUntilCompany({ name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany(), admin: { placeholder: 'Pilih pusat biaya…' } }),
-      // ADR 0023 (Q-S5): assignment to a branch office for a period (attendance at the site; PM role = on-behalf there)
-      lockedUntilCompany({ name: 'site', type: 'relationship', relationTo: 'sites', label: 'Site', index: true, ...pickerSameCompany(), filterOptions: siteOptions, admin: { placeholder: 'Pilih site…' } }),
+      // ADR 0032: the site option (ADR 0023) removed — hidden legacy column (history rows only)
+      legacySiteField('site', 'Site (lama)'),
       {
         name: 'roleInProject',
         type: 'select',

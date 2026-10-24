@@ -45,7 +45,6 @@ export const DATA_WRITABLE = [
   'urgency-levels',
   'vehicles',
   'vendor-bank-accounts',
-  'sites',
   'companies',
   'approval-rules',
   'notification-templates',

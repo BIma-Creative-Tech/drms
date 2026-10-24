@@ -26,7 +26,6 @@ export const TeamTodayQuery = z
     date: businessDate.optional().meta({ description: 'Default: today (company TZ); not in the future.' }),
     project_id: z.string().regex(/^\d{1,10}$/).optional(),
     cost_center_id: z.string().regex(/^\d{1,10}$/).optional(),
-    site_id: z.string().regex(/^\d{1,10}$/).optional().meta({ description: 'ADR 0023: narrows to a site (its home-site employees and site assignments, attendance rows of the site).' }),
     company: companyFilterParam,
   })
   .meta({ id: 'TeamTodayQuery' })

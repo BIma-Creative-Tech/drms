@@ -12,7 +12,7 @@ import { PROJECT_KIND_LABELS, PROJECT_KINDS } from '@/domain/field/rules'
 import { projectFromClientDefault } from '@/domain/partners/project-prefill'
 import { progressWriteGuard } from '@/domain/progress/guards'
 import { codeField, odooRefField, percentField, rupiahField, uuidField } from '@/fields/common'
-import { companyField, companyHook, lockedUntilCompany, pickerSameCompany, siteOptions } from '@/fields/company'
+import { companyField, companyHook, lockedUntilCompany, legacySiteField, pickerSameCompany } from '@/fields/company'
 import { pusatBiayaField } from '@/fields/pusat-biaya'
 import { USER_NAME_VIEW, userPicker } from '@/fields/users'
 
@@ -109,7 +109,7 @@ export const Projects: CollectionConfig = withAudit(
     slug: 'projects',
     labels: { singular: 'Project', plural: 'Project' },
     // DRMS 10/10 point 7: tabs Proyek (form) / RAP / Pengajuan (admin/config.ts PROJECT_TABS)
-    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['code', 'name', 'client', 'site', 'pm', 'cashAccount', 'status'], components: { views: { edit: PROJECT_TABS } } },
+    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['code', 'name', 'client', 'pm', 'cashAccount', 'status'], components: { views: { edit: PROJECT_TABS } } },
     access: {
       read: byRole({
         'pk-admin': true,
@@ -155,19 +155,9 @@ export const Projects: CollectionConfig = withAudit(
       },
       // DRMS 16/10 (b): "+ Klien baru" opens the tabbed Klien form in a drawer, in the project's PT
       creatableRelationship({ name: 'client', type: 'relationship', relationTo: 'clients', label: 'Klien', access: { update: projectEditors }, defaultValue: projectFromClientDefault('client'), ...pickerSameCompany() }, { company: 'form' }),
-      // ADR 0023 (Q-S1): the branch office (site) that handles the project — at most one; same PT (companyHook + DB
-      // trigger). Report / dashboard filter "Site"; the project keeps its own attendance point (no fallback to the site).
-      lockedUntilCompany({
-        name: 'site',
-        type: 'relationship',
-        relationTo: 'sites',
-        label: 'Site',
-        index: true,
-        access: { update: projectEditors },
-        ...pickerSameCompany(),
-        filterOptions: siteOptions,
-        admin: { placeholder: 'Pilih site…', description: 'Kantor cabang yang menangani project ini (opsional).' },
-      }),
+      // ADR 0032: the project's site (ADR 0023) removed from the product — hidden legacy column (the 24/10 migration
+      // used it to turn site team assignments into project assignments)
+      legacySiteField('site', 'Site (lama)'),
       { name: 'address', type: 'textarea', label: 'Alamat', maxLength: 500 },
       {
         type: 'row',

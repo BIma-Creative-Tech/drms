@@ -26,13 +26,15 @@ export type SQL = ReturnType<typeof sql>
  */
 export type CompanyScope = (
   | { company: number; kind: 'all' }
-  | { company: number; kind: 'team'; projects: number[]; costCenters: number[]; sites?: number[] }
+  | { company: number; kind: 'team'; projects: number[]; costCenters: number[] }
   | { company: number; kind: 'own'; userId: number; employeeId: number | null }
 ) & {
   /**
    * ADR 0023 §5 report / dashboard filter "Site": an EXTRA predicate on every row of the part (only narrows): a
    * request / project / cash row through its project's site (`projects.site_id`), a cash-ledger row and an account
    * through the account's site (`cash_accounts.site_id`), a cost center when it is the site's default cost center.
+   * ADR 0032: the filter is no longer offered (sites removed from the product) — nothing sets it any more; the inert
+   * predicate stays until the legacy site columns are dropped.
    */
   onlySites?: number[]
 }
@@ -114,7 +116,7 @@ const holds = (m: MRef, roles: readonly Role[]) => m.roles.some((r) => roles.inc
 
 async function teamOf(req: PayloadRequest, company: number): Promise<CompanyScope> {
   const s = await resolveScope(req, company)
-  return { company, kind: 'team', projects: s.teamProjects, costCenters: s.teamCostCenters, ...(s.teamSites.length ? { sites: s.teamSites } : {}) }
+  return { company, kind: 'team', projects: s.teamProjects, costCenters: s.teamCostCenters }
 }
 
 /**

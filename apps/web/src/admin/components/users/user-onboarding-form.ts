@@ -42,11 +42,14 @@ export const ASG_ROLES: ReadonlyArray<{ value: AsgRole; label: string }> = [
   { value: 'mandor', label: 'Mandor' },
 ]
 
-export const LOCATION_KINDS: ReadonlyArray<{ value: LocationKind; label: string; choices: 'projects' | 'costCenters' | 'sites' }> = [
+/** Location kinds of a NEW assignment — ADR 0032: project or pusat biaya (the ADR 0023 site option is gone). */
+export const LOCATION_KINDS: ReadonlyArray<{ value: LocationKind; label: string; choices: 'projects' | 'costCenters' }> = [
   { value: 'project', label: 'Project', choices: 'projects' },
   { value: 'costCenter', label: 'Pusat biaya', choices: 'costCenters' },
-  { value: 'site', label: 'Site', choices: 'sites' },
 ]
+
+/** Label of a saved row's location kind (a legacy site row of ADR 0023 included). */
+export const LOCATION_KIND_LABEL: Record<LocationKind, string> = { project: 'Project', costCenter: 'Pusat biaya', site: 'Site (lama)' }
 
 const asgRole = (v: string): AsgRole => (v === 'pm' || v === 'mandor' ? v : 'staff')
 const day = (v: string | null | undefined): string => (v ? v.slice(0, 10) : '')
@@ -276,7 +279,7 @@ export function errorTarget(path: string, order: BodyOrder): { key: string; tab:
   const am = /^assignments\.(\d+)(?:\.(.*))?$/.exec(rest)
   if (am) {
     const key = order.asg?.[Number(m[1])]?.[Number(am[1])] ?? '?'
-    // the collection names the location field (project / costCenter / site) — the form has one picker for it
+    // the collection names the location field (project / costCenter; legacy site) — the form has one picker for it
     const f = am[2] === 'project' || am[2] === 'costCenter' || am[2] === 'site' ? 'location' : am[2]
     return { key: `${base}.asg.${key}${f ? `.${f}` : ''}`, tab: 'penugasan' }
   }

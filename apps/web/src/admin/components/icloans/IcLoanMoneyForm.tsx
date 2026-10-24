@@ -127,7 +127,7 @@ export function IcLoanMoneyForm({ url, submitLabel, accounts, amountText, amount
                 </option>
               ))}
             </WrapSelect>
-            <p className="help">Tanpa akun site (kas kecil / rekening cabang).</p>
+            <p className="help">Akun kas cabang lama (site) tidak dapat dipakai.</p>
           </div>
           {amount ? (
             <div className="pk-fld">
@@ -163,7 +163,7 @@ export function IcLoanMoneyForm({ url, submitLabel, accounts, amountText, amount
           <button type="submit" className="pk-kbtn primary" disabled={busy || accounts.length === 0} data-pk-action={testId}>
             {busy ? 'Memproses…' : submitLabel}
           </button>
-          {accounts.length === 0 ? <span className="pk-kerr">Belum ada akun kas aktif tanpa site di PT ini.</span> : null}
+          {accounts.length === 0 ? <span className="pk-kerr">Belum ada akun kas aktif yang dapat dipakai di PT ini.</span> : null}
           {error ? (
             <span className="pk-kerr" role="alert">
               {error}

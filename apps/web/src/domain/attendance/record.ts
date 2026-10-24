@@ -96,23 +96,19 @@ export type RecordInput = {
 
 const LABEL: Record<Location['type'], string> = { project: 'project', cost_center: 'pusat biaya', site: 'site' }
 
+/** ADR 0032: refusal of a check-in at a site (sites are no longer attendance locations). */
+export const SITE_REMOVED = 'Site tidak lagi dipakai sebagai lokasi absen. Pilih lokasi project (atau pusat biaya).'
+
 /**
- * Current schedule of an employee: own work schedule, else the default schedule of the employee's home site (ADR 0023
- * §3: a branch office can have its own office hours), else the company default, else null.
+ * Current schedule of an employee: own work schedule, else the company default, else null (ADR 0032: the home-site
+ * default of ADR 0023 §3 is gone with the sites).
  */
 export async function scheduleOfEmployee(req: PayloadRequest, employee: number, defaultScheduleId?: number | null): Promise<ScheduleSnapshot | null> {
   const emp = (await req.payload.findByID({ collection: 'employees', id: employee, depth: 1, overrideAccess: true /* SYSTEM-READ: schedule of the employee */, req, disableErrors: true })) as {
     workSchedule?: unknown
-    homeSite?: unknown
   } | null
   const own = emp?.workSchedule && typeof emp.workSchedule === 'object' ? snapshotOf(emp.workSchedule as Record<string, unknown>) : null
   if (own) return own
-  const siteDefault = relId((emp?.homeSite as { defaultWorkSchedule?: unknown } | null | undefined)?.defaultWorkSchedule)
-  if (siteDefault !== undefined) {
-    const doc = await req.payload.findByID({ collection: 'work-schedules', id: siteDefault, depth: 0, overrideAccess: true /* SYSTEM-READ: home-site schedule */, req, disableErrors: true })
-    const snap = snapshotOf(doc as Record<string, unknown> | null)
-    if (snap) return snap
-  }
   let defId = defaultScheduleId
   if (defId === undefined) {
     const s = await settings(req, relId((emp as { company?: unknown } | null)?.company))
@@ -249,6 +245,8 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
   const company = relId((doc as { company?: unknown }).company)
   const emp = await employeeAttendance(req, input.employee)
   const onsite = !emp || geofenceRequired(emp.type)
+  // ADR 0032: a site is no longer a check-in location (old APKs may still send `site_id`)
+  if (input.location.type === 'site' && onsite) reject('VALIDATION', SITE_REMOVED, locField)
   // OnSite: the requested location needs a point (Non-OnSite: no location restriction)
   const geo = onsite ? await withGeofence(req, doc, input.location, locField) : doc
   const localDate = localDateString(input.time, input.timeZone)
@@ -257,8 +255,8 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
     // ADR 0016 §5: PM role + team scope IN THE LOCATION's PT
     if (!hasRole(req, 'pk-pm', company)) reject('FORBIDDEN', `Hanya untuk ${LABEL[input.location.type]} tim Anda.`, locField)
     const scope = await resolveScope(req, company ?? null)
-    // ADR 0023 Q-S5: at a site = a PM assigned (role PM) to the site or the PM of a project of that site
-    const team = input.location.type === 'project' ? scope.teamProjects : input.location.type === 'site' ? scope.teamSites : scope.teamCostCenters
+    // ADR 0032: no site in a PM's team any more
+    const team = input.location.type === 'project' ? scope.teamProjects : input.location.type === 'site' ? [] : scope.teamCostCenters
     if (!team.includes(input.location.id)) reject('FORBIDDEN', `Hanya untuk ${LABEL[input.location.type]} tim Anda.`, locField)
   }
   // DRMS 13/10 A2: own PT only (normally caught earlier as NOT_FOUND / COMPANY_MISMATCH; the DB trigger too)

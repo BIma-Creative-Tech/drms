@@ -303,7 +303,6 @@ export const MODULES: readonly ModuleDef[] = [
           // DRMS 16/10: "+ Vendor baru" = the tabbed Vendor page (detail + rekening + kontak PIC; /vendor/<id> = edit)
           { view: '/vendor/baru', label: '+ Vendor baru', roles: ['pk-admin', 'pk-finance'], navKey: 'vendor-baru', prefix: '/vendor', needsCollection: 'vendors' },
           { collection: 'vendor-bank-accounts' },
-          { collection: 'sites' },
         ],
       },
     ],
@@ -632,7 +631,6 @@ export const ITEM_ICONS: Readonly<Record<string, IconName>> = {
   '/collections/vehicles': 'tCar',
   '/collections/vendors': 'tShop',
   '/collections/vendor-bank-accounts': 'tCardTick',
-  '/collections/sites': 'tBuilding',
   // Media
   '/collections/media-receipts': 'tReceipt2',
   '/collections/media-transfer-proofs': 'tCardReceive',

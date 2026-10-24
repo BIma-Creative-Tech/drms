@@ -20,7 +20,6 @@ import { ProjectLoansTab as ProjectLoansTab_e5d452935824a68d96fdc373e55d7f95 } f
 import { BusinessDateField as BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f } from '@/admin/components/BusinessDateField'
 import { IntercompanyReceivingCell as IntercompanyReceivingCell_9d714d06e18fcaca14fd7fd6bd195f83 } from '@/admin/components/IntercompanyReceivingCell'
 import { ApprovalRulePreview as ApprovalRulePreview_d1fda995effefe011ec359f37cc8493e } from '@/admin/components/ApprovalRulePreview'
-import { SiteFromCostCenterLink as SiteFromCostCenterLink_57dfe94c9146c60f785b1649b36e1df1 } from '@/admin/components/SiteFromCostCenterLink'
 import { WorkflowPanel as WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e } from '@/admin/components/WorkflowPanel'
 import { StepperField as StepperField_6be3f0fd04aad5a2714b7b6cfd3f6a9e } from '@/admin/components/request/StepperField'
 import { PayeeTypeField as PayeeTypeField_a356a4ed347478242de628aded3440b3 } from '@/admin/components/EditableOnlyFields'
@@ -137,7 +136,6 @@ export const importMap = {
   "@/admin/components/BusinessDateField#BusinessDateField": BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f,
   "@/admin/components/IntercompanyReceivingCell#IntercompanyReceivingCell": IntercompanyReceivingCell_9d714d06e18fcaca14fd7fd6bd195f83,
   "@/admin/components/ApprovalRulePreview#ApprovalRulePreview": ApprovalRulePreview_d1fda995effefe011ec359f37cc8493e,
-  "@/admin/components/SiteFromCostCenterLink#SiteFromCostCenterLink": SiteFromCostCenterLink_57dfe94c9146c60f785b1649b36e1df1,
   "@/admin/components/WorkflowPanel#WorkflowPanel": WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e,
   "@/admin/components/request/StepperField#StepperField": StepperField_6be3f0fd04aad5a2714b7b6cfd3f6a9e,
   "@/admin/components/EditableOnlyFields#PayeeTypeField": PayeeTypeField_a356a4ed347478242de628aded3440b3,

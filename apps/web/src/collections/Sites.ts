@@ -1,9 +1,8 @@
 import type { CollectionBeforeChangeHook, CollectionConfig } from 'payload'
 
 import { denyAll, relId } from '@/access/roles'
-import { byRole, rolesAllowed } from '@/access/policies'
+import { byRole } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
-import { siteFromCostCenterDefault } from '@/domain/sites'
 import { activeField, codeField, uuidField } from '@/fields/common'
 import { andCompany, companyField, companyHook, lockedUntilCompany, pickerSameCompany } from '@/fields/company'
 import { validationError } from '@/lib/validation'
@@ -46,8 +45,9 @@ const oneHeadOfficePerPt: CollectionBeforeChangeHook = async ({ data, originalDo
  * site's projects without their own). No delete: deactivate (history keeps it).
  * DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13): `isHeadOffice` "Kantor pusat" marks the PT's head office (at most
  * one per PT); Non-OnSite employees check in at the head office and the branch offices only.
- * "Buat site dari pusat biaya" (Q-S2): /admin/collections/sites/create?costCenter=<id> pre-fills PT, kode, nama,
- * titik and pusat biaya from that cost center (domain/sites.ts siteFromCostCenterDefault).
+ * ADR 0032 (DRMS 24/10, user decision): sites are REMOVED from the product — the collection stays (history, rollback,
+ * old APKs) but is hidden from the admin navigation and from every form, list, filter and attendance location; no
+ * new site is created or linked. Projects carry the attendance points (`projects.lat/lng/radiusM`).
  */
 export const Sites: CollectionConfig = withAudit(
   {
@@ -56,13 +56,16 @@ export const Sites: CollectionConfig = withAudit(
     admin: {
       useAsTitle: 'name',
       group: 'Master Data',
+      // ADR 0032: removed from the product (no menu, no form); the table and its history stay
+      hidden: true,
       defaultColumns: ['code', 'name', 'isHeadOffice', 'address', 'costCenter', 'active'],
       description:
         'Kantor pusat dan kantor cabang PT (mis. Cabang Balikpapan). Satu site menangani beberapa project; absensi di kantor memakai titik + radius site. Tandai satu site sebagai Kantor pusat.',
     },
     access: {
       read: byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-finance': true, 'pk-pm': true, 'pk-staff': true, 'pk-operator': true }),
-      create: rolesAllowed('pk-admin', 'pk-owner'),
+      // ADR 0032: no new site (the master is no longer part of the product)
+      create: denyAll,
       update: byRole({ 'pk-admin': true, 'pk-owner': true }),
       delete: denyAll,
     },
@@ -78,9 +81,9 @@ export const Sites: CollectionConfig = withAudit(
       ],
     },
     fields: [
-      { ...companyField(), defaultValue: siteFromCostCenterDefault('company') },
-      { ...codeField('Kode', 32, { perCompany: true }), defaultValue: siteFromCostCenterDefault('code') },
-      { name: 'name', type: 'text', label: 'Nama site', required: true, maxLength: 128, defaultValue: siteFromCostCenterDefault('name') },
+      companyField(),
+      codeField('Kode', 32, { perCompany: true }),
+      { name: 'name', type: 'text', label: 'Nama site', required: true, maxLength: 128 },
       {
         name: 'isHeadOffice',
         type: 'checkbox',
@@ -95,15 +98,14 @@ export const Sites: CollectionConfig = withAudit(
       {
         type: 'row',
         fields: [
-          { name: 'lat', type: 'number', label: 'Latitude', min: -90, max: 90, defaultValue: siteFromCostCenterDefault('lat') },
-          { name: 'lng', type: 'number', label: 'Longitude', min: -180, max: 180, defaultValue: siteFromCostCenterDefault('lng') },
+          { name: 'lat', type: 'number', label: 'Latitude', min: -90, max: 90 },
+          { name: 'lng', type: 'number', label: 'Longitude', min: -180, max: 180 },
           {
             name: 'radiusM',
             type: 'number',
             label: 'Radius geofence (m)',
             min: 10,
             max: 5000,
-            defaultValue: siteFromCostCenterDefault('radiusM'),
             admin: { description: 'Kosong = radius default perusahaan (Setting perusahaan). Tanpa titik = absensi di site ini belum bisa.' },
           },
         ],
@@ -122,7 +124,6 @@ export const Sites: CollectionConfig = withAudit(
         relationTo: 'cost-centers',
         label: 'Pusat biaya default',
         index: true,
-        defaultValue: siteFromCostCenterDefault('costCenter'),
         ...pickerSameCompany(),
         filterOptions: andCompany({ type: { equals: 'operational' } }),
         admin: { placeholder: 'Pilih pusat biaya…', description: 'Pusat biaya operasional kantor cabang; diusulkan ke Finance untuk project site ini yang belum punya pusat biaya.' },

@@ -26,12 +26,8 @@ import { parseSnapshot, snapshotOf, type ScheduleSnapshot } from './schedule'
  * `(x.company_id = <PT> AND …)`. The top-level kind/ids are a summary (UI hints). MC4: a literal
  * WITHOUT `parts` is legacy and matches NOTHING (fail closed for `all` AND `team`).
  */
-/**
- * ADR 0023: `sites` = team sites of a PM part (site check-ins, site assignments, home-site employees of those sites);
- * `onlySites` = the UI / report site filter — narrows every row of the part to those sites (an attendance by its
- * server-filled `site_id`, an assignment by its site or its project's site, a home-site employee by the home site).
- */
-export type AttPart = { company: number; all: boolean; projects: number[]; costCenters: number[]; sites?: number[]; onlySites?: number[] }
+/** ADR 0032: no site part / site filter any more (ADR 0023 sites removed); an office part still sees legacy site rows. */
+export type AttPart = { company: number; all: boolean; projects: number[]; costCenters: number[] }
 export type AttScope = ({ kind: 'all' } | { kind: 'team'; projects: number[]; costCenters: number[] }) & { parts?: AttPart[] }
 
 const OFFICE_ATT: readonly Role[] = ['pk-admin', 'pk-owner', 'pk-finance']
@@ -51,20 +47,10 @@ export async function attendanceScope(req: PayloadRequest): Promise<AttScope | n
     if (m.roles.some((r) => OFFICE_ATT.includes(r))) parts.push({ company: m.company, all: true, projects: [], costCenters: [] })
     else if (m.roles.includes('pk-pm')) {
       const s = await resolveScope(req, m.company)
-      parts.push({ company: m.company, all: false, projects: s.teamProjects, costCenters: s.teamCostCenters, sites: s.teamSites })
+      parts.push({ company: m.company, all: false, projects: s.teamProjects, costCenters: s.teamCostCenters })
     }
   }
   return attScopeOf(parts)
-}
-
-/**
- * ADR 0023 §5: narrows every part to the site `siteId` (UI / report filter "Site") — never widens: it only adds a
- * predicate; a site of another PT matches nothing (its rows never carry that PT's company). Undefined = unchanged.
- */
-export function narrowAttToSite(scope: AttScope, siteId?: number): AttScope {
-  if (!siteId) return scope
-  if (!scope.parts) return { kind: 'team', projects: [], costCenters: [], parts: [] } // legacy literal: fail closed (MC4)
-  return { ...scope, parts: scope.parts.map((p) => ({ ...p, onlySites: [siteId] })) }
 }
 
 /** PTs of the scope visible in full (office roles). */
@@ -84,7 +70,6 @@ export function narrowAttScope(scope: AttScope, projectId?: number, costCenterId
     all: false,
     projects: projectId && (p.all || p.projects.includes(projectId)) ? [projectId] : [],
     costCenters: costCenterId && (p.all || p.costCenters.includes(costCenterId)) ? [costCenterId] : [],
-    ...(p.onlySites ? { onlySites: p.onlySites } : {}),
   }))
   return { kind: 'team', projects: projectId ? [projectId] : [], costCenters: costCenterId ? [costCenterId] : [], parts }
 }
@@ -100,37 +85,14 @@ export function narrowAttToCompanies(scope: AttScope, companyIds?: readonly numb
 }
 
 /**
- * Row filter on a table alias with company_id / project_id / cost_center_id / site_id columns (`a` attendances,
- * `ta` team assignments). ADR 0023: a site location = `site_id` without project / cost center (attendance rows of a
- * project also carry the project's site); `onlySites` narrows by the row's site (assignment: its site or its project's).
+ * Row filter on a table alias with company_id / project_id / cost_center_id columns (`a` attendances, `ta` team
+ * assignments): an office part = the whole PT (legacy site rows included), a PM part = its team projects / cost centers.
  */
 export function locationScopeSql(scope: AttScope, alias: 'a' | 'ta'): SQL {
   const col = (c: string) => sql.raw(`${alias}.${c}`)
-  const siteLoc = (sites: number[]) => (alias === 'a' ? sql`(${inList(col('site_id'), sites)} AND ${col('project_id')} IS NULL AND ${col('cost_center_id')} IS NULL)` : inList(col('site_id'), sites))
-  const loc = (p: AttPart) => sql`(${inList(col('project_id'), p.projects)} OR ${inList(col('cost_center_id'), p.costCenters)} OR ${siteLoc(p.sites ?? [])})`
-  const only = (sites: number[]) =>
-    alias === 'a' ? inList(col('site_id'), sites) : sql`(${inList(col('site_id'), sites)} OR ${col('project_id')} IN (SELECT sp.id FROM projects sp WHERE ${inList(sql`sp.site_id`, sites)}))`
+  const loc = (p: AttPart) => sql`(${inList(col('project_id'), p.projects)} OR ${inList(col('cost_center_id'), p.costCenters)})`
   if (!scope.parts) return sql`FALSE` // legacy literal without PT parts: fail closed (MC4)
-  const out = scope.parts.map((p) => {
-    const base = p.all ? sql`${col('company_id')} = ${p.company}` : sql`(${col('company_id')} = ${p.company} AND ${loc(p)})`
-    return p.onlySites ? sql`(${base} AND ${only(p.onlySites)})` : base
-  })
-  return out.length ? sql`(${sql.join(out, sql` OR `)})` : sql`FALSE`
-}
-
-/**
- * ADR 0023 Q-S5: employees whose home site ("Site penempatan") is a location of the scope — expected at that site
- * without an assignment row. Office part: every home-site employee of the PT (narrowed by `onlySites`); PM part:
- * home-site employees of the team sites.
- */
-export function homeSiteScopeSql(scope: AttScope, alias = 'e'): SQL {
-  const col = (c: string) => sql.raw(`${alias}.${c}`)
-  if (!scope.parts) return sql`FALSE`
-  const out = scope.parts.map((p) => {
-    const sites = p.all ? null : (p.sites ?? [])
-    const base = sites === null ? sql`${col('home_site_id')} IS NOT NULL` : inList(col('home_site_id'), sites)
-    return sql`(${col('company_id')} = ${p.company} AND ${base}${p.onlySites ? sql` AND ${inList(col('home_site_id'), p.onlySites)}` : sql``})`
-  })
+  const out = scope.parts.map((p) => (p.all ? sql`${col('company_id')} = ${p.company}` : sql`(${col('company_id')} = ${p.company} AND ${loc(p)})`))
   return out.length ? sql`(${sql.join(out, sql` OR `)})` : sql`FALSE`
 }
 
@@ -248,9 +210,9 @@ type ScheduleRow = {
 }
 
 /**
- * CURRENT schedule per employee (own, else the default schedule of the employee's home site — ADR 0023 §3 —, else
- * the default schedule of the EMPLOYEE's PT; `defaultScheduleId` only when that PT has none set) — for days without
- * a check-in snapshot (ADR 0016 §6).
+ * CURRENT schedule per employee (own, else the default schedule of the EMPLOYEE's PT — ADR 0032: no home-site
+ * default any more; `defaultScheduleId` only when that PT has none set) — for days without a check-in snapshot
+ * (ADR 0016 §6).
  */
 export async function currentSchedules(req: PayloadRequest, employeeIds: number[], defaultScheduleId: number | null): Promise<Map<number, ScheduleSnapshot | null>> {
   if (employeeIds.length === 0) return new Map()
@@ -261,8 +223,7 @@ export async function currentSchedules(req: PayloadRequest, employeeIds: number[
                ws.work_days_fri AS fri, ws.work_days_sat AS sat, ws.work_days_sun AS sun
         FROM employees e
         JOIN companies co ON co.id = e.company_id
-        LEFT JOIN sites hs ON hs.id = e.home_site_id
-        LEFT JOIN work_schedules ws ON ws.id = coalesce(e.work_schedule_id, hs.default_work_schedule_id, co.default_work_schedule_id, ${defaultScheduleId}::int) AND ws.company_id = e.company_id
+        LEFT JOIN work_schedules ws ON ws.id = coalesce(e.work_schedule_id, co.default_work_schedule_id, ${defaultScheduleId}::int) AND ws.company_id = e.company_id
         WHERE e.id IN (${idList(employeeIds)})`,
   )
   return new Map(
@@ -316,8 +277,8 @@ const memberLocation = (x: Pick<MemberRow, 'project_id' | 'project_code' | 'proj
 
 /**
  * Employees with a team assignment active on `date` (start/end inclusive, compared on the stored
- * UTC date like the check-in rule) at a location of the scope; inactive employees are left out. ADR 0023: plus the
- * employees whose home site is a site of the scope (location = that site, no assignment row needed).
+ * UTC date like the check-in rule) at a location of the scope; inactive employees are left out. ADR 0032: no
+ * home-site members any more (a legacy site assignment of an office PT still shows with its site).
  */
 export async function teamMembers(req: PayloadRequest, scope: AttScope, fromDate: string, toDate: string = fromDate, employeeId?: number): Promise<TeamMember[]> {
   const r = await rows<MemberRow>(
@@ -335,13 +296,6 @@ export async function teamMembers(req: PayloadRequest, scope: AttScope, fromDate
             AND (ta.end_date IS NULL OR to_char(ta.end_date AT TIME ZONE 'UTC', 'YYYY-MM-DD') >= ${fromDate})
             AND ${employeeId === undefined ? sql`TRUE` : sql`ta.employee_id = ${employeeId}`}
             AND ${locationScopeSql(scope, 'ta')}
-          UNION ALL
-          SELECT e.id, e.company_id, e.code, e.name, NULL, NULL, NULL, NULL, NULL, NULL, hs.id, hs.code, hs.name, 0
-          FROM employees e
-          JOIN sites hs ON hs.id = e.home_site_id
-          WHERE coalesce(e.active, true)
-            AND ${employeeId === undefined ? sql`TRUE` : sql`e.id = ${employeeId}`}
-            AND ${homeSiteScopeSql(scope, 'e')}
         ) m
         ORDER BY m.name, m.ord`,
   )

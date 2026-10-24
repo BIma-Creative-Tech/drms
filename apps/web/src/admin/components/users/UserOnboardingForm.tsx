@@ -17,6 +17,7 @@ import {
   draftFromDetail,
   ensureEmployee,
   hasEmployee,
+  LOCATION_KIND_LABEL,
   LOCATION_KINDS,
   mapErrors,
   newAssignment,
@@ -411,7 +412,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
               ) : null}
               {c.employee ? (
                 <p className="pk-uo__more">
-                  <Link prefetch={false} href={`/admin/collections/employees/${c.employee.id}`}>Buka data karyawan lengkap ↗</Link> (jadwal kerja, site penempatan, foto wajah)
+                  <Link prefetch={false} href={`/admin/collections/employees/${c.employee.id}`}>Buka data karyawan lengkap ↗</Link> (jadwal kerja, foto wajah)
                 </p>
               ) : null}
             </fieldset>
@@ -528,8 +529,8 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
       {/* ---- Penugasan Proyek (DRMS 15/10: editable, same save) ---- */}
       <section id="uo-panel-penugasan" role="tabpanel" aria-labelledby="uo-tab-penugasan" hidden={tab !== 'penugasan'} className="pk-uo__panel">
         <p className="pk-uo__lead">
-          Penugasan tim data karyawan per PT: project, pusat biaya, atau site. Penugasan yang tersimpan tidak dihapus — ubah peran atau isi tanggal selesai
-          untuk mengakhirinya (wajib dengan alasan).
+          Penugasan tim data karyawan per PT: project atau pusat biaya. Penugasan yang tersimpan tidak dihapus — ubah peran atau isi tanggal selesai untuk
+          mengakhirinya (wajib dengan alasan).
         </p>
         {noCompanies}
         {detail.companies.map((c) => {
@@ -559,7 +560,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                     <p className="pk-uo__bank-title">
                       {a.id !== undefined ? (
                         <>
-                          {kind.label}: {a.label}
+                          {LOCATION_KIND_LABEL[a.kind]}: {a.label}
                           {a.startDate ? <span className="pk-uo__hint">mulai {a.startDate}</span> : null}
                           <Link prefetch={false} href={`/admin/collections/team-assignments/${a.id}`} className="pk-uo__hint">
                             Buka ↗

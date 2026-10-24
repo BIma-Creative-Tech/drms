@@ -379,3 +379,13 @@ export function requireCompanyWhenAmbiguous(
  */
 export const ACTIVE_ONLY: Where = { active: { not_equals: false } }
 export const siteOptions = andCompany(ACTIVE_ONLY)
+
+/**
+ * ADR 0032 (DRMS 24/10, user decision): sites are removed from the product. The `site` columns of employees, projects,
+ * cash accounts and team assignments STAY (history, rollback, the fund-check flag of already-linked cash accounts) but
+ * are hidden from every form / list / APK data form and can no longer be written over HTTP (field access false; the
+ * company hook + DB trigger still guard system writes).
+ */
+export function legacySiteField(name: string, label: string): RelationshipField {
+  return { name, type: 'relationship', relationTo: 'sites', label, index: true, access: { create: () => false, update: () => false }, admin: { hidden: true } } as RelationshipField
+}

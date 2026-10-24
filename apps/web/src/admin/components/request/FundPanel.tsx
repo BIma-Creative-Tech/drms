@@ -6,7 +6,7 @@ import type { Detail } from './panel-data'
 
 /**
  * ADR 0029 §2 "Ketersediaan dana PT <code>" on the request page (Finance / Direktur / Owner of the PT, while the request
- * waits for a decision or is the Owner's own Draft): Saldo dana (n akun, tanpa akun site) − Komitmen (expandable list)
+ * waits for a decision or is the Owner's own Draft): Saldo dana (n akun; ADR 0032: accounts still flagged with a legacy site stay excluded) − Komitmen (expandable list)
  * = Dana tersedia; Dibutuhkan = this request; Kurang (red) or "Cukup" (green); the other requests waiting at their final
  * decision; linked inter-PT loans; "Perintahkan pinjaman antar-PT" (Owner, short). Read-only before the final step
  * ("cek akhir di Owner"). The server is the authority: Setujui answers 409 FUND_INSUFFICIENT while short.
@@ -94,7 +94,7 @@ export function FundPanel({ d }: { d: Pick<Detail, 'id' | 'fundCheck' | 'allowed
       <dl style={{ ...grid, margin: pb ? '4px 0 0' : grid.margin }}>
         <dt>Saldo dana</dt>
         <dd style={{ margin: 0 }} data-pk-fund="balance">
-          {rp(f.balance)} <span style={{ color: 'var(--theme-elevation-600)' }}>({f.accountCount} akun, tanpa akun site{f.excludedSiteAccounts.count ? ` — ${f.excludedSiteAccounts.count} akun site ${rp(f.excludedSiteAccounts.balance)} tidak dihitung` : ''})</span>
+          {rp(f.balance)} <span style={{ color: 'var(--theme-elevation-600)' }}>({f.accountCount} akun{f.excludedSiteAccounts.count ? ` — ${f.excludedSiteAccounts.count} akun kas cabang (site lama) ${rp(f.excludedSiteAccounts.balance)} tidak dihitung` : ''})</span>
         </dd>
         <dt>Komitmen</dt>
         <dd style={{ margin: 0 }} data-pk-fund="commitments">

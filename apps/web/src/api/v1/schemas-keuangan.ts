@@ -31,7 +31,6 @@ export const KasBook = z
     ),
     lookups: z.object({
       accounts: z.array(Option.extend({ openingDate: z.string().nullable(), siteId: id.nullable(), intercompanyReceiving: z.boolean() })),
-      sites: z.array(Option),
       projects: z.array(Option),
       costCenters: z.array(Option),
       categories: z.array(Option.extend({ requiresVehicle: z.boolean() })),
@@ -43,7 +42,7 @@ export const KasBook = z
     flowPeriod: period,
     accounts: z
       .array(z.object({ cashAccountId: id, companyId: id, name: z.string(), balance: money, flowIn: money, flowOut: money, n: z.number().int() }))
-      .meta({ description: 'Balance tiles (active or non-zero accounts; site filter) + Σ in / out of flowPeriod.' }),
+      .meta({ description: 'Balance tiles (active or non-zero accounts) + Σ in / out of flowPeriod.' }),
     page: z.object({
       rows: z.array(
         z.object({

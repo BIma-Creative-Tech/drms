@@ -37,16 +37,11 @@ function monthOf(sp: URLSearchParams, today: string): string {
 export function attendanceReportScope(scope: ReportScope, projectId?: number, costCenterId?: number): AttScope {
   const none: AttScope = { kind: 'team', projects: [], costCenters: [], parts: [] }
   if (!scope.companies) return none // legacy company-blind literal: fail closed (MC4)
-  // ADR 0023: team sites of a PM PT; the report site filter (`onlySites`) carries over as the attendance site filter
   const base: AttScope =
     attScopeOf(
       scope.companies
         .filter((c) => c.kind !== 'own')
-        .map((c) => ({
-          ...(c.kind === 'all' ? { company: c.company, all: true, projects: [], costCenters: [] } : { company: c.company, all: false, projects: c.kind === 'team' ? c.projects : [], costCenters: c.kind === 'team' ? c.costCenters : [] }),
-          ...(c.kind === 'team' && c.sites?.length ? { sites: c.sites } : {}),
-          ...(c.onlySites ? { onlySites: c.onlySites } : {}),
-        })),
+        .map((c) => (c.kind === 'all' ? { company: c.company, all: true, projects: [], costCenters: [] } : { company: c.company, all: false, projects: c.kind === 'team' ? c.projects : [], costCenters: c.kind === 'team' ? c.costCenters : [] })),
     ) ?? none
   if (!projectId && !costCenterId) return base
   return narrowAttScope(base, projectId, costCenterId)
