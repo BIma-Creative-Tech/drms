@@ -587,7 +587,7 @@ class _DecisionBar extends ConsumerWidget {
       ref.invalidate(inboxProvider);
       if (done != true || !context.mounted) return;
       final message = '${detail.docNo ?? detail.title}: ${t.decisionDone}';
-      await showActionResult(context, message: message, action: decisionLabel(t, decision));
+      await showActionResult(context, message: message, action: decisionActionLabel(t, decision));
     }
 
     final pm = detail.approvalRule?.pmApproval ?? false;

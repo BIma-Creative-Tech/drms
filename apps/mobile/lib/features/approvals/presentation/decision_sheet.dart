@@ -32,7 +32,7 @@ Future<bool?> showDecisionSheet(BuildContext context, {required ExpenseDetail de
 enum SignatureMode { profile, draw }
 
 /// D2410: the action named in the result popup ("Berhasil: setujui pengajuan").
-String decisionLabel(AppLocalizations t, Decision d) => switch (d) {
+String decisionActionLabel(AppLocalizations t, Decision d) => switch (d) {
   Decision.acknowledge => t.decisionTitleAcknowledge,
   Decision.approve => t.decisionTitleApprove,
   Decision.reject => t.decisionTitleReject,
@@ -122,7 +122,7 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
   Future<void> _failed(String message) async {
     if (!mounted) return;
     setState(() => _error = message);
-    final action = decisionLabel(AppLocalizations.of(context), widget.decision);
+    final action = decisionActionLabel(AppLocalizations.of(context), widget.decision);
     await showActionFailure(context, message, action: action);
   }
 
