@@ -110,7 +110,8 @@ async function setAttendance(enabled: boolean) {
 
 beforeAll(async () => {
   installLocalJwks()
-  tag = `d24${Date.now() % 100000}`
+  // letters first: makeWorld derives a vehicle plate from the first two characters
+  tag = `dabs${Date.now() % 100000}`
   w = await makeWorld(tag)
   const p = await getTestPayload()
   await p.update({ collection: 'projects', id: w.project, data: { lat: PRJ.lat, lng: PRJ.lng, radiusM: 100 }, overrideAccess: true /* SYSTEM-WRITE: fixture geofence */ })
