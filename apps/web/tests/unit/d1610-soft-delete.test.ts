@@ -15,6 +15,8 @@ import { Vendors } from '@/collections/Vendors'
 import { deletedRowGuard, hideDeleted, mayShowDeleted, softDeleteFields, withSoftDelete } from '@/domain/soft-delete/collection'
 import { ignoredReference, INCLUDE_DELETED, IS_DELETED, SOFT_DELETE, SOFT_DELETE_ENTRIES, SOFT_DELETE_SLUGS } from '@/domain/soft-delete/registry'
 import { isNeverSubmittedDraft, PROJECT_CANCELLABLE, requestCancellable } from '@/domain/soft-delete/service'
+import { cascadeCancellable } from '@/domain/expense/state'
+import type { RequestStatus } from '@/domain/expense/types'
 import { andNotDeleted, isIdLookup, mentionsField, NOT_DELETED, ONLY_DELETED, readWhere, WITH_DELETED } from '@/domain/soft-delete/where'
 import { closedProjectMessage, isClosedProjectStatus, PROJECT_CLOSED_STATUSES } from '@/domain/projects/status'
 import { migrations } from '@/migrations'
@@ -170,8 +172,9 @@ describe('registry vs the real config, the migration and the snapshot', () => {
     expect(enums).toContain(`"enum_audit_logs_action" ADD VALUE IF NOT EXISTS 'restore'`)
     const snapshot = JSON.parse(readFileSync(join(dir, '20261016_200100_d1610_soft_delete.json'), 'utf8')) as { enums: Record<string, { values: string[] }>; tables: Record<string, { columns: Record<string, unknown>; indexes: Record<string, unknown>; foreignKeys: Record<string, unknown> }> }
     expect(snapshot.enums['public.enum_projects_status']!.values).toEqual(PROJECT_STATUSES.map((x) => x.value))
-    // ADR 0031 (20261021_100000_d2110_pb_enums) appended 'disburse' / 'auto_create' after this snapshot
-    expect(snapshot.enums['public.enum_audit_logs_action']!.values).toEqual(AUDIT_ACTIONS.filter((a) => a !== 'disburse' && a !== 'auto_create'))
+    // ADR 0031 (20261021_100000_d2110_pb_enums) appended 'disburse' / 'auto_create' after this snapshot, D2410
+    // (20261024_300000_d2410_self_processed_enum) 'self_processed'
+    expect(snapshot.enums['public.enum_audit_logs_action']!.values).toEqual(AUDIT_ACTIONS.filter((a) => a !== 'disburse' && a !== 'auto_create' && a !== 'self_processed'))
     for (const t of SOFT_DELETE_TABLES) {
       const tb = snapshot.tables[`public.${t}`]!
       for (const c of ['is_deleted', 'deleted_at', 'deleted_by_id', 'delete_reason']) expect(tb.columns, `${t}.${c}`).toHaveProperty(c)
@@ -200,11 +203,18 @@ describe('usage + request rules (pure)', () => {
     expect(isNeverSubmittedDraft({ status: 'draft', docNo: 'PB/DRMS/2610/0001' })).toBe(false)
     expect(isNeverSubmittedDraft({ status: 'pending_approval', docNo: null })).toBe(false)
   })
-  it('the cascade cancels exactly the state machine cancel rows', () => {
+  it('row action "Batalkan" = the state machine cancel rows (D2410: Finance stage only); the project cascade adds draft / waiting', () => {
     const c = (type: string, status: string, payeeType = 'karyawan') => requestCancellable({ type, status, payeeType })
-    for (const s of ['draft', 'pending_ack', 'pending_approval', 'approved']) expect(c('advance', s), s).toBe(true)
+    for (const s of ['draft', 'pending_ack', 'pending_approval']) {
+      expect(c('advance', s), s).toBe(false)
+      expect(cascadeCancellable('advance', s as RequestStatus), s).toBe(true)
+    }
+    expect(c('advance', 'approved')).toBe(true)
     for (const s of ['approved', 'receipts_verified', 'receipt_revision']) expect(c('reimburse', s), s).toBe(true)
-    for (const s of ['transferred', 'receipts_complete', 'lpj_submitted', 'lpj_revision', 'lpj_verified', 'completed', 'cancelled', 'rejected']) expect(c('advance', s), s).toBe(false)
+    for (const s of ['transferred', 'receipts_complete', 'lpj_submitted', 'lpj_revision', 'lpj_verified', 'completed', 'cancelled', 'rejected']) {
+      expect(c('advance', s), s).toBe(false)
+      expect(cascadeCancellable('advance', s as RequestStatus), s).toBe(false)
+    }
     expect(c('reimburse', 'transferred')).toBe(false)
     expect(c('advance', 'approved', 'vendor')).toBe(true)
   })

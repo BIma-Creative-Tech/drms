@@ -49,7 +49,8 @@ type Row = { from: RequestStatus[]; action: Action; to: RequestStatus[]; types?:
 export const TRANSITIONS: readonly Row[] = [
   { from: ['draft'], action: 'submit', to: ['pending_ack', 'pending_approval'] },
   { from: ['pending_ack', 'pending_approval'], action: 'withdraw', to: ['draft'] },
-  { from: ['draft', 'pending_ack', 'pending_approval'], action: 'cancel', to: ['cancelled'] },
+  // D2410 (user 2026-10-24, point 13): "Batalkan" ONLY at the Finance stage — no cancel on draft / pending (the
+  // requester withdraws to Draft during the approval instead); the `cancel` rows below are the Finance-stage statuses.
   { from: ['pending_ack', 'pending_approval'], action: 'acknowledge', to: ['pending_approval'] },
   { from: ['pending_approval'], action: 'approve', to: ['pending_approval', 'approved'] },
   { from: ['pending_ack', 'pending_approval'], action: 'reject', to: ['rejected'] },
@@ -144,11 +145,26 @@ export type ActorContext = {
   pmFlow?: boolean
 }
 
+/**
+ * D1610 (ADR 0030) "Batalkan proyek" cascade only: statuses the SYSTEM cancels together with a cancelled project although
+ * no user may cancel them (D2410: `cancel` exists only at the Finance stage). Never offered as an action.
+ */
+export const PROJECT_CASCADE_CANCEL_FROM: readonly RequestStatus[] = ['draft', 'pending_ack', 'pending_approval']
+
+/** The project-cancel cascade may cancel this request: a Finance-stage `cancel` row, or draft / waiting for approval. */
+export function cascadeCancellable(type: RequestType, status: RequestStatus, payee: PayeeType = 'karyawan'): boolean {
+  return PROJECT_CASCADE_CANCEL_FROM.includes(status) || targets(type, status, 'cancel', payee).length > 0
+}
+
 /** Actions that do not move the status (their own status preconditions are checked in allowedActions). */
 const NON_TRANSITION: ReadonlySet<Action> = new Set<Action>(['edit', 'resubmit', 'review_flag', 'add_receipt', 'receipt_verify'])
 
-/** Finance actions refused on a request where the Finance user is requester or creator (F2e). */
-export const FINANCE_SELF_GUARDED: ReadonlySet<Action> = new Set<Action>(['receipt_verify', 'receipt_reject', 'verify_receipts', 'review_flag', 'lpj_request_revision', 'lpj_verify', 'settle', 'settle_reverse'])
+/**
+ * Finance receipt / flag / LPJ / settlement actions. F2e refused them on a request where the Finance user is requester or
+ * creator; D2410 (user decision 2026-10-24) allows them — the service records each such action as `self_processed`
+ * ("diproses oleh pemohon sendiri") in the audit trail. Approvals (G1) and the transfer rule are unchanged.
+ */
+export const FINANCE_SELF_PROCESSED: ReadonlySet<Action> = new Set<Action>(['receipt_verify', 'receipt_reject', 'verify_receipts', 'review_flag', 'lpj_request_revision', 'lpj_verify', 'settle', 'settle_reverse'])
 
 const has = (ctx: ActorContext, ...roles: Role[]) => ctx.roles.some((r) => roles.includes(r))
 const office = (ctx: ActorContext) => has(ctx, 'pk-finance', 'pk-owner')
@@ -168,19 +184,15 @@ export function allowedActions(ctx: ActorContext): Action[] {
   add('edit', (ctx.status === 'draft' || (ctx.status === 'receipt_revision' && ctx.type === 'reimburse')) && own)
   add('submit', own)
   add('withdraw', own && !ctx.hasDecision)
-  add(
-    'cancel',
-    ctx.status === 'draft' || ctx.status === 'pending_ack' || ctx.status === 'pending_approval'
-      ? own && !ctx.hasDecision
-      : office(ctx),
-  )
+  // D2410: Finance stage only (the `cancel` rows), office roles only — also on their own request; reason mandatory (G7).
+  add('cancel', office(ctx))
   const decider = (!selfInvolved || !!ctx.selfApprovalAllowed) && !ctx.alreadyDecided && !ctx.lacksDecisionRole
   add('acknowledge', ctx.isAcknowledger && decider)
   add('approve', ctx.matchesCurrentStep && decider)
   add('reject', decider && (ctx.status === 'pending_ack' ? ctx.isAcknowledger : ctx.matchesCurrentStep))
-  // F2e: Finance never verifies receipts / reviews flags of a request it requested or created
-  // (G1 spirit, like the LPJ actions below) — FINANCE_SELF_GUARDED, denied attempts are audited.
-  const finance = has(ctx, 'pk-finance') && !selfInvolved
+  // D2410 (user 2026-10-24): Finance verifies receipts / reviews flags / processes the LPJ also on a request it
+  // requested or created (F2e refused it) — FINANCE_SELF_PROCESSED, audited as `self_processed` by the service.
+  const finance = has(ctx, 'pk-finance')
   add(
     'receipt_verify',
     finance &&
@@ -197,13 +209,13 @@ export function allowedActions(ctx: ActorContext): Action[] {
   add('complete', own || has(ctx, 'pk-finance'))
   add('resubmit', ctx.status === 'rejected' && own)
   // T5 (US-08, US-21, US-22): the requester side completes receipts and (re)submits the LPJ;
-  // Finance reviews, requests revision, verifies and settles — never on its own request (G1 spirit).
+  // Finance reviews, requests revision, verifies and settles — D2410: also on its own request (audited).
   add('receipts_complete', own)
   add('lpj_submit', own)
-  add('lpj_request_revision', has(ctx, 'pk-finance') && !selfInvolved)
-  add('lpj_verify', has(ctx, 'pk-finance') && !selfInvolved)
-  add('settle', has(ctx, 'pk-finance') && !selfInvolved)
-  add('settle_reverse', has(ctx, 'pk-finance') && !selfInvolved)
+  add('lpj_request_revision', finance)
+  add('lpj_verify', finance)
+  add('settle', finance)
+  add('settle_reverse', finance)
   add('add_receipt', own && receiptsEditable(ctx.type, ctx.status))
   return out
 }
@@ -229,7 +241,8 @@ export function mayPerform(ctx: ActorContext, action: Action): boolean {
     case 'lpj_submit':
       return own
     case 'cancel':
-      return own || office(ctx)
+      // D2410: office roles only (Finance stage), whether or not they are the requester / creator
+      return office(ctx)
     case 'acknowledge':
     case 'approve':
     case 'reject':
@@ -243,7 +256,7 @@ export function mayPerform(ctx: ActorContext, action: Action): boolean {
       return own || finance
     default:
       // receipt_verify, receipt_reject, verify_receipts, review_flag, lpj_request_revision, lpj_verify,
-      // settle, settle_reverse: Finance, never on a request it requested/created (F2e, G17).
-      return finance && !own
+      // settle, settle_reverse: Finance — D2410: also on a request it requested/created (audited `self_processed`).
+      return finance
   }
 }

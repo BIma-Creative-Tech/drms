@@ -25,7 +25,7 @@ type SQL = ReturnType<typeof sql>
  * - Pulihkan and "Tampilkan yang dihapus": an Admin of the row's PT (group admins; shared masters: an Admin of any PT).
  * When:
  * - master / project: no other row references it (usage.ts); otherwise 409 with the usage lines;
- * - request: status Draft and never submitted (no number yet); otherwise 409 → "Batalkan".
+ * - request: status Draft and never submitted (no number yet); otherwise 409 (D2410: "Batalkan" = Finance stage, office roles).
  */
 
 export class RecordError extends APIError {
@@ -135,10 +135,21 @@ export function isNeverSubmittedDraft(row: Readonly<Record<string, unknown>>): b
   return row.status === 'draft' && (no === null || no === undefined || no === '')
 }
 
-/** The state machine has a `cancel` transition from the request's status. */
+/**
+ * The state machine has a `cancel` transition from the request's status (D2410: the Finance stage only — the row action
+ * "Batalkan" is then offered to the office roles of the request's PT, `mayCancelRequest`).
+ */
 export function requestCancellable(row: Readonly<Record<string, unknown>>): boolean {
   return targets((row.type ?? 'advance') as RequestType, row.status as RequestStatus, 'cancel', payeeOf(row.payee_type ?? row.payeeType)).length > 0
 }
+
+/** D2410: "Batalkan" of a submitted request = Finance / Direktur of its PT (state.ts `cancel`), never the requester as such. */
+export function mayCancelRequest(req: PayloadRequest, companyId: number | null | undefined): boolean {
+  return hasRole(req, ['pk-finance', 'pk-owner'], companyId)
+}
+
+/** D2410: a submitted request is never deleted — and only Finance cancels it, at the Finance stage. */
+export const REQUEST_NOT_DELETABLE = 'Hanya draft yang belum pernah diajukan yang dapat dihapus. Pengajuan yang sudah diajukan hanya dapat dibatalkan Finance/Direktur pada tahap Finance ("Batalkan").'
 
 function titleOf(entry: SoftDeleteEntry, row: Record<string, unknown>): string {
   const pick = (...keys: string[]) => keys.map((k) => row[k]).find((v) => typeof v === 'string' && v.trim() !== '') as string | undefined
@@ -184,8 +195,8 @@ export async function deleteCheck(req: PayloadRequest, slug: string, id: number)
   const canUpdate = entry.kind === 'expense' ? await ownsRequest(req, row) : await mayUpdate(req, slug, id)
   if (entry.kind === 'expense') {
     const draft = isNeverSubmittedDraft(row)
-    const action = draft && canUpdate ? 'hapus' : !draft && requestCancellable(row) ? 'batalkan' : null
-    const blockedReason = !draft ? 'Hanya draft yang belum pernah diajukan yang dapat dihapus. Pengajuan yang sudah diajukan dibatalkan lewat "Batalkan".' : !canUpdate ? 'Anda tidak berhak menghapus pengajuan ini.' : null
+    const action = draft && canUpdate ? 'hapus' : !draft && requestCancellable(row) && mayCancelRequest(req, company) ? 'batalkan' : null
+    const blockedReason = !draft ? REQUEST_NOT_DELETABLE : !canUpdate ? 'Anda tidak berhak menghapus pengajuan ini.' : null
     return { ...base, action, canDelete: draft && canUpdate, blockedReason, usage: [] }
   }
   const usage = (await usageOf(req, entry, [id])).get(id) ?? []
@@ -252,7 +263,7 @@ export async function softDelete(req: PayloadRequest, slug: string, id: number, 
   if (row.is_deleted === true) fail(409, 'ALREADY_DELETED', 'Data ini sudah dihapus.')
   if (!(entry.kind === 'expense' ? await ownsRequest(req, row) : await mayUpdate(req, slug, id))) fail(403, 'FORBIDDEN', entry.kind === 'expense' ? 'Hanya pembuat / pemohon yang dapat menghapus draft pengajuan ini.' : 'Anda tidak berhak menghapus data ini.')
   if (entry.kind === 'expense') {
-    if (!isNeverSubmittedDraft(row)) fail(409, 'NOT_A_DRAFT', 'Hanya draft yang belum pernah diajukan yang dapat dihapus. Pengajuan yang sudah diajukan dibatalkan lewat "Batalkan".')
+    if (!isNeverSubmittedDraft(row)) fail(409, 'NOT_A_DRAFT', REQUEST_NOT_DELETABLE)
   } else {
     const usage = (await usageOf(req, entry, [id])).get(id) ?? []
     if (usage.length > 0) fail(409, entry.kind === 'project' ? 'PROJECT_IN_USE' : 'IN_USE', blockedText(entry, usage), { usage })
@@ -302,8 +313,8 @@ export async function rowStates(req: PayloadRequest, slug: string, docs: readonl
     if (entry.kind === 'expense') {
       const emp = employeeIn(req, company)
       const own = relId(d.createdBy) === uid || (emp !== undefined && Array.isArray(d.requesters) && d.requesters.some((r) => relId(r) === emp))
-      const office = hasRole(req, ['pk-finance', 'pk-owner'], company)
-      const action = isNeverSubmittedDraft(d) ? (own ? 'hapus' : null) : requestCancellable(d) && (own || office) ? 'batalkan' : null
+      // D2410: "Batalkan" only at the Finance stage (requestCancellable) and only for the office roles — also on their own request
+      const action = isNeverSubmittedDraft(d) ? (own ? 'hapus' : null) : requestCancellable(d) && mayCancelRequest(req, company) ? 'batalkan' : null
       out.set(d.id, { action, deleted: false })
       continue
     }

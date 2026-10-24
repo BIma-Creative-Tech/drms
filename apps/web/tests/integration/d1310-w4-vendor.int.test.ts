@@ -178,7 +178,11 @@ describe('duplicate invoice', () => {
     await ok(api('POST', E, financeV, await vendorBody(financeV, { invoiceNo: no, vendorId: otherVendor, vendorBankAccountId: accOther }), key()), 201)
     // the same draft may keep its own number (PATCH)
     await ok(api('PATCH', `${E}/${first.id}`, financeV, { invoiceNo: no, title: 'Bayar invoice material (ubah)' }))
-    // cancelled → the invoice may be filed again
+    // cancelled → the invoice may be filed again. D2410: "Batalkan" only at the Finance stage — sent, approved (Direktur →
+    // Owner), then cancelled by Finance (here the filer himself: an office role may cancel its own request there)
+    await ok(api('POST', `${E}/${first.id}/submit`, financeV, {}, key()))
+    await ok(api('POST', `${E}/${first.id}/approve`, w.users.owner, {}, key()))
+    expect((await ok(api('POST', `${E}/${first.id}/approve`, principalV, {}, key()))).status).toBe('approved')
     await ok(api('POST', `${E}/${first.id}/cancel`, financeV, { reason: 'salah input invoice' }, key()))
     const again = await ok(api('POST', E, financeV, await vendorBody(financeV, { invoiceNo: no }), key()), 201)
     // DB guard: a raw write of the same key on another live request is refused

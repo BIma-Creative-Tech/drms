@@ -236,16 +236,25 @@ describe('request: Hapus only as a never-submitted draft', () => {
     expect((await auditRows('expense_request', id)).some((x) => x.action === 'soft_delete')).toBe(true)
   })
 
-  it('submitted (and withdrawn) requests are cancelled, never deleted', async () => {
+  it('submitted (and withdrawn) requests are never deleted; "Batalkan" only for Finance at the Finance stage (D2410)', async () => {
     const c = await api('POST', E, w.users.staffA, draftBody(w))
     const id = c.body.id as number
     expect((await api('POST', `${E}/${id}/submit`, w.users.staffA, {})).status).toBe(200)
     const sub = await del(w.users.staffA, 'expense-requests', id)
     expect(sub.status).toBe(409)
     expect(sub.body.code).toBe('NOT_A_DRAFT')
-    expect((await check(w.users.staffA, 'expense-requests', id)).body.action).toBe('batalkan')
+    // waiting for approval: no row action for the requester, none for Finance either (not the Finance stage yet)
+    expect((await check(w.users.staffA, 'expense-requests', id)).body.action).toBeNull()
+    expect((await check(w.users.finance, 'expense-requests', id)).body.action).toBeNull()
     expect((await api('POST', `${E}/${id}/withdraw`, w.users.staffA, { reason: 'Perlu revisi baris' })).status).toBe(200)
     expect((await del(w.users.staffA, 'expense-requests', id)).body.code).toBe('NOT_A_DRAFT') // keeps its number
+    expect((await check(w.users.staffA, 'expense-requests', id)).body.action).toBeNull()
+    // approved (Finance stage): Finance gets "Batalkan", the requester still not
+    expect((await api('POST', `${E}/${id}/submit`, w.users.staffA, {})).status).toBe(200)
+    expect((await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {})).status).toBe(200)
+    expect((await api('POST', `${E}/${id}/approve`, w.users.finance, {})).body.status).toBe('approved')
+    expect((await check(w.users.finance, 'expense-requests', id)).body.action).toBe('batalkan')
+    expect((await check(w.users.staffA, 'expense-requests', id)).body.action).toBeNull()
   })
 })
 

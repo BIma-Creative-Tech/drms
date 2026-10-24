@@ -2,13 +2,13 @@ import { sql } from '@payloadcms/db-postgres'
 import { APIError, type PayloadRequest } from 'payload'
 
 import { employeeIn, exactRolesIn, exactRolesOf, relId, rolesIn, userId, userRoles } from '@/access/roles'
-import { writeAuditDetached } from '@/audit/writer'
+import { writeAudit, writeAuditDetached } from '@/audit/writer'
 import { displayNames, settings } from '@/domain/companies'
 import { decidesAsDirektur, holdsPositionAs } from '@/domain/direktur-signature'
 import { DEFAULT_TZ, localDateInTz } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
-import { allowedActions, FINANCE_SELF_GUARDED, mayPerform, targets, type Action, type ActorContext } from './state'
+import { allowedActions, FINANCE_SELF_PROCESSED, mayPerform, targets, type Action, type ActorContext } from './state'
 import { DIREKTUR_VIA_PM_SELF, isDecisionSnapshot, isSelfApproval, lacksDecisionRole } from './decision'
 import { SHARED_FLAG_WHERE } from './flag-visibility'
 import { matchesAcknowledger, matchesStep, type ApprovalSnapshot } from './rules'
@@ -257,9 +257,10 @@ const G1_DECISIONS: ReadonlySet<Action> = new Set<Action>(['acknowledge', 'appro
 /**
  * `requireAction` + audit of decision-role denials (E1, ADR 0013: caller is neither Direktur nor
  * Finance on a Direktur → Finance request) and of SELF-INVOLVEMENT denials (F2e): a requester/creator attempting a
- * decision (G1) or a Finance user attempting a receipt/flag/LPJ verification on a request it
- * requested or created (FINANCE_SELF_GUARDED) → 403 and an `access_denied` audit row written in its
- * own transaction (the failing operation rolls back, the attempt stays recorded).
+ * decision (G1) → 403 and an `access_denied` audit row written in its own transaction (the failing operation rolls
+ * back, the attempt stays recorded). D2410 (user 2026-10-24): a Finance user who is requester or creator MAY perform
+ * the receipt / flag / LPJ / settlement actions (FINANCE_SELF_PROCESSED) — allowed, and recorded as `self_processed`
+ * ("diproses oleh pemohon sendiri") in the SAME transaction as the action.
  */
 export async function requireActionAudited(req: PayloadRequest, ctx: ActorContext, action: Action, doc: Pick<RequestDoc, 'id' | 'docNo'>): Promise<void> {
   if (G1_DECISIONS.has(action) && ctx.lacksDecisionRole) {
@@ -285,24 +286,44 @@ export async function requireActionAudited(req: PayloadRequest, ctx: ActorContex
         : 'Hanya Direktur atau Finance yang dapat menyetujui atau menolak pengajuan. PM hanya memantau.',
     )
   }
+  const selfInvolved = ctx.isCreator || ctx.isRequester
   try {
     requireAction(ctx, action)
   } catch (err) {
-    const selfInvolved = ctx.isCreator || ctx.isRequester
-    const financeSelf = FINANCE_SELF_GUARDED.has(action) && ctx.roles.includes('pk-finance')
-    if ((err as { status?: number }).status !== 403 || !selfInvolved || !(financeSelf || G1_DECISIONS.has(action))) throw err
-    const guard = financeSelf ? 'Finance adalah pemohon/pembuat pengajuan ini (G1)' : 'pemohon/pembuat tidak boleh memutuskan pengajuannya sendiri (G1, Q-08)'
+    if ((err as { status?: number }).status !== 403 || !selfInvolved || !G1_DECISIONS.has(action)) throw err
     await writeAuditDetached(req, [
-      { action: 'access_denied', docType: 'expense_request', docId: String(doc.id), docNo: doc.docNo ?? undefined, field: action, newValue: { action, status: ctx.status }, reason: guard },
+      {
+        action: 'access_denied',
+        docType: 'expense_request',
+        docId: String(doc.id),
+        docNo: doc.docNo ?? undefined,
+        field: action,
+        newValue: { action, status: ctx.status },
+        reason: 'pemohon/pembuat tidak boleh memutuskan pengajuannya sendiri (G1, Q-08)',
+      },
     ])
-    fail(
-      403,
-      financeSelf
-        ? 'Finance tidak dapat memverifikasi nota, meninjau flag atau memverifikasi LPJ pada pengajuan di mana ia pemohon atau pembuat (G1). Minta Finance lain.'
-        : 'Pemohon/pembuat tidak dapat memberi keputusan pada pengajuannya sendiri (G1).',
-    )
+    fail(403, 'Pemohon/pembuat tidak dapat memberi keputusan pada pengajuannya sendiri (G1).')
+  }
+  if (selfInvolved && FINANCE_SELF_PROCESSED.has(action) && ctx.roles.includes('pk-finance')) {
+    await writeAudit(req, [selfProcessedAudit(ctx, action, doc)])
   }
 }
+
+/** D2410: the audit row of a Finance action on the Finance user's own request (as requester and/or creator). */
+export function selfProcessedAudit(ctx: Pick<ActorContext, 'status' | 'isCreator' | 'isRequester'>, action: Action, doc: Pick<RequestDoc, 'id' | 'docNo'>) {
+  return {
+    action: 'self_processed' as const,
+    docType: 'expense_request',
+    docId: String(doc.id),
+    docNo: doc.docNo ?? undefined,
+    field: action,
+    newValue: { action, status: ctx.status, selfProcessed: true, asRequester: ctx.isRequester, asCreator: ctx.isCreator },
+    reason: SELF_PROCESSED_NOTE,
+  }
+}
+
+/** D2410: history note of a `self_processed` row (Log perubahan / Riwayat "Alasan"). */
+export const SELF_PROCESSED_NOTE = 'diproses oleh pemohon sendiri (Finance adalah pemohon/pembuat pengajuan ini)'
 
 /**
  * The only way the service changes a request after creation: status/workflow fields through a

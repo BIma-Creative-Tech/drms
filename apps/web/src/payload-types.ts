@@ -2917,7 +2917,8 @@ export interface AuditLog {
     | 'soft_delete'
     | 'restore'
     | 'disburse'
-    | 'auto_create';
+    | 'auto_create'
+    | 'self_processed';
   field?: string | null;
   lineNo?: number | null;
   oldValue?:

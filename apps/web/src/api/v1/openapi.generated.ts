@@ -8403,7 +8403,7 @@ export const openapiDocument = {
           }
         },
         "additionalProperties": false,
-        "description": "Soft delete = the draft is cancelled (no hard delete)."
+        "description": "Soft delete = a never-submitted draft is cancelled (no hard delete). D2410: a draft submitted before (withdrawn, numbered) → rejected NOT_EDITABLE with the server copy."
       },
       "SyncAttendancePayload": {
         "type": "object",
@@ -25841,7 +25841,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/submit": {
       "post": {
-        "summary": "Submit (number, rule snapshot, signatures Diajukan/Dibuat, flags). ADR 0029: the Owner's own request without approval goes straight to Finance — for a PT with the fund check on it is checked HERE: short → 409 code FUND_INSUFFICIENT (companyId, balance, commitments, available, needed, gap), the request stays Draft (audited fund_insufficient)",
+        "summary": "Submit (number, rule snapshot, signatures Diajukan/Dibuat, flags). D2410: a Reimburse needs at least one general attachment (attachmentIds) besides a receipt on every line → else 400 errors[attachmentIds]. ADR 0029: the Owner's own request without approval goes straight to Finance — for a PT with the fund check on it is checked HERE: short → 409 code FUND_INSUFFICIENT (companyId, balance, commitments, available, needed, gap), the request stays Draft (audited fund_insufficient)",
         "security": [
           {
             "bearer": []
@@ -26141,7 +26141,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/cancel": {
       "post": {
-        "summary": "Cancel (reason)",
+        "summary": "Cancel (reason, G7). D2410: only at the Finance stage (Pengajuan Baru / vendor / PT grup \"Disetujui\"; Reimburse \"Disetujui\" / \"Nota Terverifikasi\" / \"Revisi Nota\") and only by Finance / Direktur of the PT — also on their own request; anyone else → 403, other statuses (draft, waiting for approval: the requester withdraws instead) → 409",
         "security": [
           {
             "bearer": []
@@ -44379,7 +44379,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/lpj/shortfall-approval": {
       "post": {
-        "summary": "Finance (not requester/creator): ask the re-approval of the NEW total of a verified LPJ whose shortfall exceeds approved + tolerance — approval rule of the request for that total (ADR 0013: Direktur \"Diketahui\" → Finance); within tolerance / running / already approved → 409",
+        "summary": "Finance (D2410: also the requester/creator — audited self_processed): ask the re-approval of the NEW total of a verified LPJ whose shortfall exceeds approved + tolerance — approval rule of the request for that total (ADR 0013: Direktur \"Diketahui\" → Finance); within tolerance / running / already approved → 409",
         "security": [
           {
             "bearer": []

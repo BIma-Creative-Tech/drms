@@ -126,7 +126,7 @@ export const SyncDraftDeletePayload = z
     reason: z.string().trim().min(3).max(1000).optional().meta({ description: 'Default "Draft dihapus dari aplikasi".' }),
   })
   .strict()
-  .meta({ id: 'SyncDraftDeletePayload', description: 'Soft delete = the draft is cancelled (no hard delete).' })
+  .meta({ id: 'SyncDraftDeletePayload', description: 'Soft delete = a never-submitted draft is cancelled (no hard delete). D2410: a draft submitted before (withdrawn, numbered) → rejected NOT_EDITABLE with the server copy.' })
 export type SyncDraftDelete = z.infer<typeof SyncDraftDeletePayload>
 
 /** Exactly one of project_id / cost_center_id / site_id (E6, Q-40: cost-center geofence; ADR 0023: site). */
