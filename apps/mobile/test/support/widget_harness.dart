@@ -117,10 +117,25 @@ Future<void> pumpScreen(
   await tester.pumpAndSettle();
 }
 
-/// D2410: taps "Ya, …" of the confirmation popup (shared/widgets/action_feedback.dart).
-Future<void> confirmPopup(WidgetTester tester) async {
-  await tester.tap(find.byKey(const Key('confirm-action')));
-  await tester.pumpAndSettle();
+/// D2410: pumps frames without waiting to settle — a screen's busy spinner keeps animating behind the result popup
+/// (`pumpAndSettle` would time out) until the popup is closed.
+Future<void> pumpFrames(WidgetTester tester, [int count = 10]) async {
+  for (var i = 0; i < count; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
+/// D2410: taps "Ya, …" of the confirmation popup (shared/widgets/action_feedback.dart) and lets the action run up to
+/// its result popup (frames only, see [pumpFrames]).
+Future<void> confirmPopup(WidgetTester tester, {Key key = const Key('confirm-action')}) async {
+  await tester.tap(find.byKey(key));
+  await pumpFrames(tester);
+}
+
+/// D2410: [confirmPopup], then OK on the result popup when one is shown.
+Future<void> confirmAndAck(WidgetTester tester, {Key key = const Key('confirm-action')}) async {
+  await confirmPopup(tester, key: key);
+  if (find.byKey(const Key('result-ok')).evaluate().isNotEmpty) await dismissResult(tester);
 }
 
 /// D2410: closes the result popup ("Berhasil" / "Gagal" / "Tersimpan di antrian") with OK.
