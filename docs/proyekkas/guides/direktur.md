@@ -142,6 +142,16 @@ koreksi** (wajib, paling bawah) → **Simpan koreksi**. Lihat juga Panduan PM §
   mendapat notifikasi "Kas masuk antar-PT". Dashboard → kartu **Arus kas bulanan** → *Tampilkan tanpa antar-PT* untuk
   melihat arus kas gabungan tanpa transfer antar PT (tidak dieliminasi otomatis; Rekap Kas: filter **Antar PT**).
 
+### 6b. Pinjaman antar project (sejak 24 Okt 2026)
+
+- Pinjaman antar project diajukan **PM project peminjam atau Finance**. Anda memutuskan **level 1 (Direktur)** di
+  **Persetujuan → Pinjaman antar project** atau di detail pinjaman; setelah Anda menyetujui, pinjaman menunggu
+  **persetujuan Owner** (level 2). Penolakan (alasan wajib) di level mana pun mengakhiri pinjaman.
+- Pengembalian pinjaman **dana** juga diajukan (PM peminjam / Finance) dan Anda setujui di level 1, lalu Owner; setelah
+  itu Finance mentransfernya dari Antrian Transfer. Pinjaman barang: pengembalian dicatat langsung.
+- Pengaju tidak memutuskan pengajuannya sendiri (bila Anda satu-satunya Direktur dan mengajukan sebagai PM, Anda boleh
+  memutuskan level Direktur; level Owner tetap oleh Owner).
+
 ### 6a. Cek dana & pinjaman antar-PT (ADR 0029)
 
 - Di pengajuan yang menunggu persetujuan Anda (dan Owner) tampil panel **"Ketersediaan dana PT"** (saldo tanpa akun

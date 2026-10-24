@@ -19310,11 +19310,11 @@ export const openapiDocument = {
               },
               "inboxCount": {
                 "type": "integer",
-                "description": "Loans waiting for the caller's decision (Direktur)."
+                "description": "Loans waiting for the caller's decision (Direktur level 1 / Owner level 2)."
               },
               "canCreate": {
                 "type": "boolean",
-                "description": "The caller is PM of a borrower project (\"Ajukan pinjaman\")."
+                "description": "The caller is PM of a borrower project or Finance of a PT (\"Ajukan pinjaman\")."
               }
             },
             "required": [
@@ -19373,7 +19373,28 @@ export const openapiDocument = {
             ]
           },
           "statusLabel": {
-            "type": "string"
+            "type": "string",
+            "description": "2026-10-24: \"Menunggu persetujuan Direktur\" / \"Menunggu persetujuan Owner\" per level; \"Disetujui – menunggu transfer Finance\" while the transfer order waits."
+          },
+          "approvalLevel": {
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [
+                  1
+                ]
+              },
+              {
+                "type": "number",
+                "enum": [
+                  2
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "2026-10-24 (#10): level a pending loan waits at — 1 Direktur, 2 Owner; null otherwise."
           },
           "overdue": {
             "type": "boolean",
@@ -19404,10 +19425,23 @@ export const openapiDocument = {
               "manual",
               "transfer"
             ],
-            "description": "ADR 0031: manual = PM → Direktur; transfer = automatic (Finance paid a project request from another account)."
+            "description": "ADR 0031: manual = PM / Finance → Direktur → Owner; transfer = automatic (Finance paid a project request from another account)."
           },
           "originLabel": {
-            "type": "string"
+            "type": "string",
+            "description": "\"Diajukan PM\" / \"Diajukan Finance\" / \"Otomatis dari transfer\"."
+          },
+          "submitterRole": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "pm",
+              "finance",
+              null
+            ],
+            "description": "2026-10-24 (#10): the creator filed as borrower PM or as Finance (null for an automatic loan; legacy loans = pm)."
           },
           "lenderProject": {
             "type": [
@@ -19559,7 +19593,7 @@ export const openapiDocument = {
           },
           "cashBacked": {
             "type": "boolean",
-            "description": "ADR 0031: money between two different accounts — disbursement and repayments post KK / KM."
+            "description": "ADR 0031: money between two known accounts (2026-10-24: also one shared account) — the transfer orders post KK / KM."
           },
           "disbursedAt": {
             "type": [
@@ -19591,7 +19625,14 @@ export const openapiDocument = {
           },
           "awaitingDisbursement": {
             "type": "boolean",
-            "description": "Approved, cash-backed, not yet disbursed by Finance (\"Disetujui – menunggu pencairan\")."
+            "description": "Approved, cash-backed, transfer order not executed yet (\"Disetujui – menunggu transfer Finance\")."
+          },
+          "transferQueueHref": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "2026-10-24 (#11): web \"Antrian Transfer\" anchor of the loan's transfer order while it waits."
           },
           "transfer": {
             "type": [
@@ -19745,6 +19786,7 @@ export const openapiDocument = {
           "docNo",
           "status",
           "statusLabel",
+          "approvalLevel",
           "overdue",
           "overdueLabel",
           "daysOverdue",
@@ -19752,6 +19794,7 @@ export const openapiDocument = {
           "kindLabel",
           "origin",
           "originLabel",
+          "submitterRole",
           "lenderProject",
           "borrowerProject",
           "lenderCashAccount",
@@ -19760,6 +19803,7 @@ export const openapiDocument = {
           "disbursedAt",
           "disbursedBy",
           "awaitingDisbursement",
+          "transferQueueHref",
           "transfer",
           "amount",
           "repaidTotal",
@@ -19788,10 +19832,270 @@ export const openapiDocument = {
             "items": {
               "$ref": "#/components/schemas/ProjectLoanSummary"
             }
+          },
+          "repayments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectLoanRepaymentInboxItem"
+            },
+            "description": "2026-10-24 (#12): repayment requests waiting for the caller's decision at their level (absent on older servers)."
           }
         },
         "required": [
-          "items"
+          "items",
+          "repayments"
+        ]
+      },
+      "ProjectLoanRepaymentInboxItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Repayment id (decided on the loan: POST /project-loans/{loanId}/repayments/{id}/approve | reject)."
+          },
+          "loanId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "companyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "loanDocNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lenderProject": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "pm": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name",
+              "pm"
+            ]
+          },
+          "borrowerProject": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "pm": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name",
+              "pm"
+            ]
+          },
+          "lenderCashAccount": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "borrowerCashAccount": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "amount": {
+            "type": "integer"
+          },
+          "plannedDate": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "approvalLevel": {
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [
+                  1
+                ]
+              },
+              {
+                "type": "number",
+                "enum": [
+                  2
+                ]
+              }
+            ]
+          },
+          "statusLabel": {
+            "type": "string"
+          },
+          "outstanding": {
+            "type": "integer"
+          },
+          "submittedBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "submittedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "loanId",
+          "companyId",
+          "loanDocNo",
+          "lenderProject",
+          "borrowerProject",
+          "lenderCashAccount",
+          "borrowerCashAccount",
+          "amount",
+          "plannedDate",
+          "note",
+          "approvalLevel",
+          "statusLabel",
+          "outstanding",
+          "submittedBy",
+          "submittedAt"
         ]
       },
       "ProjectLoanOptions": {
@@ -19824,7 +20128,7 @@ export const openapiDocument = {
                 "companyId"
               ]
             },
-            "description": "Projects whose PM is the caller (pk-pm)."
+            "description": "Projects whose PM is the caller (pk-pm) and — 2026-10-24 — every open project of a PT where the caller is Finance."
           },
           "lenders": {
             "type": "array",
@@ -19859,6 +20163,257 @@ export const openapiDocument = {
         "required": [
           "borrowers",
           "lenders"
+        ]
+      },
+      "ProjectLoanTransferOrders": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "loan",
+                    "repayment"
+                  ],
+                  "description": "loan = \"Pencairan pinjaman\" (id = loan); repayment = \"Pengembalian pinjaman\" (id = repayment)."
+                },
+                "key": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "loanId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "companyId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "docNo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "integer"
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Loan date / planned repayment date (sort key, ascending)."
+                },
+                "minDate": {
+                  "type": "string",
+                  "description": "Earliest execution date (the loan date)."
+                },
+                "today": {
+                  "type": "string",
+                  "description": "Business date of the PT (latest execution date)."
+                },
+                "dueDate": {
+                  "type": "string"
+                },
+                "fromAccount": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "description": "Account the money leaves (KK) — frozen at the approval."
+                },
+                "toAccount": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "description": "Account the money arrives on (KM)."
+                },
+                "fromProject": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name"
+                  ]
+                },
+                "toProject": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name"
+                  ]
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "submittedBy": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                },
+                "approvedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "selfSubmitted": {
+                  "type": "boolean",
+                  "description": "The caller submitted it — a Finance user MAY execute his own order (no self-guard on loans; audited)."
+                },
+                "canExecute": {
+                  "type": "boolean",
+                  "description": "Finance of the PT."
+                },
+                "href": {
+                  "type": "string"
+                },
+                "anchor": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "key",
+                "id",
+                "loanId",
+                "companyId",
+                "docNo",
+                "title",
+                "amount",
+                "date",
+                "minDate",
+                "today",
+                "dueDate",
+                "fromAccount",
+                "toAccount",
+                "fromProject",
+                "toProject",
+                "note",
+                "reason",
+                "submittedBy",
+                "approvedAt",
+                "selfSubmitted",
+                "canExecute",
+                "href",
+                "anchor"
+              ]
+            }
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "count"
         ]
       },
       "ProjectLoanDetail": {
@@ -19901,7 +20456,28 @@ export const openapiDocument = {
             ]
           },
           "statusLabel": {
-            "type": "string"
+            "type": "string",
+            "description": "2026-10-24: \"Menunggu persetujuan Direktur\" / \"Menunggu persetujuan Owner\" per level; \"Disetujui – menunggu transfer Finance\" while the transfer order waits."
+          },
+          "approvalLevel": {
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [
+                  1
+                ]
+              },
+              {
+                "type": "number",
+                "enum": [
+                  2
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "2026-10-24 (#10): level a pending loan waits at — 1 Direktur, 2 Owner; null otherwise."
           },
           "overdue": {
             "type": "boolean",
@@ -19932,10 +20508,23 @@ export const openapiDocument = {
               "manual",
               "transfer"
             ],
-            "description": "ADR 0031: manual = PM → Direktur; transfer = automatic (Finance paid a project request from another account)."
+            "description": "ADR 0031: manual = PM / Finance → Direktur → Owner; transfer = automatic (Finance paid a project request from another account)."
           },
           "originLabel": {
-            "type": "string"
+            "type": "string",
+            "description": "\"Diajukan PM\" / \"Diajukan Finance\" / \"Otomatis dari transfer\"."
+          },
+          "submitterRole": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "pm",
+              "finance",
+              null
+            ],
+            "description": "2026-10-24 (#10): the creator filed as borrower PM or as Finance (null for an automatic loan; legacy loans = pm)."
           },
           "lenderProject": {
             "type": [
@@ -20087,7 +20676,7 @@ export const openapiDocument = {
           },
           "cashBacked": {
             "type": "boolean",
-            "description": "ADR 0031: money between two different accounts — disbursement and repayments post KK / KM."
+            "description": "ADR 0031: money between two known accounts (2026-10-24: also one shared account) — the transfer orders post KK / KM."
           },
           "disbursedAt": {
             "type": [
@@ -20119,7 +20708,14 @@ export const openapiDocument = {
           },
           "awaitingDisbursement": {
             "type": "boolean",
-            "description": "Approved, cash-backed, not yet disbursed by Finance (\"Disetujui – menunggu pencairan\")."
+            "description": "Approved, cash-backed, transfer order not executed yet (\"Disetujui – menunggu transfer Finance\")."
+          },
+          "transferQueueHref": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "2026-10-24 (#11): web \"Antrian Transfer\" anchor of the loan's transfer order while it waits."
           },
           "transfer": {
             "type": [
@@ -20279,7 +20875,7 @@ export const openapiDocument = {
                 "repay"
               ]
             },
-            "description": "edit/submit: creator PM (Draft); cancel: creator (Draft/Menunggu) or Direktur (Disetujui, no repayment, not disbursed, not automatic); approve/reject: Direktur pool (G1); disburse: Finance (approved cash-backed loan, once); repay: borrower PM / Finance — Finance only after the disbursement for a cash-backed loan."
+            "description": "edit/submit: creator (borrower PM / Finance, Draft); cancel: creator (Draft/Menunggu) or Direktur (Disetujui, no repayment, not transferred, not automatic); approve/reject: the pool of the CURRENT level (1 Direktur, 2 Owner; G1); disburse: Finance — execute the transfer order (web: in Antrian Transfer); repay: borrower PM / Finance — cash-backed: a repayment REQUEST after the transfer while `repayableAmount` > 0."
           },
           "disbursement": {
             "type": [
@@ -20309,6 +20905,14 @@ export const openapiDocument = {
           "mayVoidRepayment": {
             "type": "boolean"
           },
+          "repaymentNeedsApproval": {
+            "type": "boolean",
+            "description": "2026-10-24 (#12): cash-backed — a repayment is a request (Direktur → Owner → transfer order); else recorded at once."
+          },
+          "repayableAmount": {
+            "type": "integer",
+            "description": "Max of a new repayment: outstanding minus requests not executed yet."
+          },
           "today": {
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
@@ -20334,10 +20938,17 @@ export const openapiDocument = {
                     "integer",
                     "null"
                   ],
-                  "description": "\"Pengembalian ke-n\" among the posted repayments (null when void)."
+                  "description": "\"Pengembalian ke-n\" among the posted repayments (null otherwise)."
                 },
                 "repayDate": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Planned date while a request, the execution / record date once posted."
+                },
+                "plannedDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "amount": {
                   "type": "integer"
@@ -20351,14 +20962,50 @@ export const openapiDocument = {
                 "status": {
                   "type": "string",
                   "enum": [
+                    "pending_approval",
+                    "approved",
                     "posted",
-                    "void"
-                  ]
+                    "void",
+                    "rejected",
+                    "cancelled"
+                  ],
+                  "description": "posted = executed (cash-backed) / recorded (claim); pending_approval → approved → posted; rejected / cancelled / void final."
                 },
                 "statusLabel": {
                   "type": "string"
                 },
+                "approvalLevel": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "enum": [
+                        1
+                      ]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [
+                        2
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "voidReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "rejectReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "cancelReason": {
                   "type": [
                     "string",
                     "null"
@@ -20384,7 +21031,8 @@ export const openapiDocument = {
                   "required": [
                     "id",
                     "name"
-                  ]
+                  ],
+                  "description": "Recorded / submitted by."
                 },
                 "voidedBy": {
                   "type": [
@@ -20412,6 +21060,40 @@ export const openapiDocument = {
                   "type": [
                     "string",
                     "null"
+                  ]
+                },
+                "submittedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "executedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "executedBy": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
                   ]
                 },
                 "createdAt": {
@@ -20443,23 +21125,142 @@ export const openapiDocument = {
                     "kk",
                     "km"
                   ],
-                  "description": "ADR 0031: entry numbers of the repayment KK (borrower) / KM (lender); null for a claim or a voided repayment."
+                  "description": "ADR 0031: entry numbers of the repayment KK (borrower) / KM (lender); null for a claim, a request or a voided repayment."
+                },
+                "allowedActions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "approve",
+                      "reject",
+                      "cancel",
+                      "execute",
+                      "void"
+                    ]
+                  },
+                  "description": "approve/reject: the pool of the current level (G1: never the submitter); cancel: submitter (pending) or Finance / submitter (approved); execute: Finance (approved, in Antrian Transfer); void: posted (Direktur / Finance; Finance only when cash moved)."
+                },
+                "transferQueueHref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "decisions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "level": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "enum": [
+                              1
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      "levelLabel": {
+                        "type": "string",
+                        "description": "Direktur | Owner"
+                      },
+                      "actor": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "exclusiveMinimum": 0
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      },
+                      "decision": {
+                        "type": "string",
+                        "enum": [
+                          "approved",
+                          "rejected"
+                        ]
+                      },
+                      "reason": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "decidedAt": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "signatureSource": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "level",
+                      "levelLabel",
+                      "actor",
+                      "decision",
+                      "reason",
+                      "decidedAt",
+                      "signatureSource"
+                    ]
+                  }
                 }
               },
               "required": [
                 "id",
                 "seq",
                 "repayDate",
+                "plannedDate",
                 "amount",
                 "note",
                 "status",
                 "statusLabel",
+                "approvalLevel",
                 "voidReason",
+                "rejectReason",
+                "cancelReason",
                 "recordedBy",
                 "voidedBy",
                 "voidedAt",
+                "submittedAt",
+                "executedAt",
+                "executedBy",
                 "createdAt",
-                "cash"
+                "cash",
+                "allowedActions",
+                "transferQueueHref",
+                "decisions"
               ]
             }
           },
@@ -20471,6 +21272,26 @@ export const openapiDocument = {
                 "id": {
                   "type": "integer",
                   "exclusiveMinimum": 0
+                },
+                "level": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "enum": [
+                        1
+                      ]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [
+                        2
+                      ]
+                    }
+                  ]
+                },
+                "levelLabel": {
+                  "type": "string",
+                  "description": "Direktur | Owner"
                 },
                 "actor": {
                   "type": "object",
@@ -20522,6 +21343,8 @@ export const openapiDocument = {
               },
               "required": [
                 "id",
+                "level",
+                "levelLabel",
                 "actor",
                 "decision",
                 "reason",
@@ -20538,6 +21361,7 @@ export const openapiDocument = {
           "docNo",
           "status",
           "statusLabel",
+          "approvalLevel",
           "overdue",
           "overdueLabel",
           "daysOverdue",
@@ -20545,6 +21369,7 @@ export const openapiDocument = {
           "kindLabel",
           "origin",
           "originLabel",
+          "submitterRole",
           "lenderProject",
           "borrowerProject",
           "lenderCashAccount",
@@ -20553,6 +21378,7 @@ export const openapiDocument = {
           "disbursedAt",
           "disbursedBy",
           "awaitingDisbursement",
+          "transferQueueHref",
           "transfer",
           "amount",
           "repaidTotal",
@@ -20574,6 +21400,8 @@ export const openapiDocument = {
           "allowedActions",
           "disbursement",
           "mayVoidRepayment",
+          "repaymentNeedsApproval",
+          "repayableAmount",
           "today",
           "g1Note",
           "repayments",
@@ -20591,12 +21419,12 @@ export const openapiDocument = {
           "borrowerProjectId": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Project peminjam — the caller must be its PM (projects.pm, pk-pm)."
+            "description": "Project peminjam — the caller must be its PM (projects.pm, pk-pm) or Finance (pk-finance) of its PT (2026-10-24)."
           },
           "lenderProjectId": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Project pemberi pinjaman — same PT, ≠ borrower."
+            "description": "Project pemberi pinjaman — same PT, ≠ borrower (open project)."
           },
           "kind": {
             "type": "string",
@@ -20755,7 +21583,38 @@ export const openapiDocument = {
           }
         },
         "additionalProperties": false,
-        "description": "ADR 0031 \"Cairkan\" (Finance): KK on the lender's Pusat Biaya + KM on the borrower's, for the loan amount, once."
+        "description": "ADR 0031 \"Cairkan\" (Finance, kept for older APKs): the same execution as POST /project-loans/{id}/execute — KK on the lender's Pusat Biaya + KM on the borrower's, for the loan amount, once."
+      },
+      "ProjectLoanExecute": {
+        "type": "object",
+        "properties": {
+          "executeDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Date of the bank transfer = date of the KK / KM (default today, PT TZ; between the loan date and today)."
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "proofMediaId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "Optional transfer proof (media-attachments, an unclaimed upload of the caller) — stored on the KK."
+          },
+          "confirmOverdraft": {
+            "type": "boolean",
+            "description": "Confirm that the paying account goes below 0 (else 409 CASH_OVERDRAFT_CONFIRM_REQUIRED); audited."
+          }
+        },
+        "additionalProperties": false,
+        "description": "2026-10-24 (#11/#12): Finance executes a transfer order of \"Antrian Transfer\" — loan: KK lender account (lender project) + KM borrower account (borrower project); repayment: KK borrower + KM lender. One transaction."
       },
       "ProjectLoanRepaymentCreate": {
         "type": "object",
@@ -20764,12 +21623,12 @@ export const openapiDocument = {
             "type": "integer",
             "exclusiveMinimum": 0,
             "maximum": 1000000000000,
-            "description": "Nominal pengembalian (Rp, > 0, ≤ sisa pinjaman)."
+            "description": "Nominal pengembalian (Rp, > 0, ≤ sisa pinjaman; cash-backed: ≤ `repayableAmount`, the part not yet requested)."
           },
           "repayDate": {
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-            "description": "Default today (PT TZ); between the loan date and today."
+            "description": "Default today (PT TZ). Claim: between the loan date and today. Cash-backed loan (2026-10-24 #12): the PLANNED date of the request (≥ loan date, may be in the future)."
           },
           "note": {
             "type": [
@@ -20780,7 +21639,7 @@ export const openapiDocument = {
           },
           "confirmOverdraft": {
             "type": "boolean",
-            "description": "ADR 0031 (cash-backed loan): confirm that the borrower's account goes below 0 (else 409 CASH_OVERDRAFT_CONFIRM_REQUIRED); audited."
+            "description": "Ignored since 2026-10-24 (a cash-backed repayment is a request; the overdraft is confirmed at its execution). Kept for older APKs."
           }
         },
         "required": [
@@ -50337,7 +51196,7 @@ export const openapiDocument = {
         }
       },
       "post": {
-        "summary": "Create a Draft (PM of the borrower project only; others 403 + access_denied audit). Same PT only (400 COMPANY_MISMATCH); submit:true submits at once",
+        "summary": "Create a Draft (PM of the borrower project or Finance of its PT; others 403 + access_denied audit). Same PT only (400 COMPANY_MISMATCH); submit:true submits at once",
         "security": [
           {
             "bearer": []
@@ -50478,7 +51337,7 @@ export const openapiDocument = {
     },
     "/project-loans/inbox": {
       "get": {
-        "summary": "Loans waiting for the caller's decision (Direktur pool; the creator only under direktur_self); ?company= narrows",
+        "summary": "Loans waiting for the caller's decision at their level — Direktur (1) / Owner (2), G1 (the creator only under direktur_self, level 1) — plus repayment requests (`repayments`); ?company= narrows",
         "security": [
           {
             "bearer": []
@@ -50560,7 +51419,7 @@ export const openapiDocument = {
     },
     "/project-loans/options": {
       "get": {
-        "summary": "Create form options: borrower projects of the caller (PM) and lender projects of the same PT",
+        "summary": "Create form options: borrower projects of the caller (PM; Finance: every open project of its PTs) and lender projects of the same PT",
         "security": [
           {
             "bearer": []
@@ -50629,9 +51488,91 @@ export const openapiDocument = {
         }
       }
     },
+    "/project-loans/transfer-orders": {
+      "get": {
+        "summary": "2026-10-24 (#11/#12) \"Antrian Transfer\": approved cash-backed loans not transferred yet + approved repayment requests, in the selected PTs where the caller is Finance / Direktur (only Finance executes); ?company= narrows",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transfer orders",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLoanTransferOrders"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/project-loans/{id}": {
       "get": {
-        "summary": "Loan detail: repayments, Direktur decision, allowed actions, notes (PM peminjam = PM pemberi, direktur_self)",
+        "summary": "Loan detail: repayments (with their row actions), Direktur / Owner decisions, allowed actions, notes (PM peminjam = PM pemberi, direktur_self)",
         "security": [
           {
             "bearer": []
@@ -50719,7 +51660,7 @@ export const openapiDocument = {
         }
       },
       "patch": {
-        "summary": "Edit a Draft (creator PM)",
+        "summary": "Edit a Draft (creator: borrower PM / Finance)",
         "security": [
           {
             "bearer": []
@@ -50869,7 +51810,7 @@ export const openapiDocument = {
     },
     "/project-loans/{id}/submit": {
       "post": {
-        "summary": "Submit a Draft: number PJ/{COMPANY}/{YY}{MM}/#### issued, Direktur pool resolved (G1) → Menunggu persetujuan Direktur; 409 NO_DIREKTUR without an active Direktur",
+        "summary": "Submit a Draft: number PJ/{COMPANY}/{YY}{MM}/#### issued, both pools resolved (G1) → Menunggu persetujuan Direktur (level 1); 409 NO_DIREKTUR / NO_OWNER (no active Owner other than the creator) / SAME_PERSON",
         "security": [
           {
             "bearer": []
@@ -51160,7 +52101,7 @@ export const openapiDocument = {
     },
     "/project-loans/{id}/approve": {
       "post": {
-        "summary": "Direktur \"Setujui\" (one level). No cash entry is created (notional allocation, ADR 0022 §5)",
+        "summary": "\"Setujui\" at the current level: Direktur (level 1) → waits for the Owner; Owner (level 2) → Disetujui (a cash-backed loan becomes a transfer order). 403 wrong level / G1; 409 NO_OWNER at level 1 without an Owner left",
         "security": [
           {
             "bearer": []
@@ -51310,7 +52251,7 @@ export const openapiDocument = {
     },
     "/project-loans/{id}/reject": {
       "post": {
-        "summary": "Direktur \"Tolak\" (reason required)",
+        "summary": "\"Tolak\" at the current level (Direktur or Owner, reason required)",
         "security": [
           {
             "bearer": []
@@ -51460,7 +52401,7 @@ export const openapiDocument = {
     },
     "/project-loans/{id}/disburse": {
       "post": {
-        "summary": "ADR 0031 \"Cairkan\" (Finance): an approved cash-backed loan (money between two different Pusat Biaya) → KK on the lender account + KM on the borrower account, once",
+        "summary": "ADR 0031 \"Cairkan\" (Finance) — kept for older APKs: the same execution as /execute",
         "security": [
           {
             "bearer": []
@@ -51608,9 +52549,159 @@ export const openapiDocument = {
         }
       }
     },
+    "/project-loans/{id}/execute": {
+      "post": {
+        "summary": "2026-10-24 (#11) Finance executes the loan's transfer order: KK lender account (lender project) + KM borrower account (borrower project), one transaction, once; the submitter (Finance) may execute it (audited)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectLoanExecute"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/project-loans/{id}/repayments": {
       "post": {
-        "summary": "Record a repayment (borrower PM or Finance; Finance only — after the disbursement — when the loan moves cash; no approval; amount ≤ outstanding) → Sebagian kembali / Lunas",
+        "summary": "Repayment (borrower PM or Finance). Claim: recorded at once (no approval, ≤ outstanding) → Sebagian kembali / Lunas. Cash-backed (2026-10-24 #12): a REQUEST (≤ repayableAmount, planned date) → Direktur → Owner → transfer order",
         "security": [
           {
             "bearer": []
@@ -51819,6 +52910,642 @@ export const openapiDocument = {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ProjectLoanReason"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/project-loans/{id}/repayments/{rid}/approve": {
+      "post": {
+        "summary": "2026-10-24 (#12) \"Setujui\" a repayment request at its level (Direktur 1 → Owner 2; G1: never the submitter); the Owner's approval makes it a transfer order",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "rid",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectLoanDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/project-loans/{id}/repayments/{rid}/reject": {
+      "post": {
+        "summary": "\"Tolak\" a repayment request at its level (reason required)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "rid",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectLoanReject"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/project-loans/{id}/repayments/{rid}/cancel": {
+      "post": {
+        "summary": "Cancel a repayment request (reason): the submitter while pending; Finance / the submitter once approved, before its execution",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "rid",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectLoanReason"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLoanDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/project-loans/{id}/repayments/{rid}/execute": {
+      "post": {
+        "summary": "Finance executes an approved repayment order: KK borrower account (borrower project) + KM lender account (lender project); the repayment is posted and the loan Sebagian kembali / Lunas",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "rid",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectLoanExecute"
               }
             }
           }

@@ -6,6 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**Pinjaman antar project: PM / Finance file, Direktur → Owner, transfer orders, repayment requests (DRMS 24/10
+#10–#12; ADR 0022 + ADR 0031 amendments 2026-10-24).** Four migrations (`20261024_400000_d2410_loan_enums`,
+`_400100_d2410_loan_schema`, `_400200_d2410_loan_data`, `_400300_d2410_loan_guard`). API contract: additive (new
+fields, endpoints, statuses); `POST /project-loans/:id/disburse` kept. APK: see below.
+
+### Changed
+- A manual inter-project loan is filed by the borrower project's PM **or Finance** of the PT (`submitterRole`; Finance
+  picks both projects). Approval is **Direktur (level 1) → Owner (level 2)**, reject with reason at either level; status
+  "Menunggu persetujuan Direktur / Owner". G1: the creator never decides (`direktur_self` stays, level 1 only). A PT
+  without an active Owner refuses the submit (409 `NO_OWNER`).
+- After the Owner's approval a cash-backed loan is a **transfer order in Antrian Transfer** (new section "Transfer
+  pinjaman antar project"): Finance executes it (date, optional proof) → KK on the lender account tagged with the lender
+  project + KM on the borrower account tagged with the borrower project, one transaction. The loan page links to the
+  queue instead of "Cairkan". The Finance user who filed it may execute it (audited `selfExecuted`).
+- Money between two projects of the **same** Pusat Biaya is cash-backed too: the pair is posted on that account, tagged
+  with each project. Goods stay a claim.
+- A repayment of a cash-backed loan is a **request** (PM / Finance, planned date, ≤ the part not yet requested) →
+  Direktur → Owner → transfer order → executed by Finance (KK borrower / KM lender, tagged). Statuses `pending_approval`,
+  `approved`, `posted` (= executed, every existing row), `rejected`, `cancelled`. Claims are recorded as before.
+- Persetujuan: loans and repayment requests at the caller's level (the Owner gets the loan section); nav badge and
+  dashboard "menunggu saya" count both.
+- Fund check: an approved repayment order is a commitment of the borrower account; a same-account loan is no
+  commitment.
+
+### Added
+- API: `GET /project-loans/transfer-orders`, `POST /project-loans/:id/execute`,
+  `POST /project-loans/:id/repayments/:rid/{approve,reject,cancel,execute}`; loan fields `approvalLevel`,
+  `submitterRole`, `transferQueueHref`, `repaymentNeedsApproval`, `repayableAmount`, decision `level` / `levelLabel`,
+  repayment `status` / `approvalLevel` / `plannedDate` / `allowedActions` / `decisions` / execution fields; inbox
+  `repayments`.
+- DB guards: two-level order and stored roles on loan / repayment decision rows; repayment lifecycle; Finance executes.
+- APK: Finance files a loan; Direktur and Owner decide loans and repayment requests (Persetujuan); repayment request +
+  row actions on the loan; "Buka Antrian Transfer" replaces "Cairkan"; transfer orders executed in the APK Antrian
+  Transfer (without proof upload — optional on the server).
+
+### Data (in-flight)
+- Loans pending at the Direktur get `approval_level = 1` and now also need the Owner (audited). Approved loans keep
+  their approval; an approved cash-backed loan not yet disbursed appears as a transfer order. No other data change.
+
 ## [0.19.1] - 2026-10-22
 
 **Fund check per Pusat Biaya first, then PT (ADR 0031 §6, user 2026-10-22).** One migration

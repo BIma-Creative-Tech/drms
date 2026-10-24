@@ -279,9 +279,31 @@ TOTAL). **Kop** laporan dan file unduhan: satu PT = kop PT itu; beberapa PT = ko
   pusat biaya project, lalu kas keluar transfer dari pusat biaya. PM project dan Direktur diberi tahu.
 - Project yang **belum dipetakan** ke pusat biaya tidak bisa ditransfer (*project belum dipetakan* di antrian) — minta
   Direktur / Admin / PM mengisi pusat biaya di data project.
-- **Pinjaman antar project (PJ) dana** antara dua pusat biaya berbeda: setelah Direktur menyetujui, buka pinjaman →
-  **Cairkan** (kas keluar dari pusat biaya pemberi, kas masuk ke pusat biaya peminjam). Pengembaliannya dicatat Finance
-  (kas keluar dari peminjam, kas masuk ke pemberi); *Void* pengembalian membuat jurnal baliknya. Pinjaman barang, atau
-  dua project dengan pusat biaya sama, tetap tanpa transaksi kas.
+- **Pinjaman antar project (PJ) dana:** lihat bagian berikut (sejak 24 Okt 2026 lewat Antrian Transfer; tombol
+  *Cairkan* di halaman pinjaman diganti tautan ke antrian). Pinjaman barang tetap tanpa transaksi kas.
 - **Batalkan transfer** yang dibayar dari akun lain ikut membatalkan pinjaman otomatisnya (kas keluar/masuknya dibalik);
-  tidak bisa selama pinjaman itu sudah punya pengembalian (void pengembaliannya dulu).
+  tidak bisa selama pinjaman itu sudah punya pengembalian (void pengembaliannya dulu) atau pengajuan pengembalian yang
+  belum selesai.
+
+## Pinjaman antar project: ajukan, Antrian Transfer, pengembalian (sejak 24 Okt 2026)
+
+- **Mengajukan:** Finance boleh mengajukan pinjaman antar project (selain PM project peminjam): **Keuangan → Pinjaman
+  antar project → + Ajukan pinjaman** (web) atau menu Pinjaman di APK. Pilih project peminjam dan project pemberi (semua
+  project aktif PT Anda), jenis, nilai, jatuh tempo, alasan → **Ajukan ke Direktur**. PM project peminjam diberi tahu.
+- **Persetujuan:** Direktur (level 1) lalu **Owner** (level 2); penolakan dengan alasan di level mana pun. Pengaju
+  tidak pernah memutuskan. PT tanpa Owner aktif: pengajuan ditolak ("belum punya Owner aktif").
+- **Antrian Transfer → "Transfer pinjaman antar project":** setelah Owner menyetujui, pinjaman **dana** muncul sebagai
+  perintah transfer. Isi **Tanggal transfer** (antara tanggal pinjaman dan hari ini), catatan dan bukti (opsional) →
+  **Eksekusi transfer**. Tercatat sekaligus: **kas keluar** di pusat biaya pemberi (ditandai project pemberi) dan **kas
+  masuk** di pusat biaya peminjam (ditandai project peminjam). Akun mengikuti pusat biaya saat disetujui. Bila kedua
+  project memakai pusat biaya yang sama, keduanya tercatat di akun itu (saldo akun tetap; buku kas tiap project
+  menampilkannya). Saldo akun jadi minus → konfirmasi seperti biasa.
+- **Pengajuan Anda sendiri boleh Anda eksekusi** (tidak ada larangan Finance yang sama untuk pinjaman; tercatat di
+  audit, ada catatan "Anda yang mengajukan").
+- **Pengembalian pinjaman dana** = pengajuan: PM project peminjam atau Finance → detail pinjaman → **Ajukan
+  pengembalian** (nominal ≤ sisa yang belum diajukan, rencana tanggal, catatan) → Direktur → Owner → muncul di Antrian
+  Transfer → **Eksekusi transfer**: kas keluar di pusat biaya peminjam, kas masuk di pemberi; status pinjaman Sebagian
+  kembali / Lunas. Pengajuan yang menunggu dibatalkan pengajunya; yang sudah disetujui dapat Anda **Batalkan** (alasan)
+  sebelum dieksekusi. *Void* pengembalian yang sudah ditransfer membuat jurnal baliknya (Finance).
+- **Pinjaman barang/material:** tetap tanpa kas; pengembalian dicatat langsung (PM peminjam atau Finance).
+- APK: bagian yang sama di **Antrian Transfer** (eksekusi tanpa unggah bukti — bukti dapat ditambahkan lewat web).
