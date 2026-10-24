@@ -202,3 +202,13 @@ fall back to the server label. To do in the APK later:
 Staging first. Deploy as usual (migrate → web + worker); nothing is deleted by the migration. Rollback before any
 project is cancelled: `payload migrate:down` (newest first) — the deletion flags are lost (the audit log keeps them);
 after a project cancel → restore the dump and the 0.12.0 image.
+
+## Amendment 2026-10-24 — "Batalkan" only at the Finance stage (D2410)
+
+User decision 2026-10-24 (point 13): the expense-request `cancel` transition exists only at the Finance stage
+(advance / vendor / PT grup `approved`; Reimburse `approved`, `receipts_verified`, `receipt_revision`) and only for
+Finance / Direktur of the PT. The row action **Batalkan** of a submitted request follows it (`requestCancellable` +
+`mayCancelRequest`); a submitted / withdrawn request otherwise has no row action. **Batalkan proyek** keeps cancelling
+the project's drafts and pending requests as before — a system cascade (`state.ts` `PROJECT_CASCADE_CANCEL_FROM`,
+`cascadeCancellable`), never offered to a user.
+

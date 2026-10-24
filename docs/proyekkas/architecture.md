@@ -841,9 +841,9 @@ stateDiagram-v2
   MA --> MA : edit by requester [no decision yet] / re-snapshot
   MA --> DS : approve last level [approver not requester or creator] / approvedAmount := grandTotal
   MA --> TO : reject (reason required)
-  MA --> BA : cancel by requester [no decision yet] (reason)
+  %% D2410 (2026-10-24): no cancel before the Finance stage (requester: withdraw); project-cancel cascade only
   DS --> DT : transfer [amount = approvedAmount, proof, bankRef] / T3 + T7 KK posted
-  DS --> BA : cancel by Finance/Owner (reason)
+  DS --> BA : cancel by Finance/Direktur (reason; D2410: also on their own request)
   DT --> DS : transfer voided (T8 reversal, reason)
   DT --> NL : receipts complete (requester) [min 1 receipt]
   NL --> DT : add/remove receipt before LPJ
@@ -904,7 +904,6 @@ stateDiagram-v2
 
   Draft --> MK : submit [every line has a receipt, rule requires Diketahui] / docNo, snapshot, sign
   Draft --> MA : submit [rule without Diketahui] / docNo, snapshot, sign
-  Draft --> BA : cancel (reason)
   MK --> MA : acknowledge = Direktur approval (Diketahui Oleh, ADR 0013)
   MK --> DS : acknowledge when the only approval level was skipped (G1-2) / via MA, approvedAmount := grandTotal
   MK --> TO : reject by the Direktur (reason)
@@ -913,8 +912,6 @@ stateDiagram-v2
   MA --> MA : approve level n, not last
   MA --> DS : approve last level [approver not requester or creator] / approvedAmount := grandTotal
   MA --> TO : reject (reason)
-  MK --> BA : cancel [no decision] (reason)
-  MA --> BA : cancel [no decision] (reason)
   DS --> NV : Finance verifies receipts (verify_receipts)
   DS --> RN : Finance rejects a receipt (reason)
   NV --> RN : Finance rejects a receipt (reason)
@@ -924,9 +921,9 @@ stateDiagram-v2
   NV --> DT : transfer [amount = approvedAmount] / T3 + one KK (ADR 0005)
   DT --> NV : transfer voided (T8 reversal, reason)
   DT --> SE : complete (requester or Finance)
-  DS --> BA : cancel by Finance/Owner (reason)
-  NV --> BA : cancel by Finance/Owner (reason)
-  RN --> BA : cancel by Finance/Owner (reason)
+  DS --> BA : cancel by Finance/Direktur (reason)
+  NV --> BA : cancel by Finance/Direktur (reason)
+  RN --> BA : cancel by Finance/Direktur (reason)
   TO --> [*]
   SE --> [*]
   BA --> [*]
@@ -1042,7 +1039,7 @@ current budget + addition` (not the snapshot).
 | G5 | **Period lock**: no insert/update of cash entries dated ≤ lock date; transfers/settlements dated in a closed period are refused | service + DB trigger (ADR 0005) |
 | G6 | Status only changes through listed transitions (table-driven state machine); `status` field access update=false; hook rejects status diff without the transition context (F2a: `context.pkTransition`) | service + hook (not DB, see §5.2) |
 | G7 | Reason mandatory for: cancel, reject, void, LPJ revision, receipt reject, attendance correction, stage weight change, project archive, user deactivation, period reopen | service + audit hook |
-| G8 | Edit/cancel by requester only while Draft or Menunggu Approval with no decision rows (US-04) | service |
+| G8 | Edit/withdraw by requester only while Draft or Menunggu Approval with no decision rows (US-04). **Amendment 2026-10-24 (D2410):** `cancel` exists only at the Finance stage (advance / vendor / PT grup `approved`; Reimburse `approved` / `receipts_verified` / `receipt_revision`) and only for Finance / Direktur (`pk-finance`, `pk-owner`), also on their own request — never by the requester as such; the ADR 0030 project-cancel cascade still cancels draft / pending requests (system, `state.ts` `cascadeCancellable`); APK "hapus draft" = cancel of a never-submitted draft only (`workflow.ts` `discardDraft`) | service |
 | G9 | Bank account must belong to one of the requesters and be `active` (verified status shown; blocking = client question) | service |
 | G10 | Project scope: Staff may create requests only for projects they are assigned to (or cost centers allowed to them); PM only for team projects | service + access |
 | G11 | Stage weights of a project sum to 100 % (US-29); `progressPct` only changes via progress reports (requirements §1 #7) | hook + field access |
@@ -1051,7 +1048,7 @@ current budget + addition` (not the snapshot).
 | G14 | Progress report editable ≤ 24 h by its reporter, reason required (§8 T11) | service + trigger |
 | G15 | Idempotency: every mutating `/api/v1` call with `Idempotency-Key` returns the first result on retry | API layer |
 | G16 | Inactive user / revoked device / revoked web session → 401 on every request | auth strategies |
-| G17 | **Finance self-involvement (F2e):** a Finance user who is requester or creator of a request cannot verify/reject its receipts, review its flags, verify all receipts, request LPJ revision, verify the LPJ or settle (`state.ts` `FINANCE_SELF_GUARDED`) → 403 + `access_denied` audit; another Finance user must act | service + DB triggers `receipts_self_verify_guard`, `receipt_flags_self_review_guard` (function `pk_request_involves`, SQLSTATE 42501; LPJ/settle: service only) |
+| G17 | **Finance self-involvement (F2e):** a Finance user who is requester or creator of a request cannot verify/reject its receipts, review its flags, verify all receipts, request LPJ revision, verify the LPJ or settle (`state.ts` `FINANCE_SELF_GUARDED`) → 403 + `access_denied` audit; another Finance user must act | service + DB triggers `receipts_self_verify_guard`, `receipt_flags_self_review_guard` (function `pk_request_involves`, SQLSTATE 42501; LPJ/settle: service only) | **Superseded 2026-10-24 (D2410, user decision):** the Finance requester / creator MAY perform these actions (`FINANCE_SELF_PROCESSED`); each is recorded as audit `self_processed` ("diproses oleh pemohon sendiri", `newValue.selfProcessed`) in the action's transaction; DB triggers dropped by `20261024_300100_d2410_finance_self_lpj`. Approvals stay G1.
 
 **Guard order (UAT run 4, F2e):** the state check runs before G1 — e.g. `approve` on a request still in
 "Menunggu Diketahui" returns **409** (wrong state) even when the caller is also a requester; the action is
@@ -1432,3 +1429,9 @@ measurement gate is F1 (idle) and F6 (load).
   2026-09-24: `write-excel-file` 4.1.1, 10 000-row XLSX cap, CSV always, shared render semaphore with PDF, report PDFs
   for 3 reports). Admin: `admin.components.views.dashboard` replaced by the role home pages; custom views
   `/laporan`, `/laporan/:kode`, `/audit-log`. Company setting `lpjDueDays` (Q-F3-1).
+- **2026-10-24 (D2410, client feedback 24/10 "pengajuan"):** §5.1/§5.2: `cancel` only at the Finance stage, Finance /
+  Direktur only (G8 amended); requester withdraws; project-cancel cascade unchanged (system). G17 superseded (Finance may
+  process receipts / LPJ / settlement of its own request, audited `self_processed`; migrations
+  `20261024_300000_d2410_self_processed_enum`, `20261024_300100_d2410_finance_self_lpj`). Reimburse submit needs ≥ 1
+  general attachment. List status filter `pending_owner` (virtual; `domain/expense/status-filter*.ts`). Requirements
+  v1.3 §10.

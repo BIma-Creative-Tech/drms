@@ -56,7 +56,7 @@ Pilih jenisnya dulu:
 | Jenis | Kapan | Nota |
 |---|---|---|
 | **Pengajuan Baru** | Butuh uang **sebelum** belanja | Diunggah **setelah** uang ditransfer, lalu kirim LPJ |
-| **Reimburse** | Sudah bayar **dengan uang sendiri** | **Wajib** dilampirkan saat mengajukan (tiap baris minimal 1 nota) |
+| **Reimburse** | Sudah bayar **dengan uang sendiri** | **Wajib** dilampirkan saat mengajukan (tiap baris minimal 1 nota) **dan minimal 1 Lampiran** (sejak 24 Okt 2026) |
 
 1. Beranda → **Ajukan Pengajuan Baru** atau **Ajukan Reimburse**. Bila Anda bekerja di lebih dari satu PT, muncul
    **Untuk PT mana?** → ketuk PT tempat biaya ini dibebankan. Di editor tertulis **PT: …**. (Pesan "Anda tidak bisa
@@ -75,6 +75,9 @@ Pilih jenisnya dulu:
    nota** — Finance akan melihat tanda **Selisih nota** (pengajuan tetap memakai total).
 6. Reimburse: di tiap baris tekan **Foto nota (kamera)** atau **Dari galeri**, isi nomor nota, toko, tanggal, nominal.
    Tanggal nota tidak boleh setelah hari ini (pesan "Tanggal nota tidak boleh di masa depan").
+   **Lampiran** (foto JPG/PNG atau PDF, di APK dan web): **wajib minimal 1 untuk Reimburse** (keputusan 24 Okt 2026),
+   opsional untuk Pengajuan Baru. Tanpa lampiran, Reimburse ditolak saat diajukan dengan pesan "Lampiran wajib untuk
+   Reimburse: unggah minimal 1 lampiran (foto/PDF)." (APK lama yang belum punya kolom Lampiran: ajukan lewat web).
 7. **Simpan draft** (bisa tanpa sinyal) → saat online tekan **Ajukan** → konfirmasi.
 
 ![TODO screenshot: editor pengajuan dengan baris item dan Total (pratinjau)](img/staff-editor.png)
@@ -118,7 +121,11 @@ LPJ (invoice adalah buktinya).
 
 - **Belum ada keputusan (PM/Direktur)?** Buka pengajuan → **Tarik kembali ke Draft** (isi alasan) → **Ubah & ajukan di HP**
   → Ajukan lagi. Nomor tetap sama.
-- **Tidak jadi?** **Batalkan pengajuan** (isi alasan). Setelah ada keputusan, pembatalan hanya oleh Finance/Direktur.
+- **Tidak jadi?** Selama persetujuan: **Tarik kembali ke Draft** (isi alasan); draft boleh dibiarkan. Sejak 24 Okt 2026
+  pemohon **tidak bisa membatalkan** pengajuan: **Batalkan pengajuan** hanya oleh Finance/Direktur, dan hanya pada
+  tahap Finance (Disetujui / antri transfer; Reimburse juga Nota Terverifikasi / Revisi Nota). Minta Finance bila
+  pengajuan yang sudah disetujui memang tidak jadi. Draft yang belum pernah diajukan (belum bernomor) tetap bisa
+  **Hapus** (web) / dihapus dari aplikasi.
 - **Ditolak?** Baca alasannya → **Ajukan ulang (buat draft baru)** → perbaiki → Ajukan. Baris, pemohon, rekening,
   lampiran **dan nota** (yang tidak ditolak/dihapus) ikut disalin; nota berstatus "belum diverifikasi" lagi. Hapus
   atau ganti nota yang menjadi alasan penolakan.
