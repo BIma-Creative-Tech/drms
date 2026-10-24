@@ -360,11 +360,8 @@ class _AddendumDetailScreenState extends ConsumerState<AddendumDetailScreen> {
     if (action == AddendumAction.reject || action == AddendumAction.cancel) {
       reason = await showDialog<String>(
         context: context,
-        builder: (_) => _ReasonDialog(
-          title: t.confirmActionTitle(actionPhrase(label)),
-          summary: summary,
-          confirm: label,
-        ),
+        builder: (_) =>
+            _ReasonDialog(title: t.confirmActionTitle(actionPhrase(label)), summary: summary, confirm: label),
       );
       if (reason == null) return;
     } else {
