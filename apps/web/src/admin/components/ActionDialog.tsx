@@ -1,6 +1,8 @@
 'use client'
 import React, { useId, useRef, useState } from 'react'
 
+import { failureTitle, showResult, successTitle, type Summary } from './feedback/feedback'
+import { FeedbackStyle, SummaryList } from './feedback/FeedbackHost'
 import { KAS_STYLE } from './kas/style'
 import { isMultilineText } from './WrapText'
 
@@ -15,12 +17,19 @@ import { isMultilineText } from './WrapText'
  * `onConfirm` performs the action and returns an error text (dialog stays open) or null (closed).
  * `rotateKey` is called when the dialog opens and when the reason changes, so the caller can keep one
  * Idempotency-Key per opened dialog + body (G15).
+ * DRMS 24/10 (popup before + after every action): `summary` (document number, amount, person, …) is shown above the
+ * description; after the action the result popup (feedback.ts) says "Berhasil: <aksi> <dokumen>" (`result`), or shows
+ * the server's error on top of the still-open dialog (fix the reason, retry). `result: false` = the caller shows the success popup (e.g. before a reload).
  */
 export type ActionDialogProps = {
   label: string
   title: string
   description?: React.ReactNode
+  /** DRMS 24/10: what is affected (rows with a value are shown). */
+  summary?: Summary
   confirmLabel: string
+  /** DRMS 24/10: result popup after success — title (default "Berhasil: <label>") + message; false = the caller shows it. A failure always shows here. */
+  result?: { title?: string; message?: string | null } | false
   /** Text field (reason/note). Omitted = confirmation only. */
   field?: { label: string; minLength?: number; maxLength?: number; required?: boolean; help?: string }
   onConfirm: (value: string) => Promise<string | null>
@@ -34,7 +43,7 @@ export type ActionDialogProps = {
 
 const MIN = 3
 
-export function ActionDialog({ label, title, description, confirmLabel, field, onConfirm, rotateKey, buttonClassName, buttonStyle, danger, testId }: ActionDialogProps) {
+export function ActionDialog({ label, title, description, summary, confirmLabel, result, field, onConfirm, rotateKey, buttonClassName, buttonStyle, danger, testId }: ActionDialogProps) {
   const ref = useRef<HTMLDialogElement>(null)
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -63,12 +72,16 @@ export function ActionDialog({ label, title, description, confirmLabel, field, o
       const err = await onConfirm(v)
       if (err) {
         setError(err)
+        showResult({ ok: false, title: failureTitle(label), message: err, testId })
         return
       }
       ref.current?.close()
       setValue('')
+      if (result !== false) showResult({ ok: true, title: result?.title ?? successTitle(label), message: result?.message ?? null, testId })
     } catch {
-      setError('Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+      const msg = 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.'
+      setError(msg)
+      showResult({ ok: false, title: failureTitle(label), message: msg, testId })
     } finally {
       setBusy(false)
     }
@@ -87,17 +100,19 @@ export function ActionDialog({ label, title, description, confirmLabel, field, o
       <style href="pk-kas-style" precedence="default">
         {KAS_STYLE}
       </style>
+      <FeedbackStyle />
       <button type="button" className={buttonClassName ?? 'btn btn--style-secondary btn--size-small pk-pbtn'} style={buttonStyle ?? { margin: 0 }} onClick={open} data-pk-action={testId}>
         {label}
       </button>
-      <dialog ref={ref} className="pk-dlg" aria-labelledby={`${uid}-t`} aria-describedby={description ? `${uid}-d` : undefined} onCancel={(e) => busy && e.preventDefault()} onKeyDown={onKeyDown} data-pk-dialog={testId}>
+      <dialog ref={ref} className="pk-dlg" aria-labelledby={`${uid}-t`} aria-describedby={description || summary ? `${uid}-d` : undefined} onCancel={(e) => busy && e.preventDefault()} onKeyDown={onKeyDown} data-pk-dialog={testId}>
         <div style={{ display: 'grid', gap: 14, padding: 20 }}>
           <h2 id={`${uid}-t`} style={{ margin: 0, fontSize: 18, lineHeight: 1.3 }}>
             {title}
           </h2>
-          {description ? (
-            <div id={`${uid}-d`} className="desc">
-              {description}
+          {description || summary ? (
+            <div id={`${uid}-d`} style={{ display: 'grid', gap: 10 }}>
+              <SummaryList summary={summary} />
+              {description ? <div className="desc">{description}</div> : null}
             </div>
           ) : null}
           {field ? (

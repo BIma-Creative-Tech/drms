@@ -5,6 +5,8 @@ import { isContentEditable } from '@/domain/expense/types'
 import { formatRupiah } from '@/lib/money'
 import { formatServerTime } from '@/pdf/format'
 
+import { DocSummaryProvider } from './feedback/DocContext'
+import { expenseRequestSummary } from './feedback/summaries'
 import { ReasonAction } from './kas/ReasonAction'
 import { KAS_STYLE } from './kas/style'
 import { Act, RequesterActions, type RequesterActionsProps } from './RequesterActions'
@@ -66,7 +68,7 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
   const acts = (own ? d.allowedActions.filter((a) => (REQUESTER_ACTIONS as readonly string[]).includes(a)) : []) as RequesterActionsProps['actions']
   const box: React.CSSProperties = { border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16, fontSize: 13 }
   // DRMS 13/10 Persetujuan #4: no "Keputusan siklus sebelumnya" list — earlier cycles stay in "Log perubahan" / "Riwayat"
-  return (
+  const panel = (
     <div className="field-type pk-er-panel" data-pk-panel="workflow">
       <section style={box} data-pk-section="header">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
@@ -248,6 +250,8 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
       </div>
     </div>
   )
+  // DRMS 24/10: every action button of the panel names the request in its popups (number, title, requester, total)
+  return <DocSummaryProvider {...expenseRequestSummary(d)}>{panel}</DocSummaryProvider>
 }
 
 export default WorkflowPanel

@@ -1,10 +1,12 @@
 'use client'
 import { useRouter } from 'next/navigation'
-import React, { useRef, useState } from 'react'
+import React, { useRef } from 'react'
 
 import { errorLine } from '@/lib/field-labels'
 
 import { ActionDialog } from './ActionDialog'
+import { useDocSummary } from './feedback/DocContext'
+import { confirmLabel, confirmTitle, isDangerAction, successTitle, type Summary } from './feedback/feedback'
 
 /**
  * Posts one /api/v1 action with the admin cookie session (same-origin fetch: the session strategy
@@ -13,13 +15,24 @@ import { ActionDialog } from './ActionDialog'
  * dialog (ActionDialog: inline validation, the dialog stays open on a short reason or a server error),
  * never window.prompt/confirm. One Idempotency-Key per opened dialog + body (G15: a network retry of
  * the same submit is replayed, not repeated). The server re-checks every action; this is UI only.
+ * DRMS 24/10 (user decision): EVERY button asks first — "Yakin ingin <aksi> <dokumen>?" with the `summary` (document
+ * number, amount, person) and [Ya, <aksi>] / [Batal] (danger for Tolak / Batalkan / Hapus / Void) — and shows the
+ * result popup after ("Berhasil: <aksi> <dokumen>" + `success`, or the server's error). A reason prompt is that
+ * confirmation (no second dialog).
  */
 export type ActionButtonProps = {
   url: string
   label: string
   body?: Record<string, unknown>
   prompt?: { field: string; message: string; minLength?: number }
+  /** Extra sentence of the confirmation (what happens next). */
   confirm?: string
+  /** DRMS 24/10: document named in the popups ("PB/2026/10/0001"); default: the surrounding DocSummaryProvider. */
+  object?: string | null
+  /** DRMS 24/10: what is affected (document, amount, person, date). */
+  summary?: Summary
+  /** DRMS 24/10: message of the success popup. */
+  success?: string
   variant?: 'primary' | 'secondary'
   /** data-pk-action attribute (UI tests). */
   testId?: string
@@ -73,10 +86,12 @@ export function promptLabel(message: string): string {
   return message.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/[:：]\s*$/, '').trim() || 'Alasan'
 }
 
-export function ActionButton({ url, label, body, prompt, confirm, variant = 'secondary', testId }: ActionButtonProps) {
+export function ActionButton({ url, label, body, prompt, confirm, object: objectProp, summary: summaryProp, success, variant = 'secondary', testId }: ActionButtonProps) {
   const router = useRouter()
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // DRMS 24/10: the document of the surrounding DocSummaryProvider unless given here
+  const doc = useDocSummary()
+  const object = objectProp === undefined ? doc.object : objectProp
+  const summary = summaryProp ?? doc.summary
   const key = useRef<string | undefined>(undefined)
   const btnClass = `btn btn--style-${variant} btn--size-small pk-pbtn`
 
@@ -87,49 +102,24 @@ export function ActionButton({ url, label, body, prompt, confirm, variant = 'sec
     return null
   }
 
-  // direct action (no reason, no confirmation)
-  const run = async () => {
-    setError(null)
-    setBusy(true)
-    try {
-      setError(await send({}, idemKey()))
-    } catch {
-      setError('Gagal menghubungi server.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  if (prompt || confirm) {
-    return (
-      <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, marginRight: 6 }}>
-        <ActionDialog
-          label={label}
-          title={label}
-          description={prompt ? (confirm ?? undefined) : confirm}
-          confirmLabel={label}
-          field={prompt ? { label: promptLabel(prompt.message), minLength: prompt.minLength ?? 0, required: (prompt.minLength ?? 0) > 0 } : undefined}
-          rotateKey={() => {
-            key.current = idemKey()
-          }}
-          onConfirm={(v) => send(prompt ? (v ? { [prompt.field]: v } : {}) : {}, key.current)}
-          buttonClassName={btnClass}
-          danger={Boolean(prompt && (prompt.minLength ?? 0) > 0 && /tolak|batal/i.test(label))}
-          testId={testId}
-        />
-      </span>
-    )
-  }
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, marginRight: 6 }}>
-      <button type="button" className={btnClass} style={{ margin: 0 }} disabled={busy} onClick={run} data-pk-action={testId}>
-        {busy ? 'Memproses…' : label}
-      </button>
-      {error ? (
-        <span role="alert" style={{ color: 'var(--theme-error-500)', fontSize: 12, maxWidth: 320 }}>
-          {error}
-        </span>
-      ) : null}
+      <ActionDialog
+        label={label}
+        title={confirmTitle(label, object)}
+        description={confirm}
+        summary={summary}
+        confirmLabel={confirmLabel(label)}
+        result={{ title: successTitle(label, object), message: success ?? null }}
+        field={prompt ? { label: promptLabel(prompt.message), minLength: prompt.minLength ?? 0, required: (prompt.minLength ?? 0) > 0 } : undefined}
+        rotateKey={() => {
+          key.current = idemKey()
+        }}
+        onConfirm={(v) => send(prompt ? (v ? { [prompt.field]: v } : {}) : {}, key.current)}
+        buttonClassName={btnClass}
+        danger={isDangerAction(label)}
+        testId={testId}
+      />
     </span>
   )
 }
