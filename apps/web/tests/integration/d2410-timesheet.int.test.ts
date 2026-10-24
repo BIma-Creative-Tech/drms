@@ -33,9 +33,9 @@ let cuOld = 0
 
 beforeAll(async () => {
   installLocalJwks()
-  w = await makeFr1World('d2410')
+  w = await makeFr1World('tsd2410')
   // a second unit whose contract started 40 days ago (older than the 14-day window)
-  ex03 = await sysCreate('vehicles', { kind: 'alat_berat', unitCode: 'D2410-EX03', type: 'Excavator 30 t' })
+  ex03 = await sysCreate('vehicles', { kind: 'alat_berat', unitCode: 'TSD2410-EX03', type: 'Excavator 30 t' })
   cuOld = await sysCreate('contract-units', { project: w.kontrak, unit: ex03, startDate: addDays(w.today, -40), rateBasis: 'per_bulan', rate: 90_000_000 })
 })
 beforeEach(() => resetRateLimits())
@@ -148,13 +148,13 @@ describe('D2410 weekly HM: optional HM, pair + photo rule, HM_GAP / last HM with
     const weekly = r.body.extra.find((t: { key: string }) => t.key === 'hm-mingguan')
     expect(weekly).toBeTruthy()
     const weeks = hmWeeks(month)
-    const rows = weekly.rows.filter((x: { unit: string }) => x.unit.includes('D2410-EX01'))
+    const rows = weekly.rows.filter((x: { unit: string }) => x.unit.includes('TSD2410-EX01'))
     expect(rows.map((x: { minggu: string }) => x.minggu)).toEqual(weeks.map((x) => x.label))
     const wkA = weeks.findIndex((x) => x.from <= addDays(w.today, -6) && x.to >= addDays(w.today, -6))
     expect(rows[wkA].hariHm).toBeGreaterThanOrEqual(1)
     expect(rows[wkA].hmAwal).toBe(1000)
     // a unit without any HM in the month: Total HM empty, not 0
-    const ex03Row = r.body.main.rows.find((x: { unit: string }) => x.unit.includes('D2410-EX03'))
+    const ex03Row = r.body.main.rows.find((x: { unit: string }) => x.unit.includes('TSD2410-EX03'))
     expect(ex03Row.hm).toBeNull()
   })
 })
@@ -249,7 +249,7 @@ describe('D2410 web: matrix "+" per caller, form keeps the matrix date', () => {
     const sp = { project: String(w.kontrak), unit: String(ex03), tanggal: day }
     const pm = await render(FieldTimesheetNew, w.users.pm, ['unit-kontrak', 'timesheet', 'baru'], sp)
     expect(pm).toContain(`value="${day}"`)
-    expect(pm).toContain(`<option value="${ex03}" selected="">D2410-EX03</option>`)
+    expect(pm).toContain(`<option value="${ex03}" selected="">TSD2410-EX03</option>`)
     expect(pm).not.toContain('data-pk-date-limit')
     const staff = await render(FieldTimesheetNew, w.users.staffA, ['unit-kontrak', 'timesheet', 'baru'], sp)
     expect(staff).toContain(`value="${day}"`)
