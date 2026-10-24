@@ -83,6 +83,9 @@ export const AUDIT_ACTIONS = [
   // consequence of another one (the inter-project loan of a transfer paid from another account).
   'disburse',
   'auto_create',
+  // D2410 (user 2026-10-24): a Finance receipt / flag / LPJ / settlement action on a request where the Finance user is the
+  // requester or creator (allowed since D2410, F2e refused it) — same transaction as the action ("diproses oleh pemohon sendiri").
+  'self_processed',
 ] as const
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 

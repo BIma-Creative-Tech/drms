@@ -4,6 +4,7 @@ import type { PayloadRequest } from 'payload'
 import type { Role } from '@/access/roles'
 import { docLink } from '@/admin/doc-links'
 import { NO_APPROVAL_NOTE, noApprovalNote } from '@/domain/expense/decision'
+import { PENDING_OWNER, withPendingOwner } from '@/domain/expense/status-filter'
 import { NO_APPROVAL_STATUS_LABELS, REQUEST_STATUSES, REQUEST_TYPE_LABELS, REQUEST_TYPES, statusLabel, type RequestStatus, type RequestType } from '@/domain/expense/types'
 
 import { absensiReport } from './attendance-report'
@@ -116,9 +117,10 @@ const typeOf = (sp: URLSearchParams): RequestType | undefined => {
   const v = sp.get('jenis') ?? ''
   return (REQUEST_TYPES as readonly string[]).includes(v) ? (v as RequestType) : undefined
 }
-const statusesOf = (sp: URLSearchParams): RequestStatus[] => {
+const statusesOf = (sp: URLSearchParams): Array<RequestStatus | typeof PENDING_OWNER> => {
   const raw = sp.getAll('status').flatMap((s) => s.split(','))
-  return [...new Set(raw.filter((s): s is RequestStatus => (REQUEST_STATUSES as readonly string[]).includes(s) && s !== 'draft'))]
+  // D2410: + the virtual "Menunggu persetujuan Owner" (status-filter.ts)
+  return [...new Set(raw.filter((s): s is RequestStatus | typeof PENDING_OWNER => s === PENDING_OWNER || ((REQUEST_STATUSES as readonly string[]).includes(s) && s !== 'draft')))]
 }
 
 /**
@@ -847,7 +849,11 @@ const rekapPengajuan: ReportDef = {
         name: 'status',
         label: 'Status',
         kind: 'multiselect',
-        options: REQUEST_STATUSES.filter((s) => s !== 'draft').map((s) => ({ value: s, label: statusLabel('reimburse', s) })),
+        // D2410 (point 8): "Menunggu persetujuan Owner" after "Menunggu persetujuan Direktur" (= the non-Owner half then)
+        options: withPendingOwner(
+          REQUEST_STATUSES.filter((s) => s !== 'draft').map((s) => ({ value: s as string, label: statusLabel('reimburse', s) })),
+          (o) => ({ value: o.value, label: o.label }),
+        ),
         value: statusesOf(sp),
       },
       sel('project', 'Project', sp, await projectOptions(req, scope)),

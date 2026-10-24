@@ -184,6 +184,9 @@ function isForeign(req: PayloadRequest, company: number | undefined): boolean {
   return company !== undefined && mapped !== null && !mapped.includes(company)
 }
 
+/** D2410: submit of a Reimburse without any general attachment (web form, APK, API — the same text). */
+export const REIMBURSE_ATTACHMENT_MESSAGE = 'Lampiran wajib untuk Reimburse: unggah minimal 1 lampiran (foto/PDF).'
+
 /**
  * Header/line/master validation shared by create, update and submit (US-03, US-37, US-40, US-44,
  * US-53, G9, G10, Q-09, Q-11, Q-22). `forSubmit` adds completeness rules.
@@ -200,6 +203,8 @@ export async function validateContent(
     lines: LineInputApi[]
     neededDate?: string | null
     urgencyLevelId?: number | null
+    /** D2410: general attachments ("Lampiran") — at least one to submit a Reimburse (only passed by submit). */
+    attachmentIds?: number[]
   } & VendorContent,
   opts: {
     forSubmit: boolean
@@ -229,6 +234,11 @@ export async function validateContent(
     errors.push({ path: 'projectId', message: 'Project wajib diisi (pengajuan tanpa project tidak dapat dikirim).' })
   }
   if (opts.forSubmit && !(c.title ?? '').trim()) errors.push({ path: 'title', message: 'Judul wajib diisi.' })
+  // D2410 (user 2026-10-24, point 6): a Reimburse is sent with at least one general attachment (besides a receipt on every
+  // line); optional for Pengajuan Baru. The vendor / PT grup invoice file has its own rule below.
+  if (opts.forSubmit && c.type === 'reimburse' && !direct && (c.attachmentIds ?? []).length === 0) {
+    errors.push({ path: 'attachmentIds', message: REIMBURSE_ATTACHMENT_MESSAGE })
+  }
   if (c.neededDate && !isBusinessDate(c.neededDate)) errors.push({ path: 'neededDate', message: 'Tanggal harus YYYY-MM-DD.' })
 
   // G10: project / cost center in the caller's scope (office roles: any active one).

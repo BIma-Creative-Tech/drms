@@ -183,6 +183,15 @@ class ExpenseApi {
     ],
   );
 
+  /// D2410 (point 6): a general attachment of a request (photo / PDF) via the authorized file endpoint.
+  Future<Uint8List> attachmentFile(int id) => client.run(
+    (d) => d.get<dynamic>(
+      '/media/attachments/$id/file',
+      options: ApiClient.allCompanies(Options(responseType: ResponseType.bytes)),
+    ),
+    (data) => Uint8List.fromList(data as List<int>),
+  );
+
   /// Receipt image (thumbnail variant) via the authorized file endpoint (ADR 0004 §4a).
   Future<Uint8List> receiptImage(int imageId, {bool thumb = true}) => client.run(
     (d) => d.get<dynamic>(

@@ -95,6 +95,8 @@ import * as migration_20261021_100100_d2110_pb_schema from './20261021_100100_d2
 import * as migration_20261021_100200_d2110_pb_guard from './20261021_100200_d2110_pb_guard';
 import * as migration_20261022_100000_d2210_pb_fund from './20261022_100000_d2210_pb_fund';
 import * as migration_20261024_100000_d2410_timesheet_hm_optional from './20261024_100000_d2410_timesheet_hm_optional';
+import * as migration_20261024_300000_d2410_self_processed_enum from './20261024_300000_d2410_self_processed_enum';
+import * as migration_20261024_300100_d2410_finance_self_lpj from './20261024_300100_d2410_finance_self_lpj';
 
 export const migrations = [
   {
@@ -581,5 +583,15 @@ export const migrations = [
     up: migration_20261024_100000_d2410_timesheet_hm_optional.up,
     down: migration_20261024_100000_d2410_timesheet_hm_optional.down,
     name: '20261024_100000_d2410_timesheet_hm_optional',
+  },
+  {
+    up: migration_20261024_300000_d2410_self_processed_enum.up,
+    down: migration_20261024_300000_d2410_self_processed_enum.down,
+    name: '20261024_300000_d2410_self_processed_enum',
+  },
+  {
+    up: migration_20261024_300100_d2410_finance_self_lpj.up,
+    down: migration_20261024_300100_d2410_finance_self_lpj.down,
+    name: '20261024_300100_d2410_finance_self_lpj',
   },
 ];

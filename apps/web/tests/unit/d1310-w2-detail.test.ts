@@ -235,9 +235,11 @@ describe('Persetujuan #5/#6: page structure', () => {
     expect(fin.flowLinks).toEqual([{ href: '/admin/antrian-transfer', label: 'Catat transfer', testId: 'transfer' }])
     expect(fin).toMatchObject({ decision, canDuplicate: false })
     expect(actionBarProps({ d: d({ type: 'reimburse', allowedActions: ['verify_receipts'] }), office: true, canDuplicate: true, decision: null }).flowLinks[0]).toMatchObject({ label: 'Verifikasi nota', testId: 'receipt-review' })
-    // D1810: "Batalkan pengajuan" in the bar for the office (cancel allowed, not creator / requester); own → workflow panel
+    // D1810 / D2410: "Batalkan pengajuan" in the bar whenever the server allows `cancel` (Finance stage, office roles) —
+    // also when the Finance user is the requester (the requester panel has no cancel any more → exactly one button)
     expect(actionBarProps({ d: d({ status: 'approved', allowedActions: ['transfer', 'cancel'] }), office: true, own: false, canDuplicate: false, decision: null }).canCancel).toBe(true)
-    expect(actionBarProps({ d: d({ status: 'draft', allowedActions: ['submit', 'cancel'] }), office: false, own: true, canDuplicate: true, decision: null }).canCancel).toBe(false)
+    expect(actionBarProps({ d: d({ status: 'approved', allowedActions: ['transfer', 'cancel'] }), office: true, own: true, canDuplicate: true, decision: null }).canCancel).toBe(true)
+    expect(actionBarProps({ d: d({ status: 'draft', allowedActions: ['edit', 'submit'] }), office: false, own: true, canDuplicate: true, decision: null }).canCancel).toBe(false)
     expect(fin.canCancel).toBe(false)
     // a Draft has no number → nothing to print
     expect(actionBarProps({ d: d({ docNo: null }), office: true, canDuplicate: true, decision: null }).pdfs).toEqual([])

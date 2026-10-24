@@ -9,8 +9,8 @@ import { WorkflowPanel } from '@/admin/components/WorkflowPanel'
 import { addDays } from '@/domain/expense/types'
 import { buildPdfData } from '@/pdf/data'
 
-import { auditRows, getTestPayload, sqlAs, sqlError } from './helpers'
-import { api, asUser, draftBody, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
+import { auditRows, getTestPayload, sqlAs } from './helpers'
+import { api, asUser, draftBody, makeWorld, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }))
 
@@ -19,8 +19,8 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }))
  * 1. "Diketahui Oleh" fallback (user decision option a) — since E1 (ADR 0013) only for LEGACY
  *    snapshots: a delegated pre-E1 request still completes (G1 negatives, audit, timeline, PDF).
  * 2. "Pengajuan ulang dari" shows the old request's NUMBER + title (panel banner + form field).
- * 5. Finance cannot verify receipts / review flags on its own request (domain 403 + audited
- *    denied attempt + DB trigger).
+ * 5. (D2410, user 2026-10-24, supersedes F2e) Finance MAY verify receipts / review flags on its own request —
+ *    allowed and audited `self_processed`; the DB triggers are dropped.
  */
 let w: World
 let accPm: number
@@ -138,10 +138,9 @@ describe('F2e "Pengajuan ulang dari" shows the old number', () => {
   })
 })
 
-describe('F2e Finance self-involvement guard on receipt verification (Reimburse)', () => {
-  it('Finance who created the request cannot mark valid / reject / review flags / verify all (403, audited); another Finance can; DB refuses self-verification', async () => {
+describe('D2410 Finance processes the receipts of its own request (F2e guard lifted, audited self_processed)', () => {
+  it('Finance who created the request may mark valid / reject / review flags / verify all — each audited "diproses oleh pemohon sendiri"; the DB allows it; approvals stay G1', async () => {
     const creatorFinance = w.users.finance
-    const otherFinance = await makeFlowUser(['pk-finance'], 'FE-finance3', null)
     const d = await api('POST', E, creatorFinance, draftBody(w, { type: 'reimburse' }), key()) // on behalf of Staff A (Q-09)
     expect(d.status, JSON.stringify(d.body)).toBe(201)
     const id = d.body.id as number
@@ -152,42 +151,41 @@ describe('F2e Finance self-involvement guard on receipt verification (Reimburse)
     }
     expect((await api('POST', `${E}/${id}/submit`, creatorFinance, {}, key())).status).toBe(200)
     expect((await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {}, key())).status).toBe(200)
-    const a = await api('POST', `${E}/${id}/approve`, w.users.finance2, {}, key()) // the creator (Finance) never approves (G1)
+    expect((await api('POST', `${E}/${id}/approve`, creatorFinance, {}, key())).status).toBe(403) // the creator (Finance) never approves (G1)
+    const a = await api('POST', `${E}/${id}/approve`, w.users.finance2, {}, key())
     expect(a.body.status).toBe('approved')
-    const receipt = a.body.receipts[0] as { id: number }
+    const [first, second] = a.body.receipts as Array<{ id: number }>
     const flag = (a.body.flags as Array<{ id: number; status: string; level: string }>).find((f) => f.status === 'open')!
 
     const self = await api('GET', `${E}/${id}`, creatorFinance)
-    expect(self.body.allowedActions).not.toEqual(expect.arrayContaining(['receipt_verify']))
-    for (const [path, body] of [
-      [`receipts/${receipt.id}/verify`, {}],
-      [`receipts/${receipt.id}/reject`, { reason: 'Tidak sah' }],
-      [`flags/${flag.id}/review`, {}],
-      ['verify-receipts', {}],
-    ] as const) {
-      const r = await api('POST', `${E}/${id}/${path}`, creatorFinance, body, key())
-      expect(r.status, path).toBe(403)
-      expect(JSON.stringify(r.body)).toMatch(/Finance tidak dapat/)
-    }
-    const denied = (await auditRows('expense_request', id)).filter((r) => r.action === 'access_denied')
-    expect(denied.map((r) => r.field).sort()).toEqual(['receipt_reject', 'receipt_verify', 'review_flag', 'verify_receipts'])
-    expect(denied.every((r) => r.user_id === String(creatorFinance.id))).toBe(true)
-    // nothing changed
-    const after = await api('GET', `${E}/${id}`, otherFinance)
-    expect(after.body.status).toBe('approved')
-    expect(after.body.receipts.every((x: { status: string }) => x.status === 'pending')).toBe(true)
-    expect(after.body.allowedActions).toEqual(expect.arrayContaining(['receipt_verify', 'receipt_reject', 'verify_receipts', 'review_flag']))
+    expect(self.body.allowedActions).toEqual(expect.arrayContaining(['receipt_verify', 'receipt_reject', 'verify_receipts', 'review_flag', 'cancel']))
+    // verify everything, review the flags, "Nota Terverifikasi"; then reject one (→ Revisi Nota) and cancel at the
+    // Finance stage (D2410: an office role may cancel its own request there, reason required)
+    for (const r of [first!, second!]) expect((await api('POST', `${E}/${id}/receipts/${r.id}/verify`, creatorFinance, {}, key())).status).toBe(200)
+    const rv = await api('POST', `${E}/${id}/flags/${flag.id}/review`, creatorFinance, { note: 'ok' }, key())
+    expect(rv.status, JSON.stringify(rv.body)).toBe(200)
+    const open = (await api('GET', `${E}/${id}`, creatorFinance)).body.flags as Array<{ id: number; status: string; level: string }>
+    for (const f of open.filter((x) => x.status === 'open' && x.level === 'warning')) expect((await api('POST', `${E}/${id}/flags/${f.id}/review`, creatorFinance, {}, key())).status).toBe(200)
+    const all = await api('POST', `${E}/${id}/verify-receipts`, creatorFinance, {}, key())
+    expect(all.status, JSON.stringify(all.body)).toBe(200)
+    expect(all.body.status).toBe('receipts_verified')
+    const v = await sqlAs('app', "SELECT verified_by_id::int AS v FROM receipts WHERE request_id = $1 AND status = 'valid' ORDER BY id", [id])
+    expect(v.rows.map((x) => x.v)).toEqual([creatorFinance.id, creatorFinance.id])
+    const rj = await api('POST', `${E}/${id}/receipts/${second!.id}/reject`, creatorFinance, { reason: 'Foto buram' }, key())
+    expect(rj.status, JSON.stringify(rj.body)).toBe(200)
+    expect(rj.body.status).toBe('receipt_revision')
+    expect(rj.body.allowedActions).toContain('cancel')
+    const c = await api('POST', `${E}/${id}/cancel`, creatorFinance, { reason: 'Nota tidak dapat diganti' }, key())
+    expect(c.status, JSON.stringify(c.body)).toBe(200)
+    expect(c.body).toMatchObject({ status: 'cancelled', cancelReason: 'Nota tidak dapat diganti' })
 
-    // DB level (app role, raw SQL): the creator / a requester cannot be the verifier or reviewer
-    const e1 = await sqlError('app', "UPDATE receipts SET status = 'valid', verified_by_id = $1 WHERE id = $2", [creatorFinance.id, receipt.id])
-    expect(e1?.code).toBe('42501')
-    const e2 = await sqlError('app', "UPDATE receipts SET status = 'valid', verified_by_id = $1 WHERE id = $2", [w.users.staffA.id, receipt.id])
-    expect(e2?.code).toBe('42501')
-    const e3 = await sqlError('app', "UPDATE receipt_flags SET status = 'reviewed', reviewed_by_id = $1 WHERE id = $2", [creatorFinance.id, flag.id])
-    expect(e3?.code).toBe('42501')
-
-    // another Finance verifies normally
-    expect((await api('POST', `${E}/${id}/receipts/${receipt.id}/verify`, otherFinance, {}, key())).status).toBe(200)
-    expect((await api('POST', `${E}/${id}/flags/${flag.id}/review`, otherFinance, { note: 'ok' }, key())).status).toBe(200)
+    const rows = await auditRows('expense_request', id)
+    const selfRows = rows.filter((r) => r.action === 'self_processed')
+    expect([...new Set(selfRows.map((r) => r.field))].sort()).toEqual(['receipt_reject', 'receipt_verify', 'review_flag', 'verify_receipts'])
+    expect(selfRows.every((r) => r.user_id === String(creatorFinance.id) && r.reason?.startsWith('diproses oleh pemohon sendiri'))).toBe(true)
+    expect(rows.some((r) => r.action === 'access_denied' && r.field !== 'approve')).toBe(false)
+    // DB level (app role, raw SQL): the F2e self-verification triggers are gone (20261024_300100)
+    const t = await sqlAs('owner', "SELECT count(*)::int AS n FROM pg_trigger WHERE tgname IN ('receipts_self_verify_guard', 'receipt_flags_self_review_guard')")
+    expect(t.rows[0].n).toBe(0)
   })
 })

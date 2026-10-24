@@ -33,6 +33,8 @@ export const ACTION_LABELS: Record<string, string> = {
   privacy_ack: 'pemberitahuan privasi dibaca',
   // DRMS 13/10 Wave 4: one-time renumbering (ADR 0007 amendment 2026-10-13)
   renumbered: 'nomor diubah',
+  // D2410: Finance processed receipts / LPJ of its own request (allowed, recorded)
+  self_processed: 'diproses oleh pemohon sendiri',
 }
 
 export const DOC_LABELS: Record<string, string> = { expense_request: 'Pengajuan', receipt: 'Nota', transfer: 'Transfer', settlement: 'LPJ', cash_entry: 'Kas' }

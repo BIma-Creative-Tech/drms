@@ -4,6 +4,7 @@ import Link from 'next/link'
 import React, { Suspense } from 'react'
 
 import { rolesOf, type Role } from '@/access/roles'
+import { PENDING_OWNER } from '@/domain/expense/status-filter'
 import { statusLabel, type RequestStatus, type RequestType } from '@/domain/expense/types'
 import { adminDashboard, financeDashboard, ownerDashboard, pmDashboard, staffDashboard } from '@/domain/reports/dashboards'
 import type { ProjectBudget } from '@/domain/reports/kpi'
@@ -80,8 +81,9 @@ const LABEL: Record<Layout, string> = { owner: 'Direktur', finance: 'Finance', p
 const ER = '/admin/collections/expense-requests'
 const where = (q: Record<string, string>) => new URLSearchParams(q).toString()
 const rekapKasMonth = (period: string) => `/admin/laporan/rekap-kas?${where({ dari: period, sampai: period })}`
-// DRMS 13/10 Umum #4: the list's own multi-select filters (PkListView) — the ticks show in its filter bar
-const statusList = (statuses: readonly string[]) => `${ER}?${where({ 'f.status': statuses.join(',') })}`
+// DRMS 13/10 Umum #4: the list's own multi-select filters (PkListView) — the ticks show in its filter bar. D2410: the
+// list's `pending_approval` is the non-Owner half → a link counting every waiting request also ticks `pending_owner`
+const statusList = (statuses: readonly string[]) => `${ER}?${where({ 'f.status': (statuses.includes('pending_approval') ? [...statuses, PENDING_OWNER] : statuses).join(',') })}`
 const reqHref = (id: number) => `${ER}/${id}`
 const WAITING = ['pending_ack', 'pending_approval']
 const SR: React.CSSProperties = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }

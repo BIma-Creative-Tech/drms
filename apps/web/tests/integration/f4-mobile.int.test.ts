@@ -321,6 +321,11 @@ describe('POST /api/v1/sync/batch — expense request drafts (ADR 0010)', () => 
     expect(edit.body.results[0].server_copy.status).toMatch(/^pending_/)
     const del2 = await sync(staffA, [item('expense_request.draft_delete', { request_id: d.body.id })])
     expect(del2.body.results[0].errors[0].code).toBe('NOT_EDITABLE')
+    // D2410: a withdrawn (numbered) draft is no longer cancelled by its requester → NOT_EDITABLE, it stays a Draft
+    expect((await api('POST', `${E}/${d.body.id}/withdraw`, w.users.staffA, { reason: 'perlu revisi' })).status).toBe(200)
+    const del3 = await sync(staffA, [item('expense_request.draft_delete', { request_id: d.body.id })])
+    expect(del3.body.results[0]).toMatchObject({ status: 'rejected', errors: [expect.objectContaining({ code: 'NOT_EDITABLE' })] })
+    expect(del3.body.results[0].server_copy.status).toBe('draft')
   })
 
   it('progress items are processed (E4); on-behalf (E6) and feature flags off → FEATURE_DISABLED', async () => {

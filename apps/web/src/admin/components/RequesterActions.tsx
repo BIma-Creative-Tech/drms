@@ -14,15 +14,15 @@ import { WrapSelect } from './WrapSelect'
 import { isMultilineText, WrapText } from './WrapText'
 
 /**
- * Requester actions of the expense-request edit view (F2c, US-03…US-08): submit, withdraw/cancel
- * (reason), resubmit a rejected request, per-line receipt upload (multipart → /api/v1/media/receipts,
+ * Requester actions of the expense-request edit view (F2c, US-03…US-08): submit, withdraw (reason;
+ * D2410: no requester cancel — "Batalkan" is a Finance-stage office action in the action bar), resubmit a rejected request, per-line receipt upload (multipart → /api/v1/media/receipts,
  * then the JSON action), mark receipts complete, (re)submit the LPJ, confirm completion. Every call
  * goes to the existing /api/v1 endpoints with the cookie session and an Idempotency-Key — the
  * server re-checks everything; the buttons shown are only the DTO's `allowedActions` hint.
  * After a success the page reloads (the Payload form state must reflect the new status) and the
  * result message is carried over in sessionStorage (text only, rendered escaped).
  */
-type Action = 'submit' | 'withdraw' | 'cancel' | 'resubmit' | 'add_receipt' | 'receipts_resubmit' | 'receipts_complete' | 'lpj_submit' | 'complete'
+type Action = 'submit' | 'withdraw' | 'resubmit' | 'add_receipt' | 'receipts_resubmit' | 'receipts_complete' | 'lpj_submit' | 'complete'
 
 type Flag = { id: number; label: string; level: string; message: string; status: string; lineNo?: number | null }
 
@@ -50,6 +50,8 @@ export type RequesterActionsProps = {
   requestFlags: Flag[]
   /** Today (YYYY-MM-DD) in the request PT's timezone — QA-07: receipt dates after it are refused. */
   today?: string
+  /** D2410: a Reimburse without any general attachment ("Lampiran") — blocks "Kirim pengajuan" (the server refuses it too). */
+  missingAttachment?: boolean
   settlement: {
     docNo: string | null
     statusLabel: string
@@ -299,11 +301,11 @@ function FlagList({ flags }: { flags: Flag[] }) {
 
 const RECEIPT_STATUS: Record<string, string> = { pending: 'menunggu verifikasi', valid: 'valid', rejected: 'ditolak', removed: 'dihapus' }
 
-/** D3: (re)submit while a line still needs Qty & Harga satuan — shown, but disabled (reason above it). */
-function Blocked({ label, testId }: { label: string; testId: string }) {
+/** D3: (re)submit while a line still needs Qty & Harga satuan (D2410: or a Reimburse has no Lampiran) — shown, but disabled (reason above it). */
+function Blocked({ label, testId, describedBy = 'pk-lines-incomplete' }: { label: string; testId: string; describedBy?: string }) {
   return (
     <span style={{ display: 'inline-flex', marginRight: 6, marginBottom: 6 }}>
-      <button type="button" className={btn(true)} style={{ margin: 0 }} disabled aria-describedby="pk-lines-incomplete" data-pk-action={testId}>
+      <button type="button" className={btn(true)} style={{ margin: 0 }} disabled aria-describedby={describedBy} data-pk-action={testId}>
         {label}
       </button>
     </span>
@@ -318,6 +320,7 @@ export function RequesterActions(p: RequesterActionsProps) {
   // D3: a pre-D3 line must get Qty & Harga satuan first (server refuses submit / Kirim ulang nota as well)
   const incomplete = p.lines.filter((l) => l.incomplete).map((l) => l.no)
   const blocked = incomplete.length > 0 && (has('submit') || has('receipts_resubmit'))
+  const noAttachment = !!p.missingAttachment && has('submit')
   return (
     <div data-pk-panel="requester">
       {flash ? (
@@ -338,15 +341,19 @@ export function RequesterActions(p: RequesterActionsProps) {
             Lengkapi Qty &amp; Harga satuan pada baris {incomplete.join(', ')} (tombol Ubah di Rincian item, lalu Simpan) sebelum {has('submit') ? 'mengirim pengajuan' : 'mengirim ulang nota'}.
           </div>
         ) : null}
+        {noAttachment ? (
+          <div id="pk-attachment-missing" role="note" style={{ margin: '6px 0', color: 'var(--pk-tone-warn-text)', fontWeight: 600 }} data-pk-attachment-missing>
+            Lampiran wajib untuk Reimburse: unggah minimal 1 lampiran (foto/PDF) di kolom Lampiran (tombol Edit, lalu Simpan) sebelum mengirim pengajuan.
+          </div>
+        ) : null}
         <div style={{ marginTop: 8 }}>
-          {has('submit') && blocked ? <Blocked label="Kirim pengajuan" testId="submit" /> : null}
-          {has('submit') && !blocked ? (
+          {has('submit') && (blocked || noAttachment) ? <Blocked label="Kirim pengajuan" testId="submit" describedBy={noAttachment && !blocked ? 'pk-attachment-missing' : 'pk-lines-incomplete'} /> : null}
+          {has('submit') && !blocked && !noAttachment ? (
             <Act testId="submit" primary label="Kirim pengajuan" url={`${url}/submit`} confirm="Kirim pengajuan ini? Setelah dikirim isi terkunci (tarik kembali bila perlu mengubah)." success="Pengajuan terkirim. Nomor diterbitkan dan approver dinotifikasi." />
           ) : null}
           {has('withdraw') ? (
             <Act testId="withdraw" label="Tarik kembali ke Draft" url={`${url}/withdraw`} reason="Alasan tarik kembali (wajib, min. 3 karakter):" success="Pengajuan ditarik kembali ke Draft; silakan ubah lalu kirim lagi." />
           ) : null}
-          {has('cancel') ? <Act testId="cancel" label="Batalkan pengajuan" url={`${url}/cancel`} reason="Alasan pembatalan (wajib, min. 3 karakter):" success="Pengajuan dibatalkan." /> : null}
           {has('resubmit') ? (
             <Act testId="resubmit" primary gotoNew label="Ajukan ulang (buat draft baru)" url={`${url}/resubmit`} confirm="Buat draft baru dari pengajuan yang ditolak ini?" success="Draft baru dibuat dari pengajuan yang ditolak. Periksa, ubah bila perlu, lalu kirim." />
           ) : null}

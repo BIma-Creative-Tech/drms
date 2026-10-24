@@ -193,9 +193,12 @@ describe('403 before 409 (UAT 5.2)', () => {
     expect(statusOf(() => requireAction(ctx({ roles: ['pk-finance'], status: 'lpj_verified' }), 'settle_reverse'))).toBe(409)
   })
 
-  it('owner withdrawing/cancelling after a decision → 403 (unchanged: only office roles may then cancel); owner editing a submitted request → 409', () => {
+  it('owner withdrawing after a decision / cancelling at all → 403 (D2410: only office roles cancel, at the Finance stage); owner editing a submitted request → 409', () => {
     expect(statusOf(() => requireAction(ctx({ isCreator: true, status: 'pending_approval', hasDecision: true }), 'withdraw'))).toBe(403)
     expect(statusOf(() => requireAction(ctx({ isCreator: true, status: 'approved', hasDecision: true }), 'cancel'))).toBe(403)
+    expect(statusOf(() => requireAction(ctx({ isCreator: true, status: 'draft' }), 'cancel'))).toBe(403)
+    // an office role learns the state conflict: Finance cancelling a request still waiting for approval → 409
+    expect(statusOf(() => requireAction(ctx({ roles: ['pk-finance'], status: 'pending_approval' }), 'cancel'))).toBe(409)
     expect(statusOf(() => requireAction(ctx({ isCreator: true, status: 'pending_approval' }), 'edit'))).toBe(409)
   })
 
@@ -224,7 +227,7 @@ describe('settlement reversal state rules (E9)', () => {
     expect(() => assertTransition('advance', 'completed', 'settle_reverse', 'lpj_verified')).not.toThrow()
   })
 
-  it('Finance only, never on its own request (G17 like settle)', () => {
+  it('Finance only — D2410: also on its own request (audited self_processed, like settle)', () => {
     const base: ActorContext = {
       type: 'advance',
       status: 'completed',
@@ -237,7 +240,7 @@ describe('settlement reversal state rules (E9)', () => {
       alreadyDecided: false,
     }
     expect(allowedActions(base)).toContain('settle_reverse')
-    expect(allowedActions({ ...base, isRequester: true })).not.toContain('settle_reverse')
+    expect(allowedActions({ ...base, isRequester: true })).toContain('settle_reverse')
     expect(allowedActions({ ...base, roles: ['pk-owner'] })).not.toContain('settle_reverse')
     expect(allowedActions({ ...base, roles: ['pk-admin'] })).not.toContain('settle_reverse')
   })

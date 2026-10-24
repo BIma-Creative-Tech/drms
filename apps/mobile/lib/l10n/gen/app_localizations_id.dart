@@ -5971,4 +5971,45 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get kpiCostCentersTeamEmpty => 'Project Anda belum dipetakan ke pusat biaya (akun kas).';
+
+  @override
+  String get sectionAttachments => 'Lampiran';
+
+  @override
+  String get attachmentsOptional => 'Lampiran (opsional)';
+
+  @override
+  String get attachmentsRequired => 'Lampiran (wajib untuk Reimburse)';
+
+  @override
+  String get attachmentsHint => 'Foto atau file JPG / PNG / PDF (PDF maks. 5 MB), maks. 20 lampiran.';
+
+  @override
+  String get attachmentFile => 'File';
+
+  @override
+  String get attachmentLocal => 'Di HP — terkirim saat sinkron / Ajukan';
+
+  @override
+  String get attachmentOnServer => 'Tersimpan di server';
+
+  @override
+  String get attachmentRemove => 'Hapus lampiran';
+
+  @override
+  String attachmentsLimit(int count) {
+    return 'Maksimal $count lampiran.';
+  }
+
+  @override
+  String get attachmentTypeInvalid => 'Pilih file JPG, PNG atau PDF.';
+
+  @override
+  String get attachmentPdfTooLarge => 'File PDF lebih dari 5 MB. Perkecil file-nya atau lampirkan sebagai foto.';
+
+  @override
+  String get attachmentPdfInvalid => 'File PDF tidak valid.';
+
+  @override
+  String get attachmentTooLarge => 'File terlalu besar (maks. 15 MB).';
 }

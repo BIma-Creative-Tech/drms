@@ -43,6 +43,9 @@ List<T> requesterChoices<T>(
   return employees.where((e) => !isDirektur(e) || idOf(e) == ownEmployee).toList();
 }
 
+/// D2410 (point 6): a Reimburse without general attachment (same text as the server).
+const reimburseAttachmentRequiredMessage = 'Lampiran wajib untuk Reimburse: unggah minimal 1 lampiran (foto/PDF).';
+
 /// D4 (owner 2026-10-11): message when the project has a RAB but no RAP yet (same text as the server and the web).
 const rapMissingMessage = 'Project belum punya RAP — hubungi PM';
 
@@ -75,6 +78,13 @@ List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee, RapCh
     issues.addAll(intercompanyIssues(d));
   } else if (d.bankAccountId == null) {
     issues.add(const DraftIssue('bankAccountId', 'Rekening tujuan wajib dipilih.'));
+  }
+  // D2410 (point 6, user 2026-10-24): a Reimburse needs at least one general attachment; optional for Pengajuan Baru.
+  if (d.type == RequestType.reimburse && !d.isDirectPayment && d.attachments.isEmpty) {
+    issues.add(const DraftIssue('attachments', reimburseAttachmentRequiredMessage));
+  }
+  if (d.attachments.length > maxDraftAttachments) {
+    issues.add(const DraftIssue('attachments', 'Maksimal $maxDraftAttachments lampiran.'));
   }
   if (d.lines.isEmpty) {
     issues.add(const DraftIssue('lines', 'Minimal 1 baris item.'));

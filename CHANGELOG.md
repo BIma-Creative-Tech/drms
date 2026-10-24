@@ -45,6 +45,42 @@ migration (`20261024_100000_d2410_timesheet_hm_optional`: `unit_timesheets.hm_st
   - `dompurify` 3.4.8 → 3.4.17 via `overrides` (transitive through monaco-editor; GHSA-cg2g-xh64-v4q7 and others).
   - `undici` override 7.29.1 → 7.30.1; `zod` 4.6.5 → 4.6.7.
   - Remaining `npm audit` findings are moderate only (esbuild via drizzle-kit, fast-uri, nodemailer).
+**Pengajuan biaya — client feedback 24/10 (D2410, user decisions 2026-10-24).** Two migrations
+(`20261024_300000_d2410_self_processed_enum`: audit action `self_processed`; `20261024_300100_d2410_finance_self_lpj`:
+drops the F2e triggers `receipts_self_verify_guard` / `receipt_flags_self_review_guard`). No data change. API contract:
+additive (`ExpenseRequestDetail.attachments`, `SyncDraftUpsertPayload.attachment_ids`), plus the behaviour changes
+below. **APK:** a new APK with "Lampiran" needs this server (the old sync schema refuses `attachment_ids`); older APKs
+keep working but cannot add a Lampiran, so their Reimburse submit gets the 400 below — raise `minAppVersion` once the
+APK is released.
+
+### Changed
+- **Batalkan pengajuan only at the Finance stage, absolute** (point 13): `cancel` only from Pengajuan Baru / vendor /
+  PT grup "Disetujui" and Reimburse "Disetujui" / "Nota Terverifikasi" / "Revisi Nota", only by Finance / Direktur of
+  the PT (also on their own request), reason required. No cancel on Draft or while waiting for approval (requester:
+  "Tarik kembali ke Draft"; others 403, office roles 409). Web: one "Batalkan pengajuan" button in the action bar (the
+  requester panel has none); row action "Batalkan" for the office roles at the Finance stage only. APK: driven by
+  `allowedActions` (no change). APK "hapus draft" (sync `draft_delete`): a never-submitted draft is still cancelled; a
+  numbered (withdrawn) draft → `NOT_EDITABLE` with the server copy. "Batalkan proyek" still cancels the project's
+  drafts / pending requests (system cascade, ADR 0030).
+- **Finance may process its own request's receipts and LPJ** (user decision): verify / reject receipts, review flags,
+  verify all receipts, LPJ revision / verification, settle and settlement reversal are allowed when the Finance user is
+  the requester or creator; each is recorded as audit `self_processed` ("diproses oleh pemohon sendiri",
+  `newValue.selfProcessed = true`) in "Log perubahan" / "Riwayat". Approvals (G1) and the transfer rule are unchanged.
+- **Reimburse needs at least one Lampiran to be sent** (point 6): submit without a general attachment → 400
+  `errors[attachmentIds]` "Lampiran wajib untuk Reimburse: unggah minimal 1 lampiran (foto/PDF)." (besides a receipt on
+  every line). Optional for Pengajuan Baru; the vendor / PT grup invoice file is unchanged. Web form: hint on the
+  Lampiran field, "Kirim pengajuan" disabled with the reason.
+- **List filters: "Semua" = every option ticked** (point 7): without a filter every option shows ticked; a tri-state
+  "Semua" box ticks (or clears) all; every option ticked — or none — applies as no filter. Form mode unchanged.
+- **Status filter "Menunggu persetujuan Owner"** (point 8) in Keuangan › Pengajuan Biaya and Laporan › Rekap Pengajuan
+  (virtual value `pending_owner`: waiting rows whose current level is the Owner's); "Menunggu persetujuan Direktur" now
+  means the other waiting rows. Dashboard "menunggu" links tick both.
+
+### Added
+- APK: "Lampiran" (photo / PDF, max. 20) in the draft editor — required for Reimburse, optional for Pengajuan Baru; sent
+  with the sync / Ajukan; the request detail lists the attachments and opens them.
+- API: `SyncDraftUpsertPayload.attachment_ids` (replaces the list; omitted = unchanged) and
+  `ExpenseRequestDetail.attachments[] {id, fileName, mimeType}`.
 
 ## [0.19.1] - 2026-10-22
 

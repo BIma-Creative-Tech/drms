@@ -28,7 +28,7 @@ import {
   type Signature,
 } from './common'
 import { fromDocLines, validateContent, vendorOfDoc } from './drafts'
-import { targets } from './state'
+import { cascadeCancellable } from './state'
 import { payeeOf, STATUS_LABELS } from './types'
 import { designatedAccount } from '@/domain/intercompany/service'
 import { checkFundsForApproval } from '@/domain/fundcheck/service'
@@ -174,6 +174,7 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
       lines: fromDocLines(doc),
       neededDate: doc.neededDate,
       urgencyLevelId: relId(doc.urgencyLevel) ?? null,
+      attachmentIds: ids(doc.attachments), // D2410: ≥ 1 for a Reimburse
       ...vendorOfDoc(doc), // ADR 0027: vendor, rekening vendor, invoice (required to send a vendor payment)
     },
     // D2: a legacy cost-center request submitted before may be sent again as it was (no project)
@@ -291,7 +292,11 @@ export async function withdraw(req: PayloadRequest, id: number, reason: string):
   return updateRequest(req, id, { status: 'draft', currentLevel: null }, reason)
 }
 
-/** POST …/cancel — reason required (G7); requester before any decision, Finance/Owner later. */
+/**
+ * POST …/cancel — reason required (G7). D2410 (user 2026-10-24, point 13): ONLY at the Finance stage (Pengajuan Baru /
+ * vendor / PT grup "Disetujui"; Reimburse "Disetujui" / "Nota Terverifikasi" / "Revisi Nota") and only by Finance /
+ * Direktur (state.ts) — also on their own request. The requester withdraws to Draft during the approval instead.
+ */
 export async function cancel(req: PayloadRequest, id: number, reason: string): Promise<RequestDoc> {
   const doc = await loadVisible(req, id, { lock: true })
   requireAction(await actorContext(req, doc), 'cancel')
@@ -299,16 +304,30 @@ export async function cancel(req: PayloadRequest, id: number, reason: string): P
 }
 
 /**
+ * APK "Hapus draft" (sync `expense_request.draft_delete`, requirements §1.2 #6): a Draft that was NEVER submitted (no
+ * number yet) is closed as "Dibatalkan" by its creator / requester — the outcome the APK always received. D2410: this is
+ * not a "Batalkan pengajuan" (no cancel before the Finance stage); a draft that was submitted before (withdrawn, it keeps
+ * its number) is refused — it stays a Draft the requester may send again.
+ */
+export async function discardDraft(req: PayloadRequest, id: number, reason: string): Promise<RequestDoc> {
+  const doc = await loadVisible(req, id, { lock: true })
+  requireAction(await actorContext(req, doc), 'edit')
+  if (doc.docNo) fail(409, `Draft ${doc.docNo} sudah pernah diajukan (bernomor) dan tidak dapat dihapus; ubah lalu kirim lagi bila masih diperlukan.`)
+  return updateRequest(req, id, { status: 'cancelled', cancelReason: reason }, reason)
+}
+
+/**
  * D1610 (ADR 0030) "Batalkan proyek" cascade: cancel ONE request of the cancelled project as the system — the actor
  * guard is the project-cancel permission (Direktur / Admin of the PT, checked by domain/projects/cancel.ts), the
- * STATE MACHINE still decides (a `cancel` transition must exist: draft / pending_ack / pending_approval, advance
- * approved, reimburse approved / receipts_verified / receipt_revision). Same write as `cancel` (status + reason,
- * notifications and audit through the collection hooks), in the caller's transaction.
+ * STATE MACHINE still decides (`cascadeCancellable`: a Finance-stage `cancel` transition — advance approved, reimburse
+ * approved / receipts_verified / receipt_revision — or, for this system cascade only (D2410), draft / pending_ack /
+ * pending_approval). Same write as `cancel` (status + reason, notifications and audit through the collection hooks),
+ * in the caller's transaction.
  */
 export async function cancelForProject(req: PayloadRequest, id: number, reason: string): Promise<RequestDoc> {
   await lockRequest(req, id)
   const doc = await loadRaw(req, id)
-  if (targets(doc.type, doc.status, 'cancel', payeeOf(doc.payeeType)).length === 0) {
+  if (!cascadeCancellable(doc.type, doc.status, payeeOf(doc.payeeType))) {
     fail(409, `Pengajuan ${doc.docNo ?? `#${id}`} berstatus "${STATUS_LABELS[doc.status]}" tidak dapat dibatalkan.`)
   }
   return updateRequest(req, id, { status: 'cancelled', cancelReason: reason }, reason)

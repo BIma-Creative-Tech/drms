@@ -18,6 +18,7 @@ import '../application/expense_providers.dart';
 import '../domain/expense_request.dart';
 import '../domain/turn_timeline.dart';
 import 'requester_actions.dart';
+import 'widgets/attachments.dart';
 import 'widgets/fund_check_panel.dart';
 import 'widgets/rap_item_picker.dart';
 import 'widgets/request_stepper.dart';
@@ -217,6 +218,11 @@ class _DetailBody extends ConsumerWidget {
           ],
         ),
       if (d.rejectReason != null) row(t.rejectReasonLabel, d.rejectReason!),
+      // D2410 (point 6): the general attachments ("Lampiran", photo / PDF) — a tap opens the file
+      if (d.attachments.isNotEmpty) ...[
+        section(t.sectionAttachments, key: const Key('section-attachments')),
+        RequestAttachmentList(attachments: d.attachments),
+      ],
       section(t.sectionRequester, key: const Key('section-requester')),
       row(t.requesters, d.requesters.map((r) => r.name ?? '-').join(', ')),
       if (d.createdByName != null) row(t.createdBy, d.createdByName!),

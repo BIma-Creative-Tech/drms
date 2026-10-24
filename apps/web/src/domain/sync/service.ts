@@ -24,7 +24,7 @@ import { ids, loadRaw, loadVisible, lockRequest, settings, type RequestDoc } fro
 import { payeeOf } from '@/domain/expense/types'
 import { createDraft, updateDraft, type DraftInput, type LineInputApi } from '@/domain/expense/drafts'
 import { addReceipt, editReceipt } from '@/domain/expense/receipts'
-import { cancel } from '@/domain/expense/workflow'
+import { discardDraft } from '@/domain/expense/workflow'
 import { auditPrivacyDenied, PRIVACY_ACK_REQUIRED, PRIVACY_ACK_REQUIRED_DETAIL, privacyAckCheck } from '@/legal/privacy-enforcement'
 import { isDbGuardError } from '@/lib/pg-error'
 import { withReqTransaction } from '@/lib/system-tx'
@@ -65,7 +65,8 @@ import { applyProgressReport, ProgressSyncReject } from './progress'
  * - Conflicts: an edit of an existing draft must carry `base_rev` = the server `rev`; a stale or
  *   missing `base_rev` → `conflict` + `server_copy` (server wins, nothing changes).
  * - Drafts are edited only by their creator and only in status Draft (else `rejected
- *   NOT_EDITABLE`); delete = cancel (soft delete, requirements §1.2 #6).
+ *   NOT_EDITABLE`); delete = "Dibatalkan" of a never-submitted draft (requirements §1.2 #6; D2410: a numbered —
+ *   withdrawn — draft → NOT_EDITABLE with the server copy).
  * - Attendance check-in/out + PM on-behalf (company-settings.syncAttendanceEnabled; checks in
  *   domain/attendance/record.ts): assigned project/cost center with a geofence, inside radius
  *   (+ capped GPS accuracy), not mocked, selfie uploaded by the caller, one check-in and one
@@ -342,6 +343,8 @@ function toDraftInput(p: SyncDraftUpsert): DraftInput {
   if (p.invoice_date !== undefined) input.invoiceDate = p.invoice_date
   if (p.invoice_due_date !== undefined) input.invoiceDueDate = p.invoice_due_date
   if (p.invoice_file_id !== undefined) input.invoiceFileId = p.invoice_file_id
+  // D2410 (point 6): the general attachments ("Lampiran") — replaces the list; omitted (APK ≤ 0.11) = unchanged
+  if (p.attachment_ids !== undefined) input.attachmentIds = p.attachment_ids
   if (p.lines !== undefined) {
     input.lines = p.lines.map(
       (l): LineInputApi => ({
@@ -484,6 +487,11 @@ async function applyDraftDelete(c: ItemCtx): Promise<Outcome> {
     return { status: 'applied', id: doc.id, rev: copy.rev, copy, flags: ['ALREADY_CANCELLED'], errors: [] }
   }
   await requireDraft(c, doc)
+  // D2410 (point 13): a draft submitted before (withdrawn, numbered) is no longer cancelled by its requester → the server
+  // copy goes back to the app (it stays a Draft there too)
+  if (doc.docNo) {
+    reject('NOT_EDITABLE', `Draft ${doc.docNo} sudah pernah diajukan dan tidak dapat dihapus; ubah lalu kirim lagi bila masih diperlukan.`, undefined, { id: doc.id, copy: await draftCopy(req, doc.id) })
+  }
   const rev = revOf(doc)
   if (item.base_rev !== null && item.base_rev !== undefined && item.base_rev < rev) {
     return {
@@ -498,7 +506,7 @@ async function applyDraftDelete(c: ItemCtx): Promise<Outcome> {
   const reason = p.reason ?? 'Draft dihapus dari aplikasi'
   req.context.auditReason = reason
   try {
-    await cancel(req, doc.id, reason)
+    await discardDraft(req, doc.id, reason) // D2410: never-submitted drafts only (a numbered one → 409 → rejected)
   } finally {
     delete req.context.auditReason
   }

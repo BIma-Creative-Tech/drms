@@ -128,10 +128,6 @@ async function drive(target: string, type: 'advance' | 'reimburse', s: Scope, op
   if (target === 'draft') return bump('draft')
   if (type === 'reimburse') for (const [i, l] of lineIds.entries()) await receipt(w.users.staffA, id, l, totals[i]!, addDays(today, -1))
   await must(call('POST', `${E}/${id}/submit`, w.users.staffA, {}))
-  if (target === 'cancelled_early') {
-    await must(call('POST', `${E}/${id}/cancel`, w.users.staffA, { reason: 'tidak jadi' }))
-    return bump('cancelled')
-  }
   if (target === 'pending_ack') return bump('pending_ack')
   if (target === 'rejected') {
     await must(call('POST', `${E}/${id}/reject`, s.ack, { reason: 'anggaran tidak sesuai' }))
@@ -141,6 +137,11 @@ async function drive(target: string, type: 'advance' | 'reimburse', s: Scope, op
   if (target === 'pending_approval') return bump('pending_approval')
   await must(call('POST', `${E}/${id}/approve`, w.users.finance, {}))
   if (target === 'approved') return bump('approved')
+  // D2410 (point 13): "Batalkan" only at the Finance stage, by Finance (no requester cancel before)
+  if (target === 'cancelled_finance') {
+    await must(call('POST', `${E}/${id}/cancel`, w.users.finance, { reason: 'tidak jadi' }))
+    return bump('cancelled')
+  }
   if (type === 'reimburse') {
     const det = await must(call('GET', `${E}/${id}`, w.users.finance))
     for (const r of det.receipts as Array<{ id: number; status: string }>) if (r.status === 'pending') await must(call('POST', `${E}/${id}/receipts/${r.id}/verify`, w.users.finance, {}))
@@ -208,9 +209,9 @@ async function manual(direction: 'in' | 'out', entryDate: string, amt: number, e
   )
 }
 
-const TARGETS_ADV = ['draft', 'pending_ack', 'pending_approval', 'rejected', 'cancelled_early', 'approved', 'transferred', 'void_retransfer', 'void_only', 'receipts_complete', 'lpj_submitted', 'lpj_verified_pending', 'lpj_refund', 'lpj_shortfall', 'lpj_exact'] as const
+const TARGETS_ADV = ['draft', 'pending_ack', 'pending_approval', 'rejected', 'cancelled_finance', 'approved', 'transferred', 'void_retransfer', 'void_only', 'receipts_complete', 'lpj_submitted', 'lpj_verified_pending', 'lpj_refund', 'lpj_shortfall', 'lpj_exact'] as const
 const WEIGHTS_ADV = [4, 6, 5, 4, 3, 8, 10, 3, 2, 3, 3, 3, 6, 4, 6]
-const TARGETS_RMB = ['draft', 'pending_ack', 'pending_approval', 'rejected', 'cancelled_early', 'approved', 'receipts_verified', 'transferred', 'void_retransfer', 'completed'] as const
+const TARGETS_RMB = ['draft', 'pending_ack', 'pending_approval', 'rejected', 'cancelled_finance', 'approved', 'receipts_verified', 'transferred', 'void_retransfer', 'completed'] as const
 const WEIGHTS_RMB = [3, 5, 4, 3, 2, 6, 6, 5, 3, 8]
 function weighted<T>(xs: readonly T[], ws: number[]): T {
   const total = ws.reduce((a, b) => a + b, 0)

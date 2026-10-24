@@ -112,6 +112,7 @@ export const SyncDraftUpsertPayload = z
     invoice_date: businessDate.nullable().optional(),
     invoice_due_date: businessDate.nullable().optional(),
     invoice_file_id: id.nullable().optional().meta({ description: 'ADR 0027: media-attachments id of the invoice (POST /media/attachments).' }),
+    attachment_ids: z.array(id).max(20).optional().meta({ description: 'D2410: general attachments ("Lampiran", media-attachments ids — POST /media/attachments; photo / PDF). Replaces the list; omitted = unchanged. A Reimburse needs at least one to be submitted.' }),
     client_grand_total: rupiah.nullable().optional().meta({ description: 'Advisory; mismatch with the server total → flag CLIENT_TOTAL_MISMATCH.' }),
     lines: z.array(SyncLineInput).max(200).optional().meta({ description: 'Replaces ALL lines when present.' }),
   })
@@ -126,7 +127,7 @@ export const SyncDraftDeletePayload = z
     reason: z.string().trim().min(3).max(1000).optional().meta({ description: 'Default "Draft dihapus dari aplikasi".' }),
   })
   .strict()
-  .meta({ id: 'SyncDraftDeletePayload', description: 'Soft delete = the draft is cancelled (no hard delete).' })
+  .meta({ id: 'SyncDraftDeletePayload', description: 'Soft delete = a never-submitted draft is cancelled (no hard delete). D2410: a draft submitted before (withdrawn, numbered) → rejected NOT_EDITABLE with the server copy.' })
 export type SyncDraftDelete = z.infer<typeof SyncDraftDeletePayload>
 
 /** Exactly one of project_id / cost_center_id / site_id (E6, Q-40: cost-center geofence; ADR 0023: site). */

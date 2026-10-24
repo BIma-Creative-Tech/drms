@@ -4509,5 +4509,25 @@
     }
   },
   "kpiAdminPusatBiaya": "Project tanpa pusat biaya",
-  "kpiCostCentersTeamEmpty": "Project Anda belum dipetakan ke pusat biaya (akun kas)."
+  "kpiCostCentersTeamEmpty": "Project Anda belum dipetakan ke pusat biaya (akun kas).",
+  "sectionAttachments": "Lampiran",
+  "attachmentsOptional": "Lampiran (opsional)",
+  "attachmentsRequired": "Lampiran (wajib untuk Reimburse)",
+  "attachmentsHint": "Foto atau file JPG / PNG / PDF (PDF maks. 5 MB), maks. 20 lampiran.",
+  "attachmentFile": "File",
+  "attachmentLocal": "Di HP — terkirim saat sinkron / Ajukan",
+  "attachmentOnServer": "Tersimpan di server",
+  "attachmentRemove": "Hapus lampiran",
+  "attachmentsLimit": "Maksimal {count} lampiran.",
+  "@attachmentsLimit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "attachmentTypeInvalid": "Pilih file JPG, PNG atau PDF.",
+  "attachmentPdfTooLarge": "File PDF lebih dari 5 MB. Perkecil file-nya atau lampirkan sebagai foto.",
+  "attachmentPdfInvalid": "File PDF tidak valid.",
+  "attachmentTooLarge": "File terlalu besar (maks. 15 MB)."
 }

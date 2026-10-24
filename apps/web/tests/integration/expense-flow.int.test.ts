@@ -57,7 +57,8 @@ describe('Pengajuan Baru (advance) — happy path', () => {
     id = ok.body.id
     lineIds = ok.body.lines.map((l: { id: string }) => l.id)
     expect(ok.body).toMatchObject({ status: 'draft', type: 'advance', grandTotal: 750_000, docNo: null, createdBy: { id: w.users.staffA.id } })
-    expect(ok.body.allowedActions).toEqual(expect.arrayContaining(['edit', 'submit', 'cancel']))
+    expect(ok.body.allowedActions).toEqual(expect.arrayContaining(['edit', 'submit']))
+    expect(ok.body.allowedActions).not.toContain('cancel') // D2410: no cancel before the Finance stage
   })
 
   it('Draft edit (US-04): lines replaced, grand total recomputed, per-line audit with line_no', async () => {
@@ -327,13 +328,22 @@ describe('withdraw / cancel / reject / resubmit (US-04, US-06, G7, G8)', () => {
     expect(s.body.docNo).not.toBe(first)
   })
 
-  it('cancel a Draft with reason; Finance cancels an approved Pengajuan Baru; cancelled is terminal', async () => {
+  it('D2410: no cancel on a Draft or while waiting for approval; Finance cancels an approved Pengajuan Baru; cancelled is terminal', async () => {
     const c = await api('POST', E, w.users.staffA, draftBody(w))
-    expect((await api('POST', `${E}/${c.body.id}/cancel`, w.users.staffA, { reason: 'tidak jadi' })).body.status).toBe('cancelled')
-    expect((await api('POST', `${E}/${c.body.id}/submit`, w.users.staffA, {})).status).toBe(409)
+    expect((await api('POST', `${E}/${c.body.id}/cancel`, w.users.staffA, { reason: 'tidak jadi' })).status).toBe(403)
+    expect((await api('POST', `${E}/${c.body.id}/cancel`, w.users.finance, { reason: 'tidak jadi' })).status).toBe(409) // office role, wrong stage
+    const s = await api('POST', `${E}/${c.body.id}/submit`, w.users.staffA, {})
+    expect(s.body.status).toBe('pending_ack')
+    expect(s.body.allowedActions).toEqual(expect.arrayContaining(['withdraw']))
+    expect(s.body.allowedActions).not.toContain('cancel')
+    expect((await api('POST', `${E}/${c.body.id}/cancel`, w.users.staffA, { reason: 'tidak jadi' })).status).toBe(403)
+    expect((await api('POST', `${E}/${c.body.id}/cancel`, w.users.finance, { reason: 'tidak jadi' })).status).toBe(409)
+    expect((await api('GET', `${E}/${c.body.id}`, w.users.staffA)).body.status).toBe('pending_ack')
     const a = await approvedAdvance()
     expect((await api('POST', `${E}/${a.id}/cancel`, w.users.staffA, { reason: 'x batal' })).status).toBe(403)
+    expect((await api('POST', `${E}/${a.id}/cancel`, w.users.finance, { reason: 'ab' })).status).toBe(400) // reason ≥ 3 (G7)
     expect((await api('POST', `${E}/${a.id}/cancel`, w.users.finance, { reason: 'dobel' })).body).toMatchObject({ status: 'cancelled', cancelReason: 'dobel' })
+    expect((await api('POST', `${E}/${a.id}/submit`, w.users.staffA, {})).status).toBe(409)
   })
 })
 

@@ -324,3 +324,15 @@ the DB before first deploy is free; after deploy it needs dump/restore.
 - **2026-09-26 (E9, S3 track A):** §5 decided — hash chain **not** implemented for go-live (serialises every
   mutating transaction; verification tooling missing; superuser risk bounded by grants, triggers, backups, Loki);
   daily digest anchor proposed as a follow-up. Status stays accepted.
+
+## Amendment 2026-10-24 — Finance self-processing recorded, not refused (D2410)
+
+User decision 2026-10-24: a Finance user who is the requester or creator of a request may verify / reject its receipts,
+review its flags and process its LPJ / settlement. The F2e DB guards `receipts_self_verify_guard` and
+`receipt_flags_self_review_guard` (§2 "self-involvement guards") are dropped by
+`migrations/20261024_300100_d2410_finance_self_lpj.ts`; `pk_request_involves` stays. New action value
+**`self_processed`** (`20261024_300000_d2410_self_processed_enum`, `ADD VALUE` only): one row per such action, written
+in the action's own transaction (`requireActionAudited`), `field` = the action, `newValue = {action, status,
+selfProcessed: true, asRequester, asCreator}`, reason "diproses oleh pemohon sendiri (…)" — shown in "Log perubahan" /
+"Riwayat". Refused G1 decisions keep their `access_denied` rows.
+

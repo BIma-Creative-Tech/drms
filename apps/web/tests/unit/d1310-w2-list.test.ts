@@ -46,7 +46,9 @@ describe('multi-select URL values (list-query)', () => {
     expect(multiSummary(opts, [])).toBe('Semua')
     expect(multiSummary(opts, [], 'Semua PT')).toBe('Semua PT')
     expect(multiSummary(opts, ['r'])).toBe('Reimburse')
-    expect(multiSummary(opts, ['a', 'r'])).toBe('2 dipilih')
+    // D2410: every option ticked = no filter → "Semua"
+    expect(multiSummary(opts, ['a', 'r'])).toBe('Semua')
+    expect(multiSummary([...opts, { value: 'v', label: 'Vendor' }], ['a', 'r'])).toBe('2 dipilih')
     const rows = Array.from({ length: 45 }, (_, i) => i)
     expect(pageSlice(rows, 2, 20)).toMatchObject({ page: 2, pages: 3, from: 21, to: 40 })
     expect(pageSlice(rows, 9, 20)).toMatchObject({ page: 3, from: 41, to: 45 })

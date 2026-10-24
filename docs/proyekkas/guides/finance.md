@@ -52,6 +52,10 @@ Direktur yang dibuat Admin/Finance atas namanya ditolak saat dikirim — minta D
   di layar** → Konfirmasi.
 - Anda tidak bisa memutuskan pengajuan yang Anda buat/ajukan sendiri; bila Anda satu-satunya Finance, posisi
   Approval otomatis dilewati dan tercatat "(tidak berlaku — pemohon)".
+- **Sejak 24 Okt 2026:** verifikasi nota, flag, LPJ dan penyelesaian selisih **boleh** Anda lakukan juga pada
+  pengajuan yang Anda buat/ajukan sendiri (sebelumnya harus Finance lain). Setiap tindakan itu tercatat di Log
+  perubahan / Riwayat sebagai **"diproses oleh pemohon sendiri"**. Persetujuan (PM/Direktur/Owner) tetap tidak boleh
+  oleh pemohon/pembuat.
 - Beberapa PT: keputusan memakai peran Anda **di PT pengajuan**; warna merah Dampak anggaran memakai ambang PT itu.
 
 ## 2. Reimburse: verifikasi nota
@@ -94,6 +98,10 @@ tanggalnya menentukan periode (tutup buku) — **No. referensi bank**, **Bukti**
   bila dana memang ada (tercatat di Audit Log).
 - Salah catat? **Void transfer** (di bagian "Transfer tercatat — dapat dibatalkan" atau di detail pengajuan) + alasan:
   KK dibalik, pengajuan kembali ke antrian.
+- **Batalkan pengajuan** (alasan wajib) hanya ada pada **tahap Finance** (sejak 24 Okt 2026): Pengajuan Baru /
+  pembayaran vendor / antar-PT **Disetujui**; Reimburse **Disetujui**, **Nota Terverifikasi** atau **Revisi Nota** —
+  di Antrian Transfer atau di bar aksi detail pengajuan (juga bila Anda sendiri pemohonnya; satu tombol). Sebelum itu
+  tidak ada pembatalan oleh siapa pun; pemohon menarik kembali ke Draft.
 - Reimburse **Ditransfer**: bila pemohon sudah menerima dana tetapi belum menekan **Konfirmasi selesai**, Anda bisa
   menekannya di detail pengajuan (di bawah "Tahapan saat ini: Pemohon … atau Finance"). Tanpa itu pengajuan ditutup otomatis
   setelah batas hari di Setting perusahaan.
@@ -263,6 +271,11 @@ laporan. Bila lebih dari satu PT masuk laporan: kolom **PT** di setiap baris dan
 TOTAL). **Kop** laporan dan file unduhan: satu PT = kop PT itu; beberapa PT = kop grup (diatur Admin grup) + daftar PT.
 
 ## 8. Lain-lain
+
+- **Filter daftar (sejak 24 Okt 2026):** tanpa filter semua pilihan tampil **dicentang**; kotak **Semua** di atas daftar
+  pilihan mencentang semuanya (atau mengosongkan); semua dicentang = tanpa filter. Status **Menunggu persetujuan Owner**
+  tersedia di Keuangan › Pengajuan Biaya dan Laporan › Rekap Pengajuan; **Menunggu persetujuan Direktur** berarti
+  pengajuan menunggu langkah lain (Direktur / alur lama). Tautan Beranda "Pengajuan menunggu" mencentang keduanya.
 
 - **Pengajuan atas nama karyawan:** **+ Buat pengajuan** → Diajukan Oleh = karyawan tersebut (Anda tercatat
   sebagai "Dibuat Oleh"). Beri tahu karyawan secara langsung (tidak ada notifikasi otomatis).

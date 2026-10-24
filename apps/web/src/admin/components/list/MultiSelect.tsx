@@ -35,40 +35,70 @@ export function multiLabels(options: ReadonlyArray<MultiOption>, selected: reado
   return labels.length ? labels.join(', ') : empty
 }
 
-/** Button text: "Semua", the one label, or "2 dipilih". Pure, unit-tested. */
+/** Button text: "Semua" (nothing or every option selected — D2410), the one label, or "2 dipilih". Pure, unit-tested. */
 export function multiSummary(options: ReadonlyArray<MultiOption>, selected: readonly string[], allLabel = 'Semua'): string {
-  if (selected.length === 0) return allLabel
+  if (selected.length === 0 || isEveryOption(options, selected)) return allLabel
   if (selected.length === 1) return options.find((o) => o.value === selected[0])?.label ?? selected[0]!
   return `${selected.length} dipilih`
+}
+
+const isEveryOption = (options: ReadonlyArray<MultiOption>, selected: readonly string[]) => options.length > 0 && options.every((o) => selected.includes(o.value))
+
+/**
+ * D2410 (point 7) filter mode: the ticks shown for an applied filter — no filter (empty) = EVERY option ticked ("Semua").
+ * Pure, unit-tested.
+ */
+export function filterTicks(options: ReadonlyArray<MultiOption>, applied: readonly string[]): string[] {
+  return applied.length === 0 ? options.map((o) => o.value) : [...applied]
+}
+
+/**
+ * D2410 filter mode: the value to apply for the ticks, in option order — every option ticked (or none) = no filter
+ * (empty → the parameter is sent as ''). Pure, unit-tested.
+ */
+export function filterValue(options: ReadonlyArray<MultiOption>, ticks: readonly string[]): string[] {
+  const picked = options.map((o) => o.value).filter((v) => ticks.includes(v))
+  return picked.length === options.length ? [] : picked
+}
+
+/** Tri-state of the "Semua" box (like the PT switcher's "Semua PT saya"). Pure, unit-tested. */
+export function tickState(options: ReadonlyArray<MultiOption>, ticks: readonly string[]): 'all' | 'some' | 'none' {
+  const n = options.filter((o) => ticks.includes(o.value)).length
+  return n === 0 ? 'none' : n === options.length ? 'all' : 'some'
 }
 
 /**
  * DRMS 13/10 Umum #4 / #5 / Persetujuan #2: the checklist dropdown of every table filter — pick several values per
  * criterion. A button (aria-expanded) opens a panel with one checkbox per value (+ a search box from 8 values),
- * "Semua" (clear) and "Terapkan" (submit the enclosing GET form). Escape / a click outside closes and discards
+ * "Semua" and "Terapkan" (submit the enclosing GET form). Escape / a click outside closes and discards
  * unapplied ticks; focus returns to the button. Lives inside ListToolbar / the PkListView filter bar.
+ * D2410 (user 2026-10-24, point 7): no filter = every option ticked; "Semua" is a tri-state box above the options (as
+ * the PT switcher) that ticks every option (or clears them); every option ticked — or none — applies as no filter ('').
+ * Form mode ("Kosongkan") is unchanged.
  */
 export function MultiSelect({ name, label, options, value, allLabel = 'Semua', testKey, onChange, disabled, invalid }: Props) {
   const live = onChange !== undefined
   const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState<string[]>([...value])
+  const [draft, setDraft] = useState<string[]>(() => (live ? [...value] : filterTicks(options, value)))
   const [needle, setNeedle] = useState('')
   const rootRef = useRef<HTMLDivElement>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
   const hiddenRef = useRef<HTMLInputElement>(null)
   const panelId = useId()
   const applied = value.join(',')
+  // D2410: the ticks of the applied value (no filter = every option ticked)
+  const ticksOf = (v: string) => filterTicks(options, v ? v.split(',') : [])
   // the URL changed (applied here, elsewhere or Reset): the ticks follow it (state derived during render)
   const [seen, setSeen] = useState(applied)
   if (seen !== applied) {
     setSeen(applied)
-    setDraft(applied ? applied.split(',') : [])
+    setDraft(ticksOf(applied))
   }
 
   const close = (restoreFocus: boolean) => {
     setOpen(false)
     setNeedle('')
-    setDraft(applied ? applied.split(',') : [])
+    setDraft(ticksOf(applied))
     if (restoreFocus) btnRef.current?.focus()
   }
 
@@ -79,12 +109,12 @@ export function MultiSelect({ name, label, options, value, allLabel = 'Semua', t
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
         setOpen(false)
         setNeedle('')
-        setDraft(applied ? applied.split(',') : [])
+        setDraft(filterTicks(options, applied ? applied.split(',') : []))
       }
     }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
-  }, [open, applied])
+  }, [open, applied, options])
 
   // form mode: the panel floats (position fixed under the button) so a scrolling table (Akses PT matrix) does not clip
   // it; it closes when the page scrolls or resizes. Phones keep the bottom sheet of the CSS.
@@ -135,6 +165,13 @@ export function MultiSelect({ name, label, options, value, allLabel = 'Semua', t
   }
   const ticked = live ? value : draft
   const summary = live ? multiLabels(options, value, allLabel) : multiSummary(options, value, allLabel)
+  // D2410: a filter naming every option is no filter (an old link) — not marked active, no count
+  const filtering = value.length > 0 && (live || !isEveryOption(options, value))
+  const tri = tickState(options, draft)
+  const allBox = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (allBox.current) allBox.current.indeterminate = tri === 'some'
+  }, [tri, open])
 
   return (
     <div
@@ -159,14 +196,14 @@ export function MultiSelect({ name, label, options, value, allLabel = 'Semua', t
         aria-haspopup="true"
         aria-label={`${label}: ${summary}`}
         data-pk-filter-key={testKey ?? name}
-        data-active={value.length > 0 ? 'true' : undefined}
+        data-active={filtering ? 'true' : undefined}
         data-pk-multi-mode={live ? 'form' : undefined}
         disabled={disabled}
         data-invalid={invalid || undefined}
         onClick={() => (open ? close(false) : openPanel())}
       >
         <span className="pk-ms__value">{summary}</span>
-        {value.length > 1 && !live ? <span className="pk-ms__count" aria-hidden="true">{value.length}</span> : null}
+        {value.length > 1 && !live && filtering ? <span className="pk-ms__count" aria-hidden="true">{value.length}</span> : null}
         <span className="pk-ms__caret pk-caret" aria-hidden="true" />
       </button>
       {open ? (
@@ -186,11 +223,24 @@ export function MultiSelect({ name, label, options, value, allLabel = 'Semua', t
               autoFocus
             />
           ) : null}
+          {live ? null : (
+            <label className="pk-ms__opt pk-ms__all">
+              <input
+                ref={allBox}
+                type="checkbox"
+                checked={tri === 'all'}
+                onChange={() => setDraft(tri === 'all' ? [] : options.map((o) => o.value))}
+                autoFocus={options.length < SEARCH_FROM}
+                data-pk-multi-all
+              />
+              <span>{allLabel}</span>
+            </label>
+          )}
           <ul className="pk-ms__list">
             {shown.map((o, i) => (
               <li key={o.value}>
                 <label className="pk-ms__opt" title={o.title}>
-                  <input type="checkbox" checked={ticked.includes(o.value)} onChange={() => toggle(o.value)} autoFocus={options.length < SEARCH_FROM && i === 0} data-pk-multi-opt={o.value} />
+                  <input type="checkbox" checked={ticked.includes(o.value)} onChange={() => toggle(o.value)} autoFocus={live && options.length < SEARCH_FROM && i === 0} data-pk-multi-opt={o.value} />
                   <span>{o.label}</span>
                 </label>
               </li>
@@ -208,10 +258,7 @@ export function MultiSelect({ name, label, options, value, allLabel = 'Semua', t
             </div>
           ) : (
             <div className="pk-ms__foot">
-              <button type="button" className="pk-ltb__btn pk-ltb__btn--ghost" onClick={() => setDraft([])} disabled={draft.length === 0}>
-                {allLabel}
-              </button>
-              <button type="button" className="pk-ltb__btn pk-ltb__btn--primary" onClick={() => apply(draft)}>
+              <button type="button" className="pk-ltb__btn pk-ltb__btn--primary" onClick={() => apply(filterValue(options, draft))}>
                 Terapkan
               </button>
             </div>
