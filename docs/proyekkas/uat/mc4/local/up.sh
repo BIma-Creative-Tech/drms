@@ -1,7 +1,7 @@
 #!/bin/bash
 # MC4 UAT suite — LOCAL THROWAWAY stack to validate the suite (never staging/prod, no published ports).
 #   postgres 16.15 + Keycloak 26.7.4 (start-dev, realm from kc-realm.sh) + this worktree's app
-#   (next standalone build, node 24.21.0) on a private docker network; containers <prefix>-*.
+#   (next standalone build, node 24.22.1) on a private docker network; containers <prefix>-*.
 # Usage (repo root):  UAT_WORK=/path/outside/repo docs/proyekkas/uat/mc4/local/up.sh [build|db|kc|web|seed|all]
 #   UAT_WORK  scratch dir (mode 700): throwaway secrets (local.env), passwords (pw/<email>), media, outputs
 #   UAT_PREFIX container/network prefix (default pk-mc4uat2)
@@ -15,7 +15,7 @@ P=${UAT_PREFIX:-pk-mc4uat2}
 NET=$P-net
 REALM=drms-uat
 APP_URL=http://$P-web:3000
-NODE_IMG=node:24.21.0-bookworm-slim
+NODE_IMG=node:24.22.1-bookworm-slim
 PG_IMG=postgres:16.15-bookworm
 KC_IMG=quay.io/keycloak/keycloak:26.7.4
 HARDEN=(--cap-drop ALL --security-opt no-new-privileges:true)

@@ -3,10 +3,10 @@
 # Build context = repo root:
 #   docker build -f apps/web/Dockerfile --target runner  -t proyekkas-web:<ver> .
 #   docker build -f apps/web/Dockerfile --target migrate -t proyekkas-migrate:<ver> .
-# Base = control-plane pin: node:24.21.0-alpine (Alpine 3.24, musl 1.2.6 → sharp 0.35.4 prebuilt OK),
+# Base = control-plane pin: node:24.22.1-alpine (Alpine 3.24, musl 1.2.6 → sharp 0.35.4 prebuilt OK),
 # pinned by index digest (verified with `docker image inspect` / `docker manifest inspect`).
 # The Next build uses webpack (Turbopack was OOM-killed at 1.5/1.9 GiB, spike g) → build host ≥ 2 GiB.
-ARG NODE_IMAGE=node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
+ARG NODE_IMAGE=node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
 
 # ---- deps: full dependency tree (dev deps needed for build/migrate) ----
 FROM ${NODE_IMAGE} AS deps
