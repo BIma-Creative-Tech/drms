@@ -196,7 +196,7 @@ describe('D2410 offline sync: HM optional, old APK payload unchanged', () => {
     expect(r.status, JSON.stringify(r.body)).toBe(200)
     expect(r.body.results[0], JSON.stringify(r.body.results[0])).toMatchObject({ status: 'applied', rev: 1 })
     expect(r.body.results[0].server_unit_timesheet).toMatchObject({ hm_start: null, hm_end: null, hm_photo_media_id: null })
-    const half = await sync([item({ project_id: w.kontrak, unit_id: w.ex03, report_date: addDays(w.today, -1), hm_start: 5, work_hours: 1 }, { company_id: company })])
+    const half = await sync([item({ project_id: w.kontrak, unit_id: ex03, report_date: addDays(w.today, -1), hm_start: 5, work_hours: 1 }, { company_id: company })])
     expect(half.body.results[0]).toMatchObject({ status: 'rejected', errors: [{ code: 'VALIDATION' }] })
     const up = await uploadFieldPhoto(w.users.staffA)
     const edit = await sync([item({ timesheet_client_uuid: it1.client_uuid, hm_start: 1010, hm_end: 1017, hm_photo_media_id: up.id }, { company_id: company, base_rev: 1 })])

@@ -109,7 +109,7 @@ export function registerFieldPaths(registry: OpenAPIRegistry, h: Helpers): void 
     update: F.UnitTimesheetUpdate,
     correction: F.UnitTimesheetCorrection,
     createSummary:
-      'FR1 Timesheet harian unit: one per unit and date (409 DUPLICATE_DATE), unit in an active contract unit of the kontrak_unit project on that date (409 NOT_IN_CONTRACT), HM photo required; HM start ≠ previous HM end → flag HM_GAP; updates the unit\'s last HM',
+      'FR1 Timesheet harian unit: one per unit and date (409 DUPLICATE_DATE), unit in an active contract unit of the kontrak_unit project on that date (409 NOT_IN_CONTRACT); report date at most 14 days back — the PM of the project / the Direktur any date of the contract period (D2410); HM optional, both or none, the HM photo required with HM (D2410); HM start ≠ the previous recorded HM end → flag HM_GAP; updates the unit\'s last HM',
   })
   trio({
     path: '/aftersales-activities',
@@ -142,7 +142,7 @@ export function registerFieldPaths(registry: OpenAPIRegistry, h: Helpers): void 
   registry.registerPath({
     method: 'get',
     path: '/projects/{id}/contract-units',
-    summary: 'FR1 contract units of a project the caller may read; rate / minimum hours null unless Direktur, Finance or Admin of the PT',
+    summary: 'FR1 contract units of a project the caller may read; rate / minimum hours null unless Direktur, Finance or Admin of the PT; timesheetMinDate = the caller\'s earliest timesheet date on the project (D2410)',
     security: h.security,
     request: { headers: h.deviceHeader, params: idParam },
     responses: h.res(200, 'Contract units', F.ContractUnitList, [401, 404, 426]),
