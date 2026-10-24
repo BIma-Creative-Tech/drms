@@ -7,7 +7,7 @@ import type { z } from 'zod'
 import { employeeIn, memberCompanies, ownEmployees, relId, userId } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
 import { correctAttendance } from '@/domain/attendance/corrections'
-import { eligibleLocations, employeeAttendance, referenceSite, type EmployeeAttendance } from '@/domain/attendance/eligibility'
+import { eligibleLocations, employeeAttendance, type EmployeeAttendance } from '@/domain/attendance/eligibility'
 import { AttendanceReject, locationOf, recordWebAttendance, type Location } from '@/domain/attendance/record'
 import { employeeRecap, myRecap, teamTodayFor } from '@/domain/attendance/service'
 import { fileSize, mediaPath } from '@/lib/media-files'
@@ -84,10 +84,11 @@ export const teamTodayEndpoint = v1({
 /**
  * DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13): the caller's eligible check-in locations, per own employee in the
  * selected PTs (`?company=` narrows; the APK asks with every membership PT and caches the list for offline use).
- * Both types get every registered location of the PT with a point (OnSite must be inside one; Non-OnSite is recorded at
- * the containing one, else "Di luar area" referenced to `employees[].referenceSite` = home site, else head office).
- * Only id, kind, code, name, point, radius and the head-office / home flags — no money, no budgets. Read-only; the
- * check-in re-validates everything (domain/attendance/record.ts).
+ * Both types get every registered location of the PT with a point (projects, cost centers — ADR 0032: no site): OnSite
+ * must be inside the chosen one, Non-OnSite inside any of them (picked automatically; outside all → refused). Only id,
+ * kind, code, name, point and radius — no money, no budgets. `homeSiteId` / `referenceSite` / `isHeadOffice` / `home`
+ * stay in the answer for APK ≤ 0.11.1 and are always null / false. Read-only; the check-in re-validates everything
+ * (domain/attendance/record.ts).
  */
 export const attendanceLocationsEndpoint = v1({
   path: '/attendance/locations',
@@ -106,14 +107,9 @@ export const attendanceLocationsEndpoint = v1({
           if (emp && emp.company === c && emp.active) employees.push(emp)
         }
         const items = await eligibleLocations(req, employees)
-        const refs: Array<Awaited<ReturnType<typeof referenceSite>>> = []
-        for (const e of employees) refs.push(e.type === 'non_onsite' ? await referenceSite(req, e) : null)
         return {
-          employees: employees.map((e, i) => {
-            const r = refs[i]
-            return { id: e.id, company: e.company, attendanceType: e.type, homeSiteId: e.homeSite, referenceSite: r ? { id: r.id, code: r.code, name: r.name, lat: r.lat, lng: r.lng } : null }
-          }),
-          items: items.map((l) => ({ kind: l.kind, id: l.id, company: l.company, employeeId: l.employee, code: l.code, name: l.name, lat: l.lat, lng: l.lng, radiusM: l.radiusM, isHeadOffice: l.isHeadOffice, home: l.home })),
+          employees: employees.map((e) => ({ id: e.id, company: e.company, attendanceType: e.type, homeSiteId: null, referenceSite: null })),
+          items: items.map((l) => ({ kind: l.kind, id: l.id, company: l.company, employeeId: l.employee, code: l.code, name: l.name, lat: l.lat, lng: l.lng, radiusM: l.radiusM, isHeadOffice: false, home: false })),
         }
       }),
     )

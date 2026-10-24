@@ -14,7 +14,7 @@ import type { DayRecap, LocationDay, LocationRef, RecapSummary, TeamTodayRow } f
 import { classCounts, classifyDay, DAY_CLASSES, LEGEND, minutesText, monthWeeks, offsetText, shiftMonth, type DayClass } from '@/domain/attendance/calendar'
 import { attendanceContext, attendanceScope, employeeRef, narrowAttScope, narrowAttToCompanies, type AttScope } from '@/domain/attendance/queries'
 import { OUTSIDE_AREA_LABEL } from '@/domain/attendance/area'
-import { eligibleLocations, employeeAttendance, referenceSite, type EmployeeAttendance } from '@/domain/attendance/eligibility'
+import { eligibleLocations, employeeAttendance, type EmployeeAttendance } from '@/domain/attendance/eligibility'
 import { dayRowsAt } from '@/domain/attendance/record'
 import type { ScheduleSnapshot } from '@/domain/attendance/schedule'
 import { employeeRecap, myRecap, teamTodayFor, type MonthlyRecap, type TeamTodayResult } from '@/domain/attendance/service'
@@ -617,10 +617,10 @@ function Stamp({ loc, kind, d, tz }: { loc: LocationDay; kind: 'checkIn' | 'chec
 
 /**
  * Owner decision 2026-10-09: web self check-in/out, every role. DRMS 13/10 A2: the location list is every registered
- * location of the caller's PT(s) with its point (`eligibleLocations`), so the form can detect the area from the
- * browser GPS; a Non-OnSite employee also gets a "Di luar area" entry (reference = home site, else head office).
- * POST /attendance/check-in|check-out re-check everything (type rule, geofence for OnSite, Non-OnSite resolution,
- * company-settings.syncAttendanceEnabled, ADR 0018 privacy ack).
+ * location of the caller's PT(s) with its point (`eligibleLocations`: projects, cost centers — ADR 0032: no site), so
+ * the form can detect the area from the browser GPS. POST /attendance/check-in|check-out re-check everything (type
+ * rule: OnSite inside the chosen location, Non-OnSite inside any — outside all refused —, company-settings
+ * .syncAttendanceEnabled, ADR 0018 privacy ack).
  */
 export async function AbsensiAbsen(props: AdminViewServerProps) {
   const req = props.initPageResult.req
@@ -653,22 +653,8 @@ export async function AbsensiAbsen(props: AdminViewServerProps) {
           lat: l.lat,
           lng: l.lng,
           radiusM: l.radiusM,
-          ...(l.home ? { home: true } : {}),
-          ...(l.isHeadOffice ? { headOffice: true } : {}),
           ...(employees.find((e) => e.id === l.employee)?.type === 'non_onsite' ? { nonOnsite: true } : {}),
         })
-      }
-      // DRMS 13/10 A2 (owner 2026-10-14): Non-OnSite has no location restriction — "Di luar area" at the reference site
-      for (const e of employees) {
-        if (e.type !== 'non_onsite') continue
-        const ref = await referenceSite(req, e)
-        if (!ref) continue
-        const rows = await dayRowsAt(req, e.id, { type: 'site', id: ref.id }, ctx.today)
-        const at = (k: 'check_in' | 'check_out') => {
-          const r = rows.find((x) => x.kind === k)
-          return r ? formatServerTime(String(r.effective_time), ctx.timeZone) : null
-        }
-        locations.push({ type: 'site', id: ref.id, label: `${OUTSIDE_AREA_LABEL} (ref. ${ref.code} ${ref.name})`, checkIn: at('check_in'), checkOut: at('check_out'), outsideArea: true, nonOnsite: true })
       }
       const privacyBlocked = uid === undefined ? false : (await privacyAckCheck(req, uid)).required
       return { scope, locations, privacyBlocked }

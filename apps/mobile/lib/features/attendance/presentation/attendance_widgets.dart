@@ -29,7 +29,7 @@ class InfoCard extends StatelessWidget {
   }
 }
 
-/// `Project` / `Pusat biaya` / `Site` (ADR 0023).
+/// `Project` / `Pusat biaya` / `Site` (ADR 0023 — history only since ADR 0032).
 String siteKindLabel(AppLocalizations t, SiteKind kind) => switch (kind) {
   SiteKind.project => t.siteProject,
   SiteKind.costCenter => t.siteCostCenter,
@@ -43,62 +43,22 @@ IconData siteKindIcon(SiteKind kind) => switch (kind) {
   SiteKind.site => Icons.home_work,
 };
 
-/// Picker / history label: the location name, or — DRMS 13/10 A2 — `Di luar area (ref. HO — Kantor Pusat)`.
-String siteDisplayLabel(AppLocalizations t, ProjectSite s) =>
-    s.outsideArea ? '${t.attendanceOutsideArea} (ref. ${s.label})' : s.label;
+/// Picker / history label: the location name.
+String siteDisplayLabel(AppLocalizations t, ProjectSite s) => s.label;
 
 /// Day flags for display: `OUTSIDE_AREA` (DRMS 13/10 A2) as "Di luar area", other codes as sent.
 String flagsText(AppLocalizations t, List<String> flags) =>
     [for (final f in flags) f == 'OUTSIDE_AREA' ? t.attendanceOutsideArea : f].join(', ');
 
-/// Line under the picker: kind (Site penempatan / Kantor pusat / Project …) and radius, or the "Di luar area" hint.
+/// Line under the picker: kind (Project / Pusat biaya) and radius.
 String siteSubLabel(AppLocalizations t, ProjectSite site) {
-  if (site.outsideArea) return t.attendanceOutsideAreaHint;
-  final kind = site.home ? t.siteHome : (site.isHeadOffice ? t.siteHeadOffice : siteKindLabel(t, site.kind));
+  final kind = siteKindLabel(t, site.kind);
   final radius = site.radiusM;
   return radius == null ? kind : '$kind · ${t.attendanceRadius(radius.round())}';
 }
 
 /// `Project · P-01 — Gudang` / `Pusat biaya · Ops Palangka` / `Site · BPN — Cabang Balikpapan`.
 String siteLabel(AppLocalizations t, ProjectSite s) => '${siteKindLabel(t, s.kind)} · ${s.label}';
-
-/// "Penempatan" badge of the user's home site (ADR 0023, "Site penempatan").
-class HomeSiteBadge extends StatelessWidget {
-  const HomeSiteBadge({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      key: const Key('home-site-badge'),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(6)),
-      child: Text(
-        AppLocalizations.of(context).siteHomeBadge,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onPrimaryContainer),
-      ),
-    );
-  }
-}
-
-/// "Pusat" badge of the PT's head office (DRMS 13/10 A2, site flagged "Kantor pusat").
-class HeadOfficeBadge extends StatelessWidget {
-  const HeadOfficeBadge({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      key: const Key('head-office-badge'),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: scheme.secondaryContainer, borderRadius: BorderRadius.circular(6)),
-      child: Text(
-        AppLocalizations.of(context).siteHeadOfficeBadge,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onSecondaryContainer),
-      ),
-    );
-  }
-}
 
 /// Indonesian problem text of a client-side geofence check (null = inside).
 String? siteProblem(AppLocalizations t, ProjectSite site, ({SiteCheck check, int? distanceM}) res) =>

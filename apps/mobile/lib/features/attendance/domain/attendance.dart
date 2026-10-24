@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import '../../../core/location/location_service.dart';
-import '../../expense/data/expense_mappers.dart' show outsideAreaHintKey, selfiePlaceholderKey;
+import '../../expense/data/expense_mappers.dart' show selfiePlaceholderKey;
 import '../../masters/domain/master_item.dart';
 import '../../sync/domain/sync_models.dart';
 
@@ -17,8 +17,8 @@ enum AttendanceKind {
   static AttendanceKind? fromItemType(String t) => AttendanceKind.values.where((k) => k.itemType == t).firstOrNull;
 }
 
-/// Attendance location type (E6, Q-40): a project, a cost center ("pusat biaya", e.g. an office) or — ADR 0023 — a
-/// site (kantor cabang of the PT, `masters.sites`).
+/// Attendance location type (E6, Q-40): a project or a cost center ("pusat biaya", e.g. an office). `site` (ADR 0023
+/// kantor cabang) is history only since ADR 0032 (old outbox items, recap rows) — never offered as a location.
 enum SiteKind {
   project('project_id', 'project', 'p'),
   costCenter('cost_center_id', 'cost_center', 'c'),
@@ -43,9 +43,9 @@ enum SiteKind {
 }
 
 /// DRMS 13/10 A2: attendance type of the user's employee in a PT (`GET /attendance/locations` → `employees[]`).
-/// OnSite = inside a registered location of the PT with a point (no assignment; outside the radius refused);
-/// Non-OnSite = no location restriction (inside a registered location → that one, else "Di luar area" at the home
-/// site / head office). The server applies the same rule (apps/web/src/domain/attendance/area.ts).
+/// OnSite = inside the chosen registered location of the PT (no assignment; outside the radius refused); Non-OnSite
+/// (ADR 0032) = inside ANY registered location of the PT, picked automatically from the fix; outside all → refused (no
+/// "Di luar area" any more). The server applies the same rule (apps/web/src/domain/attendance/area.ts).
 enum AttendanceType {
   onsite('onsite'),
   nonOnsite('non_onsite');
@@ -72,7 +72,6 @@ class ProjectSite {
     this.team = false,
     this.isHeadOffice = false,
     this.attendanceType,
-    this.outsideArea = false,
   });
   final int id;
 
@@ -100,17 +99,14 @@ class ProjectSite {
   /// masters of a server before A2).
   final AttendanceType? attendanceType;
 
-  /// DRMS 13/10 A2: the "Di luar area" entry of a Non-OnSite employee — [id] is the reference site (home site, else the
-  /// head office), [label] its name; no geofence (any position is accepted, the server decides where it belongs).
-  final bool outsideArea;
-
-  /// Non-OnSite: any position may be recorded (no client-side geofence refusal).
+  /// Non-OnSite (ADR 0032): not bound to the chosen location — the check-in / check-out goes to the registered location
+  /// of the PT that contains the fix (nearest when several); outside all → refused (client hint + server).
   bool get unrestricted => attendanceType == AttendanceType.nonOnsite;
 
   bool get hasGeofence => lat != null && lng != null && radiusM != null;
 
-  /// Unique across the kinds (`p7`, `c3`, `s2`; "Di luar area" entry `o2`) — dropdown value.
-  String get key => outsideArea ? 'o$id' : '${kind.prefix}$id';
+  /// Unique across the kinds (`p7`, `c3`; legacy `s2`) — dropdown value.
+  String get key => '${kind.prefix}$id';
 
   static ProjectSite fromMaster(MasterItem m, {SiteKind kind = SiteKind.project}) {
     double? d(String k) => (m.extra[k] as num?)?.toDouble();
@@ -181,7 +177,7 @@ class AreaMatch {
 class AreaDetection {
   const AreaDetection({this.inside = const [], this.nearest});
 
-  /// Locations whose geofence contains the fix, nearest first (ties keep the list order: home site first).
+  /// Locations whose geofence contains the fix, nearest first (ties keep the list order).
   final List<AreaMatch> inside;
 
   /// Nearest location with a point (inside or not); null when none has a point.
@@ -228,8 +224,7 @@ AreaDetection detectArea(List<ProjectSite> sites, LocationFix fix) {
 
 /// `SyncAttendancePayload` (openapi) with the local selfie id in [selfiePlaceholderKey]; the sync engine
 /// uploads the selfie (`POST /media/selfies`) and replaces it with `selfie_media_id` just before sending.
-/// Exactly one of `project_id` / `cost_center_id` / `site_id` (E6, ADR 0023).
-/// DRMS 13/10 A2: a "Di luar area" item carries the local-only [outsideAreaHintKey] (history label; never sent).
+/// Exactly one of `project_id` / `cost_center_id` (E6; ADR 0032: no `site_id` any more).
 Map<String, dynamic> attendancePayload({
   required ProjectSite site,
   required LocationFix fix,
@@ -242,7 +237,6 @@ Map<String, dynamic> attendancePayload({
   'is_mocked': fix.isMocked,
   'camera_lens': 'front',
   selfiePlaceholderKey: selfieUuid,
-  if (site.outsideArea) outsideAreaHintKey: true,
 };
 
 /// Camera used by the PM for an on-behalf photo (the employee may stand in front of the PM's phone).
