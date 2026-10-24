@@ -10,8 +10,8 @@ import { type MigrateDownArgs, type MigrateUpArgs, sql } from '@payloadcms/db-po
  *   running assignment to (no duplicate row) — become its location: the row itself takes the first project (`project_id`
  *   set, `site_id` cleared: `team_assignments_location_one` holds) and one new row per further project is added with the
  *   same employee, role, start and end date;
- * - no such project and the row still running (no end date, or ending today or later): it is ended now
- *   (`end_date` = migration time, not before its start date);
+ * - no such project and the row still running (no end date, or an end date after the migration time): it is ended
+ *   now (`end_date` = migration time, not before its start date) — a second run sees it ended (idempotent);
  * - no such project and the row already ended: left as is (history; a site row is shown as "Site (lama)").
  *
  * Every change is logged: a RAISE NOTICE + payload logger line, and one `audit_logs` row (source `system`,
@@ -59,7 +59,7 @@ export async function up({ db, payload }: MigrateUpArgs): Promise<void> {
     $pk$;`)
   const rows = (await db.execute(sql`
     SELECT t.id, t.company_id, t.employee_id, t.site_id, t.role_in_project::text AS role_in_project, t.start_date, t.end_date,
-           (t.end_date IS NULL OR (t.end_date AT TIME ZONE 'Asia/Makassar')::date >= (now() AT TIME ZONE 'Asia/Makassar')::date) AS running
+           (t.end_date IS NULL OR t.end_date > greatest(now(), coalesce(t.start_date, now()))) AS running
       FROM team_assignments t
      WHERE t.site_id IS NOT NULL
      ORDER BY t.id`)) as unknown as { rows: SiteRow[] }

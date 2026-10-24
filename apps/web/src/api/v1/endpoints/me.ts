@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
-import { companyContextOf, exactRolesIn, exactRolesOf, membershipsOf, relId, userRoles, type Membership, type Role } from '@/access/roles'
+import { companyContextOf, exactRolesIn, exactRolesOf, membershipsOf, userRoles, type Membership, type Role } from '@/access/roles'
 import { appSettings, companyById, settings } from '@/domain/companies'
 import { isNoApprovalRule } from '@/domain/expense/decision'
 import { mayFileIntercompany } from '@/domain/expense/drafts'

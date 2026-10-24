@@ -14,7 +14,8 @@ import { ALL_ROLES, auditRows, companyId, getTestPayload, makeUser, sqlAs, type 
 let admin: TestUser & { _strategy: string }
 const ids: Record<string, number> = {}
 
-type Fixture = { create: () => Record<string, unknown>; update: Record<string, unknown>; field: string }
+/** `systemCreate`: the collection is closed for HTTP create (ADR 0032 sites) — created as a system write, audited `system`. */
+type Fixture = { create: () => Record<string, unknown>; update: Record<string, unknown>; field: string; systemCreate?: true }
 
 const fixtures: Record<string, Fixture> = {
   employees: { create: () => ({ code: 'AUD-EMP', name: 'Audit Emp' }), update: { position: 'Mandor' }, field: 'position' },
@@ -46,8 +47,8 @@ const fixtures: Record<string, Fixture> = {
   'budget-lines': { create: () => ({ project: ids.projects, category: ids['expense-categories'], amount: 1_000_000 }), update: { amount: 1_500_000 }, field: 'amount' },
   'cash-in-sources': { create: () => ({ code: 'AUD-CIS', name: 'CIS Audit' }), update: { name: 'CIS Audit 2' }, field: 'name' },
   'cost-centers': { create: () => ({ code: 'AUD-CC', name: 'CC Audit' }), update: { name: 'CC Audit 2' }, field: 'name' },
-  // ADR 0023
-  sites: { create: () => ({ code: 'AUD-SITE', name: 'Site Audit' }), update: { name: 'Site Audit 2' }, field: 'name' },
+  // ADR 0023 — ADR 0032: no create over HTTP any more (hidden legacy master); an update (deactivation) still audits
+  sites: { create: () => ({ code: 'AUD-SITE', name: 'Site Audit' }), update: { name: 'Site Audit 2' }, field: 'name', systemCreate: true },
   'team-assignments': { create: () => ({ employee: ids.employees, project: ids.projects, roleInProject: 'staff' }), update: { roleInProject: 'mandor' }, field: 'roleInProject' },
   'work-schedules': { create: () => ({ name: 'Shift Audit', startTime: '08:00', endTime: '17:00' }), update: { endTime: '16:30' }, field: 'endTime' },
   holidays: { create: () => ({ date: '2026-12-25', name: 'Natal' }), update: { name: 'Hari Natal' }, field: 'name' },
@@ -83,12 +84,15 @@ describe('every master collection is audited (create + update, same transaction)
   for (const [slug, fx] of Object.entries(fixtures)) {
     it(`${slug}: create rows + update row (old → new, reason, actor, web source)`, async () => {
       const p = await getTestPayload()
-      const created = await p.create({ collection: slug as CollectionSlug, data: fx.create() as never, user: admin, overrideAccess: false, depth: 0 })
+      const created = fx.systemCreate
+        ? await p.create({ collection: slug as CollectionSlug, data: fx.create() as never, overrideAccess: true /* SYSTEM-WRITE: closed for HTTP create (ADR 0032) */, depth: 0 })
+        : await p.create({ collection: slug as CollectionSlug, data: fx.create() as never, user: admin, overrideAccess: false, depth: 0 })
       ids[slug] = created.id as number
       const docType = (p.collections[slug as CollectionSlug].config.custom as { pkAudit: { docType: string } }).pkAudit.docType
       const afterCreate = await auditRows(docType, created.id)
       expect(afterCreate.length).toBeGreaterThan(0)
-      expect(afterCreate.every((r) => r.action === 'create' && r.source === 'web' && Number(r.user_id) === admin.id)).toBe(true)
+      if (fx.systemCreate) expect(afterCreate.every((r) => r.action === 'create' && r.source === 'system')).toBe(true)
+      else expect(afterCreate.every((r) => r.action === 'create' && r.source === 'web' && Number(r.user_id) === admin.id)).toBe(true)
       expect(new Set(afterCreate.map((r) => r.tx_id)).size).toBe(1) // one transaction
 
       await p.update({

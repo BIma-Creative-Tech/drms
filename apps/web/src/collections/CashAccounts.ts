@@ -6,7 +6,7 @@ import { reasonOnChange, reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, rupiahField, uuidField } from '@/fields/common'
 
 import { businessDateField } from './fields-f2'
-import { companyField, companyHook, lockedUntilCompany, legacySiteField, pickerSameCompany } from '@/fields/company'
+import { companyField, companyHook, legacySiteField } from '@/fields/company'
 import { validationError } from '@/lib/validation'
 
 /**
