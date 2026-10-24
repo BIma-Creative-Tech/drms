@@ -3,7 +3,6 @@ import type { PayloadRequest, Where } from 'payload'
 import { DEFAULT_TZ, startOfLocalDay } from '@/lib/time'
 
 import { membershipsOf, relId, userId } from './roles'
-import { NOT_DELETED } from '@/domain/soft-delete/where'
 
 /**
  * Scope data of the current user (architecture §7.1) PER PT (ADR 0016 §5), resolved once per
@@ -11,8 +10,7 @@ import { NOT_DELETED } from '@/domain/soft-delete/where'
  * - team      = projects of the PT with `pm = user`, or active `team-assignments` (roleInProject = pm)
  *               of the user's employee IN THAT PT; cost centers with `manager = user` or a pm assignment;
  * - assigned  = projects / cost centers of any active `team-assignments` of that employee.
- * - sites (ADR 0023): team = sites of a pm-role site assignment + sites of the team projects (on-behalf, Q-S5);
- *   assigned = sites of any active site assignment + the employee's home site ("Site penempatan") + team sites.
+ * ADR 0032: sites (ADR 0023) are no longer part of the scope (no team / assigned sites, no home site).
  * `companyId = null` = union over every selected PT (collections without a company column).
  */
 export type Scope = {
@@ -25,8 +23,6 @@ export type Scope = {
   assignedProjects: number[]
   teamCostCenters: number[]
   assignedCostCenters: number[]
-  teamSites: number[]
-  assignedSites: number[]
 }
 
 const EMPTY: Omit<Scope, 'userId' | 'companyId'> = {
@@ -36,8 +32,6 @@ const EMPTY: Omit<Scope, 'userId' | 'companyId'> = {
   assignedProjects: [],
   teamCostCenters: [],
   assignedCostCenters: [],
-  teamSites: [],
-  assignedSites: [],
 }
 
 /** A team assignment that is active now: started (or no start) and not ended before today. */
@@ -67,7 +61,7 @@ export async function employeesOnProjects(req: PayloadRequest, projectIds: reado
   return sortU((res.docs as Array<{ employee?: unknown }>).map((d) => relId(d.employee)).filter((e): e is number => e !== undefined))
 }
 
-type AssignmentRow = { project?: unknown; costCenter?: unknown; site?: unknown; roleInProject?: unknown }
+type AssignmentRow = { project?: unknown; costCenter?: unknown; roleInProject?: unknown }
 
 const sortU = (s: Iterable<number>) => [...new Set(s)].sort((a, b) => a - b)
 
@@ -92,7 +86,7 @@ export async function resolveScope(req: PayloadRequest, companyId: number | null
   const inCompany: Where = { company: { in: companies } }
 
   // SYSTEM-READ (overrideAccess): access functions must not recurse into access control.
-  const [pmProjects, managedCostCenters, assignments, homes] = await Promise.all([
+  const [pmProjects, managedCostCenters, assignments] = await Promise.all([
     req.payload.find({
       collection: 'projects',
       where: { and: [{ pm: { equals: uid } }, inCompany] },
@@ -120,19 +114,7 @@ export async function resolveScope(req: PayloadRequest, companyId: number | null
           },
           depth: 0,
           pagination: false,
-          select: { project: true, costCenter: true, site: true, roleInProject: true },
-          overrideAccess: true, // SYSTEM-READ: scope resolution
-          req,
-        }),
-    // ADR 0023: home site ("Site penempatan") of the user's employee(s)
-    employeeIds.length === 0
-      ? Promise.resolve({ docs: [] as Array<{ homeSite?: unknown }> })
-      : req.payload.find({
-          collection: 'employees',
-          where: { id: { in: employeeIds } },
-          depth: 0,
-          pagination: false,
-          select: { homeSite: true },
+          select: { project: true, costCenter: true, roleInProject: true },
           overrideAccess: true, // SYSTEM-READ: scope resolution
           req,
         }),
@@ -142,20 +124,9 @@ export async function resolveScope(req: PayloadRequest, companyId: number | null
   const assigned = new Set<number>()
   const teamCc = new Set<number>(managedCostCenters.docs.map((d) => d.id as number))
   const assignedCc = new Set<number>()
-  const teamSite = new Set<number>()
-  const assignedSite = new Set<number>()
-  for (const e of homes.docs as Array<{ homeSite?: unknown }>) {
-    const h = relId(e.homeSite)
-    if (h !== undefined) assignedSite.add(h)
-  }
   for (const a of assignments.docs as AssignmentRow[]) {
     const p = relId(a.project)
     const c = relId(a.costCenter)
-    const st = relId(a.site)
-    if (st !== undefined) {
-      assignedSite.add(st)
-      if (a.roleInProject === 'pm') teamSite.add(st)
-    }
     if (p !== undefined) {
       assigned.add(p)
       if (a.roleInProject === 'pm') team.add(p)
@@ -163,22 +134,6 @@ export async function resolveScope(req: PayloadRequest, companyId: number | null
     if (c !== undefined) {
       assignedCc.add(c)
       if (a.roleInProject === 'pm') teamCc.add(c)
-    }
-  }
-  // ADR 0023 Q-S5: the PM of a project of a site may record on-behalf at that site
-  if (team.size > 0) {
-    const ofTeam = await req.payload.find({
-      collection: 'projects',
-      where: { and: [{ id: { in: [...team] } }, { site: { exists: true } }, NOT_DELETED] },
-      depth: 0,
-      pagination: false,
-      select: { site: true },
-      overrideAccess: true, // SYSTEM-READ: scope resolution
-      req,
-    })
-    for (const d of ofTeam.docs as Array<{ site?: unknown }>) {
-      const st = relId(d.site)
-      if (st !== undefined) teamSite.add(st)
     }
   }
   const scope: Scope = {
@@ -190,8 +145,6 @@ export async function resolveScope(req: PayloadRequest, companyId: number | null
     assignedProjects: sortU([...assigned, ...team]),
     teamCostCenters: sortU(teamCc),
     assignedCostCenters: sortU([...assignedCc, ...teamCc]),
-    teamSites: sortU(teamSite),
-    assignedSites: sortU([...assignedSite, ...teamSite]),
   }
   cache[key] = scope
   return scope

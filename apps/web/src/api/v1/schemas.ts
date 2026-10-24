@@ -72,13 +72,8 @@ const EmployeeRef = z
     id: z.number().int(),
     code: z.string(),
     name: z.string(),
-    homeSite: z
-      .object({ id: z.number().int(), code: z.string(), name: z.string() })
-      .nullable()
-      .optional()
-      .meta({ description: 'ADR 0023: "Site penempatan" (kantor cabang) of the employee, null when none.' }),
   })
-  .meta({ id: 'EmployeeRef' })
+  .meta({ id: 'EmployeeRef', description: 'ADR 0032: no `homeSite` any more (sites removed from the product).' })
 
 export const MeCompany = z
   .object({
@@ -170,7 +165,7 @@ export const MASTER_TYPES = [
   'urgency-levels',
   // FR1 (ADR 0020 §2): customer picker of the aftersales activity log (Staff only on aftersales projects)
   'clients',
-  // ADR 0023: sites (kantor cabang) — attendance locations + per-caller `home` / `assigned` / `team`
+  // ADR 0023 sites — ADR 0032: removed from the product; kept so an APK ≤ 0.11.1 still gets an answer (always empty)
   'sites',
   // ADR 0027: vendor accounts — destination picker of a vendor payment (Finance / PM / Direktur / Admin read; Staff read
   // since the owner request 2026-10-16)

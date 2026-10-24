@@ -36,8 +36,6 @@ export const CostCenters: CollectionConfig = withAudit(
     },
     hooks: { beforeChange: [companyHook('cost-centers', { check: [{ field: 'manager', collection: 'users', member: true }] })] },
     fields: [
-      // ADR 0023 Q-S2: "Buat site dari pusat biaya" (sidebar link; no DB column, no API value)
-      { name: 'siteLink', type: 'ui', admin: { position: 'sidebar', components: { Field: '@/admin/components/SiteFromCostCenterLink#SiteFromCostCenterLink' } } },
       companyField(),
       codeField('Kode', 32, { perCompany: true }),
       { name: 'name', type: 'text', label: 'Nama', required: true, maxLength: 128 },

@@ -131,12 +131,6 @@ export const assignedCostCenters =
   async ({ scope }) =>
     inIds(field, (await scope()).assignedCostCenters)
 
-/** ADR 0023: records whose `field` (a site relationship) is in the user's team sites. */
-export const teamSites =
-  (field = 'site'): Rule =>
-  async ({ scope }) =>
-    inIds(field, (await scope()).teamSites)
-
 /** D1810 (owner 2026-10-18): records whose `field` (an employees relationship) is a member of one of the user's team projects. */
 export const teamProjectEmployees =
   (field = 'employee'): Rule =>

@@ -23,7 +23,7 @@ import { AttendanceCheckBody, AttendanceCorrectBody, AttendanceLocationsQuery, A
  * 2026-10-09, every role).
  * - GET  /attendance/me?month=YYYY-MM                 US-09 own monthly recap (any role with an employee)
  * - GET  /attendance/recap?employee_id=&month=        recap of an employee: PM team / Admin, Owner, Finance
- * - GET  /attendance/team-today?date=&project_id=&cost_center_id=&site_id=   US-13 (PM team; office roles all)
+ * - GET  /attendance/team-today?date=&project_id=&cost_center_id=   US-13 (PM team; office roles all)
  * - GET  /attendance/locations?company=              DRMS 13/10 A2: own eligible check-in locations (APK auto-detect)
  * - POST /attendance/check-in, /attendance/check-out  self-service web absen (every role)
  * - POST /attendance/{id}/correct {new_time, reason}  US-15 T10 (PM team / Admin; never own; idempotent)
@@ -74,7 +74,6 @@ export const teamTodayEndpoint = v1({
         date: q.data.date,
         projectId: q.data.project_id ? Number(q.data.project_id) : undefined,
         costCenterId: q.data.cost_center_id ? Number(q.data.cost_center_id) : undefined,
-        siteId: q.data.site_id ? Number(q.data.site_id) : undefined,
         companyIds,
       }),
     )

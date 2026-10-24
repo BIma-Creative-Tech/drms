@@ -29,7 +29,9 @@ export const NEED_EMPLOYEE_MESSAGE = 'Rekening butuh data karyawan di PT ini —
 export const SELF_DEACTIVATE_MESSAGE = 'Anda tidak dapat menonaktifkan akun Anda sendiri.'
 export const SELF_ADMIN_MESSAGE = 'Anda tidak dapat mencabut peran Admin Anda sendiri di PT ini (minta Admin lain).'
 export const NEED_EMPLOYEE_ASSIGNMENT_MESSAGE = 'Penugasan butuh data karyawan di PT ini — pilih atau buat data karyawan dulu (tab Data Karyawan).'
-export const ONE_LOCATION_MESSAGE = 'Pilih tepat satu lokasi: project, pusat biaya, ATAU site.'
+export const ONE_LOCATION_MESSAGE = 'Pilih tepat satu lokasi: project ATAU pusat biaya.'
+/** ADR 0032: no new site assignment (an APK ≤ 0.11.1 may still send `site`). */
+export const SITE_ASSIGNMENT_MESSAGE = 'Penugasan ke site tidak tersedia lagi. Pilih project atau pusat biaya.'
 export const END_BEFORE_START_MESSAGE = 'Tanggal selesai tidak boleh sebelum tanggal mulai.'
 export const ASSIGNMENT_FIXED_MESSAGE = 'Lokasi dan tanggal mulai penugasan yang tersimpan tidak dapat diubah — akhiri penugasan ini lalu tambah penugasan baru.'
 /** Same text as the collection rule (TeamAssignments reasonOnChange). */
@@ -90,7 +92,8 @@ export function validateOnboarding(input: OnboardingInput, mode: 'create' | 'upd
         if (locations > 0 || a.startDate !== undefined) errors.push({ path: aat, message: ASSIGNMENT_FIXED_MESSAGE })
         return
       }
-      if (locations !== 1) errors.push({ path: `${aat}.location`, message: ONE_LOCATION_MESSAGE })
+      if (a.site !== undefined) errors.push({ path: `${aat}.location`, message: SITE_ASSIGNMENT_MESSAGE })
+      else if (locations !== 1) errors.push({ path: `${aat}.location`, message: ONE_LOCATION_MESSAGE })
       if (a.startDate && a.endDate && a.endDate < a.startDate) errors.push({ path: `${aat}.endDate`, message: END_BEFORE_START_MESSAGE })
     })
   })

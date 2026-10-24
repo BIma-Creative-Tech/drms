@@ -40,7 +40,7 @@ export function registerProjectPaths(registry: OpenAPIRegistry, h: Helpers): voi
     method: 'get',
     path: '/sites',
     summary:
-      'ADR 0023: sites (kantor cabang) of the selected PTs (every member reads them; active only unless active=all) with the caller\'s flags home (Site penempatan), assigned (site assignment today) and team (PM on-behalf) — attendance location list',
+      'ADR 0023 sites — ADR 0032: sites are removed from the product; the endpoint stays for APK ≤ 0.11.1 and always answers an empty list',
     security: h.security,
     request: { headers: h.deviceHeader, query: P.SiteListQuery },
     responses: h.res(200, 'Sites', P.SiteList, [400, 401, 403, 426]),

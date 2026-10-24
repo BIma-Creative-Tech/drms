@@ -94,6 +94,7 @@ import * as migration_20261021_100000_d2110_pb_enums from './20261021_100000_d21
 import * as migration_20261021_100100_d2110_pb_schema from './20261021_100100_d2110_pb_schema';
 import * as migration_20261021_100200_d2110_pb_guard from './20261021_100200_d2110_pb_guard';
 import * as migration_20261022_100000_d2210_pb_fund from './20261022_100000_d2210_pb_fund';
+import * as migration_20261024_200000_d2410_site_assignments from './20261024_200000_d2410_site_assignments';
 
 export const migrations = [
   {
@@ -575,5 +576,10 @@ export const migrations = [
     up: migration_20261022_100000_d2210_pb_fund.up,
     down: migration_20261022_100000_d2210_pb_fund.down,
     name: '20261022_100000_d2210_pb_fund',
+  },
+  {
+    up: migration_20261024_200000_d2410_site_assignments.up,
+    down: migration_20261024_200000_d2410_site_assignments.down,
+    name: '20261024_200000_d2410_site_assignments',
   },
 ];

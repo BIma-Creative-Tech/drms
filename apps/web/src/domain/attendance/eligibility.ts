@@ -61,11 +61,7 @@ async function locationRows(req: PayloadRequest, company: number): Promise<LocRo
   return rows<LocRow>(
     req,
     sql`
-    SELECT 'site' AS kind, s.id, s.code, s.name, s.lat, s.lng, s.radius_m, s.is_head_office
-    FROM sites s
-    WHERE s.company_id = ${company} AND s.active IS NOT FALSE AND s.lat IS NOT NULL AND s.lng IS NOT NULL
-    UNION ALL
-    SELECT 'project', p.id, p.code, p.name, p.lat, p.lng, p.radius_m, FALSE
+    SELECT 'project' AS kind, p.id, p.code, p.name, p.lat, p.lng, p.radius_m, FALSE AS is_head_office
     FROM projects p
     WHERE p.company_id = ${company} AND coalesce(p.status::text, '') NOT IN ('arsip', 'dibatalkan') AND p.is_deleted IS NOT TRUE AND p.lat IS NOT NULL AND p.lng IS NOT NULL
     UNION ALL

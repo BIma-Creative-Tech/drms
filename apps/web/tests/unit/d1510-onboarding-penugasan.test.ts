@@ -14,6 +14,7 @@ import {
   NO_ROLE_MESSAGE,
   ONE_LOCATION_MESSAGE,
   ownerAfterSave,
+  SITE_ASSIGNMENT_MESSAGE,
   savedAssignmentErrors,
   validateOnboarding,
   type AssignmentInput,
@@ -38,8 +39,8 @@ describe('rules: assignments in validateOnboarding', () => {
     expect(validateOnboarding({ companies: [{ company: 1, roles: ['pk-staff'], employee: { code: 'K1', name: 'X' }, assignments: [{ project: 5, roleInProject: 'staff' }] }] }, 'create')).toEqual([])
     // the stored employee too; unlinking it in the same save is not
     const stored = new Map([[1, member(9)]])
-    expect(validateOnboarding({ companies: [{ company: 1, roles: ['pk-staff'], assignments: [{ site: 3, roleInProject: 'mandor' }] }] }, 'update', stored)).toEqual([])
-    expect(validateOnboarding({ companies: [{ company: 1, roles: ['pk-staff'], employee: null, assignments: [{ site: 3, roleInProject: 'mandor' }] }] }, 'update', stored).map((e) => e.path)).toEqual(['companies.0.assignments.0'])
+    expect(validateOnboarding({ companies: [{ company: 1, roles: ['pk-staff'], assignments: [{ costCenter: 3, roleInProject: 'mandor' }] }] }, 'update', stored)).toEqual([])
+    expect(validateOnboarding({ companies: [{ company: 1, roles: ['pk-staff'], employee: null, assignments: [{ costCenter: 3, roleInProject: 'mandor' }] }] }, 'update', stored).map((e) => e.path)).toEqual(['companies.0.assignments.0'])
     // a PT without membership and without a role cannot carry assignments
     expect(validateOnboarding({ companies: [{ company: 2, roles: [], employee: { id: 4 }, assignments: [{ project: 5, roleInProject: 'staff' }] }] }, 'update')).toContainEqual({ path: 'companies.0.roles', message: NO_ROLE_MESSAGE })
   })
@@ -51,7 +52,8 @@ describe('rules: assignments in validateOnboarding', () => {
     expect(v({ project: 1, costCenter: 2 })).toEqual([{ path: 'companies.0.assignments.0.location', message: ONE_LOCATION_MESSAGE }])
     expect(v({ costCenter: 2, startDate: '2026-10-15', endDate: '2026-10-14' })).toEqual([{ path: 'companies.0.assignments.0.endDate', message: END_BEFORE_START_MESSAGE }])
     expect(v({ costCenter: 2, startDate: '2026-10-15', endDate: '2026-10-15' })).toEqual([])
-    expect(v({ site: 2, endDate: '2026-10-01' })).toEqual([])
+    // ADR 0032: no new site assignment (an old APK may still send one)
+    expect(v({ site: 2, endDate: '2026-10-01' })).toEqual([{ path: 'companies.0.assignments.0.location', message: SITE_ASSIGNMENT_MESSAGE }])
   })
 
   it('a saved row (id) changes only role and end date', () => {
@@ -123,7 +125,7 @@ describe('service: collection errors of an assignment → body paths', () => {
 
 // ---- client form state ----------------------------------------------------------------------------------------
 
-const choices = { projects: [{ id: 51, code: 'P-01', name: 'Gedung A' }], costCenters: [{ id: 61, code: 'CC-1', name: 'Ops' }], sites: [{ id: 71, code: 'S-1', name: 'Cabang' }] }
+const choices = { projects: [{ id: 51, code: 'P-01', name: 'Gedung A' }], costCenters: [{ id: 61, code: 'CC-1', name: 'Ops' }], sites: [] }
 const detail: OnboardingDetail = {
   user: { id: 7, email: 'rina@example.test', name: 'Rina', phone: null, active: true, groupAdmin: false, identityEditable: true },
   banks: [],
@@ -157,11 +159,11 @@ describe('form: assignments draft → body', () => {
   it('edit: a new row + ending a saved one (reason needed), with their order', () => {
     const d = draftFromDetail(detail)
     d.companies['1']!.asg[0]!.endDate = '2026-10-31'
-    d.companies['1']!.asg.push({ ...newAssignment('n1', '2026-11-01'), kind: 'site', location: 71, roleInProject: 'mandor' })
+    d.companies['1']!.asg.push({ ...newAssignment('n1', '2026-11-01'), kind: 'costCenter', location: 61, roleInProject: 'mandor' })
     const r = buildBody(detail, d, 'update')
     expect(r.needsReason).toBe(true)
     expect(r.body.companies).toEqual([
-      { company: 1, roles: ['pk-staff'], assignments: [{ id: 81, roleInProject: 'staff', endDate: '2026-10-31' }, { site: 71, roleInProject: 'mandor', startDate: '2026-11-01' }] },
+      { company: 1, roles: ['pk-staff'], assignments: [{ id: 81, roleInProject: 'staff', endDate: '2026-10-31' }, { costCenter: 61, roleInProject: 'mandor', startDate: '2026-11-01' }] },
     ])
     expect(r.order.asg).toEqual({ 0: ['a81', 'n1'] })
     // clearing the end date again = unchanged

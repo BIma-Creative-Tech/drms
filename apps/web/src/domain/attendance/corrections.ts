@@ -74,7 +74,7 @@ export async function correctAttendance(req: PayloadRequest, attendanceId: numbe
 
   const project = relId(att.project)
   const costCenter = relId(att.costCenter)
-  // ADR 0023: a site check-in has neither project nor cost center (a project row also carries its project's site)
+  // ADR 0023: a (legacy) site check-in has neither project nor cost center; ADR 0032: only the Admin corrects those
   const site = project === undefined && costCenter === undefined ? relId(att.site) : undefined
   // ADR 0016 §5: every role check IN THE ATTENDANCE's PT (Admin of PT A is nobody in PT B)
   const company = relId((att as { company?: unknown }).company)
@@ -85,7 +85,7 @@ export async function correctAttendance(req: PayloadRequest, attendanceId: numbe
     const scope = hasRole(req, 'pk-pm', company) ? await resolveScope(req, company ?? null) : null
     const inTeam =
       !!scope &&
-      ((project !== undefined && scope.teamProjects.includes(project)) || (costCenter !== undefined && scope.teamCostCenters.includes(costCenter)) || (site !== undefined && scope.teamSites.includes(site)))
+      ((project !== undefined && scope.teamProjects.includes(project)) || (costCenter !== undefined && scope.teamCostCenters.includes(costCenter)))
     if (!inTeam) {
       // Readable (office roles of that PT) → 403 + audit; not readable at all (other team / PT, staff) → 404, no existence leak.
       if (hasRole(req, ['pk-owner', 'pk-finance'], company)) await deny(req, attendanceId, 'Koreksi absensi hanya oleh PM tim atau Admin.')

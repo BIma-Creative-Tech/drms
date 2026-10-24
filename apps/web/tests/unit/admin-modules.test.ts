@@ -29,7 +29,8 @@ beforeAll(async () => {
   config = await (await import('@/payload.config')).default
 })
 
-const INTERNAL = (slug: string) => slug.startsWith('payload-')
+// ADR 0032: `sites` is a hidden legacy collection (no menu, no create) — kept for history / old APKs only
+const INTERNAL = (slug: string) => slug.startsWith('payload-') || slug === 'sites'
 
 /** Same rule as @payloadcms/ui getVisibleEntities (3.90.1): hidden fn(user) / boolean. */
 function visibleFor(user: unknown) {

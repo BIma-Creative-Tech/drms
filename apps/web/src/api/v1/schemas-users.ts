@@ -54,7 +54,7 @@ export const OnboardingBankAccountInput = z
 /** DRMS 15/10: team assignment of THIS PT's employee (collection `team-assignments`, its hooks stay the guard). */
 export const OnboardingAssignmentInput = z
   .object({
-    id: id.optional().meta({ description: 'Existing assignment of this PT\'s employee: only roleInProject and endDate change (reason required). Omitted = a NEW assignment (exactly one of project / costCenter / site).' }),
+    id: id.optional().meta({ description: 'Existing assignment of this PT\'s employee: only roleInProject and endDate change (reason required). Omitted = a NEW assignment (exactly one of project / costCenter; ADR 0032: `site` is refused).' }),
     project: id.optional(),
     costCenter: id.optional(),
     site: id.optional(),
@@ -148,8 +148,8 @@ export const UserOnboardingDetail = z
           .array(z.object({ id, kind: z.enum(['project', 'costCenter', 'site']).nullable(), label: z.string(), roleInProject: z.string(), startDate: z.string().nullable(), endDate: z.string().nullable() }))
           .meta({ description: 'Team assignments of the linked employee.' }),
         assignmentChoices: z
-          .object({ projects: z.array(Choice), costCenters: z.array(Choice), sites: z.array(Choice) })
-          .meta({ description: 'Selectable locations of a NEW assignment: active projects (not selesai / arsip), cost centers and sites of this PT, read with the caller\'s access.' }),
+          .object({ projects: z.array(Choice), costCenters: z.array(Choice), sites: z.array(Choice).meta({ description: 'ADR 0032: always empty (sites removed; kept for APK ≤ 0.11.1).' }) })
+          .meta({ description: 'Selectable locations of a NEW assignment: active projects (not selesai / arsip) and cost centers of this PT, read with the caller\'s access.' }),
       }),
     ),
     banks: z.array(z.object({ id, name: z.string() })),

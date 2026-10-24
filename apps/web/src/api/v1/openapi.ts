@@ -365,7 +365,6 @@ export function buildOpenApiDocument(version: string) {
       query: z.object({
         asOf: z.string().optional(),
         company: F.CompanyFilterQuery.shape.company,
-        site: z.string().regex(/^\d{1,9}$/).optional().meta({ description: 'ADR 0023: only the accounts flagged with this site.' }),
       }),
     },
     responses: res(200, 'Balances', F.Balances, [400, 401, 403]),
@@ -622,7 +621,7 @@ export function buildOpenApiDocument(version: string) {
       path: `/dashboard/${name}`,
       summary,
       security,
-      request: { headers: deviceHeader, ...(['owner', 'finance', 'pm'].includes(name) ? { query: R.DashboardQuery } : {}) },
+      request: { headers: deviceHeader },
       responses: res(200, 'Dashboard', schema, [400, 401, 403, 426, 429]),
     })
   dash('owner', 'Owner home: cash (K-01, K-02b), budgets (K-07/K-08), completeness (K-12), approvals (K-10), cost centers (K-15), transfer queue (K-11), SLA transfer, inter-project loans, RAP monitoring, projects with a RAB but no RAP', R.OwnerDashboard)

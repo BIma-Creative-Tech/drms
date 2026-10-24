@@ -655,7 +655,6 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
     final c = widget.company;
     final options = switch (_kind) {
       'costCenter' => c.costCenters(),
-      'site' => c.sites(),
       _ => c.projects(),
     };
     return Padding(
@@ -668,8 +667,8 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
           SegmentedButton<String>(
             segments: [
               ButtonSegment(value: 'project', label: Text(t.cashProject)),
+              // ADR 0032: no site option any more (sites removed from the product)
               ButtonSegment(value: 'costCenter', label: Text(t.cashCostCenter)),
-              ButtonSegment(value: 'site', label: Text(t.onbSite)),
             ],
             selected: {_kind},
             onSelectionChanged: (s) => setState(() {
