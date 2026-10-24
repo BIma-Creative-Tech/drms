@@ -244,7 +244,7 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
               const SizedBox(height: 16),
               FilledButton.icon(
                 key: const Key('on-behalf-submit'),
-                onPressed: canSubmit ? () => _record(who!, site!) : null,
+                onPressed: canSubmit ? () => _record(who, site) : null,
                 icon: _busy
                     ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.how_to_reg),
