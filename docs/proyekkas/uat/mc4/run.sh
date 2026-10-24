@@ -17,7 +17,7 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 P=${UAT_PREFIX:-pk-mc4uat}
 NET=${UAT_NETWORK:-bridge}
-NODE_IMG=node:24.21.0-bookworm-slim
+NODE_IMG=node:24.22.1-bookworm-slim
 PW_IMG=mcr.microsoft.com/playwright:v1.55.0-noble
 mkdir -p "$UAT_OUT"
 ENVS=(-e UAT_TARGET -e UAT_APP_URL -e UAT_KC_URL -e UAT_REALM -e UAT_PW_DIR=/uat/pw -e UAT_OUT=/uat/out)
