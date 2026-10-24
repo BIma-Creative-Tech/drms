@@ -69,6 +69,7 @@ describe('d2210 fund check: Pusat Biaya first, then PT', () => {
 
   it('migration wiring: in timestamp order after the 0.19.0 migrations, every name once', () => {
     const names = migrations.map((m) => m.name)
+    // later migrations follow it (2026-10-24: 20261024_4x0000_d2410_* replace pk_pb_commitments)
     expect(names.indexOf('20261022_100000_d2210_pb_fund')).toBeGreaterThan(names.indexOf('20261021_100200_d2110_pb_guard'))
     expect([...names].sort()).toEqual(names)
     expect(new Set(names).size).toBe(names.length)

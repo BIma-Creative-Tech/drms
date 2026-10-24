@@ -2602,7 +2602,7 @@
   "loanNewTitle": "Ajukan pinjaman antar project",
   "loanEditTitle": "Ubah draft pinjaman",
   "loanNotEditable": "Pinjaman ini sudah tidak bisa diubah (bukan Draft lagi atau bukan milik Anda).",
-  "loanNoBorrower": "Pinjaman antar project diajukan oleh PM project peminjam. Anda belum menjadi PM project yang aktif.",
+  "loanNoBorrower": "Pinjaman antar project diajukan oleh PM project peminjam atau Finance. Anda belum menjadi PM project yang aktif.",
   "loanBorrower": "Project peminjam",
   "loanLender": "Project pemberi pinjaman",
   "loanKind": "Jenis",
@@ -2635,7 +2635,7 @@
       }
     }
   },
-  "loanApproveBody": "{borrower} meminjam {amount} dari {lender}. Bila pusat biaya kedua project berbeda (dana), Finance mencairkan dana: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat biaya peminjam.",
+  "loanApproveBody": "{borrower} meminjam {amount} dari {lender}. Persetujuan Direktur lalu Owner; untuk dana, Finance kemudian mentransfer lewat Antrian Transfer: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat biaya peminjam.",
   "@loanApproveBody": {
     "placeholders": {
       "borrower": {
@@ -4472,11 +4472,11 @@
       }
     }
   },
-  "loanCashWaiting": "Menunggu pencairan Finance",
+  "loanCashWaiting": "Menunggu transfer Finance (Antrian Transfer)",
   "loanCashCancelled": "Dibatalkan (jurnal balik)",
-  "loanCashTbd": "Ditentukan saat disetujui (dana antar pusat biaya berbeda → dicairkan Finance)",
-  "loanCashNone": "Tanpa transaksi kas (barang, atau pusat biaya sama)",
-  "loanAwaitingDisbursement": "Disetujui — menunggu Finance mencairkan dana dari {lender} ke {borrower}.",
+  "loanCashTbd": "Ditentukan saat disetujui (dana → ditransfer Finance lewat Antrian Transfer)",
+  "loanCashNone": "Tanpa transaksi kas (barang, atau pinjaman lama dengan pusat biaya sama)",
+  "loanAwaitingDisbursement": "Disetujui — menunggu Finance mentransfer dana dari {lender} ke {borrower} lewat Antrian Transfer.",
   "@loanAwaitingDisbursement": {
     "placeholders": {
       "lender": {
@@ -4487,7 +4487,7 @@
       }
     }
   },
-  "loanStepDisburse": "Pencairan Finance",
+  "loanStepDisburse": "Transfer Finance",
   "loanStepDisbursed": "Dicairkan",
   "loanStepAutomatic": "Otomatis dari transfer {no}",
   "@loanStepAutomatic": {
@@ -4531,5 +4531,150 @@
   "attachmentTypeInvalid": "Pilih file JPG, PNG atau PDF.",
   "attachmentPdfTooLarge": "File PDF lebih dari 5 MB. Perkecil file-nya atau lampirkan sebagai foto.",
   "attachmentPdfInvalid": "File PDF tidak valid.",
-  "attachmentTooLarge": "File terlalu besar (maks. 15 MB)."
+  "attachmentTooLarge": "File terlalu besar (maks. 15 MB).",
+  "loanStepOwner": "Persetujuan Owner",
+  "loanStepSubmittedFinance": "Diajukan Finance",
+  "loanOpenTransferQueue": "Buka Antrian Transfer",
+  "loanRepayRequest": "Ajukan pengembalian",
+  "loanRepayRequestTitle": "Ajukan pengembalian {title}",
+  "@loanRepayRequestTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepayRequestHint": "Disetujui Direktur lalu Owner, kemudian ditransfer Finance lewat Antrian Transfer (kas keluar dari pusat biaya peminjam, kas masuk ke pusat biaya pemberi).",
+  "loanRepayable": "Dapat diajukan {amount}",
+  "@loanRepayable": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepayPlannedDate": "Rencana tanggal pengembalian",
+  "loanRepayRequested": "Pengembalian {amount} diajukan ke Direktur.",
+  "@loanRepayRequested": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepayPlannedOn": "rencana {date}",
+  "@loanRepayPlannedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "loanSubmittedBy": "diajukan {name}",
+  "@loanSubmittedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepaymentExecutedBy": "ditransfer {name}",
+  "@loanRepaymentExecutedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepaymentRejected": "Ditolak: {reason}",
+  "@loanRepaymentRejected": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepaymentCancelled": "Dibatalkan: {reason}",
+  "@loanRepaymentCancelled": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepaymentApproveTitle": "Setujui pengembalian {amount}?",
+  "@loanRepaymentApproveTitle": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepaymentApproveBody": "Setelah persetujuan Owner, Finance mentransfer dari pusat biaya peminjam ke pusat biaya pemberi lewat Antrian Transfer.",
+  "loanRepaymentRejectTitle": "Tolak pengembalian {amount}?",
+  "@loanRepaymentRejectTitle": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepaymentCancelTitle": "Batalkan pengembalian {amount}?",
+  "@loanRepaymentCancelTitle": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepaymentCancelBody": "Pengajuan pengembalian dibatalkan (tidak dihapus). Alasan wajib.",
+  "loanRepaymentInboxTitle": "Pengembalian pinjaman {no}",
+  "@loanRepaymentInboxTitle": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "loanTransferOrdersTitle": "Transfer pinjaman antar project ({count})",
+  "@loanTransferOrdersTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "loanTransferOrderSelf": "Anda yang mengajukan; boleh dieksekusi sendiri (tercatat di audit).",
+  "loanTransferOrderExecute": "Catat transfer",
+  "loanTransferOrderExecuteTitle": "Catat transfer {no}",
+  "@loanTransferOrderExecuteTitle": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "loanTransferOrderExecuteBody": "Kas keluar {amount} dari {from} dan kas masuk ke {to}, masing-masing ditandai project-nya. Bukti transfer dapat dilampirkan di web.",
+  "@loanTransferOrderExecuteBody": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "loanTransferOrderDate": "Tanggal transfer",
+  "loanTransferOrderDone": "Transfer {no} tercatat.",
+  "@loanTransferOrderDone": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  }
 }

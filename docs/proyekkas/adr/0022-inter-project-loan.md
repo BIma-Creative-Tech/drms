@@ -287,3 +287,44 @@ projects with different Pusat Biaya posts KK on the lender account and KM on the
 disburses it ("Cairkan"), and every repayment posts the mirror pair (Finance only). Goods, or two projects on the same
 account, stay a notional claim (option B). A transfer paid from an account other than the project's Pusat Biaya creates
 an automatic, approved loan whose lender is that account (`origin = 'transfer'`). See ADR 0031.
+
+## Amendment 2026-10-24 (DRMS 24/10 #10–#12)
+
+User decisions 2026-10-24 amend §3 (who files), §4 (approval), §7 (repayments); details of the cash side in
+[ADR 0031](0031-pusat-biaya-akun-kas.md) "Amendment 2026-10-24".
+
+- **§3 Who files.** The borrower project's PM **or a Finance user of the PT** (`pk-finance`) creates and submits a manual
+  loan. Finance picks borrower and lender among the PT's open projects (`GET /project-loans/options` lists them).
+  `project_loans.submitter_role` records `pm` | `finance`, frozen at create; the DB insert guard checks that the creator
+  holds that role in the PT (`pm` = pk-pm **and** `projects.pm` of the borrower). Existing loans keep NULL (= PM, the
+  only filer before). The Direktur / Admin / Owner still never file.
+- **§4 Approval: two levels.** Level 1 = Direktur (STORED `pk-owner`), level 2 = Owner (STORED `pk-principal`); the
+  Owner's implied Direktur role (ADR 0026) never decides level 1. `project_loans.approval_level` = the level a pending
+  loan waits at; status text "Menunggu persetujuan Direktur" / "Menunggu persetujuan Owner". Reject with a reason at
+  either level ends the loan. Only the Owner's approval sets `approved` (and freezes the accounts, ADR 0031).
+  - **G1:** the creator never decides. The narrow `direktur_self` (creator PM = the PT's only Direktur) stays as it was,
+    **for level 1 only**; level 2 has no exception. One person never holds both levels (one decision position per
+    person, existing unique index); the last Owner who could still take level 2 does not decide level 1.
+  - **Pools at submit** (`decisionPools`): Direktur pool as before; Owner pool = active Owners minus the creator.
+    No Owner → 409 `NO_OWNER` "PT ini belum punya Owner aktif …" (like an expense request, ADR 0026); the single
+    Direktur being the single Owner → 409 `SAME_PERSON`. At the level-1 approval the Owner pool is re-checked (409
+    `NO_OWNER` when it became empty).
+  - **Notifications:** `project_loan.pending` (Direktur pool) → `project_loan.pending_owner` (Owner pool) →
+    `project_loan.approved` (creator, lender PM, borrower PM) + `project_loan.disburse_pending` (Finance, transfer
+    order); `project_loan.filed` tells the borrower PM about a loan Finance filed.
+  - **DB:** `pk_approvals_before_insert` — a loan decision is level 1 by a stored Direktur or level 2 by a stored Owner
+    after an approved level 1 of the cycle; `pk_project_loans_guard` — level 0 → 1 only at submit, 1 → 2 only after the
+    approved level-1 row, `approved` only at level 2 after the approved level-2 row, `rejected` only with the rejection
+    row of the current level (migration `20261024_400300_d2410_loan_guard`).
+- **§7 Repayments.** A **claim** (goods) is still recorded at once by the borrower PM or Finance, without approval. A
+  repayment of a **cash-backed** loan is a **request**: the borrower PM or Finance submits amount (≤ outstanding minus
+  the requests not executed yet) + planned date (≥ loan date, may be in the future) + note → Direktur → Owner (same G1,
+  no `direktur_self`: the submitter never decides) → transfer order executed by Finance (ADR 0031). Statuses
+  `pending_approval` → `approved` → `posted` (= executed; every existing repayment is `posted`, no data change), or
+  `rejected` / `cancelled` (reasons). The submitter cancels while pending; Finance or the submitter cancels an approved
+  order before its execution. Void of a posted repayment unchanged (Finance only when cash moved). Decision rows:
+  `approvals.doc_type = project_loan_repayment` + `loan_repayment_id` (own unique indexes).
+- **In-flight data** (`20261024_400200_d2410_loan_data`, audited): a loan pending at the single Direktur level gets
+  `approval_level = 1` and follows the new path (the Direktur's approval no longer finalises it). Approved loans keep
+  their approval; a cash-backed one not yet disbursed appears as a transfer order (ADR 0031). Overdue reminders, due
+  dates, automatic loans (origin `transfer`, created approved) and inter-PT loans (ADR 0029) are unchanged.

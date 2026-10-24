@@ -8,6 +8,7 @@ import 'package:proyekkas/features/auth/domain/user_profile.dart';
 import 'package:proyekkas/features/loans/domain/loan.dart';
 import 'package:proyekkas/features/loans/presentation/loan_providers.dart';
 import 'package:proyekkas/features/loans/presentation/loan_screens.dart';
+import 'package:proyekkas/features/loans/presentation/loan_transfer_orders.dart';
 import 'package:proyekkas/features/projects/application/projects_providers.dart';
 import 'package:proyekkas/features/projects/presentation/project_detail_screen.dart';
 
@@ -16,7 +17,8 @@ import '../support/d1010_c_fixtures.dart' show FakeProjectsApi;
 import '../support/d1010_d_loans_fixtures.dart';
 import '../support/widget_harness.dart';
 
-/// ADR 0022 APK: project "Pinjaman" tab, PM Draft form + submit/cancel, Direktur decision bar, inbox section.
+/// ADR 0022 APK: project "Pinjaman" tab, PM Draft form + submit/cancel, Direktur decision bar, inbox section. User
+/// decision 2026-10-24: Owner level, repayment requests (row actions), inbox repayments, Antrian Transfer orders.
 AuthSignedIn _as(Set<Role> roles) => AuthSignedIn(profile: profile(roles), sub: 'user-sub-1');
 
 Loan _loan(Map<String, dynamic> j) => Loan.fromJson(j);
@@ -209,12 +211,14 @@ void main() {
     expect(find.text('Menunggu'), findsOneWidget, reason: 'Direktur step waiting');
     await tester.tap(find.byKey(const Key('loan-action-approve')));
     await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const Key('loan-decision-step'))).data, 'Persetujuan Direktur');
+    expect(find.byKey(const Key('loan-step-owner')), findsOneWidget, reason: 'the Owner decides after the Direktur');
     expect(find.text('Setujui PJ/DRMS/2610/0001?'), findsOneWidget);
     expect(
       find.text(
-        'PRJ-B Jalan Tambang Blok B meminjam Rp 150.000.000 dari PRJ-A Gudang Balikpapan. Bila pusat biaya kedua '
-        'project berbeda (dana), Finance mencairkan dana: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat '
-        'biaya peminjam.',
+        'PRJ-B Jalan Tambang Blok B meminjam Rp 150.000.000 dari PRJ-A Gudang Balikpapan. Persetujuan Direktur lalu '
+        'Owner; untuk dana, Finance kemudian mentransfer lewat Antrian Transfer: kas keluar dari pusat biaya pemberi '
+        'dan kas masuk ke pusat biaya peminjam.',
       ),
       findsOneWidget,
     );
@@ -252,10 +256,40 @@ void main() {
     expect(find.byKey(const Key('loan-action-approve')), findsNothing);
   });
 
-  testWidgets('ADR 0031 detail Finance: "Cairkan" confirmed, overdraft 409 → "Tetap simpan" → re-sent confirmed', (
+  testWidgets('detail Owner (level 2): Direktur step done, Owner step waiting, decision bar "Persetujuan Owner"', (
     tester,
   ) async {
-    final api = FakeLoansApi()..overdraftFirst = true;
+    final api = FakeLoansApi();
+    await pumpScreen(
+      tester,
+      const LoanDetailScreen(id: 41),
+      auth: _as({Role.principal, Role.owner}),
+      overrides: [
+        loansApiProvider.overrideWithValue(api),
+        loanDetailProvider.overrideWith(
+          (ref, id) async => _loan({
+            ...loanJson(actions: ['approve', 'reject'], decisions: [levelDecisionJson(1)]),
+            'approvalLevel': 2,
+            'statusLabel': 'Menunggu persetujuan Owner',
+            'submitterRole': 'finance',
+          }),
+        ),
+      ],
+    );
+    expect(find.text('Menunggu persetujuan Owner'), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(const Key('loan-decision-step'))).data, 'Persetujuan Owner');
+    expect(find.text('Diajukan Finance'), findsOneWidget);
+    expect(find.textContaining('Dedi Direktur'), findsOneWidget, reason: 'the Direktur approved level 1');
+    expect(find.text('Menunggu'), findsOneWidget, reason: 'only the Owner step waits');
+    await tester.tap(find.byKey(const Key('loan-action-approve')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('loan-confirm')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['approve:41']);
+  });
+
+  testWidgets('detail Finance: no "Cairkan" any more — "Buka Antrian Transfer", no call', (tester) async {
+    final api = FakeLoansApi();
     await pumpScreen(
       tester,
       const LoanDetailScreen(id: 43),
@@ -265,36 +299,187 @@ void main() {
         loanDetailProvider.overrideWith((ref, id) async => _loan(loanAwaitingJson())),
       ],
     );
-    expect(find.text('Disetujui – menunggu pencairan'), findsWidgets);
-    expect(tester.widget<Text>(find.byKey(const Key('loan-cash-value'))).data, 'Menunggu pencairan Finance');
+    expect(find.text('Disetujui – menunggu transfer Finance'), findsWidgets);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('loan-cash-value'))).data,
+      'Menunggu transfer Finance (Antrian Transfer)',
+    );
     expect(tester.widget<Text>(find.byKey(const Key('loan-lender-pb-value'))).data, 'Bank Mandiri Operasional');
     expect(tester.widget<Text>(find.byKey(const Key('loan-borrower-pb-value'))).data, 'Bank BRI Blok B');
     expect(find.byKey(const Key('loan-awaiting-disbursement')), findsOneWidget);
+    expect(find.byKey(const Key('loan-step-owner')), findsOneWidget);
     expect(find.byKey(const Key('loan-step-disburse')), findsOneWidget);
-    expect(find.byKey(const Key('loan-action-repay')), findsNothing, reason: 'repay only after the disbursement');
-
+    expect(find.text('Transfer Finance'), findsOneWidget);
+    expect(find.byKey(const Key('loan-action-repay')), findsNothing, reason: 'repay only after the transfer');
+    expect(find.text('Cairkan'), findsNothing);
+    expect(find.text('Buka Antrian Transfer'), findsOneWidget);
     await tester.tap(find.byKey(const Key('loan-action-disburse')));
     await tester.pumpAndSettle();
-    expect(find.text('Cairkan PJ/DRMS/2610/0004?'), findsOneWidget);
-    expect(
-      find.text(
-        'Dicatat hari ini: kas keluar Rp 150.000.000 dari Bank Mandiri Operasional dan kas masuk ke Bank BRI Blok B. '
-        'Pastikan dana sudah dipindahkan di bank.',
-      ),
-      findsOneWidget,
+    expect(api.calls, isEmpty, reason: 'executed in the Antrian Transfer, not on the loan page');
+  });
+
+  testWidgets('cash-backed repayment request: "Ajukan pengembalian" with a planned date and the repayable amount', (
+    tester,
+  ) async {
+    final api = FakeLoansApi();
+    await pumpScreen(
+      tester,
+      const LoanDetailScreen(id: 45),
+      auth: _as({Role.pm}),
+      overrides: [
+        loansApiProvider.overrideWithValue(api),
+        loanDetailProvider.overrideWith((ref, id) async => _loan(loanCashRepaymentJson())),
+      ],
     );
-    await tester.tap(find.byKey(const Key('loan-disburse-confirm')));
+    expect(find.text('Ajukan pengembalian'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('loan-action-repay')));
     await tester.pumpAndSettle();
-    // QA-04: the lender's account would go below 0 → the transfer's overdraft dialog
+    expect(find.text('Ajukan pengembalian PJ/DRMS/2610/0009'), findsOneWidget);
+    expect(find.text('Dapat diajukan Rp 110.000.000'), findsOneWidget);
+    expect(find.text('Rencana tanggal pengembalian'), findsOneWidget);
+    expect(find.byKey(const Key('loan-repay-request-hint')), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('loan-repay-amount')), '120000000');
+    await tester.tap(find.byKey(const Key('loan-repay-save')));
+    await tester.pumpAndSettle();
+    expect(find.text('Nominal melebihi sisa pinjaman.'), findsOneWidget, reason: 'above the repayable amount');
+    await tester.enterText(find.byKey(const Key('loan-repay-amount')), '60000000');
+    await tester.tap(find.byKey(const Key('loan-repay-save')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['repay:45:60000000:2026-10-21:']);
+    expect(find.text('Pengembalian Rp 60.000.000 diajukan ke Direktur.'), findsOneWidget);
+  });
+
+  testWidgets('repayment requests: status, planned date, decisions, reject reason; Owner approves and rejects', (
+    tester,
+  ) async {
+    final api = FakeLoansApi();
+    await pumpScreen(
+      tester,
+      const LoanDetailScreen(id: 45),
+      auth: _as({Role.principal, Role.owner}),
+      overrides: [
+        loansApiProvider.overrideWithValue(api),
+        loanDetailProvider.overrideWith(
+          (ref, id) async => _loan(loanCashRepaymentJson(actions: const [], rowActions: const ['approve', 'reject'])),
+        ),
+      ],
+    );
+    expect(tester.widget<Text>(find.byKey(const Key('loan-repayment-status-7'))).data, 'Menunggu persetujuan Owner');
+    expect(find.textContaining('rencana 30'), findsOneWidget);
+    expect(find.textContaining('diajukan Fina Keuangan'), findsNWidgets(2));
+    expect(
+      tester.widget<Text>(find.byKey(const Key('loan-repayment-7-decision-1'))).data,
+      startsWith('Direktur · Disetujui'),
+    );
+    expect(tester.widget<Text>(find.byKey(const Key('loan-repayment-rejected-8'))).data, 'Ditolak: Saldo belum cukup');
+    expect(find.byKey(const Key('loan-repayment-8-approve')), findsNothing);
+    expect(find.byKey(const Key('loan-repayment-7-void')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('loan-repayment-7-approve')));
+    await tester.pumpAndSettle();
+    expect(find.text('Setujui pengembalian Rp 40.000.000?'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('loan-repayment-approve-confirm')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['approve-repayment:45:7']);
+
+    await tester.tap(find.byKey(const Key('loan-repayment-7-reject')));
+    await tester.pumpAndSettle();
+    expect(find.text('Tolak pengembalian Rp 40.000.000?'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('loan-repayment-reject-field')), 'Tunggu termin');
+    await tester.tap(find.byKey(const Key('loan-repayment-reject-ok')));
+    await tester.pumpAndSettle();
+    expect(api.calls.last, 'reject-repayment:45:7:Tunggu termin');
+  });
+
+  testWidgets('repayment request: the submitter cancels (reason); Finance sees "Buka Antrian Transfer" once approved', (
+    tester,
+  ) async {
+    final api = FakeLoansApi();
+    await pumpScreen(
+      tester,
+      const LoanDetailScreen(id: 45),
+      auth: _as({Role.finance}),
+      overrides: [
+        loansApiProvider.overrideWithValue(api),
+        loanDetailProvider.overrideWith(
+          (ref, id) async =>
+              _loan(loanCashRepaymentJson(rowActions: const ['cancel', 'execute'], repaymentStatus: 'approved')),
+        ),
+      ],
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const Key('loan-repayment-status-7'))).data,
+      'Disetujui – menunggu transfer Finance',
+    );
+    await tester.tap(find.byKey(const Key('loan-repayment-7-execute')));
+    await tester.pumpAndSettle();
+    expect(api.calls, isEmpty, reason: 'executed in the Antrian Transfer');
+    await tester.tap(find.byKey(const Key('loan-repayment-7-cancel')));
+    await tester.pumpAndSettle();
+    expect(find.text('Batalkan pengembalian Rp 40.000.000?'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('loan-repayment-cancel-field')), 'Salah nominal');
+    await tester.tap(find.byKey(const Key('loan-repayment-cancel-ok')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['cancel-repayment:45:7:Salah nominal']);
+  });
+
+  testWidgets('Antrian Transfer: loan orders — self note, execute (date, note), overdraft → re-sent confirmed', (
+    tester,
+  ) async {
+    final api = FakeLoansApi()..overdraftFirst = true;
+    await pumpScreen(
+      tester,
+      Scaffold(body: ListView(children: const [LoanTransferOrderSection()])),
+      auth: _as({Role.finance}),
+      overrides: [
+        loansApiProvider.overrideWithValue(api),
+        loanTransferOrdersProvider.overrideWith((ref) async => LoanTransferOrders.fromJson(loanTransferOrdersJson())),
+      ],
+    );
+    expect(find.text('Transfer pinjaman antar project (2)'), findsOneWidget);
+    expect(find.text('Pencairan pinjaman'), findsOneWidget);
+    expect(find.text('Pengembalian pinjaman'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('loan-order-loan-43-accounts'))).data,
+      'Bank Mandiri Operasional → Bank BRI Blok B',
+    );
+    expect(find.byKey(const Key('loan-order-loan-43-self')), findsOneWidget);
+    expect(find.byKey(const Key('loan-order-repayment-7-self')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('loan-order-loan-43-execute')));
+    await tester.pumpAndSettle();
+    expect(find.text('Catat transfer PJ/DRMS/2610/0004'), findsOneWidget);
+    expect(find.byKey(const Key('loan-order-execute-body')), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('loan-order-execute-note')), 'BCA ref 123');
+    await tester.tap(find.byKey(const Key('loan-order-execute-save')));
+    await tester.pumpAndSettle();
     expect(find.text('Saldo akun kas akan minus'), findsOneWidget);
     await tester.tap(find.byKey(const Key('loan-override-confirm')));
     await tester.pumpAndSettle();
-    expect(api.calls, ['disburse:43', 'disburse:43:confirm']);
+    expect(api.calls, ['execute:43:2026-10-21:BCA ref 123', 'execute:43:2026-10-21:BCA ref 123:confirm']);
     expect(api.keys.first, isNot(api.keys.last), reason: 'another body, another key');
-    expect(
-      find.text('PJ/DRMS/2610/0004 dicairkan: kas keluar KK/DRMS/2610/0041, kas masuk KM/DRMS/2610/0042.'),
-      findsOneWidget,
+    expect(find.text('Transfer PJ/DRMS/2610/0004 tercatat.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('loan-order-repayment-7-execute')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('loan-order-execute-save')));
+    await tester.pumpAndSettle();
+    expect(api.calls.last, 'execute-repayment:45:7:2026-10-21');
+  });
+
+  testWidgets('Antrian Transfer: read-only orders without "Catat transfer"; hidden when empty', (tester) async {
+    await pumpScreen(
+      tester,
+      Scaffold(body: ListView(children: const [LoanTransferOrderSection()])),
+      auth: _as({Role.owner}),
+      overrides: [
+        loanTransferOrdersProvider.overrideWith(
+          (ref) async => LoanTransferOrders.fromJson(loanTransferOrdersJson(canExecute: false)),
+        ),
+      ],
     );
+    expect(find.byKey(const Key('loan-transfer-orders')), findsOneWidget);
+    expect(find.byKey(const Key('loan-order-loan-43-execute')), findsNothing);
   });
 
   testWidgets('ADR 0031 detail: automatic loan of a transfer — lender account, origin, cash numbers, one step', (
@@ -371,12 +556,33 @@ void main() {
       auth: _as({Role.owner}),
       overrides: [
         inboxProvider.overrideWith((ref) async => const InboxPage([], 85)),
-        loanInboxProvider.overrideWith((ref) async => [_loan(loanJson())]),
+        loanInboxProvider.overrideWith((ref) async => LoanInbox(loans: [_loan(loanJson())])),
       ],
     );
     expect(find.byKey(const Key('loan-inbox')), findsOneWidget);
     expect(find.text('Pinjaman antar project (1)'), findsOneWidget);
     expect(find.byKey(const Key('loan-41')), findsOneWidget);
+  });
+
+  testWidgets('Owner inbox: loans at level 2 and repayment requests', (tester) async {
+    await pumpScreen(
+      tester,
+      const InboxScreen(),
+      auth: _as({Role.principal}),
+      overrides: [
+        inboxProvider.overrideWith((ref) async => const InboxPage([], 85)),
+        loanInboxProvider.overrideWith((ref) async => LoanInbox.fromJson(loanInboxJson())),
+      ],
+    );
+    expect(find.text('Pinjaman antar project (2)'), findsOneWidget);
+    expect(find.text('Menunggu persetujuan Owner'), findsOneWidget);
+    expect(find.byKey(const Key('loan-repayment-inbox-7')), findsOneWidget);
+    expect(find.text('Pengembalian pinjaman PJ/DRMS/2610/0009'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('loan-repayment-inbox-flow-7'))).data,
+      'PRJ-B Jalan Tambang Blok B → PRJ-A Gudang Balikpapan',
+    );
+    expect(find.text('Menunggu persetujuan Direktur'), findsOneWidget);
   });
 
   testWidgets('Direktur inbox: empty loan text', (tester) async {
@@ -386,7 +592,7 @@ void main() {
       auth: _as({Role.owner}),
       overrides: [
         inboxProvider.overrideWith((ref) async => const InboxPage([], 85)),
-        loanInboxProvider.overrideWith((ref) async => const <Loan>[]),
+        loanInboxProvider.overrideWith((ref) async => const LoanInbox()),
       ],
     );
     expect(find.text('Tidak ada pinjaman antar project yang menunggu keputusan Anda.'), findsOneWidget);
@@ -399,7 +605,7 @@ void main() {
       auth: _as({Role.pm}),
       overrides: [
         inboxProvider.overrideWith((ref) async => const InboxPage([], 85)),
-        loanInboxProvider.overrideWith((ref) async => const <Loan>[]),
+        loanInboxProvider.overrideWith((ref) async => const LoanInbox()),
       ],
     );
     expect(find.byKey(const Key('loan-inbox')), findsNothing);

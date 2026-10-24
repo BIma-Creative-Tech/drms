@@ -37,6 +37,7 @@ const collectionConfig = async (slug: string) => ((await getTestPayload()).colle
 beforeAll(async () => {
   w = await makeWorld('SD')
   ptAdmin = await makeFlowUser(['pk-admin'], 'sd-ptadmin', null, { groupAdmin: false })
+  await makeFlowUser(['pk-principal'], 'sd-principal', null) // 2026-10-24: a loan submit needs an Owner (level 2)
   today = (await sqlAs('app', "SELECT to_char(now() AT TIME ZONE 'Asia/Makassar', 'YYYY-MM-DD') AS d")).rows[0].d
 })
 

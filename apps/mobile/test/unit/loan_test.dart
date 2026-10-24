@@ -57,13 +57,68 @@ void main() {
     expect(bare.lenderLabel, 'Akun —');
 
     final w = Loan.fromJson(loanAwaitingJson());
-    expect((w.awaitingDisbursement, w.statusLabel), (true, 'Disetujui – menunggu pencairan'));
+    expect((w.awaitingDisbursement, w.statusLabel), (true, 'Disetujui – menunggu transfer Finance'));
     expect(w.allowedActions, {LoanAction.disburse});
     expect(w.lender?.label, 'PRJ-A Gudang Balikpapan');
     expect(Loan.fromJson(loanJson(actions: ['disburse', 'repay'])).allowedActions, {
       LoanAction.disburse,
       LoanAction.repay,
     });
+  });
+
+  test('2026-10-24: levels, submitter role, repayable amount, repayment requests; older server defaults', () {
+    final old = Loan.fromJson(loanApprovedJson());
+    expect((old.approvalLevel, old.submitterRole, old.waitingOwner), (null, null, false));
+    expect(old.repayableAmount, old.outstanding, reason: 'older server: the outstanding');
+    expect(old.repaymentNeedsApproval, isFalse);
+    expect(old.decisions.single.level, 1, reason: 'the single decision of the one-level flow');
+    expect(old.repayments.first.status, LoanRepaymentStatus.posted);
+    expect(old.repayments.last.status, LoanRepaymentStatus.voided);
+    expect(old.repayments.first.allowedActions, isEmpty);
+
+    final owner = Loan.fromJson({...loanJson(), 'approvalLevel': 2});
+    expect(owner.waitingOwner, isTrue);
+
+    final l = Loan.fromJson(loanCashRepaymentJson(rowActions: const ['approve', 'reject', 'bogus']));
+    expect((l.submitterRole, l.repayableAmount, l.repaymentNeedsApproval), ('finance', 110000000, true));
+    final r = l.repayments.first;
+    expect((r.status, r.approvalLevel, r.plannedDate), (LoanRepaymentStatus.pendingApproval, 2, '2026-10-30'));
+    expect((r.posted, r.open), (false, true));
+    expect(r.allowedActions, {LoanRepaymentAction.approve, LoanRepaymentAction.reject});
+    expect((r.decisions.single.level, r.decisions.single.levelLabel), (1, 'Direktur'));
+    final rejected = l.repayments.last;
+    expect((rejected.status, rejected.status.closed), (LoanRepaymentStatus.rejected, true));
+    expect(rejected.rejectReason, 'Saldo belum cukup');
+    expect(LoanRepaymentStatus.fromCode(null), LoanRepaymentStatus.posted, reason: 'older rows without a code');
+    expect(LoanRepaymentStatus.fromCode('on_hold'), LoanRepaymentStatus.pendingApproval, reason: 'never as paid');
+    expect(LoanRepaymentAction.fromCode('void'), LoanRepaymentAction.voidRepayment);
+    expect(Loan.fromJson(loanAwaitingJson()).decisions.map((d) => d.level), [1, 2]);
+  });
+
+  test('2026-10-24: inbox with repayment requests (older server: loans only) and the transfer orders', () {
+    final inbox = LoanInbox.fromJson(loanInboxJson());
+    expect((inbox.loans.single.approvalLevel, inbox.repayments.single.loanId, inbox.count), (2, 45, 2));
+    final rq = inbox.repayments.single;
+    expect((rq.amount, rq.plannedDate, rq.approvalLevel), (40000000, '2026-10-30', 1));
+    expect(rq.submittedBy?.name, 'Fina Keuangan');
+    expect(rq.borrower.label, 'PRJ-B Jalan Tambang Blok B');
+    expect((rq.lender?.label, rq.loanDocNo), ('PRJ-A Gudang Balikpapan', 'PJ/DRMS/2610/0009'));
+    final older = LoanInbox.fromJson({
+      'items': [loanJson()],
+    });
+    expect((older.loans.length, older.repayments.length, older.count), (1, 0, 1));
+
+    final orders = LoanTransferOrders.fromJson(loanTransferOrdersJson()).items;
+    expect(orders.map((o) => o.key), ['loan-43', 'repayment-7']);
+    final loan = orders.first;
+    expect((loan.repayment, loan.loanId, loan.amount), (false, 43, 150000000));
+    expect((loan.minDate, loan.today), ('2026-10-05', '2026-10-21'));
+    expect((loan.fromAccount?.label, loan.toAccount?.label), ('Bank Mandiri Operasional', 'Bank BRI Blok B'));
+    expect((loan.selfSubmitted, loan.canExecute), (true, true));
+    final rep = orders.last;
+    expect((rep.repayment, rep.id, rep.loanId), (true, 7, 45));
+    expect((rep.fromProject?.label, rep.note), ('PRJ-B Jalan Tambang Blok B', 'Termin klien B cair'));
+    expect(LoanTransferOrders.fromJson(const {}).items, isEmpty);
   });
 
   test('options: borrower PM check and lenders of the same PT without the borrower', () {

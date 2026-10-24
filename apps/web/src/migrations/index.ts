@@ -100,6 +100,10 @@ import * as migration_20261024_210000_d2410_admin_staff_enums from './20261024_2
 import * as migration_20261024_210100_d2410_admin_staff_guard from './20261024_210100_d2410_admin_staff_guard';
 import * as migration_20261024_300000_d2410_self_processed_enum from './20261024_300000_d2410_self_processed_enum';
 import * as migration_20261024_300100_d2410_finance_self_lpj from './20261024_300100_d2410_finance_self_lpj';
+import * as migration_20261024_400000_d2410_loan_enums from './20261024_400000_d2410_loan_enums';
+import * as migration_20261024_400100_d2410_loan_schema from './20261024_400100_d2410_loan_schema';
+import * as migration_20261024_400200_d2410_loan_data from './20261024_400200_d2410_loan_data';
+import * as migration_20261024_400300_d2410_loan_guard from './20261024_400300_d2410_loan_guard';
 
 export const migrations = [
   {
@@ -611,5 +615,25 @@ export const migrations = [
     up: migration_20261024_300100_d2410_finance_self_lpj.up,
     down: migration_20261024_300100_d2410_finance_self_lpj.down,
     name: '20261024_300100_d2410_finance_self_lpj',
+  },
+  {
+    up: migration_20261024_400000_d2410_loan_enums.up,
+    down: migration_20261024_400000_d2410_loan_enums.down,
+    name: '20261024_400000_d2410_loan_enums',
+  },
+  {
+    up: migration_20261024_400100_d2410_loan_schema.up,
+    down: migration_20261024_400100_d2410_loan_schema.down,
+    name: '20261024_400100_d2410_loan_schema',
+  },
+  {
+    up: migration_20261024_400200_d2410_loan_data.up,
+    down: migration_20261024_400200_d2410_loan_data.down,
+    name: '20261024_400200_d2410_loan_data',
+  },
+  {
+    up: migration_20261024_400300_d2410_loan_guard.up,
+    down: migration_20261024_400300_d2410_loan_guard.down,
+    name: '20261024_400300_d2410_loan_guard',
   },
 ];

@@ -188,6 +188,16 @@ PM"). Dashboard PM menampilkan kartu **"Project Anda belum punya RAP"** berisi p
 
 Butuh internet. Hanya untuk project yang Anda pegang dan sudah punya RAB.
 
+## 5a. Pinjaman antar project (sejak 24 Okt 2026)
+
+1. **Pinjaman → + Ajukan pinjaman** (web / APK): project peminjam (project Anda), project pemberi, jenis, nilai, jatuh
+   tempo, alasan → **Ajukan ke Direktur**. Finance PT juga dapat mengajukan untuk project Anda (Anda diberi tahu).
+2. Status: **Menunggu persetujuan Direktur** → **Menunggu persetujuan Owner** → **Disetujui** (pinjaman dana: *menunggu
+   transfer Finance* sampai Finance mengeksekusi transfernya di Antrian Transfer) atau **Ditolak** (alasan tampil).
+3. **Pengembalian pinjaman dana:** detail pinjaman → **Ajukan pengembalian** (nominal, rencana tanggal, catatan) →
+   Direktur → Owner → Finance mentransfer. Selama menunggu persetujuan Anda dapat **Batalkan** (alasan).
+   Pinjaman barang/material: **Catat pengembalian** langsung seperti sebelumnya.
+
 ## 6. Laporan & pengingat
 
 - Web **Laporan**: Anggaran Project, Pengeluaran per Kategori, Rekap Pengajuan, Kelengkapan Nota/LPJ, Biaya per

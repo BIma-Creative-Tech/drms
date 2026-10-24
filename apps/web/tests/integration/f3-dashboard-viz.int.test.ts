@@ -218,7 +218,8 @@ describe('module launcher + /admin/dashboard', () => {
   async function inboxRows(req: Parameters<typeof approvalInbox>[0]) {
     return withReqTransaction(req, async () => {
       const lists = await Promise.all([approvalInbox(req), addendumInbox(req), shortfallInbox(req), loanInbox(req)])
-      return lists.reduce((n, l) => n + l.items.length, 0)
+      // 2026-10-24: the loan section also lists repayment requests
+      return lists.reduce((n, l) => n + l.items.length + ('repayments' in l ? l.repayments.length : 0), 0)
     })
   }
 

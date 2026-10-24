@@ -6562,7 +6562,7 @@ abstract class AppLocalizations {
   /// No description provided for @loanNoBorrower.
   ///
   /// In id, this message translates to:
-  /// **'Pinjaman antar project diajukan oleh PM project peminjam. Anda belum menjadi PM project yang aktif.'**
+  /// **'Pinjaman antar project diajukan oleh PM project peminjam atau Finance. Anda belum menjadi PM project yang aktif.'**
   String get loanNoBorrower;
 
   /// No description provided for @loanBorrower.
@@ -6718,7 +6718,7 @@ abstract class AppLocalizations {
   /// No description provided for @loanApproveBody.
   ///
   /// In id, this message translates to:
-  /// **'{borrower} meminjam {amount} dari {lender}. Bila pusat biaya kedua project berbeda (dana), Finance mencairkan dana: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat biaya peminjam.'**
+  /// **'{borrower} meminjam {amount} dari {lender}. Persetujuan Direktur lalu Owner; untuk dana, Finance kemudian mentransfer lewat Antrian Transfer: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat biaya peminjam.'**
   String loanApproveBody(String borrower, String amount, String lender);
 
   /// No description provided for @loanRejectTitle.
@@ -10366,7 +10366,7 @@ abstract class AppLocalizations {
   /// No description provided for @loanCashWaiting.
   ///
   /// In id, this message translates to:
-  /// **'Menunggu pencairan Finance'**
+  /// **'Menunggu transfer Finance (Antrian Transfer)'**
   String get loanCashWaiting;
 
   /// No description provided for @loanCashCancelled.
@@ -10378,25 +10378,25 @@ abstract class AppLocalizations {
   /// No description provided for @loanCashTbd.
   ///
   /// In id, this message translates to:
-  /// **'Ditentukan saat disetujui (dana antar pusat biaya berbeda → dicairkan Finance)'**
+  /// **'Ditentukan saat disetujui (dana → ditransfer Finance lewat Antrian Transfer)'**
   String get loanCashTbd;
 
   /// No description provided for @loanCashNone.
   ///
   /// In id, this message translates to:
-  /// **'Tanpa transaksi kas (barang, atau pusat biaya sama)'**
+  /// **'Tanpa transaksi kas (barang, atau pinjaman lama dengan pusat biaya sama)'**
   String get loanCashNone;
 
   /// No description provided for @loanAwaitingDisbursement.
   ///
   /// In id, this message translates to:
-  /// **'Disetujui — menunggu Finance mencairkan dana dari {lender} ke {borrower}.'**
+  /// **'Disetujui — menunggu Finance mentransfer dana dari {lender} ke {borrower} lewat Antrian Transfer.'**
   String loanAwaitingDisbursement(String lender, String borrower);
 
   /// No description provided for @loanStepDisburse.
   ///
   /// In id, this message translates to:
-  /// **'Pencairan Finance'**
+  /// **'Transfer Finance'**
   String get loanStepDisburse;
 
   /// No description provided for @loanStepDisbursed.
@@ -10518,6 +10518,168 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'File terlalu besar (maks. 15 MB).'**
   String get attachmentTooLarge;
+
+  /// No description provided for @loanStepOwner.
+  ///
+  /// In id, this message translates to:
+  /// **'Persetujuan Owner'**
+  String get loanStepOwner;
+
+  /// No description provided for @loanStepSubmittedFinance.
+  ///
+  /// In id, this message translates to:
+  /// **'Diajukan Finance'**
+  String get loanStepSubmittedFinance;
+
+  /// No description provided for @loanOpenTransferQueue.
+  ///
+  /// In id, this message translates to:
+  /// **'Buka Antrian Transfer'**
+  String get loanOpenTransferQueue;
+
+  /// No description provided for @loanRepayRequest.
+  ///
+  /// In id, this message translates to:
+  /// **'Ajukan pengembalian'**
+  String get loanRepayRequest;
+
+  /// No description provided for @loanRepayRequestTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Ajukan pengembalian {title}'**
+  String loanRepayRequestTitle(String title);
+
+  /// No description provided for @loanRepayRequestHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Disetujui Direktur lalu Owner, kemudian ditransfer Finance lewat Antrian Transfer (kas keluar dari pusat biaya peminjam, kas masuk ke pusat biaya pemberi).'**
+  String get loanRepayRequestHint;
+
+  /// No description provided for @loanRepayable.
+  ///
+  /// In id, this message translates to:
+  /// **'Dapat diajukan {amount}'**
+  String loanRepayable(String amount);
+
+  /// No description provided for @loanRepayPlannedDate.
+  ///
+  /// In id, this message translates to:
+  /// **'Rencana tanggal pengembalian'**
+  String get loanRepayPlannedDate;
+
+  /// No description provided for @loanRepayRequested.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengembalian {amount} diajukan ke Direktur.'**
+  String loanRepayRequested(String amount);
+
+  /// No description provided for @loanRepayPlannedOn.
+  ///
+  /// In id, this message translates to:
+  /// **'rencana {date}'**
+  String loanRepayPlannedOn(String date);
+
+  /// No description provided for @loanSubmittedBy.
+  ///
+  /// In id, this message translates to:
+  /// **'diajukan {name}'**
+  String loanSubmittedBy(String name);
+
+  /// No description provided for @loanRepaymentExecutedBy.
+  ///
+  /// In id, this message translates to:
+  /// **'ditransfer {name}'**
+  String loanRepaymentExecutedBy(String name);
+
+  /// No description provided for @loanRepaymentRejected.
+  ///
+  /// In id, this message translates to:
+  /// **'Ditolak: {reason}'**
+  String loanRepaymentRejected(String reason);
+
+  /// No description provided for @loanRepaymentCancelled.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibatalkan: {reason}'**
+  String loanRepaymentCancelled(String reason);
+
+  /// No description provided for @loanRepaymentApproveTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Setujui pengembalian {amount}?'**
+  String loanRepaymentApproveTitle(String amount);
+
+  /// No description provided for @loanRepaymentApproveBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Setelah persetujuan Owner, Finance mentransfer dari pusat biaya peminjam ke pusat biaya pemberi lewat Antrian Transfer.'**
+  String get loanRepaymentApproveBody;
+
+  /// No description provided for @loanRepaymentRejectTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tolak pengembalian {amount}?'**
+  String loanRepaymentRejectTitle(String amount);
+
+  /// No description provided for @loanRepaymentCancelTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Batalkan pengembalian {amount}?'**
+  String loanRepaymentCancelTitle(String amount);
+
+  /// No description provided for @loanRepaymentCancelBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan pengembalian dibatalkan (tidak dihapus). Alasan wajib.'**
+  String get loanRepaymentCancelBody;
+
+  /// No description provided for @loanRepaymentInboxTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengembalian pinjaman {no}'**
+  String loanRepaymentInboxTitle(String no);
+
+  /// No description provided for @loanTransferOrdersTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Transfer pinjaman antar project ({count})'**
+  String loanTransferOrdersTitle(int count);
+
+  /// No description provided for @loanTransferOrderSelf.
+  ///
+  /// In id, this message translates to:
+  /// **'Anda yang mengajukan; boleh dieksekusi sendiri (tercatat di audit).'**
+  String get loanTransferOrderSelf;
+
+  /// No description provided for @loanTransferOrderExecute.
+  ///
+  /// In id, this message translates to:
+  /// **'Catat transfer'**
+  String get loanTransferOrderExecute;
+
+  /// No description provided for @loanTransferOrderExecuteTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Catat transfer {no}'**
+  String loanTransferOrderExecuteTitle(String no);
+
+  /// No description provided for @loanTransferOrderExecuteBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Kas keluar {amount} dari {from} dan kas masuk ke {to}, masing-masing ditandai project-nya. Bukti transfer dapat dilampirkan di web.'**
+  String loanTransferOrderExecuteBody(String amount, String from, String to);
+
+  /// No description provided for @loanTransferOrderDate.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanggal transfer'**
+  String get loanTransferOrderDate;
+
+  /// No description provided for @loanTransferOrderDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Transfer {no} tercatat.'**
+  String loanTransferOrderDone(String no);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

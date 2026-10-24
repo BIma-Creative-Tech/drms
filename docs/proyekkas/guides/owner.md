@@ -66,6 +66,16 @@ sendiri saat **Kirim**) **ditolak bila dana PT tidak cukup**:
 - Dashboard Direktur/Owner: kartu **"Dana tersedia & pinjaman antar-PT"** (dana tersedia, piutang / hutang antar-PT,
   terlambat per PT).
 
-## 3. Yang tetap hanya Direktur
+## 3. Pinjaman antar project: level Owner (sejak 24 Okt 2026)
 
-**Addendum RAB** dan **pinjaman antar project** tetap diputuskan Direktur; Anda dapat melihatnya.
+- Pinjaman antar project (diajukan PM project peminjam atau Finance) dan **pengembalian pinjaman dana** disetujui
+  **Direktur lalu Anda (Owner)**. Setelah Direktur menyetujui, item muncul di **Persetujuan → Pinjaman antar project**
+  (APK: Persetujuan) dengan langkah "Persetujuan Owner": **Setujui** atau **Tolak** (alasan wajib).
+- Setelah Anda menyetujui, pinjaman / pengembalian dana masuk **Antrian Transfer** Finance; Finance mengeksekusi
+  transfernya (kas keluar / masuk di pusat biaya masing-masing project).
+- Anda tidak memutuskan level Direktur, dan tidak memutuskan pengajuan yang Anda ajukan sendiri. Bila PT tidak punya
+  Owner aktif, pengajuan pinjaman ditolak.
+
+## 3a. Yang tetap hanya Direktur
+
+**Addendum RAB** tetap diputuskan Direktur; Anda dapat melihatnya.

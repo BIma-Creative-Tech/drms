@@ -485,6 +485,13 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /project-loans/:id/reject': 'document',
   'POST /project-loans/:id/repayments': 'document',
   'POST /project-loans/:id/repayments/:rid/void': 'document',
+  // 2026-10-24 (#11/#12): transfer orders (selection) + execution / repayment request steps (one loan document)
+  'GET /project-loans/transfer-orders': 'selection',
+  'POST /project-loans/:id/execute': 'document',
+  'POST /project-loans/:id/repayments/:rid/approve': 'document',
+  'POST /project-loans/:id/repayments/:rid/reject': 'document',
+  'POST /project-loans/:id/repayments/:rid/cancel': 'document',
+  'POST /project-loans/:id/repayments/:rid/execute': 'document',
   'POST /project-loans': 'named-pt',
   // D1610 (ADR 0030): row actions — one document, read within the selection, role checked IN its PT
   'GET /records/:collection/:id/delete-check': 'document',

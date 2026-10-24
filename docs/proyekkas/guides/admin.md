@@ -287,7 +287,9 @@ sampai selesai).
 - Level Owner **tidak pernah dilewati diam-diam**: bila satu-satunya Owner PT adalah pemohon/pembuat pengajuan dengan
   level Owner (mis. Owner membuat pengajuan untuk orang lain), pengiriman ditolak dengan pesan. Bila belum ada Owner
   aktif di PT, pengiriman ditolak "Tidak ada pengguna aktif untuk posisi Approval level n (peran Owner)".
-- **Addendum RAB** dan **pinjaman antar project** tetap hanya Direktur; aturan Addendum RAB tidak boleh berisi Owner.
+- **Addendum RAB** tetap hanya Direktur; aturan Addendum RAB tidak boleh berisi Owner. **Pinjaman antar project**
+  (sejak 24 Okt 2026, tanpa aturan approval — alur tetap di sistem): Direktur lalu Owner; PT tanpa Owner aktif menolak
+  pengajuan pinjaman ("belum punya Owner aktif") — beri peran Owner di Pengguna → Akses PT.
 - Pengajuan yang sudah diajukan sebelum perubahan tetap memakai snapshot lama (Direktur = keputusan terakhir).
 
 ### 4a. Mengubah aturan setelah deploy (sekali, setiap PT: DRMS, LAS, TBK, CS1)

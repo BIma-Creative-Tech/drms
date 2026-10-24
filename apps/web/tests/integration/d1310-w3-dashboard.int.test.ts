@@ -21,6 +21,7 @@ let today = ''
 let noRap = 0 // umum project WITH a RAB and WITHOUT a RAP (PM = w.users.pm)
 let otherPt = 0
 let foreignOwner: FlowUser
+let principal: FlowUser
 let foreignNoRap = 0
 const L = '/api/v1/project-loans'
 
@@ -41,11 +42,14 @@ async function loan(over: Record<string, unknown>): Promise<number> {
 
 beforeAll(async () => {
   w = await makeWorld('WTD') // letters only: the world's vehicle plate suffix comes from the tag
+  principal = await makeFlowUser(['pk-principal'], 'w3d-principal', null) // 2026-10-24: level 2 of a loan
   today = (await sqlAs('app', "SELECT to_char(now() AT TIME ZONE 'Asia/Makassar', 'YYYY-MM-DD') AS d")).rows[0].d
   noRap = await sysCreate('projects', { code: `W3D-NR${Date.now() % 10000}`, name: 'W3D tanpa RAP', kind: 'umum', pm: w.users.pm.id, budget: 9_000_000, status: 'berjalan' }, { rap: false })
   // one approved loan (outstanding) + one waiting for the Direktur
   const approved = await loan({})
   await must(api('POST', `${L}/${approved}/approve`, w.users.owner, {}, { 'Idempotency-Key': randomUUID() }))
+  // 2026-10-24 (#10): the Owner's level makes it approved
+  await must(api('POST', `${L}/${approved}/approve`, principal, {}, { 'Idempotency-Key': randomUUID() }))
   await loan({ amount: 2_500_000 })
   // a second PT with its own Direktur and a RAB project without RAP
   otherPt = await sysCreate('companies', { name: 'PT Uji Dashboard W3', shortCode: `W3${Date.now() % 1000}`, timezone: 'Asia/Makassar' })
