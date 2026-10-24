@@ -308,7 +308,8 @@ describe('PDF "Pengajuan Biaya" — form 228 golden test (US-46, ADR 0008)', () 
     const signBlock = flat.slice(flat.indexOf('Diajukan Oleh'), flat.indexOf('Info Transfer'))
     expect(signBlock.match(/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} WITA/g)).toHaveLength(4)
     expect(signBlock).toContain('ditandatangani Citra (diwakili)') // Q-10/Q-28: creator signs for "Budi, Doni"
-    expect(pdfPageCount(pdf)).toBe(3) // form + receipts 2 per page
+    // form + receipts 2 per page + the general attachment (D2410: ≥ 1 "Lampiran" to send a Reimburse; fixture of api())
+    expect(pdfPageCount(pdf)).toBe(4)
     expect(flat).not.toContain('Nota ganda') // flags only on the internal copy
   })
 

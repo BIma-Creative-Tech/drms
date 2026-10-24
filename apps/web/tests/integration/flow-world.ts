@@ -263,10 +263,26 @@ export async function makeWorld(tag: string, opts: { rule?: 'direktur_finance' |
 
 export type Res = { status: number; body: any; headers: Headers } // eslint-disable-line @typescript-eslint/no-explicit-any
 
+/**
+ * D2410 (point 6): a Reimburse is sent with ≥ 1 general attachment ("Lampiran"). A Reimburse draft created through `api()`
+ * — POST /api/v1/expense-requests (`attachmentIds`) or the web form's Payload REST create (`attachments`) — without that
+ * key gets one PNG uploaded by the same user (the fixture of every test written before the rule). A test of the rule
+ * itself passes `attachmentIds: []` / `attachments: []`.
+ */
+async function withReimburseAttachment(method: string, path: string, user: FlowUser | null, json: unknown): Promise<unknown> {
+  if (method !== 'POST' || !user || !json || typeof json !== 'object' || (json as { type?: unknown }).type !== 'reimburse') return json
+  const key = path === '/api/v1/expense-requests' ? 'attachmentIds' : path === '/api/expense-requests' ? 'attachments' : null
+  if (!key || (json as Record<string, unknown>)[key] !== undefined) return json
+  const up = await upload('/api/v1/media/attachments', user, await png())
+  if (up.status !== 201) throw new Error(`fixture attachment upload ${up.status}: ${JSON.stringify(up.body)}`)
+  return { ...(json as Record<string, unknown>), [key]: [up.body.id as number] }
+}
+
 export async function api(method: string, path: string, user: FlowUser | null, json?: unknown, headers: Record<string, string> = {}): Promise<Res> {
   const h = new Headers({ Origin: ORIGIN, ...headers })
   if (user) h.set('Cookie', user.cookie)
   let body: string | undefined
+  json = await withReimburseAttachment(method, path, user, json)
   if (json !== undefined) {
     h.set('Content-Type', 'application/json')
     body = JSON.stringify(withFixtureRap(json))

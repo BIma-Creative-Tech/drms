@@ -174,6 +174,7 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
       lines: fromDocLines(doc),
       neededDate: doc.neededDate,
       urgencyLevelId: relId(doc.urgencyLevel) ?? null,
+      attachmentIds: ids(doc.attachments), // D2410: ≥ 1 for a Reimburse
       ...vendorOfDoc(doc), // ADR 0027: vendor, rekening vendor, invoice (required to send a vendor payment)
     },
     // D2: a legacy cost-center request submitted before may be sent again as it was (no project)
