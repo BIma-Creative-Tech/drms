@@ -216,6 +216,13 @@ export async function pbCommitmentItems(req: PayloadRequest, accountId: number, 
       SELECT 'project_loan', l.id, l.doc_no, l.amount, l.status::text
         FROM project_loans l
        WHERE l.lender_cash_account_id = ${accountId} AND l.status::text = 'approved' AND coalesce(l.cash_backed, false) AND l.disbursed_at IS NULL
+         AND l.borrower_cash_account_id IS DISTINCT FROM ${accountId}
+      UNION ALL
+      -- 2026-10-24 (#12): an approved repayment order leaves the borrower's account (id = the loan, status repayment_approved)
+      SELECT 'project_loan', l.id, l.doc_no, pr.amount, 'repayment_approved'
+        FROM project_loan_repayments pr JOIN project_loans l ON l.id = pr.loan_id
+       WHERE l.borrower_cash_account_id = ${accountId} AND pr.status::text = 'approved' AND coalesce(l.cash_backed, false)
+         AND l.lender_cash_account_id IS DISTINCT FROM ${accountId}
     ) x WHERE x.amount > 0 ORDER BY x.amount DESC, x.id LIMIT ${limit}`)) as unknown as { rows: Array<{ kind: CommitmentItem['kind']; id: number; doc_no: string | null; amount: string; status: string }> }
   return r.rows.map((x) => ({ kind: x.kind, id: Number(x.id), docNo: x.doc_no, amount: n(x.amount), status: x.status }))
 }

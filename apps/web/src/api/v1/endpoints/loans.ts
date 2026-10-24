@@ -4,19 +4,42 @@ import { relId } from '@/access/roles'
 import { today } from '@/domain/expense/common'
 import { loanScope, loanTotals } from '@/domain/loans/report'
 
-import { addRepayment, approveLoan, cancelLoan, createLoan, disburseLoan, editLoan, listLoans, loadVisibleLoan, loanDetail, loanInbox, loanProjectOptions, rejectLoan, submitLoan, voidRepayment, type LoanDoc } from '@/domain/loans/service'
+import {
+  addRepayment,
+  approveLoan,
+  approveRepayment,
+  cancelLoan,
+  cancelRepayment,
+  createLoan,
+  disburseLoan,
+  editLoan,
+  executeLoan,
+  executeRepayment,
+  listLoans,
+  loadVisibleLoan,
+  loanDetail,
+  loanInbox,
+  loanProjectOptions,
+  loanTransferOrders,
+  rejectLoan,
+  rejectRepayment,
+  submitLoan,
+  voidRepayment,
+  type LoanDoc,
+} from '@/domain/loans/service'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { companyQuery } from '../company-query'
 import { HttpError, json, v1 } from '../http'
 import { withNamedCompany } from '../named-company'
-import { LoanCreate, LoanDecision, LoanDisburse, LoanListQuery, LoanReason, LoanReject, LoanUpdate, RepaymentCreate } from '../schemas-loans'
+import { LoanCreate, LoanDecision, LoanDisburse, LoanExecute, LoanListQuery, LoanReason, LoanReject, LoanUpdate, RepaymentCreate } from '../schemas-loans'
 
 /**
  * ADR 0022 Pinjaman antar project. Mutations: transactional + Idempotency-Key (mandatory for the APK), 30/min per
  * user like the addendum. Role checks live in the domain service (borrower PM creates; Direktur decides, G1;
  * ADR 0031: Finance disburses a cash-backed loan; borrower PM / Finance repay — Finance only when cash moves;
- * Direktur / Finance void).
+ * Direktur / Finance void). 2026-10-24 (DRMS 24/10 #10–#12): borrower PM or Finance files; Direktur → Owner decide
+ * (loans and repayment requests); Finance executes the transfer orders (`/execute`, legacy `/disburse`).
  */
 const WRITE_LIMIT: [number, number] = [30, 60_000]
 
@@ -44,19 +67,30 @@ export const listLoansEndpoint = v1({
         // user 2026-10-19 (APK Pinjaman list): the web LoanList tiles
         const t = await loanTotals(req, await loanScope(req))
         const totals = { pending: t.pending, amount: t.amount, repaid: t.repaid, outstanding: t.outstanding, overdueCount: t.overdueCount, overdue: t.overdue }
-        return { ...page, summary: { totals, inboxCount: (await loanInbox(req)).items.length, canCreate: (await loanProjectOptions(req)).borrowers.length > 0 } }
+        const inbox = await loanInbox(req)
+        return { ...page, summary: { totals, inboxCount: inbox.items.length + inbox.repayments.length, canCreate: (await loanProjectOptions(req)).borrowers.length > 0 } }
       }),
     )
   },
 })
 
-/** Loans waiting for the caller's decision (Direktur) — web inbox + APK. */
+/** Loans + repayment requests waiting for the caller's decision (Direktur level 1 / Owner level 2) — web inbox + APK. */
 export const loanInboxEndpoint = v1({
   path: '/project-loans/inbox',
   method: 'get',
   handler: async ({ req }) => {
     const companyIds = await companyQuery(req)
     return json(await withReqTransaction(req, () => loanInbox(req, { companyIds })))
+  },
+})
+
+/** 2026-10-24 (#11/#12): transfer orders of inter-project loans ("Antrian Transfer", web + APK). */
+export const loanTransferOrdersEndpoint = v1({
+  path: '/project-loans/transfer-orders',
+  method: 'get',
+  handler: async ({ req }) => {
+    const companyIds = await companyQuery(req)
+    return json(await withReqTransaction(req, () => loanTransferOrders(req, { companyIds })))
   },
 })
 
@@ -82,9 +116,9 @@ export const createLoanEndpoint = v1({
   rateLimit: WRITE_LIMIT,
   transactional: true,
   idempotent: true,
-  // MC4: optional body `company` = the borrower project's PT; PM IN that PT (borrower-PM check in the service)
+  // MC4: optional body `company` = the borrower project's PT; PM or Finance IN that PT (borrower-PM / Finance check in the service)
   handler: async ({ req, body }) =>
-    withNamedCompany(req, body.company, { roles: ['pk-pm'], refs: [{ collection: 'projects', id: body.borrowerProjectId, path: 'borrowerProjectId' }] }, async () =>
+    withNamedCompany(req, body.company, { roles: ['pk-pm', 'pk-finance'], refs: [{ collection: 'projects', id: body.borrowerProjectId, path: 'borrowerProjectId' }] }, async () =>
       detail(
         req,
         await createLoan(req, {
@@ -161,7 +195,7 @@ export const addRepaymentEndpoint = v1({
   handler: async ({ req, body, params }) => detail(req, await addRepayment(req, idParam(params), { amount: body.amount, repayDate: body.repayDate, note: body.note ?? null, confirmOverdraft: body.confirmOverdraft === true }), 201),
 })
 
-/** ADR 0031 "Cairkan": Finance posts the KK / KM of an approved cash-backed loan (once). */
+/** ADR 0031 "Cairkan" (older APKs): the same execution as `/execute`. */
 export const disburseLoanEndpoint = v1({
   path: '/project-loans/:id/disburse',
   method: 'post',
@@ -171,6 +205,60 @@ export const disburseLoanEndpoint = v1({
   idempotent: true,
   handler: async ({ req, body, params }) =>
     detail(req, await disburseLoan(req, idParam(params), { disburseDate: body.disburseDate, note: body.note ?? null, proofMediaId: body.proofMediaId ?? null, confirmOverdraft: body.confirmOverdraft === true })),
+})
+
+/** 2026-10-24 (#11): Finance executes the loan's transfer order (Antrian Transfer). */
+export const executeLoanEndpoint = v1({
+  path: '/project-loans/:id/execute',
+  method: 'post',
+  body: LoanExecute,
+  rateLimit: WRITE_LIMIT,
+  transactional: true,
+  idempotent: true,
+  handler: async ({ req, body, params }) =>
+    detail(req, await executeLoan(req, idParam(params), { executeDate: body.executeDate, note: body.note ?? null, proofMediaId: body.proofMediaId ?? null, confirmOverdraft: body.confirmOverdraft === true })),
+})
+
+/** 2026-10-24 (#12): decisions / cancel / execution of a repayment request. */
+export const approveRepaymentEndpoint = v1({
+  path: '/project-loans/:id/repayments/:rid/approve',
+  method: 'post',
+  body: LoanDecision,
+  rateLimit: WRITE_LIMIT,
+  transactional: true,
+  idempotent: true,
+  handler: async ({ req, body, params }) => detail(req, await approveRepayment(req, idParam(params), idParam(params, 'rid'), { signatureMediaId: body.signatureMediaId ?? null })),
+})
+
+export const rejectRepaymentEndpoint = v1({
+  path: '/project-loans/:id/repayments/:rid/reject',
+  method: 'post',
+  body: LoanReject,
+  rateLimit: WRITE_LIMIT,
+  transactional: true,
+  idempotent: true,
+  handler: async ({ req, body, params }) => detail(req, await rejectRepayment(req, idParam(params), idParam(params, 'rid'), body.reason, { signatureMediaId: body.signatureMediaId ?? null })),
+})
+
+export const cancelRepaymentEndpoint = v1({
+  path: '/project-loans/:id/repayments/:rid/cancel',
+  method: 'post',
+  body: LoanReason,
+  rateLimit: WRITE_LIMIT,
+  transactional: true,
+  idempotent: true,
+  handler: async ({ req, body, params }) => detail(req, await cancelRepayment(req, idParam(params), idParam(params, 'rid'), body.reason)),
+})
+
+export const executeRepaymentEndpoint = v1({
+  path: '/project-loans/:id/repayments/:rid/execute',
+  method: 'post',
+  body: LoanExecute,
+  rateLimit: WRITE_LIMIT,
+  transactional: true,
+  idempotent: true,
+  handler: async ({ req, body, params }) =>
+    detail(req, await executeRepayment(req, idParam(params), idParam(params, 'rid'), { executeDate: body.executeDate, note: body.note ?? null, proofMediaId: body.proofMediaId ?? null, confirmOverdraft: body.confirmOverdraft === true })),
 })
 
 export const voidRepaymentEndpoint = v1({
@@ -183,10 +271,11 @@ export const voidRepaymentEndpoint = v1({
   handler: async ({ req, body, params }) => detail(req, await voidRepayment(req, idParam(params), idParam(params, 'rid'), body.reason)),
 })
 
-/** Order matters: `/project-loans/inbox` and `/options` before `/project-loans/:id`. */
+/** Order matters: `/project-loans/inbox`, `/transfer-orders` and `/options` before `/project-loans/:id`. */
 export const LOAN_ENDPOINTS: Endpoint[] = [
   listLoansEndpoint,
   loanInboxEndpoint,
+  loanTransferOrdersEndpoint,
   loanOptionsEndpoint,
   getLoanEndpoint,
   createLoanEndpoint,
@@ -196,6 +285,11 @@ export const LOAN_ENDPOINTS: Endpoint[] = [
   approveLoanEndpoint,
   rejectLoanEndpoint,
   disburseLoanEndpoint,
+  executeLoanEndpoint,
   addRepaymentEndpoint,
+  approveRepaymentEndpoint,
+  rejectRepaymentEndpoint,
+  cancelRepaymentEndpoint,
+  executeRepaymentEndpoint,
   voidRepaymentEndpoint,
 ]

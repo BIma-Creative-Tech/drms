@@ -18,6 +18,8 @@ import '../../expense/domain/request_status.dart';
 import '../../expense/presentation/widgets/receipt_mismatch_chip.dart';
 import '../../loans/presentation/intercompany_loan_providers.dart';
 import '../../loans/presentation/intercompany_loan_screens.dart';
+import '../../loans/presentation/loan_providers.dart';
+import '../../loans/presentation/loan_transfer_orders.dart';
 import '../application/finance_providers.dart';
 import '../domain/transfer_queue.dart';
 
@@ -148,8 +150,10 @@ class _TransferQueueViewState extends ConsumerState<TransferQueueView> {
         Expanded(
           child: RefreshIndicator(
             onRefresh: () {
-              // ADR 0029: the "Pencairan pinjaman antar-PT" section above the queue reloads with it
+              // ADR 0029: the "Pencairan pinjaman antar-PT" section above the queue reloads with it; user decision
+              // 2026-10-24: so do the inter-project loan transfer orders
               ref.invalidate(icLoanQueueProvider);
+              ref.invalidate(loanTransferOrdersProvider);
               return ref.refresh(transferQueueProvider.future);
             },
             child: AsyncBody(
@@ -170,6 +174,7 @@ class _TransferQueueViewState extends ConsumerState<TransferQueueView> {
                     padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
                     children: [
                       const IcLoanQueueSection(),
+                      const LoanTransferOrderSection(),
                       Padding(
                         padding: const EdgeInsets.all(32),
                         child: Column(
@@ -189,9 +194,11 @@ class _TransferQueueViewState extends ConsumerState<TransferQueueView> {
                   key: const Key('transfer-queue'),
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
                   // ADR 0029: index 0 = "Pencairan pinjaman antar-PT" (Finance of a lender PT; hidden when empty)
+                  // and the inter-project loan transfer orders (user decision 2026-10-24; hidden when empty)
                   itemCount: shown.length + 2,
-                  itemBuilder: (_, j) =>
-                      j == 0 ? const IcLoanQueueSection() : _queueRow(j - 1, shown, items.length, more),
+                  itemBuilder: (_, j) => j == 0
+                      ? const Column(children: [IcLoanQueueSection(), LoanTransferOrderSection()])
+                      : _queueRow(j - 1, shown, items.length, more),
                 );
               },
             ),

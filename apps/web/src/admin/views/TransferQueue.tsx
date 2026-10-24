@@ -20,12 +20,14 @@ import { ReimburseReceiptReview, loadReimburseReview } from '../components/Reimb
 import { SlaAgeBadge } from '../components/SlaAgeBadge'
 import { accountsOf, itemCompany, PtChip, PtScopeNote, ptView } from './pt'
 import { IcLoanQueueSection } from './IntercompanyLoans'
+import { LoanTransferOrderSection } from './Loans'
 import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
 
 /**
  * "Antrian Transfer" (M05, US-19/US-20): Pengajuan Baru "Disetujui (Antri Transfer)" and Reimburse
  * "Nota Terverifikasi (Antri Transfer)", sorted by needed date, open flags shown. Finance records
  * the transfer (cash account, bank reference, proof); the amount is the approved amount (G3).
+ * DRMS 24/10 #11/#12: + "Transfer pinjaman antar project" (approved loans / repayment requests of inter-project loans).
  */
 export async function TransferQueue(props: AdminViewServerProps) {
   const req = props.initPageResult.req
@@ -217,6 +219,8 @@ export async function TransferQueue(props: AdminViewServerProps) {
       )}
       {items.length > 0 ? <Pager id="antrian-transfer" path="/admin/antrian-transfer" sp={props.searchParams} page={page} unit="pengajuan" /> : null}
       <style>{KAS_STYLE}</style>
+      {/* DRMS 24/10 #11/#12: transfer orders of inter-project loans (disbursements + repayments approved by the Owner) */}
+      <LoanTransferOrderSection req={req} companyIds={ptIds.length ? ptIds : undefined} />
       {/* ADR 0029 §3.5: "Pencairan pinjaman antar-PT" — instructed loans whose lender is a PT where the caller is Finance */}
       <IcLoanQueueSection req={req} />
       {/* E2 (US-24, T8): recorded transfers that can still be voided (request "Sudah Ditransfer"). */}

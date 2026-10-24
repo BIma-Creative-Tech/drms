@@ -181,7 +181,9 @@ export type SlaBlock = Awaited<ReturnType<typeof slaBlock>>
  */
 export async function loanBlock(req: PayloadRequest) {
   const d = await loanDashboard(req)
-  const waitingForMe = (await loanInbox(req)).items.length
+  const inbox = await loanInbox(req)
+  // 2026-10-24 (#12): loans AND repayment requests waiting for the caller's level
+  const waitingForMe = inbox.items.length + inbox.repayments.length
   return { totals: d.totals, projects: d.projects, waitingForMe }
 }
 export type LoanBlock = Awaited<ReturnType<typeof loanBlock>>

@@ -18,10 +18,10 @@ const ctx = (over: Partial<LoanActorContext> = {}): LoanActorContext => ({
   ...over,
 })
 
-describe('isCashBacked: money between two different known accounts', () => {
+describe('isCashBacked: money between two known accounts (2026-10-24: one shared account too)', () => {
   it.each([
     [{ kind: 'dana', lenderCashAccountId: 1, borrowerCashAccountId: 2 }, true],
-    [{ kind: 'dana', lenderCashAccountId: 1, borrowerCashAccountId: 1 }, false],
+    [{ kind: 'dana', lenderCashAccountId: 1, borrowerCashAccountId: 1 }, true],
     [{ kind: 'barang', lenderCashAccountId: 1, borrowerCashAccountId: 2 }, false],
     [{ kind: 'dana', lenderCashAccountId: null, borrowerCashAccountId: 2 }, false],
     [{ kind: 'dana', lenderCashAccountId: 1, borrowerCashAccountId: undefined }, false],
@@ -39,11 +39,12 @@ describe('automatic loan due date', () => {
 })
 
 describe('loanAllowedActions with cash (ADR 0031)', () => {
-  it('approved cash-backed loan: Finance disburses once; nobody repays before the disbursement', () => {
+  it('approved cash-backed loan: Finance executes the transfer order once; nobody repays before it (2026-10-24: then PM / Finance request)', () => {
     expect(loanAllowedActions(ctx({ isFinance: true, cashBacked: true, disbursed: false }))).toEqual(['disburse'])
     expect(loanAllowedActions(ctx({ isBorrowerPm: true, cashBacked: true, disbursed: false }))).toEqual([])
     expect(loanAllowedActions(ctx({ isFinance: true, cashBacked: true, disbursed: true }))).toEqual(['repay'])
-    expect(loanAllowedActions(ctx({ isBorrowerPm: true, cashBacked: true, disbursed: true }))).toEqual([])
+    expect(loanAllowedActions(ctx({ isBorrowerPm: true, cashBacked: true, disbursed: true }))).toEqual(['repay'])
+    expect(loanAllowedActions(ctx({ isBorrowerPm: true, cashBacked: true, disbursed: true, repayableAmount: 0 }))).toEqual([])
   })
 
   it('a claim (no cash) keeps ADR 0022: borrower PM or Finance repay, no disbursement', () => {

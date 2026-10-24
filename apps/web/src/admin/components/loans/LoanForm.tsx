@@ -10,7 +10,7 @@ import { WrapSelect } from '../WrapSelect'
 
 /**
  * ADR 0022: PM form of an inter-project loan ("Pinjaman antar project") — project peminjam (projects the caller is
- * PM of), project pemberi (open projects of the SAME PT), jenis (Dana / Barang/material), nilai (Rupiah), alasan,
+ * PM of; DRMS 24/10 #10: for Finance every open project of its PTs), project pemberi (open projects of the SAME PT), jenis (Dana / Barang/material), nilai (Rupiah), alasan,
  * tanggal pinjaman (default today, not future) and jatuh tempo (required, ≥ tanggal pinjaman). "Ajukan ke Direktur"
  * creates + submits in one call (POST /api/v1/project-loans {submit:true}); "Simpan draft" keeps a Draft. Edit mode
  * PATCHes a Draft (borrower fixed). Inline errors under each field (server errors mapped by path); one
@@ -133,7 +133,7 @@ export function LoanForm({ borrowers, lenders, today, initialBorrower, edit }: {
               </option>
             ))}
           </WrapSelect>
-          {err('borrowerProjectId') ?? <p className="help">Project yang memakai dana / barang (Anda PM-nya).</p>}
+          {err('borrowerProjectId') ?? <p className="help">Project yang memakai dana / barang (Anda PM-nya, atau Finance PT-nya).</p>}
         </div>
         <div className="pk-fld">
           <label htmlFor={`${uid}-l`}>Project pemberi pinjaman{req}</label>
@@ -256,7 +256,7 @@ export function LoanForm({ borrowers, lenders, today, initialBorrower, edit }: {
             </p>
           ) : (
             <p id={`${uid}-rh`} className="help">
-              Untuk apa dana / barang dipakai dan bagaimana dikembalikan. Dibaca Direktur dan PM project pemberi.
+              Untuk apa dana / barang dipakai dan bagaimana dikembalikan. Dibaca Direktur, Owner dan PM project pemberi.
             </p>
           )}
         </div>

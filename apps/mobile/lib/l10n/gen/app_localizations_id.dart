@@ -3670,7 +3670,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get loanNoBorrower =>
-      'Pinjaman antar project diajukan oleh PM project peminjam. Anda belum menjadi PM project yang aktif.';
+      'Pinjaman antar project diajukan oleh PM project peminjam atau Finance. Anda belum menjadi PM project yang aktif.';
 
   @override
   String get loanBorrower => 'Project peminjam';
@@ -3752,7 +3752,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String loanApproveBody(String borrower, String amount, String lender) {
-    return '$borrower meminjam $amount dari $lender. Bila pusat biaya kedua project berbeda (dana), Finance mencairkan dana: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat biaya peminjam.';
+    return '$borrower meminjam $amount dari $lender. Persetujuan Direktur lalu Owner; untuk dana, Finance kemudian mentransfer lewat Antrian Transfer: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat biaya peminjam.';
   }
 
   @override
@@ -5919,24 +5919,24 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
-  String get loanCashWaiting => 'Menunggu pencairan Finance';
+  String get loanCashWaiting => 'Menunggu transfer Finance (Antrian Transfer)';
 
   @override
   String get loanCashCancelled => 'Dibatalkan (jurnal balik)';
 
   @override
-  String get loanCashTbd => 'Ditentukan saat disetujui (dana antar pusat biaya berbeda → dicairkan Finance)';
+  String get loanCashTbd => 'Ditentukan saat disetujui (dana → ditransfer Finance lewat Antrian Transfer)';
 
   @override
-  String get loanCashNone => 'Tanpa transaksi kas (barang, atau pusat biaya sama)';
+  String get loanCashNone => 'Tanpa transaksi kas (barang, atau pinjaman lama dengan pusat biaya sama)';
 
   @override
   String loanAwaitingDisbursement(String lender, String borrower) {
-    return 'Disetujui — menunggu Finance mencairkan dana dari $lender ke $borrower.';
+    return 'Disetujui — menunggu Finance mentransfer dana dari $lender ke $borrower lewat Antrian Transfer.';
   }
 
   @override
-  String get loanStepDisburse => 'Pencairan Finance';
+  String get loanStepDisburse => 'Transfer Finance';
 
   @override
   String get loanStepDisbursed => 'Dicairkan';
@@ -5962,4 +5962,119 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get kpiCostCentersTeamEmpty => 'Project Anda belum dipetakan ke pusat biaya (akun kas).';
+
+  @override
+  String get loanStepOwner => 'Persetujuan Owner';
+
+  @override
+  String get loanStepSubmittedFinance => 'Diajukan Finance';
+
+  @override
+  String get loanOpenTransferQueue => 'Buka Antrian Transfer';
+
+  @override
+  String get loanRepayRequest => 'Ajukan pengembalian';
+
+  @override
+  String loanRepayRequestTitle(String title) {
+    return 'Ajukan pengembalian $title';
+  }
+
+  @override
+  String get loanRepayRequestHint =>
+      'Disetujui Direktur lalu Owner, kemudian ditransfer Finance lewat Antrian Transfer (kas keluar dari pusat biaya peminjam, kas masuk ke pusat biaya pemberi).';
+
+  @override
+  String loanRepayable(String amount) {
+    return 'Dapat diajukan $amount';
+  }
+
+  @override
+  String get loanRepayPlannedDate => 'Rencana tanggal pengembalian';
+
+  @override
+  String loanRepayRequested(String amount) {
+    return 'Pengembalian $amount diajukan ke Direktur.';
+  }
+
+  @override
+  String loanRepayPlannedOn(String date) {
+    return 'rencana $date';
+  }
+
+  @override
+  String loanSubmittedBy(String name) {
+    return 'diajukan $name';
+  }
+
+  @override
+  String loanRepaymentExecutedBy(String name) {
+    return 'ditransfer $name';
+  }
+
+  @override
+  String loanRepaymentRejected(String reason) {
+    return 'Ditolak: $reason';
+  }
+
+  @override
+  String loanRepaymentCancelled(String reason) {
+    return 'Dibatalkan: $reason';
+  }
+
+  @override
+  String loanRepaymentApproveTitle(String amount) {
+    return 'Setujui pengembalian $amount?';
+  }
+
+  @override
+  String get loanRepaymentApproveBody =>
+      'Setelah persetujuan Owner, Finance mentransfer dari pusat biaya peminjam ke pusat biaya pemberi lewat Antrian Transfer.';
+
+  @override
+  String loanRepaymentRejectTitle(String amount) {
+    return 'Tolak pengembalian $amount?';
+  }
+
+  @override
+  String loanRepaymentCancelTitle(String amount) {
+    return 'Batalkan pengembalian $amount?';
+  }
+
+  @override
+  String get loanRepaymentCancelBody => 'Pengajuan pengembalian dibatalkan (tidak dihapus). Alasan wajib.';
+
+  @override
+  String loanRepaymentInboxTitle(String no) {
+    return 'Pengembalian pinjaman $no';
+  }
+
+  @override
+  String loanTransferOrdersTitle(int count) {
+    return 'Transfer pinjaman antar project ($count)';
+  }
+
+  @override
+  String get loanTransferOrderSelf => 'Anda yang mengajukan; boleh dieksekusi sendiri (tercatat di audit).';
+
+  @override
+  String get loanTransferOrderExecute => 'Catat transfer';
+
+  @override
+  String loanTransferOrderExecuteTitle(String no) {
+    return 'Catat transfer $no';
+  }
+
+  @override
+  String loanTransferOrderExecuteBody(String amount, String from, String to) {
+    return 'Kas keluar $amount dari $from dan kas masuk ke $to, masing-masing ditandai project-nya. Bukti transfer dapat dilampirkan di web.';
+  }
+
+  @override
+  String get loanTransferOrderDate => 'Tanggal transfer';
+
+  @override
+  String loanTransferOrderDone(String no) {
+    return 'Transfer $no tercatat.';
+  }
 }

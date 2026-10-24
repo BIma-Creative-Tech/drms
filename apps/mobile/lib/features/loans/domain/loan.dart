@@ -5,6 +5,9 @@
 // and records its repayments (KK borrower, KM lender); a transfer paid from another account than the project's Pusat
 // Biaya records an automatic loan (origin `transfer`, lender = the paying account, no lender project). Goods or the
 // same account stay a claim without cash. Parsing is tolerant (unknown fields ignored, missing ones defaulted).
+// User decision 2026-10-24: the borrower PM or Finance submits; Direktur (level 1) then Owner (level 2) approve; a
+// cash-backed loan then becomes a transfer order in Finance's "Antrian Transfer" (executed there: KK lender, KM
+// borrower). A cash-backed repayment follows the same path (request → Direktur → Owner → Antrian Transfer).
 
 int _int(Object? v, [int fallback = 0]) =>
     v is num ? v.toInt() : (v is String ? int.tryParse(v) ?? fallback : fallback);
@@ -114,6 +117,43 @@ class LoanCash {
       v is Map<String, dynamic> ? LoanCash(kk: _strN(v['kk']), km: _strN(v['km'])) : null;
 }
 
+/// Repayment lifecycle (user decision 2026-10-24): the repayment of a cash-backed loan is a REQUEST — Direktur →
+/// Owner → transfer order in Finance's "Antrian Transfer" → `posted` (executed: KK borrower, KM lender); a claim's
+/// repayment is `posted` at once (ADR 0022). Rows of an older server carry `posted` / `void` only (a missing code is
+/// read as `posted`, as before); an unknown code of a newer server counts as still pending — never as paid.
+enum LoanRepaymentStatus {
+  pendingApproval('pending_approval'),
+  approved('approved'),
+  posted('posted'),
+  voided('void'),
+  rejected('rejected'),
+  cancelled('cancelled');
+
+  const LoanRepaymentStatus(this.code);
+  final String code;
+
+  static LoanRepaymentStatus fromCode(String? c) =>
+      LoanRepaymentStatus.values.where((s) => s.code == c).firstOrNull ?? (c == null ? posted : pendingApproval);
+
+  /// Void / rejected / cancelled: shown struck through, never counted.
+  bool get closed => this == voided || this == rejected || this == cancelled;
+}
+
+/// Row actions of a repayment (`repayments[].allowedActions`, the server decides): Setujui / Tolak (Direktur, Owner),
+/// Batalkan (submitter; Finance once approved), execute (Finance — done in the Antrian Transfer), void (posted).
+enum LoanRepaymentAction {
+  approve('approve'),
+  reject('reject'),
+  cancel('cancel'),
+  execute('execute'),
+  voidRepayment('void');
+
+  const LoanRepaymentAction(this.code);
+  final String code;
+
+  static LoanRepaymentAction? fromCode(String c) => LoanRepaymentAction.values.where((a) => a.code == c).firstOrNull;
+}
+
 class LoanRepayment {
   const LoanRepayment({
     required this.id,
@@ -121,28 +161,58 @@ class LoanRepayment {
     required this.repayDate,
     required this.amount,
     this.note,
-    required this.posted,
+    this.status = LoanRepaymentStatus.posted,
     required this.statusLabel,
+    this.approvalLevel,
+    this.plannedDate,
     this.voidReason,
+    this.rejectReason,
+    this.cancelReason,
     this.recordedByName,
     this.voidedByName,
+    this.executedAt,
+    this.executedByName,
     this.cash,
+    this.allowedActions = const {},
+    this.decisions = const [],
   });
   final int id;
 
-  /// "Pengembalian ke-n" among the posted repayments (null when void).
+  /// "Pengembalian ke-n" among the posted repayments (null otherwise).
   final int? seq;
+
+  /// The planned date until the transfer is executed, then the execution date.
   final String repayDate;
   final int amount;
   final String? note;
-  final bool posted;
+  final LoanRepaymentStatus status;
   final String statusLabel;
+
+  /// 1 = waiting for the Direktur, 2 = waiting for the Owner (pending only).
+  final int? approvalLevel;
+  final String? plannedDate;
   final String? voidReason;
+  final String? rejectReason;
+  final String? cancelReason;
+
+  /// The submitter (a request) or the recorder (a claim's repayment).
   final String? recordedByName;
   final String? voidedByName;
+  final String? executedAt;
+  final String? executedByName;
 
   /// ADR 0031: KK (borrower) / KM (lender) numbers of a cash-backed loan's repayment; null for a claim or a void.
   final LoanCash? cash;
+  final Set<LoanRepaymentAction> allowedActions;
+
+  /// Direktur / Owner decisions of the request (level order).
+  final List<LoanDecision> decisions;
+
+  /// Executed / recorded (counts in the repaid total).
+  bool get posted => status == LoanRepaymentStatus.posted;
+
+  /// Request still on its way (approval or transfer order).
+  bool get open => status == LoanRepaymentStatus.pendingApproval || status == LoanRepaymentStatus.approved;
 
   factory LoanRepayment.fromJson(Map<String, dynamic> j) => LoanRepayment(
     id: _int(j['id']),
@@ -150,24 +220,45 @@ class LoanRepayment {
     repayDate: '${j['repayDate'] ?? ''}',
     amount: _int(j['amount']),
     note: _strN(j['note']),
-    posted: j['status'] != 'void',
+    status: LoanRepaymentStatus.fromCode(_strN(j['status'])),
     statusLabel: '${j['statusLabel'] ?? ''}',
+    approvalLevel: _intN(j['approvalLevel']),
+    plannedDate: _strN(j['plannedDate']),
     voidReason: _strN(j['voidReason']),
+    rejectReason: _strN(j['rejectReason']),
+    cancelReason: _strN(j['cancelReason']),
     recordedByName: _strN(_map(j['recordedBy'])['name']),
     voidedByName: _strN(_map(j['voidedBy'])['name']),
+    executedAt: _strN(j['executedAt']),
+    executedByName: _strN(_map(j['executedBy'])['name']),
     cash: LoanCash.fromJson(j['cash']),
+    allowedActions: {for (final a in _list(j['allowedActions'])) ?LoanRepaymentAction.fromCode('$a')},
+    decisions: [for (final d in _list(j['decisions'])) LoanDecision.fromJson(_map(d))],
   );
 }
 
 class LoanDecision {
-  const LoanDecision({required this.approved, this.actorName, this.reason, this.decidedAt});
+  const LoanDecision({
+    required this.approved,
+    this.level = 1,
+    this.levelLabel,
+    this.actorName,
+    this.reason,
+    this.decidedAt,
+  });
   final bool approved;
+
+  /// 1 = Direktur, 2 = Owner (user decision 2026-10-24); an older server's single decision is level 1.
+  final int level;
+  final String? levelLabel;
   final String? actorName;
   final String? reason;
   final String? decidedAt;
 
   factory LoanDecision.fromJson(Map<String, dynamic> j) => LoanDecision(
     approved: j['decision'] != 'rejected',
+    level: _int(j['level'], 1),
+    levelLabel: _strN(j['levelLabel']),
     actorName: _strN(_map(j['actor'])['name']),
     reason: _strN(j['reason']),
     decidedAt: _strN(j['decidedAt']),
@@ -188,6 +279,8 @@ class Loan {
     required this.kindLabel,
     this.origin = 'manual',
     this.originLabel = '',
+    this.approvalLevel,
+    this.submitterRole,
     this.lender,
     required this.borrower,
     this.lenderCashAccount,
@@ -201,6 +294,8 @@ class Loan {
     required this.amount,
     this.repaidTotal = 0,
     this.outstanding = 0,
+    this.repayableAmount = 0,
+    this.repaymentNeedsApproval = false,
     required this.reason,
     required this.loanDate,
     required this.dueDate,
@@ -238,6 +333,13 @@ class Loan {
   final String origin;
   final String originLabel;
 
+  /// User decision 2026-10-24: 1 = waiting for the Direktur, 2 = waiting for the Owner (pending only; null from an
+  /// older server = the Direktur step).
+  final int? approvalLevel;
+
+  /// `pm` | `finance` — who submitted a manual loan (null: automatic loan or older server).
+  final String? submitterRole;
+
   /// Null for an automatic loan — its lender is [lenderCashAccount] (ADR 0031).
   final LoanProjectRef? lender;
   final LoanProjectRef borrower;
@@ -262,6 +364,13 @@ class Loan {
   final int amount;
   final int repaidTotal;
   final int outstanding;
+
+  /// Highest amount of a NEW repayment: outstanding minus the repayments still pending / approved (older server: the
+  /// outstanding).
+  final int repayableAmount;
+
+  /// Cash-backed loan: a repayment is a request (Direktur → Owner → Antrian Transfer), not an immediate record.
+  final bool repaymentNeedsApproval;
   final String reason;
   final String loanDate;
   final String dueDate;
@@ -291,6 +400,9 @@ class Loan {
   /// Automatic loan of a transfer (ADR 0031).
   bool get automatic => origin == 'transfer';
 
+  /// Waiting for the Owner (level 2) — else a pending loan waits for the Direktur.
+  bool get waitingOwner => status == LoanStatus.pendingApproval && approvalLevel == 2;
+
   /// Web `lenderText`: the lender project, else "Akun <name>" (an automatic loan's paying account).
   String get lenderLabel => lender?.label ?? 'Akun ${lenderCashAccount?.label ?? '—'}';
 
@@ -310,6 +422,8 @@ class Loan {
     kindLabel: '${j['kindLabel'] ?? ''}',
     origin: '${j['origin'] ?? 'manual'}',
     originLabel: '${j['originLabel'] ?? ''}',
+    approvalLevel: _intN(j['approvalLevel']),
+    submitterRole: _strN(j['submitterRole']),
     lender: j['lenderProject'] is Map<String, dynamic> ? LoanProjectRef.fromJson(j['lenderProject']) : null,
     borrower: LoanProjectRef.fromJson(j['borrowerProject']),
     lenderCashAccount: LoanAccountRef.fromJson(j['lenderCashAccount']),
@@ -323,6 +437,8 @@ class Loan {
     amount: _int(j['amount']),
     repaidTotal: _int(j['repaidTotal']),
     outstanding: _int(j['outstanding']),
+    repayableAmount: _int(j['repayableAmount'] ?? j['outstanding']),
+    repaymentNeedsApproval: j['repaymentNeedsApproval'] == true,
     reason: '${j['reason'] ?? ''}',
     loanDate: '${j['loanDate'] ?? ''}',
     dueDate: '${j['dueDate'] ?? ''}',
@@ -414,7 +530,161 @@ class LoanSummary {
   }
 }
 
-/// "Catat pengembalian" checks (web RepaymentAction messages; the server re-checks).
+/// User decision 2026-10-24 `GET /project-loans/inbox`: loans AND cash-backed repayment requests waiting for the
+/// caller's decision (Direktur level 1, Owner level 2). An older server answers the loans only.
+class LoanInbox {
+  const LoanInbox({this.loans = const [], this.repayments = const []});
+  final List<Loan> loans;
+  final List<LoanRepaymentInboxItem> repayments;
+
+  int get count => loans.length + repayments.length;
+
+  factory LoanInbox.fromJson(Map<String, dynamic> j) => LoanInbox(
+    loans: [for (final i in _list(j['items'])) Loan.fromJson(_map(i))],
+    repayments: [for (final r in _list(j['repayments'])) LoanRepaymentInboxItem.fromJson(_map(r))],
+  );
+}
+
+/// One repayment request in the inbox (decided on the loan detail).
+class LoanRepaymentInboxItem {
+  const LoanRepaymentInboxItem({
+    required this.id,
+    required this.loanId,
+    this.companyId,
+    this.loanDocNo,
+    this.lender,
+    required this.borrower,
+    required this.amount,
+    this.plannedDate,
+    this.note,
+    this.approvalLevel,
+    this.statusLabel = '',
+    this.submittedBy,
+    this.submittedAt,
+  });
+  final int id;
+  final int loanId;
+  final int? companyId;
+  final String? loanDocNo;
+  final LoanProjectRef? lender;
+  final LoanProjectRef borrower;
+  final int amount;
+  final String? plannedDate;
+  final String? note;
+  final int? approvalLevel;
+  final String statusLabel;
+  final LoanUserRef? submittedBy;
+  final String? submittedAt;
+
+  factory LoanRepaymentInboxItem.fromJson(Map<String, dynamic> j) => LoanRepaymentInboxItem(
+    id: _int(j['id']),
+    loanId: _int(j['loanId']),
+    companyId: _intN(j['companyId']),
+    loanDocNo: _strN(j['loanDocNo']),
+    lender: j['lenderProject'] is Map<String, dynamic> ? LoanProjectRef.fromJson(j['lenderProject']) : null,
+    borrower: LoanProjectRef.fromJson(j['borrowerProject']),
+    amount: _int(j['amount']),
+    plannedDate: _strN(j['plannedDate']),
+    note: _strN(j['note']),
+    approvalLevel: _intN(j['approvalLevel']),
+    statusLabel: '${j['statusLabel'] ?? ''}',
+    submittedBy: LoanUserRef.fromJson(j['submittedBy']),
+    submittedAt: _strN(j['submittedAt']),
+  );
+}
+
+/// User decision 2026-10-24 `GET /project-loans/transfer-orders`: an approved cash-backed loan (`loan`: KK lender
+/// account, KM borrower account) or repayment (`repayment`: KK borrower, KM lender) waiting in Finance's "Antrian
+/// Transfer". Executed by Finance of the PT (`canExecute`); the submitter, when Finance, may execute it himself.
+class LoanTransferOrder {
+  const LoanTransferOrder({
+    required this.kind,
+    required this.id,
+    required this.loanId,
+    this.companyId,
+    this.docNo,
+    this.title = '',
+    required this.amount,
+    this.date,
+    this.minDate,
+    this.today,
+    this.fromAccount,
+    this.toAccount,
+    this.fromProject,
+    this.toProject,
+    this.note,
+    this.reason = '',
+    this.submittedBy,
+    this.approvedAt,
+    this.selfSubmitted = false,
+    this.canExecute = false,
+  });
+
+  /// `loan` | `repayment`.
+  final String kind;
+
+  /// Loan id (`loan`) or repayment id (`repayment`).
+  final int id;
+  final int loanId;
+  final int? companyId;
+  final String? docNo;
+  final String title;
+  final int amount;
+  final String? date;
+
+  /// Earliest execution date (the loan date) and the PT's business date (latest).
+  final String? minDate;
+  final String? today;
+  final LoanAccountRef? fromAccount;
+  final LoanAccountRef? toAccount;
+  final LoanProjectRef? fromProject;
+  final LoanProjectRef? toProject;
+  final String? note;
+  final String reason;
+  final LoanUserRef? submittedBy;
+  final String? approvedAt;
+  final bool selfSubmitted;
+  final bool canExecute;
+
+  bool get repayment => kind == 'repayment';
+
+  /// Unique within the list (a loan and a repayment may share an id).
+  String get key => '$kind-$id';
+
+  factory LoanTransferOrder.fromJson(Map<String, dynamic> j) => LoanTransferOrder(
+    kind: '${j['kind'] ?? 'loan'}',
+    id: _int(j['id']),
+    loanId: _int(j['loanId'] ?? j['id']),
+    companyId: _intN(j['companyId']),
+    docNo: _strN(j['docNo']),
+    title: '${j['title'] ?? ''}',
+    amount: _int(j['amount']),
+    date: _strN(j['date']),
+    minDate: _strN(j['minDate']),
+    today: _strN(j['today']),
+    fromAccount: LoanAccountRef.fromJson(j['fromAccount']),
+    toAccount: LoanAccountRef.fromJson(j['toAccount']),
+    fromProject: j['fromProject'] is Map<String, dynamic> ? LoanProjectRef.fromJson(j['fromProject']) : null,
+    toProject: j['toProject'] is Map<String, dynamic> ? LoanProjectRef.fromJson(j['toProject']) : null,
+    note: _strN(j['note']),
+    reason: '${j['reason'] ?? ''}',
+    submittedBy: LoanUserRef.fromJson(j['submittedBy']),
+    approvedAt: _strN(j['approvedAt']),
+    selfSubmitted: j['selfSubmitted'] == true,
+    canExecute: j['canExecute'] == true,
+  );
+}
+
+class LoanTransferOrders {
+  const LoanTransferOrders({this.items = const []});
+  final List<LoanTransferOrder> items;
+
+  factory LoanTransferOrders.fromJson(Map<String, dynamic> j) =>
+      LoanTransferOrders(items: [for (final i in _list(j['items'])) LoanTransferOrder.fromJson(_map(i))]);
+}
+
+/// "Catat pengembalian" / "Ajukan pengembalian" checks (web RepaymentAction messages; the server re-checks).
+/// [outstanding] is the highest amount allowed now (`Loan.repayableAmount`).
 Map<String, String> validateRepayment({required int? amount, required int outstanding, required String? repayDate}) => {
   if (amount == null || amount <= 0) 'amount': 'Nominal pengembalian wajib diisi (> 0).',
   if (amount != null && amount > outstanding) 'amount': 'Nominal melebihi sisa pinjaman.',

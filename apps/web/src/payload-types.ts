@@ -1731,11 +1731,12 @@ export interface Approval {
    * Mengikuti dokumen induk.
    */
   company?: (number | null) | Company;
-  docType: 'expense_request' | 'budget_addendum' | 'expense_shortfall' | 'project_loan';
+  docType: 'expense_request' | 'budget_addendum' | 'expense_shortfall' | 'project_loan' | 'project_loan_repayment';
   request?: (number | null) | ExpenseRequest;
   addendum?: (number | null) | BudgetAddendum;
   settlement?: (number | null) | Settlement;
   loan?: (number | null) | ProjectLoan;
+  loanRepayment?: (number | null) | ProjectLoanRepayment;
   cycle: number;
   position: 'diajukan' | 'dibuat' | 'diketahui' | 'approval';
   level: number;
@@ -2077,6 +2078,8 @@ export interface ProjectLoan {
   rejectReason?: string | null;
   cancelReason?: string | null;
   approvalCycle?: number | null;
+  approvalLevel?: number | null;
+  submitterRole?: ('pm' | 'finance') | null;
   g1Exception?: string | null;
   source?: ('web' | 'apk') | null;
   uuid?: string | null;
@@ -2103,11 +2106,20 @@ export interface ProjectLoanRepayment {
   repayDate: string;
   amount: number;
   note?: string | null;
-  status: 'posted' | 'void';
+  status: 'pending_approval' | 'approved' | 'posted' | 'void' | 'rejected' | 'cancelled';
   voidReason?: string | null;
   recordedBy: number | User;
   voidedBy?: (number | null) | User;
   voidedAt?: string | null;
+  plannedDate?: string | null;
+  approvalLevel?: number | null;
+  submittedAt?: string | null;
+  decidedAt?: string | null;
+  decidedBy?: (number | null) | User;
+  rejectReason?: string | null;
+  cancelReason?: string | null;
+  executedAt?: string | null;
+  executedBy?: (number | null) | User;
   source?: ('web' | 'apk') | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -4169,6 +4181,7 @@ export interface ApprovalsSelect<T extends boolean = true> {
   addendum?: T;
   settlement?: T;
   loan?: T;
+  loanRepayment?: T;
   cycle?: T;
   position?: T;
   level?: T;
@@ -4822,6 +4835,8 @@ export interface ProjectLoansSelect<T extends boolean = true> {
   rejectReason?: T;
   cancelReason?: T;
   approvalCycle?: T;
+  approvalLevel?: T;
+  submitterRole?: T;
   g1Exception?: T;
   source?: T;
   uuid?: T;
@@ -4844,6 +4859,15 @@ export interface ProjectLoanRepaymentsSelect<T extends boolean = true> {
   recordedBy?: T;
   voidedBy?: T;
   voidedAt?: T;
+  plannedDate?: T;
+  approvalLevel?: T;
+  submittedAt?: T;
+  decidedAt?: T;
+  decidedBy?: T;
+  rejectReason?: T;
+  cancelReason?: T;
+  executedAt?: T;
+  executedBy?: T;
   source?: T;
   changeReason?: T;
   updatedAt?: T;

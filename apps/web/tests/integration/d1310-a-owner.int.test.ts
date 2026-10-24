@@ -262,14 +262,20 @@ describe('3. LPJ shortfall re-approval uses the same rule and roles (PM → Dire
   })
 })
 
-describe('4. Loans and Addendum RAB stay Direktur-only', () => {
-  it('the Owner cannot decide an inter-project loan; the Direktur can', async () => {
+describe('4. Addendum RAB stays Direktur-only; loans: Direktur then Owner (2026-10-24)', () => {
+  it('the Owner cannot decide the Direktur level of an inter-project loan; after the Direktur he decides the Owner level', async () => {
     const L = '/api/v1/project-loans'
-    const c = await api('POST', L, w.users.pm, { borrowerProjectId: w.project, lenderProjectId: w.otherProject, amount: 1_500_000, reason: 'Termin klien belum cair', dueDate: addDays(today(), 30), submit: true }, key())
+    const c = await api('POST', L, w.users.pm, { borrowerProjectId: w.project, lenderProjectId: w.otherProject, kind: 'barang', amount: 1_500_000, reason: 'Termin klien belum cair', dueDate: addDays(today(), 30), submit: true }, key())
     expect(c.status, JSON.stringify(c.body)).toBe(201)
     expect((await api('POST', `${L}/${c.body.id}/approve`, principal, {}, key())).status).toBe(403)
     expect((await api('GET', `${L}/inbox`, principal)).body.items?.find((x: { id: number }) => x.id === c.body.id)).toBeUndefined()
-    expect((await api('POST', `${L}/${c.body.id}/approve`, w.users.owner, {}, key())).status).toBe(200)
+    const d = await api('POST', `${L}/${c.body.id}/approve`, w.users.owner, {}, key())
+    expect(d.status, JSON.stringify(d.body)).toBe(200)
+    expect(d.body).toMatchObject({ status: 'pending_approval', statusLabel: 'Menunggu persetujuan Owner' })
+    expect((await api('GET', `${L}/inbox`, principal)).body.items?.find((x: { id: number }) => x.id === c.body.id)).toBeDefined()
+    const o = await api('POST', `${L}/${c.body.id}/approve`, principal, {}, key())
+    expect(o.status, JSON.stringify(o.body)).toBe(200)
+    expect(o.body.status).toBe('approved')
   })
   it('the Owner cannot give the Direktur "Diketahui" of an addendum; the Direktur can', async () => {
     const c = await api('POST', '/api/v1/budget-addenda', w.users.pm, { projectId: w.project, addition: 1_000_000, reason: 'Tambah pekerjaan pagar' })

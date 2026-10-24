@@ -9,7 +9,7 @@ import { PROJECT_WITHOUT_PB } from '@/fields/pusat-biaya'
 import { resetRateLimits } from '@/lib/rate-limit'
 
 import { getTestPayload, sqlAs, sqlError } from './helpers'
-import { api, asUser, draftBody, makeWorld, png, sysCreate, upload, type World } from './flow-world'
+import { api, asUser, draftBody, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
 
 /**
  * ADR 0031 (DRMS 21/10) "Pusat Biaya = akun kas" through the real API and the DB guards:
@@ -17,8 +17,9 @@ import { api, asUser, draftBody, makeWorld, png, sysCreate, upload, type World }
  * - Finance pays from ANOTHER account → automatic, approved inter-project loan (reason required) with KK on the paying
  *   account + KM on the Pusat Biaya, then the transfer KK on the Pusat Biaya (A nets to 0, B carries the payment);
  *   the transfer void reverses the loan legs and cancels the loan (refused while a repayment is posted);
- * - a manual PJ of money between two different Pusat Biaya: Direktur approves → Finance "Cairkan" (KK lender, KM
- *   borrower) → repayments by Finance post the mirror pair, a void reverses it; same account / goods → a claim (no cash);
+ * - a manual PJ of money between two different Pusat Biaya: Direktur → Owner approve (2026-10-24 #10) → a transfer
+ *   order Finance executes (KK lender, KM borrower, each tagged with its project) → repayment REQUESTS (Direktur → Owner →
+ *   executed) post the mirror pair, a void reverses it; goods → a claim (no cash); one shared account → the pair on it;
  * - the PM picks the Pusat Biaya of his project (names only, no bank data); K-15 per account; loan legs are not
  *   operational cash flow. Fictional data only.
  */
@@ -26,6 +27,7 @@ let w: World
 let accB = 0 // second account of the world's PT (DRMS)
 let projectB = 0 // project mapped to accB, PM = otherPm
 let unmapped = 0 // project without Pusat Biaya
+let principal: FlowUser // 2026-10-24: Owner — level 2 of loans and repayment requests
 
 const E = '/api/v1/expense-requests'
 const L = '/api/v1/project-loans'
@@ -79,7 +81,18 @@ beforeAll(async () => {
   projectB = await sysCreate('projects', { code: 'PB-PB', name: 'PB Proyek Akun Kedua', pm: w.users.otherPm.id, budget: 0, status: 'berjalan', cashAccount: accB })
   unmapped = await sysCreate('projects', { code: 'PB-NO', name: 'PB Proyek Tanpa Pusat Biaya', pm: w.users.pm.id, budget: 0, status: 'berjalan', cashAccount: null })
   for (const e of [w.emp.a]) await sysCreate('team-assignments', { employee: e, project: unmapped, roleInProject: 'staff' })
+  principal = await makeFlowUser(['pk-principal'], 'pb-principal', null)
 })
+
+/** 2026-10-24 (#12): Direktur → Owner approve a repayment request (then it waits in Antrian Transfer). */
+async function approveRepayment(loan: number, rid: number): Promise<void> {
+  for (const u of [w.users.owner, principal]) {
+    const r = await api('POST', `${L}/${loan}/repayments/${rid}/approve`, u, {}, key())
+    expect(r.status, JSON.stringify(r.body)).toBe(200)
+  }
+}
+const tags = async (loan: number, rid: number | null) =>
+  (await sqlAs('app', `SELECT direction::text AS d, project_id::int AS p FROM cash_entries WHERE project_loan_id = $1 AND status = 'posted' AND ${rid === null ? 'project_loan_repayment_id IS NULL' : 'project_loan_repayment_id = $2'} ORDER BY direction`, rid === null ? [loan] : [loan, rid])).rows.map((x) => ({ d: x.d as string, p: x.p === null ? null : Number(x.p) }))
 
 beforeEach(() => resetRateLimits())
 
@@ -175,13 +188,27 @@ describe('2. paid from another account → automatic inter-project loan (DRMS 21
     expect(r.status, JSON.stringify(r.body)).toBe(409)
   })
 
-  it('repayment (Finance; the PM may not): KK on A, KM on B; void reverses; transfer void refused meanwhile', async () => {
-    expect((await api('POST', `${L}/${loan}/repayments`, w.users.pm, { amount: 100_000 }, key())).status).toBe(403)
-    const rep = await api('POST', `${L}/${loan}/repayments`, w.users.finance, { amount: 300_000 }, key())
-    expect(rep.status, JSON.stringify(rep.body)).toBe(201)
+  it('repayment request (2026-10-24 #12: borrower PM or Finance) → Direktur → Owner → executed: KK on A, KM on B; void reverses; transfer void refused meanwhile', async () => {
+    const req1 = await api('POST', `${L}/${loan}/repayments`, w.users.pm, { amount: 300_000, repayDate: addDays(today(), 3) }, key())
+    expect(req1.status, JSON.stringify(req1.body)).toBe(201)
+    expect(req1.body).toMatchObject({ status: 'approved', outstanding: 750_000, repayableAmount: 450_000, repaymentNeedsApproval: true })
+    const rid = req1.body.repayments[0].id as number
+    expect(req1.body.repayments[0]).toMatchObject({ status: 'pending_approval', approvalLevel: 1, plannedDate: addDays(today(), 3), cash: null })
+    // an open request blocks the transfer void (the automatic loan stays)
+    expect((await api('POST', `${E}/${id}/transfers/${transferId}/void`, w.users.finance, { reason: 'salah akun' }, key())).status).toBe(409)
+    await approveRepayment(loan, rid)
+    const order = (await api('GET', `${L}/transfer-orders`, w.users.finance)).body.items.find((i: { key: string }) => i.key === `repayment-${rid}`)
+    expect(order).toMatchObject({ kind: 'repayment', loanId: loan, amount: 300_000, fromAccount: { id: w.cashAccount }, toAccount: { id: accB }, canExecute: true })
+    const rep = await api('POST', `${L}/${loan}/repayments/${rid}/execute`, w.users.finance, {}, key())
+    expect(rep.status, JSON.stringify(rep.body)).toBe(200)
     expect(rep.body).toMatchObject({ status: 'partially_repaid', outstanding: 450_000 })
-    const rid = rep.body.repayments[0].id as number
+    expect(rep.body.repayments[0]).toMatchObject({ status: 'posted', seq: 1, repayDate: today(), executedBy: { id: w.users.finance.id } })
     expect(rep.body.repayments[0].cash).toEqual({ kk: expect.any(String), km: expect.any(String) })
+    // the borrower project on its KK; the automatic loan has no lender project (its KM stays untagged)
+    expect(await tags(loan, rid)).toEqual([
+      { d: 'in', p: null },
+      { d: 'out', p: w.project },
+    ])
     expect((await legs(loan)).filter((x) => x.r === rid)).toEqual([
       { d: 'out', a: w.cashAccount, amount: 300_000, s: 'posted', t: 'project_loan', r: rid },
       { d: 'in', a: accB, amount: 300_000, s: 'posted', t: 'project_loan', r: rid },
@@ -212,60 +239,115 @@ describe('2. paid from another account → automatic inter-project loan (DRMS 21
   })
 })
 
-describe('3. manual PJ of money between two Pusat Biaya (Direktur → Finance "Cairkan")', () => {
+describe('3. manual PJ of money between two Pusat Biaya (Direktur → Owner → transfer order, 2026-10-24)', () => {
   let loan = 0
   const body = (over: Record<string, unknown> = {}) => ({ borrowerProjectId: w.project, lenderProjectId: projectB, amount: 5_000_000, reason: 'Termin belum cair', dueDate: addDays(today(), 30), submit: true, ...over })
+  const approve = async (id: number) => {
+    for (const u of [w.users.owner, principal]) {
+      const r = await api('POST', `${L}/${id}/approve`, u, {}, key())
+      expect(r.status, JSON.stringify(r.body)).toBe(200)
+    }
+    return (await api('GET', `${L}/${id}`, w.users.finance)).body
+  }
 
-  it('approval freezes the accounts → cash-backed, waiting for Finance; the PM cannot repay; Finance notified', async () => {
+  it('the Owner\'s approval freezes the accounts → cash-backed transfer order in Antrian Transfer; nobody repays yet; Finance notified', async () => {
     const c = await api('POST', L, w.users.pm, body(), key())
     expect(c.status, JSON.stringify(c.body)).toBe(201)
     loan = c.body.id
     expect(c.body).toMatchObject({ cashBacked: false, lenderCashAccount: null })
     const a = await api('POST', `${L}/${loan}/approve`, w.users.owner, {}, key())
     expect(a.status, JSON.stringify(a.body)).toBe(200)
-    expect(a.body).toMatchObject({ status: 'approved', cashBacked: true, awaitingDisbursement: true, statusLabel: 'Disetujui – menunggu pencairan', lenderCashAccount: { id: accB }, borrowerCashAccount: { id: w.cashAccount }, disbursement: null })
+    expect(a.body).toMatchObject({ status: 'pending_approval', statusLabel: 'Menunggu persetujuan Owner', cashBacked: false })
+    const o = await api('POST', `${L}/${loan}/approve`, principal, {}, key())
+    expect(o.status, JSON.stringify(o.body)).toBe(200)
+    expect(o.body).toMatchObject({
+      status: 'approved',
+      cashBacked: true,
+      awaitingDisbursement: true,
+      statusLabel: 'Disetujui – menunggu transfer Finance',
+      transferQueueHref: `/admin/antrian-transfer#pinjaman-loan-${loan}`,
+      lenderCashAccount: { id: accB },
+      borrowerCashAccount: { id: w.cashAccount },
+      disbursement: null,
+    })
     expect(await notified(loan, 'project_loan.disburse_pending')).toEqual(expect.arrayContaining([w.users.finance.id, w.users.finance2.id]))
+    const order = (await api('GET', `${L}/transfer-orders`, w.users.finance)).body.items.find((i: { key: string }) => i.key === `loan-${loan}`)
+    expect(order).toMatchObject({ kind: 'loan', amount: 5_000_000, fromAccount: { id: accB }, toAccount: { id: w.cashAccount }, fromProject: { id: projectB }, toProject: { id: w.project }, canExecute: true, selfSubmitted: false })
+    expect((await api('GET', `${L}/transfer-orders`, w.users.owner)).body.items.find((i: { key: string }) => i.key === `loan-${loan}`)).toMatchObject({ canExecute: false })
+    expect((await api('GET', `${L}/transfer-orders`, w.users.pm)).body.items).toEqual([])
     const pm = (await api('GET', `${L}/${loan}`, w.users.pm)).body
     expect(pm.allowedActions).not.toContain('repay')
-    expect((await api('POST', `${L}/${loan}/repayments`, w.users.finance, { amount: 1_000 }, key())).status).toBe(409) // not disbursed yet
-    expect((await api('POST', `${L}/${loan}/disburse`, w.users.pm, {}, key())).status).toBe(403)
+    expect((await api('POST', `${L}/${loan}/repayments`, w.users.finance, { amount: 1_000 }, key())).status).toBe(409) // not transferred yet
+    expect((await api('POST', `${L}/${loan}/execute`, w.users.pm, {}, key())).status).toBe(403)
+    expect((await api('POST', `${L}/${loan}/execute`, w.users.finance, { executeDate: addDays(today(), 1) }, key())).status).toBe(400)
   })
 
-  it('Cairkan (Finance, once): KK on the lender account, KM on the borrower account', async () => {
+  it('execute (Finance, once): KK on the lender account tagged with the lender project, KM on the borrower account tagged with the borrower project', async () => {
     const [a0, b0] = [await balance(w.cashAccount), await balance(accB)]
-    const d = await api('POST', `${L}/${loan}/disburse`, w.users.finance, {}, key())
+    const d = await api('POST', `${L}/${loan}/execute`, w.users.finance, { note: 'BCA 24/10' }, key())
     expect(d.status, JSON.stringify(d.body)).toBe(200)
-    expect(d.body).toMatchObject({ awaitingDisbursement: false, statusLabel: 'Disetujui', disbursement: { kk: expect.any(String), km: expect.any(String) }, disbursedBy: { id: w.users.finance.id } })
+    expect(d.body).toMatchObject({ awaitingDisbursement: false, statusLabel: 'Disetujui', disbursement: { kk: expect.any(String), km: expect.any(String) }, disbursedBy: { id: w.users.finance.id }, transferQueueHref: null })
     expect(await balance(accB)).toBe(b0 - 5_000_000)
     expect(await balance(w.cashAccount)).toBe(a0 + 5_000_000)
-    expect((await api('POST', `${L}/${loan}/disburse`, w.users.finance, {}, key())).status).toBe(409)
-    // a disbursed loan is settled by repayments, not cancelled
+    expect(await tags(loan, null)).toEqual([
+      { d: 'in', p: w.project },
+      { d: 'out', p: projectB },
+    ])
+    expect((await api('POST', `${L}/${loan}/execute`, w.users.finance, {}, key())).status).toBe(409)
+    expect((await api('POST', `${L}/${loan}/disburse`, w.users.finance, {}, key())).status).toBe(409) // legacy path, same rule
+    expect((await api('GET', `${L}/transfer-orders`, w.users.finance)).body.items.find((i: { key: string }) => i.key === `loan-${loan}`)).toBeUndefined()
+    // a transferred loan is settled by repayments, not cancelled
     expect((await api('POST', `${L}/${loan}/cancel`, w.users.owner, { reason: 'batal saja' }, key())).status).toBe(409)
   })
 
-  it('repayment by Finance: KK borrower, KM lender; Lunas', async () => {
+  it('repayment request by Finance → Direktur → Owner → executed: KK borrower (borrower project), KM lender (lender project); Lunas', async () => {
     const r = await api('POST', `${L}/${loan}/repayments`, w.users.finance, { amount: 5_000_000 }, key())
     expect(r.status, JSON.stringify(r.body)).toBe(201)
-    expect(r.body.status).toBe('repaid')
+    expect(r.body).toMatchObject({ status: 'approved', repayableAmount: 0 })
     const rid = r.body.repayments[0].id as number
-    expect((await legs(loan)).filter((x) => x.r === rid)).toEqual([
+    await approveRepayment(loan, rid)
+    const x = await api('POST', `${L}/${loan}/repayments/${rid}/execute`, w.users.finance, {}, key())
+    expect(x.status, JSON.stringify(x.body)).toBe(200)
+    expect(x.body.status).toBe('repaid')
+    expect((await legs(loan)).filter((l) => l.r === rid)).toEqual([
       { d: 'out', a: w.cashAccount, amount: 5_000_000, s: 'posted', t: 'project_loan', r: rid },
       { d: 'in', a: accB, amount: 5_000_000, s: 'posted', t: 'project_loan', r: rid },
     ])
+    expect(await tags(loan, rid)).toEqual([
+      { d: 'in', p: projectB },
+      { d: 'out', p: w.project },
+    ])
   })
 
-  it('same Pusat Biaya (w.project ↔ w.otherProject) or goods → a claim: no disbursement, no cash, PM repays', async () => {
-    for (const over of [{ lenderProjectId: w.otherProject }, { kind: 'barang' }]) {
-      const c = await api('POST', L, w.users.pm, body(over), key())
-      expect(c.status, JSON.stringify(c.body)).toBe(201)
-      const a = await api('POST', `${L}/${c.body.id}/approve`, w.users.owner, {}, key())
-      expect(a.status, JSON.stringify(a.body)).toBe(200)
-      expect(a.body).toMatchObject({ cashBacked: false, awaitingDisbursement: false })
-      expect(a.body.allowedActions).not.toContain('disburse')
-      const r = await api('POST', `${L}/${c.body.id}/repayments`, w.users.pm, { amount: 1_000_000 }, key())
-      expect(r.status, JSON.stringify(r.body)).toBe(201)
-      expect(await legs(c.body.id)).toEqual([])
-    }
+  it('goods → a claim: no transfer order, no cash, the PM records a repayment at once', async () => {
+    const c = await api('POST', L, w.users.pm, body({ kind: 'barang' }), key())
+    expect(c.status, JSON.stringify(c.body)).toBe(201)
+    const a = await approve(c.body.id)
+    expect(a).toMatchObject({ status: 'approved', cashBacked: false, awaitingDisbursement: false, repaymentNeedsApproval: false })
+    expect(a.allowedActions).not.toContain('disburse')
+    const r = await api('POST', `${L}/${c.body.id}/repayments`, w.users.pm, { amount: 1_000_000 }, key())
+    expect(r.status, JSON.stringify(r.body)).toBe(201)
+    expect(r.body.repayments[0]).toMatchObject({ status: 'posted', seq: 1 })
+    expect(await legs(c.body.id)).toEqual([])
+  })
+
+  it('one shared Pusat Biaya (w.project ↔ w.otherProject): still cash-backed — the KK / KM pair on that account, tagged with each project', async () => {
+    const c = await api('POST', L, w.users.pm, body({ lenderProjectId: w.otherProject, amount: 2_000_000 }), key())
+    expect(c.status, JSON.stringify(c.body)).toBe(201)
+    const a = await approve(c.body.id)
+    expect(a).toMatchObject({ cashBacked: true, awaitingDisbursement: true, lenderCashAccount: { id: w.cashAccount }, borrowerCashAccount: { id: w.cashAccount } })
+    const a0 = await balance(w.cashAccount)
+    const d = await api('POST', `${L}/${c.body.id}/execute`, w.users.finance, {}, key())
+    expect(d.status, JSON.stringify(d.body)).toBe(200)
+    expect(await balance(w.cashAccount)).toBe(a0) // the pair nets to 0 on the one account
+    expect((await legs(c.body.id)).map((x) => [x.d, x.a, x.amount])).toEqual([
+      ['in', w.cashAccount, 2_000_000],
+      ['out', w.cashAccount, 2_000_000],
+    ])
+    expect(await tags(c.body.id, null)).toEqual([
+      { d: 'in', p: w.project },
+      { d: 'out', p: w.otherProject },
+    ])
   })
 })
 
