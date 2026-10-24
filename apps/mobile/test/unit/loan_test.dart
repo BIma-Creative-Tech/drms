@@ -106,7 +106,7 @@ void main() {
     final older = LoanInbox.fromJson({
       'items': [loanJson()],
     });
-    expect((older.loans.length, older.repayments, older.count), (1, isEmpty, 1));
+    expect((older.loans.length, older.repayments.length, older.count), (1, 0, 1));
 
     final orders = LoanTransferOrders.fromJson(loanTransferOrdersJson()).items;
     expect(orders.map((o) => o.key), ['loan-43', 'repayment-7']);

@@ -402,9 +402,8 @@ void main() {
       overrides: [
         loansApiProvider.overrideWithValue(api),
         loanDetailProvider.overrideWith(
-          (ref, id) async => _loan(
-            loanCashRepaymentJson(rowActions: const ['cancel', 'execute'], repaymentStatus: 'approved'),
-          ),
+          (ref, id) async =>
+              _loan(loanCashRepaymentJson(rowActions: const ['cancel', 'execute'], repaymentStatus: 'approved')),
         ),
       ],
     );
