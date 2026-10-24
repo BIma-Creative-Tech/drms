@@ -302,7 +302,7 @@ export async function requireActionAudited(req: PayloadRequest, ctx: ActorContex
         reason: 'pemohon/pembuat tidak boleh memutuskan pengajuannya sendiri (G1, Q-08)',
       },
     ])
-    fail(403, 'Pemohon/pembuat tidak dapat memberi keputusan pada pengajuannya sendiri (G1).')
+    fail(403, 'Pemohon/pembuat tidak dapat memberi keputusan pada pengajuannya sendiri.')
   }
   if (selfInvolved && FINANCE_SELF_PROCESSED.has(action) && ctx.roles.includes('pk-finance')) {
     await writeAudit(req, [selfProcessedAudit(ctx, action, doc)])
