@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.19.3] - 2026-10-24
+
+**Security release: Node.js runtime bump only.** No code change, no migration, APK unchanged (0.11.1).
+
+### Security
+- Node.js 24.21.0 → 24.22.1 (2026-10-20 security release: 5 High — tls ×3, dns, brotli; 2 Medium — http, crypto;
+  1 Low — permission). Base image `node:24.22.1-alpine` pinned by index digest (Alpine 3.24.3); CI `NODE_VERSION`
+  and the integration test env follow (PR #136). Trivy: 0 HIGH/CRITICAL.
+
 ## [0.19.2] - 2026-10-24
 
 **Security release: dependency bumps only.** No code change, no migration, APK unchanged (0.11.1).
