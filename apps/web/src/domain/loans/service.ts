@@ -1,5 +1,5 @@
 import { sql } from '@payloadcms/db-postgres'
-import { APIError, type PayloadRequest, type Where } from 'payload'
+import { APIError, type Payload, type PayloadRequest, type TypedUser, type Where } from 'payload'
 
 import { companiesWithRole, hasExactRole, hasRole, hasRoleAny, mappedCompanies, relId, userId, userRoles } from '@/access/roles'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
@@ -1565,6 +1565,26 @@ export type RepaymentInboxItem = {
   submittedAt: string | null
 }
 
+/** "Antrian Transfer" loan orders of PTs `pts`: approved cash-backed manual loans not transferred yet. */
+export const loanOrderLoansWhere = (pts: readonly number[]): Where => ({
+  and: [{ company: { in: [...pts] } }, { status: { equals: 'approved' } }, { cashBacked: { equals: true } }, { origin: { equals: 'manual' } }, { disbursedAt: { exists: false } }],
+})
+/** "Antrian Transfer" repayment orders of PTs `pts`: approved repayment requests (not executed yet). */
+export const loanOrderRepaymentsWhere = (pts: readonly number[]): Where => ({ and: [{ company: { in: [...pts] } }, { status: { equals: 'approved' } }] })
+
+/**
+ * Pinjaman open item (DRMS 24/10): the loan transfer orders the user may EXECUTE (Finance of the order's PT, selected
+ * PTs) — counted into the "Antrian Transfer" nav badge (web launcher + GET /me/modules for the APK) next to the expense
+ * transfer queue. Read with the user's access; `count` = Payload's (stubbed in unit tests).
+ */
+export async function loanTransferOrderCount(payload: Pick<Payload, 'count'>, user: TypedUser): Promise<number> {
+  const pts = companiesWithRole({ user }, ['pk-finance'])
+  if (pts.length === 0) return 0
+  const loans = await payload.count({ collection: 'project-loans', where: loanOrderLoansWhere(pts), user, overrideAccess: false })
+  const reps = await payload.count({ collection: 'project-loan-repayments', where: loanOrderRepaymentsWhere(pts), user, overrideAccess: false })
+  return loans.totalDocs + reps.totalDocs
+}
+
 /**
  * #11/#12 "Antrian Transfer" — transfer orders of inter-project loans: approved cash-backed manual loans not executed
  * yet ("Pencairan pinjaman") and approved repayment requests ("Pengembalian pinjaman"), in the selected PTs where the
@@ -1576,7 +1596,7 @@ export async function loanTransferOrders(req: PayloadRequest, f: { companyIds?: 
   if (!req.user || pts.length === 0 || !mayReadLoans(req)) return { items: [] as LoanTransferOrder[], count: 0 }
   const loansRes = await req.payload.find({
     collection: 'project-loans',
-    where: { and: [{ company: { in: pts } }, { status: { equals: 'approved' } }, { cashBacked: { equals: true } }, { origin: { equals: 'manual' } }, { disbursedAt: { exists: false } }] },
+    where: loanOrderLoansWhere(pts),
     sort: 'decidedAt',
     limit: 500,
     depth: 0,
@@ -1584,7 +1604,7 @@ export async function loanTransferOrders(req: PayloadRequest, f: { companyIds?: 
     overrideAccess: false, // caller's read scope (office roles of the PT)
     req,
   })
-  const repRes = await req.payload.find({ collection: 'project-loan-repayments', where: { and: [{ company: { in: pts } }, { status: { equals: 'approved' } }] }, sort: 'decidedAt', limit: 500, depth: 0, user: req.user, overrideAccess: false, req })
+  const repRes = await req.payload.find({ collection: 'project-loan-repayments', where: loanOrderRepaymentsWhere(pts), sort: 'decidedAt', limit: 500, depth: 0, user: req.user, overrideAccess: false, req })
   const reps = repRes.docs as unknown as RepaymentDoc[]
   const own = loansRes.docs as unknown as LoanDoc[]
   const missing = [...new Set(reps.map((r) => relId(r.loan)!))].filter((id) => !own.some((l) => l.id === id))

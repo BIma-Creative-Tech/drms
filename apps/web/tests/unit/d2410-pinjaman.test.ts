@@ -1,8 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+import type { Payload, TypedUser } from 'payload'
 import { describe, expect, it } from 'vitest'
 
+import { withCompanyContext, type Role } from '@/access/roles'
+import { loadBadges } from '@/admin/shell/modules-server'
 import { LoanExecute, LoanInbox, LoanTransferOrders, RepaymentCreate } from '@/api/v1/schemas-loans'
 import {
   decisionPools,
@@ -23,6 +26,8 @@ import {
 } from '@/domain/loans/rules'
 import { migrations } from '@/migrations'
 import { RENUMBER_GUARDED_FUNCTIONS } from '@/migrations/20261013_610000_d1310_renumber'
+import { loanOrderLoansWhere, loanOrderRepaymentsWhere, loanTransferOrderCount } from '@/domain/loans/service'
+import { TRANSFER_QUEUE_WHERE } from '@/domain/expense/types'
 
 /**
  * DRMS 24/10 #10–#12 (ADR 0022 / 0031 amendment 2026-10-24) — pure rules: two decision levels (Direktur → Owner, G1),
@@ -145,5 +150,56 @@ describe('migrations wiring (20261024_4x0000_d2410_*)', () => {
     expect(src).toContain('withPrelude(LOANS_GUARD_NEW)')
     expect(src).toContain("NEW.doc_type::text = 'project_loan_repayment'")
     expect(src).toContain("'pk-principal'")
+  })
+})
+
+describe('"Antrian Transfer" badge counts the loan transfer orders Finance executes (pinjaman open item)', () => {
+  const PER_COLLECTION: Record<string, number> = { 'expense-requests': 3, 'project-loans': 2, 'project-loan-repayments': 1 }
+  function stub(fail: string[] = []) {
+    const calls: Array<{ collection: string; where: unknown; overrideAccess?: boolean }> = []
+    const payload = {
+      count: async (args: { collection: string; where: unknown; overrideAccess?: boolean }) => {
+        calls.push(args)
+        if (fail.includes(args.collection)) throw new Error('db down')
+        return { totalDocs: PER_COLLECTION[args.collection] ?? 0 }
+      },
+    } as unknown as Payload
+    return { payload, calls }
+  }
+  const user = (memberships: Array<{ company: number; roles: Role[] }>) =>
+    withCompanyContext({ id: 7, collection: 'users', email: 'fina@contoh.test' }, memberships.map((m) => ({ ...m, employee: null })), null, false) as unknown as TypedUser
+
+  it('Finance: expense queue + approved loan disbursements + approved repayment orders of its own PTs only', async () => {
+    const { payload, calls } = stub()
+    const u = user([
+      { company: 1, roles: ['pk-finance'] },
+      { company: 2, roles: ['pk-owner'] },
+    ])
+    expect(await loadBadges(payload, u, async () => 0)).toEqual({ transfers: 3 + 2 + 1, lpj: 3, approvals: 0 })
+    const loans = calls.find((c) => c.collection === 'project-loans')!
+    const reps = calls.find((c) => c.collection === 'project-loan-repayments')!
+    expect(loans.where).toEqual(loanOrderLoansWhere([1]))
+    expect(reps.where).toEqual(loanOrderRepaymentsWhere([1]))
+    expect([loans.overrideAccess, reps.overrideAccess]).toEqual([false, false]) // the caller's read access
+    expect(calls.find((c) => c.collection === 'expense-requests')!.where).toBe(TRANSFER_QUEUE_WHERE)
+  })
+
+  it('the loan order filter: approved, cash-backed, manual, not transferred yet; repayments: approved', () => {
+    expect(JSON.stringify(loanOrderLoansWhere([4]))).toBe(
+      JSON.stringify({ and: [{ company: { in: [4] } }, { status: { equals: 'approved' } }, { cashBacked: { equals: true } }, { origin: { equals: 'manual' } }, { disbursedAt: { exists: false } }] }),
+    )
+    expect(loanOrderRepaymentsWhere([4])).toEqual({ and: [{ company: { in: [4] } }, { status: { equals: 'approved' } }] })
+  })
+
+  it('Direktur / Owner only (no Finance role): the expense queue only, no loan count', async () => {
+    const { payload, calls } = stub()
+    expect(await loadBadges(payload, user([{ company: 1, roles: ['pk-owner'] }]), async () => 0)).toEqual({ transfers: 3, lpj: 3, approvals: 0 })
+    expect(calls.map((c) => c.collection)).not.toContain('project-loans')
+    expect(await loanTransferOrderCount(payload, user([{ company: 1, roles: ['pk-principal'] }]))).toBe(0)
+  })
+
+  it('a failing loan count never breaks the nav (expense queue still counted)', async () => {
+    const { payload } = stub(['project-loan-repayments'])
+    expect(await loadBadges(payload, user([{ company: 1, roles: ['pk-finance'] }]), async () => 1)).toEqual({ transfers: 3, lpj: 3, approvals: 1 })
   })
 })
