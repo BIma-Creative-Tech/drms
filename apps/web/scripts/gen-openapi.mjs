@@ -5,8 +5,6 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-import { execFileSync } from 'node:child_process'
-
 import { build } from 'esbuild'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -48,15 +46,6 @@ try {
       if (current !== content) {
         drift = true
         console.error(`openapi drift: ${path.relative(process.cwd(), file)} is not up to date — run npm run gen:openapi`)
-        if (file === out) {
-          const want = path.join(tmp, 'want.json')
-          writeFileSync(want, content)
-          try {
-            execFileSync('diff', ['-u', file, want], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
-          } catch (e) {
-            console.error('TMPDIFF-BEGIN\n' + e.stdout + 'TMPDIFF-END')
-          }
-        }
       }
     }
     if (drift) process.exit(1)

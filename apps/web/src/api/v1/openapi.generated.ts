@@ -146,6 +146,14 @@ export const openapiDocument = {
                 "type": "boolean",
                 "description": "ADR 0029: Finance (stored) — the \"Pencairan pinjaman antar-PT\" queue (GET /intercompany-loans/queue) and the disbursement of loans whose LENDER is this PT (never one the caller instructed, G1)."
               },
+              "attendanceOnBehalf": {
+                "type": "boolean",
+                "description": "ADR 0032: may record check-in / check-out on behalf of an employee — PM (team members at team locations, APK) or Admin Staff (any employee of the PT incl. those without an account; web POST /attendance/on-behalf and APK). The server re-checks."
+              },
+              "attendanceAdminStaff": {
+                "type": "boolean",
+                "description": "ADR 0032: holds pk-admin-staff (\"Admin Staff\") — reads every attendance + correction of the PT, corrects (never own), on-behalf for any employee (GET /attendance/on-behalf/options)."
+              },
               "fundCheckEnabled": {
                 "type": "boolean",
                 "description": "ADR 0029: companies.fundCheckEnabled of this PT (top level: any selected PT) — the final approval / the Owner's own submit is refused (409 FUND_INSUFFICIENT) when the PT's available funds are short. Off = the fund panel is information only."
@@ -162,6 +170,8 @@ export const openapiDocument = {
               "intercompanyPayment",
               "instructIntercompanyLoan",
               "disburseIntercompanyLoan",
+              "attendanceOnBehalf",
+              "attendanceAdminStaff",
               "fundCheckEnabled"
             ],
             "description": "DEPRECATED (MC3): derived from the top-level `roles` (union over the selected PTs). Use companies[].capabilities."
@@ -180,29 +190,6 @@ export const openapiDocument = {
               },
               "name": {
                 "type": "string"
-              },
-              "homeSite": {
-                "type": [
-                  "object",
-                  "null"
-                ],
-                "properties": {
-                  "id": {
-                    "type": "integer"
-                  },
-                  "code": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "id",
-                  "code",
-                  "name"
-                ],
-                "description": "ADR 0023: \"Site penempatan\" (kantor cabang) of the employee, null when none."
               }
             },
             "required": [
@@ -369,9 +356,11 @@ export const openapiDocument = {
           "pk-finance",
           "pk-owner",
           "pk-principal",
-          "pk-admin"
+          "pk-admin",
+          "pk-operator",
+          "pk-admin-staff"
         ],
-        "description": "pk-owner = \"Direktur\"; pk-principal = \"Owner\" (ADR 0026: the approval level above the Direktur). Effective roles: an Owner is also listed with pk-owner (same view and permissions as the Direktur); only the approval flow differs."
+        "description": "pk-owner = \"Direktur\"; pk-principal = \"Owner\" (ADR 0026: the approval level above the Direktur); pk-operator = \"Operator/Anggota\"; pk-admin-staff = \"Admin Staff\" (ADR 0032). Effective roles: an Owner is also listed with pk-owner (same view and permissions as the Direktur); only the approval flow differs."
       },
       "ImageTargets": {
         "type": "object",
@@ -515,36 +504,14 @@ export const openapiDocument = {
           },
           "name": {
             "type": "string"
-          },
-          "homeSite": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "integer"
-              },
-              "code": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "code",
-              "name"
-            ],
-            "description": "ADR 0023: \"Site penempatan\" (kantor cabang) of the employee, null when none."
           }
         },
         "required": [
           "id",
           "code",
           "name"
-        ]
+        ],
+        "description": "ADR 0032: no `homeSite` any more (sites removed from the product)."
       },
       "Capabilities": {
         "type": "object",
@@ -589,6 +556,14 @@ export const openapiDocument = {
             "type": "boolean",
             "description": "ADR 0029: Finance (stored) — the \"Pencairan pinjaman antar-PT\" queue (GET /intercompany-loans/queue) and the disbursement of loans whose LENDER is this PT (never one the caller instructed, G1)."
           },
+          "attendanceOnBehalf": {
+            "type": "boolean",
+            "description": "ADR 0032: may record check-in / check-out on behalf of an employee — PM (team members at team locations, APK) or Admin Staff (any employee of the PT incl. those without an account; web POST /attendance/on-behalf and APK). The server re-checks."
+          },
+          "attendanceAdminStaff": {
+            "type": "boolean",
+            "description": "ADR 0032: holds pk-admin-staff (\"Admin Staff\") — reads every attendance + correction of the PT, corrects (never own), on-behalf for any employee (GET /attendance/on-behalf/options)."
+          },
           "fundCheckEnabled": {
             "type": "boolean",
             "description": "ADR 0029: companies.fundCheckEnabled of this PT (top level: any selected PT) — the final approval / the Owner's own submit is refused (409 FUND_INSUFFICIENT) when the PT's available funds are short. Off = the fund panel is information only."
@@ -605,6 +580,8 @@ export const openapiDocument = {
           "intercompanyPayment",
           "instructIntercompanyLoan",
           "disburseIntercompanyLoan",
+          "attendanceOnBehalf",
+          "attendanceAdminStaff",
           "fundCheckEnabled"
         ],
         "description": "UI hints for the APK (E1); the server guards stay authoritative."
@@ -5576,7 +5553,8 @@ export const openapiDocument = {
                     "pk-owner",
                     "pk-principal",
                     "pk-admin",
-                    "pk-operator"
+                    "pk-operator",
+                    "pk-admin-staff"
                   ]
                 },
                 "label": {
@@ -5692,7 +5670,8 @@ export const openapiDocument = {
                       "pk-owner",
                       "pk-principal",
                       "pk-admin",
-                      "pk-operator"
+                      "pk-operator",
+                      "pk-admin-staff"
                     ]
                   }
                 },
@@ -5864,10 +5843,11 @@ export const openapiDocument = {
                       "pk-owner",
                       "pk-principal",
                       "pk-admin",
-                      "pk-operator"
+                      "pk-operator",
+                      "pk-admin-staff"
                     ]
                   },
-                  "maxItems": 7
+                  "maxItems": 8
                 },
                 "employee": {
                   "type": [
@@ -8421,7 +8401,7 @@ export const openapiDocument = {
           "site_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "ADR 0023: site (kantor cabang) — allowed at the home site or with an active site assignment."
+            "description": "ADR 0023 site — ADR 0032: no longer a check-in location (OnSite → VALIDATION; Non-OnSite: a hint only, recorded at the registered location containing the fix)."
           },
           "lat": {
             "type": "number",
@@ -10117,7 +10097,7 @@ export const openapiDocument = {
           },
           "onBehalf": {
             "type": "boolean",
-            "description": "At least one row \"diabsenkan oleh PM\" (US-14)."
+            "description": "At least one row \"diabsenkan\" — by the PM (US-14) or an Admin Staff (ADR 0032); names in onBehalfBy."
           },
           "onBehalfBy": {
             "type": "array",
@@ -10186,8 +10166,10 @@ export const openapiDocument = {
                 "type": "string",
                 "enum": [
                   "self",
-                  "pm"
-                ]
+                  "pm",
+                  "admin"
+                ],
+                "description": "pm = diabsenkan PM, admin = diabsenkan Admin Staff (ADR 0032)."
               },
               "corrected": {
                 "type": "boolean"
@@ -10222,8 +10204,10 @@ export const openapiDocument = {
                 "type": "string",
                 "enum": [
                   "self",
-                  "pm"
-                ]
+                  "pm",
+                  "admin"
+                ],
+                "description": "pm = diabsenkan PM, admin = diabsenkan Admin Staff (ADR 0032)."
               },
               "corrected": {
                 "type": "boolean"
@@ -10519,14 +10503,15 @@ export const openapiDocument = {
                     "onsite",
                     "non_onsite"
                   ],
-                  "description": "onsite = inside a registered location of the PT (outside the radius refused); non_onsite = no location restriction (inside a registered location → that one, else \"Di luar area\")."
+                  "description": "onsite = inside the chosen registered location of the PT (outside the radius refused); non_onsite (ADR 0032) = inside ANY registered location of the PT (picked automatically; outside all → refused)."
                 },
                 "homeSiteId": {
                   "type": [
                     "integer",
                     "null"
                   ],
-                  "exclusiveMinimum": 0
+                  "exclusiveMinimum": 0,
+                  "description": "ADR 0032: always null (sites removed; kept for APK ≤ 0.11.1)."
                 },
                 "referenceSite": {
                   "type": [
@@ -10564,7 +10549,7 @@ export const openapiDocument = {
                     "lat",
                     "lng"
                   ],
-                  "description": "Non-OnSite only: the reference of a \"Di luar area\" check-in (home site, else the PT head office); null for OnSite or when neither is set (then an outside check-in is refused VALIDATION)."
+                  "description": "ADR 0032: always null — no \"Di luar area\" check-in any more (kept for APK ≤ 0.11.1)."
                 }
               },
               "required": [
@@ -10621,11 +10606,11 @@ export const openapiDocument = {
                 },
                 "isHeadOffice": {
                   "type": "boolean",
-                  "description": "Site flagged \"Kantor pusat\"."
+                  "description": "ADR 0032: always false (kept for APK ≤ 0.11.1)."
                 },
                 "home": {
                   "type": "boolean",
-                  "description": "\"Site penempatan\" of the employee."
+                  "description": "ADR 0032: always false (kept for APK ≤ 0.11.1)."
                 }
               },
               "required": [
@@ -10642,7 +10627,7 @@ export const openapiDocument = {
                 "home"
               ]
             },
-            "description": "Eligible locations with a point: home site first, then head office, sites, projects, cost centers (by code). Locations without a point are never listed."
+            "description": "Eligible locations with a point: projects, then cost centers (by code). Locations without a point are never listed."
           }
         },
         "required": [
@@ -10681,11 +10666,11 @@ export const openapiDocument = {
               "type",
               "id"
             ],
-            "description": "Where the record belongs (DRMS 13/10 A2: a Non-OnSite check-in may be recorded at the registered location containing the fix, or at the reference site when outside)."
+            "description": "Where the record belongs (a Non-OnSite check-in: the registered location containing the fix; a check-out: the open check-in of the day). `site` = history only (ADR 0032)."
           },
           "outsideArea": {
             "type": "boolean",
-            "description": "Non-OnSite \"Di luar area\": outside every registered location of the PT; `location` = the reference (home site, else head office; a check-out: the open check-in)."
+            "description": "DRMS 13/10 A2 \"Di luar area\" — ADR 0032: always false for a new record (Non-OnSite outside every location is refused)."
           },
           "distanceM": {
             "type": "integer",
@@ -10706,17 +10691,12 @@ export const openapiDocument = {
           "project_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Project (exactly one of project_id / cost_center_id / site_id)."
+            "description": "Project (exactly one of project_id / cost_center_id). OnSite: the fix must be inside it; Non-OnSite (ADR 0032): a hint — recorded at the registered location containing the fix (outside all → 409 OUTSIDE_GEOFENCE)."
           },
           "cost_center_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
             "description": "Cost center / operational location (E6, Q-40)."
-          },
-          "site_id": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "description": "ADR 0023: site (kantor pusat / kantor cabang). DRMS 13/10 A2: no assignment needed; OnSite must be inside the location; Non-OnSite has no location restriction (send the reference site when outside every registered location → \"Di luar area\")."
           },
           "lat": {
             "type": "number",
@@ -10747,6 +10727,193 @@ export const openapiDocument = {
           "lat",
           "lng",
           "selfie_media_id"
+        ],
+        "additionalProperties": false
+      },
+      "AttendanceOnBehalfOptions": {
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "attendanceEnabled": {
+                  "type": "boolean",
+                  "description": "company-settings.syncAttendanceEnabled of the PT."
+                }
+              },
+              "required": [
+                "id",
+                "attendanceEnabled"
+              ]
+            },
+            "description": "PTs (of the selection) where the caller is Admin Staff."
+          },
+          "employees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "company": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "attendanceType": {
+                  "type": "string",
+                  "enum": [
+                    "onsite",
+                    "non_onsite"
+                  ]
+                },
+                "hasAccount": {
+                  "type": "boolean",
+                  "description": "false = an employee without a user account (e.g. tukang harian)."
+                }
+              },
+              "required": [
+                "id",
+                "company",
+                "code",
+                "name",
+                "attendanceType",
+                "hasAccount"
+              ]
+            },
+            "description": "Active employees of those PTs, the caller's own excluded (by name)."
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "project",
+                    "cost_center"
+                  ]
+                },
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "company": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "lat": {
+                  "type": "number"
+                },
+                "lng": {
+                  "type": "number"
+                },
+                "radiusM": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "company",
+                "code",
+                "name",
+                "lat",
+                "lng",
+                "radiusM"
+              ]
+            },
+            "description": "Registered check-in locations of those PTs with a point (projects, cost centers)."
+          }
+        },
+        "required": [
+          "companies",
+          "employees",
+          "locations"
+        ],
+        "description": "ADR 0032: what an Admin Staff may record on behalf of. Names, codes and points only (no money, no bank data, no phone)."
+      },
+      "AttendanceOnBehalfBody": {
+        "type": "object",
+        "properties": {
+          "employee_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "employees id of the Admin Staff's PT (may have no user account); never the caller's own."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "check_in",
+              "check_out"
+            ]
+          },
+          "project_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Project (exactly one of project_id / cost_center_id; a Non-OnSite employee: a hint, the registered location containing the fix is used)."
+          },
+          "cost_center_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "lng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "accuracy_m": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "selfie_media_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "media-selfies id uploaded by the caller (photo of the employee)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500,
+            "description": "Why the Admin Staff records it (e.g. \"tukang harian tanpa HP\"). Required."
+          }
+        },
+        "required": [
+          "employee_id",
+          "kind",
+          "lat",
+          "lng",
+          "selfie_media_id",
+          "reason"
         ],
         "additionalProperties": false
       },
@@ -12425,37 +12592,6 @@ export const openapiDocument = {
                   ]
                 }
               },
-              "sites": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "integer",
-                      "exclusiveMinimum": 0
-                    },
-                    "label": {
-                      "type": "string"
-                    },
-                    "active": {
-                      "type": "boolean"
-                    },
-                    "companyId": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ],
-                      "exclusiveMinimum": 0
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "label",
-                    "active",
-                    "companyId"
-                  ]
-                }
-              },
               "projects": {
                 "type": "array",
                 "items": {
@@ -12618,7 +12754,6 @@ export const openapiDocument = {
             },
             "required": [
               "accounts",
-              "sites",
               "projects",
               "costCenters",
               "categories",
@@ -12691,7 +12826,7 @@ export const openapiDocument = {
                 "n"
               ]
             },
-            "description": "Balance tiles (active or non-zero accounts; site filter) + Σ in / out of flowPeriod."
+            "description": "Balance tiles (active or non-zero accounts) + Σ in / out of flowPeriod."
           },
           "page": {
             "type": "object",
@@ -18675,30 +18810,6 @@ export const openapiDocument = {
             ],
             "description": "ADR 0031: the project's Pusat Biaya = a cash account of its PT (name only); null = not mapped yet (transfers refused)."
           },
-          "site": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              "code": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "code",
-              "name"
-            ],
-            "description": "ADR 0023: site (kantor cabang) that handles the project."
-          },
           "rapPlanned": {
             "type": [
               "number",
@@ -18753,7 +18864,6 @@ export const openapiDocument = {
           "progressPct",
           "costCenter",
           "pusatBiaya",
-          "site",
           "rapPlanned",
           "rapRealised",
           "rapPercent",
@@ -18872,30 +18982,6 @@ export const openapiDocument = {
             ],
             "description": "ADR 0031: the project's Pusat Biaya = a cash account of its PT (name only); null = not mapped yet (transfers refused)."
           },
-          "site": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              "code": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "code",
-              "name"
-            ],
-            "description": "ADR 0023: site (kantor cabang) that handles the project."
-          },
           "rapPlanned": {
             "type": [
               "number",
@@ -18990,7 +19076,6 @@ export const openapiDocument = {
           "progressPct",
           "costCenter",
           "pusatBiaya",
-          "site",
           "rapPlanned",
           "rapRealised",
           "rapPercent",
@@ -19251,7 +19336,7 @@ export const openapiDocument = {
           "docs",
           "totalDocs"
         ],
-        "description": "ADR 0023: sites (kantor cabang) of the selected PTs."
+        "description": "ADR 0023 sites — ADR 0032: removed from the product; always an empty list (kept for APK ≤ 0.11.1)."
       },
       "ProjectLoanList": {
         "type": "object",
@@ -22688,7 +22773,8 @@ export const openapiDocument = {
                           "code",
                           "name"
                         ]
-                      }
+                      },
+                      "description": "ADR 0032: always empty (sites removed; kept for APK ≤ 0.11.1)."
                     }
                   },
                   "required": [
@@ -22696,7 +22782,7 @@ export const openapiDocument = {
                     "costCenters",
                     "sites"
                   ],
-                  "description": "Selectable locations of a NEW assignment: active projects (not selesai / arsip), cost centers and sites of this PT, read with the caller's access."
+                  "description": "Selectable locations of a NEW assignment: active projects (not selesai / arsip) and cost centers of this PT, read with the caller's access."
                 }
               },
               "required": [
@@ -22749,9 +22835,10 @@ export const openapiDocument = {
           "pk-owner",
           "pk-principal",
           "pk-admin",
-          "pk-operator"
+          "pk-operator",
+          "pk-admin-staff"
         ],
-        "description": "Role in ONE PT (pk-owner = Direktur, pk-principal = Owner (ADR 0026), pk-operator = Operator/Anggota)."
+        "description": "Role in ONE PT (pk-owner = Direktur, pk-principal = Owner (ADR 0026), pk-operator = Operator/Anggota, pk-admin-staff = Admin Staff (ADR 0032))."
       },
       "UserOnboardingCreate": {
         "type": "object",
@@ -22850,7 +22937,7 @@ export const openapiDocument = {
                         "onsite",
                         "non_onsite"
                       ],
-                      "description": "DRMS 13/10 A2 \"Tipe absensi\": onsite (default for a new employee) = any registered location of the PT; non_onsite = head office + branch offices only."
+                      "description": "DRMS 13/10 A2 \"Tipe absensi\": onsite (default for a new employee) = inside the chosen registered location of the PT; non_onsite (ADR 0032) = inside any registered location of the PT (picked automatically, outside all refused)."
                     },
                     "active": {
                       "type": "boolean"
@@ -22910,7 +22997,7 @@ export const openapiDocument = {
                       "id": {
                         "type": "integer",
                         "exclusiveMinimum": 0,
-                        "description": "Existing assignment of this PT's employee: only roleInProject and endDate change (reason required). Omitted = a NEW assignment (exactly one of project / costCenter / site)."
+                        "description": "Existing assignment of this PT's employee: only roleInProject and endDate change (reason required). Omitted = a NEW assignment (exactly one of project / costCenter; ADR 0032: `site` is refused)."
                       },
                       "project": {
                         "type": "integer",
@@ -23073,7 +23160,7 @@ export const openapiDocument = {
                         "onsite",
                         "non_onsite"
                       ],
-                      "description": "DRMS 13/10 A2 \"Tipe absensi\": onsite (default for a new employee) = any registered location of the PT; non_onsite = head office + branch offices only."
+                      "description": "DRMS 13/10 A2 \"Tipe absensi\": onsite (default for a new employee) = inside the chosen registered location of the PT; non_onsite (ADR 0032) = inside any registered location of the PT (picked automatically, outside all refused)."
                     },
                     "active": {
                       "type": "boolean"
@@ -23133,7 +23220,7 @@ export const openapiDocument = {
                       "id": {
                         "type": "integer",
                         "exclusiveMinimum": 0,
-                        "description": "Existing assignment of this PT's employee: only roleInProject and endDate change (reason required). Omitted = a NEW assignment (exactly one of project / costCenter / site)."
+                        "description": "Existing assignment of this PT's employee: only roleInProject and endDate change (reason required). Omitted = a NEW assignment (exactly one of project / costCenter; ADR 0032: `site` is refused)."
                       },
                       "project": {
                         "type": "integer",
@@ -29774,17 +29861,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "pattern": "^\\d{1,9}$",
-              "description": "ADR 0023: only the accounts flagged with this site."
-            },
-            "required": false,
-            "description": "ADR 0023: only the accounts flagged with this site.",
-            "name": "site",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -33649,17 +33725,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "pattern": "^\\d{1,9}$",
-              "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card."
-            },
-            "required": false,
-            "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card.",
-            "name": "site",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -33718,154 +33783,6 @@ export const openapiDocument = {
                         ]
                       },
                       "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
-                    },
-                    "sites": {
-                      "type": "object",
-                      "properties": {
-                        "options": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "integer"
-                              },
-                              "companyId": {
-                                "type": "integer",
-                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
-                              },
-                              "code": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "active": {
-                                "type": "boolean"
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "companyId",
-                              "code",
-                              "name",
-                              "active"
-                            ]
-                          }
-                        },
-                        "selected": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        },
-                        "cash": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "siteId": {
-                                "type": [
-                                  "integer",
-                                  "null"
-                                ]
-                              },
-                              "companyId": {
-                                "type": [
-                                  "integer",
-                                  "null"
-                                ],
-                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
-                              },
-                              "code": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "balance": {
-                                "type": "integer",
-                                "description": "Rupiah (integer)"
-                              },
-                              "accounts": {
-                                "type": "integer"
-                              }
-                            },
-                            "required": [
-                              "siteId",
-                              "companyId",
-                              "code",
-                              "name",
-                              "balance",
-                              "accounts"
-                            ]
-                          }
-                        },
-                        "summary": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "siteId": {
-                                "type": [
-                                  "integer",
-                                  "null"
-                                ]
-                              },
-                              "companyId": {
-                                "type": [
-                                  "integer",
-                                  "null"
-                                ],
-                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
-                              },
-                              "code": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "balance": {
-                                "type": "integer",
-                                "description": "Rupiah (integer)"
-                              },
-                              "accounts": {
-                                "type": "integer"
-                              },
-                              "projectsRunning": {
-                                "type": "integer"
-                              },
-                              "attendanceToday": {
-                                "type": "integer",
-                                "description": "Employees with a check-in today at the site or a project of the site."
-                              },
-                              "disbursedMonth": {
-                                "type": "integer",
-                                "description": "K-05 net disbursed this month for the site's projects."
-                              }
-                            },
-                            "required": [
-                              "siteId",
-                              "companyId",
-                              "code",
-                              "name",
-                              "balance",
-                              "accounts",
-                              "projectsRunning",
-                              "attendanceToday",
-                              "disbursedMonth"
-                            ]
-                          },
-                          "description": "Per-site breakdown (only without a site filter)."
-                        }
-                      },
-                      "required": [
-                        "options",
-                        "selected",
-                        "cash",
-                        "summary"
-                      ],
-                      "description": "ADR 0023: empty lists when the PTs have no site."
                     },
                     "cash": {
                       "type": "object",
@@ -35477,7 +35394,6 @@ export const openapiDocument = {
                     "asOf",
                     "month",
                     "companies",
-                    "sites",
                     "cash",
                     "budget",
                     "completeness",
@@ -35565,17 +35481,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "pattern": "^\\d{1,9}$",
-              "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card."
-            },
-            "required": false,
-            "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card.",
-            "name": "site",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -35634,96 +35539,6 @@ export const openapiDocument = {
                         ]
                       },
                       "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
-                    },
-                    "sites": {
-                      "type": "object",
-                      "properties": {
-                        "options": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "integer"
-                              },
-                              "companyId": {
-                                "type": "integer",
-                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
-                              },
-                              "code": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "active": {
-                                "type": "boolean"
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "companyId",
-                              "code",
-                              "name",
-                              "active"
-                            ]
-                          }
-                        },
-                        "selected": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        },
-                        "cash": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "siteId": {
-                                "type": [
-                                  "integer",
-                                  "null"
-                                ]
-                              },
-                              "companyId": {
-                                "type": [
-                                  "integer",
-                                  "null"
-                                ],
-                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
-                              },
-                              "code": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "balance": {
-                                "type": "integer",
-                                "description": "Rupiah (integer)"
-                              },
-                              "accounts": {
-                                "type": "integer"
-                              }
-                            },
-                            "required": [
-                              "siteId",
-                              "companyId",
-                              "code",
-                              "name",
-                              "balance",
-                              "accounts"
-                            ]
-                          }
-                        }
-                      },
-                      "required": [
-                        "options",
-                        "selected",
-                        "cash"
-                      ],
-                      "description": "ADR 0023: per-site cash balance; empty without sites."
                     },
                     "transferQueue": {
                       "type": "object",
@@ -36748,7 +36563,6 @@ export const openapiDocument = {
                     "asOf",
                     "month",
                     "companies",
-                    "sites",
                     "transferQueue",
                     "reimburseToVerify",
                     "lpjToVerify",
@@ -36839,17 +36653,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "pattern": "^\\d{1,9}$",
-              "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card."
-            },
-            "required": false,
-            "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card.",
-            "name": "site",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -36908,53 +36711,6 @@ export const openapiDocument = {
                         ]
                       },
                       "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
-                    },
-                    "sites": {
-                      "type": "object",
-                      "properties": {
-                        "options": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "integer"
-                              },
-                              "companyId": {
-                                "type": "integer",
-                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
-                              },
-                              "code": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "active": {
-                                "type": "boolean"
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "companyId",
-                              "code",
-                              "name",
-                              "active"
-                            ]
-                          }
-                        },
-                        "selected": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "options",
-                        "selected"
-                      ],
-                      "description": "ADR 0023: site filter options (sites of the PM's PTs)."
                     },
                     "hasScope": {
                       "type": "boolean"
@@ -37973,7 +37729,6 @@ export const openapiDocument = {
                     "asOf",
                     "month",
                     "companies",
-                    "sites",
                     "hasScope",
                     "waitingForMe",
                     "teamWaiting",
@@ -38898,16 +38653,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "description": "ADR 0023: site id (kantor cabang) — narrows the scope (requests/projects through the project's site, cash through the account's site, attendance through the row's site); never widens."
-            },
-            "required": false,
-            "description": "ADR 0023: site id (kantor cabang) — narrows the scope (requests/projects through the project's site, cash through the account's site, attendance through the row's site); never widens.",
-            "name": "site",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -39662,16 +39407,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "description": "ADR 0023: site id (kantor cabang) — narrows the scope (requests/projects through the project's site, cash through the account's site, attendance through the row's site); never widens."
-            },
-            "required": false,
-            "description": "ADR 0023: site id (kantor cabang) — narrows the scope (requests/projects through the project's site, cash through the account's site, attendance through the row's site); never widens.",
-            "name": "site",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -40098,17 +39833,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "pattern": "^\\d{1,10}$",
-              "description": "ADR 0023: narrows to a site (its home-site employees and site assignments, attendance rows of the site)."
-            },
-            "required": false,
-            "description": "ADR 0023: narrows to a site (its home-site employees and site assignments, attendance rows of the site).",
-            "name": "site_id",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
               "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
             },
@@ -40208,7 +39932,7 @@ export const openapiDocument = {
     },
     "/attendance/locations": {
       "get": {
-        "summary": "DRMS 13/10 A2: registered check-in locations of the caller (own employee per selected PT): every location of the PT with a point (sites incl. head office, projects, cost centers; no assignment needed). OnSite must check in inside one; Non-OnSite has no location restriction (outside every location → \"Di luar area\" at employees[].referenceSite). Coordinates and radius only (no money). The APK matches the GPS fix against this list (auto-detect) and caches it for offline check-ins; the server re-validates each check-in",
+        "summary": "DRMS 13/10 A2: registered check-in locations of the caller (own employee per selected PT): every location of the PT with a point (projects, cost centers — ADR 0032: no site; no assignment needed). OnSite must check in inside the chosen one; Non-OnSite inside any of them (picked automatically; outside all → 409 OUTSIDE_GEOFENCE, no \"Di luar area\" any more). Coordinates and radius only (no money). The APK matches the GPS fix against this list (auto-detect) and caches it for offline check-ins; the server re-validates each check-in",
         "security": [
           {
             "bearer": []
@@ -40320,7 +40044,7 @@ export const openapiDocument = {
     },
     "/attendance/check-in": {
       "post": {
-        "summary": "Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED = location outside the PT of the employee, OUTSIDE_GEOFENCE (OnSite only; DRMS 13/10 A2: a Non-OnSite check-in outside every registered location is recorded \"Di luar area\", see the result), MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)",
+        "summary": "Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED = location outside the PT of the employee, OUTSIDE_GEOFENCE (OnSite: outside the chosen location; Non-OnSite, ADR 0032: outside every registered location of the PT), MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)",
         "security": [
           {
             "bearer": []
@@ -40578,9 +40302,251 @@ export const openapiDocument = {
         }
       }
     },
+    "/attendance/on-behalf/options": {
+      "get": {
+        "summary": "ADR 0032: Admin Staff (pk-admin-staff) — per PT of the selection where the caller holds the role: the active employees (own excluded; also those without an account, hasAccount false) and the registered check-in locations with their point. Names, codes and points only. The APK caches it for offline on-behalf items",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "On-behalf options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceOnBehalfOptions"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attendance/on-behalf": {
+      "post": {
+        "summary": "ADR 0032: Admin Staff check-in / check-out ON BEHALF of an employee of its PT (also without an account) from the web. Photo of the employee first with POST /media/selfies (the caller's camera), GPS = the caller's; the employee's attendance-type rule is evaluated against that fix. Recorded with source admin (\"diabsenkan oleh Admin Staff\"), recorded_by = caller, reason. Gates and codes as /attendance/check-in, plus FORBIDDEN (no Admin Staff of the PT / own employee), COMPANY_MISMATCH (employee of another PT), NO_CHECK_IN, ALREADY_CHECKED_OUT",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceOnBehalfBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceCheckResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/attendance/{id}/correct": {
       "post": {
-        "summary": "US-15 T10 correction of one attendance time (PM of the team location or Admin; never own attendance; reason required; same local date). Creates an append-only correction; audit old → new",
+        "summary": "US-15 T10 correction of one attendance time (PM of the team location, Admin or — ADR 0032 — Admin Staff of the PT; never own attendance; reason required; same local date). Creates an append-only correction; audit old → new",
         "security": [
           {
             "bearer": []
@@ -42861,15 +42827,6 @@ export const openapiDocument = {
             "required": false,
             "description": "One Kas PT (a PT without Kas rights is ignored).",
             "name": "pt",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d+$"
-            },
-            "required": false,
-            "name": "site",
             "in": "query"
           },
           {
@@ -49715,17 +49672,6 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "pattern": "^\\d{1,10}$",
-              "description": "ADR 0023: only projects of this site (narrows the read scope)."
-            },
-            "required": false,
-            "description": "ADR 0023: only projects of this site (narrows the read scope).",
-            "name": "site",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -50019,7 +49965,7 @@ export const openapiDocument = {
     },
     "/sites": {
       "get": {
-        "summary": "ADR 0023: sites (kantor cabang) of the selected PTs (every member reads them; active only unless active=all) with the caller's flags home (Site penempatan), assigned (site assignment today) and team (PM on-behalf) — attendance location list",
+        "summary": "ADR 0023 sites — ADR 0032: sites are removed from the product; the endpoint stays for APK ≤ 0.11.1 and always answers an empty list",
         "security": [
           {
             "bearer": []
