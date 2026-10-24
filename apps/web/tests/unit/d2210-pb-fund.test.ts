@@ -67,9 +67,9 @@ describe('d2210 fund check: Pusat Biaya first, then PT', () => {
     expect(FundCheck.safeParse({ ...base, route: 'elsewhere' }).success).toBe(false)
   })
 
-  it('migration wiring: last in the list, every name once', () => {
+  it('migration wiring: right after the d2110 guard (later streams append after it), every name once', () => {
     const names = migrations.map((m) => m.name)
-    expect(names.at(-1)).toBe('20261022_100000_d2210_pb_fund')
+    expect(names.indexOf('20261022_100000_d2210_pb_fund')).toBe(names.indexOf('20261021_100200_d2110_pb_guard') + 1)
     expect(new Set(names).size).toBe(names.length)
   })
 

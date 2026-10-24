@@ -1996,7 +1996,7 @@
   "fieldHourMeter": "Hour meter (HM)",
   "fieldHmStart": "HM awal",
   "fieldHmEnd": "HM akhir",
-  "fieldHmPrefilled": "HM awal diisi otomatis dari HM akhir {date} ({hm}).",
+  "fieldHmPrefilled": "HM awal otomatis dari HM akhir terakhir yang tercatat: {date} ({hm}).",
   "@fieldHmPrefilled": {
     "placeholders": {
       "date": {
@@ -2024,8 +2024,17 @@
     }
   },
   "fieldHmPhoto": "Foto meter HM",
-  "fieldHmPhotoRequired": "Foto meter HM akhir (wajib)",
+  "fieldHmPhotoRequired": "Foto meter HM akhir (wajib bila HM diisi)",
   "fieldHmPhotoFixed": "Foto meter HM sudah di server (tidak bisa diganti).",
+  "fieldHmOptional": "HM opsional — isi saat pencatatan HM mingguan. Bila diisi, HM awal dan HM akhir wajib keduanya, plus foto meter HM. HM awal otomatis tidak dikirim selama HM akhir kosong.",
+  "fieldTimesheetBackdateWide": "Sebagai PM project / Direktur Anda dapat mengisi timesheet sejak {date} (selama periode kontrak unit).",
+  "@fieldTimesheetBackdateWide": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "fieldOperatingHours": "Jam operasi",
   "fieldWorkHours": "Kerja",
   "fieldStandbyHours": "Standby",

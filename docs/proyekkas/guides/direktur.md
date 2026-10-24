@@ -125,6 +125,10 @@ klik foto untuk ukuran penuh. Anda juga boleh membuat laporan dari HP (sama sepe
 **Koreksi** → halaman form yang sama dengan isian laporan (project, unit, tanggal terkunci) → ubah isian → **Alasan
 koreksi** (wajib, paling bawah) → **Simpan koreksi**. Lihat juga Panduan PM §2a.
 
+**Timesheet unit (sejak 24 Okt 2026):** Direktur (dan PM project) boleh mengisi timesheet untuk tanggal mana pun dalam
+periode kontrak unit — pelapor lapangan tetap paling lama 14 hari ke belakang. HM dan foto meter HM opsional (dicatat
+±1× seminggu); tab **Rekap** menampilkan HM mingguan per unit. Lihat Panduan PM §2b.
+
 ## 6. Keuangan
 
 - **Kas** (baca saja; transaksi kas yang dikonfirmasi meski saldo menjadi minus dan transfer ke rekening belum

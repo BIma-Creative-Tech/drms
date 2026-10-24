@@ -7553,10 +7553,17 @@ export const openapiDocument = {
             "type": "string"
           },
           "hm_start": {
-            "type": "number"
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "null = no HM reading (D2410)."
           },
           "hm_end": {
-            "type": "number"
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "work_hours": {
             "type": "number"
@@ -8803,19 +8810,27 @@ export const openapiDocument = {
             "description": "Required for a new timesheet."
           },
           "hm_start": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
-            "maximum": 10000000
+            "maximum": 10000000,
+            "description": "Optional (D2410), both hm_start and hm_end or none. On an edit: omitted = unchanged, null = cleared."
           },
           "hm_end": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 10000000
           },
           "work_hours": {
             "type": "number",
             "minimum": 0,
-            "maximum": 24
+            "maximum": 24,
+            "description": "Required for a new timesheet."
           },
           "standby_hours": {
             "type": "number",
@@ -8864,9 +8879,12 @@ export const openapiDocument = {
             "maxLength": 2000
           },
           "hm_photo_media_id": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "exclusiveMinimum": 0,
-            "description": "Required for a new timesheet (photo of the HM meter). Cannot change afterwards."
+            "description": "Photo of the HM meter — required when the timesheet has HM (D2410). Never replaced: on an edit it is only added to a timesheet without one (ignored otherwise)."
           },
           "reason": {
             "type": "string",
@@ -15310,14 +15328,24 @@ export const openapiDocument = {
             ]
           },
           "hmStart": {
-            "type": "number"
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "null = no HM reading on this day (D2410)."
           },
           "hmEnd": {
-            "type": "number"
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "hmUsed": {
-            "type": "number",
-            "description": "hmEnd − hmStart."
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "hmEnd − hmStart (null without HM)."
           },
           "workHours": {
             "type": "number"
@@ -15521,19 +15549,26 @@ export const openapiDocument = {
           },
           "reportDate": {
             "type": "string",
-            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Not in the future; at most 14 days back — the PM of the project and the Direktur may use any date inside the contract unit's period (D2410)."
           },
           "hmStart": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 10000000,
-            "description": "HM awal; ≠ the previous timesheet's HM akhir → flag HM_GAP (not rejected)."
+            "description": "HM awal — optional since D2410 (HM is read about once a week): both hmStart and hmEnd or none. ≠ the HM akhir of the unit's previous timesheet WITH HM → flag HM_GAP (not rejected)."
           },
           "hmEnd": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 10000000,
-            "description": "HM akhir ≥ HM awal."
+            "description": "HM akhir ≥ HM awal; optional, both or none."
           },
           "workHours": {
             "type": "number",
@@ -15589,9 +15624,12 @@ export const openapiDocument = {
             "maxLength": 2000
           },
           "hmPhotoId": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "exclusiveMinimum": 0,
-            "description": "Photo of the HM meter (media-progress-photos, uploaded by the caller) — required, exactly one."
+            "description": "Photo of the HM meter (media-progress-photos, uploaded by the caller) — required when hmStart/hmEnd are given (D2410), at most one."
           },
           "clientUuid": {
             "type": "string",
@@ -15603,10 +15641,7 @@ export const openapiDocument = {
           "projectId",
           "unitId",
           "reportDate",
-          "hmStart",
-          "hmEnd",
-          "workHours",
-          "hmPhotoId"
+          "workHours"
         ],
         "additionalProperties": false,
         "description": "Σ work + standby + breakdown ≤ 24."
@@ -15615,16 +15650,27 @@ export const openapiDocument = {
         "type": "object",
         "properties": {
           "hmStart": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 10000000,
-            "description": "HM awal; ≠ the previous timesheet's HM akhir → flag HM_GAP (not rejected)."
+            "description": "Omitted = unchanged; null (with hmEnd null) clears the HM reading."
           },
           "hmEnd": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 10000000,
-            "description": "HM akhir ≥ HM awal."
+            "description": "HM akhir ≥ HM awal; optional, both or none."
+          },
+          "hmPhotoId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "D2410: adds the HM photo of a timesheet that has none (required when HM is added to it); a stored photo is never replaced (400 PHOTO_LIMIT)."
           },
           "workHours": {
             "type": "number",
@@ -15691,16 +15737,27 @@ export const openapiDocument = {
         "type": "object",
         "properties": {
           "hmStart": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 10000000,
-            "description": "HM awal; ≠ the previous timesheet's HM akhir → flag HM_GAP (not rejected)."
+            "description": "Omitted = unchanged; null (with hmEnd null) clears the HM reading."
           },
           "hmEnd": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 10000000,
-            "description": "HM akhir ≥ HM awal."
+            "description": "HM akhir ≥ HM awal; optional, both or none."
+          },
+          "hmPhotoId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "D2410: adds the HM photo of a timesheet that has none (required when HM is added to it); a stored photo is never replaced (400 PHOTO_LIMIT)."
           },
           "workHours": {
             "type": "number",
@@ -16667,11 +16724,16 @@ export const openapiDocument = {
             "items": {
               "$ref": "#/components/schemas/ContractUnit"
             }
+          },
+          "timesheetMinDate": {
+            "type": "string",
+            "description": "D2410: earliest report date the CALLER may use for a new timesheet on this project — today − 14 days for field reporters; for the PM of the project and the Direktur the earliest contract-unit start (any date inside a unit's contract period). Never a future date; each contract unit's own period still applies."
           }
         },
         "required": [
           "projectId",
-          "items"
+          "items",
+          "timesheetMinDate"
         ]
       },
       "ContractUnit": {
@@ -46178,7 +46240,7 @@ export const openapiDocument = {
         }
       },
       "post": {
-        "summary": "FR1 Timesheet harian unit: one per unit and date (409 DUPLICATE_DATE), unit in an active contract unit of the kontrak_unit project on that date (409 NOT_IN_CONTRACT), HM photo required; HM start ≠ previous HM end → flag HM_GAP; updates the unit's last HM",
+        "summary": "FR1 Timesheet harian unit: one per unit and date (409 DUPLICATE_DATE), unit in an active contract unit of the kontrak_unit project on that date (409 NOT_IN_CONTRACT); report date at most 14 days back — the PM of the project / the Direktur any date of the contract period (D2410); HM optional, both or none, the HM photo required with HM (D2410); HM start ≠ the previous recorded HM end → flag HM_GAP; updates the unit's last HM",
         "security": [
           {
             "bearer": []
@@ -47736,7 +47798,7 @@ export const openapiDocument = {
     },
     "/projects/{id}/contract-units": {
       "get": {
-        "summary": "FR1 contract units of a project the caller may read; rate / minimum hours null unless Direktur, Finance or Admin of the PT",
+        "summary": "FR1 contract units of a project the caller may read; rate / minimum hours null unless Direktur, Finance or Admin of the PT; timesheetMinDate = the caller's earliest timesheet date on the project (D2410)",
         "security": [
           {
             "bearer": []

@@ -107,6 +107,18 @@ bisa diubah; foto yang sudah tersimpan tampil (tidak bisa dihapus), foto baru bi
 bawah — wajib untuk koreksi. **Simpan perubahan** / **Simpan koreksi**, atau **Batal** kembali ke laporan. Laporan
 ditandai "dikoreksi" dan perubahan tercatat di **Riwayat & koreksi**.
 
+### 2b. Timesheet unit: tanggal mundur dan HM mingguan (sejak 24 Okt 2026)
+
+- **Tanggal mundur:** pelapor lapangan paling lama **14 hari** ke belakang. **PM project** (PM yang tercatat di
+  project) dan **Direktur** boleh mengisi timesheet untuk **tanggal mana pun dalam periode kontrak unit** (tidak boleh
+  tanggal masa depan). Di matriks **Unit & kontrak → Timesheet**, tanda **+** hanya muncul pada hari yang boleh Anda
+  isi; hari merah bertanda **!** sudah lewat batas Anda. Klik **+** membuka form dengan tanggal dan unit tersebut.
+- **HM mingguan:** HM awal / HM akhir dan foto meter HM **opsional** — dicatat ±1× seminggu. Bila diisi, keduanya wajib
+  dan foto meter HM wajib. Jam kerja tetap wajib. HM awal terisi otomatis dari HM akhir terakhir yang tercatat; hari
+  tanpa pencatatan HM: kosongkan HM akhir. Tanda **selisih HM** membandingkan dengan timesheet ber-HM sebelumnya.
+- **Rekap:** tab **Rekap** dan laporan **Rekap Timesheet Kontrak Unit** menampilkan **HM mingguan** per unit (Senin–
+  Minggu): HM awal, HM akhir, total HM dan jumlah hari ber-HM.
+
 **Progress vs anggaran:** Laporan progress → tab **Project**, atau web **Progress project**. Hijau = sesuai;
 kuning = perlu perhatian; merah = anggaran terpakai mendahului progress lebih dari 8 poin.
 

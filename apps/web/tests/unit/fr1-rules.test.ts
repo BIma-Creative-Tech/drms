@@ -179,14 +179,17 @@ describe('Jenis servis legacy single value (DRMS owner 2026-10-17)', () => {
 })
 
 describe('FR1 API / sync contract', () => {
-  it('spare parts are validated text lines (no stock); timesheet needs exactly one HM photo', () => {
+  it('spare parts are validated text lines (no stock); timesheet HM + photo optional in the schema (D2410: pair / photo rule in the service)', () => {
     expect(SparepartLines.safeParse([{ name: 'Filter oli', partNo: '600-211', qty: 2, uom: 'PCS' }]).success).toBe(true)
     expect(SparepartLines.safeParse([{ name: '', qty: 1 }]).success).toBe(false)
     expect(SparepartLines.safeParse([{ name: 'Seal', qty: 0 }]).success).toBe(false)
     expect(SparepartLines.safeParse([{ name: 'Seal', qty: 1, stock: 4 }]).success).toBe(false)
     const ts = { projectId: 1, unitId: 2, reportDate: '2026-10-10', hmStart: 1000, hmEnd: 1008, workHours: 8 }
-    expect(UnitTimesheetCreate.safeParse(ts).success).toBe(false)
+    expect(UnitTimesheetCreate.safeParse(ts).success).toBe(true) // D2410: photo required with HM → checked by the service (400)
     expect(UnitTimesheetCreate.safeParse({ ...ts, hmPhotoId: 9 }).success).toBe(true)
+    expect(UnitTimesheetCreate.safeParse({ ...ts, hmStart: null, hmEnd: null, hmPhotoId: null }).success).toBe(true)
+    expect(UnitTimesheetCreate.safeParse({ projectId: 1, unitId: 2, reportDate: '2026-10-10', workHours: 8 }).success).toBe(true)
+    expect(UnitTimesheetCreate.safeParse({ ...ts, hmStart: 1000.001 }).success).toBe(false)
     // DRMS owner 2026-10-17: ≤ 25 photos (26 refused)
     expect(ServiceReportCreate.safeParse({ projectId: 1, unitId: 2, serviceType: 'perbaikan', action: 'Ganti seal', unitStatusAfter: 'menunggu_part', photoIds: Array.from({ length: 25 }, (_, i) => i + 1) }).success).toBe(true)
     expect(ServiceReportCreate.safeParse({ projectId: 1, unitId: 2, serviceType: 'perbaikan', action: 'Ganti seal', unitStatusAfter: 'menunggu_part', photoIds: Array.from({ length: 26 }, (_, i) => i + 1) }).success).toBe(false)

@@ -89,7 +89,7 @@ void main() {
       );
     });
     addTearDown(db.close);
-    expect(db.schemaVersion, 11);
+    expect(db.schemaVersion, 12);
     final repo = DraftRepository(db);
     final old = (await repo.load(sub, 'd-10'))!;
     expect((old.payeeType, old.isVendor, old.bankAccountId), (PayeeType.karyawan, false, 21));

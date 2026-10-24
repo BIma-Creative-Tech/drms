@@ -16,6 +16,9 @@ import { USER_NAME_VIEW } from '@/fields/users'
  * exactly one HM meter photo (owner type `unit_timesheet`). Updates vehicles.lastHourMeter. Basis of
  * the monthly recap + billing ESTIMATE (`rekap-timesheet-kontrak`). Written only by
  * domain/field/timesheet.ts.
+ * D2410 (user 2026-10-24, ADR 0020 amendment 2026-10-24): HM start/end + the HM photo are OPTIONAL (read about once a
+ * week) — both values or none (CHECK unit_timesheets_hm_pair, migration d2410_timesheet_hm_optional), the photo only
+ * with HM; work hours stay required.
  */
 export const UnitTimesheets: CollectionConfig = withAudit(
   {
@@ -40,8 +43,8 @@ export const UnitTimesheets: CollectionConfig = withAudit(
       { name: 'contractUnit', type: 'relationship', relationTo: 'contract-units', label: 'Unit kontrak', required: true, index: true, admin: ro },
       businessDateField('reportDate', 'Tanggal', { required: true, index: true, admin: ro }),
       { name: 'reporter', type: 'relationship', relationTo: 'users', label: 'Pelapor', required: true, index: true, admin: { ...ro, components: USER_NAME_VIEW } },
-      { name: 'hmStart', type: 'number', label: 'HM awal', required: true, admin: ro },
-      { name: 'hmEnd', type: 'number', label: 'HM akhir', required: true, admin: ro },
+      { name: 'hmStart', type: 'number', label: 'HM awal', admin: ro },
+      { name: 'hmEnd', type: 'number', label: 'HM akhir', admin: ro },
       { name: 'workHours', type: 'number', label: 'Jam kerja', required: true, admin: ro },
       { name: 'standbyHours', type: 'number', label: 'Jam standby', defaultValue: 0, admin: ro },
       { name: 'breakdownHours', type: 'number', label: 'Jam breakdown', defaultValue: 0, admin: ro },

@@ -110,8 +110,8 @@ export async function fieldCopy(req: PayloadRequest, type: FieldReportType, id: 
       project_id: relId(t.project)!,
       unit_id: relId(t.unit)!,
       report_date: t.reportDate,
-      hm_start: n(t.hmStart),
-      hm_end: n(t.hmEnd),
+      hm_start: t.hmStart === null || t.hmStart === undefined ? null : n(t.hmStart),
+      hm_end: t.hmEnd === null || t.hmEnd === undefined ? null : n(t.hmEnd),
       work_hours: n(t.workHours),
       standby_hours: n(t.standbyHours),
       breakdown_hours: n(t.breakdownHours),
@@ -265,6 +265,8 @@ export async function applyFieldItem(c: Ctx, type: FieldReportType, verdict: Tim
       same(p.project_id, existing.project, 'payload.project_id')
       same(p.unit_id, existing.unit, 'payload.unit_id')
       if (p.report_date !== undefined && p.report_date !== (existing as unknown as TimesheetDoc).reportDate) reject('VALIDATION', 'Tanggal timesheet tidak dapat diganti.', 'payload.report_date')
+      // D2410: the photo only completes a timesheet without one (an older APK may resend the stored id → ignored)
+      const addPhoto = typeof p.hm_photo_media_id === 'number' && (await photoIdsOf(req, type, existing.id)).length === 0 ? p.hm_photo_media_id : undefined
       await editTimesheet(req, existing.id, {
         hmStart: p.hm_start,
         hmEnd: p.hm_end,
@@ -276,12 +278,14 @@ export async function applyFieldItem(c: Ctx, type: FieldReportType, verdict: Tim
         operatorName: p.operator_name,
         location: p.location,
         notes: p.notes,
+        hmPhotoId: addPhoto,
         reason: p.reason,
       })
       return done(c, type, existing.id)
     }
     if (p.timesheet_id !== undefined) reject('NOT_FOUND', 'Timesheet tidak ditemukan.', 'payload.timesheet_id')
-    for (const k of ['project_id', 'unit_id', 'report_date', 'hm_start', 'hm_end', 'work_hours', 'hm_photo_media_id'] as const) required(p[k], k, k)
+    // D2410: HM + its photo are optional (pair / photo rule in the domain service)
+    for (const k of ['project_id', 'unit_id', 'report_date', 'work_hours'] as const) required(p[k], k, k)
     const { timing, timeFlags } = timingOf(c, verdict, receivedAt)
     const { doc } = await createTimesheet(
       req,
@@ -289,8 +293,8 @@ export async function applyFieldItem(c: Ctx, type: FieldReportType, verdict: Tim
         projectId: p.project_id!,
         unitId: p.unit_id!,
         reportDate: p.report_date!,
-        hmStart: p.hm_start!,
-        hmEnd: p.hm_end!,
+        hmStart: p.hm_start ?? null,
+        hmEnd: p.hm_end ?? null,
         workHours: p.work_hours!,
         standbyHours: p.standby_hours,
         breakdownHours: p.breakdown_hours,
@@ -299,7 +303,7 @@ export async function applyFieldItem(c: Ctx, type: FieldReportType, verdict: Tim
         operatorName: p.operator_name,
         location: p.location,
         notes: p.notes,
-        hmPhotoId: p.hm_photo_media_id!,
+        hmPhotoId: p.hm_photo_media_id ?? null,
         clientUuid: p.timesheet_client_uuid ?? item.client_uuid,
       },
       timing,

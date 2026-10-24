@@ -31,7 +31,7 @@ void main() {
       );
     });
     addTearDown(db.close);
-    expect(db.schemaVersion, 11);
+    expect(db.schemaVersion, 12);
     final repo = DraftRepository(db);
     final before = await repo.load(sub, 'd-7');
     expect(before!.lines, hasLength(2));
