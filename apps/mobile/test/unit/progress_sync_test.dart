@@ -493,6 +493,6 @@ void main() {
     expect(loaded.pctAfter, 10);
     expect(loaded.companyId, 3);
     // + v4 urgency level (2026-10-09) + v5 FR1 field reports + v6 P3 RAP caches + v7 D3 + v8 D4 + v9 sites + v10 vendor
-    expect(old.schemaVersion, 11);
+    expect(old.schemaVersion, 12);
   });
 }

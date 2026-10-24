@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import { APIError, type CollectionSlug, type PayloadRequest } from 'payload'
 
-import { relId, userId } from '@/access/roles'
+import { hasRole, relId, userId } from '@/access/roles'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
 import { companyById } from '@/domain/companies'
 import { claimMedia } from '@/domain/expense/receipts'
@@ -120,9 +120,20 @@ export async function companyDay(req: PayloadRequest, companyId: number, time: D
   return { tz, today: localDate(time, tz) }
 }
 
-export function checkReportDate(date: string, today: string, field: string): void {
-  const err = reportDateError(date, today)
+export function checkReportDate(date: string, today: string, field: string, opts: { unlimitedBackdate?: boolean } = {}): void {
+  const err = reportDateError(date, today, opts)
   if (err) fail(400, 'VALIDATION', err, field)
+}
+
+/**
+ * D2410 (user 2026-10-24, ADR 0020 amendment 2026-10-24): the PM of the project (`projects.pm`) and the Direktur
+ * (pk-owner) of its PT may file a timesheet for ANY past date inside the contract unit's period; everyone else keeps
+ * BACKDATE_MAX_DAYS. Other field report types are unchanged.
+ */
+export function mayBackdateTimesheet(req: PayloadRequest, project: { company: number; pm: number | null }): boolean {
+  if (hasRole(req, 'pk-owner', project.company)) return true
+  const uid = userId(req)
+  return uid !== undefined && project.pm !== null && project.pm === uid
 }
 
 // ---------------------------------------------------------------- loading / idempotency
@@ -341,7 +352,7 @@ export async function readingOnOrBefore(req: PayloadRequest, unitId: number, com
   const r = (await tx.execute(sql`
     SELECT reading FROM (
       SELECT t.hm_end AS reading, t.report_date AS d, t.received_at AS at FROM unit_timesheets t
-       WHERE t.unit_id = ${unitId} AND t.company_id = ${company} AND t.report_date <= ${date} AND t.id <> ${exTs}
+       WHERE t.unit_id = ${unitId} AND t.company_id = ${company} AND t.report_date <= ${date} AND t.hm_end IS NOT NULL AND t.id <> ${exTs}
       UNION ALL
       SELECT s.hour_meter, s.report_date, s.received_at FROM service_reports s
        WHERE s.unit_id = ${unitId} AND s.company_id = ${company} AND s.report_date <= ${date} AND s.hour_meter IS NOT NULL AND s.id <> ${exSv}
@@ -350,11 +361,11 @@ export async function readingOnOrBefore(req: PayloadRequest, unitId: number, com
   return v === undefined || v === null ? null : Number(v)
 }
 
-/** HM end of the latest timesheet of the unit BEFORE `date` (HM_GAP reference). */
+/** HM end of the latest timesheet of the unit BEFORE `date` that HAS HM (HM_GAP reference; D2410: HM is optional). */
 export async function previousTimesheetEnd(req: PayloadRequest, unitId: number, company: number, date: string): Promise<number | null> {
   const tx = await getRequestTx(req)
   const r = (await tx.execute(sql`
-    SELECT t.hm_end FROM unit_timesheets t WHERE t.unit_id = ${unitId} AND t.company_id = ${company} AND t.report_date < ${date}
+    SELECT t.hm_end FROM unit_timesheets t WHERE t.unit_id = ${unitId} AND t.company_id = ${company} AND t.report_date < ${date} AND t.hm_end IS NOT NULL
      ORDER BY t.report_date DESC, t.id DESC LIMIT 1`)) as unknown as { rows: Array<{ hm_end: string | number }> }
   const v = r.rows[0]?.hm_end
   return v === undefined || v === null ? null : Number(v)
@@ -364,7 +375,7 @@ export async function previousTimesheetEnd(req: PayloadRequest, unitId: number, 
  * Unit state from its field documents (ADR 0020 §5/§6), recalculated after every create / edit /
  * correction so a corrected typo also corrects the unit:
  * - `lastHourMeter` / `lastHourMeterAt` = the reading of the LATEST document (report date, then
- *   server time) among timesheets (HM end) and service reports (HM);
+ *   server time) among timesheets (HM end) and service reports (HM) — documents without HM are skipped (D2410);
  * - `status` = `unitStatusAfter` of the latest service report (unchanged when there is none).
  * Returns the status before/after (menunggu_part notification).
  */
@@ -372,7 +383,7 @@ export async function refreshUnit(req: PayloadRequest, unitId: number, company: 
   const tx = await getRequestTx(req)
   const r = (await tx.execute(sql`
     SELECT reading, at FROM (
-      SELECT t.hm_end AS reading, t.report_date AS d, t.received_at AS at FROM unit_timesheets t WHERE t.unit_id = ${unitId} AND t.company_id = ${company}
+      SELECT t.hm_end AS reading, t.report_date AS d, t.received_at AS at FROM unit_timesheets t WHERE t.unit_id = ${unitId} AND t.company_id = ${company} AND t.hm_end IS NOT NULL
       UNION ALL
       SELECT s.hour_meter, s.report_date, s.received_at FROM service_reports s WHERE s.unit_id = ${unitId} AND s.company_id = ${company} AND s.hour_meter IS NOT NULL
     ) x ORDER BY d DESC, at DESC LIMIT 1`)) as unknown as { rows: Array<{ reading: string | number; at: string | Date | null }> }

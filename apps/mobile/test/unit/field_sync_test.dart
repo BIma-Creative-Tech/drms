@@ -13,6 +13,7 @@ import 'package:proyekkas/features/field_reports/application/field_service.dart'
 import 'package:proyekkas/features/field_reports/data/field_api.dart';
 import 'package:proyekkas/features/field_reports/data/field_repository.dart';
 import 'package:proyekkas/features/field_reports/domain/field_models.dart';
+import 'package:proyekkas/features/field_reports/domain/field_rules.dart' show copySource;
 import 'package:proyekkas/features/masters/data/masters_repository.dart';
 import 'package:proyekkas/features/sync/application/sync_engine.dart';
 import 'package:proyekkas/features/sync/data/outbox_repository.dart';
@@ -56,7 +57,7 @@ void main() {
     addTearDown(db.close);
     expect(
       db.schemaVersion,
-      11,
+      12,
     ); // v5 field tables; v6 (P3) + v7 (D3) + v8 (D4) + v9 (sites) + v10 (vendor) + v11 (service types) on top
     final draft = (await (db.select(db.localDrafts)..where((t) => t.clientUuid.equals('d-5'))).getSingle());
     expect((draft.title, draft.urgencyLevelId, draft.companyId), ('BBM genset', 2, 3));
@@ -277,6 +278,32 @@ void main() {
       expect(next.marks.single.operatorName, 'Slamet');
     });
 
+    test('timesheet without HM (weekly HM, user 2026-10-24): no HM, no photo upload; the day still counts', () async {
+      answerBatch(
+        'applied',
+        extra: (_) => {
+          'server_unit_timesheet': {'id': 78, 'rev': 1, 'hm_start': null, 'hm_end': null},
+        },
+      );
+      final d = service.newDraft(
+        FieldReportType.unitTimesheet,
+        projectId: 41,
+        companyId: 3,
+        reportDate: today,
+        content: const TimesheetContent(unitId: 9, unitLabel: 'EX-01', workHours: 8, operatorName: 'Udin'),
+      );
+      await service.submit(sub, d, online: true);
+      await engine.run(sub);
+      expect(uploads, isEmpty);
+      final p = (((batches.single['items'] as List).single as Map)['payload'] as Map).cast<String, dynamic>();
+      expect(p.keys, isNot(anyOf(contains('hm_start'), contains('hm_end'), contains('hm_photo_media_id'))));
+      expect(p['work_hours'], 8);
+      final next = await service.timesheetStart(sub, projectId: 41, unitId: 9, date: '2026-10-10');
+      expect(next.marks.single.reportDate, today, reason: 'unit tab "terisi" for the day');
+      expect(next.marks.single.hmEnd, isNull);
+      expect(next.prevHm, isNull, reason: 'never an HM prefill source');
+    });
+
     test('rejected HM_DECREASED → clear Indonesian message, local version kept (state ditolak)', () async {
       answerBatch(
         'rejected',
@@ -432,6 +459,7 @@ void main() {
             200,
             {
               'projectId': 41,
+              'timesheetMinDate': '2026-10-01',
               'items': [
                 {
                   'id': 1,
@@ -462,10 +490,21 @@ void main() {
                   'companyId': 3,
                   'project': {'id': 41},
                   'unit': {'id': 9},
-                  'reportDate': '2026-10-08',
+                  'reportDate': '2026-10-07',
                   'hmStart': 1015,
                   'hmEnd': 1023,
                   'operatorName': 'Slamet',
+                },
+                // weekly HM (user 2026-10-24): a later timesheet without HM
+                {
+                  'id': 71,
+                  'companyId': 3,
+                  'project': {'id': 41},
+                  'unit': {'id': 9},
+                  'reportDate': '2026-10-08',
+                  'hmStart': null,
+                  'hmEnd': null,
+                  'operatorName': 'Udin',
                 },
               ],
               'nextCursor': null,
@@ -576,9 +615,17 @@ void main() {
           'PT Sumber Tambang',
         ]);
         final marks = await repo.timesheetMarks(sub, unitIds: [9]);
-        expect(marks.single.hmEnd, 1023);
+        expect(
+          marks.map((m) => (m.reportDate, m.hmEnd)),
+          unorderedEquals([('2026-10-07', 1023.0), ('2026-10-08', null)]),
+        );
+        // HM awal prefill skips the timesheet without HM; "Salin dari kemarin" does not
         final st = await service.timesheetStart(sub, projectId: 41, unitId: 9, date: today);
-        expect(st.prevHm, 1023);
+        expect((st.prevHm, st.prevDate), (1023, '2026-10-07'));
+        expect(copySource(unitId: 9, date: today, marks: marks)!.operatorName, 'Udin');
+        // the caller's earliest timesheet date of the project (PM project / Direktur: contract period)
+        expect(await repo.timesheetMinDate(sub, 41), '2026-10-01');
+        expect(await repo.timesheetMinDate(sub, 52), isNull);
       },
     );
 
@@ -650,7 +697,7 @@ void main() {
       );
     });
     addTearDown(db.close);
-    expect(db.schemaVersion, 11);
+    expect(db.schemaVersion, 12);
     final repo = FieldRepository(db);
     final old = (await repo.load(sub, 'sv-old'))!;
     expect(old.service.serviceTypeIds, isEmpty);
@@ -658,6 +705,40 @@ void main() {
     await repo.putServiceTypes(sub, const [ServiceType(id: 7, companyId: 3, code: 'perbaikan', name: 'Perbaikan')]);
     expect((await repo.serviceTypes(sub, companyId: 3)).single.name, 'Perbaikan');
     expect(await repo.serviceTypes(sub, companyId: 4), isEmpty);
+  });
+
+  test('database v11 → v12: recent-timesheet cache recreated with nullable HM; local timesheets untouched', () async {
+    const ts = 1790000000;
+    final db = oldPhoneDb(11, (raw) {
+      raw.execute(
+        'INSERT INTO field_recent_timesheets (user_sub, id, company_id, project_id, unit_id, report_date, hm_start, '
+        "hm_end) VALUES ('$sub', 70, 3, 41, 9, '2026-10-08', 1015, 1023)",
+      );
+      raw.execute(
+        'INSERT INTO local_field_reports (client_uuid, user_sub, company_id, report_type, project_id, unit_id, '
+        'report_date, hour_meter, content_json, sync_state, created_at, updated_at) VALUES '
+        "('ts-old', '$sub', 3, 'unit_timesheet', 41, 9, '$today', 1031, "
+        "'{\"unitId\":9,\"hmStart\":1023,\"hmEnd\":1031,\"workHours\":8,\"hmPhoto\":\"hm-1\"}', 'queued', $ts, $ts)",
+      );
+    });
+    addTearDown(db.close);
+    expect(db.schemaVersion, 12);
+    // a pure server cache: emptied (the next field refresh refills it)
+    expect(await db.select(db.fieldRecentTimesheets).get(), isEmpty);
+    final repo = FieldRepository(db);
+    await repo.putRecentTimesheets(sub, 41, '2026-09-24', [
+      const FieldRecord(FieldReportType.unitTimesheet, {
+        'id': 71,
+        'companyId': 3,
+        'unit': {'id': 9},
+        'reportDate': '2026-10-08',
+        'hmStart': null,
+        'hmEnd': null,
+      }),
+    ]);
+    final marks = await repo.timesheetMarks(sub, unitIds: [9]);
+    expect(marks.map((m) => (m.reportDate, m.hmEnd, m.local)), [('2026-10-08', null, false), (today, 1031.0, true)]);
+    expect((await repo.load(sub, 'ts-old'))!.timesheet.hmPhoto, 'hm-1');
   });
 
   test('rejected create can be fixed and sent again (new op, same report uuid in the payload)', () async {

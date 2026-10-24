@@ -8,6 +8,7 @@ import 'package:proyekkas/features/auth/domain/user_profile.dart';
 import 'package:proyekkas/features/field_reports/application/field_providers.dart';
 import 'package:proyekkas/features/field_reports/application/field_service.dart';
 import 'package:proyekkas/features/field_reports/domain/field_models.dart';
+import 'package:proyekkas/features/field_reports/domain/field_rules.dart' show timesheetMinDate;
 import 'package:proyekkas/features/field_reports/presentation/aftersales_screen.dart';
 import 'package:proyekkas/features/field_reports/presentation/field_conflict_screen.dart';
 import 'package:proyekkas/features/field_reports/presentation/field_hub_screen.dart';
@@ -167,6 +168,7 @@ void main() {
     UserProfile? profile,
     List<FieldDraft> local = const [],
     List<TimesheetMark> marks = const [],
+    String? tsMinDate,
     List<Override> extra = const [],
     bool online = true,
   }) => pumpScreen(
@@ -182,6 +184,7 @@ void main() {
       fieldUnitsProvider.overrideWith((ref, key) async => const [ex01, ex02, dz01]),
       fieldContractUnitsProvider.overrideWith((ref, id) async => [cu(ex01), cu(ex02), cu(dz01)]),
       fieldTimesheetMarksProvider.overrideWith((ref, id) async => marks),
+      fieldTimesheetMinDateProvider.overrideWith((ref, id) async => tsMinDate ?? timesheetMinDate(today, null)),
       openFieldDraftsProvider.overrideWith((ref) => Stream.value(local)),
       fieldClientsProvider.overrideWith(
         (ref, c) async => const [
@@ -512,7 +515,9 @@ void main() {
       expect(find.text('DZ-01 terisi'), findsOneWidget);
       final hmStart = tester.widget<TextField>(find.byKey(const Key('timesheet-hm-start')));
       expect(hmStart.controller!.text, '1023');
-      expect(find.textContaining('HM awal diisi otomatis dari HM akhir'), findsOneWidget);
+      expect(find.textContaining('HM awal otomatis dari HM akhir terakhir yang tercatat'), findsOneWidget);
+      expect(find.textContaining('HM opsional'), findsOneWidget);
+      expect(find.byKey(const Key('timesheet-date-window')), findsNothing, reason: 'reporter: 14 days');
       await tester.enterText(find.byKey(const Key('timesheet-hm-end')), '1031,5');
       await tester.pump();
       expect(find.textContaining('Selisih HM: 8,5 jam'), findsOneWidget);
@@ -531,7 +536,7 @@ void main() {
       await tester.tap(find.byKey(const Key('timesheet-submit')));
       await tester.pumpAndSettle();
       expect(service.submitted, isEmpty);
-      expect(find.text('Foto meter HM wajib (1 foto).'), findsOneWidget);
+      expect(find.text('Foto meter HM wajib bila HM diisi.'), findsOneWidget);
       expect(find.text('Alasan breakdown wajib bila ada jam breakdown.'), findsOneWidget);
       await tester.enterText(find.byKey(const Key('timesheet-breakdown-reason')), 'Hidrolik bocor');
       await tester.ensureVisible(find.byKey(const Key('timesheet-hm-photo')));
@@ -554,6 +559,23 @@ void main() {
       );
       // next unit opened, empty, HM awal prefilled again
       expect(tester.widget<TextField>(find.byKey(const Key('timesheet-operator'))).controller!.text, '');
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('weekly HM (user 2026-10-24): a day without HM is saved without HM awal and without photo', (
+      tester,
+    ) async {
+      await pump(tester, const TimesheetScreen(projectId: 41), tsMinDate: '2026-08-01');
+      // PM project / Direktur: the whole contract period
+      expect(find.byKey(const Key('timesheet-date-window')), findsOneWidget);
+      expect(tester.widget<TextField>(find.byKey(const Key('timesheet-hm-start'))).controller!.text, '1023');
+      await tester.enterText(find.byKey(const Key('timesheet-work')), '8');
+      await tester.pump();
+      await tester.ensureVisible(find.byKey(const Key('timesheet-submit')));
+      await tester.tap(find.byKey(const Key('timesheet-submit')));
+      await tester.pumpAndSettle();
+      final c = service.submitted.single.$1.timesheet;
+      expect((c.hmStart, c.hmEnd, c.hmPhoto, c.workHours), (null, null, null, 8.0));
       await tester.pump(const Duration(seconds: 1));
     });
 

@@ -90,6 +90,36 @@ describe('Timesheet form', () => {
   })
 })
 
+/** D2410 (user 2026-10-24): date window per project (matrix "+" date honoured or a visible notice), HM optional. */
+describe('Timesheet form — D2410 backdate window + optional HM', () => {
+  const units = [{ contractUnitId: 1, unitId: 11, label: 'EX-01', startDate: '2026-08-01', endDate: null, active: true, lastHm: 1023 }]
+  const form = (minDate: string | undefined, initialDate: string) =>
+    html(React.createElement(TimesheetForm, { projects: [{ projectId: 5, label: 'K-001', companyId: 1, minDate, units }], today: '2026-10-24', minDate: '2026-10-10', initialProject: 5, initialUnit: 11, initialDate }))
+  it('PM / Direktur (minDate = contract start): an old matrix date is kept and its unit preselected, no notice', () => {
+    const out = form('2026-08-01', '2026-09-05')
+    expect(out).toContain('value="2026-09-05"')
+    expect(out).toContain('min="2026-08-01"')
+    expect(out).toContain('<option value="11" selected="">EX-01</option>')
+    expect(out).not.toContain('data-pk-date-limit')
+  })
+  it('reporter: a date older than 14 days is NOT swapped for today — it stays with a visible notice', () => {
+    const out = form('2026-10-10', '2026-09-05')
+    expect(out).toContain('value="2026-09-05"')
+    expect(out).toContain('data-pk-date-limit')
+    expect(out).toContain('hanya dapat diisi PM project atau Direktur')
+    expect(out).toContain('min="2026-10-10"')
+  })
+  it('HM section is optional (weekly): no required mark on HM, photo required only with HM', () => {
+    const out = form('2026-10-10', '2026-10-24')
+    expect(out).toContain('Hour meter (HM) · opsional')
+    expect(out).toContain('data-pk-hm-optional')
+    expect(out).toContain('HM dicatat ±1× seminggu')
+    expect(out).not.toMatch(/HM awal<span class="req"/)
+    expect(out).not.toMatch(/HM akhir<span class="req"/)
+    expect(out).toContain('Wajib 1 foto bila HM diisi.')
+  })
+})
+
 describe('Aktivitas aftersales form', () => {
   it('customer, kind chips (radio), value optional with the visibility note', () => {
     const out = html(React.createElement(ActivityForm, { projects: [{ id: 9, label: 'AS-01', companyId: 1, clientId: null }], clients: [{ id: 3, name: 'CV Maju Jaya', companyId: 1 }], today: '2026-10-09', minDate: '2026-09-25', initial: { kind: 'pengiriman', client: 3 } }))

@@ -10037,18 +10037,18 @@ class $FieldRecentTimesheetsTable extends FieldRecentTimesheets
   late final GeneratedColumn<double> hmStart = GeneratedColumn<double>(
     'hm_start',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.double,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _hmEndMeta = const VerificationMeta('hmEnd');
   @override
   late final GeneratedColumn<double> hmEnd = GeneratedColumn<double>(
     'hm_end',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.double,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _operatorNameMeta = const VerificationMeta(
     'operatorName',
@@ -10159,16 +10159,12 @@ class $FieldRecentTimesheetsTable extends FieldRecentTimesheets
         _hmStartMeta,
         hmStart.isAcceptableOrUnknown(data['hm_start']!, _hmStartMeta),
       );
-    } else if (isInserting) {
-      context.missing(_hmStartMeta);
     }
     if (data.containsKey('hm_end')) {
       context.handle(
         _hmEndMeta,
         hmEnd.isAcceptableOrUnknown(data['hm_end']!, _hmEndMeta),
       );
-    } else if (isInserting) {
-      context.missing(_hmEndMeta);
     }
     if (data.containsKey('operator_name')) {
       context.handle(
@@ -10230,11 +10226,11 @@ class $FieldRecentTimesheetsTable extends FieldRecentTimesheets
       hmStart: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}hm_start'],
-      )!,
+      ),
       hmEnd: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}hm_end'],
-      )!,
+      ),
       operatorName: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}operator_name'],
@@ -10264,8 +10260,8 @@ class FieldRecentTimesheetRow extends DataClass
   final int projectId;
   final int unitId;
   final String reportDate;
-  final double hmStart;
-  final double hmEnd;
+  final double? hmStart;
+  final double? hmEnd;
   final String? operatorName;
   final String? location;
   final double? fuelLiters;
@@ -10276,8 +10272,8 @@ class FieldRecentTimesheetRow extends DataClass
     required this.projectId,
     required this.unitId,
     required this.reportDate,
-    required this.hmStart,
-    required this.hmEnd,
+    this.hmStart,
+    this.hmEnd,
     this.operatorName,
     this.location,
     this.fuelLiters,
@@ -10291,8 +10287,12 @@ class FieldRecentTimesheetRow extends DataClass
     map['project_id'] = Variable<int>(projectId);
     map['unit_id'] = Variable<int>(unitId);
     map['report_date'] = Variable<String>(reportDate);
-    map['hm_start'] = Variable<double>(hmStart);
-    map['hm_end'] = Variable<double>(hmEnd);
+    if (!nullToAbsent || hmStart != null) {
+      map['hm_start'] = Variable<double>(hmStart);
+    }
+    if (!nullToAbsent || hmEnd != null) {
+      map['hm_end'] = Variable<double>(hmEnd);
+    }
     if (!nullToAbsent || operatorName != null) {
       map['operator_name'] = Variable<String>(operatorName);
     }
@@ -10313,8 +10313,12 @@ class FieldRecentTimesheetRow extends DataClass
       projectId: Value(projectId),
       unitId: Value(unitId),
       reportDate: Value(reportDate),
-      hmStart: Value(hmStart),
-      hmEnd: Value(hmEnd),
+      hmStart: hmStart == null && nullToAbsent
+          ? const Value.absent()
+          : Value(hmStart),
+      hmEnd: hmEnd == null && nullToAbsent
+          ? const Value.absent()
+          : Value(hmEnd),
       operatorName: operatorName == null && nullToAbsent
           ? const Value.absent()
           : Value(operatorName),
@@ -10339,8 +10343,8 @@ class FieldRecentTimesheetRow extends DataClass
       projectId: serializer.fromJson<int>(json['projectId']),
       unitId: serializer.fromJson<int>(json['unitId']),
       reportDate: serializer.fromJson<String>(json['reportDate']),
-      hmStart: serializer.fromJson<double>(json['hmStart']),
-      hmEnd: serializer.fromJson<double>(json['hmEnd']),
+      hmStart: serializer.fromJson<double?>(json['hmStart']),
+      hmEnd: serializer.fromJson<double?>(json['hmEnd']),
       operatorName: serializer.fromJson<String?>(json['operatorName']),
       location: serializer.fromJson<String?>(json['location']),
       fuelLiters: serializer.fromJson<double?>(json['fuelLiters']),
@@ -10356,8 +10360,8 @@ class FieldRecentTimesheetRow extends DataClass
       'projectId': serializer.toJson<int>(projectId),
       'unitId': serializer.toJson<int>(unitId),
       'reportDate': serializer.toJson<String>(reportDate),
-      'hmStart': serializer.toJson<double>(hmStart),
-      'hmEnd': serializer.toJson<double>(hmEnd),
+      'hmStart': serializer.toJson<double?>(hmStart),
+      'hmEnd': serializer.toJson<double?>(hmEnd),
       'operatorName': serializer.toJson<String?>(operatorName),
       'location': serializer.toJson<String?>(location),
       'fuelLiters': serializer.toJson<double?>(fuelLiters),
@@ -10371,8 +10375,8 @@ class FieldRecentTimesheetRow extends DataClass
     int? projectId,
     int? unitId,
     String? reportDate,
-    double? hmStart,
-    double? hmEnd,
+    Value<double?> hmStart = const Value.absent(),
+    Value<double?> hmEnd = const Value.absent(),
     Value<String?> operatorName = const Value.absent(),
     Value<String?> location = const Value.absent(),
     Value<double?> fuelLiters = const Value.absent(),
@@ -10383,8 +10387,8 @@ class FieldRecentTimesheetRow extends DataClass
     projectId: projectId ?? this.projectId,
     unitId: unitId ?? this.unitId,
     reportDate: reportDate ?? this.reportDate,
-    hmStart: hmStart ?? this.hmStart,
-    hmEnd: hmEnd ?? this.hmEnd,
+    hmStart: hmStart.present ? hmStart.value : this.hmStart,
+    hmEnd: hmEnd.present ? hmEnd.value : this.hmEnd,
     operatorName: operatorName.present ? operatorName.value : this.operatorName,
     location: location.present ? location.value : this.location,
     fuelLiters: fuelLiters.present ? fuelLiters.value : this.fuelLiters,
@@ -10470,8 +10474,8 @@ class FieldRecentTimesheetsCompanion
   final Value<int> projectId;
   final Value<int> unitId;
   final Value<String> reportDate;
-  final Value<double> hmStart;
-  final Value<double> hmEnd;
+  final Value<double?> hmStart;
+  final Value<double?> hmEnd;
   final Value<String?> operatorName;
   final Value<String?> location;
   final Value<double?> fuelLiters;
@@ -10497,8 +10501,8 @@ class FieldRecentTimesheetsCompanion
     required int projectId,
     required int unitId,
     required String reportDate,
-    required double hmStart,
-    required double hmEnd,
+    this.hmStart = const Value.absent(),
+    this.hmEnd = const Value.absent(),
     this.operatorName = const Value.absent(),
     this.location = const Value.absent(),
     this.fuelLiters = const Value.absent(),
@@ -10508,9 +10512,7 @@ class FieldRecentTimesheetsCompanion
        companyId = Value(companyId),
        projectId = Value(projectId),
        unitId = Value(unitId),
-       reportDate = Value(reportDate),
-       hmStart = Value(hmStart),
-       hmEnd = Value(hmEnd);
+       reportDate = Value(reportDate);
   static Insertable<FieldRecentTimesheetRow> custom({
     Expression<String>? userSub,
     Expression<int>? id,
@@ -10548,8 +10550,8 @@ class FieldRecentTimesheetsCompanion
     Value<int>? projectId,
     Value<int>? unitId,
     Value<String>? reportDate,
-    Value<double>? hmStart,
-    Value<double>? hmEnd,
+    Value<double?>? hmStart,
+    Value<double?>? hmEnd,
     Value<String?>? operatorName,
     Value<String?>? location,
     Value<double?>? fuelLiters,
@@ -17668,8 +17670,8 @@ typedef $$FieldRecentTimesheetsTableCreateCompanionBuilder =
       required int projectId,
       required int unitId,
       required String reportDate,
-      required double hmStart,
-      required double hmEnd,
+      Value<double?> hmStart,
+      Value<double?> hmEnd,
       Value<String?> operatorName,
       Value<String?> location,
       Value<double?> fuelLiters,
@@ -17683,8 +17685,8 @@ typedef $$FieldRecentTimesheetsTableUpdateCompanionBuilder =
       Value<int> projectId,
       Value<int> unitId,
       Value<String> reportDate,
-      Value<double> hmStart,
-      Value<double> hmEnd,
+      Value<double?> hmStart,
+      Value<double?> hmEnd,
       Value<String?> operatorName,
       Value<String?> location,
       Value<double?> fuelLiters,
@@ -17922,8 +17924,8 @@ class $$FieldRecentTimesheetsTableTableManager
                 Value<int> projectId = const Value.absent(),
                 Value<int> unitId = const Value.absent(),
                 Value<String> reportDate = const Value.absent(),
-                Value<double> hmStart = const Value.absent(),
-                Value<double> hmEnd = const Value.absent(),
+                Value<double?> hmStart = const Value.absent(),
+                Value<double?> hmEnd = const Value.absent(),
                 Value<String?> operatorName = const Value.absent(),
                 Value<String?> location = const Value.absent(),
                 Value<double?> fuelLiters = const Value.absent(),
@@ -17950,8 +17952,8 @@ class $$FieldRecentTimesheetsTableTableManager
                 required int projectId,
                 required int unitId,
                 required String reportDate,
-                required double hmStart,
-                required double hmEnd,
+                Value<double?> hmStart = const Value.absent(),
+                Value<double?> hmEnd = const Value.absent(),
                 Value<String?> operatorName = const Value.absent(),
                 Value<String?> location = const Value.absent(),
                 Value<double?> fuelLiters = const Value.absent(),

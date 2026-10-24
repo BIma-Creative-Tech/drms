@@ -4,6 +4,8 @@ import type { PayloadRequest } from 'payload'
 import { mayReadRates } from '@/domain/field/access'
 import { ACTIVITY_KIND_LABELS, addDays, availabilityPct, billingEstimate, contractDaysInMonth, daysBetween, PO_STATUS_LABELS, round2, type ActivityKind, type PoStatus, type RateBasis } from '@/domain/field/rules'
 
+import { hmWeeks, weeklyHm } from '@/domain/field/views'
+
 import { reportContext, rows } from './kpi'
 import type { Column, FilterField, Option, ReportDef, Table } from './registry'
 import { dateRange, firstDay, lastDay, PERIOD_RE, periodLabel } from './rules'
@@ -62,7 +64,7 @@ export const rekapTimesheetKontrak: ReportDef = {
   code: 'rekap-timesheet-kontrak',
   title: 'Rekap Timesheet Kontrak Unit',
   kpi: 'FR1',
-  description: 'Per unit kontrak per bulan: HM, jam kerja/standby/breakdown, ketersediaan, hari tanpa timesheet, dan estimasi tagihan (Direktur/Finance/Admin) — estimasi, bukan invoice.',
+  description: 'Per unit kontrak per bulan: HM (termasuk HM mingguan), jam kerja/standby/breakdown, ketersediaan, hari tanpa timesheet, dan estimasi tagihan (Direktur/Finance/Admin) — estimasi, bukan invoice.',
   roles: ['pk-owner', 'pk-finance', 'pk-pm', 'pk-admin'],
   formats: ['csv', 'xlsx', 'pdf'],
   paged: false,
@@ -134,7 +136,8 @@ export const rekapTimesheetKontrak: ReportDef = {
           hariKontrak: span.contractDays,
           hariTs: x.days,
           tanpaTs: Math.max(0, covered - x.days),
-          hm: round2(n(x.hm_used)),
+          // D2410: HM is optional (weekly) — Σ over the timesheets WITH HM; null when the month has none
+          hm: x.hm_used === null || x.hm_used === undefined ? null : round2(n(x.hm_used)),
           kerja: work,
           standby,
           breakdown,
@@ -187,8 +190,8 @@ export const rekapTimesheetKontrak: ReportDef = {
           tanggal: String(x.report_date),
           project: String(x.code),
           unit: [x.unit_code, x.plate].filter(Boolean).join(' · '),
-          hmAwal: n(x.hm_start),
-          hmAkhir: n(x.hm_end),
+          hmAwal: x.hm_start === null ? null : n(x.hm_start),
+          hmAkhir: x.hm_end === null ? null : n(x.hm_end),
           kerja: n(x.work_hours),
           standby: n(x.standby_hours),
           breakdown: n(x.breakdown_hours),
@@ -199,11 +202,48 @@ export const rekapTimesheetKontrak: ReportDef = {
       })),
       empty: 'Belum ada timesheet.',
     }
+    // D2410 (user 2026-10-24): weekly HM per contract unit — Monday–Sunday weeks overlapping the month
+    const weeks = hmWeeks(month)
+    const readings = r.length
+      ? await rows<{ contract_unit_id: number; report_date: string; hm_start: string | number; hm_end: string | number }>(
+          req,
+          sql`SELECT t.contract_unit_id, t.report_date, t.hm_start, t.hm_end
+                FROM unit_timesheets t JOIN projects p ON p.id = t.project_id
+               WHERE ${projectScopeSql(scope)} AND t.report_date >= ${weeks[0]!.from} AND t.report_date <= ${weeks.at(-1)!.to}
+                 AND t.hm_start IS NOT NULL AND t.hm_end IS NOT NULL AND t.contract_unit_id IN (${sql.join(r.map((x) => sql`${x.id}`), sql`, `)})
+               ORDER BY t.report_date, t.id`,
+        )
+      : []
+    const weekly: Table = {
+      key: 'hm-mingguan',
+      title: 'HM mingguan per unit (Senin–Minggu)',
+      columns: [
+        { key: 'project', label: 'Project', type: 'text' },
+        { key: 'unit', label: 'Unit', type: 'text', primary: true },
+        { key: 'minggu', label: 'Minggu', type: 'text', primary: true },
+        { key: 'hmAwal', label: 'HM awal', type: 'int' },
+        { key: 'hmAkhir', label: 'HM akhir', type: 'int' },
+        { key: 'totalHm', label: 'Total HM', type: 'int', primary: true },
+        { key: 'hariHm', label: 'Hari ber-HM', type: 'int' },
+      ],
+      rows: r.flatMap((x) =>
+        weeklyHm(
+          readings.filter((t) => Number(t.contract_unit_id) === Number(x.id)).map((t) => ({ reportDate: String(t.report_date), hmStart: n(t.hm_start), hmEnd: n(t.hm_end) })),
+          month,
+        ).map((wk) => ({
+          company: Number(x.company_id),
+          href: `/admin/unit-kontrak/kontrak/${x.project_id}?tab=rekap&bulan=${month}`,
+          cells: { project: String(x.code), unit: [x.unit_code, x.plate].filter(Boolean).join(' · ') || x.type || `#${x.id}`, minggu: wk.label, hmAwal: wk.hmStart, hmAkhir: wk.hmEnd, totalHm: wk.total, hariHm: wk.days },
+        })),
+      ),
+      empty: 'Belum ada unit kontrak aktif di bulan ini dalam cakupan Anda.',
+    }
     return {
       main,
-      extra: [extra],
+      extra: [weekly, extra],
       notes: [
         `Periode ${periodLabel(month)}; hari tanpa timesheet dihitung s/d ${until} untuk hari yang tercakup kontrak.`,
+        'HM dicatat ±1× seminggu (opsional per hari): Total HM = jumlah (HM akhir − HM awal) dari timesheet yang mengisi HM; HM mingguan: HM awal pertama dan HM akhir terakhir yang tercatat di minggu itu, total = HM akhir − HM awal.',
         'Ketersediaan = (jam kerja + standby) / (jam kerja + standby + breakdown).',
         ...(anyRates
           ? ['ESTIMASI, BUKAN INVOICE: per jam = tarif × maks(jam kerja, minimum jam; minimum diprorata bila kontrak tidak sebulan penuh); per bulan = tarif × hari kontrak / hari dalam bulan. Invoice resmi dibuat di luar aplikasi.']

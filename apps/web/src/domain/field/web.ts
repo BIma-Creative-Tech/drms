@@ -6,9 +6,10 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { localDate } from '@/domain/progress/rules'
 
 import { mayReadRates } from './access'
+import { mayBackdateTimesheet } from './common'
 import { scopedFind } from './service'
 import { namesOf, num, str, unitRef } from './refs'
-import { kindOf, round2, unitLabel, type FieldReportType, type ProjectKind, type RateBasis } from './rules'
+import { kindOf, round2, timesheetMinDate, unitLabel, type FieldReportType, type ProjectKind, type RateBasis } from './rules'
 import type { TimesheetDoc } from './timesheet'
 import type { ContractTermsView, MatrixContract, MatrixTimesheet } from './views'
 import { NOT_DELETED } from '@/domain/soft-delete/where'
@@ -19,7 +20,7 @@ import { NOT_DELETED } from '@/domain/soft-delete/where'
  * lookup, rates only through `mayReadRates`. Writes never happen here (the views post to /api/v1).
  */
 
-export type ProjectOpt = { id: number; code: string; name: string; kind: ProjectKind; companyId: number; clientId: number | null; status: string | null; label: string }
+export type ProjectOpt = { id: number; code: string; name: string; kind: ProjectKind; companyId: number; clientId: number | null; status: string | null; label: string; pmId?: number | null }
 
 /** Selected PTs of the caller where field reports are switched on (companies.fieldReportsEnabled). */
 export async function enabledCompanies(req: PayloadRequest): Promise<number[]> {
@@ -43,7 +44,7 @@ export async function fieldProjects(req: PayloadRequest, kinds: readonly Project
   const and: Where[] = [{ kind: { in: [...kinds] } }, { company: { in: [...companies] } }]
   if (!opts.includeArchived) and.push({ status: { not_in: ['arsip', 'dibatalkan'] } })
   const r = await req.payload
-    .find({ collection: 'projects', where: { and }, sort: 'code', depth: 0, pagination: false, select: { code: true, name: true, kind: true, company: true, client: true, status: true }, user: req.user, overrideAccess: false /* caller's project scope */, req })
+    .find({ collection: 'projects', where: { and }, sort: 'code', depth: 0, pagination: false, select: { code: true, name: true, kind: true, company: true, client: true, status: true, pm: true }, user: req.user, overrideAccess: false /* caller's project scope */, req })
     .catch(() => ({ docs: [] as unknown[] }))
   return (r.docs as Array<Record<string, unknown> & { id: number }>).map((p) => ({
     id: p.id,
@@ -54,6 +55,7 @@ export async function fieldProjects(req: PayloadRequest, kinds: readonly Project
     clientId: relId(p.client) ?? null,
     status: (p.status as string | null) ?? null,
     label: `${String(p.code ?? '')} ${String(p.name ?? '')}`.trim(),
+    pmId: relId(p.pm) ?? null,
   }))
 }
 
@@ -74,9 +76,9 @@ export async function visibleFieldDoc<T>(req: PayloadRequest, type: FieldReportT
 
 /** One project the caller may read (any kind), or null. */
 export async function visibleProject(req: PayloadRequest, id: number): Promise<ProjectOpt | null> {
-  const p = await findVisible(req, 'projects', id, { code: true, name: true, kind: true, company: true, client: true, status: true })
+  const p = await findVisible(req, 'projects', id, { code: true, name: true, kind: true, company: true, client: true, status: true, pm: true })
   if (!p) return null
-  return { id: p.id, code: String(p.code ?? ''), name: String(p.name ?? ''), kind: kindOf(p.kind), companyId: relId(p.company)!, clientId: relId(p.client) ?? null, status: (p.status as string | null) ?? null, label: `${String(p.code ?? '')} ${String(p.name ?? '')}`.trim() }
+  return { id: p.id, code: String(p.code ?? ''), name: String(p.name ?? ''), kind: kindOf(p.kind), companyId: relId(p.company)!, clientId: relId(p.client) ?? null, status: (p.status as string | null) ?? null, label: `${String(p.code ?? '')} ${String(p.name ?? '')}`.trim(), pmId: relId(p.pm) ?? null }
 }
 
 type ContractRow = Record<string, unknown> & { id: number; startDate: string; endDate?: string | null }
@@ -129,8 +131,8 @@ export async function timesheetsOf(req: PayloadRequest, f: { projectIds?: readon
     unitLabel: unitRef(n, d.unit).label ?? `Unit #${relId(d.unit)}`,
     contractUnitId: relId(d.contractUnit) ?? null,
     reportDate: d.reportDate,
-    hmStart: Number(d.hmStart),
-    hmEnd: Number(d.hmEnd),
+    hmStart: num(d.hmStart),
+    hmEnd: num(d.hmEnd),
     workHours: Number(d.workHours),
     standbyHours: num(d.standbyHours) ?? 0,
     breakdownHours: num(d.breakdownHours) ?? 0,
@@ -289,5 +291,14 @@ export const sum2 = (xs: readonly number[]): number => round2(xs.reduce((a, b) =
 
 /** Caller holds a creator role (Staff/PM/Direktur) in PT `company` — UI hint; the API re-checks assignment/team. */
 export const mayCreateIn = (req: PayloadRequest, company: number): boolean => hasRole(req, ['pk-staff', 'pk-pm', 'pk-owner'], company)
+/**
+ * D2410: earliest date of a NEW timesheet for the caller on `project` (web matrix "+" and the input form) — the same
+ * rule as the API (`mayBackdateTimesheet` + `timesheetMinDate`): PM of the project / Direktur → the earliest contract
+ * start, everyone else today − BACKDATE_MAX_DAYS.
+ */
+export function timesheetMinDateFor(req: PayloadRequest, project: Pick<ProjectOpt, 'companyId' | 'pmId'>, today: string, contracts: ReadonlyArray<{ startDate: string; active: boolean }>): string {
+  return timesheetMinDate(today, mayBackdateTimesheet(req, { company: project.companyId, pm: project.pmId ?? null }), contracts.filter((c) => c.active).map((c) => c.startDate))
+}
+
 /** PM / Direktur in PT `company` (corrections; the API re-checks the project team). */
 export const mayCorrectIn = (req: PayloadRequest, company: number | null | undefined): boolean => hasRole(req, ['pk-pm', 'pk-owner'], company)

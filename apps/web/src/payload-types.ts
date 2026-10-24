@@ -2375,8 +2375,8 @@ export interface UnitTimesheet {
   contractUnit: number | ContractUnit;
   reportDate: string;
   reporter: number | User;
-  hmStart: number;
-  hmEnd: number;
+  hmStart?: number | null;
+  hmEnd?: number | null;
   workHours: number;
   standbyHours?: number | null;
   breakdownHours?: number | null;

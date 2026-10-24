@@ -5068,7 +5068,7 @@ abstract class AppLocalizations {
   /// No description provided for @fieldHmPrefilled.
   ///
   /// In id, this message translates to:
-  /// **'HM awal diisi otomatis dari HM akhir {date} ({hm}).'**
+  /// **'HM awal otomatis dari HM akhir terakhir yang tercatat: {date} ({hm}).'**
   String fieldHmPrefilled(String date, String hm);
 
   /// No description provided for @fieldHmUsed.
@@ -5092,7 +5092,7 @@ abstract class AppLocalizations {
   /// No description provided for @fieldHmPhotoRequired.
   ///
   /// In id, this message translates to:
-  /// **'Foto meter HM akhir (wajib)'**
+  /// **'Foto meter HM akhir (wajib bila HM diisi)'**
   String get fieldHmPhotoRequired;
 
   /// No description provided for @fieldHmPhotoFixed.
@@ -5100,6 +5100,18 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Foto meter HM sudah di server (tidak bisa diganti).'**
   String get fieldHmPhotoFixed;
+
+  /// No description provided for @fieldHmOptional.
+  ///
+  /// In id, this message translates to:
+  /// **'HM opsional — isi saat pencatatan HM mingguan. Bila diisi, HM awal dan HM akhir wajib keduanya, plus foto meter HM. HM awal otomatis tidak dikirim selama HM akhir kosong.'**
+  String get fieldHmOptional;
+
+  /// No description provided for @fieldTimesheetBackdateWide.
+  ///
+  /// In id, this message translates to:
+  /// **'Sebagai PM project / Direktur Anda dapat mengisi timesheet sejak {date} (selama periode kontrak unit).'**
+  String fieldTimesheetBackdateWide(String date);
 
   /// No description provided for @fieldOperatingHours.
   ///

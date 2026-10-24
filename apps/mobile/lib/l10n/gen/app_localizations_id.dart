@@ -2835,7 +2835,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String fieldHmPrefilled(String date, String hm) {
-    return 'HM awal diisi otomatis dari HM akhir $date ($hm).';
+    return 'HM awal otomatis dari HM akhir terakhir yang tercatat: $date ($hm).';
   }
 
   @override
@@ -2852,10 +2852,19 @@ class AppLocalizationsId extends AppLocalizations {
   String get fieldHmPhoto => 'Foto meter HM';
 
   @override
-  String get fieldHmPhotoRequired => 'Foto meter HM akhir (wajib)';
+  String get fieldHmPhotoRequired => 'Foto meter HM akhir (wajib bila HM diisi)';
 
   @override
   String get fieldHmPhotoFixed => 'Foto meter HM sudah di server (tidak bisa diganti).';
+
+  @override
+  String get fieldHmOptional =>
+      'HM opsional — isi saat pencatatan HM mingguan. Bila diisi, HM awal dan HM akhir wajib keduanya, plus foto meter HM. HM awal otomatis tidak dikirim selama HM akhir kosong.';
+
+  @override
+  String fieldTimesheetBackdateWide(String date) {
+    return 'Sebagai PM project / Direktur Anda dapat mengisi timesheet sejak $date (selama periode kontrak unit).';
+  }
 
   @override
   String get fieldOperatingHours => 'Jam operasi';

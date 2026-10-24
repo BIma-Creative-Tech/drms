@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**Timesheet unit: backdate for PM / Direktur, HM weekly (client feedback 24/10, ADR 0020 amendment 2026-10-24).** One
+migration (`20261024_100000_d2410_timesheet_hm_optional`: `unit_timesheets.hm_start` / `hm_end` nullable + CHECK
+`unit_timesheets_hm_pair`; additive for the 0.19 image). API contract: additive / relaxed (nullable HM, new
+`timesheetMinDate`). Old APKs (always HM + photo) keep working; the APK changes ship with the next APK.
+
+### Added
+- `GET /projects/{id}/contract-units` returns the caller's `timesheetMinDate` (APK date picker).
+- Weekly HM per unit (weeks Monday–Sunday overlapping the month): HM awal, HM akhir, total HM, days with HM — web
+  contract tab **Rekap** (card "HM mingguan") and report `rekap-timesheet-kontrak` (sheet "HM mingguan per unit").
+- `PATCH /unit-timesheets/{id}`, `POST …/corrections` and the sync edit accept the HM photo (`hmPhotoId` /
+  `hm_photo_media_id`) for a timesheet that has none; a stored photo is never replaced (REST 400 `PHOTO_LIMIT`, sync
+  ignores it).
+
+### Changed
+- The PM of the project (`projects.pm`) and the Direktur may file a timesheet for any past date inside the contract
+  unit's period (REST + sync); field reporters keep 14 days. Web matrix: "+" only on days the caller may fill, older
+  missing days show "!" with the reason; the timesheet form keeps `?tanggal=` (visible notice when not allowed, no
+  silent switch to today) and preselects `?unit=` when active on that date.
+- HM awal / HM akhir and the HM photo are optional on the daily timesheet (HM read about once a week): both or none,
+  HM akhir ≥ HM awal, photo only with HM; work hours stay required. An edit / correction may clear the HM (null).
+- HM_GAP compares with the previous timesheet **with HM**; the unit's last HM and the service-report HM reference skip
+  timesheets without HM; HM awal prefill = last recorded HM akhir (web lookup 60 days, else the unit's last HM).
+- Monthly "HM awal → akhir" = first / last recorded reading; report **Total HM** is empty (not 0) without readings;
+  the daily detail shows empty HM cells for days without HM.
+- `UnitTimesheet.hmStart/hmEnd/hmUsed` and sync copy `hm_start/hm_end` are nullable.
+- APK: date picker window from `timesheetMinDate`; HM optional (both or none, photo only with HM, untouched prefill not
+  sent); edit may add the missing HM photo; drift schema 12 (`field_recent_timesheets` HM nullable, cache rebuilt);
+  l10n `fieldHmOptional`, `fieldTimesheetBackdateWide`.
+
 ## [0.19.1] - 2026-10-22
 
 **Fund check per Pusat Biaya first, then PT (ADR 0031 §6, user 2026-10-22).** One migration

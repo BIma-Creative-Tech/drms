@@ -282,7 +282,10 @@ export const SyncServiceReportPayload = z
   .meta({ id: 'SyncServiceReportPayload' })
 export type SyncServiceReport = z.infer<typeof SyncServiceReportPayload>
 
-/** `unit_timesheet.upsert` (FR1): one timesheet per unit and date; the HM photo is required on create. */
+/**
+ * `unit_timesheet.upsert` (FR1): one timesheet per unit and date. D2410 (user 2026-10-24): HM optional — hm_start +
+ * hm_end both or none, the HM photo required only with HM (older APKs always send all three: unchanged behaviour).
+ */
 export const SyncUnitTimesheetPayload = z
   .object({
     timesheet_id: id.optional(),
@@ -290,9 +293,9 @@ export const SyncUnitTimesheetPayload = z
     project_id: id.optional().meta({ description: 'Required for a new timesheet (kind kontrak_unit).' }),
     unit_id: id.optional().meta({ description: 'Required for a new timesheet (active contract unit on report_date).' }),
     report_date: businessDate.optional().meta({ description: 'Required for a new timesheet.' }),
-    hm_start: dec2(10_000_000).optional(),
-    hm_end: dec2(10_000_000).optional(),
-    work_hours: dec2(24).optional(),
+    hm_start: dec2(10_000_000).nullable().optional().meta({ description: 'Optional (D2410), both hm_start and hm_end or none. On an edit: omitted = unchanged, null = cleared.' }),
+    hm_end: dec2(10_000_000).nullable().optional(),
+    work_hours: dec2(24).optional().meta({ description: 'Required for a new timesheet.' }),
     standby_hours: dec2(24).optional(),
     breakdown_hours: dec2(24).optional(),
     breakdown_reason: optStr(500),
@@ -300,7 +303,10 @@ export const SyncUnitTimesheetPayload = z
     operator_name: optStr(128),
     location: optStr(200),
     notes: optStr(2000),
-    hm_photo_media_id: id.optional().meta({ description: 'Required for a new timesheet (photo of the HM meter). Cannot change afterwards.' }),
+    hm_photo_media_id: id
+      .nullable()
+      .optional()
+      .meta({ description: 'Photo of the HM meter — required when the timesheet has HM (D2410). Never replaced: on an edit it is only added to a timesheet without one (ignored otherwise).' }),
     reason: z.string().trim().min(3).max(1000).optional(),
   })
   .strict()
@@ -546,8 +552,8 @@ export const SyncUnitTimesheetCopy = z
     project_id: id,
     unit_id: id,
     report_date: z.string(),
-    hm_start: z.number(),
-    hm_end: z.number(),
+    hm_start: z.number().nullable().meta({ description: 'null = no HM reading (D2410).' }),
+    hm_end: z.number().nullable(),
     work_hours: z.number(),
     standby_hours: z.number(),
     breakdown_hours: z.number(),
