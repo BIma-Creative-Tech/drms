@@ -247,7 +247,7 @@ export const MODULES: readonly ModuleDef[] = [
           { view: '/absensi/absen', label: 'Absen', navKey: 'absensi-absen' },
           // ADR 0032: Admin Staff = attendance administration of the PT (board, on-behalf, recap, schedules read)
           { view: '/absensi', label: 'Tim hari ini', roles: [...OFFICE_PM_ADMIN, 'pk-admin-staff'], navKey: 'absensi' },
-          { view: '/absensi/absenkan', label: 'Absenkan karyawan', roles: ['pk-admin-staff'], navKey: 'absensi-absenkan' },
+          { view: '/absensi/absenkan', label: 'Absenkan karyawan', roles: ['pk-admin-staff', 'pk-pm'], navKey: 'absensi-absenkan' },
           { view: '/absensi/rekap', label: 'Rekap bulanan', staffLabel: 'Rekap absensi saya', navKey: 'absensi-saya' },
           { view: '/absensi/jadwal', label: 'Jadwal & hari libur', roles: [...OFFICE_PM_ADMIN, 'pk-admin-staff'], navKey: 'absensi-jadwal' },
           { collection: 'attendances' },

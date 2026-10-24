@@ -62,7 +62,7 @@ export const Capabilities = z
       description: 'ADR 0029: Finance (stored) — the "Pencairan pinjaman antar-PT" queue (GET /intercompany-loans/queue) and the disbursement of loans whose LENDER is this PT (never one the caller instructed, G1).',
     }),
     attendanceOnBehalf: z.boolean().meta({
-      description: 'ADR 0032: may record check-in / check-out on behalf of an employee — PM (team members at team locations, APK) or Admin Staff (any employee of the PT incl. those without an account; web POST /attendance/on-behalf and APK). The server re-checks.',
+      description: 'ADR 0032: may record check-in / check-out on behalf of an employee — PM (team members at team locations, APK and — DRMS 24/10 — web) or Admin Staff (any employee of the PT incl. those without an account; web POST /attendance/on-behalf and APK). The server re-checks.',
     }),
     attendanceAdminStaff: z.boolean().meta({
       description: 'ADR 0032: holds pk-admin-staff ("Admin Staff") — reads every attendance + correction of the PT, corrects (never own), on-behalf for any employee (GET /attendance/on-behalf/options).',

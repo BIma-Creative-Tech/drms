@@ -233,7 +233,8 @@ function Frame({ props, name, children }: { props: AdminViewServerProps; name: s
 }
 
 /** ADR 0032: "Absenkan karyawan" is offered to an Admin Staff (any selected PT; the page re-checks per PT). */
-const isAdminStaff = (req: PayloadRequest) => hasRoleAny(req, 'pk-admin-staff')
+/** "Absenkan karyawan" sub-tab: Admin Staff (PT-wide) and — DRMS 24/10 (C) — PM (team-scoped). */
+const isAdminStaff = (req: PayloadRequest) => hasRoleAny(req, 'pk-admin-staff', 'pk-pm')
 
 function SubNav({ active, scope, absenkan = false }: { active: 'today' | 'absen' | 'absenkan' | 'rekap' | 'jadwal'; scope: AttScope | null; absenkan?: boolean }) {
   const items: Array<[typeof active, string, string]> = scope
@@ -708,7 +709,7 @@ export async function AbsensiAbsenkan(props: AdminViewServerProps) {
   const label = (company: number, text: string) => (multi ? `[${ptCode(company)}] ${text}` : text)
   return (
     <Frame props={props} name="absensi-absenkan">
-      <DashHead title="Absensi · Absenkan karyawan" note="Admin Staff: absen masuk / pulang atas nama karyawan PT (juga tanpa akun). Foto dan GPS dari perangkat Anda; nama Anda dan alasannya tercatat." />
+      <DashHead title="Absensi · Absenkan karyawan" note="Admin Staff: absen masuk / pulang atas nama karyawan PT (juga tanpa akun). PM: anggota tim project / pusat biaya Anda, di lokasi tim. Foto dan GPS dari perangkat Anda; nama Anda dan alasannya tercatat." />
       <SubNav active="absenkan" scope={scope} absenkan />
       <Card id="on-behalf" title="Absenkan karyawan" span={12}>
         <OnBehalfForm

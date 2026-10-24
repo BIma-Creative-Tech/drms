@@ -125,7 +125,7 @@ describe('role Admin Staff (ADR 0032 §5)', () => {
 
   it('menu: "Absenkan karyawan" for the role; Tim hari ini / Jadwal / Laporan include it', () => {
     const items = MODULES.flatMap((m) => m.sections.flatMap((s) => s.items)) as Array<{ view?: string; roles?: readonly string[] }>
-    expect(items.find((i) => i.view === '/absensi/absenkan')?.roles).toEqual(['pk-admin-staff'])
+    expect(items.find((i) => i.view === '/absensi/absenkan')?.roles).toEqual(['pk-admin-staff', 'pk-pm']) // DRMS 24/10 (C): PM team-scoped
     for (const v of ['/absensi', '/absensi/jadwal', '/laporan']) expect(items.find((i) => i.view === v)?.roles, v).toContain('pk-admin-staff')
     expect(ITEM_ICONS['/absensi/absenkan']).toBeDefined()
   })

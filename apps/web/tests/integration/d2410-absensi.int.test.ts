@@ -262,8 +262,22 @@ describe('ADR 0032 §5: role Admin Staff', () => {
     expect(body.employees.find((e) => e.id === w.emp.a)).toMatchObject({ hasAccount: true })
     expect(body.employees.some((e) => e.id === adminStaffEmp)).toBe(false)
     expect(body.locations).toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'project', id: w.project })]))
-    // other roles: 403
-    expect((await api('GET', '/api/v1/attendance/on-behalf/options', w.users.pm)).status).toBe(403)
+    // other roles: 403 (DRMS 24/10 C: a PM gets its team — next test)
+    expect((await api('GET', '/api/v1/attendance/on-behalf/options', w.users.staffA)).status).toBe(403)
+  })
+
+  it('DRMS 24/10 (C): a PM gets the on-behalf options of its TEAM only (team members today, team locations)', async () => {
+    resetRateLimits()
+    const r = await api('GET', '/api/v1/attendance/on-behalf/options', w.users.pm)
+    expect(r.status, JSON.stringify(r.body)).toBe(200)
+    const body = r.body as { companies: Array<{ id: number }>; employees: Array<{ id: number }>; locations: Array<{ kind: string; id: number }> }
+    expect(body.companies).toHaveLength(1)
+    const ids = body.employees.map((e) => e.id)
+    expect(ids).toEqual(expect.arrayContaining([w.emp.a, w.emp.b]))
+    expect(ids).not.toContain(w.emp.noAccount) // not in the PM's team
+    expect(ids).not.toContain(adminStaffEmp)
+    expect(body.locations).toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'project', id: w.project })]))
+    expect(body.locations.some((l) => l.kind === 'project' && l.id === w.otherProject)).toBe(false) // another PM's project
   })
 
   it('web on-behalf for an employee WITHOUT an account → 201, source admin, recorder + reason; recap says "diabsenkan"', async () => {
@@ -287,7 +301,7 @@ describe('ADR 0032 §5: role Admin Staff', () => {
     expect(day?.onBehalfBy).toEqual([expect.stringContaining(tag)])
   })
 
-  it('refused: own employee (403), no reason (400), outside the location (409), a PM / staff caller (403)', async () => {
+  it('refused: own employee (403), no reason (400), outside the location (409), a staff caller (403)', async () => {
     resetRateLimits()
     const base = { kind: 'check_in', project_id: w.project, ...PRJ, accuracy_m: 8, reason: 'uji penolakan' }
     const own = await api('POST', '/api/v1/attendance/on-behalf', adminStaff, { ...base, employee_id: adminStaffEmp, selfie_media_id: await selfie(adminStaff) })
@@ -296,9 +310,23 @@ describe('ADR 0032 §5: role Admin Staff', () => {
     expect(noReason.status).toBe(400)
     const far = await api('POST', '/api/v1/attendance/on-behalf', adminStaff, { ...base, lat: PRJ.lat + 0.2, employee_id: w.emp.b, selfie_media_id: await selfie(adminStaff) })
     expect((far.body as { code?: string }).code).toBe('OUTSIDE_GEOFENCE')
-    for (const u of [w.users.pm, w.users.staffA]) {
+    for (const u of [w.users.staffA]) {
       expect((await api('POST', '/api/v1/attendance/on-behalf', u, { ...base, employee_id: w.emp.b, selfie_media_id: 1 })).status).toBe(403)
     }
+  })
+
+  it('DRMS 24/10 (C): a PM records a team member from the web (source pm); a non-member or another team\'s location is refused', async () => {
+    resetRateLimits()
+    const base = { kind: 'check_in', project_id: w.project, ...PRJ, accuracy_m: 8, reason: 'HP tertinggal di mes' }
+    const notMember = await api('POST', '/api/v1/attendance/on-behalf', w.users.pm, { ...base, employee_id: w.emp.noAccount, selfie_media_id: await selfie(w.users.pm) })
+    expect(notMember.status, JSON.stringify(notMember.body)).toBe(403)
+    const otherTeam = await api('POST', '/api/v1/attendance/on-behalf', w.users.pm, { ...base, project_id: w.otherProject, employee_id: w.emp.a, selfie_media_id: await selfie(w.users.pm) })
+    // another PM's project: refused (FORBIDDEN "tim Anda", or NO_GEOFENCE first when that project has no point)
+    expect([403, 409], JSON.stringify(otherTeam.body)).toContain(otherTeam.status)
+    const r = await api('POST', '/api/v1/attendance/on-behalf', w.users.pm, { ...base, employee_id: w.emp.a, selfie_media_id: await selfie(w.users.pm) })
+    expect(r.status, JSON.stringify(r.body)).toBe(201)
+    const row = (await sqlAs('app', 'SELECT employee_id, source::text AS source, recorded_by_id, on_behalf_reason, project_id FROM attendances WHERE id = $1', [(r.body as { id: number }).id])).rows[0]
+    expect(row).toEqual({ employee_id: w.emp.a, source: 'pm', recorded_by_id: w.users.pm.id, on_behalf_reason: 'HP tertinggal di mes', project_id: w.project })
   })
 
   it('APK sync attendance.on_behalf by the Admin Staff → applied with source admin (employee not in any team)', async () => {

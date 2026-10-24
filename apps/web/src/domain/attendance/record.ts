@@ -14,6 +14,7 @@ import { snapshotOf, type ScheduleSnapshot } from './schedule'
 import { effectiveRadiusM } from './calendar'
 import { CHECK_OUT_ELSEWHERE_FLAG, geofenceRequired, NON_ONSITE_OUTSIDE, NOT_ELIGIBLE_OTHER_PT, pickContaining } from './area'
 import { eligibleLocations, employeeAttendance, type EmployeeAttendance } from './eligibility'
+import { pmTeam } from './on-behalf'
 import { companyOf, settings, userOfEmployee as userOfEmployeeLink } from '@/domain/companies'
 import { closedProjectMessage, isClosedProjectStatus } from '@/domain/projects/status'
 
@@ -428,6 +429,9 @@ export type WebOnBehalfInput = WebCheckInput & { employeeId: number; kind: Atten
  * against the Admin Staff's GPS fix; the row carries source `admin`, recorded_by = the Admin Staff and the reason. Same
  * gates as the web self check-in (syncAttendanceEnabled of the PT, ADR 0018 privacy ack of the caller) and the SAME
  * write path (recordAttendance).
+ * DRMS 24/10 (user decision C): a PM may use the web page too, TEAM-scoped like the APK PM on-behalf — source `pm`, the
+ * employee must be assigned today to one of the PM's team projects / cost centers (FORBIDDEN otherwise) and the location
+ * must be a team location (recordAttendance). An Admin Staff of the PT stays PT-wide (source `admin` wins).
  */
 export async function recordWebOnBehalf(req: PayloadRequest, input: WebOnBehalfInput): Promise<RecordResult> {
   const uid = userId(req)
@@ -436,7 +440,10 @@ export async function recordWebOnBehalf(req: PayloadRequest, input: WebOnBehalfI
   const mapped = mappedCompanies(req)
   const locCompany = locRaw !== undefined && (mapped === null || mapped.includes(locRaw)) ? locRaw : undefined
   if (locCompany === undefined) reject('NOT_FOUND', input.location.type === 'project' ? 'Project tidak ditemukan.' : 'Pusat biaya tidak ditemukan.', LOCATION_FIELD[input.location.type])
-  const actor = await onBehalfActor(req, { employeeId: input.employeeId, locCompany, own: employeeIn(req, locCompany!), pmAllowed: false, field: 'employee_id' })
+  const actor = await onBehalfActor(req, { employeeId: input.employeeId, locCompany, own: employeeIn(req, locCompany!), pmAllowed: true, field: 'employee_id' })
+  if (actor.source === 'pm' && !(await pmTeam(req, locCompany!)).employees.includes(actor.employee)) {
+    reject('FORBIDDEN', 'Hanya anggota tim project / pusat biaya Anda yang dapat Anda absenkan.', 'employee_id')
+  }
 
   const s = (await settings(req, locCompany)) as { syncAttendanceEnabled?: boolean | null; timezone?: string | null }
   if (s.syncAttendanceEnabled !== true) reject('FEATURE_DISABLED', 'Absensi dari web belum diaktifkan server (Setting perusahaan).')

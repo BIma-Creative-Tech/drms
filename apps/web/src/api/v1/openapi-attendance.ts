@@ -66,7 +66,7 @@ export function registerAttendancePaths(registry: OpenAPIRegistry, h: Helpers): 
   registry.registerPath({
     method: 'get',
     path: '/attendance/on-behalf/options',
-    summary: 'ADR 0032: Admin Staff (pk-admin-staff) — per PT of the selection where the caller holds the role: the active employees (own excluded; also those without an account, hasAccount false) and the registered check-in locations with their point. Names, codes and points only. The APK caches it for offline on-behalf items',
+    summary: 'ADR 0032: Admin Staff (pk-admin-staff) — per PT of the selection where the caller holds the role: the active employees (own excluded; also those without an account, hasAccount false) and the registered check-in locations with their point. Names, codes and points only. The APK caches it for offline on-behalf items. DRMS 24/10: a PM (not Admin Staff of the PT) gets its TEAM only — employees assigned today to its team projects / cost centers and those team locations (web Absenkan karyawan)',
     security: h.security,
     request: { headers: h.deviceHeader, query: A.AttendanceOnBehalfOptionsQuery },
     responses: h.res(200, 'On-behalf options', A.AttendanceOnBehalfOptions, [400, 401, 403, 426, 429]),
@@ -74,7 +74,7 @@ export function registerAttendancePaths(registry: OpenAPIRegistry, h: Helpers): 
   registry.registerPath({
     method: 'post',
     path: '/attendance/on-behalf',
-    summary: 'ADR 0032: Admin Staff check-in / check-out ON BEHALF of an employee of its PT (also without an account) from the web. Photo of the employee first with POST /media/selfies (the caller\'s camera), GPS = the caller\'s; the employee\'s attendance-type rule is evaluated against that fix. Recorded with source admin ("diabsenkan oleh Admin Staff"), recorded_by = caller, reason. Gates and codes as /attendance/check-in, plus FORBIDDEN (no Admin Staff of the PT / own employee), COMPANY_MISMATCH (employee of another PT), NO_CHECK_IN, ALREADY_CHECKED_OUT',
+    summary: 'ADR 0032: Admin Staff check-in / check-out ON BEHALF of an employee of its PT (also without an account) from the web. Photo of the employee first with POST /media/selfies (the caller\'s camera), GPS = the caller\'s; the employee\'s attendance-type rule is evaluated against that fix. Recorded with source admin ("diabsenkan oleh Admin Staff"), recorded_by = caller, reason. DRMS 24/10: a PM may record too, team-scoped (source pm; the employee assigned today to a team project / cost center, a team location — else FORBIDDEN). Gates and codes as /attendance/check-in, plus FORBIDDEN (no Admin Staff of the PT / own employee), COMPANY_MISMATCH (employee of another PT), NO_CHECK_IN, ALREADY_CHECKED_OUT',
     security: h.security,
     request: { headers: h.deviceHeader, body: { content: { 'application/json': { schema: A.AttendanceOnBehalfBody } } } },
     responses: h.res(201, 'Recorded', A.AttendanceCheckResult, [400, 401, 403, 404, 409, 426, 429]),

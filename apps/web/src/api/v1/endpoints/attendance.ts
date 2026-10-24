@@ -196,7 +196,7 @@ export const attendanceCheckOutEndpoint = v1({
 export const attendanceOnBehalfOptionsEndpoint = v1({
   path: '/attendance/on-behalf/options',
   method: 'get',
-  roles: ['pk-admin-staff'],
+  roles: ['pk-admin-staff', 'pk-pm'],
   rateLimit: READ_LIMIT,
   handler: async ({ req }) => {
     const q = AttendanceOnBehalfOptionsQuery.safeParse(params(req))
@@ -210,7 +210,7 @@ export const attendanceOnBehalfOptionsEndpoint = v1({
 export const attendanceOnBehalfEndpoint = v1({
   path: '/attendance/on-behalf',
   method: 'post',
-  roles: ['pk-admin-staff'],
+  roles: ['pk-admin-staff', 'pk-pm'],
   body: AttendanceOnBehalfBody,
   rateLimit: [30, 60_000],
   transactional: true,
