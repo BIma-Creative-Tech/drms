@@ -223,7 +223,7 @@ describe('2. the block at the Owner approval (hard, 409 FUND_INSUFFICIENT)', () 
     const audit = await sqlAs('app', "SELECT field, new_value FROM audit_logs WHERE action = 'fund_insufficient' AND doc_type = 'expense_request' AND doc_id = $1", [String(r1)])
     expect(audit.rows).toEqual([expect.objectContaining({ field: 'approve', new_value: { v: expect.objectContaining({ needed: 120 * JT, available: 100 * JT, gap: 20 * JT }) } })])
     const d = await ok(api('GET', `${E}/${r1}`, owner))
-    expect(d.fundCheck).toMatchObject({ enabled: true, applies: true, status: 'insufficient', blocked: true, needed: 120 * JT, gap: 20 * JT, accountCount: 1 })
+    expect(d.fundCheck).toMatchObject({ enabled: true, applies: true, status: 'insufficient', blocked: true, needed: 120 * JT, gap: 20 * JT, accountCount: 2 }) // DRMS 24/10: the (empty) site-flagged account counts too
     expect(d.fundCheck.blockedText).toContain('kurang Rp 20.000.000')
     expect(d.allowedActions).toEqual(expect.arrayContaining(['approve', 'reject', 'instruct_loan']))
     // the Direktur reads the panel (no loan action); Finance of the PT too
