@@ -21,7 +21,7 @@ export type CellDraft = { id?: number; user: number; company: number; roles: Rol
 
 export type Viewer = { groupAdmin: boolean; adminOf: readonly number[] }
 
-export const ROLE_SHORT: Record<Role, string> = { 'pk-staff': 'Staff', 'pk-pm': 'PM', 'pk-finance': 'Fin', 'pk-owner': 'Dir', 'pk-principal': 'Own', 'pk-admin': 'Adm', 'pk-operator': 'Opr' }
+export const ROLE_SHORT: Record<Role, string> = { 'pk-staff': 'Staff', 'pk-pm': 'PM', 'pk-finance': 'Fin', 'pk-owner': 'Dir', 'pk-principal': 'Own', 'pk-admin': 'Adm', 'pk-operator': 'Opr', 'pk-admin-staff': 'AdmS' }
 
 export const cellKey = (user: number, company: number) => `${user}:${company}`
 

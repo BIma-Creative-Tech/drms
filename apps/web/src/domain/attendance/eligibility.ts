@@ -76,21 +76,30 @@ export async function eligibleLocations(req: PayloadRequest, employees: readonly
   const out: EligibleLocation[] = []
   for (const emp of employees) {
     if (!emp.active) continue
-    const s = await settings(req, emp.company)
-    for (const r of await locationRows(req, emp.company)) {
-      const radius = r.radius_m === null || r.radius_m === undefined ? null : Number(r.radius_m)
-      out.push({
-        kind: r.kind,
-        id: Number(r.id),
-        company: emp.company,
-        employee: emp.id,
-        code: r.code ?? '',
-        name: r.name ?? '',
-        lat: Number(r.lat),
-        lng: Number(r.lng),
-        radiusM: effectiveRadiusM(radius, s.defaultGeofenceRadiusM),
-      })
-    }
+    for (const l of await registeredLocations(req, emp.company)) out.push({ ...l, employee: emp.id })
   }
   return out.sort((a, b) => a.company - b.company || compareEligible(a, b))
+}
+
+/**
+ * The registered check-in locations of PT `company` (projects, then cost centers; with a point, effective radius). The
+ * same list for every employee of the PT — ADR 0032: the Admin Staff on-behalf pages (web + APK) offer it.
+ */
+export async function registeredLocations(req: PayloadRequest, company: number): Promise<Array<Omit<EligibleLocation, 'employee'>>> {
+  const s = await settings(req, company)
+  const out: Array<Omit<EligibleLocation, 'employee'>> = []
+  for (const r of await locationRows(req, company)) {
+    const radius = r.radius_m === null || r.radius_m === undefined ? null : Number(r.radius_m)
+    out.push({
+      kind: r.kind,
+      id: Number(r.id),
+      company,
+      code: r.code ?? '',
+      name: r.name ?? '',
+      lat: Number(r.lat),
+      lng: Number(r.lng),
+      radiusM: effectiveRadiusM(radius, s.defaultGeofenceRadiusM),
+    })
+  }
+  return out.sort(compareEligible)
 }

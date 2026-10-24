@@ -18,7 +18,8 @@ const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJs
  * (domain/attendance/record.ts): assigned project OR cost center (E6, Q-40) OR site (ADR 0023) with a geofence,
  * distance ≤ radius + GPS accuracy (capped), no mocked location, selfie uploaded by the caller, one
  * check-in and one check-out per employee/location/local date. `source = pm` = "diabsenkan oleh PM"
- * (US-14): `recordedBy` = the PM, selfie + GPS from the PM's phone, reason mandatory. Nothing is
+ * (US-14): `recordedBy` = the PM, selfie + GPS from the PM's phone, reason mandatory; `source = admin` (ADR 0032) =
+ * "diabsenkan oleh Admin Staff" (any employee of the PT, web or APK; same fields). Nothing is
  * editable (create/update/delete are closed for HTTP; the DB role cannot UPDATE/DELETE either —
  * migration f4b_attendance_security): a correction (T10, US-15) is an `attendance-corrections` row
  * whose `newTime` supersedes `attendanceTime` in every recap/report. `schedule` = snapshot of the
@@ -46,6 +47,8 @@ export const Attendances: CollectionConfig = withAudit(
         'pk-staff': anyOf(ownUser('user'), ownEmployee('employee')),
         // Operator/Anggota (owner decision 2026-10-09): own attendance only, same as Staff.
         'pk-operator': anyOf(ownUser('user'), ownEmployee('employee')),
+        // ADR 0032: Admin Staff reads every attendance of its PT (selfie views audited by GET /attendance/{id}/selfie)
+        'pk-admin-staff': true,
       }),
       create: denyAll,
       update: denyAll,
@@ -86,11 +89,13 @@ export const Attendances: CollectionConfig = withAudit(
         options: [
           { label: 'Sendiri (APK)', value: 'self' },
           { label: 'Diabsenkan oleh PM', value: 'pm' },
+          // ADR 0032: recorded by an Admin Staff of the PT (any employee of the PT, also without an account)
+          { label: 'Diabsenkan oleh Admin Staff', value: 'admin' },
         ],
         admin: ro,
       },
       { name: 'recordedBy', type: 'relationship', relationTo: 'users', label: 'Diabsenkan oleh', index: true, admin: { ...ro, components: USER_NAME_VIEW } },
-      { name: 'onBehalfReason', type: 'text', label: 'Alasan diabsenkan PM', maxLength: 500, admin: ro },
+      { name: 'onBehalfReason', type: 'text', label: 'Alasan diabsenkan', maxLength: 500, admin: ro },
       { name: 'localDate', type: 'text', label: 'Tanggal (zona perusahaan)', required: true, index: true, admin: ro },
       { name: 'attendanceTime', type: 'date', label: 'Jam absensi', required: true, admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
       { name: 'receivedAt', type: 'date', label: 'Diterima server', required: true, admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },

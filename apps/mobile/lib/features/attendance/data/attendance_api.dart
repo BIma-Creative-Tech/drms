@@ -35,6 +35,13 @@ class AttendanceApi {
     (data) => data as Map<String, dynamic>,
   );
 
+  /// ADR 0032: Admin Staff — employees (also without an account) and registered locations of the PTs where the user is
+  /// Admin Staff (`AttendanceOnBehalfOptions`), for EVERY membership PT; cached for offline on-behalf items.
+  Future<Map<String, dynamic>> onBehalfOptions() => client.run(
+    (d) => d.get<dynamic>('/attendance/on-behalf/options', options: ApiClient.allCompanies()),
+    (data) => data as Map<String, dynamic>,
+  );
+
   /// US-13 team presence for a date (default today, company TZ).
   Future<TeamToday> teamToday({String? date}) => client.run(
     (d) => d.get<dynamic>('/attendance/team-today', queryParameters: {'date': ?date}),

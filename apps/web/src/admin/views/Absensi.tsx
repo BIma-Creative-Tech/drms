@@ -4,8 +4,8 @@ import type { AdminViewServerProps, PayloadRequest } from 'payload'
 import Link from 'next/link'
 import React from 'react'
 
-import { hasRoleAny, ownEmployees, relId, userId } from '@/access/roles'
-import { CorrectionDialog, DefaultSchedule, GeofenceForm, HolidayAdd, ScheduleAssign, SelfCheckForm, SelfieButton, type Option, type SelfCheckLocation } from '@/admin/components/absensi/AttendanceActions'
+import { hasRoleAny, membershipsOf, ownEmployees, relId, userId } from '@/access/roles'
+import { CorrectionDialog, DefaultSchedule, GeofenceForm, HolidayAdd, OnBehalfForm, ScheduleAssign, SelfCheckForm, SelfieButton, type Option, type SelfCheckLocation } from '@/admin/components/absensi/AttendanceActions'
 import { KAS_STYLE } from '@/admin/components/kas/style'
 import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
 import { matchesQuery, spValue } from '@/admin/list-query'
@@ -15,6 +15,7 @@ import { classCounts, classifyDay, DAY_CLASSES, LEGEND, minutesText, monthWeeks,
 import { attendanceContext, attendanceScope, employeeRef, narrowAttScope, narrowAttToCompanies, type AttScope } from '@/domain/attendance/queries'
 import { OUTSIDE_AREA_LABEL } from '@/domain/attendance/area'
 import { eligibleLocations, employeeAttendance, type EmployeeAttendance } from '@/domain/attendance/eligibility'
+import { onBehalfOptions, type OnBehalfOptions } from '@/domain/attendance/on-behalf'
 import { dayRowsAt } from '@/domain/attendance/record'
 import type { ScheduleSnapshot } from '@/domain/attendance/schedule'
 import { employeeRecap, myRecap, teamTodayFor, type MonthlyRecap, type TeamTodayResult } from '@/domain/attendance/service'
@@ -231,11 +232,15 @@ function Frame({ props, name, children }: { props: AdminViewServerProps; name: s
   )
 }
 
-function SubNav({ active, scope }: { active: 'today' | 'absen' | 'rekap' | 'jadwal'; scope: AttScope | null }) {
+/** ADR 0032: "Absenkan karyawan" is offered to an Admin Staff (any selected PT; the page re-checks per PT). */
+const isAdminStaff = (req: PayloadRequest) => hasRoleAny(req, 'pk-admin-staff')
+
+function SubNav({ active, scope, absenkan = false }: { active: 'today' | 'absen' | 'absenkan' | 'rekap' | 'jadwal'; scope: AttScope | null; absenkan?: boolean }) {
   const items: Array<[typeof active, string, string]> = scope
     ? [
         ['today', '/admin/absensi', 'Tim hari ini'],
         ['absen', '/admin/absensi/absen', 'Absen'],
+        ...(absenkan ? [['absenkan', '/admin/absensi/absenkan', 'Absenkan karyawan'] as [typeof active, string, string]] : []),
         ['rekap', '/admin/absensi/rekap', 'Rekap bulanan'],
         ['jadwal', '/admin/absensi/jadwal', 'Jadwal & hari libur'],
       ]
@@ -317,7 +322,7 @@ function MemberCard({ m, tz, month, pt }: { m: TeamTodayRow; tz: string; month: 
           </span>
         ))}
         {m.lateMinutes > 0 ? <StatusPill tone="warn" label={`Terlambat ${minutesText(m.lateMinutes)}`} /> : null}
-        {m.onBehalf ? <StatusPill tone="progress" label="Diabsenkan PM" /> : null}
+        {m.onBehalf ? <StatusPill tone="progress" label="Diabsenkan" /> : null}
         {m.corrected ? <StatusPill tone="none" label="Dikoreksi" /> : null}
       </div>
     </li>
@@ -392,7 +397,7 @@ export async function AbsensiToday(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="absensi-today">
       <DashHead title="Absensi · Tim hari ini" note={`${WD_LONG[wdOf(r.date) - 1]}, ${dayMonth(r.date)} (WITA) · ${r.scope === 'team' ? 'anggota tim di project/pusat biaya Anda' : 'semua karyawan yang ditugaskan'}${r.date === today ? '' : ' · tanggal lampau'}`} />
-      <SubNav active="today" scope={scope} />
+      <SubNav active="today" scope={scope} absenkan={isAdminStaff(req)} />
       <form className="pk-filter" method="get" action="/admin/absensi" role="search" aria-label="Filter tim hari ini" data-pk-filter="absensi-today">
         <label className="pk-filter__search">
           Cari
@@ -602,7 +607,7 @@ function Stamp({ loc, kind, d, tz }: { loc: LocationDay; kind: 'checkIn' | 'chec
   return (
     <span>
       <b>{hhmm(s.time, tz)}</b>
-      {s.source === 'pm' ? ' · PM' : ''}
+      {s.source === 'pm' ? ' · PM' : s.source === 'admin' ? ' · Admin Staff' : ''}
       {s.corrected ? ' · dikoreksi' : ''}
       {s.outsideArea ? (
         <span className="pk-chip warn" data-pk-outside-area>
@@ -666,9 +671,52 @@ export async function AbsensiAbsen(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="absensi-absen">
       <DashHead title="Absensi · Absen" note="Absen masuk / pulang dari web, aturan sama dengan aplikasi Android." />
-      <SubNav active="absen" scope={scope} />
+      <SubNav active="absen" scope={scope} absenkan={isAdminStaff(req)} />
       <Card id="self-check" title="Absen hari ini" span={12}>
         <SelfCheckForm locations={locations} privacyBlocked={privacyBlocked} />
+      </Card>
+    </Frame>
+  )
+}
+
+/**
+ * ADR 0032 (DRMS 24/10): "Absensi · Absenkan karyawan" — an Admin Staff records a check-in / check-out ON BEHALF of an
+ * employee of its PT (also one without an account, e.g. a tukang harian): the photo of the employee is taken with the
+ * Admin Staff's device camera, the GPS fix is the Admin Staff's (the employee's OnSite / Non-OnSite rule applies to it),
+ * a reason is mandatory; the row shows "diabsenkan oleh <Admin Staff>". POST /attendance/on-behalf re-checks
+ * everything (role in the PT, employee of the PT and not the own, geofence, syncAttendanceEnabled, privacy ack).
+ */
+export async function AbsensiAbsenkan(props: AdminViewServerProps) {
+  const req = props.initPageResult.req
+  let data: { scope: AttScope | null; options: OnBehalfOptions; privacyBlocked: boolean; multi: boolean } | null = null
+  try {
+    data = await withReqTransaction(req, async () => {
+      const scope = await attendanceScope(req)
+      const pts = membershipsOf(req.user).map((m) => m.company)
+      const options = await onBehalfOptions(req, pts)
+      const uid = userId(req)
+      const privacyBlocked = uid === undefined ? false : (await privacyAckCheck(req, uid)).required
+      return { scope, options, privacyBlocked, multi: options.companies.length > 1 }
+    })
+  } catch (err) {
+    return <Failed props={props} name="absensi-absenkan" title="Absensi · Absenkan karyawan" err={err} req={req} />
+  }
+  const { scope, options, privacyBlocked, multi } = data
+  if (options.companies.length === 0) return <NoAccess props={props} />
+  const pt = await ptView(req)
+  const ptCode = (id: number) => pt.ref(id)?.shortCode ?? String(id)
+  const label = (company: number, text: string) => (multi ? `[${ptCode(company)}] ${text}` : text)
+  return (
+    <Frame props={props} name="absensi-absenkan">
+      <DashHead title="Absensi · Absenkan karyawan" note="Admin Staff: absen masuk / pulang atas nama karyawan PT (juga tanpa akun). Foto dan GPS dari perangkat Anda; nama Anda dan alasannya tercatat." />
+      <SubNav active="absenkan" scope={scope} absenkan />
+      <Card id="on-behalf" title="Absenkan karyawan" span={12}>
+        <OnBehalfForm
+          employees={options.employees.map((e) => ({ id: e.id, company: e.company, label: label(e.company, `${e.name} (${e.code})`), nonOnsite: e.attendanceType === 'non_onsite', hasAccount: e.hasAccount }))}
+          locations={options.locations.map((l) => ({ type: l.kind, id: l.id, company: l.company, label: label(l.company, `${l.code} ${l.name}`), lat: l.lat, lng: l.lng, radiusM: l.radiusM }))}
+          disabledCompanies={options.companies.filter((c) => !c.attendanceEnabled).map((c) => c.id)}
+          privacyBlocked={privacyBlocked}
+        />
       </Card>
     </Frame>
   )
@@ -754,7 +802,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
           ) : null}
         </div>
       </DashHead>
-      <SubNav active="rekap" scope={d.scope} />
+      <SubNav active="rekap" scope={d.scope} absenkan={isAdminStaff(req)} />
       {d.scope ? (
         <form className="pk-filter" method="get" action="/admin/absensi/rekap" role="search" aria-label="Pilih karyawan dan bulan" data-pk-filter="absensi-rekap">
           <PtSelect pt={d.pt} pts={d.pts} value={d.chosen} />
@@ -844,7 +892,7 @@ function EmployeeRecap({ d, recap }: { d: RekapData; recap: MonthlyRecap }) {
           <KpiTile id="rk-work" icon="target" label="Jam kerja" value={minutesText(s.workMinutes)} kpi="rk-work" i={4}>
             <p className="pk-kpi-x">{s.incompleteDays > 0 ? <StatusPill tone="warn" label={`${s.incompleteDays} hari tanpa absen pulang`} /> : 'semua hari lengkap'}</p>
           </KpiTile>
-          <KpiTile id="rk-other" icon="users" label="Diabsenkan PM / dikoreksi" value={`${s.onBehalfDays} / ${s.correctedDays}`} kpi="rk-other" i={5}>
+          <KpiTile id="rk-other" icon="users" label="Diabsenkan / dikoreksi" value={`${s.onBehalfDays} / ${s.correctedDays}`} kpi="rk-other" i={5}>
             <p className="pk-kpi-x">
               libur: <b>{s.holidayWorkDays}</b> · non-kerja: <b>{s.offDayWorkDays}</b> hari masuk
             </p>
@@ -1216,7 +1264,7 @@ export async function AbsensiJadwal(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="absensi-jadwal">
       <DashHead title="Absensi · Jadwal & hari libur" note="Dasar perhitungan terlambat / pulang cepat / tidak hadir (Q-30) dan geofence pusat biaya (Q-40)." />
-      <SubNav active="jadwal" scope={scope} />
+      <SubNav active="jadwal" scope={scope} absenkan={isAdminStaff(req)} />
       {!canWrite ? (
         <Alert tone="info" attr="read-only">
           Tampilan baca. Perubahan jadwal, hari libur dan geofence oleh Admin atau Direktur (tercatat di audit log).

@@ -19,7 +19,9 @@ import 'attendance_widgets.dart';
 /// US-14 "Diabsenkan PM": for a team member without a phone. The PM picks the employee, the team location
 /// and check-in/out, writes the reason, then GPS (PM's phone, geofence + mock checked on the phone and
 /// again on the server) and a photo of the employee with the front or back camera. Queued like an own
-/// check-in (works offline); the server records source = PM with the PM's name.
+/// check-in (works offline); the server records source = PM with the PM's name. ADR 0032: an Admin Staff picks ANY
+/// employee of its PT (also without an account) and any registered location of it; a Non-OnSite employee is recorded at
+/// the location containing the fix; the server records source = Admin Staff with the user's name.
 class OnBehalfScreen extends ConsumerStatefulWidget {
   const OnBehalfScreen({super.key, this.employeeId, this.kind});
   final int? employeeId;
@@ -46,8 +48,9 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
     super.dispose();
   }
 
-  Future<void> _record(OnBehalfCandidate who, ProjectSite site) async {
+  Future<void> _record(OnBehalfCandidate who, ProjectSite picked) async {
     final t = AppLocalizations.of(context);
+    var site = picked;
     final sub = ref.read(currentSubProvider);
     if (sub == null) return;
     // ADR 0018: the PM's own acknowledgement gates on-behalf attendance (GPS of the PM's phone + a photo).
@@ -68,16 +71,31 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
     });
     try {
       final fix = await ref.read(locationServiceProvider).current();
-      final res = checkSite(site, fix);
-      final problem = siteProblem(t, site, res);
-      if (problem != null) {
-        setState(() {
-          _notice = problem;
-          _noticeError = true;
-        });
-        return;
+      if (site.unrestricted && !fix.isMocked) {
+        // ADR 0032 (Non-OnSite employee): the registered location of the PT containing the fix, nearest first
+        final d = detectArea(who.sites, fix);
+        final hit = d.inside.where((m) => m.site.key == site.key).firstOrNull ?? d.inside.firstOrNull;
+        if (hit == null) {
+          setState(() {
+            _notice = t.attendanceNonOnsiteOutside;
+            _noticeError = true;
+          });
+          return;
+        }
+        site = hit.site;
+        setState(() => _notice = t.attendanceInside(hit.distanceM, hit.site.radiusM?.round() ?? 0));
+      } else {
+        final res = checkSite(site, fix);
+        final problem = siteProblem(t, site, res);
+        if (problem != null) {
+          setState(() {
+            _notice = problem;
+            _noticeError = true;
+          });
+          return;
+        }
+        setState(() => _notice = t.attendanceInside(res.distanceM ?? 0, site.radiusM?.round() ?? 0));
       }
-      setState(() => _notice = t.attendanceInside(res.distanceM ?? 0, site.radiusM?.round() ?? 0));
       if (!mounted) return;
       final raw = await ref.read(onBehalfCaptureProvider)(context, t.onBehalfPhotoTitle(who.name), _lens);
       if (raw == null || !mounted) return;
@@ -132,6 +150,9 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
               ? ref.watch(attendanceEnabledAnyProvider)
               : ref.watch(attendanceEnabledForProvider(site.companyId));
           final privacyBlocked = ref.watch(attendanceBlockedByPrivacyProvider);
+          // ADR 0032: a Non-OnSite employee (Admin Staff list) needs no point on the chosen location
+          final usable = site != null && (site.hasGeofence || site.unrestricted);
+          final canSubmit = enabled && !privacyBlocked && !_busy && who != null && usable;
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -145,7 +166,13 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
                 initialValue: who?.employeeId,
                 isExpanded: true,
                 decoration: InputDecoration(labelText: t.onBehalfEmployee, prefixIcon: const Icon(Icons.person)),
-                items: [for (final c in list) DropdownMenuItem(value: c.employeeId, child: Text(c.name))],
+                items: [
+                  for (final c in list)
+                    DropdownMenuItem(
+                      value: c.employeeId,
+                      child: Text(c.hasAccount ? c.name : '${c.name} · ${t.onBehalfNoAccount}'),
+                    ),
+                ],
                 onChanged: _busy
                     ? null
                     : (v) => setState(() {
@@ -212,13 +239,12 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
                 selected: {_lens},
                 onSelectionChanged: _busy ? null : (s) => setState(() => _lens = s.first),
               ),
-              if (site != null && !site.hasGeofence) InfoCard(text: t.attendanceNoGeofence, error: true),
+              if (site != null && !site.hasGeofence && !site.unrestricted)
+                InfoCard(text: t.attendanceNoGeofence, error: true),
               const SizedBox(height: 16),
               FilledButton.icon(
                 key: const Key('on-behalf-submit'),
-                onPressed: enabled && !privacyBlocked && !_busy && who != null && site != null && site.hasGeofence
-                    ? () => _record(who, site)
-                    : null,
+                onPressed: canSubmit ? () => _record(who!, site!) : null,
                 icon: _busy
                     ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.how_to_reg),

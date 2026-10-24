@@ -30,7 +30,8 @@ import { parseSnapshot, snapshotOf, type ScheduleSnapshot } from './schedule'
 export type AttPart = { company: number; all: boolean; projects: number[]; costCenters: number[] }
 export type AttScope = ({ kind: 'all' } | { kind: 'team'; projects: number[]; costCenters: number[] }) & { parts?: AttPart[] }
 
-const OFFICE_ATT: readonly Role[] = ['pk-admin', 'pk-owner', 'pk-finance']
+/** ADR 0032: Admin Staff = attendance administration of its PT (whole PT, like the office roles). */
+const OFFICE_ATT: readonly Role[] = ['pk-admin', 'pk-owner', 'pk-finance', 'pk-admin-staff']
 
 /** Builds the summary AttScope from per-PT parts (null when nothing is in scope). */
 export function attScopeOf(parts: AttPart[]): AttScope | null {
@@ -124,7 +125,7 @@ type FactRow = {
   site_id: number | null
   site_code: string | null
   site_name: string | null
-  source: 'self' | 'pm' | null
+  source: 'self' | 'pm' | 'admin' | null
   recorded_by_name: string | null
   corrected: boolean
   schedule: unknown
@@ -147,7 +148,7 @@ export function factsSql(f: { from: string; to: string; employeeIds?: number[]; 
            a.project_id, p.code AS project_code, p.name AS project_name,
            a.cost_center_id, cc.code AS cc_code, cc.name AS cc_name,
            a.site_id, st.code AS site_code, st.name AS site_name,
-           a.source, CASE WHEN ru.id IS NULL THEN NULL ELSE coalesce(ru.name, 'PM #' || ru.id) END AS recorded_by_name,
+           a.source, CASE WHEN ru.id IS NULL THEN NULL ELSE coalesce(ru.name, CASE WHEN a.source::text = 'admin' THEN 'Admin Staff #' ELSE 'PM #' END || ru.id) END AS recorded_by_name,
            (c.new_time IS NOT NULL) AS corrected, a.schedule, a.flags, a.offline, a.outside_area
     FROM attendances a
     LEFT JOIN LATERAL (SELECT new_time FROM attendance_corrections x WHERE x.attendance_id = a.id ORDER BY x.id DESC LIMIT 1) c ON TRUE
@@ -175,7 +176,7 @@ export async function loadFacts(req: PayloadRequest, f: { from: string; to: stri
       localDate: x.local_date,
       time: new Date(x.effective_time),
       location,
-      source: x.source === 'pm' ? 'pm' : 'self',
+      source: x.source === 'pm' || x.source === 'admin' ? x.source : 'self',
       recordedByName: x.recorded_by_name,
       corrected: x.corrected === true,
       schedule: parseSnapshot(x.schedule),

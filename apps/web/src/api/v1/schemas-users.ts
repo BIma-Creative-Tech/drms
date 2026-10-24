@@ -12,8 +12,8 @@ const businessDate = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[0
 
 /** Same set as `ROLES` (access/roles.ts) — inlined: this module is bundled without Payload. */
 export const OnboardingRole = z
-  .enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator'])
-  .meta({ id: 'OnboardingRole', description: 'Role in ONE PT (pk-owner = Direktur, pk-principal = Owner (ADR 0026), pk-operator = Operator/Anggota).' })
+  .enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator', 'pk-admin-staff'])
+  .meta({ id: 'OnboardingRole', description: 'Role in ONE PT (pk-owner = Direktur, pk-principal = Owner (ADR 0026), pk-operator = Operator/Anggota, pk-admin-staff = Admin Staff (ADR 0032)).' })
 
 const optText = (max: number, label: string) => z.string().trim().max(max, `${label} maksimal ${max} karakter.`)
 

@@ -114,7 +114,8 @@ kuning = perlu perhatian; merah = anggaran terpakai mendahului progress lebih da
 
 - **Tim hari ini:** APK Absensi → tab **Tim** (atau web **Absensi → Tim hari ini**): Belum absen / Hadir / Selesai.
 - **Mengabsenkan anggota tanpa HP (APK saja):** Tim → **Absenkan anggota tim** → pilih karyawan dan lokasi →
-  isi **alasan** → foto karyawan dengan kamera **belakang**. Tercatat "Oleh PM". Anda tidak bisa mengabsenkan diri
+  isi **alasan** → foto karyawan dengan kamera **belakang**. Tercatat "Oleh PM". Untuk karyawan di luar tim Anda (mis.
+  tukang harian tanpa akun) minta **Admin Staff** PT (ADR 0032). Anda tidak bisa mengabsenkan diri
   sendiri.
 - **Pemberitahuan privasi (APK 0.3.3+):** absen sendiri **dan** mengabsenkan anggota terkunci sampai **Anda** menekan
   **Saya mengerti** pada pemberitahuan privasi (layar penuh setelah masuk, atau **Profil → Pemberitahuan privasi**).

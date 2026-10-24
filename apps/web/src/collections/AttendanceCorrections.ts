@@ -37,6 +37,8 @@ export const AttendanceCorrections: CollectionConfig = withAudit(
         'pk-staff': ownEmployee('employee'),
         // Operator/Anggota (owner decision 2026-10-09): own corrections only, same as Staff.
         'pk-operator': ownEmployee('employee'),
+        // ADR 0032: Admin Staff reads (and makes, never own) the corrections of its PT
+        'pk-admin-staff': true,
       }),
       create: denyAll,
       update: denyAll,

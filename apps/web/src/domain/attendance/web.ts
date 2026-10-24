@@ -89,7 +89,7 @@ export async function selfieState(req: PayloadRequest, attendanceIds: number[]):
 
 /**
  * Can the caller correct (T10) attendance of `employeeId` (of PT `companyId`)? Mirrors corrections.ts
- * (server re-checks): never the own employee (any PT); Admin OF THE EMPLOYEE'S PT, or PM there with a
+ * (server re-checks): never the own employee (any PT); Admin / Admin Staff OF THE EMPLOYEE'S PT, or PM there with a
  * team scope. Without `companyId`: any PT of the scope. A scope without PT parts → false (MC4).
  */
 export function mayCorrect(req: PayloadRequest, scope: AttScope | null, employeeId: number, companyId?: number): boolean {
@@ -97,7 +97,8 @@ export function mayCorrect(req: PayloadRequest, scope: AttScope | null, employee
   if (ownEmployees(req).includes(employeeId) || relId((req.user as { employee?: unknown } | null)?.employee) === employeeId) return false
   if (!scope.parts) return false // legacy literal without PT parts: fail closed (MC4)
   const pts = companyId !== undefined ? [companyId] : scope.parts.map((p) => p.company)
-  return pts.some((c) => hasRole(req, 'pk-admin', c) || (hasRole(req, 'pk-pm', c) && scope.parts!.some((p) => p.company === c && !p.all)))
+  // ADR 0032: Admin Staff of the PT corrects like the Admin
+  return pts.some((c) => hasRole(req, ['pk-admin', 'pk-admin-staff'], c) || (hasRole(req, 'pk-pm', c) && scope.parts!.some((p) => p.company === c && !p.all)))
 }
 
 /** Team month grid (all members of the scope/filters), same aggregation as the M13 report. */

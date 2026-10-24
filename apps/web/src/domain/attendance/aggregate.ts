@@ -16,7 +16,8 @@ export type AttendanceFact = {
   /** Effective time (correction applied). */
   time: Date
   location: LocationRef
-  source: 'self' | 'pm'
+  /** `pm` = diabsenkan PM, `admin` = diabsenkan Admin Staff (ADR 0032). */
+  source: 'self' | 'pm' | 'admin'
   recordedByName: string | null
   corrected: boolean
   schedule: ScheduleSnapshot | null
@@ -29,7 +30,7 @@ export type AttendanceFact = {
 export type DayStatus = 'selesai' | 'hadir' | 'belum_absen' | 'tidak_hadir' | 'libur' | 'tanpa_jadwal'
 
 /** `outsideArea` (DRMS 13/10 A2, only when true): this check-in / check-out was "Di luar area". */
-export type LocationStamp = { id: number; time: string; source: 'self' | 'pm'; corrected: boolean; outsideArea?: boolean }
+export type LocationStamp = { id: number; time: string; source: 'self' | 'pm' | 'admin'; corrected: boolean; outsideArea?: boolean }
 
 export type LocationDay = {
   location: LocationRef
@@ -125,7 +126,8 @@ export function recapDay(args: {
   else if (ev.kind === 'workday') status = args.date < args.today ? 'tidak_hadir' : 'belum_absen'
   else if (ev.kind === 'unscheduled') status = 'tanpa_jadwal'
   else status = 'libur'
-  const onBehalfBy = [...new Set(args.facts.filter((f) => f.source === 'pm' && f.recordedByName).map((f) => f.recordedByName as string))]
+  // US-14 / ADR 0032: on-behalf = diabsenkan PM or Admin Staff (the recorder's name)
+  const onBehalfBy = [...new Set(args.facts.filter((f) => f.source !== 'self' && f.recordedByName).map((f) => f.recordedByName as string))]
   return {
     date: args.date,
     weekday: isoWeekday(args.date),
@@ -139,7 +141,7 @@ export function recapDay(args: {
     workMinutes,
     lateMinutes: ev.lateMinutes,
     earlyLeaveMinutes: ev.earlyLeaveMinutes,
-    onBehalf: args.facts.some((f) => f.source === 'pm'),
+    onBehalf: args.facts.some((f) => f.source !== 'self'),
     onBehalfBy,
     corrected: args.facts.some((f) => f.corrected),
     flags: [...new Set(args.facts.flatMap((f) => f.flags))],
