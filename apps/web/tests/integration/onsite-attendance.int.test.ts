@@ -29,7 +29,7 @@ let project = 0 // nobody assigned
 let projectNoPoint = 0
 let costCenter = 0 // nobody assigned
 let otherCompany = 0
-let foreignProject = 0
+let foreignCostCenter = 0
 let onsite: FlowUser // staff A — OnSite (default)
 let office: FlowUser // staff B — Non-OnSite
 
@@ -68,7 +68,7 @@ beforeAll(async () => {
   await p.update({ collection: 'projects', id: w.project, data: { lat: PRJ.lat + 0.5, lng: PRJ.lng, radiusM: 100 }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
   await p.update({ collection: 'projects', id: w.otherProject, data: { lat: PRJ.lat + 0.6, lng: PRJ.lng, radiusM: 100 }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
   otherCompany = (await p.create({ collection: 'companies', data: { name: 'PT OnSite Lain', shortCode: `OS${Date.now() % 1000}`, timezone: 'Asia/Makassar', active: false } as never, depth: 0, overrideAccess: true, context: { [SKIP_COMPANY_DEFAULTS]: true } })).id as number
-  foreignProject = await sysCreate('projects', { company: otherCompany, code: `${tag}-X`, name: `${tag} Proyek PT lain`, pm: w.users.otherPm.id, status: 'berjalan', lat: PRJ.lat, lng: PRJ.lng, radiusM: 100 })
+  foreignCostCenter = await sysCreate('cost-centers', { company: otherCompany, code: `${tag}-X`, name: `${tag} Ops PT lain`, type: 'operational', lat: PRJ.lat, lng: PRJ.lng, radiusM: 100 })
   // office staff and the admin: Non-OnSite
   await p.update({ collection: 'employees', id: w.emp.b, data: { attendanceType: 'non_onsite' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
   await p.update({ collection: 'employees', id: w.emp.admin, data: { attendanceType: 'non_onsite' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
@@ -118,9 +118,9 @@ describe('OnSite: inside the chosen registered location of the own PT, no assign
   })
 
   it("another PT's location → NOT_FOUND, nothing stored", async () => {
-    const r = await check(onsite, PRJ, { project_id: foreignProject })
+    const r = await check(onsite, PRJ, { cost_center_id: foreignCostCenter })
     expect(r.status).toBe(404)
-    const n = await sqlAs('app', 'SELECT count(*)::int AS n FROM attendances WHERE project_id = $1', [foreignProject])
+    const n = await sqlAs('app', 'SELECT count(*)::int AS n FROM attendances WHERE cost_center_id = $1', [foreignCostCenter])
     expect(n.rows[0].n).toBe(0)
   })
 })
@@ -164,7 +164,7 @@ describe('Non-OnSite: only inside a registered location of the own PT (ADR 0032)
   })
 
   it("still refused: another PT's location (NOT_FOUND)", async () => {
-    const r = await check(office, PRJ, { project_id: foreignProject })
+    const r = await check(office, PRJ, { cost_center_id: foreignCostCenter })
     expect(r.status).toBe(404)
   })
 
@@ -209,7 +209,7 @@ describe('GET /api/v1/attendance/locations', () => {
     const keys = body.items.map((i) => `${i.kind}:${i.id}`)
     expect(keys).toEqual(expect.arrayContaining([`project:${project}`, `cost_center:${costCenter}`, `project:${w.project}`]))
     expect(keys.findIndex((k) => k.startsWith('cost_center:'))).toBeGreaterThan(keys.findIndex((k) => k === `project:${project}`))
-    for (const missing of [`project:${projectNoPoint}`, `project:${foreignProject}`]) expect(keys).not.toContain(missing)
+    for (const missing of [`project:${projectNoPoint}`, `cost_center:${foreignCostCenter}`]) expect(keys).not.toContain(missing)
     expect(new Set(body.items.map((i) => i.kind))).toEqual(new Set(['project', 'cost_center']))
     expect(body.items.find((i) => i.id === project && i.kind === 'project')).toMatchObject({ isHeadOffice: false, home: false, radiusM: 100, lat: PRJ.lat, lng: PRJ.lng })
     for (const i of body.items) expect(Object.keys(i).sort()).toEqual(['code', 'company', 'employeeId', 'home', 'id', 'isHeadOffice', 'kind', 'lat', 'lng', 'name', 'radiusM'])
