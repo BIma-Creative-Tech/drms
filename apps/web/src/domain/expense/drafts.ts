@@ -444,15 +444,16 @@ export function duplicateInvoiceMessage(invoiceNo: string, other: { id: number; 
 
 /**
  * ADR 0027 duplicate-invoice rule: same vendor + same normalized invoice number on a request that is not cancelled /
- * rejected (Draft included) → 409 with a field error on `invoiceNo`. The DB unique index
- * `expense_requests_vendor_invoice_uq` (same key, `pk_invoice_key`) is the final guard against a race.
+ * rejected (Draft included; D2410: a soft-deleted draft — "Hapus draft" — no longer counts) → 409 with a field error on
+ * `invoiceNo`. The DB unique index `expense_requests_vendor_invoice_uq` (same key, `pk_invoice_key`, migration
+ * 20261024_510000 ignores deleted rows) is the final guard against a race.
  */
 export async function assertInvoiceUnused(req: PayloadRequest, vendorId: number, invoiceNo: string, requestId?: number): Promise<void> {
   const key = normalizeInvoiceNo(invoiceNo)
   const tx = await getRequestTx(req)
   const r = (await tx.execute(sql`
     SELECT id, doc_no, status::text AS status FROM expense_requests
-     WHERE payee_type = 'vendor' AND vendor_id = ${vendorId} AND id <> ${requestId ?? -1}
+     WHERE payee_type = 'vendor' AND vendor_id = ${vendorId} AND id <> ${requestId ?? -1} AND is_deleted IS NOT TRUE
        AND status::text NOT IN (${sql.join(
          INACTIVE_FOR_DUPLICATES.map((s) => sql`${s}`),
          sql`, `,

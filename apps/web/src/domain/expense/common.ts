@@ -238,7 +238,7 @@ export function selfApprovalAllowed(
  */
 export function requireAction(ctx: ActorContext, action: Action): void {
   if (!mayPerform(ctx, action)) fail(403, 'Anda tidak berhak melakukan aksi ini pada pengajuan ini.')
-  const nonTransition = ['edit', 'add_receipt', 'receipt_verify', 'review_flag', 'resubmit'].includes(action)
+  const nonTransition = ['edit', 'add_receipt', 'receipt_verify', 'review_flag', 'resubmit', 'delete_draft'].includes(action)
   if (!nonTransition && targets(ctx.type, ctx.status, action, ctx.payeeType).length === 0) {
     fail(409, `Aksi tidak dapat dilakukan pada status pengajuan saat ini (${ctx.status}).`)
   }
@@ -247,6 +247,7 @@ export function requireAction(ctx: ActorContext, action: Action): void {
     if (own && action === 'edit') fail(409, 'Pengajuan hanya dapat diubah saat Draft (tarik kembali dulu).')
     if (own && action === 'add_receipt') fail(409, 'Nota tidak dapat diubah pada status pengajuan saat ini.')
     if (own && action === 'resubmit') fail(409, 'Hanya pengajuan yang ditolak yang dapat diajukan ulang.')
+    if (own && action === 'delete_draft') fail(409, 'Hanya draft yang belum pernah diputuskan yang dapat dihapus (pengajuan yang sedang berjalan: tarik kembali ke Draft sebelum ada keputusan).')
     fail(403, 'Anda tidak berhak melakukan aksi ini pada pengajuan ini.')
   }
 }

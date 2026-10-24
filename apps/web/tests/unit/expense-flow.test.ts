@@ -59,9 +59,16 @@ describe('state machines (architecture §5.1 Pengajuan Baru / §5.2 Reimburse, G
     ...over,
   })
 
-  it('actor guards: own edit/submit (D2410: no cancel on a Draft); strangers nothing', () => {
-    expect(allowedActions(ctx({ isCreator: true }))).toEqual(['edit', 'submit'])
+  it('actor guards: own edit/submit + "Hapus draft" (D2410: no cancel on a Draft); strangers nothing', () => {
+    expect(allowedActions(ctx({ isCreator: true }))).toEqual(['edit', 'submit', 'delete_draft'])
+    expect(allowedActions(ctx({ isRequester: true }))).toContain('delete_draft')
     expect(allowedActions(ctx({}))).toEqual([])
+    // D2410 "Hapus draft": only an own Draft without a decision; never in the flow, never for others
+    expect(allowedActions(ctx({ isCreator: true, hasDecision: true }))).not.toContain('delete_draft')
+    expect(allowedActions(ctx({ isCreator: true, status: 'pending_approval' }))).not.toContain('delete_draft')
+    expect(allowedActions(ctx({ roles: ['pk-finance'] }))).not.toContain('delete_draft')
+    expect(mayPerform(ctx({ roles: ['pk-finance'] }), 'delete_draft')).toBe(false)
+    expect(mayPerform(ctx({ isRequester: true }), 'delete_draft')).toBe(true)
   })
 
   it('D2410 (point 13): "Batalkan" only at the Finance stage, only Finance / Direktur — also on their own request', () => {

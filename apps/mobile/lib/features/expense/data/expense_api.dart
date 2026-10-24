@@ -143,6 +143,17 @@ class ExpenseApi {
   Future<ExpenseDetail> cancel(int requestId, String reason, {required String idempotencyKey}) =>
       _reasonAction(requestId, 'cancel', reason, idempotencyKey);
 
+  /// D2410 "Hapus draft": `POST …/delete-draft` — soft delete of an own server Draft nobody ever decided on (reason
+  /// optional; the number of a withdrawn draft is never reused). Returns the (deleted) request.
+  Future<ExpenseDetail> deleteDraft(int requestId, {String? reason, required String idempotencyKey}) => client.run(
+    (d) => d.post<dynamic>(
+      '/expense-requests/$requestId/delete-draft',
+      data: {if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim()},
+      options: _idem(idempotencyKey),
+    ),
+    (data) => detailFromJson(data as Map<String, dynamic>),
+  );
+
   Future<ExpenseDetail> _reasonAction(int requestId, String path, String reason, String idempotencyKey) => client.run(
     (d) =>
         d.post<dynamic>('/expense-requests/$requestId/$path', data: {'reason': reason}, options: _idem(idempotencyKey)),

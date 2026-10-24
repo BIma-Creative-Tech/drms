@@ -4711,5 +4711,8 @@
   "progressDiscardAction": "Hapus laporan",
   "progressResendAction": "Kirim versi HP",
   "accountSignatureSaveAction": "Simpan tanda tangan",
-  "accountSignatureRemoveAction": "Hapus tanda tangan"
+  "accountSignatureRemoveAction": "Hapus tanda tangan",
+  "actionDeleteDraft": "Hapus draft",
+  "deleteDraftServerConfirm": "Draft dihapus dari daftar dan tidak dapat dikirim lagi; nomor yang sudah terbit tidak dipakai ulang.",
+  "deleteDraftDone": "Draft dihapus."
 }

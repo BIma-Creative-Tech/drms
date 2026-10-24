@@ -105,6 +105,7 @@ import * as migration_20261024_400100_d2410_loan_schema from './20261024_400100_
 import * as migration_20261024_400200_d2410_loan_data from './20261024_400200_d2410_loan_data';
 import * as migration_20261024_400300_d2410_loan_guard from './20261024_400300_d2410_loan_guard';
 import * as migration_20261024_500000_d2410_site_accounts_fund from './20261024_500000_d2410_site_accounts_fund';
+import * as migration_20261024_510000_d2410_delete_draft_invoice from './20261024_510000_d2410_delete_draft_invoice';
 
 export const migrations = [
   {
@@ -641,5 +642,10 @@ export const migrations = [
     up: migration_20261024_500000_d2410_site_accounts_fund.up,
     down: migration_20261024_500000_d2410_site_accounts_fund.down,
     name: '20261024_500000_d2410_site_accounts_fund',
+  },
+  {
+    up: migration_20261024_510000_d2410_delete_draft_invoice.up,
+    down: migration_20261024_510000_d2410_delete_draft_invoice.down,
+    name: '20261024_510000_d2410_delete_draft_invoice',
   },
 ];

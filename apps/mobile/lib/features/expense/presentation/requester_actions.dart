@@ -204,6 +204,15 @@ class RequestLifecycleActions extends ConsumerWidget {
           outlined: true,
           onPressed: () => _withReason(context, ref, withdraw: true),
         ),
+      // D2410 "Hapus draft": an own server Draft nobody decided on (never submitted, or withdrawn before a decision)
+      if (isDraft && a.contains('delete_draft'))
+        OnlineOnlyButton(
+          key: const Key('action-delete-draft'),
+          label: t.actionDeleteDraft,
+          icon: Icons.delete_outline,
+          outlined: true,
+          onPressed: () => _deleteDraft(context, ref),
+        ),
       if (a.contains('cancel'))
         OnlineOnlyButton(
           key: const Key('action-cancel'),
@@ -258,6 +267,30 @@ class RequestLifecycleActions extends ConsumerWidget {
       _refreshLists(ref);
       final done = withdraw ? t.withdrawDone : t.cancelDone;
       if (context.mounted) await showActionResult(context, message: done, action: label);
+    } on Object catch (e) {
+      _refreshLists(ref);
+      if (context.mounted) await showActionError(context, e, action: label);
+    }
+  }
+
+  /// D2410 "Hapus draft" through the popups: "Yakin ingin hapus draft?" (danger) → soft delete → result → back.
+  Future<void> _deleteDraft(BuildContext context, WidgetRef ref) async {
+    final t = AppLocalizations.of(context);
+    final label = t.actionDeleteDraft;
+    final ok = await confirmAction(
+      context,
+      action: label,
+      summary: requestSummary(detail),
+      note: t.deleteDraftServerConfirm,
+      confirmKey: const Key('delete-draft-confirm'),
+    );
+    if (!ok || !context.mounted) return;
+    try {
+      await ref.read(expenseApiProvider).deleteDraft(detail.id, idempotencyKey: const Uuid().v7());
+      _refreshLists(ref);
+      if (!context.mounted) return;
+      await showActionResult(context, message: t.deleteDraftDone, action: label);
+      if (context.mounted) await Navigator.of(context).maybePop();
     } on Object catch (e) {
       _refreshLists(ref);
       if (context.mounted) await showActionError(context, e, action: label);

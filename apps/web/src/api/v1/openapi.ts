@@ -260,6 +260,13 @@ export function buildOpenApiDocument(version: string) {
   )
   post('/expense-requests/{id}/withdraw', 'Withdraw to Draft before any decision (reason)', F.ReasonBody, ['id'], detailOk())
   post('/expense-requests/{id}/cancel', 'Cancel (reason, G7). D2410: only at the Finance stage (Pengajuan Baru / vendor / PT grup "Disetujui"; Reimburse "Disetujui" / "Nota Terverifikasi" / "Revisi Nota") and only by Finance / Direktur of the PT — also on their own request; anyone else → 403, other statuses (draft, waiting for approval: the requester withdraws instead) → 409', F.ReasonBody, ['id'], detailOk())
+  post(
+    '/expense-requests/{id}/delete-draft',
+    'D2410 "Hapus draft": soft delete (ADR 0030 isDeleted, audit soft_delete) of an own Draft nobody ever decided on — never submitted, or withdrawn before any approval decision; reason optional. The number of a withdrawn draft is never reused; the deleted draft leaves every list and no longer blocks its vendor / PT grup invoice number. Not the creator / a requester → 403; a request in the flow or with a decision → 409',
+    F.OptionalReasonBody,
+    ['id'],
+    detailOk(),
+  )
   post('/expense-requests/{id}/resubmit', 'Clone a rejected request into a new Draft (US-06)', F.EmptyBody, ['id'], res(201, 'New draft', F.ExpenseRequestDetail, [401, 403, 404, 409, 422, 426, 429]))
   post('/expense-requests/{id}/duplicate', 'Duplikat: a clean new Draft from a readable request (same PT, project, lines, requesters; no number, approvals, transfers, receipts, flags) — DRMS 13/10 Persetujuan #12', F.EmptyBody, ['id'], res(201, 'New draft', F.ExpenseRequestDetail, [401, 403, 404, 409, 422, 426, 429]))
   post('/expense-requests/{id}/acknowledge', '"Diketahui Oleh" = Direktur approval (US-42, ADR 0013); PM/Staff/Admin → 403 (audited). ADR 0029: a final "Diketahui" (no approval level) is fund-checked like the final approval (409 FUND_INSUFFICIENT)', F.SignBody, ['id'], detailOk())

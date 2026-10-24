@@ -24,7 +24,7 @@ import { ids, loadRaw, loadVisible, lockRequest, settings, type RequestDoc } fro
 import { payeeOf } from '@/domain/expense/types'
 import { createDraft, updateDraft, type DraftInput, type LineInputApi } from '@/domain/expense/drafts'
 import { addReceipt, editReceipt } from '@/domain/expense/receipts'
-import { discardDraft } from '@/domain/expense/workflow'
+import { deleteDraft, discardDraft } from '@/domain/expense/workflow'
 import { auditPrivacyDenied, PRIVACY_ACK_REQUIRED, PRIVACY_ACK_REQUIRED_DETAIL, privacyAckCheck } from '@/legal/privacy-enforcement'
 import { isDbGuardError } from '@/lib/pg-error'
 import { withReqTransaction } from '@/lib/system-tx'
@@ -65,8 +65,8 @@ import { applyProgressReport, ProgressSyncReject } from './progress'
  * - Conflicts: an edit of an existing draft must carry `base_rev` = the server `rev`; a stale or
  *   missing `base_rev` → `conflict` + `server_copy` (server wins, nothing changes).
  * - Drafts are edited only by their creator and only in status Draft (else `rejected
- *   NOT_EDITABLE`); delete = "Dibatalkan" of a never-submitted draft (requirements §1.2 #6; D2410: a numbered —
- *   withdrawn — draft → NOT_EDITABLE with the server copy).
+ *   NOT_EDITABLE`); delete = "Dibatalkan" of a never-submitted draft (requirements §1.2 #6; D2410 "Hapus draft": a
+ *   numbered — withdrawn, never decided — draft is soft-deleted like on the web, flag DELETED).
  * - Attendance check-in/out + PM on-behalf (company-settings.syncAttendanceEnabled; checks in
  *   domain/attendance/record.ts): assigned project/cost center with a geofence, inside radius
  *   (+ capped GPS accuracy), not mocked, selfie uploaded by the caller, one check-in and one
@@ -487,11 +487,6 @@ async function applyDraftDelete(c: ItemCtx): Promise<Outcome> {
     return { status: 'applied', id: doc.id, rev: copy.rev, copy, flags: ['ALREADY_CANCELLED'], errors: [] }
   }
   await requireDraft(c, doc)
-  // D2410 (point 13): a draft submitted before (withdrawn, numbered) is no longer cancelled by its requester → the server
-  // copy goes back to the app (it stays a Draft there too)
-  if (doc.docNo) {
-    reject('NOT_EDITABLE', `Draft ${doc.docNo} sudah pernah diajukan dan tidak dapat dihapus; ubah lalu kirim lagi bila masih diperlukan.`, undefined, { id: doc.id, copy: await draftCopy(req, doc.id) })
-  }
   const rev = revOf(doc)
   if (item.base_rev !== null && item.base_rev !== undefined && item.base_rev < rev) {
     return {
@@ -506,12 +501,16 @@ async function applyDraftDelete(c: ItemCtx): Promise<Outcome> {
   const reason = p.reason ?? 'Draft dihapus dari aplikasi'
   req.context.auditReason = reason
   try {
-    await discardDraft(req, doc.id, reason) // D2410: never-submitted drafts only (a numbered one → 409 → rejected)
+    // never submitted: closed as "Dibatalkan" (the outcome the APK always received); D2410 "Hapus draft": a draft
+    // submitted before (withdrawn, numbered) and never decided is soft-deleted by the same rule as the web / REST
+    // (deleteDraft: own Draft, no decision in any cycle, number never reused) — a decided one → 409 → rejected
+    if (doc.docNo) await deleteDraft(req, doc.id, reason)
+    else await discardDraft(req, doc.id, reason)
   } finally {
     delete req.context.auditReason
   }
   const copy = await draftCopy(req, doc.id)
-  return { status: 'applied', id: doc.id, rev: copy.rev, copy, flags: [], errors: [] }
+  return { status: 'applied', id: doc.id, rev: copy.rev, copy, flags: doc.docNo ? ['DELETED'] : [], errors: [] }
 }
 
 // ------------------------------------------------------------------------------------ attendance

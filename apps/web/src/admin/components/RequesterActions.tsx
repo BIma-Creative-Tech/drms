@@ -25,7 +25,7 @@ import { isMultilineText, WrapText } from './WrapText'
  * result popup (feedback.ts, kept in sessionStorage until OK) shows on the reloaded page.
  * DRMS 24/10: every action asks first ("Yakin ingin …?" with the request number / amount) and ends in the result popup.
  */
-type Action = 'submit' | 'withdraw' | 'resubmit' | 'add_receipt' | 'receipts_resubmit' | 'receipts_complete' | 'lpj_submit' | 'complete'
+type Action = 'submit' | 'withdraw' | 'delete_draft' | 'resubmit' | 'add_receipt' | 'receipts_resubmit' | 'receipts_complete' | 'lpj_submit' | 'complete'
 
 type Flag = { id: number; label: string; level: string; message: string; status: string; lineNo?: number | null }
 
@@ -132,14 +132,29 @@ async function post(url: string, body: unknown): Promise<Record<string, unknown>
  * DRMS 24/10: always asks first ("Yakin ingin <aksi> <dokumen>?" + `summary`); the result popup follows (the page
  * reloads behind it).
  */
-export function Act(props: { label: string; url: string; success: string; primary?: boolean; reason?: string; confirm?: string; gotoNew?: boolean; testId: string; object?: string | null; summary?: Summary }) {
+export function Act(props: {
+  label: string
+  url: string
+  success: string
+  primary?: boolean
+  reason?: string
+  /** D2410 "Hapus draft": the reason field is optional (sent only when filled). */
+  reasonOptional?: boolean
+  confirm?: string
+  gotoNew?: boolean
+  /** Page opened after a success (e.g. the list after "Hapus draft") instead of reloading this one. */
+  goto?: string
+  testId: string
+  object?: string | null
+  summary?: Summary
+}) {
   const key = useRef<string | undefined>(undefined)
   const doc = useDocSummary()
   const object = props.object === undefined ? doc.object : props.object
   const summary = props.summary ?? doc.summary
   const done = (data: Record<string, unknown>) => {
     const newId = typeof data.id === 'number' ? data.id : undefined
-    flashAndGo(successTitle(props.label, object), props.success, props.gotoNew && newId ? `/admin/collections/expense-requests/${newId}` : undefined)
+    flashAndGo(successTitle(props.label, object), props.success, props.gotoNew && newId ? `/admin/collections/expense-requests/${newId}` : props.goto)
   }
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, marginRight: 6, marginBottom: 6 }}>
@@ -150,12 +165,12 @@ export function Act(props: { label: string; url: string; success: string; primar
         summary={summary}
         confirmLabel={confirmLabel(props.label)}
         result={false}
-        field={props.reason ? { label: promptLabel(props.reason), minLength: 3 } : undefined}
+        field={props.reason ? (props.reasonOptional ? { label: promptLabel(props.reason), required: false } : { label: promptLabel(props.reason), minLength: 3 }) : undefined}
         rotateKey={() => {
           key.current = idemKey()
         }}
         onConfirm={async (v) => {
-          const r = await postJson(props.url, props.reason ? { reason: v } : {}, { idempotencyKey: key.current })
+          const r = await postJson(props.url, props.reason && (!props.reasonOptional || v.trim()) ? { reason: v } : {}, { idempotencyKey: key.current })
           if (!r.ok) return problemText(r.data, r.status)
           done((r.data ?? {}) as Record<string, unknown>)
           return null
@@ -351,6 +366,18 @@ export function RequesterActions(p: RequesterActionsProps) {
           ) : null}
           {has('withdraw') ? (
             <Act testId="withdraw" label="Tarik kembali ke Draft" url={`${url}/withdraw`} reason="Alasan tarik kembali (wajib, min. 3 karakter):" success="Pengajuan ditarik kembali ke Draft; silakan ubah lalu kirim lagi." />
+          ) : null}
+          {has('delete_draft') ? (
+            <Act
+              testId="delete-draft"
+              label="Hapus draft"
+              url={`${url}/delete-draft`}
+              reason="Alasan menghapus (opsional):"
+              reasonOptional
+              confirm="Draft dihapus dari daftar (tidak dapat dikirim lagi); nomor yang sudah terbit tidak dipakai ulang. Admin PT dapat memulihkannya."
+              success="Draft dihapus."
+              goto="/admin/collections/expense-requests"
+            />
           ) : null}
           {has('resubmit') ? (
             <Act testId="resubmit" primary gotoNew label="Ajukan ulang (buat draft baru)" url={`${url}/resubmit`} confirm="Buat draft baru dari pengajuan yang ditolak ini?" success="Draft baru dibuat dari pengajuan yang ditolak. Periksa, ubah bila perlu, lalu kirim." />

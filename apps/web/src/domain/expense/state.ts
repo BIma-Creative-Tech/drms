@@ -34,6 +34,8 @@ export const ACTIONS = [
   'settle',
   // E9 — settlement reversal (Finance): void the refund KM / shortfall transfer, back to "LPJ Terverifikasi".
   'settle_reverse',
+  // D2410 (user decision "Hapus draft"): the creator / requester soft-deletes a Draft nobody ever decided on (ADR 0030).
+  'delete_draft',
 ] as const
 export type Action = (typeof ACTIONS)[number]
 
@@ -157,7 +159,7 @@ export function cascadeCancellable(type: RequestType, status: RequestStatus, pay
 }
 
 /** Actions that do not move the status (their own status preconditions are checked in allowedActions). */
-const NON_TRANSITION: ReadonlySet<Action> = new Set<Action>(['edit', 'resubmit', 'review_flag', 'add_receipt', 'receipt_verify'])
+const NON_TRANSITION: ReadonlySet<Action> = new Set<Action>(['edit', 'resubmit', 'review_flag', 'add_receipt', 'receipt_verify', 'delete_draft'])
 
 /**
  * Finance receipt / flag / LPJ / settlement actions. F2e refused them on a request where the Finance user is requester or
@@ -184,6 +186,8 @@ export function allowedActions(ctx: ActorContext): Action[] {
   add('edit', (ctx.status === 'draft' || (ctx.status === 'receipt_revision' && ctx.type === 'reimburse')) && own)
   add('submit', own)
   add('withdraw', own && !ctx.hasDecision)
+  // D2410 ("Hapus draft", cancel is Finance-stage only): own Draft without any decision → soft delete (number kept, never reused)
+  add('delete_draft', own && ctx.status === 'draft' && !ctx.hasDecision)
   // D2410: Finance stage only (the `cancel` rows), office roles only — also on their own request; reason mandatory (G7).
   add('cancel', office(ctx))
   const decider = (!selfInvolved || !!ctx.selfApprovalAllowed) && !ctx.alreadyDecided && !ctx.lacksDecisionRole
@@ -234,6 +238,7 @@ export function mayPerform(ctx: ActorContext, action: Action): boolean {
     case 'edit':
     case 'submit':
     case 'withdraw':
+    case 'delete_draft':
     case 'resubmit':
     case 'receipts_resubmit':
     case 'add_receipt':

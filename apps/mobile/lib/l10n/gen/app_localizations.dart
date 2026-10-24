@@ -10782,6 +10782,24 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Hapus tanda tangan'**
   String get accountSignatureRemoveAction;
+
+  /// No description provided for @actionDeleteDraft.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus draft'**
+  String get actionDeleteDraft;
+
+  /// No description provided for @deleteDraftServerConfirm.
+  ///
+  /// In id, this message translates to:
+  /// **'Draft dihapus dari daftar dan tidak dapat dikirim lagi; nomor yang sudah terbit tidak dipakai ulang.'**
+  String get deleteDraftServerConfirm;
+
+  /// No description provided for @deleteDraftDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Draft dihapus.'**
+  String get deleteDraftDone;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

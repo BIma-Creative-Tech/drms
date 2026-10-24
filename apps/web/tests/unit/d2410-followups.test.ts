@@ -3,11 +3,16 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { MODULES } from '@/admin/modules/registry'
+import { ActionEnum, OptionalReasonBody } from '@/api/v1/schemas-flow'
+import { ACTIONS, allowedActions, type ActorContext } from '@/domain/expense/state'
+import { isDeletableDraft } from '@/domain/soft-delete/service'
 import { migrations } from '@/migrations'
 import { patchDefinition, SITE_FILTER_PATCHES } from '@/migrations/20261024_500000_d2410_site_accounts_fund'
 
 /**
- * DRMS 24/10 follow-ups after the five d2410 merges (user decisions): A. funds without the site exclusion. Pure parts
+ * DRMS 24/10 follow-ups after the five d2410 merges (user decisions): A. funds without the site exclusion, B. "Hapus
+ * draft", C. web on-behalf for the PM (team-scoped). Pure parts
  * only; the DB behaviour is covered by tests/integration/d2410-followups.int.test.ts. Fictional data only.
  */
 const dir = join(process.cwd(), 'src/migrations')
@@ -68,5 +73,74 @@ AS $function$
     expect(src('src/admin/views/IntercompanyLoans.tsx')).not.toContain('site: { exists: false }')
     expect(src('src/admin/components/request/FundPanel.tsx')).not.toContain('site lama')
     expect(src('src/admin/components/icloans/IcLoanMoneyForm.tsx')).not.toContain('(site) tidak dapat dipakai')
+  })
+})
+
+describe('B. "Hapus draft"', () => {
+  const ctx = (over: Partial<ActorContext>): ActorContext => ({
+    type: 'advance',
+    status: 'draft',
+    roles: ['pk-staff'],
+    isCreator: true,
+    isRequester: false,
+    hasDecision: false,
+    isAcknowledger: false,
+    matchesCurrentStep: false,
+    alreadyDecided: false,
+    ...over,
+  })
+
+  it('action + contract: delete_draft is an action, in the API enum; the body takes an optional reason only', () => {
+    expect(ACTIONS).toContain('delete_draft')
+    expect(ActionEnum.options).toContain('delete_draft')
+    expect(OptionalReasonBody.safeParse({}).success).toBe(true)
+    expect(OptionalReasonBody.safeParse({ reason: 'tidak jadi' }).success).toBe(true)
+    expect(OptionalReasonBody.safeParse({ reason: 'x'.repeat(1001) }).success).toBe(false)
+    expect(OptionalReasonBody.safeParse({ other: 1 }).success).toBe(false)
+  })
+
+  it('offered on an own undecided Draft only (numbered or not); the soft-delete rule matches', () => {
+    expect(allowedActions(ctx({}))).toContain('delete_draft')
+    expect(allowedActions(ctx({ hasDecision: true }))).not.toContain('delete_draft')
+    expect(allowedActions(ctx({ status: 'pending_ack' }))).not.toContain('delete_draft')
+    expect(allowedActions(ctx({ isCreator: false }))).not.toContain('delete_draft')
+    expect(isDeletableDraft({ status: 'draft', docNo: null }, false)).toBe(true)
+    expect(isDeletableDraft({ status: 'draft', docNo: 'PB/DRMS/2610/0001' }, false)).toBe(true) // withdrawn, undecided
+    expect(isDeletableDraft({ status: 'draft', docNo: 'PB/DRMS/2610/0001' }, true)).toBe(false)
+    expect(isDeletableDraft({ status: 'pending_approval', docNo: null }, false)).toBe(false)
+  })
+
+  it('invoice uniqueness ignores deleted drafts (services + migration 20261024_510000); sync deletes numbered drafts', () => {
+    const names = migrations.map((m) => m.name)
+    expect(names.indexOf('20261024_510000_d2410_delete_draft_invoice')).toBe(names.indexOf('20261024_500000_d2410_site_accounts_fund') + 1)
+    const m = readFileSync(join(dir, '20261024_510000_d2410_delete_draft_invoice.ts'), 'utf8')
+    expect(m.split("AND status NOT IN ('cancelled', 'rejected') AND is_deleted IS NOT TRUE;").length - 1).toBe(2)
+    expect(src('src/domain/expense/drafts.ts')).toContain("AND vendor_id = ${vendorId} AND id <> ${requestId ?? -1} AND is_deleted IS NOT TRUE")
+    expect(src('src/domain/intercompany/service.ts')).toContain('AND payee_company_id = ${payeeCompanyId} AND id <> ${requestId ?? -1} AND is_deleted IS NOT TRUE')
+    const sync = src('src/domain/sync/service.ts')
+    expect(sync).toContain('if (doc.docNo) await deleteDraft(req, doc.id, reason)')
+    expect(sync).not.toContain("reject('NOT_EDITABLE', `Draft ${doc.docNo} sudah pernah diajukan")
+  })
+
+  it('web: "Hapus draft" in the requester panel through the confirm popup (danger), optional reason, back to the list', () => {
+    const panel = src('src/admin/components/RequesterActions.tsx')
+    expect(panel).toContain('url={`${url}/delete-draft`}')
+    expect(panel).toContain('reasonOptional')
+    expect(src('src/admin/components/WorkflowPanel.tsx')).toContain("'delete_draft'")
+  })
+})
+
+describe('C. web "Absenkan karyawan" for the PM (team-scoped)', () => {
+  it('menu item, endpoints and the web write path admit the PM; the PM part is team-scoped', () => {
+    const items = MODULES.flatMap((m) => m.sections.flatMap((s) => s.items)) as Array<{ view?: string; roles?: readonly string[] }>
+    expect(items.find((i) => i.view === '/absensi/absenkan')?.roles).toEqual(['pk-admin-staff', 'pk-pm'])
+    const ep = src('src/api/v1/endpoints/attendance.ts')
+    expect(ep.split("roles: ['pk-admin-staff', 'pk-pm'],").length - 1).toBe(2)
+    const rec = src('src/domain/attendance/record.ts')
+    expect(rec).toContain("pmAllowed: true, field: 'employee_id'")
+    expect(rec).toContain("actor.source === 'pm' && !(await pmTeam(req, locCompany!)).employees.includes(actor.employee)")
+    const opts = src('src/domain/attendance/on-behalf.ts')
+    expect(opts).toContain('pmOnBehalfCompanies(req, companies)')
+    expect(opts).toContain("(l.kind === 'project' ? team.projects : team.costCenters).includes(l.id)")
   })
 })

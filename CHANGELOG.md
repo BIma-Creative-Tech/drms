@@ -7,13 +7,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 **Client feedback 24/10 (D2410): five streams integrated in one release on top of 0.19.2** (0.19.2 = security dependency
-bumps only, already released). Ten migrations, run in timestamp order: `20261024_100000_d2410_timesheet_hm_optional`,
-`_200000_d2410_site_assignments`, `_210000_d2410_admin_staff_enums`, `_210100_d2410_admin_staff_guard`,
-`_300000_d2410_self_processed_enum`, `_300100_d2410_finance_self_lpj`, `_400000_d2410_loan_enums`,
-`_400100_d2410_loan_schema`, `_400200_d2410_loan_data`, `_400300_d2410_loan_guard`. The latest snapshot
-(`20261024_400100_d2410_loan_schema.json`) carries every schema change of the five streams. API contract version stays
-0.19.2 until the release (additive / relaxed changes only). APK: drift schema 12; new APK needed for Lampiran, HM
-optional, Admin Staff on-behalf, loan transfer orders and the popups (older APKs keep working, see each stream).
+bumps only, already released). Ten stream migrations (+ two follow-ups below), run in timestamp order:
+`20261024_100000_d2410_timesheet_hm_optional`, `_200000_d2410_site_assignments`, `_210000_d2410_admin_staff_enums`,
+`_210100_d2410_admin_staff_guard`, `_300000_d2410_self_processed_enum`, `_300100_d2410_finance_self_lpj`,
+`_400000_d2410_loan_enums`, `_400100_d2410_loan_schema`, `_400200_d2410_loan_data`, `_400300_d2410_loan_guard`. The
+latest snapshot (`20261024_400100_d2410_loan_schema.json`) carries every schema change of the five streams. API contract
+version stays 0.19.2 until the release (additive / relaxed changes only). APK: drift schema 12; new APK needed for
+Lampiran, HM optional, Admin Staff on-behalf, loan transfer orders and the popups (older APKs keep working, see each
+stream).
+
+### Follow-up decisions (user, 2026-10-24)
+
+Two more migrations: `20261024_500000_d2410_site_accounts_fund` (data + functions) and
+`20261024_510000_d2410_delete_draft_invoice` (indexes); no schema snapshot change.
+
+- **Funds without the site exclusion** (every project is mapped to a cash account): `pk_fund_balance` and the inter-PT
+  loan transfer guard count / accept every active account of the PT; the migration clears every legacy
+  `cash_accounts.site_id` (one audit row per account, source `system`, NOTICE; `down()` restores them). Service,
+  inter-PT loan source lists (web + APK) and the fund panel ("akun kas cabang (site lama) … tidak dihitung" removed, web
+  and APK) follow; `excludedSiteAccounts` stays in the API, always 0. ADR 0029 / 0031 amendments, ADR 0032 §4 decided.
+- **"Hapus draft"**: the creator / requester soft-deletes (ADR 0030) a Draft nobody ever decided on — never submitted or
+  withdrawn before any decision — with `POST /expense-requests/{id}/delete-draft` (reason optional, audited
+  `soft_delete`, action `delete_draft`); the number is never reused; the draft leaves every list and no longer blocks
+  its vendor / PT grup invoice number (duplicate checks + partial unique indexes skip deleted rows). Web button in the
+  requester panel (confirm popup, danger), APK button on a server draft; sync `draft_delete` of a numbered draft
+  soft-deletes it (flag `DELETED`) instead of `NOT_EDITABLE`. ADR 0030 amendment.
+- **Web "Absensi → Absenkan karyawan" for the PM**, team-scoped like the APK PM on-behalf: options = employees assigned
+  today to the PM's team projects / cost centers and those team locations; `POST /attendance/on-behalf` records source
+  `pm` and refuses a non-member (403); the Admin Staff stays PT-wide. ADR 0032 open question 3 decided.
+- `npm run check:openapi` prints the first differing line on drift.
 
 ### Timesheet unit
 

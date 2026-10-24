@@ -6191,4 +6191,14 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get accountSignatureRemoveAction => 'Hapus tanda tangan';
+
+  @override
+  String get actionDeleteDraft => 'Hapus draft';
+
+  @override
+  String get deleteDraftServerConfirm =>
+      'Draft dihapus dari daftar dan tidak dapat dikirim lagi; nomor yang sudah terbit tidak dipakai ulang.';
+
+  @override
+  String get deleteDraftDone => 'Draft dihapus.';
 }

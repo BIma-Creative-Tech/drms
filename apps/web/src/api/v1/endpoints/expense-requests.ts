@@ -13,7 +13,7 @@ import { detail, listItem } from '@/domain/expense/dto'
 import { addReceipt, editReceipt, rejectReceipt, removeReceipt, resubmitReceipts, reviewFlag, verifyAllReceipts, verifyReceipt } from '@/domain/expense/receipts'
 import { allowedActions } from '@/domain/expense/state'
 import { recordTransfer, voidTransfer } from '@/domain/expense/transfers'
-import { acknowledge, approve, cancel, complete, reject, submit, withdraw } from '@/domain/expense/workflow'
+import { acknowledge, approve, cancel, complete, DELETE_DRAFT_DEFAULT_REASON, deleteDraft, reject, submit, withdraw } from '@/domain/expense/workflow'
 import { receiptsComplete, requestLpjRevision, reverseSettlement, setLpjPhotos, settle, submitLpj, verifyLpj } from '@/domain/expense/lpj'
 import { requestHistory } from '@/domain/history'
 import { approvalInbox, lpjQueue, officeQueueWhere, transferQueue } from '@/domain/expense/queues'
@@ -37,6 +37,7 @@ import {
   RevisionBody,
   SettleBody,
   ReasonBody,
+  OptionalReasonBody,
   ReceiptCreate,
   ReceiptUpdate,
   RejectBody,
@@ -351,6 +352,12 @@ export const cancelEndpoint = action('cancel', ReasonBody, (req, id, b) => {
   req.context.auditReason = b.reason
   return cancel(req, id, b.reason)
 })
+/** D2410 "Hapus draft": soft delete of an own Draft nobody ever decided on (reason optional, audited `soft_delete`). */
+export const deleteDraftEndpoint = action('delete-draft', OptionalReasonBody, (req, id, b) => {
+  const reason = b.reason?.trim() || DELETE_DRAFT_DEFAULT_REASON
+  req.context.auditReason = reason
+  return deleteDraft(req, id, reason)
+})
 export const resubmitEndpoint = action('resubmit', EmptyBody, (req, id) => resubmitAsDraft(req, id), { status: 201, returnsNewId: true })
 /**
  * POST /expense-requests/{id}/duplicate — DRMS 13/10 Persetujuan #12 "Duplikat": a clean NEW Draft from a request the
@@ -638,6 +645,7 @@ export const EXPENSE_ENDPOINTS = [
   submitEndpoint,
   withdrawEndpoint,
   cancelEndpoint,
+  deleteDraftEndpoint,
   resubmitEndpoint,
   duplicateEndpoint,
   acknowledgeEndpoint,

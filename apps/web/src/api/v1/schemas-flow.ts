@@ -86,6 +86,8 @@ export const ActionEnum = z
     'settle_reverse',
     // ADR 0029: the Owner orders an inter-PT loan for a short request (POST /intercompany-loans)
     'instruct_loan',
+    // D2410 "Hapus draft" (POST /expense-requests/{id}/delete-draft)
+    'delete_draft',
   ])
   .meta({ id: 'RequestAction' })
 
@@ -154,6 +156,9 @@ export const SignBody = z
   .meta({ id: 'SignBody' })
 
 export const ReasonBody = z.object({ reason }).strict().meta({ id: 'ReasonBody' })
+
+/** D2410 "Hapus draft": the reason is optional (default "Draft dihapus oleh pemohon" in the audit row). */
+export const OptionalReasonBody = z.object({ reason: z.string().trim().max(1000).optional() }).strict().meta({ id: 'OptionalReasonBody' })
 
 export const RejectBody = z
   .object({ reason, signatureMediaId: id.nullable().optional() })

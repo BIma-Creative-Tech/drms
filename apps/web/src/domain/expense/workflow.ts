@@ -29,6 +29,7 @@ import {
 } from './common'
 import { fromDocLines, validateContent, vendorOfDoc } from './drafts'
 import { cascadeCancellable } from './state'
+import { softDelete } from '@/domain/soft-delete/service'
 import { payeeOf, STATUS_LABELS } from './types'
 import { designatedAccount } from '@/domain/intercompany/service'
 import { checkFundsForApproval } from '@/domain/fundcheck/service'
@@ -314,6 +315,24 @@ export async function discardDraft(req: PayloadRequest, id: number, reason: stri
   requireAction(await actorContext(req, doc), 'edit')
   if (doc.docNo) fail(409, `Draft ${doc.docNo} sudah pernah diajukan (bernomor) dan tidak dapat dihapus; ubah lalu kirim lagi bila masih diperlukan.`)
   return updateRequest(req, id, { status: 'cancelled', cancelReason: reason }, reason)
+}
+
+/** D2410 "Hapus draft": the audit reason when the requester gives none (the soft-delete CHECK needs ≥ 3 characters). */
+export const DELETE_DRAFT_DEFAULT_REASON = 'Draft dihapus oleh pemohon'
+
+/**
+ * POST …/delete-draft — D2410 (user decision: cancel is Finance-stage only, so the requester / creator may DELETE a draft
+ * nobody ever decided on: never submitted, or withdrawn before any approval decision). The ADR 0030 soft delete
+ * (`isDeleted`, who / when / reason, audit `soft_delete`), reason optional. The number of a withdrawn draft stays on the
+ * deleted row (never reused, ADR 0007); a deleted draft no longer blocks its vendor / PT grup invoice number and
+ * disappears from every list. 403 for anyone but the creator / requesters, 409 for a request in the flow or decided.
+ */
+export async function deleteDraft(req: PayloadRequest, id: number, reasonRaw?: string | null): Promise<RequestDoc> {
+  const doc = await loadVisible(req, id, { lock: true })
+  requireAction(await actorContext(req, doc), 'delete_draft')
+  const reason = (reasonRaw ?? '').trim() || DELETE_DRAFT_DEFAULT_REASON
+  await softDelete(req, 'expense-requests', id, reason) // re-checks owner, draft and "never decided" (any cycle)
+  return loadRaw(req, id)
 }
 
 /**

@@ -46,6 +46,13 @@ try {
       if (current !== content) {
         drift = true
         console.error(`openapi drift: ${path.relative(process.cwd(), file)} is not up to date — run npm run gen:openapi`)
+        // first differing line ± 3 (CI log: the fix is visible without a local run)
+        const a = current.split('\n')
+        const b = content.split('\n')
+        let i = 0
+        while (i < a.length && i < b.length && a[i] === b[i]) i++
+        const from = Math.max(0, i - 3)
+        console.error(`  first difference at line ${i + 1}\n  committed:\n${a.slice(from, i + 4).map((l) => `    ${l}`).join('\n')}\n  generated:\n${b.slice(from, i + 4).map((l) => `    ${l}`).join('\n')}`)
       }
     }
     if (drift) process.exit(1)

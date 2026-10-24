@@ -36,7 +36,7 @@ const badge = (tone: 'ok' | 'warn' | 'bad'): React.CSSProperties => ({
  * "Batalkan pengajuan" is an office action at the Finance stage, in the action bar only (also when the Finance / Direktur
  * user is the requester), so the page never shows it twice.
  */
-const REQUESTER_ACTIONS = ['submit', 'withdraw', 'resubmit', 'add_receipt', 'receipts_resubmit', 'receipts_complete', 'lpj_submit', 'complete'] as const
+const REQUESTER_ACTIONS = ['submit', 'withdraw', 'delete_draft', 'resubmit', 'add_receipt', 'receipts_resubmit', 'receipts_complete', 'lpj_submit', 'complete'] as const
 
 /**
  * ui field at the top of the expense-request edit view (F2c items 3 + 5) = the MAIN COLUMN of the request page

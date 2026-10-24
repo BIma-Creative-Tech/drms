@@ -148,7 +148,7 @@ export const openapiDocument = {
               },
               "attendanceOnBehalf": {
                 "type": "boolean",
-                "description": "ADR 0032: may record check-in / check-out on behalf of an employee — PM (team members at team locations, APK) or Admin Staff (any employee of the PT incl. those without an account; web POST /attendance/on-behalf and APK). The server re-checks."
+                "description": "ADR 0032: may record check-in / check-out on behalf of an employee — PM (team members at team locations, APK and — DRMS 24/10 — web) or Admin Staff (any employee of the PT incl. those without an account; web POST /attendance/on-behalf and APK). The server re-checks."
               },
               "attendanceAdminStaff": {
                 "type": "boolean",
@@ -558,7 +558,7 @@ export const openapiDocument = {
           },
           "attendanceOnBehalf": {
             "type": "boolean",
-            "description": "ADR 0032: may record check-in / check-out on behalf of an employee — PM (team members at team locations, APK) or Admin Staff (any employee of the PT incl. those without an account; web POST /attendance/on-behalf and APK). The server re-checks."
+            "description": "ADR 0032: may record check-in / check-out on behalf of an employee — PM (team members at team locations, APK and — DRMS 24/10 — web) or Admin Staff (any employee of the PT incl. those without an account; web POST /attendance/on-behalf and APK). The server re-checks."
           },
           "attendanceAdminStaff": {
             "type": "boolean",
@@ -3451,7 +3451,8 @@ export const openapiDocument = {
           "lpj_verify",
           "settle",
           "settle_reverse",
-          "instruct_loan"
+          "instruct_loan",
+          "delete_draft"
         ]
       },
       "ExpenseRequestCreate": {
@@ -4070,6 +4071,16 @@ export const openapiDocument = {
         "required": [
           "reason"
         ],
+        "additionalProperties": false
+      },
+      "OptionalReasonBody": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
         "additionalProperties": false
       },
       "EmptyBody": {
@@ -8430,7 +8441,7 @@ export const openapiDocument = {
           }
         },
         "additionalProperties": false,
-        "description": "Soft delete = a never-submitted draft is cancelled (no hard delete). D2410: a draft submitted before (withdrawn, numbered) → rejected NOT_EDITABLE with the server copy."
+        "description": "A never-submitted draft is cancelled (no hard delete). D2410 \"Hapus draft\": a draft submitted before (withdrawn, numbered) and never decided is soft-deleted (ADR 0030, flag DELETED; number never reused); a decided one → rejected."
       },
       "SyncAttendancePayload": {
         "type": "object",
@@ -27337,6 +27348,156 @@ export const openapiDocument = {
         }
       }
     },
+    "/expense-requests/{id}/delete-draft": {
+      "post": {
+        "summary": "D2410 \"Hapus draft\": soft delete (ADR 0030 isDeleted, audit soft_delete) of an own Draft nobody ever decided on — never submitted, or withdrawn before any approval decision; reason optional. The number of a withdrawn draft is never reused; the deleted draft leaves every list and no longer blocks its vendor / PT grup invoice number. Not the creator / a requester → 403; a request in the flow or with a decision → 409",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptionalReasonBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Request after the action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseRequestDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/expense-requests/{id}/resubmit": {
       "post": {
         "summary": "Clone a rejected request into a new Draft (US-06)",
@@ -41265,7 +41426,7 @@ export const openapiDocument = {
     },
     "/attendance/on-behalf/options": {
       "get": {
-        "summary": "ADR 0032: Admin Staff (pk-admin-staff) — per PT of the selection where the caller holds the role: the active employees (own excluded; also those without an account, hasAccount false) and the registered check-in locations with their point. Names, codes and points only. The APK caches it for offline on-behalf items",
+        "summary": "ADR 0032: Admin Staff (pk-admin-staff) — per PT of the selection where the caller holds the role: the active employees (own excluded; also those without an account, hasAccount false) and the registered check-in locations with their point. Names, codes and points only. The APK caches it for offline on-behalf items. DRMS 24/10: a PM (not Admin Staff of the PT) gets its TEAM only — employees assigned today to its team projects / cost centers and those team locations (web Absenkan karyawan)",
         "security": [
           {
             "bearer": []
@@ -41377,7 +41538,7 @@ export const openapiDocument = {
     },
     "/attendance/on-behalf": {
       "post": {
-        "summary": "ADR 0032: Admin Staff check-in / check-out ON BEHALF of an employee of its PT (also without an account) from the web. Photo of the employee first with POST /media/selfies (the caller's camera), GPS = the caller's; the employee's attendance-type rule is evaluated against that fix. Recorded with source admin (\"diabsenkan oleh Admin Staff\"), recorded_by = caller, reason. Gates and codes as /attendance/check-in, plus FORBIDDEN (no Admin Staff of the PT / own employee), COMPANY_MISMATCH (employee of another PT), NO_CHECK_IN, ALREADY_CHECKED_OUT",
+        "summary": "ADR 0032: Admin Staff check-in / check-out ON BEHALF of an employee of its PT (also without an account) from the web. Photo of the employee first with POST /media/selfies (the caller's camera), GPS = the caller's; the employee's attendance-type rule is evaluated against that fix. Recorded with source admin (\"diabsenkan oleh Admin Staff\"), recorded_by = caller, reason. DRMS 24/10: a PM may record too, team-scoped (source pm; the employee assigned today to a team project / cost center, a team location — else FORBIDDEN). Gates and codes as /attendance/check-in, plus FORBIDDEN (no Admin Staff of the PT / own employee), COMPANY_MISMATCH (employee of another PT), NO_CHECK_IN, ALREADY_CHECKED_OUT",
         "security": [
           {
             "bearer": []
@@ -56305,7 +56466,7 @@ export const openapiDocument = {
     },
     "/records/{collection}/{id}/delete": {
       "post": {
-        "summary": "Soft delete (isDeleted = true, reason, audit `soft_delete`): masters / projects nobody references (409 IN_USE / PROJECT_IN_USE + usage), requests only as a never-submitted Draft (409 NOT_A_DRAFT). Whoever may update the row; hard delete stays denied",
+        "summary": "Soft delete (isDeleted = true, reason, audit `soft_delete`): masters / projects nobody references (409 IN_USE / PROJECT_IN_USE + usage), requests only as a Draft nobody ever decided on (never submitted, or withdrawn before any decision — D2410; else 409 NOT_A_DRAFT). Whoever may update the row; hard delete stays denied",
         "security": [
           {
             "bearer": []

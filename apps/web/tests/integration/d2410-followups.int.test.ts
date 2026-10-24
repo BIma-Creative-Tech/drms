@@ -1,16 +1,23 @@
+import { randomUUID } from 'node:crypto'
+
 import { PgDialect } from 'drizzle-orm/pg-core'
 import pg from 'pg'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+
+import { resetRateLimits } from '@/lib/rate-limit'
 
 import { down as siteAccountsDown, up as siteAccountsUp } from '@/migrations/20261024_500000_d2410_site_accounts_fund'
 
 import { sqlAs } from './helpers'
-import { sysCreate } from './flow-world'
+import { api, draftBody, makeWorld, sysCreate, type World } from './flow-world'
 
 /**
  * DRMS 24/10 follow-ups after the five d2410 merges (user decisions), through the real DB:
  * A. funds without the site exclusion — migration 20261024_500000 clears every legacy site flag of a cash account
  *    (audited, NOTICE, idempotent, reversible) and `pk_fund_balance` counts every active account of the PT.
+ * B. "Hapus draft" — the creator / requester soft-deletes an undecided Draft (never submitted or withdrawn before a
+ *    decision): POST /expense-requests/{id}/delete-draft, reason optional, audited, number kept, gone from the lists;
+ *    others 403 / 404, a request in the flow or decided 409.
  * Names and codes are fictional.
  */
 
@@ -72,5 +79,60 @@ describe('A. site-flagged cash accounts count in the funds (migration 20261024_5
     await siteUp() // the state the other files see
     expect(await balance()).toBe(140_000_000)
     expect(((await sqlAs('owner', "SELECT pg_get_functiondef('pk_icl_transfer_guard'::regproc) AS d")).rows[0].d as string).includes('site_id')).toBe(false)
+  })
+})
+
+describe('B. "Hapus draft" (POST /expense-requests/{id}/delete-draft)', () => {
+  const E = '/api/v1/expense-requests'
+  const key = () => ({ 'Idempotency-Key': randomUUID() })
+  let w: World
+  beforeAll(async () => {
+    w = await makeWorld(`fub${Date.now() % 100000}`)
+  })
+  beforeEach(() => resetRateLimits())
+
+  it('a withdrawn (numbered) undecided draft: requester deletes it (reason optional), number kept, gone from lists; others refused', async () => {
+    const c = await api('POST', E, w.users.staffA, draftBody(w))
+    expect(c.status, JSON.stringify(c.body)).toBe(201)
+    const id = c.body.id as number
+    expect(c.body.allowedActions).toContain('delete_draft')
+    const sub = await api('POST', `${E}/${id}/submit`, w.users.staffA, {}, key())
+    expect(sub.status, JSON.stringify(sub.body)).toBe(200)
+    const docNo = sub.body.docNo as string
+    expect(docNo).toBeTruthy()
+    expect(sub.body.allowedActions).not.toContain('delete_draft')
+    expect((await api('POST', `${E}/${id}/delete-draft`, w.users.staffA, {}, key())).status).toBe(409) // in the flow
+    expect((await api('POST', `${E}/${id}/withdraw`, w.users.staffA, { reason: 'perlu revisi' }, key())).status).toBe(200)
+    const d = await api('GET', `${E}/${id}`, w.users.staffA)
+    expect(d.body.allowedActions).toContain('delete_draft')
+    expect((await api('POST', `${E}/${id}/delete-draft`, w.users.staffB, {}, key())).status).toBe(404) // not visible
+    expect((await api('POST', `${E}/${id}/delete-draft`, w.users.finance, {}, key())).status).toBe(403) // reads it, not his
+    const r = await api('POST', `${E}/${id}/delete-draft`, w.users.staffA, { reason: 'tidak jadi dibeli' }, key())
+    expect(r.status, JSON.stringify(r.body)).toBe(200)
+    const row = (await sqlAs('app', 'SELECT status::text AS s, is_deleted AS del, doc_no, delete_reason, deleted_by_id FROM expense_requests WHERE id = $1', [id])).rows[0]
+    expect(row).toEqual({ s: 'draft', del: true, doc_no: docNo, delete_reason: 'tidak jadi dibeli', deleted_by_id: w.users.staffA.id })
+    const audit = (await sqlAs('owner', "SELECT action::text AS action, reason FROM audit_logs WHERE doc_type = 'expense_request' AND doc_id = $1 AND action = 'soft_delete'", [String(id)])).rows
+    expect(audit).toEqual([{ action: 'soft_delete', reason: 'tidak jadi dibeli' }])
+    const mine = await api('GET', `${E}?scope=mine&limit=100`, w.users.staffA)
+    expect(mine.body.items.some((i: { id: number }) => i.id === id)).toBe(false)
+    expect((await api('POST', `${E}/${id}/submit`, w.users.staffA, {}, key())).status).toBe(409)
+    expect((await api('POST', `${E}/${id}/delete-draft`, w.users.staffA, {}, key())).status).toBe(409) // already deleted
+  })
+
+  it('a never-submitted draft without a reason → default reason; a decided request never offers it', async () => {
+    const c = await api('POST', E, w.users.staffA, draftBody(w))
+    const id = c.body.id as number
+    const r = await api('POST', `${E}/${id}/delete-draft`, w.users.staffA, {}, key())
+    expect(r.status, JSON.stringify(r.body)).toBe(200)
+    expect((await sqlAs('app', 'SELECT delete_reason AS r FROM expense_requests WHERE id = $1', [id])).rows[0].r).toBe('Draft dihapus oleh pemohon')
+    // decided (rejected by the Direktur at "Diketahui"): never "Hapus draft", the requester gets 409
+    const c2 = await api('POST', E, w.users.staffA, draftBody(w))
+    const id2 = c2.body.id as number
+    expect((await api('POST', `${E}/${id2}/submit`, w.users.staffA, {}, key())).status).toBe(200)
+    const rj = await api('POST', `${E}/${id2}/reject`, w.users.owner, { reason: 'tidak sesuai RAP' }, key())
+    expect(rj.status, JSON.stringify(rj.body)).toBe(200)
+    const rej = await api('GET', `${E}/${id2}`, w.users.staffA)
+    expect(rej.body.allowedActions).not.toContain('delete_draft')
+    expect((await api('POST', `${E}/${id2}/delete-draft`, w.users.staffA, {}, key())).status).toBe(409)
   })
 })

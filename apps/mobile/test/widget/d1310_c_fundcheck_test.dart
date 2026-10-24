@@ -122,10 +122,7 @@ void main() {
       );
       expect(find.byKey(const Key('fund-check')), findsOneWidget);
       expect(_text(tester, 'fund-title'), 'Ketersediaan dana PT DRMS');
-      expect(
-        _text(tester, 'fund-balance'),
-        'Rp 5.000.000 (2 akun)',
-      );
+      expect(_text(tester, 'fund-balance'), 'Rp 5.000.000 (2 akun)');
       expect(_text(tester, 'fund-commitments'), '− Rp 4.000.000');
       expect(_text(tester, 'fund-available'), 'Rp 1.000.000');
       expect(_text(tester, 'fund-needed'), 'Rp 1.447.500');
@@ -615,7 +612,9 @@ void main() {
       expect(find.byKey(const Key('icloan-queue')), findsNothing);
     });
 
-    testWidgets('form: every active account (no site exclusion), overdraft confirmation, then the KK / KM numbers', (tester) async {
+    testWidgets('form: every active account (no site exclusion), overdraft confirmation, then the KK / KM numbers', (
+      tester,
+    ) async {
       final loans = _FakeLoansApi()..refuse.add(problem409('CASH_OVERDRAFT_CONFIRM_REQUIRED'));
       final finance = _LenderFinanceApi();
       final loan = IcLoan.fromJson(icLoanDetailJson());
