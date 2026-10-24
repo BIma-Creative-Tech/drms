@@ -134,7 +134,7 @@ UAT_WORK=<scratch outside the repo> docs/proyekkas/uat/mc4/local/validate.sh   #
 UAT_PREFIX=pk-mc4uat2 docs/proyekkas/uat/mc4/local/down.sh                    # remove containers + network
 ```
 
-`validate.sh`: postgres 16.15 + Keycloak 26.7.4 + the standalone build of this worktree (node 24.21.0) on a private
+`validate.sh`: postgres 16.15 + Keycloak 26.7.4 + the standalone build of this worktree (node 24.22.1) on a private
 network → `emulate-staging.mjs` (owner step B-1 through Payload REST, DRMS history by the DRMS UAT accounts: requests
 pending_ack / approved / transferred, cash entry, progress report + photo, addendum, attendance with selfie) → fixture
 plan → apply → API (all optional flags on) → UI → cleanup plan → cleanup → apply again (re-activation) → API (default

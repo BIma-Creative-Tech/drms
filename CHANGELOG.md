@@ -6,13 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-**Client feedback 24/10 (D2410): five streams integrated in one release on top of 0.19.2** (0.19.2 = security dependency
-bumps only, already released). Ten stream migrations (+ two follow-ups below), run in timestamp order:
+**Client feedback 24/10 (D2410): five streams integrated in one release on top of 0.19.3** (0.19.2/0.19.3 = security releases,
+already released). Ten stream migrations (+ two follow-ups below), run in timestamp order:
 `20261024_100000_d2410_timesheet_hm_optional`, `_200000_d2410_site_assignments`, `_210000_d2410_admin_staff_enums`,
 `_210100_d2410_admin_staff_guard`, `_300000_d2410_self_processed_enum`, `_300100_d2410_finance_self_lpj`,
 `_400000_d2410_loan_enums`, `_400100_d2410_loan_schema`, `_400200_d2410_loan_data`, `_400300_d2410_loan_guard`. The
 latest snapshot (`20261024_400100_d2410_loan_schema.json`) carries every schema change of the five streams. API contract
-version stays 0.19.2 until the release (additive / relaxed changes only). APK: drift schema 12; new APK needed for
+version stays 0.19.3 until the release (additive / relaxed changes only). APK: drift schema 12; new APK needed for
 Lampiran, HM optional, Admin Staff on-behalf, loan transfer orders and the popups (older APKs keep working, see each
 stream).
 
@@ -216,6 +216,15 @@ fields, endpoints, statuses); `POST /project-loans/:id/disburse` kept. APK: see 
   execution in Antrian Transfer (`LoanExecuteForm`), "Ajukan pengembalian", repayment approve / reject / cancel; APK
   Antrian Transfer "Catat transfer", Admin Staff on-behalf, repayment decisions.
 - No migration. No API change.
+
+## [0.19.3] - 2026-10-24
+
+**Security release: Node.js runtime bump only.** No code change, no migration, APK unchanged (0.11.1).
+
+### Security
+- Node.js 24.21.0 → 24.22.1 (2026-10-20 security release: 5 High — tls ×3, dns, brotli; 2 Medium — http, crypto;
+  1 Low — permission). Base image `node:24.22.1-alpine` pinned by index digest (Alpine 3.24.3); CI `NODE_VERSION`
+  and the integration test env follow (PR #136). Trivy: 0 HIGH/CRITICAL.
 
 ## [0.19.2] - 2026-10-24
 

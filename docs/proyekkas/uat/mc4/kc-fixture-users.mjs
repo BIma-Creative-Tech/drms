@@ -5,7 +5,7 @@
 //   docker run --rm --name pk-mc4uat-kc --memory 256m --network drms-kc-admin-stg \
 //     -v "$SCRATCH:/work:ro" \
 //     -v /opt/infra/identity/keycloak/secrets/drms-staging-proyekkas-admin-api.secret:/run/kc.secret:ro \
-//     -v "$PWD/docs/proyekkas/uat/mc4:/scripts:ro" node:24.21.0-bookworm-slim node /scripts/kc-fixture-users.mjs list uji
+//     -v "$PWD/docs/proyekkas/uat/mc4:/scripts:ro" node:24.22.1-bookworm-slim node /scripts/kc-fixture-users.mjs list uji
 // "ensure" reads the password from $SCRATCH/pw/<email> (file 600, outside git), sets it with temporary=false,
 // clears required actions and maps the realm role pk-user. It never calls execute-actions-email.
 // Usage: node kc-fixture-users.mjs list <search>
