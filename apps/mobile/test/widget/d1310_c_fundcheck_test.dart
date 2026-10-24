@@ -98,7 +98,7 @@ class _FakeLoansApi extends Fake implements IntercompanyLoansApi {
   }
 }
 
-/// The lender's accounts: a head-office bank account and a site petty-cash account (not in the fund pool).
+/// The lender's accounts: a head-office bank account and a legacy site petty-cash account (DRMS 24/10: in the fund pool too).
 class _LenderFinanceApi extends FakeFinanceApi {
   @override
   Future<List<CashAccountOption>> cashAccounts(int? companyId) async => const [
@@ -124,7 +124,7 @@ void main() {
       expect(_text(tester, 'fund-title'), 'Ketersediaan dana PT DRMS');
       expect(
         _text(tester, 'fund-balance'),
-        'Rp 5.000.000 (2 akun, tanpa akun site — 1 akun site Rp 750.000 tidak dihitung)',
+        'Rp 5.000.000 (2 akun)',
       );
       expect(_text(tester, 'fund-commitments'), '− Rp 4.000.000');
       expect(_text(tester, 'fund-available'), 'Rp 1.000.000');
@@ -615,7 +615,7 @@ void main() {
       expect(find.byKey(const Key('icloan-queue')), findsNothing);
     });
 
-    testWidgets('form: head-office accounts only, overdraft confirmation, then the KK / KM numbers', (tester) async {
+    testWidgets('form: every active account (no site exclusion), overdraft confirmation, then the KK / KM numbers', (tester) async {
       final loans = _FakeLoansApi()..refuse.add(problem409('CASH_OVERDRAFT_CONFIRM_REQUIRED'));
       final finance = _LenderFinanceApi();
       final loan = IcLoan.fromJson(icLoanDetailJson());
@@ -642,10 +642,10 @@ void main() {
         'Transfer Rp 500.000 dari PT LAS ke rekening penerimaan antar-PT PT DRMS',
       );
       expect(_text(tester, 'icloan-destination'), 'Rekening tujuan: Mandiri · ••••0123 · PT Contoh Dirgantara');
-      // the site account is not offered
+      // DRMS 24/10: a (legacy) site account is offered too
       await tester.tap(find.byKey(const Key('icloan-cash-account')));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Kas Kecil Site'), findsNothing);
+      expect(find.textContaining('Kas Kecil Site'), findsWidgets);
       expect(find.textContaining('Bank Operasional LAS'), findsWidgets);
       await tester.tap(find.text('Batal').last);
       await tester.pumpAndSettle();

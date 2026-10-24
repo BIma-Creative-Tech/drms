@@ -35,7 +35,7 @@ import 'intercompany_loan_providers.dart';
 
 /// ADR 0029 "Pinjaman antar-PT" on the APK (online only): the Owner's instruction form (opened from the fund panel of
 /// a short request), the loan detail (notifications `icloan.*` deep-link here) and Finance's disbursement form (reusing
-/// the transfer form: source account without site, date + time of the bank proof, bank reference, proof photo, overdraft
+/// the transfer form: source account (any active one), date + time of the bank proof, bank reference, proof photo, overdraft
 /// confirmation). Phase 3 (user 2026-10-19): the repayment by Finance of the borrower (same form + amount) and the voids
 /// of a disbursement / repayment; only "Batalkan perintah" stays on the web.
 
@@ -877,7 +877,7 @@ class IcLoanRepayRoute extends ConsumerWidget {
 
 /// "Catat pencairan" (Finance of the LENDER) or, with [repay], "Catat pengembalian" (Finance of the BORROWER, amount
 /// ≤ sisa, destination = the lender's receiving account): the transfer form without a cost center — source account of the lender
-/// WITHOUT a site (the fund pool), date + time of the bank proof (lender zone), bank reference, proof photo; a
+/// (any active account, the fund pool), date + time of the bank proof (lender zone), bank reference, proof photo; a
 /// confirmable 409 (overdraft, QA-04) asks "Tetap simpan". The amount is the loan amount (server-set).
 class IcLoanDisburseScreen extends ConsumerStatefulWidget {
   const IcLoanDisburseScreen({
@@ -1077,8 +1077,8 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
     final loan = widget.loan;
     final issues = _tried ? _issues() : const <String, String>{};
     final accounts = ref.watch(cashAccountsProvider(_payerId));
-    // ADR 0029 §3.5: only active accounts WITHOUT a site (the PT's fund pool) pay an inter-PT loan
-    final pool = (accounts.value ?? const <CashAccountOption>[]).where((a) => a.active && a.siteId == null).toList();
+    // ADR 0029 §3.5: active accounts (the PT's fund pool; DRMS 24/10: no site exclusion any more) pay an inter-PT loan
+    final pool = (accounts.value ?? const <CashAccountOption>[]).where((a) => a.active).toList();
     if (_cashAccountId == null && pool.isNotEmpty) _cashAccountId = pool.first.id;
     final zone = zoneAbbrev(ref.watch(accountProfileProvider)?.forCompany(_payerId).timezone);
     final destination = widget.destination;

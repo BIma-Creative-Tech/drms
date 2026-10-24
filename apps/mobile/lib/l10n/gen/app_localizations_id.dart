@@ -4010,12 +4010,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String fundAccounts(int count) {
-    return '$count akun, tanpa akun site';
-  }
-
-  @override
-  String fundSiteExcluded(int count, String amount) {
-    return '$count akun site $amount tidak dihitung';
+    return '$count akun';
   }
 
   @override

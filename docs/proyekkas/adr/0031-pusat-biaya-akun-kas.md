@@ -169,3 +169,10 @@ User decisions 2026-10-24; the approval side (PM / Finance file, Direktur → Ow
   `_400100_d2410_loan_schema` (+ .json snapshot), `_400200_d2410_loan_data` (in-flight pending loans → level 1),
   `_400300_d2410_loan_guard` (loan / repayment / approval guards, CHECKs, commitments). Already approved, not disbursed
   cash-backed loans need no data change: they appear in the queue.
+
+## Amendment 2026-10-24 (DRMS 24/10, user decision) — PT figures without the site exclusion
+
+Because every project is mapped to a Pusat Biaya account, the PT figures behind "Seluruh PT" (`pk_fund_balance`, ADR
+0029 §1) count every active account of the PT — accounts once flagged with a site included (migration
+`20261024_500000_d2410_site_accounts_fund` clears the flags, audited). The Pusat Biaya figures (`pk_pb_balance`) never
+excluded them; nothing changes there.

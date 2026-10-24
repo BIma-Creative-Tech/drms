@@ -17,7 +17,7 @@ import { WrapSelect } from '../WrapSelect'
 /**
  * ADR 0029 §3.5 / §3.6: the money form of an inter-PT loan movement — "Cairkan pinjaman" (Finance of the LENDER, amount =
  * the loan amount, fixed) and "Catat pengembalian" (Finance of the BORROWER, amount ≤ outstanding, editable). Source
- * account (the paying PT's accounts WITHOUT a site), date + time of the bank proof, bank reference and the proof upload
+ * account (the paying PT's active accounts; DRMS 24/10: no site exclusion), date + time of the bank proof, bank reference and the proof upload
  * (media-transfer-proofs first, then the action with its id). A 409 CASH_OVERDRAFT_CONFIRM_REQUIRED opens the app
  * dialog; "Tetap simpan" re-sends the same body + `confirmOverdraft` (one Idempotency-Key per body). The server
  * re-checks role, G1, the fund check and both PTs' lock dates.
@@ -150,7 +150,6 @@ export function IcLoanMoneyForm({ url, submitLabel, accounts, amountText, amount
                 </option>
               ))}
             </WrapSelect>
-            <p className="help">Akun kas cabang lama (site) tidak dapat dipakai.</p>
           </div>
           {amount ? (
             <div className="pk-fld">

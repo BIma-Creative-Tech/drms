@@ -2454,7 +2454,7 @@ export const openapiDocument = {
               },
               "balance": {
                 "type": "integer",
-                "description": "Saldo dana: Σ balance of the PT's active accounts WITHOUT a site."
+                "description": "Saldo dana: Σ balance of the PT's active accounts (no site exclusion since DRMS 24/10)."
               },
               "commitments": {
                 "type": "integer",
@@ -2575,7 +2575,7 @@ export const openapiDocument = {
               },
               "accountCount": {
                 "type": "integer",
-                "description": "\"n akun, tanpa akun site\"."
+                "description": "\"n akun\" (every active account)."
               },
               "excludedSiteAccounts": {
                 "type": "object",
@@ -21899,7 +21899,7 @@ export const openapiDocument = {
                 "balance"
               ]
             },
-            "description": "The accounts behind \"Saldo dana\" (active, without a site)."
+            "description": "The accounts behind \"Saldo dana\" (every active account)."
           },
           "excludedSiteAccounts": {
             "type": "object",
@@ -23244,7 +23244,7 @@ export const openapiDocument = {
           "cashAccountId": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Source account of the PAYING PT: active, WITHOUT a site (the pool of the fund check)."
+            "description": "Source account of the PAYING PT: active (the pool of the fund check; no site exclusion since DRMS 24/10)."
           },
           "bankRef": {
             "type": "string",
@@ -23303,7 +23303,7 @@ export const openapiDocument = {
           "cashAccountId": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Source account of the PAYING PT: active, WITHOUT a site (the pool of the fund check)."
+            "description": "Source account of the PAYING PT: active (the pool of the fund check; no site exclusion since DRMS 24/10)."
           },
           "bankRef": {
             "type": "string",
@@ -53694,7 +53694,7 @@ export const openapiDocument = {
     },
     "/fund-availability": {
       "get": {
-        "summary": "ADR 0029 §1 \"Dana tersedia\" of one PT = Σ balance of its ACTIVE accounts WITHOUT a site − commitments (approved-not-transferred requests, unpaid LPJ shortfalls, loans instructed with this PT as lender). Finance / Direktur / Owner of that PT within the selection (else 403 / COMPANY_NOT_ALLOWED)",
+        "summary": "ADR 0029 §1 \"Dana tersedia\" of one PT = Σ balance of its ACTIVE accounts − commitments (approved-not-transferred requests, unpaid LPJ shortfalls, loans instructed with this PT as lender). Finance / Direktur / Owner of that PT within the selection (else 403 / COMPANY_NOT_ALLOWED)",
         "security": [
           {
             "bearer": []
@@ -54599,7 +54599,7 @@ export const openapiDocument = {
     },
     "/intercompany-loans/{id}/disburse": {
       "post": {
-        "summary": "Finance of the LENDER executes the disbursement (never the instruction's creator: 403, G1; DB-checked). Re-check of the lender: \"Dana tersedia\" + this loan's reservation ≥ amount, else 409 code LOAN_LENDER_INSUFFICIENT (the instruction stays, the Owner gets icloan.lender_insufficient). Source account of the lender: active, without site, opening date, lock date (409 \"Periode … sudah ditutup\"), overdraft → 409 CASH_OVERDRAFT_CONFIRM_REQUIRED unless confirmOverdraft. Borrower: designated account (409 INTERCOMPANY_NO_ACCOUNT), its period of the date closed → 409 INTERCOMPANY_PERIOD_CLOSED. Writes KK (source intercompany) in the lender + automatic KM \"Antar PT\" in the borrower, paired in intercompany_links; status disbursed; icloan.disbursed to the Owner and the borrower's Finance + Direktur (the Owner then approves the short requests again — no automatic approval)",
+        "summary": "Finance of the LENDER executes the disbursement (never the instruction's creator: 403, G1; DB-checked). Re-check of the lender: \"Dana tersedia\" + this loan's reservation ≥ amount, else 409 code LOAN_LENDER_INSUFFICIENT (the instruction stays, the Owner gets icloan.lender_insufficient). Source account of the lender: active, opening date, lock date (409 \"Periode … sudah ditutup\"), overdraft → 409 CASH_OVERDRAFT_CONFIRM_REQUIRED unless confirmOverdraft. Borrower: designated account (409 INTERCOMPANY_NO_ACCOUNT), its period of the date closed → 409 INTERCOMPANY_PERIOD_CLOSED. Writes KK (source intercompany) in the lender + automatic KM \"Antar PT\" in the borrower, paired in intercompany_links; status disbursed; icloan.disbursed to the Owner and the borrower's Finance + Direktur (the Owner then approves the short requests again — no automatic approval)",
         "security": [
           {
             "bearer": []

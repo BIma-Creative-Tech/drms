@@ -7126,14 +7126,8 @@ abstract class AppLocalizations {
   /// No description provided for @fundAccounts.
   ///
   /// In id, this message translates to:
-  /// **'{count} akun, tanpa akun site'**
+  /// **'{count} akun'**
   String fundAccounts(int count);
-
-  /// No description provided for @fundSiteExcluded.
-  ///
-  /// In id, this message translates to:
-  /// **'{count} akun site {amount} tidak dihitung'**
-  String fundSiteExcluded(int count, String amount);
 
   /// ADR 0031 amendment: heading of the Pusat Biaya figures in the fund panel (web FundPanel.tsx).
   ///

@@ -684,14 +684,12 @@ async function movementDate(req: PayloadRequest, payer: number, input: Pick<Move
 }
 
 /**
- * Paying side of a movement (§3.5 step 3): an ACTIVE account of the paying PT WITHOUT a site (the pool of §1), the
- * opening date, the paying PT's lock date (409 "Periode … sudah ditutup").
+ * Paying side of a movement (§3.5 step 3): an ACTIVE account of the paying PT (DRMS 24/10: any account — the site
+ * exclusion is gone, every project is mapped to a cash account), the opening date, the paying PT's lock date (409
+ * "Periode … sudah ditutup").
  */
 async function preparePayer(req: PayloadRequest, payer: number, cashAccountId: number, date: string): Promise<void> {
   const account = await assertAccount(req, cashAccountId, payer)
-  if (relId((account as { site?: unknown }).site) !== undefined) {
-    fail(400, 'Akun site (kas kecil / rekening kantor cabang) tidak dipakai untuk pinjaman antar-PT — pilih rekening kantor pusat.', [{ path: 'cashAccountId', message: 'Akun site tidak dapat dipakai.' }])
-  }
   assertOnOrAfterOpening(account, date, 'transferDate')
   const lock = await currentLockDate(req, payer)
   if (lock && date <= lock) fail(409, `Periode ${date.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)

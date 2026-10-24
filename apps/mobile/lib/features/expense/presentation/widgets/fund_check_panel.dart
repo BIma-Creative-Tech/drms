@@ -21,7 +21,7 @@ String icLoanInstructPath(ExpenseDetail d) {
   ).toString();
 }
 
-/// ADR 0029 §2 "Ketersediaan dana PT <code>" (web `FundPanel.tsx`): Saldo dana (n akun, tanpa akun site) − Komitmen
+/// ADR 0029 §2 "Ketersediaan dana PT <code>" (web `FundPanel.tsx`): Saldo dana (n akun, every active account) − Komitmen
 /// (expandable list) = Dana tersedia; Dibutuhkan; Kurang (red) or "Cukup" (green); other requests waiting at the final
 /// step; linked inter-PT loans; the blocked text; "Perintahkan pinjaman antar-PT" ([onInstructLoan], Owner, short).
 /// Read-only before the final step ("cek akhir di persetujuan Owner"). Shown on the request detail and in the decision
@@ -62,9 +62,6 @@ class FundCheckPanel extends StatelessWidget {
         ],
       ),
     );
-    final site = f.excludedSiteCount > 0
-        ? ' — ${t.fundSiteExcluded(f.excludedSiteCount, formatRupiah(f.excludedSiteBalance))}'
-        : '';
     Widget commitmentList(List<FundCommitmentItem> items, String keyPrefix) => Theme(
       data: theme.copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
@@ -150,7 +147,7 @@ class FundCheckPanel extends StatelessWidget {
             row(
               t.fundBalance,
               Text(
-                '${formatRupiah(f.balance)} (${t.fundAccounts(f.accountCount)}$site)',
+                '${formatRupiah(f.balance)} (${t.fundAccounts(f.accountCount)})',
                 key: const Key('fund-balance'),
                 style: money,
               ),

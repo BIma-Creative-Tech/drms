@@ -283,7 +283,7 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
 /**
  * ADR 0029 (owner 2026-10-14): "Cek dana saat persetujuan" per PT, default OFF. On = the final approval of a request
  * (normally the Owner's), the submit of the Owner's own request and the final approval of a rule without an Owner level
- * are refused when the PT's available funds (bank + kas without site accounts − commitments) are short. Switched on per
+ * are refused when the PT's available funds (every active bank / kas account − commitments) are short. Switched on per
  * PT by a group admin only, reason required (audited), after Finance reconciled the cash book with the bank statements.
  * NOT a copied setting (outside COMPANY_SETTING_FIELDS): a new PT starts with the check off.
  */
@@ -295,7 +295,7 @@ export const FUND_CHECK_FIELD: Field = {
   access: { create: ({ req }) => isGroupAdmin(req), update: ({ req }) => isGroupAdmin(req) },
   admin: {
     description:
-      'Aktif = persetujuan terakhir (Owner) dan pengajuan Owner sendiri ditolak bila dana tersedia PT (saldo semua akun kas/bank — kecuali akun kas cabang lama (site) — − pengajuan disetujui belum ditransfer − kekurangan LPJ belum dibayar − perintah pinjaman antar-PT belum dicairkan) kurang. Nyalakan hanya setelah saldo buku kas cocok dengan rekening koran. Hanya Admin grup; alasan wajib.',
+      'Aktif = persetujuan terakhir (Owner) dan pengajuan Owner sendiri ditolak bila dana tersedia PT (saldo semua akun kas/bank aktif − pengajuan disetujui belum ditransfer − kekurangan LPJ belum dibayar − perintah pinjaman antar-PT belum dicairkan) kurang. Nyalakan hanya setelah saldo buku kas cocok dengan rekening koran. Hanya Admin grup; alasan wajib.',
   },
 }
 

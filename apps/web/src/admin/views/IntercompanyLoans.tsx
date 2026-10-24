@@ -232,11 +232,11 @@ export async function IcLoanNew(props: AdminViewServerProps) {
 
 // ================================================================ detail
 
-/** Active accounts WITHOUT a site of PT `company` the caller reads (source of a loan movement). */
+/** Active accounts of PT `company` the caller reads (source of a loan movement; DRMS 24/10: no site exclusion). */
 async function poolAccounts(req: PayloadRequest, company: number): Promise<Array<{ id: number; name: string }>> {
   const res = await req.payload.find({
     collection: 'cash-accounts',
-    where: { and: [{ company: { equals: company } }, { active: { not_equals: false } }, { site: { exists: false } }] },
+    where: { and: [{ company: { equals: company } }, { active: { not_equals: false } }] },
     depth: 0,
     pagination: false,
     sort: 'name',

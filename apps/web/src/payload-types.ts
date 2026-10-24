@@ -395,7 +395,7 @@ export interface Company {
    */
   fieldReportsEnabled?: boolean | null;
   /**
-   * Aktif = persetujuan terakhir (Owner) dan pengajuan Owner sendiri ditolak bila dana tersedia PT (saldo semua akun kas/bank tanpa akun site − pengajuan disetujui belum ditransfer − kekurangan LPJ belum dibayar − perintah pinjaman antar-PT belum dicairkan) kurang. Nyalakan hanya setelah saldo buku kas cocok dengan rekening koran. Hanya Admin grup; alasan wajib.
+   * Aktif = persetujuan terakhir (Owner) dan pengajuan Owner sendiri ditolak bila dana tersedia PT (saldo semua akun kas/bank aktif − pengajuan disetujui belum ditransfer − kekurangan LPJ belum dibayar − perintah pinjaman antar-PT belum dicairkan) kurang. Nyalakan hanya setelah saldo buku kas cocok dengan rekening koran. Hanya Admin grup; alasan wajib.
    */
   fundCheckEnabled?: boolean | null;
   /**

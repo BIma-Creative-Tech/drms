@@ -2847,22 +2847,11 @@
   "fundNotEnabled": "Cek dana PT ini belum aktif (informasi saja).",
   "fundNotFinal": "Cek akhir di persetujuan Owner.",
   "fundBalance": "Saldo dana",
-  "fundAccounts": "{count} akun, tanpa akun site",
+  "fundAccounts": "{count} akun",
   "@fundAccounts": {
     "placeholders": {
       "count": {
         "type": "int"
-      }
-    }
-  },
-  "fundSiteExcluded": "{count} akun site {amount} tidak dihitung",
-  "@fundSiteExcluded": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      },
-      "amount": {
-        "type": "String"
       }
     }
   },

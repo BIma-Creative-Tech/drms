@@ -95,6 +95,14 @@ turn a "dana kurang" refusal into an approval). The fund panel still names the e
 (site lama) … tidak dihitung"). **To decide by the owner:** count those accounts from now on (one data migration that
 clears `cash_accounts.site_id`, audited) or keep them excluded (then the Admin needs a way to clear the flag).
 
+**Decided 2026-10-24 (user):** every project is mapped to a cash account (ADR 0031), so the funds are recomputed
+**without** the site exclusion. Migration `20261024_500000_d2410_site_accounts_fund` clears every
+`cash_accounts.site_id` (one `audit_logs` row per account, source `system`, old → new, RAISE NOTICE; `down()` restores
+the flags from those rows) and patches `pk_fund_balance` (every active account of the PT) and `pk_icl_transfer_guard`
+(paying account = any active account of the paying PT) from their current definitions. The service (`fundAccounts`:
+`excludedSiteAccounts` stays in the contract, always 0), the inter-PT loan source list (web + APK) and the fund panel
+text ("akun kas cabang (site lama) … tidak dihitung", web + APK) follow.
+
 ### 5. Role Admin Staff (D5)
 
 - `ROLES` += `pk-admin-staff`, `ROLE_LABELS` "Admin Staff", `PANEL_ROLES`, role matrix short "AdmS", onboarding / akses
@@ -142,7 +150,10 @@ columns were never dropped.
 
 ## Open questions (owner)
 
-1. Cash accounts already flagged with a site: count them in the fund pool from now on, or keep them excluded (§4)?
+1. ~~Cash accounts already flagged with a site: count them in the fund pool from now on, or keep them excluded (§4)?~~
+   Decided 2026-10-24: counted (§4).
 2. Go-live import workbook: drop the Site sheet / `kode_site` columns (needs the committed template / sample `.xlsx`
    regenerated) — until then the CLI import still writes the hidden legacy columns.
-3. Should the web on-behalf page also be offered to the PM (team-scoped), or stay Admin Staff only (current)?
+3. ~~Should the web on-behalf page also be offered to the PM (team-scoped), or stay Admin Staff only?~~ Decided
+   2026-10-24 (user): the PM gets **Absensi → Absenkan karyawan** too, scoped like the APK PM on-behalf (employees and
+   locations of the PM's team projects); the Admin Staff stays PT-wide.

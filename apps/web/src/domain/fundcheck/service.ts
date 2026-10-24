@@ -241,20 +241,21 @@ export async function waitingAtFinal(req: PayloadRequest, companyId: number, exc
   return r.rows.map((x) => ({ id: Number(x.id), docNo: x.doc_no, title: x.title, needed: n(x.needed) }))
 }
 
-/** Accounts behind "Saldo dana" (active, without site) + the excluded site accounts (count, balance). */
+/**
+ * Accounts behind "Saldo dana": every ACTIVE account of the PT. DRMS 24/10 (user decision): no site exclusion any more
+ * (migration 20261024_500000 cleared the legacy site flags) — `excludedSiteAccounts` stays in the contract, always 0.
+ */
 export async function fundAccounts(req: PayloadRequest, companyId: number): Promise<{ accounts: Array<{ id: number; name: string; kind: string; balance: number }>; excludedSiteAccounts: { count: number; balance: number } }> {
   const tx = await getRequestTx(req)
   const r = (await tx.execute(sql`
-    SELECT a.id, a.name, a.kind::text AS kind, a.site_id,
+    SELECT a.id, a.name, a.kind::text AS kind,
            (coalesce(a.opening_balance, 0) + coalesce((SELECT sum(CASE WHEN e.direction = 'in' THEN e.amount ELSE -e.amount END) FROM cash_entries e WHERE e.cash_account_id = a.id), 0))::text AS balance
       FROM cash_accounts a
      WHERE a.company_id = ${companyId} AND a.active IS NOT FALSE
-     ORDER BY a.name, a.id`)) as unknown as { rows: Array<{ id: number; name: string; kind: string; site_id: number | null; balance: string }> }
-  const pool = r.rows.filter((x) => x.site_id === null)
-  const site = r.rows.filter((x) => x.site_id !== null)
+     ORDER BY a.name, a.id`)) as unknown as { rows: Array<{ id: number; name: string; kind: string; balance: string }> }
   return {
-    accounts: pool.map((x) => ({ id: Number(x.id), name: x.name, kind: x.kind, balance: n(x.balance) })),
-    excludedSiteAccounts: { count: site.length, balance: site.reduce((s, x) => s + n(x.balance), 0) },
+    accounts: r.rows.map((x) => ({ id: Number(x.id), name: x.name, kind: x.kind, balance: n(x.balance) })),
+    excludedSiteAccounts: { count: 0, balance: 0 },
   }
 }
 

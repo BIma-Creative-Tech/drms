@@ -313,7 +313,7 @@ export const FundCheck = z
     status: z.enum(['ok', 'insufficient', 'not_applicable']),
     blocked: z.boolean().meta({ description: 'enabled ∧ applies ∧ insufficient.' }),
     blockedText: z.string().nullable().meta({ description: '"Dana PT tidak cukup — kurang Rp X. Tolak, atau perintahkan pinjaman antar-PT."' }),
-    balance: signedRupiah.meta({ description: 'Saldo dana: Σ balance of the PT\'s active accounts WITHOUT a site.' }),
+    balance: signedRupiah.meta({ description: 'Saldo dana: Σ balance of the PT\'s active accounts (no site exclusion since DRMS 24/10).' }),
     commitments: signedRupiah.meta({ description: 'Komitmen: approved-not-transferred + unpaid LPJ shortfalls + loans instructed with this PT as lender.' }),
     available: signedRupiah.meta({ description: 'Dana tersedia = balance − commitments (may be negative).' }),
     needed: rupiah.meta({ description: 'Dibutuhkan: the request\'s grand total (not yet committed).' }),
@@ -333,7 +333,7 @@ export const FundCheck = z
       })
       .nullable()
       .meta({ description: 'The project\'s Pusat Biaya (cash account) and its figures; null = no project / not mapped (checked per PT only).' }),
-    accountCount: z.number().int().meta({ description: '"n akun, tanpa akun site".' }),
+    accountCount: z.number().int().meta({ description: '"n akun" (every active account).' }),
     excludedSiteAccounts: z.object({ count: z.number().int(), balance: signedRupiah }),
     waitingAtOwner: z.object({ count: z.number().int(), amount: rupiah }).meta({ description: 'Other requests of the PT waiting at their final decision (not committed: first approved, first served).' }),
     commitmentItems: z

@@ -19,7 +19,7 @@ export function registerIcLoanPaths(registry: OpenAPIRegistry, h: Helpers): void
     method: 'get',
     path: '/fund-availability',
     summary:
-      'ADR 0029 §1 "Dana tersedia" of one PT = Σ balance of its ACTIVE accounts WITHOUT a site − commitments (approved-not-transferred requests, unpaid LPJ shortfalls, loans instructed with this PT as lender). Finance / Direktur / Owner of that PT within the selection (else 403 / COMPANY_NOT_ALLOWED)',
+      'ADR 0029 §1 "Dana tersedia" of one PT = Σ balance of its ACTIVE accounts − commitments (approved-not-transferred requests, unpaid LPJ shortfalls, loans instructed with this PT as lender). Finance / Direktur / Owner of that PT within the selection (else 403 / COMPANY_NOT_ALLOWED)',
     security: h.security,
     request: { headers: h.deviceHeader, query: L.FundAvailabilityQuery },
     responses: h.res(200, 'Availability', L.FundAvailability, [400, 401, 403, 426, 429]),
@@ -79,7 +79,7 @@ export function registerIcLoanPaths(registry: OpenAPIRegistry, h: Helpers): void
     method: 'post',
     path: '/intercompany-loans/{id}/disburse',
     summary:
-      'Finance of the LENDER executes the disbursement (never the instruction\'s creator: 403, G1; DB-checked). Re-check of the lender: "Dana tersedia" + this loan\'s reservation ≥ amount, else 409 code LOAN_LENDER_INSUFFICIENT (the instruction stays, the Owner gets icloan.lender_insufficient). Source account of the lender: active, without site, opening date, lock date (409 "Periode … sudah ditutup"), overdraft → 409 CASH_OVERDRAFT_CONFIRM_REQUIRED unless confirmOverdraft. Borrower: designated account (409 INTERCOMPANY_NO_ACCOUNT), its period of the date closed → 409 INTERCOMPANY_PERIOD_CLOSED. Writes KK (source intercompany) in the lender + automatic KM "Antar PT" in the borrower, paired in intercompany_links; status disbursed; icloan.disbursed to the Owner and the borrower\'s Finance + Direktur (the Owner then approves the short requests again — no automatic approval)',
+      'Finance of the LENDER executes the disbursement (never the instruction\'s creator: 403, G1; DB-checked). Re-check of the lender: "Dana tersedia" + this loan\'s reservation ≥ amount, else 409 code LOAN_LENDER_INSUFFICIENT (the instruction stays, the Owner gets icloan.lender_insufficient). Source account of the lender: active, opening date, lock date (409 "Periode … sudah ditutup"), overdraft → 409 CASH_OVERDRAFT_CONFIRM_REQUIRED unless confirmOverdraft. Borrower: designated account (409 INTERCOMPANY_NO_ACCOUNT), its period of the date closed → 409 INTERCOMPANY_PERIOD_CLOSED. Writes KK (source intercompany) in the lender + automatic KM "Antar PT" in the borrower, paired in intercompany_links; status disbursed; icloan.disbursed to the Owner and the borrower\'s Finance + Direktur (the Owner then approves the short requests again — no automatic approval)',
     security: h.security,
     request: { headers: h.idem, params: idParam, body: body(L.IcLoanDisburse) },
     responses: h.res(200, 'Loan', L.IcLoanDetail, write),
