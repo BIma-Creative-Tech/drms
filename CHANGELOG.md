@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.19.2] - 2026-10-24
+
+**Security release: dependency bumps only.** No code change, no migration, APK unchanged (0.11.1).
+
 ### Security
 - Dependency bumps for CRITICAL/HIGH advisories found by `npm audit` / trivy on 2026-10-24 (no code change):
   - `next` + `eslint-config-next` 16.3.8 → 16.4.2 (GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr unauthenticated RCE;
