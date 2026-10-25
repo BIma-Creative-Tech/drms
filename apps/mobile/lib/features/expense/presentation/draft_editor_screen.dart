@@ -1163,12 +1163,10 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                         onTap: () => _editLine(l),
                       ),
                     ),
-                  Container(
+                  PkTile(
                     margin: const EdgeInsets.only(top: 4),
-                    decoration: BoxDecoration(
-                      color: context.pk.infoBg,
-                      borderRadius: BorderRadius.circular(PkRadius.sm),
-                    ),
+                    color: context.pk.infoBg,
+                    borderColor: Colors.transparent,
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                       title: Text(
@@ -1291,14 +1289,9 @@ class _BankAccountPreviewState extends State<BankAccountPreview> {
     final bankName = bank == null ? '' : '${bank.extra['name'] ?? bank.label}';
     final holder = '${x['accountHolder'] ?? ''}';
     final title = [bankName, holder].where((e) => e.isNotEmpty).join(' · ');
-    return Container(
+    return PkTile(
       key: const Key('bank-preview'),
       margin: const EdgeInsets.only(top: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        border: Border.all(color: context.pk.border),
-        borderRadius: BorderRadius.circular(PkRadius.sm),
-      ),
       child: ListTile(
         leading: const PkIconChip(icon: Icons.account_balance, size: 36),
         // Masters cached before the bank fields were read: the picker label.
@@ -1387,14 +1380,9 @@ class IntercompanyAccountPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    return Container(
+    return PkTile(
       key: const Key('ic-account-preview'),
       margin: const EdgeInsets.only(top: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        border: Border.all(color: context.pk.border),
-        borderRadius: BorderRadius.circular(PkRadius.sm),
-      ),
       child: ListTile(
         leading: const PkIconChip(icon: Icons.account_balance, size: 36),
         title: Text(payee.accountTitle.isEmpty ? payee.label : payee.accountTitle, key: const Key('ic-account-title')),

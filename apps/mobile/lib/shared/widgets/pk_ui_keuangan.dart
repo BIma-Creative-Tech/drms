@@ -185,3 +185,37 @@ TextStyle? pkMoneyStyle(BuildContext context, {bool large = false}) {
     fontFeatures: const [FontFeature.tabularFigures()],
   );
 }
+
+/// Soft bordered tile that is itself a [Material] (so a [ListTile] / [ExpansionTile] inside keeps its ink): the
+/// transfer rows, account previews and totals inside a section card.
+class PkTile extends StatelessWidget {
+  const PkTile({
+    super.key,
+    required this.child,
+    this.color,
+    this.borderColor,
+    this.radius = PkRadius.sm,
+    this.margin = EdgeInsets.zero,
+  });
+  final Widget child;
+  final Color? color;
+
+  /// Hairline border colour; [Colors.transparent] for none. Defaults to the theme border.
+  final Color? borderColor;
+  final double radius;
+  final EdgeInsets margin;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: margin,
+    child: Material(
+      color: color ?? Theme.of(context).colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(radius),
+        side: BorderSide(color: borderColor ?? context.pk.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: child,
+    ),
+  );
+}

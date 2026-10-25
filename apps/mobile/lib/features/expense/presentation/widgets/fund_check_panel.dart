@@ -4,6 +4,7 @@ import '../../../../app/theme.dart';
 import '../../../../core/format/rupiah.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../../shared/widgets/pk_ui.dart';
+import '../../../../shared/widgets/pk_ui_keuangan.dart';
 import '../../domain/expense_request.dart';
 import '../../domain/fund_check.dart';
 import '../../domain/request_status.dart';
@@ -99,14 +100,12 @@ class FundCheckPanel extends StatelessWidget {
     final blocked = f.blockedReason;
     final draft = detail.status == RequestStatus.draft;
     // D2510: a bordered card like the other sections (red border while the PT is short).
-    return Container(
+    return PkTile(
       key: const Key('fund-check'),
       margin: compact ? const EdgeInsets.symmetric(vertical: 8) : const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: context.pk.card,
-        borderRadius: BorderRadius.circular(PkRadius.md),
-        border: Border.all(color: short ? context.pk.badText.withValues(alpha: 0.6) : context.pk.border),
-      ),
+      color: context.pk.card,
+      radius: PkRadius.md,
+      borderColor: short ? context.pk.badText.withValues(alpha: 0.6) : context.pk.border,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
         child: Column(

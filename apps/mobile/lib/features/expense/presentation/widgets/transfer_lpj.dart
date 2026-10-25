@@ -41,14 +41,8 @@ class TransferSection extends StatelessWidget {
           if (detail.transfers.isEmpty)
             Text(t.transferNone, style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
           for (final tr in detail.transfers)
-            Container(
+            PkTile(
               margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerLow,
-                border: Border.all(color: context.pk.border),
-                borderRadius: BorderRadius.circular(PkRadius.sm),
-              ),
-              clipBehavior: Clip.antiAlias,
               child: ListTile(
                 key: Key('transfer-${tr.id}'),
                 // d1010 (12b): no transfer screen on the APK — a tap copies the TRF number.
