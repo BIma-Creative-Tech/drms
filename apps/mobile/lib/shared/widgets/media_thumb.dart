@@ -154,11 +154,11 @@ class MediaThumb extends ConsumerWidget {
         ),
       ),
     );
-    AsyncValue<Uint8List> image = ref.watch(mediaImageProvider((photo.path, photo.thumbVariant)));
+    final thumb = ref.watch(mediaImageProvider((photo.path, photo.thumbVariant)));
     // A file without a thumbnail (a PDF proof / attachment: 404 on `variant=thumb`) → the file itself.
-    if (image case AsyncError(error: ProblemException(status: 404)) when photo.thumbVariant) {
-      image = ref.watch(mediaImageProvider((photo.path, false)));
-    }
+    final err = thumb.error;
+    final noThumb = photo.thumbVariant && err is ProblemException && err.status == 404;
+    final image = noThumb ? ref.watch(mediaImageProvider((photo.path, false))) : thumb;
     return switch (image) {
       AsyncData(:final value) when isPdfBytes(value) => tile(
         Tooltip(message: t.mediaOpenFile, child: const Icon(Icons.picture_as_pdf)),
