@@ -305,7 +305,8 @@ void main() {
       const OnboardingScreen(),
       [onbNew],
       (tester) async {
-        await tester.ensureVisible(find.byKey(const Key('onb-save')));
+        // the save button is the last item of the lazy list: jump to the end so it is built
+        await _scroll(tester, 'onb-form', 100000);
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('onb-save')), warnIfMissed: false);
         await tester.pumpAndSettle();

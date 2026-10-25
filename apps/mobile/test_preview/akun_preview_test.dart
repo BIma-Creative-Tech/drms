@@ -182,9 +182,9 @@ final _recordPage = RecordPage.fromJson({
         },
       },
   ],
-  'totalDocs': 23,
+  'totalDocs': 5,
   'page': 1,
-  'totalPages': 3,
+  'totalPages': 1,
 });
 
 final _recordDetail = RecordDetail.fromJson({
@@ -252,6 +252,7 @@ Future<void> _shot(
   Future<void> Function(AppDatabase db)? seed,
   Future<void> Function(WidgetTester tester)? act,
   AppConfig appConfig = const AppConfig(syncAttendance: true),
+  bool online = true,
 }) async {
   // flutter_test paints shadows as solid black outlines unless this is off.
   debugDisableShadows = false;
@@ -282,7 +283,7 @@ Future<void> _shot(
         secureStoreProvider.overrideWithValue(MemorySecureStore()),
         deviceIdentityProvider.overrideWithValue(testDevice()),
         databaseProvider.overrideWithValue(db),
-        connectivityProvider.overrideWith(() => FakeConnectivity(true)),
+        connectivityProvider.overrideWith(() => FakeConnectivity(online)),
         authControllerProvider.overrideWith(() => FakeAuth(auth)),
         appConfigProvider.overrideWith((ref) async => appConfig),
         integrityReportProvider.overrideWith((ref) async => null),
@@ -557,6 +558,8 @@ void main() {
           overrides: s.overrides,
           seed: s.seed,
           act: s.act,
+          // offline: no automatic sync run (its spinner would never settle without a server)
+          online: s.name != 'akun-queue',
         );
       });
     }
