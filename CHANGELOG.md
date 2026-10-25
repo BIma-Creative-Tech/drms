@@ -17,6 +17,10 @@ APK 0.12.0 keeps working. Folded into the next web release section.
   ⌘K), "+ Buat", PT switcher, bell and avatar menu; soft grey page under white cards. `/admin` opens the role
   dashboard (first menu item) instead of the module launcher; module landing pages show their menus as cards.
   Breadcrumb home outside a module = "Beranda".
+  - Dashboard per role (PR-2): Nexus cards / stat tiles (icon chip, muted "Rp", delta soft badge), soft status
+    badges, roomy card tables, metric rows; Finance in the Corporate Finance style (hero "Saldo kas total" with a mini
+    card per cash account, project budget progress, quick actions); role / range tabs as a segmented control. Same
+    data, links and `data-pk-*` hooks.
   - List & form chrome (PR-3): every collection list is one card (module glyph, title, total badge, "Kolom" /
     "+ Buat baru" in the head, filter bar row, Nexus table with soft status badges and ghost row actions, pager and
     page size in the foot; long text still wraps); edit / create views show their fields in white cards under a

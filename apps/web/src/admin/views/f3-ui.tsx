@@ -9,6 +9,8 @@ import { BUDGET_LABELS, type BudgetTone } from '@/domain/reports/rules'
  * Beranda (charts/cards: ./viz.tsx). Colours are the web-starter theme tokens (--pk-*, set per
  * light/dark mode in (payload)/custom.scss from src/theme/tokens.ts); status is never colour alone.
  * All text goes through React escaping. `data-pk-*` attributes are stable UAT selectors.
+ * D2510 (ADR 0033, Nexus look): budget badges are soft badges (tinted pill, *-text token), report tables get the
+ * muted header row and roomy rows of the dashboard tables (viz.tsx); class names unchanged.
  */
 export const F3_STYLE = `
 .pk-f3 { --pk-grid: var(--pk-border); --pk-muted: var(--pk-muted-fg);
@@ -19,13 +21,16 @@ export const F3_STYLE = `
 /* DRMS 15/10 #6: a report with few columns does not spread them over the page — the card hugs its table */
 .pk-f3 .pk-scroll:has(> table.pk-table) { width: fit-content; max-width: 100%; }
 .pk-f3 table.pk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.pk-f3 .pk-table th { text-align: left; border-bottom: 2px solid var(--pk-border); padding: 8px 12px; white-space: nowrap; color: var(--pk-muted-fg); font-weight: 600; }
-.pk-f3 .pk-table td { border-bottom: 1px solid var(--pk-border); padding: 8px 12px; vertical-align: top; }
+.pk-f3 .pk-table th { text-align: left; border-bottom: 1px solid var(--pk-border); padding: 10px 14px; white-space: nowrap; color: var(--pk-muted-fg); background: color-mix(in oklab, var(--pk-muted-bg) 55%, var(--pk-card)); font-size: 12px; font-weight: 600; }
+.pk-f3 .pk-table td { border-bottom: 1px solid var(--pk-border); padding: 10px 14px; vertical-align: top; overflow-wrap: break-word; }
+.pk-f3 .pk-table tbody tr:hover td { background: color-mix(in oklab, var(--pk-primary) 5%, transparent); }
 .pk-f3 .pk-table tbody tr:last-child td { border-bottom: 0; }
 .pk-f3 .pk-table .n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.pk-f3 .pk-table tfoot td { font-weight: 700; border-top: 2px solid var(--pk-border); }
-.pk-f3 .pk-badge { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 8px; font-size: 11px; font-weight: 600; border: 1px solid currentColor; }
-.pk-f3 .pk-badge.ok { color: var(--pk-ok); } .pk-f3 .pk-badge.warn { color: var(--pk-warn); } .pk-f3 .pk-badge.over { color: var(--pk-bad); } .pk-f3 .pk-badge.none { color: var(--pk-none); }
+.pk-f3 .pk-table tfoot td { font-weight: 700; border-top: 1px solid var(--pk-border); }
+/* soft badge (= kit pk-nx-badge): the tone's *-text colour on its own 14% tint; the glyph keeps status off colour alone */
+.pk-f3 .pk-badge { display: inline-flex; align-items: center; gap: 4px; min-height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1.2; white-space: nowrap; background: color-mix(in oklab, currentColor 14%, var(--pk-card)); }
+.pk-f3 .pk-badge > span[aria-hidden] { font-size: 10px; }
+.pk-f3 .pk-badge.ok { color: var(--pk-ok); } .pk-f3 .pk-badge.warn { color: var(--pk-warn); } .pk-f3 .pk-badge.over { color: var(--pk-bad); } .pk-f3 .pk-badge.none { color: var(--pk-muted-fg); }
 .pk-f3 .pk-empty { color: var(--pk-muted); }
 .pk-f3 .pk-note { color: var(--pk-muted); font-size: 12px; margin: 4px 0; }
 .pk-f3 form.pk-filter { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; margin: 0 0 12px; padding: 12px; border: 1px solid var(--pk-border); border-radius: var(--style-radius-l); background: var(--pk-card); }
