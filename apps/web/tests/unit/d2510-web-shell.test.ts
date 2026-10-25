@@ -79,7 +79,7 @@ describe('Nexus kit (SSR)', () => {
     const html = renderToString(
       h('div', null, [
         h(PageHeader, { key: 'h', title: 'Buku kas', sub: 'Per hari ini', icon: 'finance', mod: 'keuangan', actions: h('a', { href: '#' }, 'Ekspor') }),
-        h(Panel, { key: 'p', id: 'acc', title: 'Akun kas', icon: 'finance', note: '(3)', foot: 'kaki', flush: true, 'data-pk-card': 'acc' }, h(SoftBadge, { tone: 'ok' }, 'Aktif')),
+        h(Panel, { key: 'p', id: 'acc', title: 'Akun kas', icon: 'finance', note: '(3)', foot: 'kaki', flush: true, 'data-pk-card': 'acc' }, h(SoftBadge, { tone: 'ok', children: 'Aktif' })),
         h(StatusDot, { key: 's', tone: 'warn', label: 'Tertunda' }),
         h(Progress, { key: 'g', value: 140, label: 'Anggaran terpakai' }),
       ]),
