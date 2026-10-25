@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:proyekkas/app/providers.dart';
 import 'package:proyekkas/core/network/api_client.dart';
 import 'package:proyekkas/core/network/api_exception.dart';
 import 'package:proyekkas/features/auth/application/auth_controller.dart';

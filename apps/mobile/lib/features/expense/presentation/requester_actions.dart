@@ -483,8 +483,8 @@ Future<void> removeServerReceipt(BuildContext context, WidgetRef ref, ExpenseDet
   }
 }
 
-/// D2510: the text prompt of these actions for other screens (Finance LPJ review): "Yakin ingin <aksi>?" with the
-/// summary, a text field ([required] = min. 3 characters; optional text, when given, also min. 3) and "Ya, <aksi>" —
+/// D2510: the text prompt of these actions for other screens (Finance LPJ review): "Yakin ingin …?" with the
+/// summary, a text field ([required] = min. 3 characters; optional text, when given, also min. 3) and "Ya, …" —
 /// it IS the confirmation of the action. Pops the trimmed text, null when cancelled. OK key `prompt-ok`.
 Future<String?> showTextPrompt(
   BuildContext context, {
