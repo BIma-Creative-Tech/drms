@@ -154,7 +154,7 @@ class MediaThumb extends ConsumerWidget {
         ),
       ),
     );
-    var image = ref.watch(mediaImageProvider((photo.path, photo.thumbVariant)));
+    AsyncValue<Uint8List> image = ref.watch(mediaImageProvider((photo.path, photo.thumbVariant)));
     // A file without a thumbnail (a PDF proof / attachment: 404 on `variant=thumb`) → the file itself.
     if (image case AsyncError(error: ProblemException(status: 404)) when photo.thumbVariant) {
       image = ref.watch(mediaImageProvider((photo.path, false)));
