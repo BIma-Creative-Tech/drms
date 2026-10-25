@@ -6,8 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-**APK 0.13.0 (tag `mobile-v0.13.0`, PR #140), APK-only release:** server stays 0.20.0, no migration, no API change;
-APK 0.12.0 keeps working. Folded into the next web release section.
+## [0.21.0] - 2026-10-25
+
+**Web admin in the Nexus layout (D2510, ADR 0033) + APK 0.13.0 restyle (tag `mobile-v0.13.0`, PR #140, already
+published).** Presentation only: no migration, no API change, no token change; APK 0.12.0 / 0.13.0 keep working.
+Rollback = image 0.20.0.
 
 ### Changed
 
