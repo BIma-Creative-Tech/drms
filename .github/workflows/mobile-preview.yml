@@ -1,0 +1,64 @@
+# Visual preview of the Android app WITHOUT a device (D2510 APK UI restyle): runs the screenshot tests in
+# apps/mobile/test_preview/ (390×844 logical px, light + dark, bundled fonts) and uploads the PNGs as the
+# artifact `mobile-preview-shots`. Not a gate: the screens are checked by eye.
+#
+# Runs on pushes to the restyle branches (a workflow_dispatch workflow is only dispatchable once it is on the
+# default branch) and by hand afterwards. Same Flutter pin as mobile.yml.
+name: mobile-preview
+
+on:
+  push:
+    branches: ["feat/d2510-apk-ui-**"]
+    paths: ["apps/mobile/**", ".github/workflows/mobile-preview.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.47.5
+  FLUTTER_SHA256: 2132e990f236f8d22e7c6314b29a191a95b10d7cbcfec9b4e2e303d996652cbb
+
+defaults:
+  run:
+    working-directory: apps/mobile
+
+jobs:
+  shots:
+    name: preview screenshots
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Flutter ${{ env.FLUTTER_VERSION }} (official tarball, sha256-verified)
+        env:
+          RUNNER_ENV: ${{ runner.environment }}
+        run: tool/ci_install_flutter.sh
+      - uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        if: runner.environment == 'github-hosted'
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('apps/mobile/pubspec.lock') }}
+      - run: flutter config --no-analytics && flutter pub get --enforce-lockfile
+      # Every file on its own so one broken preview does not hide the others' screenshots.
+      - name: Screenshot tests
+        run: |
+          status=0
+          for f in test_preview/*_test.dart; do
+            echo "::group::$f"
+            flutter test "$f" --dart-define=PK_SHOTS_DIR="$PWD/build/preview-shots" || { status=1; echo "::warning::$f failed"; }
+            echo "::endgroup::"
+          done
+          ls build/preview-shots | tee -a "$GITHUB_STEP_SUMMARY"
+          exit $status
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        continue-on-error: true
+        with:
+          name: mobile-preview-shots
+          path: apps/mobile/build/preview-shots/
+          retention-days: 3 # Free plan: 500 MB Actions storage
