@@ -11,6 +11,8 @@ import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/user_profile.dart';
 import '../application/attendance_providers.dart';
 import '../domain/attendance_recap.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_lapangan.dart';
 import 'attendance_widgets.dart' show flagsText, siteKindIcon;
 
 /// Visual of a day status: colour + icon + short text (never colour alone).
@@ -26,6 +28,14 @@ import 'attendance_widgets.dart' show flagsText, siteKindIcon;
   DayStatus.tidakHadir => (color: pk.badText, icon: Icons.cancel, label: t.recapStatusAbsent),
   DayStatus.libur => (color: scheme.outline, icon: Icons.beach_access, label: t.recapStatusHoliday),
   DayStatus.tanpaJadwal => (color: scheme.outlineVariant, icon: Icons.remove, label: t.recapStatusNoSchedule),
+};
+
+/// Soft fill of a day status (calendar cells, day sheet pill).
+PkTone dayStatusTone(DayStatus s) => switch (s) {
+  DayStatus.selesai => PkTone.ok,
+  DayStatus.hadir => PkTone.info,
+  DayStatus.tidakHadir => PkTone.bad,
+  DayStatus.belumAbsen || DayStatus.libur || DayStatus.tanpaJadwal => PkTone.neutral,
 };
 
 /// US-09 monthly recap: month switcher, totals and a Monday-first calendar grid. [employeeId] null =
@@ -51,31 +61,34 @@ class _RecapViewState extends ConsumerState<RecapView> {
     return RefreshIndicator(
       onRefresh: () async => ref.invalidate(attendanceRecapProvider(key)),
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
-          Row(
-            children: [
-              IconButton.filledTonal(
-                key: const Key('recap-prev'),
-                tooltip: t.recapPrevMonth,
-                onPressed: () => setState(() => _month = shiftMonth(_month, -1)),
-                icon: const Icon(Icons.chevron_left),
-              ),
-              Expanded(
-                child: Text(
-                  periodLong(_month),
-                  key: const Key('recap-month'),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium,
+          PkCard(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              children: [
+                IconButton.filledTonal(
+                  key: const Key('recap-prev'),
+                  tooltip: t.recapPrevMonth,
+                  onPressed: () => setState(() => _month = shiftMonth(_month, -1)),
+                  icon: const Icon(Icons.chevron_left),
                 ),
-              ),
-              IconButton.filledTonal(
-                key: const Key('recap-next'),
-                tooltip: t.recapNextMonth,
-                onPressed: isCurrent ? null : () => setState(() => _month = shiftMonth(_month, 1)),
-                icon: const Icon(Icons.chevron_right),
-              ),
-            ],
+                Expanded(
+                  child: Text(
+                    periodLong(_month),
+                    key: const Key('recap-month'),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                IconButton.filledTonal(
+                  key: const Key('recap-next'),
+                  tooltip: t.recapNextMonth,
+                  onPressed: isCurrent ? null : () => setState(() => _month = shiftMonth(_month, 1)),
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ),
           ),
           if (widget.employeeId == null) const _OwnRecapCompanyPicker(),
           const SizedBox(height: 12),
@@ -88,19 +101,48 @@ class _RecapViewState extends ConsumerState<RecapView> {
                 if (widget.employeeId != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(r.employee.name, style: Theme.of(context).textTheme.titleMedium),
+                    child: Row(
+                      children: [
+                        PkAvatar(name: r.employee.name, size: 40),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            r.employee.name,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 if (r.scheduleStart != null)
-                  Text(
-                    t.recapSchedule(r.scheduleName ?? '-', r.scheduleStart!, r.scheduleEnd ?? '-', r.toleranceMin),
-                    style: Theme.of(context).textTheme.bodySmall,
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: PkMetaLine(
+                      icon: Icons.schedule,
+                      text: t.recapSchedule(
+                        r.scheduleName ?? '-',
+                        r.scheduleStart!,
+                        r.scheduleEnd ?? '-',
+                        r.toleranceMin,
+                      ),
+                    ),
                   ),
                 const SizedBox(height: 8),
                 _SummaryGrid(s: r.summary),
-                const SizedBox(height: 16),
-                RecapCalendar(recap: r),
-                const SizedBox(height: 8),
-                const _Legend(),
+                const SizedBox(height: 6),
+                PkCard(
+                  padding: const EdgeInsets.fromLTRB(10, 14, 10, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      RecapCalendar(recap: r),
+                      const SizedBox(height: 10),
+                      const Divider(height: 1),
+                      const SizedBox(height: 10),
+                      const _Legend(),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -117,60 +159,85 @@ class _SummaryGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final tiles = <(IconData, String, String, String?)>[
-      (Icons.event_available, t.recapPresent, '${s.presentDays}/${s.workingDays}', t.recapWorkingDays),
-      (Icons.timer, t.recapWorkHours, hoursMinutes(s.workMinutes), null),
-      (Icons.alarm, t.recapLate, t.recapDays(s.lateDays), s.lateMinutes > 0 ? t.recapMinutes(s.lateMinutes) : null),
+    final tiles = <(IconData, PkTone, String, String, String?)>[
+      (Icons.event_available, PkTone.ok, t.recapPresent, '${s.presentDays}/${s.workingDays}', t.recapWorkingDays),
+      (Icons.timer, PkTone.info, t.recapWorkHours, hoursMinutes(s.workMinutes), null),
+      (
+        Icons.alarm,
+        PkTone.warn,
+        t.recapLate,
+        t.recapDays(s.lateDays),
+        s.lateMinutes > 0 ? t.recapMinutes(s.lateMinutes) : null,
+      ),
       (
         Icons.directions_walk,
+        PkTone.warn,
         t.recapEarlyLeave,
         t.recapDays(s.earlyLeaveDays),
         s.earlyLeaveMinutes > 0 ? t.recapMinutes(s.earlyLeaveMinutes) : null,
       ),
-      (Icons.event_busy, t.recapAbsent, t.recapDays(s.absentDays), null),
-      (Icons.pending_actions, t.recapIncomplete, t.recapDays(s.incompleteDays), null),
+      (Icons.event_busy, PkTone.bad, t.recapAbsent, t.recapDays(s.absentDays), null),
+      (Icons.pending_actions, PkTone.neutral, t.recapIncomplete, t.recapDays(s.incompleteDays), null),
     ];
     return LayoutBuilder(
       builder: (context, c) {
         final cols = c.maxWidth >= 520 ? 3 : 2;
-        final w = (c.maxWidth - (cols - 1) * 8) / cols;
+        final w = (c.maxWidth - (cols - 1) * 10) / cols;
         return Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: 10,
+          runSpacing: 10,
           children: [
-            for (final (icon, label, value, sub) in tiles)
+            for (final (icon, tone, label, value, sub) in tiles)
               SizedBox(
                 width: w,
-                child: Card(
-                  elevation: 0,
-                  margin: EdgeInsets.zero,
-                  color: Theme.of(context).colorScheme.surfaceContainerLow,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
-                            const SizedBox(width: 6),
-                            Expanded(child: Text(label, style: Theme.of(context).textTheme.labelMedium)),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          value,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        if (sub != null) Text(sub, style: Theme.of(context).textTheme.bodySmall),
-                      ],
-                    ),
-                  ),
-                ),
+                child: _RecapTile(icon: icon, tone: tone, label: label, value: value, sub: sub),
               ),
           ],
         );
       },
+    );
+  }
+}
+
+/// Compact KPI tile of the month: tone chip, label, bold value, supporting line.
+class _RecapTile extends StatelessWidget {
+  const _RecapTile({required this.icon, required this.tone, required this.label, required this.value, this.sub});
+  final IconData icon;
+  final PkTone tone;
+  final String label;
+  final String value;
+  final String? sub;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    return PkCard(
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PkIconChip(icon: icon, tone: tone, size: 34),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: theme.textTheme.labelMedium?.copyWith(color: muted)),
+                Text(
+                  value,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontFamily: PkFonts.heading,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+                if (sub != null) Text(sub!, style: theme.textTheme.labelSmall?.copyWith(color: muted)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -196,7 +263,14 @@ class RecapCalendar extends StatelessWidget {
           children: [
             for (final w in weekdays)
               Expanded(
-                child: Text(w, textAlign: TextAlign.center, style: theme.textTheme.labelSmall),
+                child: Text(
+                  w,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
           ],
         ),
@@ -242,6 +316,9 @@ class _DayCell extends StatelessWidget {
       );
     }
     final v = dayStatusVisual(d.status, t, theme.colorScheme, context.pk);
+    final tone = dayStatusTone(d.status);
+    final c = pkToneColors(context, tone);
+    final iconColor = tone == PkTone.neutral ? v.color : c.fg;
     final marks = d.lateMinutes > 0 || d.onBehalf || d.corrected;
     return Padding(
       padding: const EdgeInsets.all(2),
@@ -250,11 +327,11 @@ class _DayCell extends StatelessWidget {
         label: '${formatDateOnly(d.date)}: ${v.label}${d.checkInLocal == null ? '' : ', ${d.checkInLocal}'}',
         excludeSemantics: true,
         child: Material(
-          color: v.color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(10),
+          color: c.bg,
+          borderRadius: BorderRadius.circular(PkRadius.sm + 2),
           child: InkWell(
             key: Key('recap-day-${d.date}'),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(PkRadius.sm + 2),
             onTap: () => showModalBottomSheet<void>(
               context: context,
               showDragHandle: true,
@@ -266,16 +343,27 @@ class _DayCell extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('$dayNo', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                    '$dayNo',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: tone == PkTone.neutral ? null : c.fg,
+                    ),
+                  ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(v.icon, size: 14, color: v.color),
+                      Icon(v.icon, size: 14, color: iconColor),
                       if (marks) Icon(Icons.circle, size: 5, color: context.pk.warnText),
                     ],
                   ),
                   if (d.checkInLocal != null)
-                    FittedBox(child: Text(d.checkInLocal!, style: theme.textTheme.labelSmall)),
+                    FittedBox(
+                      child: Text(
+                        d.checkInLocal!,
+                        style: theme.textTheme.labelSmall?.copyWith(color: tone == PkTone.neutral ? null : c.fg),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -335,45 +423,72 @@ class DayDetailSheet extends StatelessWidget {
     final theme = Theme.of(context);
     final d = day;
     final v = dayStatusVisual(d.status, t, theme.colorScheme, context.pk);
+    final muted = theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant);
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(formatDateOnly(d.date), style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(v.icon, color: v.color, size: 18),
-                const SizedBox(width: 6),
-                Text(v.label),
-                if (d.holidayName != null) Text(' · ${d.holidayName}'),
-              ],
+            Text(
+              formatDateOnly(d.date),
+              style: theme.textTheme.titleLarge?.copyWith(fontFamily: PkFonts.heading, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                PkPill(label: v.label, tone: dayStatusTone(d.status), icon: v.icon),
+                if (d.holidayName != null) Text('· ${d.holidayName}', style: muted),
+              ],
+            ),
+            const SizedBox(height: 12),
             if (d.checkInLocal != null || d.checkOutLocal != null)
-              Text(t.recapInOut(d.checkInLocal ?? '—', d.checkOutLocal ?? '—')),
-            if (d.workMinutes != null) Text(t.recapWorked(hoursMinutes(d.workMinutes!))),
+              Text(
+                t.recapInOut(d.checkInLocal ?? '—', d.checkOutLocal ?? '—'),
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            if (d.workMinutes != null) Text(t.recapWorked(hoursMinutes(d.workMinutes!)), style: muted),
+            if (d.lateMinutes > 0 || d.earlyLeaveMinutes > 0 || d.onBehalf || d.corrected) const SizedBox(height: 6),
             if (d.lateMinutes > 0) Text(t.recapLateBy(d.lateMinutes), style: TextStyle(color: context.pk.warnText)),
             if (d.earlyLeaveMinutes > 0)
               Text(t.recapEarlyBy(d.earlyLeaveMinutes), style: TextStyle(color: context.pk.warnText)),
             if (d.onBehalf) Text(t.recapOnBehalf(d.onBehalfBy.join(', '))),
             if (d.corrected) Text(t.recapCorrected),
             if (d.flags.isNotEmpty) Text(t.recapFlags(flagsText(t, d.flags)), style: theme.textTheme.bodySmall),
+            if (d.locations.isNotEmpty) const SizedBox(height: 12),
             for (final l in d.locations)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(l.outsideArea ? Icons.explore : siteKindIcon(l.location.kind)),
-                title: Text(l.outsideArea ? '${t.attendanceOutsideArea} (ref. ${l.location.label})' : l.location.label),
-                subtitle: Text(
-                  '${t.attendanceCheckIn}: ${localHm(l.checkIn?.time, zone)} · ${t.attendanceCheckOut}: ${localHm(l.checkOut?.time, zone)}',
-                ),
-                // d1010 (12c): check-in / check-out selfies of this location in the shared viewer.
-                trailing: l.checkIn == null && l.checkOut == null
-                    ? null
-                    : IconButton(
+              PkCard(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+                child: Row(
+                  children: [
+                    PkIconChip(
+                      icon: l.outsideArea ? Icons.explore : siteKindIcon(l.location.kind),
+                      tone: l.outsideArea ? PkTone.warn : PkTone.info,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l.outsideArea ? '${t.attendanceOutsideArea} (ref. ${l.location.label})' : l.location.label,
+                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          Text(
+                            '${t.attendanceCheckIn}: ${localHm(l.checkIn?.time, zone)} · ${t.attendanceCheckOut}: ${localHm(l.checkOut?.time, zone)}',
+                            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // d1010 (12c): check-in / check-out selfies of this location in the shared viewer.
+                    if (l.checkIn != null || l.checkOut != null)
+                      IconButton(
                         key: Key('selfie-${l.location.kind.name}-${l.location.id}'),
                         tooltip: t.attendanceSelfieView,
                         icon: const Icon(Icons.photo_outlined),
@@ -389,6 +504,8 @@ class DayDetailSheet extends StatelessWidget {
                               ),
                         ]),
                       ),
+                  ],
+                ),
               ),
           ],
         ),
