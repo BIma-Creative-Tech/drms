@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**APK 0.13.0 (tag `mobile-v0.13.0`, PR #140), APK-only release:** server stays 0.20.0, no migration, no API change;
+APK 0.12.0 keeps working. Folded into the next web release section.
+
 ### Changed
 
 - **APK restyle after the Banani reference "Project Monitoring Hub" (D2510, user 2026-10-25), web palette kept** (ADR
