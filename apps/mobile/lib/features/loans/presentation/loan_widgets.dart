@@ -2,38 +2,49 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../app/theme.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_proyek.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/user_profile.dart';
 import '../../companies/presentation/company_chip.dart';
 import '../domain/loan.dart';
 import 'loan_providers.dart';
 
-/// Status chip: icon + the server's label (never colour alone).
+/// Soft tone of a loan status: Draft neutral, waiting warn, approved awaiting Finance info, approved / repaid ok,
+/// rejected / cancelled bad.
+PkTone loanStatusTone(Loan loan) => switch (loan.status) {
+  LoanStatus.draft => PkTone.neutral,
+  LoanStatus.pendingApproval => PkTone.warn,
+  LoanStatus.approved when loan.awaitingDisbursement => PkTone.info,
+  LoanStatus.approved || LoanStatus.partiallyRepaid || LoanStatus.repaid => PkTone.ok,
+  LoanStatus.rejected || LoanStatus.cancelled => PkTone.bad,
+};
+
+/// Status pill: icon + the server's label (never colour alone).
 class LoanStatusChip extends StatelessWidget {
   const LoanStatusChip({super.key, required this.loan});
   final Loan loan;
 
   @override
   Widget build(BuildContext context) {
-    final (IconData icon, Color? color) = switch (loan.status) {
-      LoanStatus.draft => (Icons.edit_note, null),
-      LoanStatus.pendingApproval => (Icons.hourglass_top, context.pk.warnText),
+    final icon = switch (loan.status) {
+      LoanStatus.draft => Icons.edit_note,
+      LoanStatus.pendingApproval => Icons.hourglass_top,
       // ADR 0031: "Disetujui – menunggu pencairan" (Finance has not disbursed the cash-backed loan yet)
-      LoanStatus.approved when loan.awaitingDisbursement => (Icons.hourglass_top, context.pk.warnText),
-      LoanStatus.approved || LoanStatus.partiallyRepaid => (Icons.check_circle_outline, context.pk.okText),
-      LoanStatus.repaid => (Icons.check_circle, context.pk.okText),
-      LoanStatus.rejected => (Icons.cancel, context.pk.badText),
-      LoanStatus.cancelled => (Icons.block, null),
+      LoanStatus.approved when loan.awaitingDisbursement => Icons.hourglass_top,
+      LoanStatus.approved || LoanStatus.partiallyRepaid => Icons.check_circle_outline,
+      LoanStatus.repaid => Icons.check_circle,
+      LoanStatus.rejected => Icons.cancel,
+      LoanStatus.cancelled => Icons.block,
     };
-    return Chip(
+    return PkPill(
       key: Key('loan-status-${loan.id}'),
-      avatar: Icon(icon, size: 18, color: color),
-      label: Text(loan.statusLabel.isEmpty ? loan.status.code : loan.statusLabel, overflow: TextOverflow.ellipsis),
-      visualDensity: VisualDensity.compact,
+      icon: icon,
+      tone: loanStatusTone(loan),
+      label: loan.statusLabel.isEmpty ? loan.status.code : loan.statusLabel,
     );
   }
 }
@@ -46,16 +57,17 @@ class LoanOverdueChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return Chip(
+    return PkPill(
       key: Key('loan-overdue-${loan.id}'),
-      avatar: Icon(Icons.warning_amber, size: 18, color: context.pk.warnText),
-      label: Text(t.loanOverdueDays(loan.daysOverdue), style: TextStyle(color: context.pk.warnText)),
-      visualDensity: VisualDensity.compact,
+      icon: Icons.warning_amber_rounded,
+      tone: PkTone.bad,
+      label: t.loanOverdueDays(loan.daysOverdue),
     );
   }
 }
 
-/// One loan in a list. With [projectId] (project tab) a chip says whether that project borrows or lends.
+/// One loan in a list (icon chip, title + amount, lender → borrower, pills, kind · due · sisa). With [projectId]
+/// (project tab) a pill says whether that project borrows or lends.
 class LoanCard extends StatelessWidget {
   const LoanCard({super.key, required this.loan, this.projectId});
   final Loan loan;
@@ -64,69 +76,75 @@ class LoanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     final l = loan;
     final pid = projectId;
-    final money = theme.textTheme.titleMedium?.copyWith(
-      fontWeight: FontWeight.w700,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
-    return Card(
+    final borrows = pid != null && l.borrowedBy(pid);
+    return PkCard(
       key: Key('loan-${l.id}'),
       margin: const EdgeInsets.only(bottom: 10),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.push('/loans/${l.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CompanyChipLead(companyId: l.companyId),
-                  Expanded(
-                    child: Text(l.title, style: theme.textTheme.labelLarge, overflow: TextOverflow.ellipsis),
-                  ),
-                  Text(formatRupiah(l.amount), style: money),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                t.loanFlow(l.lenderLabel, l.borrower.label),
-                key: Key('loan-flow-${l.id}'),
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (pid != null)
-                    Chip(
-                      key: Key('loan-role-${l.id}'),
-                      avatar: Icon(l.borrowedBy(pid) ? Icons.call_received : Icons.call_made, size: 18),
-                      label: Text(l.borrowedBy(pid) ? t.loanRoleBorrower : t.loanRoleLender),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  LoanStatusChip(loan: l),
-                  if (l.overdue) LoanOverdueChip(loan: l),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                [
-                  l.kindLabel,
-                  t.loanDueOn(formatDateOnly(l.dueDate)),
-                  if (l.status == LoanStatus.approved || l.status == LoanStatus.partiallyRepaid)
-                    t.loanOutstandingOf(formatRupiah(l.outstanding)),
-                ].where((e) => e.isNotEmpty).join(' · '),
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
+      padding: const EdgeInsets.all(14),
+      onTap: () => context.push('/loans/${l.id}'),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PkIconChip(
+            icon: pid == null ? Icons.swap_horiz : (borrows ? Icons.call_received : Icons.call_made),
+            tone: l.overdue ? PkTone.bad : PkTone.info,
+            size: 38,
           ),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CompanyChipLead(companyId: l.companyId),
+                    Expanded(
+                      child: Text(l.title, style: pkTitleStyle(context), overflow: TextOverflow.ellipsis),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(formatRupiah(l.amount), style: pkMoneyStyle(context)),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  t.loanFlow(l.lenderLabel, l.borrower.label),
+                  key: Key('loan-flow-${l.id}'),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (pid != null)
+                      PkPill(
+                        key: Key('loan-role-${l.id}'),
+                        icon: borrows ? Icons.call_received : Icons.call_made,
+                        tone: PkTone.primary,
+                        label: borrows ? t.loanRoleBorrower : t.loanRoleLender,
+                      ),
+                    LoanStatusChip(loan: l),
+                    if (l.overdue) LoanOverdueChip(loan: l),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  [
+                    l.kindLabel,
+                    t.loanDueOn(formatDateOnly(l.dueDate)),
+                    if (l.status == LoanStatus.approved || l.status == LoanStatus.partiallyRepaid)
+                      t.loanOutstandingOf(formatRupiah(l.outstanding)),
+                  ].where((e) => e.isNotEmpty).join(' · '),
+                  style: pkMetaStyle(context),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -154,25 +172,25 @@ class LoanInboxSection extends ConsumerWidget {
         key: const Key('loan-inbox'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-            child: Text(
-              inbox.count == 0 ? t.loanTitle : t.loanInboxTitle(inbox.count),
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+          PkSectionHeader(
+            title: inbox.count == 0 ? t.loanTitle : t.loanInboxTitle(inbox.count),
+            padding: const EdgeInsets.only(bottom: 10),
           ),
           if (inbox.count == 0)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
-              child: Text(
-                t.loanInboxEmpty,
-                key: const Key('loan-inbox-empty'),
-                style: Theme.of(context).textTheme.bodySmall,
+            PkCard(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  const PkIconChip(icon: Icons.swap_horiz, tone: PkTone.ok, size: 34, round: true),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(t.loanInboxEmpty, key: const Key('loan-inbox-empty'), style: pkMetaStyle(context)),
+                  ),
+                ],
               ),
             ),
           for (final l in inbox.loans) LoanCard(loan: l),
           for (final r in inbox.repayments) LoanRepaymentInboxCard(item: r),
-          const Divider(height: 16),
         ],
       ),
     );
@@ -190,60 +208,57 @@ class LoanRepaymentInboxCard extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final r = item;
-    return Card(
+    return PkCard(
       key: Key('loan-repayment-inbox-${r.id}'),
       margin: const EdgeInsets.only(bottom: 10),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.push('/loans/${r.loanId}'),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CompanyChipLead(companyId: r.companyId),
-                  Expanded(
-                    child: Text(
-                      t.loanRepaymentInboxTitle(r.loanDocNo ?? '#${r.loanId}'),
-                      style: theme.textTheme.labelLarge,
-                      overflow: TextOverflow.ellipsis,
+      padding: const EdgeInsets.all(14),
+      onTap: () => context.push('/loans/${r.loanId}'),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const PkIconChip(icon: Icons.keyboard_return, tone: PkTone.warn, size: 38),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CompanyChipLead(companyId: r.companyId),
+                    Expanded(
+                      child: Text(
+                        t.loanRepaymentInboxTitle(r.loanDocNo ?? '#${r.loanId}'),
+                        style: pkTitleStyle(context),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  Text(
-                    formatRupiah(r.amount),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              // the money goes back: borrower → lender
-              Text(
-                t.loanFlow(r.borrower.label, r.lender?.label ?? '—'),
-                key: Key('loan-repayment-inbox-flow-${r.id}'),
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 6),
-              Chip(
-                avatar: Icon(Icons.hourglass_top, size: 18, color: context.pk.warnText),
-                label: Text(r.statusLabel, overflow: TextOverflow.ellipsis),
-                visualDensity: VisualDensity.compact,
-              ),
-              Text(
-                [
-                  if (r.plannedDate != null) t.loanRepayPlannedOn(formatDateOnly(r.plannedDate)),
-                  if (r.submittedBy?.name != null) t.loanSubmittedBy(r.submittedBy!.name!),
-                  if ((r.note ?? '').isNotEmpty) r.note!,
-                ].join(' · '),
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
+                    const SizedBox(width: 8),
+                    Text(formatRupiah(r.amount), style: pkMoneyStyle(context)),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                // the money goes back: borrower → lender
+                Text(
+                  t.loanFlow(r.borrower.label, r.lender?.label ?? '—'),
+                  key: Key('loan-repayment-inbox-flow-${r.id}'),
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 8),
+                PkPill(icon: Icons.hourglass_top, tone: PkTone.warn, label: r.statusLabel),
+                const SizedBox(height: 6),
+                Text(
+                  [
+                    if (r.plannedDate != null) t.loanRepayPlannedOn(formatDateOnly(r.plannedDate)),
+                    if (r.submittedBy?.name != null) t.loanSubmittedBy(r.submittedBy!.name!),
+                    if ((r.note ?? '').isNotEmpty) r.note!,
+                  ].join(' · '),
+                  style: pkMetaStyle(context),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -7,6 +7,8 @@ import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_proyek.dart';
 import '../../companies/presentation/company_chip.dart';
 import '../application/projects_providers.dart';
 import '../domain/project.dart';
@@ -46,7 +48,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: ListSearchField(
               key: const Key('projects-search'),
               hint: t.projectsSearchHint,
@@ -81,20 +83,15 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                 data: (s) => s.items.isEmpty
                     ? ListView(
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Center(
-                              child: Text(
-                                _q.isEmpty && _status == null ? t.projectsEmpty : t.projectsNoMatch,
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
+                          PkEmptyState(
+                            icon: Icons.apartment,
+                            message: _q.isEmpty && _status == null ? t.projectsEmpty : t.projectsNoMatch,
                           ),
                         ],
                       )
                     : ListView.builder(
                         key: const Key('projects-list'),
-                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                        padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
                         itemCount: s.items.length + (s.hasMore ? 1 : 0),
                         itemBuilder: (_, i) => i == s.items.length
                             ? LoadMoreTrigger(
@@ -112,32 +109,25 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
   }
 }
 
+/// Tone of a project status (Berjalan ok, Ditunda warn, Perencanaan info, Selesai / Arsip neutral).
+PkTone projectStatusTone(String? status) => switch (status) {
+  'berjalan' => PkTone.ok,
+  'ditunda' => PkTone.warn,
+  'perencanaan' => PkTone.info,
+  _ => PkTone.neutral,
+};
+
 /// Status pill of a project (Berjalan green, Ditunda amber, Selesai / Arsip muted).
 class ProjectStatusChip extends StatelessWidget {
   const ProjectStatusChip({super.key, required this.project});
   final ProjectSummary project;
 
   @override
-  Widget build(BuildContext context) {
-    final pk = context.pk;
-    final color = switch (project.status) {
-      'berjalan' => pk.okText,
-      'ditunda' => pk.warnText,
-      'perencanaan' => Theme.of(context).colorScheme.primary,
-      _ => Theme.of(context).colorScheme.outline,
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999)),
-      child: Text(
-        project.statusText,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w700),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => PkPill(label: project.statusText, tone: projectStatusTone(project.status));
 }
 
-/// One project in the list: PT chip, code + status, name, PM, contract value and the RAP realisation bar.
+/// One project in the list (Banani "ProjectCard"): icon chip, code (+ PT chip), bold name, status pill, PM and
+/// contract value, then the RAP realisation bar with "Rp realisasi / Rp rencana" and the percentage.
 class ProjectCard extends StatelessWidget {
   const ProjectCard({super.key, required this.project});
   final ProjectSummary project;
@@ -150,80 +140,98 @@ class ProjectCard extends StatelessWidget {
     final pct = p.rapPercent;
     // the bar turns red only when the whole RAP is over plan; single items over plan are named below it
     final over = (pct ?? 0) > 100;
-    return Card(
+    final muted = theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    return PkCard(
       key: Key('project-${p.id}'),
       margin: const EdgeInsets.only(bottom: 10),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.push('/projects/${p.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
+      padding: const EdgeInsets.all(14),
+      onTap: () => context.push('/projects/${p.id}'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  CompanyChipLead(companyId: p.companyId),
-                  Expanded(
-                    child: Text(
-                      p.code,
-                      style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  ProjectStatusChip(project: p),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(p.name, style: theme.textTheme.titleMedium),
-              const SizedBox(height: 2),
-              Text(
-                [
-                  '${t.projectPm}: ${p.pm?.name ?? '-'}',
-                  if (p.contractValue != null) formatRupiah(p.contractValue!),
-                ].join(' · '),
-                style: theme.textTheme.bodySmall,
-              ),
-              if (pct != null) ...[
-                const SizedBox(height: 10),
-                Row(
+              const PkIconChip(icon: Icons.apartment, tone: PkTone.primary, size: 40),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: Text(t.projectRapUsed, style: theme.textTheme.labelMedium)),
+                    Row(
+                      children: [
+                        CompanyChipLead(companyId: p.companyId),
+                        Flexible(
+                          child: Text(
+                            p.code,
+                            style: muted?.copyWith(fontWeight: FontWeight.w700),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
                     Text(
-                      formatPercent(pct, digits: 0),
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: over ? context.pk.badText : null,
-                      ),
+                      p.name,
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, height: 1.25),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: (pct / 100).clamp(0, 1).toDouble(),
-                    minHeight: 6,
-                    color: over ? context.pk.badText : theme.colorScheme.primary,
-                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                  ),
-                ),
-                if ((p.rapOverBudgetItems ?? 0) > 0)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      t.projectRapOverItems(p.rapOverBudgetItems!),
-                      key: Key('project-${p.id}-over'),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: context.pk.badText,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-              ],
+              ),
+              const SizedBox(width: 8),
+              ProjectStatusChip(project: p),
             ],
           ),
-        ),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.only(left: 52),
+            child: Text(
+              [
+                '${t.projectPm}: ${p.pm?.name ?? '-'}',
+                if (p.contractValue != null) formatRupiah(p.contractValue!),
+              ].join(' · '),
+              style: pkMetaStyle(context),
+            ),
+          ),
+          if (pct != null) ...[
+            const SizedBox(height: 12),
+            PkProgressBar(value: pct / 100, color: over ? context.pk.badText : null),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    p.rapPlanned == null
+                        ? t.projectRapUsed
+                        : '${formatRupiah(p.rapRealised ?? 0)} / ${formatRupiah(p.rapPlanned!)}',
+                    style: muted,
+                  ),
+                ),
+                if (p.rapPlanned != null) Text('${t.projectRapUsed} ', style: muted),
+                Text(
+                  formatPercent(pct, digits: 0),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: over ? context.pk.badText : null,
+                  ),
+                ),
+              ],
+            ),
+            if ((p.rapOverBudgetItems ?? 0) > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: PkPill(
+                    key: Key('project-${p.id}-over'),
+                    label: t.projectRapOverItems(p.rapOverBudgetItems!),
+                    tone: PkTone.bad,
+                    icon: Icons.warning_amber_rounded,
+                  ),
+                ),
+              ),
+          ],
+        ],
       ),
     );
   }

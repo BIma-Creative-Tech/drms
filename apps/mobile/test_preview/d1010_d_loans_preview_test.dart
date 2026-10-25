@@ -214,7 +214,7 @@ void main() {
           loanDetailProvider.overrideWith((ref, id) async => Loan.fromJson(loanApprovedJson())),
         ],
         child: const LoanDetailScreen(id: 42),
-        act: (t) => _scrollTo(t, const Key('loan-repay-web-hint')),
+        act: (t) => _scrollTo(t, const Key('loan-repayments')),
       );
       await _shot(
         tester,

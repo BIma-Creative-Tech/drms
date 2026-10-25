@@ -8,6 +8,8 @@ import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_proyek.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../companies/presentation/company_chip.dart';
 import '../../expense/domain/expense_request.dart';
@@ -68,16 +70,7 @@ class ProjectDetailScreen extends ConsumerWidget {
   }
 }
 
-Widget _row(BuildContext context, String k, String v, {Key? key}) => Padding(
-  padding: const EdgeInsets.symmetric(vertical: 5),
-  child: Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      SizedBox(width: 130, child: Text(k, style: Theme.of(context).textTheme.bodySmall)),
-      Expanded(child: Text(v, key: key)),
-    ],
-  ),
-);
+Widget _row(BuildContext context, String k, String v, {Key? key}) => PkKeyRow(k, v, valueKey: key);
 
 String _money(int? v) => v == null ? '-' : formatRupiah(v);
 
@@ -103,92 +96,131 @@ class _InfoTab extends ConsumerWidget {
               : (pt == null ? account?.companyCode(p.companyId) ?? '-' : '${pt.code} — ${pt.name}');
           final pb = d.pusatBiaya;
           final rap = d.rap;
+          final over = (rap.overBudgetItems ?? 0) > 0;
           return ListView(
             key: const Key('project-info'),
             padding: const EdgeInsets.all(16),
             children: [
-              Row(
-                children: [
-                  CompanyChipLead(companyId: p.companyId),
-                  ProjectStatusChip(project: p),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(p.name, style: theme.textTheme.titleLarge),
-              const SizedBox(height: 8),
-              _row(context, t.projectCode, p.code, key: const Key('project-code')),
-              _row(context, t.projectName, p.name),
-              _row(context, t.draftCompany, ptText, key: const Key('project-company')),
-              _row(context, t.projectKind, projectKindLabel(p.kind)),
-              _row(context, t.projectPm, p.pm?.name ?? '-', key: const Key('project-pm')),
-              _row(context, t.projectStatus, p.statusText),
-              // owner 2026-10-11: no contract value (RAB) for Staff — the server sends null, the row is left out
-              if (p.contractValue != null || (pt?.seesProjectMoney ?? account?.seesProjectMoney ?? false))
-                _row(context, t.projectContractValue, _money(p.contractValue), key: const Key('project-contract')),
-              // ADR 0031: the Pusat Biaya = the project's cash account (mapped in the project data on the web)
-              _row(context, t.fieldCostCenter, pb?.name ?? t.pusatBiayaUnmapped, key: const Key('project-cost-center')),
-              if (d.client != null) _row(context, t.projectClient, d.client!.name ?? '-'),
-              if (d.startDate != null || d.targetDate != null)
-                _row(context, t.projectPeriod, '${formatDateOnly(d.startDate)} – ${formatDateOnly(d.targetDate)}'),
-              if (p.progressPct != null) _row(context, t.projectProgress, formatPercent(p.progressPct!)),
-              if (d.address != null && d.address!.trim().isNotEmpty) _row(context, t.projectAddress, d.address!),
-              const SizedBox(height: 16),
-              Card(
-                key: const Key('project-rap-summary'),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(t.projectRapSummary, style: theme.textTheme.titleSmall),
-                      const SizedBox(height: 6),
-                      if (rap.planned == null)
-                        Text(t.rapItemsCount(rap.items), style: theme.textTheme.bodySmall)
-                      else ...[
-                        _row(context, t.rapPlanned, _money(rap.planned)),
-                        _row(context, t.rapRealised, _money(rap.realised)),
-                        _row(
-                          context,
-                          t.rapRemainingLabel,
-                          _money(rap.remaining),
-                          key: const Key('project-rap-remaining'),
-                        ),
-                        if (rap.percent != null) ...[
-                          const SizedBox(height: 6),
+              // headline card: icon, code (+ PT), name, status
+              PkCard(
+                radius: PkRadius.lg,
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const PkIconChip(icon: Icons.apartment, tone: PkTone.primary, size: 44),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Row(
                             children: [
-                              Expanded(
-                                child: RapProgressBar(
-                                  item: RapBudgetItem(
-                                    id: 0,
-                                    code: '',
-                                    name: '',
-                                    planned: rap.planned,
-                                    realised: rap.realised,
-                                    remaining: rap.remaining,
-                                    percent: rap.percent,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                formatPercent(rap.percent!, digits: 0),
-                                style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
-                              ),
+                              CompanyChipLead(companyId: p.companyId),
+                              ProjectStatusChip(project: p),
                             ],
                           ),
+                          const SizedBox(height: 6),
+                          Text(
+                            p.name,
+                            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, height: 1.25),
+                          ),
                         ],
-                        if ((rap.overBudgetItems ?? 0) > 0)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Text(
-                              t.projectRapOverItems(rap.overBudgetItems!),
-                              style: TextStyle(color: context.pk.badText, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              PkCard(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _row(context, t.projectCode, p.code, key: const Key('project-code')),
+                    _row(context, t.projectName, p.name),
+                    _row(context, t.draftCompany, ptText, key: const Key('project-company')),
+                    _row(context, t.projectKind, projectKindLabel(p.kind)),
+                    _row(context, t.projectPm, p.pm?.name ?? '-', key: const Key('project-pm')),
+                    _row(context, t.projectStatus, p.statusText),
+                    // owner 2026-10-11: no contract value (RAB) for Staff — the server sends null, the row is left out
+                    if (p.contractValue != null || (pt?.seesProjectMoney ?? account?.seesProjectMoney ?? false))
+                      _row(
+                        context,
+                        t.projectContractValue,
+                        _money(p.contractValue),
+                        key: const Key('project-contract'),
+                      ),
+                    // ADR 0031: the Pusat Biaya = the project's cash account (mapped in the project data on the web)
+                    _row(
+                      context,
+                      t.fieldCostCenter,
+                      pb?.name ?? t.pusatBiayaUnmapped,
+                      key: const Key('project-cost-center'),
+                    ),
+                    if (d.client != null) _row(context, t.projectClient, d.client!.name ?? '-'),
+                    if (d.startDate != null || d.targetDate != null)
+                      _row(
+                        context,
+                        t.projectPeriod,
+                        '${formatDateOnly(d.startDate)} – ${formatDateOnly(d.targetDate)}',
+                      ),
+                    if (p.progressPct != null) _row(context, t.projectProgress, formatPercent(p.progressPct!)),
+                    if (d.address != null && d.address!.trim().isNotEmpty) _row(context, t.projectAddress, d.address!),
+                  ],
+                ),
+              ),
+              PkSectionCard(
+                key: const Key('project-rap-summary'),
+                title: t.projectRapSummary,
+                icon: Icons.pie_chart_outline,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (rap.planned == null)
+                      Text(t.rapItemsCount(rap.items), style: pkMetaStyle(context))
+                    else ...[
+                      _row(context, t.rapPlanned, _money(rap.planned)),
+                      _row(context, t.rapRealised, _money(rap.realised)),
+                      _row(
+                        context,
+                        t.rapRemainingLabel,
+                        _money(rap.remaining),
+                        key: const Key('project-rap-remaining'),
+                      ),
+                      if (rap.percent != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: PkProgressBar(
+                                value: rap.percent! / 100,
+                                color: rap.percent! > 100 ? context.pk.badText : null,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              formatPercent(rap.percent!, digits: 0),
+                              style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (over)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: PkPill(
+                              label: t.projectRapOverItems(rap.overBudgetItems!),
+                              tone: PkTone.bad,
+                              icon: Icons.warning_amber_rounded,
                             ),
                           ),
-                      ],
+                        ),
                     ],
-                  ),
+                  ],
                 ),
               ),
             ],
@@ -225,7 +257,7 @@ class _RapTabState extends ConsumerState<_RapTab> {
           final noMoney = load.items.isNotEmpty && load.items.every((i) => i.planned == null);
           return ListView(
             key: const Key('project-rap'),
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
               ListSearchField(key: const Key('rap-tab-search'), onChanged: (v) => setState(() => _q = v)),
               // phase 5b (user 2026-10-19): the web "RAP proyek" page — editing where the server allows it
@@ -244,43 +276,40 @@ class _RapTabState extends ConsumerState<_RapTab> {
                   ),
                 ),
               if (load.offline || noMoney)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    load.offline ? t.rapOfflineNoBudget : t.rapNoPrices,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-              const SizedBox(height: 8),
+                PkNote(load.offline ? t.rapOfflineNoBudget : t.rapNoPrices, margin: const EdgeInsets.only(top: 8)),
+              const SizedBox(height: 12),
               if (load.items.isEmpty && load.missing)
-                Card(
+                PkCard(
                   key: const Key('project-rap-missing'),
-                  color: Theme.of(context).colorScheme.errorContainer,
-                  child: ListTile(
-                    leading: Icon(Icons.block, color: Theme.of(context).colorScheme.onErrorContainer),
-                    title: Text(
-                      t.rapMissingBlock,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onErrorContainer,
+                  color: context.pk.badBg,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.block, color: context.pk.badOn),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              t.rapMissingBlock,
+                              style: TextStyle(fontWeight: FontWeight.w700, color: context.pk.badOn),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              t.rapMissingProjectDetail,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.pk.badOn),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    subtitle: Text(
-                      t.rapMissingProjectDetail,
-                      style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
-                    ),
+                    ],
                   ),
                 )
               else if (load.items.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Center(child: Text(t.rapNoItemsProject)),
-                )
+                PkEmptyState(icon: Icons.table_rows_outlined, message: t.rapNoItemsProject)
               else if (items.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Center(child: Text(t.noSearchResults)),
-                )
+                PkEmptyState(icon: Icons.search_off, message: t.noSearchResults)
               else
                 for (final i in items) RapItemCard(item: i),
             ],
@@ -306,81 +335,76 @@ class RapItemCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(k, style: theme.textTheme.labelSmall),
+          Text(k, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 2),
           Text(
             v,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: color,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
+            style: pkMoneyStyle(context, base: theme.textTheme.bodyMedium, color: color),
           ),
         ],
       ),
     );
-    return Card(
+    return PkCard(
       key: Key('rap-item-${i.id}'),
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: over
-          ? RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(PkTokens.radius),
-              side: BorderSide(color: context.pk.badText.withValues(alpha: 0.6)),
-            )
-          : null,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(i.label, style: const TextStyle(fontWeight: FontWeight.w600)),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      color: i.active ? null : theme.colorScheme.surfaceContainerHighest,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              PkIconChip(icon: Icons.table_rows_outlined, tone: over ? PkTone.bad : PkTone.info, size: 34),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(i.label, style: pkTitleStyle(context)),
+                    if (i.qty != null || i.uom.isNotEmpty)
+                      Text(
+                        [if (i.qty != null) formatQty(i.qty!), i.uom].where((e) => e.isNotEmpty).join(' '),
+                        style: pkMetaStyle(context),
+                      ),
+                  ],
                 ),
-                if (!i.active)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 6),
-                    child: Text(t.rapInactive, style: theme.textTheme.labelSmall),
-                  ),
+              ),
+              if (!i.active) ...[const SizedBox(width: 6), PkPill(label: t.rapInactive)],
+            ],
+          ),
+          if (i.planned != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                fig(t.rapPlanned, _money(i.planned)),
+                fig(t.rapRealised, _money(i.realised ?? 0)),
+                fig(t.rapRemainingLabel, _money(i.remaining), color: over ? context.pk.badText : null),
               ],
             ),
-            if (i.qty != null || i.uom.isNotEmpty)
-              Text(
-                [if (i.qty != null) formatQty(i.qty!), i.uom].where((e) => e.isNotEmpty).join(' '),
-                style: theme.textTheme.bodySmall,
-              ),
-            if (i.planned != null) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  fig(t.rapPlanned, _money(i.planned)),
-                  fig(t.rapRealised, _money(i.realised ?? 0)),
-                  fig(t.rapRemainingLabel, _money(i.remaining), color: over ? context.pk.badText : null),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(child: RapProgressBar(item: i)),
-                  const SizedBox(width: 8),
-                  Text(
-                    i.percent == null ? '-' : formatPercent(i.percent!, digits: 0),
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: over ? context.pk.badText : null,
-                    ),
-                  ),
-                ],
-              ),
-              if (over)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: RapOverBudgetChip(key: Key('rap-item-${i.id}-over')),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: PkProgressBar(value: i.progress ?? 0, color: over ? context.pk.badText : null),
                 ),
-            ],
+                const SizedBox(width: 10),
+                Text(
+                  i.percent == null ? '-' : formatPercent(i.percent!, digits: 0),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: over ? context.pk.badText : null,
+                  ),
+                ),
+              ],
+            ),
+            if (over)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: RapOverBudgetChip(key: Key('rap-item-${i.id}-over')),
+              ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -410,7 +434,7 @@ class _RequestsTabState extends ConsumerState<_RequestsTab> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Row(
             children: [
               Expanded(
@@ -451,22 +475,17 @@ class _RequestsTabState extends ConsumerState<_RequestsTab> {
               data: (s) => s.items.isEmpty
                   ? ListView(
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: Center(
-                            child: Text(
-                              _q.isEmpty && _status == null ? t.projectNoRequests : t.projectsNoMatch,
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
+                        PkEmptyState(
+                          icon: Icons.receipt_long_outlined,
+                          message: _q.isEmpty && _status == null ? t.projectNoRequests : t.projectsNoMatch,
                         ),
                       ],
                     )
                   : ListView.separated(
                       key: const Key('project-requests'),
-                      padding: const EdgeInsets.only(bottom: 24),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                       itemCount: s.items.length + (s.hasMore ? 1 : 0),
-                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (_, i) {
                         if (i == s.items.length) {
                           return LoadMoreTrigger(
@@ -486,21 +505,57 @@ class _RequestsTabState extends ConsumerState<_RequestsTab> {
   }
 }
 
+/// Soft tone of a request status (draft neutral, waiting warn, approved / done ok, rejected / cancelled bad).
+PkTone _requestTone(RequestStatus s) => switch (s) {
+  RequestStatus.draft || RequestStatus.unknown => PkTone.neutral,
+  RequestStatus.pendingAck || RequestStatus.pendingApproval => PkTone.warn,
+  RequestStatus.receiptRevision || RequestStatus.lpjRevision => PkTone.warn,
+  RequestStatus.rejected || RequestStatus.cancelled => PkTone.bad,
+  RequestStatus.completed || RequestStatus.lpjVerified || RequestStatus.transferred => PkTone.ok,
+  _ => PkTone.info,
+};
+
 class _RequestTile extends StatelessWidget {
   const _RequestTile({required this.r, required this.theme});
   final ExpenseSummary r;
   final ThemeData theme;
 
   @override
-  Widget build(BuildContext context) => ListTile(
+  Widget build(BuildContext context) => PkCard(
     key: Key('project-request-${r.id}'),
-    title: Text(r.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-    subtitle: Text(
-      '${r.docNo ?? '-'} · ${r.typeLabel}\n${r.statusLabel}'
-      '${r.neededDate != null ? ' · ${formatDateOnly(r.neededDate)}' : ''}',
-    ),
-    isThreeLine: true,
-    trailing: Text(formatRupiah(r.grandTotal), style: const TextStyle(fontWeight: FontWeight.bold)),
+    padding: const EdgeInsets.all(14),
     onTap: () => context.push('/requests/${r.id}'),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        PkIconChip(
+          icon: r.type == RequestType.reimburse ? Icons.receipt_outlined : Icons.request_quote_outlined,
+          size: 36,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${r.docNo ?? '-'} · ${r.typeLabel}', style: pkMetaStyle(context)),
+              const SizedBox(height: 2),
+              Text(r.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: pkTitleStyle(context)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  PkPill(label: r.statusLabel, tone: _requestTone(r.status)),
+                  if (r.neededDate != null) Text(formatDateOnly(r.neededDate), style: pkMetaStyle(context)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(formatRupiah(r.grandTotal), style: pkMoneyStyle(context)),
+      ],
+    ),
   );
 }
