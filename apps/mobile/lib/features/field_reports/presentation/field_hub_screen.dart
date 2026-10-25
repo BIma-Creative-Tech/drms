@@ -181,7 +181,6 @@ class _HistoryTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     final local = ref.watch(openFieldDraftsProvider).value ?? const <FieldDraft>[];
     final online = ref.watch(connectivityProvider);
     final server = ref.watch(myFieldRecordsProvider);
