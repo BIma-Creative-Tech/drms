@@ -520,7 +520,10 @@ class _IcLoanCard extends StatelessWidget {
                   l.status.active
                       ? t.icLoanCardFigures(formatRupiah(l.amount), formatRupiah(l.outstanding))
                       : formatRupiah(l.amount),
-                  style: pkMoneyStyle(context, base: theme.textTheme.bodyMedium)?.copyWith(fontWeight: FontWeight.w600),
+                  style: pkAmountStyle(
+                    context,
+                    base: theme.textTheme.bodyMedium,
+                  )?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 Wrap(

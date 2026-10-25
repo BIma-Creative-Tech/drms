@@ -8,7 +8,7 @@ import 'pk_ui.dart';
 /// a timeline step and the compact KPI tiles of the list headers. Colours from the theme only.
 
 /// Bold, tabular-figure money style on top of [base] (default `titleSmall`).
-TextStyle? pkMoneyStyle(BuildContext context, {TextStyle? base, Color? color, double? fontSize}) =>
+TextStyle? pkAmountStyle(BuildContext context, {TextStyle? base, Color? color, double? fontSize}) =>
     (base ?? Theme.of(context).textTheme.titleSmall)?.copyWith(
       fontWeight: FontWeight.w700,
       color: color,
@@ -42,8 +42,8 @@ class PkKeyRow extends StatelessWidget {
 }
 
 /// Thin divider between the rows of a detail card.
-class PkRowDivider extends StatelessWidget {
-  const PkRowDivider({super.key});
+class PkListDivider extends StatelessWidget {
+  const PkListDivider({super.key});
 
   @override
   Widget build(BuildContext context) => Divider(height: 1, color: context.pk.border);
@@ -191,7 +191,7 @@ class PkMiniKpi extends StatelessWidget {
           const SizedBox(height: 8),
           Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 2),
-          Text(value, style: pkMoneyStyle(context, base: theme.textTheme.titleMedium, fontSize: 16)),
+          Text(value, style: pkAmountStyle(context, base: theme.textTheme.titleMedium, fontSize: 16)),
           if (sub != null && sub!.isNotEmpty) ...[const SizedBox(height: 2), Text(sub!, style: pkMetaStyle(context))],
         ],
       ),

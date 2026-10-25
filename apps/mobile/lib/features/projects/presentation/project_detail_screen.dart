@@ -339,7 +339,7 @@ class RapItemCard extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             v,
-            style: pkMoneyStyle(context, base: theme.textTheme.bodyMedium, color: color),
+            style: pkAmountStyle(context, base: theme.textTheme.bodyMedium, color: color),
           ),
         ],
       ),
@@ -554,7 +554,7 @@ class _RequestTile extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Text(formatRupiah(r.grandTotal), style: pkMoneyStyle(context)),
+        Text(formatRupiah(r.grandTotal), style: pkAmountStyle(context)),
       ],
     ),
   );

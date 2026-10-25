@@ -278,7 +278,7 @@ class _BalanceTiles extends ConsumerWidget {
               Text(
                 formatRupiah(book.total),
                 key: const Key('cash-total-value'),
-                style: pkMoneyStyle(context, base: theme.textTheme.headlineSmall, fontSize: 28),
+                style: pkAmountStyle(context, base: theme.textTheme.headlineSmall, fontSize: 28),
               ),
               const SizedBox(height: 2),
               Text(t.cashTotalSub(book.accounts.length), style: pkMetaStyle(context)),
@@ -372,7 +372,7 @@ class _AccountRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(formatRupiah(balance), style: pkMoneyStyle(context, color: negative ? context.pk.badText : null)),
+              Text(formatRupiah(balance), style: pkAmountStyle(context, color: negative ? context.pk.badText : null)),
             ],
           ),
         ),
@@ -597,7 +597,7 @@ class CashEntryCard extends ConsumerWidget {
                     Text(
                       '${r.inbound ? '+' : '−'} ${formatRupiah(r.amount)}',
                       key: Key('cash-row-${r.id}-amount'),
-                      style: pkMoneyStyle(context, color: r.inbound ? context.pk.okText : null)?.merge(strike),
+                      style: pkAmountStyle(context, color: r.inbound ? context.pk.okText : null)?.merge(strike),
                     ),
                   ],
                 ),

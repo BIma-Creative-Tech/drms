@@ -196,6 +196,10 @@ Future<void> _shot(
     await Scrollable.ensureVisible(tester.element(find.byKey(Key(showKey))), alignment: 0.5);
     await tester.pumpAndSettle();
   }
+  if (act != null) {
+    await act(tester);
+    await tester.pumpAndSettle();
+  }
   final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(key));
   await tester.runAsync(() async {
     final image = await boundary.toImage(pixelRatio: 2);

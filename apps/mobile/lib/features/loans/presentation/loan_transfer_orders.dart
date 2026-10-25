@@ -213,7 +213,7 @@ class _LoanTransferOrderCardState extends ConsumerState<LoanTransferOrderCard> {
               Text(
                 formatRupiah(o.amount),
                 key: Key('loan-order-${o.key}-amount'),
-                style: pkMoneyStyle(context, base: theme.textTheme.titleMedium),
+                style: pkAmountStyle(context, base: theme.textTheme.titleMedium),
               ),
             ],
           ),

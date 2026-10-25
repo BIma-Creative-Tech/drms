@@ -744,7 +744,7 @@ class _LoanBody extends ConsumerWidget {
     final acts = l.allowedActions;
     Widget row(String k, String v, {Key? key, TextStyle? style}) => PkKeyRow(k, v, valueKey: key, style: style);
     Widget note(String text, {Key? key, PkTone tone = PkTone.info}) => PkNote(text, key: key, tone: tone);
-    final money = pkMoneyStyle(context, base: theme.textTheme.bodyMedium);
+    final money = pkAmountStyle(context, base: theme.textTheme.bodyMedium);
     final submitted = l.submittedAt != null;
     final waiting = l.status == LoanStatus.pendingApproval;
     // user decision 2026-10-24: Direktur (level 1) then Owner (level 2); an older server's single decision is level 1
@@ -818,7 +818,7 @@ class _LoanBody extends ConsumerWidget {
                         Text(
                           formatRupiah(l.amount),
                           key: const Key('loan-amount-value'),
-                          style: pkMoneyStyle(context, base: theme.textTheme.headlineSmall, fontSize: 24),
+                          style: pkAmountStyle(context, base: theme.textTheme.headlineSmall, fontSize: 24),
                         ),
                       ],
                     ),
@@ -1071,7 +1071,7 @@ class _RepaymentTile extends StatelessWidget {
               ),
               Text(
                 formatRupiah(r.amount),
-                style: pkMoneyStyle(context, base: theme.textTheme.bodyMedium)?.merge(strike),
+                style: pkAmountStyle(context, base: theme.textTheme.bodyMedium)?.merge(strike),
               ),
             ],
           ),

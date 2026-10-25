@@ -539,7 +539,7 @@ class _IcLoanBody extends ConsumerWidget {
     final l = loan;
     Widget row(String k, String v, {Key? key, TextStyle? style}) => PkKeyRow(k, v, valueKey: key, style: style);
     Widget note(String text, {Key? key, PkTone tone = PkTone.info}) => PkNote(text, key: key, tone: tone);
-    final money = pkMoneyStyle(context, base: theme.textTheme.bodyMedium);
+    final money = pkAmountStyle(context, base: theme.textTheme.bodyMedium);
     final destination = icLoanDestinationOf(l, queued: queued);
     final side = switch (l.side) {
       'lender' => t.icLoanSideLender,
@@ -606,7 +606,7 @@ class _IcLoanBody extends ConsumerWidget {
                         Text(
                           formatRupiah(l.amount),
                           key: const Key('icloan-amount-value'),
-                          style: pkMoneyStyle(context, base: theme.textTheme.headlineSmall, fontSize: 24),
+                          style: pkAmountStyle(context, base: theme.textTheme.headlineSmall, fontSize: 24),
                         ),
                       ],
                     ),
@@ -812,7 +812,7 @@ class _MovementTile extends StatelessWidget {
               ),
               Text(
                 formatRupiah(m.amount),
-                style: pkMoneyStyle(context, base: theme.textTheme.bodyMedium)?.merge(strike),
+                style: pkAmountStyle(context, base: theme.textTheme.bodyMedium)?.merge(strike),
               ),
             ],
           ),
@@ -1374,7 +1374,7 @@ class IcLoanQueueCard extends ConsumerWidget {
               Text(
                 formatRupiah(l.amount),
                 key: Key('icloan-q-${l.id}-amount'),
-                style: pkMoneyStyle(context, base: theme.textTheme.titleMedium),
+                style: pkAmountStyle(context, base: theme.textTheme.titleMedium),
               ),
             ],
           ),

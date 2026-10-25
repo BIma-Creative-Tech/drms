@@ -177,7 +177,7 @@ class _VoidableTransfersViewState extends ConsumerState<VoidableTransfersView> {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                Text(formatRupiah(x.amount), style: pkMoneyStyle(context)),
+                                Text(formatRupiah(x.amount), style: pkAmountStyle(context)),
                               ],
                             ),
                             const SizedBox(height: 8),
