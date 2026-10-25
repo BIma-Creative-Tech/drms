@@ -103,10 +103,14 @@ class HomeShell extends ConsumerWidget {
 
   static NavigationBarThemeData _compact(NavigationBarThemeData base, int count) {
     if (count < 5) return base;
+    // Six tabs (Direktur / PM): 10 sp with tight tracking keeps "Persetujuan" on one line at 360 dp.
+    final six = count >= 6;
     return base.copyWith(
       height: 76,
       labelTextStyle: WidgetStateProperty.resolveWith(
-        (s) => base.labelTextStyle?.resolve(s)?.copyWith(fontSize: 11, height: 1.15),
+        (s) => base.labelTextStyle
+            ?.resolve(s)
+            ?.copyWith(fontSize: six ? 10 : 11, height: 1.15, letterSpacing: six ? -0.2 : null),
       ),
     );
   }

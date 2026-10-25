@@ -228,7 +228,8 @@ class _HomeHero extends ConsumerWidget {
                   if (multi) Icon(Icons.unfold_more, size: 18, color: pk.onHero),
                 ],
               ),
-              Text(t.appTitle, style: theme.textTheme.bodySmall?.copyWith(color: pk.onHero.withValues(alpha: 0.75))),
+              if (ptLabel != t.appTitle)
+                Text(t.appTitle, style: theme.textTheme.bodySmall?.copyWith(color: pk.onHero.withValues(alpha: 0.75))),
             ],
           ),
         ),
@@ -323,6 +324,30 @@ extension _Let<T extends Object> on T? {
     final v = this;
     return v == null ? null : f(v);
   }
+}
+
+/// Summary card button: the label shrinks to fit instead of being cut ("Pengajuan Baru" on a 360 dp phone).
+Widget _summaryButton(_SummaryAction a) {
+  final label = FittedBox(fit: BoxFit.scaleDown, child: Text(a.label, maxLines: 1));
+  final style = FilledButton.styleFrom(
+    minimumSize: const Size.fromHeight(46),
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+  );
+  return a.primary
+      ? FilledButton.icon(
+          key: Key('home-summary-${a.label}'),
+          onPressed: a.onTap,
+          icon: Icon(a.icon, size: 18),
+          label: label,
+          style: style,
+        )
+      : FilledButton.tonalIcon(
+          key: Key('home-summary-${a.label}'),
+          onPressed: a.onTap,
+          icon: Icon(a.icon, size: 18),
+          label: label,
+          style: style,
+        );
 }
 
 class _SummaryAction {
@@ -460,21 +485,7 @@ class _RoleSummary extends ConsumerWidget {
               children: [
                 for (final (i, a) in s.actions.indexed) ...[
                   if (i > 0) const SizedBox(width: 10),
-                  Expanded(
-                    child: a.primary
-                        ? FilledButton.icon(
-                            onPressed: a.onTap,
-                            icon: Icon(a.icon, size: 18),
-                            label: Text(a.label, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(46)),
-                          )
-                        : FilledButton.tonalIcon(
-                            onPressed: a.onTap,
-                            icon: Icon(a.icon, size: 18),
-                            label: Text(a.label, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(46)),
-                          ),
-                  ),
+                  Expanded(child: _summaryButton(a)),
                 ],
               ],
             ),

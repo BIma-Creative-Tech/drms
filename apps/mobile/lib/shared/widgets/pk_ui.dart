@@ -488,17 +488,54 @@ class PkQuickAction extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
+          PkWordFitText(
             label,
-            textAlign: TextAlign.center,
             maxLines: 2,
-            overflow: TextOverflow.ellipsis,
             style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700, height: 1.2),
           ),
         ],
       ),
     );
   }
+}
+
+/// Centred label that never breaks inside a word: when its longest word is wider than the box, the font shrinks
+/// (down to 75 %) until that word fits ("Persetujuan" in a quarter-width tile).
+class PkWordFitText extends StatelessWidget {
+  const PkWordFitText(this.text, {super.key, this.style, this.maxLines = 2});
+  final String text;
+  final TextStyle? style;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      final base = DefaultTextStyle.of(context).style.merge(style);
+      final scaler = MediaQuery.textScalerOf(context);
+      var widest = 0.0;
+      for (final word in text.split(RegExp(r'\s+'))) {
+        final tp = TextPainter(
+          text: TextSpan(text: word, style: base),
+          textDirection: Directionality.of(context),
+          textScaler: scaler,
+          maxLines: 1,
+        )..layout();
+        if (tp.width > widest) widest = tp.width;
+        tp.dispose();
+      }
+      final size = base.fontSize ?? 14;
+      final fitted = widest > box.maxWidth && box.maxWidth.isFinite
+          ? (size * box.maxWidth / widest).clamp(size * 0.75, size).toDouble()
+          : size;
+      return Text(
+        text,
+        textAlign: TextAlign.center,
+        maxLines: maxLines,
+        overflow: TextOverflow.ellipsis,
+        style: base.copyWith(fontSize: fitted),
+      );
+    },
+  );
 }
 
 /// Row of up to four [PkQuickAction]s of equal width.
