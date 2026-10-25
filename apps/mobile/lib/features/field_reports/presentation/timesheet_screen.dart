@@ -421,39 +421,45 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
       ),
       bottomNavigationBar: _unitId == null
           ? null
-          : SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (!_single)
-                      Text(
-                        next == null ? t.fieldNextNone : t.fieldNextUnit(next.label),
-                        key: const Key('timesheet-next'),
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodySmall,
+          : DecoratedBox(
+              decoration: BoxDecoration(
+                color: context.pk.card,
+                border: Border(top: BorderSide(color: context.pk.border)),
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (!_single)
+                        Text(
+                          next == null ? t.fieldNextNone : t.fieldNextUnit(next.label),
+                          key: const Key('timesheet-next'),
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      const SizedBox(height: 8),
+                      FilledButton(
+                        key: const Key('timesheet-submit'),
+                        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                        onPressed: _busy || _loading || alreadySent ? null : () => _submit(next),
+                        child: _busy
+                            ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                            : Text(
+                                _isEdit
+                                    ? t.fieldSaveEdit
+                                    : (next == null || _single ? t.fieldTimesheetSave : t.fieldSaveAndNext(next.label)),
+                              ),
                       ),
-                    const SizedBox(height: 8),
-                    FilledButton(
-                      key: const Key('timesheet-submit'),
-                      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                      onPressed: _busy || _loading || alreadySent ? null : () => _submit(next),
-                      child: _busy
-                          ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                          : Text(
-                              _isEdit
-                                  ? t.fieldSaveEdit
-                                  : (next == null || _single ? t.fieldTimesheetSave : t.fieldSaveAndNext(next.label)),
-                            ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           if (_base?.lastError != null) FieldNote(text: _base!.lastError!, error: true),
           if (_isEdit && _base?.editableUntil != null)
@@ -666,13 +672,17 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
                   Card(
                     key: const Key('timesheet-suggest-service'),
                     elevation: 0,
-                    color: context.pk.warnText.withValues(alpha: 0.10),
+                    color: context.pk.warnBg,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     child: Padding(
                       padding: const EdgeInsets.all(12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(t.fieldSuggestService(fmtNum(c.breakdownHours ?? 0))),
+                          Text(
+                            t.fieldSuggestService(fmtNum(c.breakdownHours ?? 0)),
+                            style: TextStyle(color: context.pk.warnOn),
+                          ),
                           const SizedBox(height: 6),
                           OutlinedButton.icon(
                             key: const Key('timesheet-open-service'),
@@ -785,8 +795,8 @@ class _UnitTab extends StatelessWidget {
     final (Color bg, Color fg, String text) = selected
         ? (scheme.primary, scheme.onPrimary, filled ? '$label ✓' : label)
         : filled
-        ? (context.pk.okText.withValues(alpha: 0.14), context.pk.okText, '$label ${t.fieldTabFilled}')
-        : (context.pk.badText.withValues(alpha: 0.12), context.pk.badText, '$label ${t.fieldTabMissing}');
+        ? (context.pk.okBg, context.pk.okOn, '$label ${t.fieldTabFilled}')
+        : (context.pk.badBg, context.pk.badOn, '$label ${t.fieldTabMissing}');
     return Material(
       color: bg,
       shape: const StadiumBorder(),
@@ -795,7 +805,7 @@ class _UnitTab extends StatelessWidget {
         customBorder: const StadiumBorder(),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           child: Text(
             text,
             style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 13),

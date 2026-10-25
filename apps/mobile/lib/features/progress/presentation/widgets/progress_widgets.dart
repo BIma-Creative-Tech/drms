@@ -17,7 +17,7 @@ const progressSeriesPhysical = VizColors.series1;
 const progressSeriesBudget = VizColors.series2;
 
 /// Horizontal percentage bar (0–100) with its label and value always written beside it (dataviz: the
-/// number is never colour-only; the track is a light step of the same hue).
+/// number is never colour-only; the track is a light step of the same hue). D2510: rounded 8 dp bar, muted label.
 class PctBar extends StatelessWidget {
   const PctBar({super.key, required this.label, required this.value, required this.color});
   final String label;
@@ -36,19 +36,28 @@ class PctBar extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text(label, style: theme.textTheme.bodySmall)),
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               Text(
                 v == null ? '—' : fmtPct(v),
-                style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.titleSmall?.copyWith(fontFamily: PkFonts.heading, fontWeight: FontWeight.w700),
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           ClipRRect(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
               value: v == null ? 0 : (v / 100).clamp(0, 1).toDouble(),
-              minHeight: 10,
+              minHeight: 8,
               color: color,
               backgroundColor: color.withValues(alpha: 0.16),
             ),
@@ -59,7 +68,15 @@ class PctBar extends StatelessWidget {
   }
 }
 
-/// K-09 status: icon + label + colour (never colour alone).
+/// [PkTone] of a K-09 status.
+PkTone progressPkTone(ProgressTone tone) => switch (tone) {
+  ProgressTone.ok => PkTone.ok,
+  ProgressTone.warn => PkTone.warn,
+  ProgressTone.bad => PkTone.bad,
+  ProgressTone.none => PkTone.neutral,
+};
+
+/// K-09 status: icon + label + soft tone pill (never colour alone).
 class ToneChip extends StatelessWidget {
   const ToneChip({super.key, required this.tone, required this.label});
   final ProgressTone tone;
@@ -67,30 +84,13 @@ class ToneChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (IconData icon, Color color) = switch (tone) {
-      ProgressTone.ok => (Icons.check_circle, context.pk.okText),
-      ProgressTone.warn => (Icons.warning_amber_rounded, context.pk.warnText),
-      ProgressTone.bad => (Icons.error, context.pk.badText),
-      ProgressTone.none => (Icons.help_outline, Theme.of(context).colorScheme.outline),
+    final icon = switch (tone) {
+      ProgressTone.ok => Icons.check_circle,
+      ProgressTone.warn => Icons.warning_amber_rounded,
+      ProgressTone.bad => Icons.error,
+      ProgressTone.none => Icons.help_outline,
     };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(label, style: Theme.of(context).textTheme.labelMedium, overflow: TextOverflow.ellipsis),
-          ),
-        ],
-      ),
-    );
+    return PkPill(label: label, tone: progressPkTone(tone), icon: icon);
   }
 }
 
@@ -114,61 +114,83 @@ class ProjectProgressCard extends StatelessWidget {
             ProgressTone.bad => t.progressToneBad,
             ProgressTone.none => t.progressToneNone,
           };
-    return Card(
+    final muted = theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant);
+    return PkCard(
       key: Key('project-progress-${item.id}'),
-      elevation: 0,
-      color: scheme.surfaceContainerLow,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      item.code.isEmpty ? item.name : '${item.code} — ${item.name}',
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  if (onTap != null) Icon(Icons.chevron_right, color: scheme.outline),
-                ],
-              ),
-              const SizedBox(height: 12),
-              PctBar(label: t.progressPhysical, value: item.progressPct, color: progressSeriesPhysical),
-              const SizedBox(height: 10),
-              PctBar(label: t.progressBudgetUsed, value: item.budgetPct, color: progressSeriesBudget),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  ToneChip(tone: item.tone, label: toneText),
-                  if (gap != null)
+              const PkIconChip(icon: Icons.apartment, tone: PkTone.primary, size: 40),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (item.code.isNotEmpty)
+                      Text(
+                        item.code,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     Text(
-                      t.progressGap('${gap >= 0 ? '+' : '−'}${fmtPct(gap.abs())}'),
-                      style: theme.textTheme.bodySmall,
+                      item.name,
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, height: 1.25),
                     ),
-                ],
+                  ],
+                ),
               ),
-              if (!item.stagesComplete) ...[
-                const SizedBox(height: 8),
-                Text(t.progressStagesIncomplete(fmtPct(item.weightSum)), style: theme.textTheme.bodySmall),
-              ],
-              const SizedBox(height: 4),
-              Text(
-                item.lastReportDate == null
-                    ? t.progressNoReportYet
-                    : t.progressLastReport(formatDateOnly(item.lastReportDate), item.reportCount),
-                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              if (onTap != null) Icon(Icons.chevron_right, color: scheme.outline),
+            ],
+          ),
+          const SizedBox(height: 14),
+          PctBar(label: t.progressPhysical, value: item.progressPct, color: progressSeriesPhysical),
+          const SizedBox(height: 12),
+          PctBar(label: t.progressBudgetUsed, value: item.budgetPct, color: progressSeriesBudget),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              ToneChip(tone: item.tone, label: toneText),
+              if (gap != null)
+                Text(
+                  t.progressGap('${gap >= 0 ? '+' : '−'}${fmtPct(gap.abs())}'),
+                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+            ],
+          ),
+          if (!item.stagesComplete) ...[
+            const SizedBox(height: 8),
+            Text(
+              t.progressStagesIncomplete(fmtPct(item.weightSum)),
+              style: theme.textTheme.bodySmall?.copyWith(color: context.pk.warnText),
+            ),
+          ],
+          const SizedBox(height: 10),
+          const Divider(height: 1),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(Icons.event_note_outlined, size: 16, color: scheme.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  item.lastReportDate == null
+                      ? t.progressNoReportYet
+                      : t.progressLastReport(formatDateOnly(item.lastReportDate), item.reportCount),
+                  style: muted,
+                ),
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -379,7 +401,7 @@ class _Thumb extends StatelessWidget {
   }
 }
 
-/// Local report state as chip (icon + text).
+/// Local report state as a soft pill (icon + text).
 class ProgressStateChip extends StatelessWidget {
   const ProgressStateChip({super.key, required this.state, this.queueEnabled = true});
   final ProgressSyncState state;
@@ -388,18 +410,14 @@ class ProgressStateChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final (IconData icon, Color? color, String label) = switch (state) {
-      ProgressSyncState.queued => (Icons.schedule, null, t.progressStateQueued),
-      ProgressSyncState.local => (Icons.cloud_off, context.pk.warnText, t.progressStateLocal),
-      ProgressSyncState.conflict => (Icons.call_split, context.pk.warnText, t.progressStateConflict),
-      ProgressSyncState.rejected => (Icons.error, context.pk.badText, t.progressStateRejected),
-      ProgressSyncState.synced => (Icons.cloud_done, context.pk.okText, t.progressStateSynced),
+    final (IconData icon, PkTone tone, String label) = switch (state) {
+      ProgressSyncState.queued => (Icons.schedule, PkTone.info, t.progressStateQueued),
+      ProgressSyncState.local => (Icons.cloud_off, PkTone.warn, t.progressStateLocal),
+      ProgressSyncState.conflict => (Icons.call_split, PkTone.warn, t.progressStateConflict),
+      ProgressSyncState.rejected => (Icons.error, PkTone.bad, t.progressStateRejected),
+      ProgressSyncState.synced => (Icons.cloud_done, PkTone.ok, t.progressStateSynced),
     };
-    return Chip(
-      avatar: Icon(icon, size: 18, color: color),
-      label: Text(label),
-      visualDensity: VisualDensity.compact,
-    );
+    return PkPill(icon: icon, tone: tone, label: label);
   }
 }
 

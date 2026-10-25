@@ -8,6 +8,7 @@ import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/pk_ui.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../companies/presentation/company_chip.dart';
 import '../application/field_providers.dart';
@@ -72,52 +73,58 @@ class _NewTab extends ConsumerWidget {
           children: [
             if (!online) FieldNote(text: t.fieldOfflineCache, warn: true),
             if (refresh.isLoading) const LinearProgressIndicator(),
-            if (list.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 32),
-                child: Column(
-                  children: [
-                    Icon(Icons.assignment_late_outlined, size: 40, color: theme.colorScheme.outline),
-                    const SizedBox(height: 8),
-                    Text(t.fieldNoProjectsHub, textAlign: TextAlign.center),
-                  ],
-                ),
-              ),
+            if (list.isEmpty) PkEmptyState(icon: Icons.assignment_late_outlined, message: t.fieldNoProjectsHub),
             for (final p in list)
-              Card(
+              PkCard(
                 key: Key('field-project-${p.id}'),
-                elevation: 0,
-                color: theme.colorScheme.surfaceContainerLow,
                 margin: const EdgeInsets.only(bottom: 12),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          CompanyChipLead(companyId: p.companyId),
-                          Expanded(child: Text(p.label, style: theme.textTheme.titleSmall)),
-                        ],
-                      ),
-                      Text(p.kind.label, style: theme.textTheme.bodySmall),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final type in p.kind.reportTypes)
-                            if (canCreateField(profile, type, p.companyId))
-                              FilledButton.tonalIcon(
-                                key: Key('field-new-${type.segment}-${p.id}'),
-                                onPressed: () => context.push('/field/${type.segment}/new?project=${p.id}'),
-                                icon: Icon(_icon(type)),
-                                label: Text(type.label),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const PkIconChip(icon: Icons.apartment, tone: PkTone.primary, size: 40),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  CompanyChipLead(companyId: p.companyId),
+                                  Expanded(
+                                    child: Text(
+                                      p.label,
+                                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                                    ),
+                                  ),
+                                ],
                               ),
-                        ],
-                      ),
-                    ],
-                  ),
+                              Text(
+                                p.kind.label,
+                                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    PkTwoColumnGrid(
+                      spacing: 8,
+                      children: [
+                        for (final type in p.kind.reportTypes)
+                          if (canCreateField(profile, type, p.companyId))
+                            _NewReportTile(
+                              key: Key('field-new-${type.segment}-${p.id}'),
+                              icon: fieldReportIcon(type),
+                              label: type.label,
+                              onTap: () => context.push('/field/${type.segment}/new?project=${p.id}'),
+                            ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
           ],
@@ -127,12 +134,46 @@ class _NewTab extends ConsumerWidget {
   }
 }
 
-IconData _icon(FieldReportType type) => switch (type) {
-  FieldReportType.serviceReport => Icons.build_circle_outlined,
-  FieldReportType.unitTimesheet => Icons.timer_outlined,
-  FieldReportType.aftersalesActivity => Icons.local_shipping_outlined,
-  FieldReportType.dailyReport => Icons.engineering_outlined,
-};
+/// One report type of a project: tonal tile (icon + label), ≥ 56 dp, the whole tile is the target.
+class _NewReportTile extends StatelessWidget {
+  const _NewReportTile({super.key, required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final pk = context.pk;
+    return Material(
+      color: pk.infoBg,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 56),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Icon(icon, color: pk.infoOn, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: theme.textTheme.labelLarge?.copyWith(color: pk.infoOn, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                Icon(Icons.add, color: pk.infoOn, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _HistoryTab extends ConsumerWidget {
   const _HistoryTab();
@@ -151,13 +192,14 @@ class _HistoryTab extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
           if (local.isNotEmpty) ...[
-            Text(t.fieldLocalTitle, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
+            PkSectionHeader(title: t.fieldLocalTitle, padding: const EdgeInsets.only(bottom: 10)),
             for (final d in local) _LocalCard(draft: d),
-            const SizedBox(height: 16),
+            const SizedBox(height: 6),
           ],
-          Text(t.fieldServerTitle, style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
+          PkSectionHeader(
+            title: t.fieldServerTitle,
+            padding: EdgeInsets.only(top: local.isEmpty ? 0 : 14, bottom: 10),
+          ),
           if (!online && !server.hasValue)
             FieldNote(text: t.fieldHistoryOffline, warn: true)
           else
@@ -165,10 +207,7 @@ class _HistoryTab extends ConsumerWidget {
               value: server,
               onRetry: () => ref.invalidate(myFieldRecordsProvider),
               data: (items) => items.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Text(t.fieldHistoryEmpty, textAlign: TextAlign.center),
-                    )
+                  ? PkEmptyState(icon: Icons.history, message: t.fieldHistoryEmpty)
                   : Column(
                       children: [for (final r in items) _ServerCard(record: r, zone: zone)],
                     ),
@@ -195,41 +234,65 @@ class _LocalCard extends ConsumerWidget {
     final summary = d.summaryWith(names);
     final decide =
         d.conflictCopy != null && (d.syncState == FieldSyncState.conflict || d.syncState == FieldSyncState.rejected);
-    return Card(
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    return PkCard(
       key: Key('field-local-${d.clientUuid}'),
-      child: InkWell(
-        onTap: () => context.push(decide ? '/field/conflict/${d.clientUuid}' : '/field/draft/${d.clientUuid}'),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CompanyChipLead(companyId: d.companyId),
-                  Expanded(child: Text(d.type.label, style: theme.textTheme.labelLarge)),
-                  FieldStateChip(state: d.syncState),
-                ],
-              ),
-              Text(
-                [fieldDateLabel(d.reportDate), d.projectLabel].where((e) => e.isNotEmpty).join(' · '),
-                style: theme.textTheme.bodySmall,
-              ),
-              if (summary.isNotEmpty) Text(summary, style: theme.textTheme.titleSmall),
-              if (d.isEdit) Text(t.fieldEditTag(d.docNo ?? '#${d.serverId}'), style: theme.textTheme.bodySmall),
-              if (d.lastError != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(d.lastError!, style: TextStyle(color: theme.colorScheme.error)),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      onTap: () => context.push(decide ? '/field/conflict/${d.clientUuid}' : '/field/draft/${d.clientUuid}'),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PkIconChip(icon: fieldReportIcon(d.type), tone: PkTone.warn, size: 40),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CompanyChipLead(companyId: d.companyId),
+                    Expanded(
+                      child: Text(
+                        d.type.label,
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FieldStateChip(state: d.syncState),
+                  ],
                 ),
-              if (decide)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(t.fieldConflictHint, style: theme.textTheme.bodySmall),
+                Text(
+                  [fieldDateLabel(d.reportDate), d.projectLabel].where((e) => e.isNotEmpty).join(' · '),
+                  style: muted,
                 ),
-            ],
+                if (summary.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(summary, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  ),
+                if (d.isEdit) Text(t.fieldEditTag(d.docNo ?? '#${d.serverId}'), style: muted),
+                if (d.lastError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(d.lastError!, style: theme.textTheme.bodySmall?.copyWith(color: context.pk.badText)),
+                  ),
+                if (decide)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      t.fieldConflictHint,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -245,48 +308,66 @@ class _ServerCard extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final r = record;
-    return Card(
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    return PkCard(
       key: Key('field-server-${r.type.code}-${r.id}'),
-      child: InkWell(
-        onTap: () => showModalBottomSheet<void>(
-          context: context,
-          showDragHandle: true,
-          isScrollControlled: true,
-          builder: (_) => FieldRecordSheet(record: r, zone: zone),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CompanyChipLead(companyId: r.companyId),
-                  Expanded(child: Text(r.type.label, style: theme.textTheme.labelLarge)),
-                  const FieldStateChip(state: FieldSyncState.synced),
-                ],
-              ),
-              Text(
-                [r.docNo ?? '', formatDateOnly(r.date), r.projectLabel].where((e) => e.isNotEmpty).join(' · '),
-                style: theme.textTheme.bodySmall,
-              ),
-              if (r.title.isNotEmpty) Text(r.title, style: theme.textTheme.titleSmall),
-              if (r.subtitle.isNotEmpty) Text(r.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
-              if (r.flags.isNotEmpty || r.editable)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Wrap(
-                    spacing: 6,
-                    children: [
-                      for (final f in r.flags)
-                        Text(flagLabel(t, f), style: theme.textTheme.bodySmall?.copyWith(color: context.pk.warnText)),
-                      if (r.editable) Text(t.fieldEditableTag, style: theme.textTheme.bodySmall),
-                    ],
-                  ),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        isScrollControlled: true,
+        builder: (_) => FieldRecordSheet(record: r, zone: zone),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PkIconChip(icon: fieldReportIcon(r.type), tone: PkTone.info, size: 40),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CompanyChipLead(companyId: r.companyId),
+                    Expanded(
+                      child: Text(
+                        r.type.label,
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const FieldStateChip(state: FieldSyncState.synced),
+                  ],
                 ),
-            ],
+                Text(
+                  [r.docNo ?? '', formatDateOnly(r.date), r.projectLabel].where((e) => e.isNotEmpty).join(' · '),
+                  style: muted,
+                ),
+                if (r.title.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(r.title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  ),
+                if (r.subtitle.isNotEmpty) Text(r.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: muted),
+                if (r.flags.isNotEmpty || r.editable)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        for (final f in r.flags) PkPill(label: flagLabel(t, f), tone: PkTone.warn),
+                        if (r.editable) PkPill(label: t.fieldEditableTag, tone: PkTone.info, icon: Icons.edit),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -322,10 +403,28 @@ class FieldRecordSheet extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(r.type.label, style: theme.textTheme.titleLarge),
-            Text([r.docNo ?? '', formatDateOnly(r.date)].where((e) => e.isNotEmpty).join(' · ')),
-            Text(r.projectLabel, style: theme.textTheme.bodySmall),
-            const Divider(),
+            Row(
+              children: [
+                PkIconChip(icon: fieldReportIcon(r.type), tone: PkTone.primary, size: 40),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    r.type.label,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontFamily: PkFonts.heading,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              [r.docNo ?? '', formatDateOnly(r.date)].where((e) => e.isNotEmpty).join(' · '),
+              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            Text(r.projectLabel, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            const Divider(height: 24),
             if (r.title.isNotEmpty) Text(r.title, style: theme.textTheme.titleMedium),
             if (r.subtitle.isNotEmpty) Text(r.subtitle),
             for (final p in r.parts)
@@ -340,6 +439,7 @@ class FieldRecordSheet extends StatelessWidget {
             if (r.editable)
               FilledButton.icon(
                 key: const Key('field-record-edit'),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                 onPressed: () {
                   Navigator.of(context).pop();
                   context.push('/field/edit/${r.type.segment}/${r.id}');
