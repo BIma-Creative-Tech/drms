@@ -65,7 +65,8 @@ function withCell(field: Field): Field {
     // keeps Payload's own field — upload, choose existing — and so does a field with its own Field component)
     const components = field.admin?.components ?? {}
     const readOnly = field.admin?.readOnly === true
-    return { ...field, admin: { ...field.admin, components: { ...components, Cell: components.Cell ?? UPLOAD_CELL, ...(readOnly ? { Field: components.Field ?? UPLOAD_PREVIEW_FIELD } : {}) } } }
+    const wired = { ...components, Cell: components.Cell ?? UPLOAD_CELL, ...(readOnly ? { Field: components.Field ?? UPLOAD_PREVIEW_FIELD } : {}) }
+    return { ...field, admin: { ...field.admin, components: wired } } as Field
   }
   if (field.type === 'checkbox') {
     if (field.admin?.components?.Cell) return field
