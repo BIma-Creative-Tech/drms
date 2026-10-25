@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-**APK 0.13.1 (APK-only, server 0.21.0)** (branch `fix/d2510-apk-tap-lpj`, pubspec `0.13.1+1`, release notes
+**APK 0.13.1 (APK-only, works with server 0.21.0 and 0.21.1)** (branch `fix/d2510-apk-tap-lpj`, pubspec `0.13.1+1`, release notes
 `docs/release-notes/apk/0.13.1.md`): no server change, no migration, no API change; APK 0.13.0 keeps working. Folded
 into the next web release section.
 
@@ -37,6 +37,49 @@ into the next web release section.
   account; dashboard "Kas terbaru" opens the request (else the cash entry); Aftersales "Hari ini" sent rows, Unit &
   kontrak (contract → contract unit, unit → vehicle record), Akses PT user header and Tutup buku history open their
   detail. `canOpenApkRoute` keeps a target the user cannot read unlinked.
+
+## [0.21.1] - 2026-10-25
+
+**Web fix: image previews + popup for every image link, selfies only through audited endpoints (D2510, user
+2026-10-25).** Web only: no migration, no API change, no CSP change, no token change; one access tightening (selfies,
+see Security); APK unchanged (APK 0.13.1 — Finance LPJ, tappable rows, photo
+previews — is a separate APK-only release, branch `fix/d2510-apk-tap-lpj`). Rollback = image 0.21.0.
+
+### Fixed
+
+- **Attendance photos had no preview on the web.** The selfie of a check-in / check-out was only reachable through a
+  "Selfie" text button in the Aksi column of the per-employee rekap (a dialog); "Tim hari ini" and "Rekap saya"
+  showed none, and the Payload Absensi record previewed through the generic `/api/media-selfies` route, whose media
+  read rule never lets a PM see his team's selfie (Q-33 visibility runs through the attendance). Now the selfies are
+  lazy thumbnails on the "Tim hari ini" member cards and in the rekap (per karyawan and "Rekap saya"), each opening
+  the shared lightbox (caption: masuk / pulang, time, location, date; ← → between the selfies of the day / member).
+  Same audited endpoint `GET /api/v1/attendance/{id}/selfie` (attendance read access; someone else's selfie still
+  audited `view_sensitive`); a selfie removed by retention keeps the "Selfie dihapus" chip.
+- **Every image link of the web admin is a preview that opens in a popup:** one shared thumbnail
+  (`src/admin/components/media/ImageThumb.tsx`: fixed size, `object-fit: cover`, lazy, alt text, keyboard link
+  opening the lightbox — Esc closes and returns the focus, ← → within the record, caption, "Buka di tab baru"; no JS /
+  Ctrl-click = new tab; thumbnail → full file → file link fallback) for receipts and LPJ photos (Verifikasi LPJ,
+  Verifikasi nota Reimburse, request detail lines, own receipts), transfer proofs (request detail — was a "bukti"
+  text link —, Pinjaman antar-PT movements), cash proofs (Buku kas list — was a "Bukti" button —, KK / KM edit form),
+  the request's invoice / PT document file and its Lampiran (images previewed, PDFs stay file links with their
+  name), field-report / progress galleries and the photo cells of the Progress and Laporan servis lists. Lightbox
+  title and caption wrap instead of an ellipsis.
+- **Payload views:** every upload field to a media collection shows thumbnails in the collection list (was the file
+  name); read-only ones (attendance selfie, transfer / cash proof, approval signature) show the authorized preview in
+  the edit form; editable upload fields keep Payload's own field.
+
+### Security
+
+- **No unaudited path to attendance selfies any more (user decision 2026-10-25).** The Payload side of
+  `media-selfies` (REST `/api/media-selfies` list and by id, the static file route `/api/media-selfies/file/<name>`,
+  the Media → Selfie absensi library, Payload upload previews, populated `selfie` relations) answers only the
+  uploader's own rows: Admin, Direktur, Finance and Admin Staff (and the PM, already before) no longer see other
+  people's selfies there without an audit row. Every legitimate viewer goes through the audited
+  `GET /api/v1/attendance/{id}/selfie` or `GET /api/v1/media/selfies/{id}/file` (+ signed URL): visibility = read
+  access of the referencing attendance (Q-33), someone else's selfie audited `view_sensitive` (throttled). The
+  library is hidden from the admin menu and routes and from `/me/modules` (APK). Uploads (web + APK), check-in /
+  on-behalf and the uploader's own capture are unchanged. ADR 0004 (revision 2026-10-25) and ADR 0018 amended.
+  Note: a face reference photo (`employees.faceRefPhoto`, unused — 0 rows) is only previewable by its uploader.
 
 ## [0.21.0] - 2026-10-25
 

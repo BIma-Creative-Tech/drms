@@ -47,6 +47,8 @@ import { PtNotAllowed } from './shared'
 import { PerPt } from './pt-breakdown'
 import { Bento, Card, DataTable, EmptyState, KpiRow, KpiTile, rp, StatusPill, VIZ_STYLE, type Col } from './viz'
 import { NoAccess } from './NoAccess'
+import { ImageThumb } from '../components/media/ImageThumb'
+import { mediaThumbSource } from '../components/media/media-url'
 
 /**
  * E2 (fase1-golive §E2, US-23/US-24, ADR 0005): web "Kas" for Finance — buku kas with filters,
@@ -552,9 +554,8 @@ function LedgerTable({
       cell: (r) => (
         <div className="pk-kact">
           {r.proofId ? (
-            <a className="pk-kbtn sm" href={`/api/v1/media/attachments/${r.proofId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox="kas-proofs" data-pk-lightbox-title={`Bukti ${r.entryNo}`}>
-              Bukti
-            </a>
+            // D2510 (web 0.21.1): the proof as a preview (lightbox over the proofs of the page; a PDF → file link "Bukti")
+            <ImageThumb src={mediaThumbSource('attachments', r.proofId)} group="kas-proofs" title={`Bukti ${r.entryNo}`} caption={`${dayMonth(r.entryDate)} · ${r.direction === 'in' ? 'masuk' : 'keluar'} ${rp(r.amount)}`} size={40} fileLabel="Bukti" data-pk-proof={r.id} />
           ) : null}
           {writeIn(r.companyId) && canEdit(r, lockOf(r.companyId)) ? (
             <a className="pk-kbtn sm" href={`/admin/kas/${r.id}/ubah`} data-pk-action={`edit-${r.id}`}>

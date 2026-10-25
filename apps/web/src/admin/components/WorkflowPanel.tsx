@@ -17,6 +17,8 @@ import { loadRequestPanel } from './request/panel-data'
 import { RequestStepper } from './request/RequestStepper'
 import { RequestSummary } from './request/RequestSummary'
 import { LpjPhotoGrid } from './lpj/LpjPhotoGrid'
+import { ImageThumb } from './media/ImageThumb'
+import { mediaThumbSource } from './media/media-url'
 
 // Local copies of views/shared helpers: that module pulls the admin DefaultTemplate (not needed
 // in a field component, and keeps this component renderable in integration tests).
@@ -182,9 +184,8 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
                   <>
                     {' '}
                     ·{' '}
-                    <a href={`/api/v1/media/transfer-proofs/${t.proofId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`transfer-${d.id}`} data-pk-lightbox-title={`Bukti transfer ${t.docNo}`}>
-                      bukti
-                    </a>
+                    {/* D2510 (web 0.21.1): the proof as a preview (lightbox; a PDF proof → file link) */}
+                    <ImageThumb src={mediaThumbSource('transfer-proofs', t.proofId)} group={`transfer-${d.id}`} title={`Bukti transfer ${t.docNo}`} caption={`${t.transferDate} · ${rp(t.amount)}`} size={40} fileLabel="Bukti transfer" data-pk-transfer-proof={t.id} />
                   </>
                 ) : null}
               </li>

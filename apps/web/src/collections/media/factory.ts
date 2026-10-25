@@ -74,6 +74,8 @@ export type MediaSpec = {
    * refused while the uploader has not acknowledged the current privacy notice (enforcement on).
    */
   createGuard?: (req: PayloadRequest) => Promise<void>
+  /** Not in the admin nav / routes (Payload `admin.hidden`; upload-field drawers still work). D2510: selfies. */
+  hidden?: boolean
 }
 
 /**
@@ -162,7 +164,7 @@ export function mediaCollection(spec: MediaSpec): CollectionConfig {
     {
       slug: spec.slug,
       labels: spec.labels,
-      admin: { group: 'Media', defaultColumns: ['filename', 'mimeType', 'filesize', 'uploadedBy', 'createdAt'] },
+      admin: { group: 'Media', defaultColumns: ['filename', 'mimeType', 'filesize', 'uploadedBy', 'createdAt'], ...(spec.hidden ? { hidden: true } : {}) },
       access: { read: spec.access.read, create: spec.access.create, update: denyAll, delete: denyAll },
       upload: {
         staticDir: path.join(MEDIA_DIR, spec.slug),

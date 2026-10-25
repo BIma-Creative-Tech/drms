@@ -21,6 +21,7 @@ import { ptOptionsOf, ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
 import { Bento, Card, DataTable, EmptyState, KpiRow, KpiTile, type Col } from './viz'
 import { DateInput } from '../components/DateInput'
+import { ImageThumb } from '../components/media/ImageThumb'
 
 /**
  * FR1 "Laporan servis unit" (ADR 0020, plan A; mockups Android-Servis + Web-Timeline): list (filters
@@ -125,10 +126,10 @@ export async function FieldServiceList(props: AdminViewServerProps) {
         r.photos.length === 0 ? (
           '—'
         ) : (
-          <span className="pk-thumbs">
-            {r.photos.slice(0, 3).map((p) => (
-              // eslint-disable-next-line @next/next/no-img-element -- authenticated API thumbnail
-              <img key={p.id} src={p.thumbUrl} alt="" loading="lazy" width={36} height={28} />
+          // D2510 (web 0.21.1): real previews (lightbox group = the report)
+          <span className="pk-thumbs" data-pk-report-thumbs={r.id}>
+            {r.photos.slice(0, 3).map((p, i) => (
+              <ImageThumb key={p.id} src={{ href: p.url, thumb: p.thumbUrl, fallback: 'full' }} size={36} group={`service-list-${r.id}`} title={`Foto ${i + 1} laporan servis ${r.docNo ?? r.id}`} caption={dateId(r.reportDate)} data-pk-photo={p.id} />
             ))}
             {r.photos.length > 3 ? <small>+{r.photos.length - 3}</small> : null}
           </span>
@@ -470,7 +471,7 @@ export async function FieldServiceDetail(props: AdminViewServerProps) {
           />
         </Card>
         <Card id="service-photos" title="Foto sebelum / sesudah" sub={r.photos.length ? 'Klik foto untuk ukuran penuh (tab baru)' : undefined} span={7} i={7}>
-          <PhotoGallery photos={r.photos} label={`laporan ${r.docNo ?? r.id}`} empty="Laporan ini tanpa foto." />
+          <PhotoGallery photos={r.photos} label={`laporan ${r.docNo ?? r.id}`} empty="Laporan ini tanpa foto." caption={`${longDate(r.reportDate)} · ${unitName}`} />
         </Card>
         <Card id="service-history" title="Riwayat & koreksi" span={5} i={8}>
           <History entries={history} tz={tz} />

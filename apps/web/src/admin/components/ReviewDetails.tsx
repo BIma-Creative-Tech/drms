@@ -6,6 +6,8 @@ import { formatRupiah } from '@/lib/money'
 
 import { formatQty } from './lines/line-form'
 import { LineCard } from './lines/LineCard'
+import { ImageThumb } from './media/ImageThumb'
+import { mediaThumbSource } from './media/media-url'
 
 type Detail = Awaited<ReturnType<typeof detail>>
 
@@ -86,10 +88,7 @@ function Receipt({ r, d, lineNo }: { r: Detail['receipts'][number]; d: Detail; l
   return (
     <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginBottom: 4 }} data-pk-review-receipt={r.id}>
       {r.imageId ? (
-        <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" title="Buka foto nota (ukuran penuh)" data-pk-lightbox={`receipts-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · baris ${lineNo} · ${rp(r.amount)}`}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
-          <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Foto nota ${r.receiptNo ?? r.id}, baris ${lineNo}`} loading="lazy" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 4 }} />
-        </a>
+        <ImageThumb src={mediaThumbSource('receipts', r.imageId)} group={`receipts-${d.id}`} title={`Nota ${r.receiptNo ?? r.id} · baris ${lineNo} · ${rp(r.amount)}`} caption={`${r.vendorName} · ${r.receiptDate}`} alt={`Foto nota ${r.receiptNo ?? r.id}, baris ${lineNo}`} size={56} data-pk-receipt-thumb={r.id} />
       ) : null}
       <div style={{ minWidth: 0 }}>
         {r.vendorName} · No. {r.receiptNo ?? '—'} · {r.receiptDate}
