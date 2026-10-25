@@ -491,6 +491,7 @@ class PkQuickAction extends StatelessWidget {
           PkWordFitText(
             label,
             maxLines: 2,
+            maxWidth: _PkQuickCell.labelWidthOf(context),
             style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700, height: 1.2),
           ),
         ],
@@ -500,64 +501,92 @@ class PkQuickAction extends StatelessWidget {
 }
 
 /// Centred label that never breaks inside a word: when its longest word is wider than the box, the font shrinks
-/// (down to 75 %) until that word fits ("Persetujuan" in a quarter-width tile).
+/// (down to 75 %) until that word fits ("Persetujuan" in a quarter-width tile). Give [maxWidth] when the widget sits
+/// under an [IntrinsicHeight] (it then measures without a LayoutBuilder).
 class PkWordFitText extends StatelessWidget {
-  const PkWordFitText(this.text, {super.key, this.style, this.maxLines = 2});
+  const PkWordFitText(this.text, {super.key, this.style, this.maxLines = 2, this.maxWidth});
   final String text;
   final TextStyle? style;
   final int maxLines;
+  final double? maxWidth;
+
+  Widget _fitted(BuildContext context, double width) {
+    final base = DefaultTextStyle.of(context).style.merge(style);
+    final scaler = MediaQuery.textScalerOf(context);
+    var widest = 0.0;
+    for (final word in text.split(RegExp(r'\s+'))) {
+      final tp = TextPainter(
+        text: TextSpan(text: word, style: base),
+        textDirection: Directionality.of(context),
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      if (tp.width > widest) widest = tp.width;
+      tp.dispose();
+    }
+    final size = base.fontSize ?? 14;
+    final fitted = widest > width && width.isFinite && width > 0
+        ? (size * width / widest).clamp(size * 0.75, size).toDouble()
+        : size;
+    return Text(
+      text,
+      textAlign: TextAlign.center,
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
+      style: base.copyWith(fontSize: fitted),
+    );
+  }
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, box) {
-      final base = DefaultTextStyle.of(context).style.merge(style);
-      final scaler = MediaQuery.textScalerOf(context);
-      var widest = 0.0;
-      for (final word in text.split(RegExp(r'\s+'))) {
-        final tp = TextPainter(
-          text: TextSpan(text: word, style: base),
-          textDirection: Directionality.of(context),
-          textScaler: scaler,
-          maxLines: 1,
-        )..layout();
-        if (tp.width > widest) widest = tp.width;
-        tp.dispose();
-      }
-      final size = base.fontSize ?? 14;
-      final fitted = widest > box.maxWidth && box.maxWidth.isFinite
-          ? (size * box.maxWidth / widest).clamp(size * 0.75, size).toDouble()
-          : size;
-      return Text(
-        text,
-        textAlign: TextAlign.center,
-        maxLines: maxLines,
-        overflow: TextOverflow.ellipsis,
-        style: base.copyWith(fontSize: fitted),
-      );
-    },
-  );
+  Widget build(BuildContext context) {
+    final w = maxWidth;
+    if (w != null) return _fitted(context, w);
+    return LayoutBuilder(builder: (context, box) => _fitted(context, box.maxWidth));
+  }
 }
 
-/// Row of up to four [PkQuickAction]s of equal width.
+/// Row of up to four [PkQuickAction]s of equal width and height. The cell width is measured here, outside the
+/// [IntrinsicHeight] (a LayoutBuilder cannot report intrinsic sizes), and handed to the labels via [_PkQuickCell].
 class PkQuickActions extends StatelessWidget {
   const PkQuickActions({super.key, required this.children});
   final List<Widget> children;
 
+  static const _gap = 10.0;
+
   @override
   Widget build(BuildContext context) {
     if (children.isEmpty) return const SizedBox.shrink();
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < 4; i++) ...[
-            if (i > 0) const SizedBox(width: 10),
-            Expanded(child: i < children.length ? children[i] : const SizedBox.shrink()),
-          ],
-        ],
+    return LayoutBuilder(
+      builder: (context, box) => _PkQuickCell(
+        width: (box.maxWidth - 3 * _gap) / 4,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < 4; i++) ...[
+                if (i > 0) const SizedBox(width: _gap),
+                Expanded(child: i < children.length ? children[i] : const SizedBox.shrink()),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
+}
+
+class _PkQuickCell extends InheritedWidget {
+  const _PkQuickCell({required this.width, required super.child});
+  final double width;
+
+  /// Label width inside a [PkQuickAction] (cell minus its 2 × 4 dp padding), null outside [PkQuickActions].
+  static double? labelWidthOf(BuildContext context) {
+    final w = context.dependOnInheritedWidgetOfExactType<_PkQuickCell>()?.width;
+    return w == null ? null : w - 8;
+  }
+
+  @override
+  bool updateShouldNotify(_PkQuickCell old) => old.width != width;
 }
 
 /// Initials in a circle (no photos in the app).
