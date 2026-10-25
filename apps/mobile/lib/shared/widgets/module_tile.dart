@@ -5,7 +5,8 @@ import '../icons/iconsax.dart';
 
 /// Home launcher tile (web `LauncherGrid` / `.pk-tile`, ADR 0015): white Iconsax Bulk glyph on the 135°
 /// gradient of a web module, label, optional secondary line and a count badge. Replaces the former
-/// BigActionButton list; the whole card is one ≥ 48 dp touch target.
+/// BigActionButton list; the whole card is one ≥ 48 dp touch target. [compact] (D2510 Beranda, Banani
+/// "MenuButtonGrid"): centred glyph over a short label, three per row.
 class ModuleTile extends StatelessWidget {
   const ModuleTile({
     super.key,
@@ -15,6 +16,7 @@ class ModuleTile extends StatelessWidget {
     this.subtitle,
     this.badge,
     this.onPressed,
+    this.compact = false,
   });
 
   final PkModule module;
@@ -23,105 +25,133 @@ class ModuleTile extends StatelessWidget {
   final String? subtitle;
   final String? badge;
   final VoidCallback? onPressed;
+  final bool compact;
+
+  Widget _glyph(BuildContext context, double size) {
+    final theme = Theme.of(context);
+    final pk = context.pk;
+    final g = pk.gradient(module);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(PkTokens.radius),
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [g.from, g.to]),
+            boxShadow: [
+              BoxShadow(
+                color: g.from.withValues(alpha: pk.brightness == Brightness.dark ? 0.25 : 0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+                spreadRadius: -6,
+              ),
+            ],
+          ),
+          child: SizedBox.square(
+            dimension: size,
+            child: Center(
+              child: PkIcon(icon, size: size * 0.54, color: const Color(0xFFFFFFFF)),
+            ),
+          ),
+        ),
+        if (badge != null)
+          Positioned(
+            top: -6,
+            right: -10,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 24),
+              height: 24,
+              padding: const EdgeInsets.symmetric(horizontal: 7),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: pk.bad,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: pk.card, width: 2),
+              ),
+              child: Text(
+                badge!,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: const Color(0xFFFFFFFF),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final pk = context.pk;
-    final g = pk.gradient(module);
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onPressed,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(PkTokens.radius),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [g.from, g.to],
+        child: compact
+            ? Padding(
+                padding: const EdgeInsets.fromLTRB(6, 14, 6, 12),
+                child: Column(
+                  children: [
+                    _glyph(context, 46),
+                    const SizedBox(height: 10),
+                    Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelLarge?.copyWith(fontSize: 13, height: 1.2),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: muted?.copyWith(fontSize: 11, height: 1.2),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: g.from.withValues(alpha: pk.brightness == Brightness.dark ? 0.25 : 0.35),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
-                          spreadRadius: -6,
-                        ),
-                      ],
-                    ),
-                    child: SizedBox.square(
-                      dimension: 52,
-                      child: Center(child: PkIcon(icon, size: 28, color: const Color(0xFFFFFFFF))),
-                    ),
-                  ),
-                  if (badge != null)
-                    Positioned(
-                      top: -6,
-                      right: -10,
-                      child: Container(
-                        constraints: const BoxConstraints(minWidth: 24),
-                        height: 24,
-                        padding: const EdgeInsets.symmetric(horizontal: 7),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: pk.bad,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: pk.card, width: 2),
-                        ),
-                        child: Text(
-                          badge!,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: const Color(0xFFFFFFFF),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                            height: 1,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                label,
-                style: theme.textTheme.titleMedium?.copyWith(fontSize: 15, height: 1.25),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  subtitle!,
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+                    ],
+                  ],
                 ),
-              ],
-            ],
-          ),
-        ),
+              )
+            : Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _glyph(context, 52),
+                    const SizedBox(height: 12),
+                    Text(
+                      label,
+                      style: theme.textTheme.titleMedium?.copyWith(fontSize: 15, height: 1.25),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 4),
+                      Text(subtitle!, style: muted, maxLines: 3, overflow: TextOverflow.ellipsis),
+                    ],
+                  ],
+                ),
+              ),
       ),
     );
   }
 }
 
-/// Launcher grid: 2 columns on phones, 3 from 600 dp; tiles of a row share the row height. Staggered
-/// entrance (fade + rise, built-in animation APIs) that is skipped when the system asks for reduced
+/// Launcher grid: 2 columns on phones, 3 from 600 dp ([compact]: 3, 4 from 600 dp); tiles of a row share the row
+/// height. Staggered entrance (fade + rise, built-in animation APIs) that is skipped when the system asks for reduced
 /// motion ([MediaQuery.disableAnimationsOf]).
 class ModuleGrid extends StatefulWidget {
-  const ModuleGrid({super.key, required this.children, this.spacing = 12});
+  const ModuleGrid({super.key, required this.children, this.spacing = 12, this.compact = false});
   final List<Widget> children;
   final double spacing;
+  final bool compact;
 
   @override
   State<ModuleGrid> createState() => _ModuleGridState();
@@ -169,7 +199,8 @@ class _ModuleGridState extends State<ModuleGrid> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) {
-      final cols = box.maxWidth >= 600 ? 3 : 2;
+      final wide = box.maxWidth >= 600;
+      final cols = widget.compact ? (wide ? 4 : 3) : (wide ? 3 : 2);
       final items = widget.children;
       final rows = <Widget>[];
       for (var r = 0; r * cols < items.length; r++) {

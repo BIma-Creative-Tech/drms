@@ -216,9 +216,9 @@ void main() {
 
   final shots = <(String, Set<Role>, String, bool, String?)>[
     ('home-direktur', {Role.owner}, '/home', true, null),
-    ('home-direktur-scrolled', {Role.owner}, '/home', true, 'home-requests'),
+    ('home-direktur-scrolled', {Role.owner}, '/home', true, 'home-approvals'),
     ('home-pm', {Role.pm}, '/home', true, null),
-    ('home-pm-scrolled', {Role.pm}, '/home', true, 'home-attendance'),
+    ('home-pm-scrolled', {Role.pm}, '/home', true, 'home-menu'),
     ('home-staff', {Role.staff}, '/home', true, null),
     ('requests', {Role.staff}, '/requests?tab=sent', true, null),
     ('request-detail', {Role.staff}, '/requests/42', true, null),

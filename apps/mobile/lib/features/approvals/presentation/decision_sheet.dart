@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:signature/signature.dart';
 import 'package:uuid/uuid.dart';
 
@@ -12,10 +13,12 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/online_only_button.dart';
+import '../../expense/application/expense_providers.dart';
 import '../../expense/domain/expense_request.dart';
 import '../../expense/domain/fund_check.dart';
 import '../../expense/presentation/widgets/fund_check_panel.dart';
 import '../../expense/domain/turn_timeline.dart' show ownerApproveTitle, ownerRoleCode;
+import '../application/inbox_providers.dart';
 import '../data/approvals_api.dart';
 
 /// Signature PNG limit (requirements §9: ≤ 800×300 px, ≤ 50 KB).
@@ -28,6 +31,37 @@ Future<bool?> showDecisionSheet(BuildContext context, {required ExpenseDetail de
       useSafeArea: true,
       builder: (_) => DecisionSheet(detail: detail, decision: decision),
     );
+
+/// D2510: Setujui / Diketahui / Tolak straight from a list card (Beranda): loads the request, checks that the server
+/// still allows [decision] (and that the fund check does not block an approval), then the same [DecisionSheet] and
+/// result popup as the detail screen's decision bar. Anything unusual opens the detail instead.
+Future<void> quickDecision(BuildContext context, WidgetRef ref, int id, Decision decision) async {
+  final t = AppLocalizations.of(context);
+  final ExpenseDetail detail;
+  try {
+    detail = await ref.read(requestDetailProvider(id).future);
+  } catch (e) {
+    if (context.mounted) await showActionError(context, e, action: decisionActionLabel(t, decision));
+    return;
+  }
+  if (!context.mounted) return;
+  final allowed = detail.allowedActions.contains(decision.name);
+  final blocked = decision != Decision.reject && detail.fundCheck?.blockedReason != null;
+  if (!allowed || blocked) {
+    await context.push<void>('/requests/$id');
+    ref.invalidate(inboxProvider);
+    return;
+  }
+  final done = await showDecisionSheet(context, detail: detail, decision: decision);
+  ref.invalidate(requestDetailProvider(id));
+  ref.invalidate(inboxProvider);
+  if (done != true || !context.mounted) return;
+  await showActionResult(
+    context,
+    message: '${detail.docNo ?? detail.title}: ${t.decisionDone}',
+    action: decisionActionLabel(t, decision),
+  );
+}
 
 enum SignatureMode { profile, draw }
 

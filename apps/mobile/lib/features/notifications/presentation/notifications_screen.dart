@@ -10,15 +10,31 @@ import '../../companies/presentation/company_chip.dart';
 import '../application/notifications_providers.dart';
 import '../domain/app_notification.dart';
 import '../../../shared/icons/iconsax.dart';
+import '../../../shared/widgets/pk_ui.dart';
 
 /// Bell icon with the unread count (home app bar).
 class NotificationBell extends ConsumerWidget {
-  const NotificationBell({super.key});
+  const NotificationBell({super.key, this.onHero = false});
+
+  /// D2510: round translucent button on the Beranda hero band instead of an app bar icon.
+  final bool onHero;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     final unread = ref.watch(notificationsProvider).value?.unreadCount ?? 0;
+    if (onHero) {
+      return PkHeroIconButton(
+        key: const Key('notification-bell'),
+        tooltip: t.notificationsTitle,
+        onPressed: () => context.push('/notifications'),
+        child: Badge(
+          isLabelVisible: unread > 0,
+          label: Text(unread > 99 ? '99+' : '$unread'),
+          child: const PkIcon(PkIcons.bell),
+        ),
+      );
+    }
     return IconButton(
       key: const Key('notification-bell'),
       tooltip: t.notificationsTitle,

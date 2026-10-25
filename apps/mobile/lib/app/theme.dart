@@ -32,10 +32,24 @@ class PkColors extends ThemeExtension<PkColors> {
     required this.border,
     required this.muted,
     required this.brightness,
+    required this.hero,
+    required this.heroEnd,
+    required this.onHero,
+    required this.heroPill,
+    required this.onHeroPill,
+    required this.okBg,
+    required this.warnBg,
+    required this.badBg,
+    required this.infoBg,
+    required this.okOn,
+    required this.warnOn,
+    required this.badOn,
+    required this.infoOn,
   });
 
   factory PkColors.of(Brightness b) {
     final t = PkTokens.of(b);
+    final dark = b == Brightness.dark;
     return PkColors(
       ok: t.ok,
       warn: t.warn,
@@ -50,6 +64,20 @@ class PkColors extends ThemeExtension<PkColors> {
       border: t.border,
       muted: t.muted,
       brightness: b,
+      // D2510 (Banani reference, web palette kept): deep-blue hero band, soft status fills with darker text.
+      hero: dark ? const Color(0xFF172554) : const Color(0xFF1E40AF),
+      heroEnd: const Color(0xFF1E3A8A),
+      onHero: const Color(0xFFFFFFFF),
+      heroPill: const Color(0xFFBFDBFE),
+      onHeroPill: dark ? const Color(0xFF172554) : const Color(0xFF1E3A8A),
+      okBg: dark ? const Color(0xFF14532D) : const Color(0xFFDCFCE7),
+      warnBg: dark ? const Color(0xFF431407) : const Color(0xFFFFEDD5),
+      badBg: dark ? const Color(0xFF450A0A) : const Color(0xFFFEE2E2),
+      infoBg: dark ? const Color(0xFF172554) : const Color(0xFFDBEAFE),
+      okOn: dark ? const Color(0xFF86EFAC) : const Color(0xFF166534),
+      warnOn: dark ? const Color(0xFFFDBA74) : const Color(0xFF9A3412),
+      badOn: dark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
+      infoOn: dark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF),
     );
   }
 
@@ -72,6 +100,23 @@ class PkColors extends ThemeExtension<PkColors> {
   final Color muted;
   final Brightness brightness;
 
+  /// Hero band of the main screens (gradient [hero] → [heroEnd]) and its text / pills.
+  final Color hero;
+  final Color heroEnd;
+  final Color onHero;
+  final Color heroPill;
+  final Color onHeroPill;
+
+  /// Soft status fills (pills, icon chips) and the text / icon colour on top of them (≥ 4.5:1).
+  final Color okBg;
+  final Color warnBg;
+  final Color badBg;
+  final Color infoBg;
+  final Color okOn;
+  final Color warnOn;
+  final Color badOn;
+  final Color infoOn;
+
   /// Launcher tile gradient of a web module for this brightness.
   PkGradient gradient(PkModule m) => PkGradients.of(m, brightness);
 
@@ -80,6 +125,15 @@ class PkColors extends ThemeExtension<PkColors> {
 
   @override
   PkColors lerp(PkColors? other, double t) => t < 0.5 || other == null ? this : other;
+}
+
+/// Corner radii of the D2510 restyle (Banani reference `--radius-*`): [md] = web `radius` for cards, inputs and
+/// buttons; [lg] for summary cards, sheets and the hero band; [sm] for small chips.
+abstract final class PkRadius {
+  static const double sm = 8;
+  static const double md = PkTokens.radius;
+  static const double lg = 20;
+  static const double xl = 28;
 }
 
 extension PkThemeContext on BuildContext {
@@ -149,7 +203,7 @@ TextTheme _textTheme(ColorScheme scheme) {
     headlineLarge: heading(base.headlineLarge, FontWeight.w700),
     headlineMedium: heading(base.headlineMedium, FontWeight.w700),
     headlineSmall: heading(base.headlineSmall, FontWeight.w600),
-    titleLarge: heading(base.titleLarge, FontWeight.w600),
+    titleLarge: heading(base.titleLarge, FontWeight.w700),
     titleMedium: heading(base.titleMedium, FontWeight.w600),
     titleSmall: base.titleSmall?.copyWith(fontWeight: FontWeight.w700),
     labelLarge: base.labelLarge?.copyWith(fontWeight: FontWeight.w700),
@@ -190,7 +244,7 @@ ThemeData buildTheme([Brightness brightness = Brightness.light]) {
       scrolledUnderElevation: 0,
       centerTitle: false,
       shape: Border(bottom: BorderSide(color: t.border)),
-      titleTextStyle: text.titleLarge?.copyWith(fontSize: 20, color: t.foreground),
+      titleTextStyle: text.titleLarge?.copyWith(fontSize: 19, color: t.foreground, letterSpacing: -0.2),
       iconTheme: IconThemeData(color: t.foreground),
       actionsIconTheme: IconThemeData(color: t.foreground),
     ),
@@ -246,7 +300,7 @@ ThemeData buildTheme([Brightness brightness = Brightness.light]) {
       focusedErrorBorder: inputBorder(t.destructive, 2),
       disabledBorder: inputBorder(t.border),
     ),
-    listTileTheme: ListTileThemeData(minVerticalPadding: 12, iconColor: t.mutedForeground),
+    listTileTheme: ListTileThemeData(minVerticalPadding: 12, iconColor: t.mutedForeground, shape: shape),
     chipTheme: ChipThemeData(
       side: BorderSide(color: t.border),
       shape: const StadiumBorder(),
@@ -256,14 +310,15 @@ ThemeData buildTheme([Brightness brightness = Brightness.light]) {
     dialogTheme: DialogThemeData(
       backgroundColor: t.card,
       surfaceTintColor: Colors.transparent,
-      shape: shape,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(PkRadius.lg))),
       titleTextStyle: text.titleLarge?.copyWith(color: t.foreground),
     ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: t.card,
       surfaceTintColor: Colors.transparent,
       modalBackgroundColor: t.card,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(PkTokens.radius))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(PkRadius.lg))),
+      dragHandleColor: t.input,
     ),
     popupMenuTheme: PopupMenuThemeData(color: t.card, surfaceTintColor: Colors.transparent, shape: shape),
     snackBarTheme: SnackBarThemeData(
@@ -285,16 +340,19 @@ ThemeData buildTheme([Brightness brightness = Brightness.light]) {
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       height: 72,
-      // Web active menu entry: pill in a primary tint.
-      indicatorColor: t.primary.withValues(alpha: brightness == Brightness.dark ? 0.20 : 0.12),
+      // D2510: active tab = tonal pill with a dark glyph, bold label in the text colour (Banani BottomNav).
+      indicatorColor: scheme.secondaryContainer,
       indicatorShape: const StadiumBorder(),
       iconTheme: WidgetStateProperty.resolveWith(
-        (s) => IconThemeData(size: 24, color: s.contains(WidgetState.selected) ? t.primary : t.mutedForeground),
+        (s) => IconThemeData(
+          size: 22,
+          color: s.contains(WidgetState.selected) ? scheme.onSecondaryContainer : t.mutedForeground,
+        ),
       ),
       labelTextStyle: WidgetStateProperty.resolveWith(
         (s) => text.labelMedium?.copyWith(
-          color: s.contains(WidgetState.selected) ? t.primary : t.mutedForeground,
-          fontWeight: s.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
+          color: s.contains(WidgetState.selected) ? t.foreground : t.mutedForeground,
+          fontWeight: FontWeight.w700,
         ),
       ),
     ),

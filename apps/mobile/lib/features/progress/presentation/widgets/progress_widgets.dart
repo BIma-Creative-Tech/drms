@@ -7,6 +7,7 @@ import '../../../../app/theme.dart';
 import '../../../../core/format/dates.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../../shared/widgets/photo_viewer.dart';
+import '../../../../shared/widgets/pk_ui.dart';
 import '../../../dashboard/presentation/charts.dart' show VizColors;
 import '../../application/progress_providers.dart';
 import '../../domain/progress.dart';
@@ -168,6 +169,86 @@ class ProjectProgressCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// D2510 Beranda project card (Banani "ProjectCard"): icon, code, name, tone pill, budget-used bar and the
+/// physical / budget percentages on one line.
+class ProjectProgressCompactCard extends StatelessWidget {
+  const ProjectProgressCompactCard({super.key, required this.item, this.onTap});
+  final ProjectProgress item;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final pk = context.pk;
+    final tone = switch (item.tone) {
+      ProgressTone.ok => PkTone.ok,
+      ProgressTone.warn => PkTone.warn,
+      ProgressTone.bad => PkTone.bad,
+      ProgressTone.none => PkTone.neutral,
+    };
+    final toneText = item.toneLabel.isNotEmpty
+        ? item.toneLabel
+        : switch (item.tone) {
+            ProgressTone.ok => t.progressToneOk,
+            ProgressTone.warn => t.progressToneWarn,
+            ProgressTone.bad => t.progressToneBad,
+            ProgressTone.none => t.progressToneNone,
+          };
+    final barColor = switch (item.tone) {
+      ProgressTone.bad => pk.badText,
+      ProgressTone.warn => pk.warnText,
+      _ => theme.colorScheme.primary,
+    };
+    final muted = theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    return PkCard(
+      key: Key('project-progress-${item.id}'),
+      onTap: onTap,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const PkIconChip(icon: Icons.apartment, tone: PkTone.primary, size: 40),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (item.code.isNotEmpty) Text(item.code, style: muted?.copyWith(fontWeight: FontWeight.w700)),
+                    Text(
+                      item.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, height: 1.25),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              PkPill(label: toneText, tone: tone),
+            ],
+          ),
+          const SizedBox(height: 12),
+          PkProgressBar(value: (item.budgetPct ?? 0) / 100, color: barColor),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: Text('${t.progressPhysical} ${fmtPct(item.progressPct)}', style: muted)),
+              Text(
+                '${t.progressBudgetUsed} ${item.budgetPct == null ? '—' : fmtPct(item.budgetPct!)}',
+                style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
