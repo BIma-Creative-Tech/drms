@@ -92,6 +92,7 @@ Future<void> _shot(
   AuthController Function()? authController,
   Future<void> Function(WidgetTester tester)? act,
   AppConfig appConfig = const AppConfig(syncAttendance: true),
+  List<Addendum> addendumInbox = const [],
 }) async {
   // flutter_test paints shadows as solid black outlines unless this is off.
   debugDisableShadows = false;
@@ -131,7 +132,7 @@ Future<void> _shot(
         outboxCountsProvider.overrideWith((ref) => Stream.value(const OutboxCounts())),
         openProgressDraftsProvider.overrideWith((ref) => Stream.value(const <ProgressDraft>[])),
         projectProgressProvider.overrideWith((ref) async => ProjectProgressList.fromJson(projectProgressJson())),
-        addendumInboxProvider.overrideWith((ref) async => const <Addendum>[]),
+        addendumInboxProvider.overrideWith((ref) async => addendumInbox),
         direkturDashboardProvider.overrideWith((ref) async => DirekturDashboard.fromJson(direkturDashboardJson())),
         pmDashboardProvider.overrideWith((ref) async => PmDashboard.fromJson(pmDashboardJson())),
         inboxProvider.overrideWith((ref) async => e1.inboxPage()),
@@ -262,15 +263,7 @@ void main() {
       [requestHistoryProvider(42).overrideWith((ref) async => _history)],
       null,
     ),
-    (
-      'k-inbox-addendum',
-      {Role.owner},
-      '/inbox',
-      [
-        addendumInboxProvider.overrideWith((ref) async => [pending]),
-      ],
-      null,
-    ),
+    ('k-inbox-addendum', {Role.owner}, '/inbox', const [], null),
     (
       'k-addenda',
       {Role.pm},
@@ -323,6 +316,7 @@ void main() {
           location: location,
           overrides: overrides,
           act: act,
+          addendumInbox: name == 'k-inbox-addendum' ? [pending] : const [],
         );
       });
     }

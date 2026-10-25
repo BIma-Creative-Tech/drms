@@ -200,7 +200,7 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

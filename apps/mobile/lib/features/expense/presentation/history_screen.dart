@@ -153,7 +153,8 @@ class _HistoryCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Flexible(
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 170),
                       child: PkPill(label: e.docNo != null && e.docType != 'expense_request' ? '$doc ${e.docNo}' : doc),
                     ),
                   ],
