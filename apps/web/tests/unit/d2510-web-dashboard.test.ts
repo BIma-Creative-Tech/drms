@@ -18,13 +18,13 @@ const render = async (node: (h: typeof import('react').createElement, v: typeof 
 
 describe('Card / KpiTile / Delta (Nexus restyle, same hooks)', () => {
   it('Card: root classes stay `pk-card s{span}` before data-pk-card; glyph, extra actions and the action link in the head', async () => {
-    const html = await render((h, v) => h(v.Card, { id: 'acc', title: 'Saldo kas total', sub: 'Per akun', span: 8, icon: 'finance', actions: h('a', { href: '#x', className: 'pk-btn sm' }, 'Ekspor'), action: { href: '/admin/kas', label: 'Buku kas' }, className: 'pk-hero' }, 'isi'))
+    const html = await render((h, v) => h(v.Card, { id: 'acc', title: 'Saldo kas total', sub: 'Per akun', span: 8, icon: 'finance', actions: h('a', { href: '#x', className: 'pk-btn sm' }, 'Ekspor'), action: { href: '/admin/kas', label: 'Buku kas' }, className: 'pk-hero', children: 'isi' }))
     expect(html).toMatch(/class="pk-card s8 pk-anim pk-hero"[^>]*data-pk-card="acc"/)
     expect(html).toContain('aria-labelledby="pk-card-acc"')
     expect(html).toMatch(/<svg class="gl"/)
     expect(html).toMatch(/<div class="acts"><a href="#x" class="pk-btn sm">Ekspor<\/a><a class="pk-btn sm" href="\/admin\/kas" data-pk-card-action="">/)
     // without icon / actions: no glyph, no empty action box (Frame pages keep their markup)
-    const plain = await render((h, v) => h(v.Card, { id: 'p', title: 'T' }, 'x'))
+    const plain = await render((h, v) => h(v.Card, { id: 'p', title: 'T', children: 'x' }))
     expect(plain).not.toContain('class="gl"')
     expect(plain).not.toContain('class="acts"')
   })
@@ -91,7 +91,7 @@ describe('MetricRow / ProgressRows / QuickActions / Segmented', () => {
     const html = await render((h, v) => h(v.QuickActions, { label: 'Aksi cepat', items: [{ key: 'kas', href: '/admin/kas/baru', label: '+ Kas', icon: 'add', primary: true }, { key: 'lpj', href: '/admin/verifikasi-lpj', label: 'Verifikasi LPJ', icon: 'tReceiptSearch' }] }))
     expect(html).toMatch(/<a href="\/admin\/kas\/baru" class="primary" data-pk-quick-action="kas"><span class="qi" aria-hidden="true"><svg/)
     expect(html).toContain('<span>Verifikasi LPJ</span>')
-    const seg = await render((h, v) => h(v.Segmented, { label: 'Tampilan peran' }, h('a', { href: '/admin/dashboard?peran=pm', 'aria-current': 'page', 'data-pk-role-tab': 'pm' }, 'PM')))
+    const seg = await render((h, v) => h(v.Segmented, { label: 'Tampilan peran', children: h('a', { href: '/admin/dashboard?peran=pm', 'aria-current': 'page', 'data-pk-role-tab': 'pm' }, 'PM') }))
     expect(seg).toMatch(/<nav class="pk-seg" aria-label="Tampilan peran"><a href="\/admin\/dashboard\?peran=pm" aria-current="page" data-pk-role-tab="pm">PM<\/a><\/nav>/)
   })
 
