@@ -5,6 +5,7 @@ import '../../../../app/providers.dart';
 import '../../../../core/platform/report_files.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../../shared/widgets/async_body.dart';
+import '../../../../shared/widgets/pk_ui.dart';
 import '../../domain/draft.dart';
 import '../../domain/expense_request.dart';
 
@@ -37,61 +38,87 @@ class DraftAttachmentsSection extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final full = attachments.length >= maxDraftAttachments;
-    return Column(
+    // D2510: a titled card like the other form sections.
+    return PkCard(
       key: const Key('draft-attachments'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          mandatory ? t.attachmentsRequired : t.attachmentsOptional,
-          key: const Key('draft-attachments-label'),
-          style: theme.textTheme.titleSmall,
-        ),
-        Text(t.attachmentsHint, style: theme.textTheme.bodySmall),
-        for (final (i, a) in attachments.indexed)
-          ListTile(
-            key: Key('draft-attachment-$i'),
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(a.isPdf ? Icons.picture_as_pdf : Icons.image),
-            title: Text(a.fileName),
-            subtitle: Text(a.isLocal ? t.attachmentLocal : t.attachmentOnServer),
-            trailing: IconButton(
-              key: Key('draft-attachment-$i-remove'),
-              tooltip: t.attachmentRemove,
-              icon: const Icon(Icons.delete_outline),
-              onPressed: enabled ? () => onRemove(a) : null,
-            ),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const PkIconChip(icon: Icons.attach_file, size: 30),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  mandatory ? t.attachmentsRequired : t.attachmentsOptional,
+                  key: const Key('draft-attachments-label'),
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
           ),
-        if (error != null)
+          const SizedBox(height: 6),
           Text(
-            error!,
-            key: const Key('draft-attachments-error'),
-            style: TextStyle(color: theme.colorScheme.error),
+            t.attachmentsHint,
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
-        Wrap(
-          spacing: 8,
-          children: [
-            OutlinedButton.icon(
-              key: const Key('draft-attachment-camera'),
-              onPressed: enabled && !full ? () => onAdd(AttachmentSource.camera) : null,
-              icon: const Icon(Icons.photo_camera),
-              label: Text(t.invoiceCamera),
+          for (final (i, a) in attachments.indexed)
+            ListTile(
+              key: Key('draft-attachment-$i'),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: PkIconChip(
+                icon: a.isPdf ? Icons.picture_as_pdf : Icons.image,
+                tone: a.isPdf ? PkTone.bad : PkTone.info,
+                size: 34,
+              ),
+              title: Text(a.fileName, style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Text(a.isLocal ? t.attachmentLocal : t.attachmentOnServer),
+              trailing: IconButton(
+                key: Key('draft-attachment-$i-remove'),
+                tooltip: t.attachmentRemove,
+                icon: const Icon(Icons.delete_outline),
+                onPressed: enabled ? () => onRemove(a) : null,
+              ),
             ),
-            OutlinedButton.icon(
-              key: const Key('draft-attachment-gallery'),
-              onPressed: enabled && !full ? () => onAdd(AttachmentSource.gallery) : null,
-              icon: const Icon(Icons.photo_library),
-              label: Text(t.invoiceGallery),
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                error!,
+                key: const Key('draft-attachments-error'),
+                style: TextStyle(color: theme.colorScheme.error),
+              ),
             ),
-            OutlinedButton.icon(
-              key: const Key('draft-attachment-file'),
-              onPressed: enabled && !full ? () => onAdd(AttachmentSource.file) : null,
-              icon: const Icon(Icons.attach_file),
-              label: Text(t.attachmentFile),
-            ),
-          ],
-        ),
-      ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                key: const Key('draft-attachment-camera'),
+                onPressed: enabled && !full ? () => onAdd(AttachmentSource.camera) : null,
+                icon: const Icon(Icons.photo_camera),
+                label: Text(t.invoiceCamera),
+              ),
+              OutlinedButton.icon(
+                key: const Key('draft-attachment-gallery'),
+                onPressed: enabled && !full ? () => onAdd(AttachmentSource.gallery) : null,
+                icon: const Icon(Icons.photo_library),
+                label: Text(t.invoiceGallery),
+              ),
+              OutlinedButton.icon(
+                key: const Key('draft-attachment-file'),
+                onPressed: enabled && !full ? () => onAdd(AttachmentSource.file) : null,
+                icon: const Icon(Icons.attach_file),
+                label: Text(t.attachmentFile),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -137,8 +164,12 @@ class _RequestAttachmentListState extends ConsumerState<RequestAttachmentList> {
           key: Key('detail-attachment-${a.id}'),
           dense: true,
           contentPadding: EdgeInsets.zero,
-          leading: Icon(a.isPdf ? Icons.picture_as_pdf : Icons.image),
-          title: Text(a.label),
+          leading: PkIconChip(
+            icon: a.isPdf ? Icons.picture_as_pdf : Icons.image,
+            tone: a.isPdf ? PkTone.bad : PkTone.info,
+            size: 34,
+          ),
+          title: Text(a.label, style: const TextStyle(fontWeight: FontWeight.w600)),
           trailing: _opening == a.id
               ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.open_in_new),

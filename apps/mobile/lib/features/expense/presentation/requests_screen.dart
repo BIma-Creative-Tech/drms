@@ -2,16 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/theme.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/icons/iconsax.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_keuangan.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../companies/presentation/company_chip.dart';
 import '../../auth/domain/user_profile.dart';
 import '../application/expense_providers.dart';
 import '../domain/draft.dart';
 import '../domain/request_status.dart';
+import 'widgets/request_ui.dart';
 
 String syncStateLabel(AppLocalizations t, DraftSyncState s) => switch (s) {
   DraftSyncState.local => t.syncStateLocal,
@@ -80,19 +85,22 @@ class _DraftList extends ConsumerWidget {
     return AsyncBody(
       value: ref.watch(openDraftsProvider),
       data: (drafts) => drafts.isEmpty
-          ? Center(child: Text(t.noDrafts))
-          : ListView.separated(
-              padding: const EdgeInsets.only(bottom: 96),
+          ? ListView(
+              children: [PkEmptyState(icon: Icons.phone_android, message: t.noDrafts)],
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
               itemCount: drafts.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (_, i) {
                 final d = drafts[i];
                 final warn = d.syncState == DraftSyncState.rejected || d.syncState == DraftSyncState.conflict;
-                return ListTile(
+                final synced = d.syncState == DraftSyncState.synced;
+                return PkListCard(
                   key: Key('draft-${d.clientUuid}'),
-                  leading: Icon(
-                    d.syncState == DraftSyncState.synced ? Icons.cloud_done : Icons.phone_android,
-                    color: warn ? Theme.of(context).colorScheme.error : null,
+                  leading: PkIconChip(
+                    icon: synced ? Icons.cloud_done : Icons.phone_android,
+                    tone: warn ? PkTone.bad : (synced ? PkTone.ok : PkTone.neutral),
+                    size: 40,
                   ),
                   title: Row(
                     children: [
@@ -100,11 +108,20 @@ class _DraftList extends ConsumerWidget {
                       Expanded(child: Text(d.title.isEmpty ? t.draftUntitled : d.title)),
                     ],
                   ),
-                  subtitle: Text(
-                    '${d.type.label} · ${syncStateLabel(t, d.syncState)}'
-                    '${d.lastError != null ? '\n${d.lastError}' : ''}',
-                  ),
-                  trailing: Text(formatRupiah(d.previewGrandTotal)),
+                  amount: formatRupiah(d.previewGrandTotal),
+                  subtitle: Text(d.type.label),
+                  badges: [
+                    PkPill(
+                      label: syncStateLabel(t, d.syncState),
+                      tone: warn ? PkTone.bad : (synced ? PkTone.ok : PkTone.neutral),
+                    ),
+                  ],
+                  footer: d.lastError == null
+                      ? null
+                      : Text(
+                          d.lastError!,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.pk.badText),
+                        ),
                   onTap: () => context.push('/drafts/${d.clientUuid}'),
                 );
               },
@@ -129,29 +146,24 @@ class _SentList extends ConsumerWidget {
         onRetry: () => ref.invalidate(provider),
         data: (s) => s.items.isEmpty
             ? ListView(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Center(child: Text(t.noRequests)),
-                  ),
-                ],
+                children: [PkEmptyState(icon: PkIcons.requests, message: t.noRequests)],
               )
-            : ListView.separated(
-                padding: const EdgeInsets.only(bottom: 96),
+            : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                 itemCount: s.items.length + (s.nextCursor != null ? 1 : 0) + (teamHint ? 1 : 0),
-                separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (_, index) {
                   if (teamHint && index == 0) {
-                    return ListTile(
+                    return PkNoticeCard(
                       key: const Key('team-readonly-hint'),
-                      leading: const Icon(Icons.visibility),
+                      dense: true,
+                      icon: Icons.visibility_outlined,
                       title: Text(t.teamReadOnlyHint),
                     );
                   }
                   final i = teamHint ? index - 1 : index;
                   if (i == s.items.length) {
                     return Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                       child: OutlinedButton(
                         onPressed: s.loadingMore ? null : () => ref.read(provider.notifier).loadMore(),
                         child: Text(t.loadMore),
@@ -159,28 +171,23 @@ class _SentList extends ConsumerWidget {
                     );
                   }
                   final r = s.items[i];
-                  return ListTile(
+                  return PkListCard(
                     key: Key('request-${r.id}'),
+                    leading: requestTypeChip(r.type, payee: r.payeeType),
                     title: Row(
                       children: [
                         CompanyChipLead(companyId: r.companyId),
                         Expanded(child: Text(r.title)),
                       ],
                     ),
+                    amount: formatRupiah(r.grandTotal),
                     subtitle: Text(
-                      '${r.docNo ?? '-'} · ${r.typeLabel}\n${r.statusLabel}'
-                      '${r.neededDate != null ? ' · ${formatDateOnly(r.neededDate)}' : ''}',
+                      [r.docNo ?? '-', r.typeLabel, if (r.neededDate != null) formatDateOnly(r.neededDate)].join(' · '),
                     ),
-                    isThreeLine: true,
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(formatRupiah(r.grandTotal), style: const TextStyle(fontWeight: FontWeight.bold)),
-                        if (r.openWarningFlags > 0)
-                          Icon(Icons.flag, size: 16, color: Theme.of(context).colorScheme.error),
-                      ],
-                    ),
+                    badges: [
+                      PkPill(label: r.statusLabel, tone: requestStatusTone(r.status)),
+                      if (r.openWarningFlags > 0) Icon(Icons.flag, size: 16, color: context.pk.badText),
+                    ],
                     onTap: () => context.push('/requests/${r.id}'),
                   );
                 },

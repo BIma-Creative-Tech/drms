@@ -7,10 +7,13 @@ import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_keuangan.dart';
 import '../../expense/domain/expense_request.dart';
 import '../../expense/presentation/request_detail_screen.dart' show pct;
 import '../../expense/presentation/widgets/fund_check_panel.dart';
 import '../../expense/presentation/widgets/receipt_mismatch_chip.dart';
+import '../../expense/presentation/widgets/request_ui.dart';
 import '../../addendum/presentation/addendum_providers.dart';
 import '../../addendum/presentation/addendum_screens.dart';
 import '../../companies/presentation/company_chip.dart';
@@ -50,25 +53,16 @@ class InboxScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(inboxProvider),
           data: (page) => page.items.isEmpty
               ? ListView(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   children: [
                     const AddendumInboxSection(),
                     const LoanInboxSection(),
                     const LpjQueueSection(),
-                    Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Column(
-                        children: [
-                          Icon(Icons.task_alt, size: 48, color: Theme.of(context).colorScheme.primary),
-                          const SizedBox(height: 12),
-                          Text(t.inboxEmpty, textAlign: TextAlign.center),
-                        ],
-                      ),
-                    ),
+                    PkEmptyState(icon: Icons.task_alt, message: t.inboxEmpty),
                   ],
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   itemCount: page.items.length + 1,
                   itemBuilder: (_, i) => i == 0
                       ? const Column(children: [AddendumInboxSection(), LoanInboxSection(), LpjQueueSection()])
@@ -81,6 +75,8 @@ class InboxScreen extends ConsumerWidget {
 }
 
 /// One waiting request: step chip, title, amount, scope/requesters, budget meter and flag counts.
+/// D2510: Banani "ApprovalItem" layout — requester avatar, type + step pill, bold title and amount, muted meta lines,
+/// rounded budget bar.
 class InboxCard extends StatelessWidget {
   const InboxCard({super.key, required this.item});
   final InboxItem item;
@@ -91,106 +87,132 @@ class InboxCard extends StatelessWidget {
     final theme = Theme.of(context);
     final it = item;
     final after = it.budget.pctAfter;
-    return Card(
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.35);
+    final risky = it.budgetOverWarn || it.fundShort != null;
+    return PkCard(
       key: Key('inbox-${it.id}'),
-      margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.push('/requests/${it.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CompanyChipLead(companyId: it.companyId),
-                  Flexible(
-                    child: Chip(
-                      key: Key('inbox-step-${it.id}'),
-                      avatar: Icon(it.step == 'acknowledge' ? Icons.verified_user : Icons.fact_check, size: 18),
-                      label: Text(inboxStepLabel(t, it), overflow: TextOverflow.ellipsis),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(it.typeLabel, style: theme.textTheme.labelMedium),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: Text(it.title, style: theme.textTheme.titleMedium)),
-                  const SizedBox(width: 12),
-                  Text(
-                    formatRupiah(it.grandTotal),
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text('${it.docNo ?? '-'} · ${it.scope}', style: theme.textTheme.bodySmall),
-              Text(it.requesters, style: theme.textTheme.bodySmall),
-              if (it.neededDate != null)
-                Text('${t.neededDate}: ${formatDateOnly(it.neededDate)}', style: theme.textTheme.bodySmall),
-              const SizedBox(height: 12),
-              if (it.budget.hasBudget) ...[
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      onTap: () => context.push('/requests/${it.id}'),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PkAvatar(name: it.requesters, size: 40),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Row(
                   children: [
-                    Expanded(child: Text(t.budgetImpact, style: theme.textTheme.labelMedium)),
-                    Text(
-                      t.budgetChange(pct(it.budget.pctBefore), pct(after)),
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: it.budgetOverWarn ? context.pk.badText : null,
-                        fontWeight: FontWeight.w600,
+                    CompanyChipLead(companyId: it.companyId),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            it.typeLabel,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          PkPill(
+                            key: Key('inbox-step-${it.id}'),
+                            label: inboxStepLabel(t, it),
+                            tone: risky ? PkTone.warn : PkTone.info,
+                            icon: it.step == 'acknowledge' ? Icons.verified_user_outlined : Icons.fact_check_outlined,
+                          ),
+                        ],
                       ),
                     ),
-                    if (it.budgetOverWarn) ...[
-                      const SizedBox(width: 4),
-                      Icon(Icons.warning_amber, color: context.pk.badText, size: 18, semanticLabel: t.budgetOverWarn),
-                    ],
                   ],
                 ),
                 const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: ((after ?? 0) / 100).clamp(0, 1).toDouble(),
-                    minHeight: 8,
-                    color: it.budgetOverWarn ? context.pk.badText : theme.colorScheme.primary,
-                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        it.title,
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, height: 1.3),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      formatRupiah(it.grandTotal),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        height: 1.3,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
                 ),
-              ] else
-                Text('${t.budgetImpact}: ${t.budgetNone}', style: theme.textTheme.labelMedium),
-              const SizedBox(height: 8),
-              Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                runSpacing: 4,
-                children: [
-                  Icon(
-                    Icons.flag,
-                    size: 16,
-                    color: it.warningFlags > 0 ? context.pk.warnText : theme.colorScheme.outline,
+                const SizedBox(height: 3),
+                Text('${it.docNo ?? '-'} · ${it.scope}', style: muted),
+                Text(it.requesters, style: muted),
+                if (it.neededDate != null) Text('${t.neededDate}: ${formatDateOnly(it.neededDate)}', style: muted),
+                const SizedBox(height: 12),
+                if (it.budget.hasBudget) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          t.budgetImpact,
+                          style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                      ),
+                      Text(
+                        t.budgetChange(pct(it.budget.pctBefore), pct(after)),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: it.budgetOverWarn ? context.pk.badText : null,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (it.budgetOverWarn) ...[
+                        const SizedBox(width: 4),
+                        Icon(Icons.warning_amber, color: context.pk.badText, size: 18, semanticLabel: t.budgetOverWarn),
+                      ],
+                    ],
                   ),
-                  const SizedBox(width: 4),
-                  Text(t.flagsCount(it.warningFlags, it.infoFlags), style: theme.textTheme.bodySmall),
-                  // D3: same badge as the web Antrian Transfer — lines whose "Nominal sesuai nota" ≠ total
-                  if (it.receiptMismatchFlags > 0) ...[
-                    const SizedBox(width: 8),
-                    ReceiptMismatchChip(key: Key('inbox-mismatch-${it.id}'), count: it.receiptMismatchFlags),
+                  const SizedBox(height: 6),
+                  PkProgressBar(value: (after ?? 0) / 100, color: it.budgetOverWarn ? context.pk.badText : null),
+                ] else
+                  Text(
+                    '${t.budgetImpact}: ${t.budgetNone}',
+                    style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                const SizedBox(height: 10),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  runSpacing: 6,
+                  children: [
+                    Icon(
+                      Icons.flag,
+                      size: 16,
+                      color: it.warningFlags > 0 ? context.pk.warnText : theme.colorScheme.outline,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(t.flagsCount(it.warningFlags, it.infoFlags), style: muted),
+                    // D3: same badge as the web Antrian Transfer — lines whose "Nominal sesuai nota" ≠ total
+                    if (it.receiptMismatchFlags > 0) ...[
+                      const SizedBox(width: 8),
+                      ReceiptMismatchChip(key: Key('inbox-mismatch-${it.id}'), count: it.receiptMismatchFlags),
+                    ],
+                    // ADR 0029: the PT is short for this request at its final step ("Setujui" is refused)
+                    if (it.fundShort case final gap?) ...[
+                      const SizedBox(width: 8),
+                      FundShortBadge(key: Key('inbox-fund-short-${it.id}'), gap: gap),
+                    ],
                   ],
-                  // ADR 0029: the PT is short for this request at its final step ("Setujui" is refused)
-                  if (it.fundShort case final gap?) ...[
-                    const SizedBox(width: 8),
-                    FundShortBadge(key: Key('inbox-fund-short-${it.id}'), gap: gap),
-                  ],
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -215,24 +237,29 @@ class LpjQueueSection extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-            child: Text('${t.lpjQueueTitle} · ${t.lpjQueueCount(items.length)}', style: theme.textTheme.titleMedium),
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              '${t.lpjQueueTitle} · ${t.lpjQueueCount(items.length)}',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
           ),
           for (final r in items)
-            Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                key: Key('lpj-${r.id}'),
-                title: Row(
-                  children: [
-                    CompanyChipLead(companyId: r.companyId),
-                    Expanded(child: Text(r.title, overflow: TextOverflow.ellipsis)),
-                  ],
-                ),
-                subtitle: Text('${r.docNo ?? '-'} · ${r.statusLabel}'),
-                trailing: Text(formatRupiah(r.approvedAmount ?? r.grandTotal)),
-                onTap: () => context.push('/requests/${r.id}'),
+            PkListCard(
+              key: Key('lpj-${r.id}'),
+              leading: PkIconChip(
+                icon: Icons.assignment_turned_in_outlined,
+                tone: requestStatusTone(r.status),
+                size: 40,
               ),
+              title: Row(
+                children: [
+                  CompanyChipLead(companyId: r.companyId),
+                  Expanded(child: Text(r.title, overflow: TextOverflow.ellipsis)),
+                ],
+              ),
+              subtitle: Text('${r.docNo ?? '-'} · ${r.statusLabel}'),
+              amount: formatRupiah(r.approvedAmount ?? r.grandTotal),
+              onTap: () => context.push('/requests/${r.id}'),
             ),
         ],
       ),
