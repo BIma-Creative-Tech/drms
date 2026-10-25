@@ -266,7 +266,6 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     final initial = widget.initial;
     final canSubmit = initial == null || initial.allowedActions.contains(LoanAction.submit);
     final options = ref.watch(loanOptionsProvider);
