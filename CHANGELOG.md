@@ -11,6 +11,12 @@ APK 0.12.0 keeps working. Folded into the next web release section.
 
 ### Changed
 
+- **Web admin: Nexus-style shell (D2510, user 2026-10-25, ADR 0033)** after the Nexus daisyUI CRM / Corporate Finance
+  dashboards, web palette kept (no token change). Left sidebar with every visible module (collapsible groups, section
+  labels, badges; compact icon mode remembered per browser; drawer ≤ 1024px), slim top bar with menu search (Ctrl+K /
+  ⌘K), "+ Buat", PT switcher, bell and avatar menu; soft grey page under white cards. `/admin` opens the role
+  dashboard (first menu item) instead of the module launcher; module landing pages show their menus as cards.
+  Breadcrumb home outside a module = "Beranda".
 - **APK restyle after the Banani reference "Project Monitoring Hub" (D2510, user 2026-10-25), web palette kept** (ADR
   0015 tokens unchanged; layout and components only). Presentation-only: same providers, routes, keys, texts and popups.
   - Kit `lib/shared/widgets/pk_ui.dart` (hero band, cards, icon chips, soft status pills, KPI tiles, section headers,

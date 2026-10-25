@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import type { Payload, SanitizedPermissions, TypedUser, VisibleEntities } from 'payload'
 import React from 'react'
 
@@ -7,19 +8,29 @@ import { LogoutButton } from '@/components/LogoutButton'
 
 import { ModuleBar } from './ModuleBar'
 import { loadFeatures, loadModules, loadNavUser, loadSwitcher, quickCreateFor } from './modules-server'
+import { SIDEBAR_COOKIE, sidebarMode } from './nav-search'
 
 /**
  * admin.components.Nav (Payload 3.90.1 templates/Default: rendered on EVERY page that uses the
  * DefaultTemplate — built-in list/edit/account views and our custom views wrapped in Frame/Shell —
- * with serverProps {payload, permissions, user, i18n, …} + clientProps {visibleEntities}). Replaces
- * the left sidebar by the Odoo-style top bar: the server computes the visible modules, badges and
- * the bell, the client ModuleBar resolves the active module from the pathname (no module menu since
- * DRMS 13/10 #9 — the module landing page has the tiles).
+ * with serverProps {payload, permissions, user, i18n, …} + clientProps {visibleEntities}). D2510 (ADR 0033):
+ * renders the Nexus-style shell — left sidebar with every visible module/menu item + slim top bar — instead of
+ * Payload's sidebar: the server computes the visible modules, badges, the bell and the sidebar width (cookie), the
+ * client ModuleBar resolves the active module/item from the pathname.
  * Replacing Nav drops before/afterNavLinks and the default logout slot → bell + logout live here.
  * Also hosts the privacy-notice gate (ADR 0018): this is the one server component on every admin page.
  * DRMS 16/10: the "+ Buat" menu items (quick-create.ts) are resolved here too — the PT features are loaded once and
  * shared with the module list.
  */
+/** The `pk-side` cookie of this request; outside a request scope (tests) → the full sidebar. */
+async function sidebarModeOfRequest() {
+  try {
+    return sidebarMode((await cookies()).get(SIDEBAR_COOKIE)?.value)
+  } catch {
+    return sidebarMode(undefined)
+  }
+}
+
 type Props = {
   payload: Payload
   user?: TypedUser
@@ -38,9 +49,10 @@ export async function ModuleNav({ payload, user, permissions, visibleEntities, i
     loadNavUser(payload, user),
   ])
   const quickCreate = quickCreateFor({ user, permissions, visibleEntities, features })
+  const mode = await sidebarModeOfRequest()
   return (
     <>
-      <ModuleBar modules={modules} user={who} companies={companies} quickCreate={quickCreate} bell={<NotificationBell payload={payload} user={user} />} logout={<LogoutButton />} />
+      <ModuleBar modules={modules} user={who} companies={companies} quickCreate={quickCreate} sidebarMode={mode} bell={<NotificationBell payload={payload} user={user} />} logout={<LogoutButton />} />
       {/* ADR 0018 (Q-46): non-dismissable privacy-notice interstitial until the current version is acknowledged */}
       <PrivacyGate user={user as { privacyAckVersion?: unknown }} />
     </>

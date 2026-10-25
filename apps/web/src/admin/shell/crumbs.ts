@@ -2,13 +2,13 @@ import type { IconName } from '@/admin/modules/icons'
 import { activeHref, ADMIN_ROUTE, moduleLandingHref, type ResolvedModule } from '@/admin/modules/registry'
 
 /**
- * Breadcrumb line under the module bar (replaces Payload's AppHeader/StepNav row, whose home crumb
+ * Breadcrumb line under the top bar (replaces Payload's AppHeader/StepNav row, whose home crumb
  * is the graphics Icon — a lone "D" on every page, and an empty row on pages without crumbs).
  * Pure (no React): the client ModuleBar feeds it the pathname, the active module and Payload's
  * step-nav items (useStepNav) and renders the result; tests/unit/admin-modules.test.ts covers it.
  *
  * - Home crumb = the current module (icon + name → its first menu item); a page outside every
- *   module (account, a hidden entity) → "Semua modul" (launcher).
+ *   module (account, a hidden entity) → "Beranda" (/admin → the first menu item, D2510).
  * - Entity routes (/collections/<slug>…, /globals/<slug>, /account): Payload's steps, or — before
  *   the view has set them (SSR, first paint) or when they belong to the previous page — a fallback
  *   from the module's own menu labels, so the line does not jump in after hydration.
@@ -16,7 +16,7 @@ import { activeHref, ADMIN_ROUTE, moduleLandingHref, type ResolvedModule } from 
  *   no gap (their title is the page's h1 and the bar already names the module).
  * - DRMS 10/10 D9: the home crumb links the module LANDING page (module.href) when the module has
  *   one; its custom views get "module › menu item" so every sub-menu leads back to the landing page,
- *   and the landing page itself shows "Semua modul › module".
+ *   and the landing page itself shows "Beranda › module".
  * - The last crumb is the current page (no link, aria-current="page") — except the fallback entity
  *   crumb of an edit page, which stays a link until Payload names the document.
  */
@@ -70,7 +70,7 @@ export function deriveCrumbs({ pathname, module, steps, translate }: CrumbInput)
     const clean = (pathname.split(/[?#]/)[0] ?? '').replace(/\/+$/, '')
     if (clean === moduleLandingHref(module.id)) {
       return [
-        { key: 'home', label: 'Semua modul', href: ADMIN_ROUTE, icon: 'grid' },
+        { key: 'home', label: 'Beranda', href: ADMIN_ROUTE, icon: 'home' },
         { key: 'c0', label: module.label, icon: module.icon, mod: module.id, current: true },
       ]
     }
@@ -83,7 +83,7 @@ export function deriveCrumbs({ pathname, module, steps, translate }: CrumbInput)
 
   const home: Crumb = module
     ? { key: 'home', label: module.label, href: module.href, icon: module.icon, mod: module.id }
-    : { key: 'home', label: 'Semua modul', href: ADMIN_ROUTE, icon: 'grid' }
+    : { key: 'home', label: 'Beranda', href: ADMIN_ROUTE, icon: 'home' }
   // "Persetujuan › Persetujuan": a step repeating the module name adds nothing.
   if (norm(tail[0]!.label) === norm(home.label)) {
     if (tail.length === 1) return [{ ...home, href: undefined, current: true }]

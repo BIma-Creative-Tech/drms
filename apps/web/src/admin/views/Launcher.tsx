@@ -1,17 +1,16 @@
 import { Gutter } from '@payloadcms/ui'
+import { redirect } from 'next/navigation'
 import type { Payload, SanitizedPermissions, TypedUser, VisibleEntities } from 'payload'
 import React from 'react'
 
-import { loadModules, loadNavUser } from '@/admin/shell/modules-server'
-
-import { LauncherGrid } from './LauncherGrid'
+import { loadModules } from '@/admin/shell/modules-server'
 
 /**
- * `/admin` = Odoo-style module launcher (admin.components.views.dashboard, Payload 3.90.1
- * views/Dashboard: rendered inside the default template with {payload, user, permissions,
- * visibleEntities, i18n, …}). Greeting (name + role) and a tile per visible module — the same
- * resolveModules() as the top bar, so a tile appears only when the caller can open at least one
- * item of it. The role dashboard moved to its own module at /admin/dashboard.
+ * `/admin` (admin.components.views.dashboard, Payload 3.90.1 views/Dashboard: rendered inside the default
+ * template with {payload, user, permissions, visibleEntities, i18n, …}). D2510 (user 2026-10-25, ADR 0033): the
+ * Odoo-style module launcher is gone — the sidebar lists every module — so the home URL opens the caller's first
+ * visible menu item, i.e. the role dashboard (/admin/dashboard) for every role that has one. A caller without any
+ * visible module gets the empty-state line instead of a redirect loop.
  */
 type Props = {
   payload: Payload
@@ -21,36 +20,16 @@ type Props = {
   i18n?: Parameters<typeof loadModules>[0]['i18n']
 }
 
-export function greeting(date: Date, timeZone = 'Asia/Makassar'): string {
-  const h = Number(new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', hourCycle: 'h23' }).format(date))
-  if (h < 11) return 'Selamat pagi'
-  if (h < 15) return 'Selamat siang'
-  if (h < 18) return 'Selamat sore'
-  return 'Selamat malam'
-}
-
 export async function Launcher({ payload, user, permissions, visibleEntities, i18n }: Props) {
   if (!user) return null
-  const [modules, who] = await Promise.all([loadModules({ payload, user, permissions, visibleEntities, i18n }), loadNavUser(payload, user)])
+  const modules = await loadModules({ payload, user, permissions, visibleEntities, i18n })
+  const first = modules[0]?.firstHref
+  if (first) redirect(first)
   return (
     <Gutter>
-      <section className="pk-launcher" data-pk-launcher aria-labelledby="pk-launcher-title">
-        <header className="pk-launcher__head">
-          <p className="pk-launcher__hello">{greeting(new Date())},</p>
-          <h1 id="pk-launcher-title" className="pk-launcher__name">
-            {who.name}
-          </h1>
-          <p className="pk-launcher__role">
-            <span className="pk-launcher__role-pill">{who.roleLabel}</span>
-            <span>Pilih modul untuk mulai bekerja.</span>
-          </p>
-        </header>
-        {modules.length ? (
-          <LauncherGrid modules={modules} />
-        ) : (
-          <p className="pk-launcher__empty">Akun Anda belum punya akses ke modul mana pun. Hubungi Admin.</p>
-        )}
-      </section>
+      <p className="pk-home-empty" data-pk-home-empty>
+        Akun Anda belum punya akses ke modul mana pun. Hubungi Admin.
+      </p>
     </Gutter>
   )
 }

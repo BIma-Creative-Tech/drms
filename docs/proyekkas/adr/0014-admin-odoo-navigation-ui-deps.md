@@ -1,6 +1,7 @@
 # ADR 0014 — Admin navigation "gaya Odoo": module launcher + top menu bar, icon and animation dependencies
 
-- **Status:** accepted (2026-09-27, user approved screenshots + Iconsax licence)
+- **Status:** accepted (2026-09-27, user approved screenshots + Iconsax licence); **§1 navigation superseded by ADR 0033**
+  (2026-10-25, Nexus sidebar layout) — §2–4 still apply
 - **Date:** 2026-09-27
 - **Related:** plan `tolong-rubah-tampilan-managementnya` (user decision: launcher at `/admin`, tiles = Iconsax on a
   gradient, Dashboard as its own module at `/admin/dashboard`); /opt/infra CLAUDE.md §0.10 (trusted OSS, licence,

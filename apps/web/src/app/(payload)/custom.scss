@@ -427,17 +427,23 @@
 }
 
 // =================================================================================================
-// Odoo-style navigation (2026-09-27): top module bar (src/admin/shell/ModuleBar.tsx, rendered as
-// admin.components.Nav) + module launcher at /admin (src/admin/views/Launcher*.tsx).
-// Payload 3.90.1 templates/Default lays Nav and the page out as a 2-column grid with a sidebar
-// toggler; here the template becomes a column (bar on top, full-width content) and the sidebar
-// toggler/hamburgers are hidden. Breadcrumbs = the slim .pk-crumbs line under the bar (no AppHeader row).
+// D2510 Nexus-style shell (user 2026-10-25, ADR 0033 — supersedes the Odoo top bar of ADR 0014): left
+// sidebar (src/admin/shell/AppSidebar.tsx) + slim top bar (ModuleBar.tsx) + breadcrumb line, all rendered
+// as admin.components.Nav. Payload 3.90.1 templates/Default puts Nav and `.template-default__wrap` side by
+// side in `.template-default`; here that element becomes a grid: sidebar column on the left (full 264px,
+// compact 76px via the `pk-side` cookie), bar / crumbs / page stacked on the right. ≤ 1024px: one column,
+// the sidebar is an off-canvas drawer. Payload's own sidebar toggler/hamburgers stay hidden.
+// Page = soft grey surface (Nexus base-200) under white cards — layout mix only, tokens.ts untouched.
 // =================================================================================================
 $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, pengguna, master, media, pengaturan, sistem;
+$pk-side-full: 264px;
+$pk-side-compact: 76px;
 
 @layer payload {
   :root {
-    --pk-bar-h: 60px;
+    --pk-bar-h: 64px;
+    --pk-page: color-mix(in oklab, var(--pk-muted-bg) 50%, var(--pk-bg));
+    --theme-bg: var(--pk-page);
     @each $m in $pk-modules {
       --pk-mod-#{$m}-from: var(--pk-light-mod-#{$m}-from);
       --pk-mod-#{$m}-to: var(--pk-light-mod-#{$m}-to);
@@ -445,6 +451,8 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   }
 
   html[data-theme='dark'] {
+    --pk-page: var(--pk-bg);
+    --theme-bg: var(--pk-page);
     @each $m in $pk-modules {
       --pk-mod-#{$m}-from: var(--pk-dark-mod-#{$m}-from);
       --pk-mod-#{$m}-to: var(--pk-dark-mod-#{$m}-to);
@@ -463,14 +471,36 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     scroll-padding-top: calc(var(--pk-bar-h) + 8px);
   }
 
-  // ---- template: bar on top, content full width -------------------------------------------------
+  // left edge of the page area (loading overlay, fixed panels): the sidebar column on desktop
+  @media (min-width: 1025px) {
+    :root:has(.pk-side) {
+      --pk-side-inset: #{$pk-side-full};
+    }
+
+    :root:has(.pk-side[data-compact]) {
+      --pk-side-inset: #{$pk-side-compact};
+    }
+  }
+
+  // ---- template: sidebar | (bar, crumbs, page) -------------------------------------------------------
   .template-default,
   .template-default--nav-open,
   .template-default--nav-hydrated,
   .template-default--nav-hydrated.template-default--nav-open {
-    display: flex;
-    flex-direction: column;
-    grid-template-columns: none;
+    --pk-side-w: #{$pk-side-full};
+    display: grid;
+    grid-template-areas:
+      'side bar'
+      'side crumbs'
+      'side main';
+    grid-template-rows: auto auto 1fr;
+    grid-template-columns: var(--pk-side-w) minmax(0, 1fr);
+    min-height: 100dvh;
+    background: var(--pk-page);
+  }
+
+  .template-default:has(> .pk-side[data-compact]) {
+    --pk-side-w: #{$pk-side-compact};
   }
 
   .template-default__nav-toggler-wrapper,
@@ -480,6 +510,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   }
 
   .template-default__wrap {
+    grid-area: main;
     min-width: 0;
     width: 100%;
   }
@@ -498,6 +529,445 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     top: var(--pk-bar-h);
   }
 
+  @media (max-width: 1024px) {
+    .template-default,
+    .template-default--nav-open,
+    .template-default--nav-hydrated,
+    .template-default--nav-hydrated.template-default--nav-open {
+      grid-template-areas:
+        'bar'
+        'crumbs'
+        'main';
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  // ---- sidebar ---------------------------------------------------------------------------------------
+  .pk-side {
+    position: sticky;
+    top: 0;
+    z-index: 26; // above the bar (25) — the compact sidebar expands over the page; below modals/drawers (30)
+    display: flex;
+    flex-direction: column;
+    grid-area: side;
+    box-sizing: border-box;
+    width: var(--pk-side-w, #{$pk-side-full});
+    height: 100dvh;
+    border-right: 1px solid var(--pk-border);
+    background: var(--pk-card);
+    color: var(--pk-fg);
+    font-size: 14px; // px: Payload's root font-size is 13px
+    transition:
+      width 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+
+  .pk-side__brand {
+    display: flex;
+    flex: none;
+    gap: 6px;
+    align-items: center;
+    height: var(--pk-bar-h);
+    padding: 0 10px 0 20px;
+  }
+
+  .pk-side__logo {
+    display: flex;
+    flex: 1;
+    gap: 10px;
+    align-items: center;
+    min-width: 0;
+    border-radius: 10px;
+    color: var(--pk-fg);
+    text-decoration: none;
+
+    .pk-mark {
+      flex: none;
+    }
+
+    &:focus-visible {
+      outline: var(--accessibility-outline);
+      outline-offset: 2px;
+    }
+  }
+
+  .pk-side__logo-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.15;
+    white-space: nowrap;
+
+    strong {
+      font-family: var(--pk-font-heading);
+      font-size: 16px;
+      letter-spacing: -0.01em;
+    }
+
+    span {
+      color: var(--pk-muted-fg);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+    }
+  }
+
+  .pk-side__collapse,
+  .pk-side__close {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--pk-muted-fg);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--pk-muted-bg);
+      color: var(--pk-fg);
+    }
+  }
+
+  .pk-side__close {
+    display: none;
+  }
+
+  .pk-side__scroll {
+    flex: 1;
+    min-height: 0;
+    padding: 4px 12px 16px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .pk-side__empty {
+    margin: 8px;
+    color: var(--pk-muted-fg);
+  }
+
+  .pk-side__mods,
+  .pk-side__sec ul {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pk-side__mod {
+    position: relative;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 42px;
+    padding: 5px 10px 5px 6px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--pk-fg);
+    font: inherit;
+    font-weight: 500;
+    text-align: start;
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--pk-muted-bg);
+    }
+
+    &[data-active] {
+      font-weight: 600;
+    }
+
+    &[aria-current='page'] {
+      background: color-mix(in oklab, var(--pk-primary) 10%, transparent);
+      color: var(--pk-primary);
+    }
+
+    &:focus-visible {
+      outline: var(--accessibility-outline);
+      outline-offset: -2px;
+    }
+  }
+
+  .pk-side__chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: var(--pk-muted-bg);
+    color: var(--pk-muted-fg);
+    transition:
+      background 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .pk-side__mod:hover .pk-side__chip,
+  .pk-side__mod[data-active] .pk-side__chip {
+    background: linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
+    box-shadow: 0 4px 10px -4px color-mix(in oklab, var(--pk-tile-from) 70%, transparent);
+    color: #FFFFFF;
+  }
+
+  .pk-side__label {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .pk-side__chev {
+    flex: none;
+    color: var(--pk-muted-fg);
+    transition: transform 0.18s ease;
+  }
+
+  li[data-open] > .pk-side__mod .pk-side__chev {
+    transform: rotate(180deg);
+  }
+
+  .pk-side__sub {
+    margin: 2px 0 6px 20px;
+    padding-left: 10px;
+    border-left: 1px solid var(--pk-border);
+  }
+
+  .pk-side__sec + .pk-side__sec {
+    margin-top: 4px;
+  }
+
+  .pk-side__sec-label {
+    margin: 8px 0 2px;
+    padding: 0 10px;
+    color: var(--pk-muted-fg);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .pk-side__item {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    min-height: 34px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    color: var(--pk-muted-fg);
+    font-size: 13.5px;
+    line-height: 1.3;
+    text-decoration: none;
+
+    svg {
+      flex: none;
+    }
+
+    &:hover {
+      background: var(--pk-muted-bg);
+      color: var(--pk-fg);
+    }
+
+    &[aria-current='page'] {
+      background: color-mix(in oklab, var(--pk-primary) 10%, transparent);
+      color: var(--pk-primary);
+      font-weight: 600;
+    }
+
+    &:focus-visible {
+      outline: var(--accessibility-outline);
+      outline-offset: -2px;
+    }
+  }
+
+  // Nexus "badge-soft": tinted pill, dark text (≥ 4.5:1 in both modes)
+  .pk-side__count {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--pk-tone-bad-text) 14%, var(--pk-card));
+    color: var(--pk-tone-bad-text);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .pk-side__foot {
+    flex: none;
+    padding: 12px;
+    border-top: 1px solid var(--pk-border);
+  }
+
+  .pk-side__user {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 8px;
+    border-radius: 12px;
+    background: color-mix(in oklab, var(--pk-muted-bg) 60%, transparent);
+    color: var(--pk-fg);
+    text-decoration: none;
+
+    &:hover {
+      background: var(--pk-muted-bg);
+    }
+
+    &:focus-visible {
+      outline: var(--accessibility-outline);
+      outline-offset: 2px;
+    }
+  }
+
+  .pk-side__avatar {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--pk-light-primary), var(--pk-mod-proyek-from));
+    color: #FFFFFF;
+    font-family: var(--pk-font-heading);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .pk-side__who {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.3;
+
+    strong {
+      overflow-wrap: anywhere;
+      font-size: 13.5px;
+    }
+
+    span {
+      color: var(--pk-muted-fg);
+      font-size: 12px;
+    }
+  }
+
+  .pk-side__backdrop {
+    display: none;
+  }
+
+  // compact (desktop): icons only; hover / keyboard focus expands it over the page (Nexus "dense" mode)
+  @media (min-width: 1025px) {
+    .pk-side[data-compact]:is(:hover, :focus-within) {
+      width: $pk-side-full;
+      box-shadow: 0 16px 40px -12px rgb(15 23 42 / 0.28);
+    }
+
+    .pk-side[data-compact]:not(:hover, :focus-within) {
+      .pk-side__brand {
+        justify-content: center;
+        padding: 0;
+      }
+
+      .pk-side__logo {
+        flex: none;
+      }
+
+      .pk-side__logo-text,
+      .pk-side__collapse,
+      .pk-side__label,
+      .pk-side__chev,
+      .pk-side__sub,
+      .pk-side__who {
+        display: none;
+      }
+
+      .pk-side__mod {
+        justify-content: center;
+        padding: 5px;
+      }
+
+      // the count shrinks to a dot on the chip
+      .pk-side__mod .pk-side__count {
+        position: absolute;
+        top: 4px;
+        right: 9px;
+        min-width: 9px;
+        height: 9px;
+        padding: 0;
+        background: var(--pk-tone-bad);
+        box-shadow: 0 0 0 2px var(--pk-card);
+        font-size: 0;
+      }
+
+      .pk-side__user {
+        justify-content: center;
+        padding: 4px;
+        background: transparent;
+      }
+    }
+  }
+
+  // drawer (≤ 1024px)
+  @media (max-width: 1024px) {
+    .pk-side {
+      position: fixed;
+      inset: 0 auto 0 0;
+      z-index: 40; // over the bar and Payload's sticky rows while open
+      width: min(300px, 86vw);
+      visibility: hidden;
+      transform: translateX(-105%);
+      transition:
+        transform 0.22s ease,
+        visibility 0s linear 0.22s;
+    }
+
+    .pk-side[data-open] {
+      box-shadow: 0 24px 60px -16px rgb(15 23 42 / 0.45);
+      visibility: visible;
+      transform: none;
+      transition: transform 0.22s ease;
+    }
+
+    .pk-side__collapse {
+      display: none;
+    }
+
+    .pk-side__close {
+      display: inline-flex;
+    }
+
+    .pk-side__backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 39;
+      display: block;
+      background: rgb(15 23 42 / 0.45);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pk-side,
+    .pk-side[data-open],
+    .pk-side__chip,
+    .pk-side__chev {
+      transition: none;
+    }
+  }
+
   // ---- bar ---------------------------------------------------------------------------------------
   .pk-bar {
     position: sticky;
@@ -507,9 +977,10 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     gap: 12px;
     align-items: center;
     height: var(--pk-bar-h);
-    padding: 0 var(--gutter-h);
+    grid-area: bar;
+    padding: 0 clamp(12px, 2vw, 24px);
     border-bottom: 1px solid color-mix(in oklab, var(--pk-border) 85%, transparent);
-    background-color: color-mix(in oklab, var(--pk-card) 82%, transparent);
+    background-color: color-mix(in oklab, var(--pk-card) 86%, transparent);
     backdrop-filter: blur(16px) saturate(160%);
     color: var(--pk-fg);
     font-size: 14px; // px: Payload's root font-size is 13px, rem would shrink the bar
@@ -523,13 +994,12 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     align-items: center;
   }
 
-  // The module name may shrink (ellipsis) so the bell/avatar never leave the viewport.
+  // The search field may shrink so the bell/avatar never leave the viewport.
   .pk-bar__start {
     flex-shrink: 1;
     min-width: 0;
   }
 
-  // DRMS 13/10 #9: no module menu in the middle any more — the right group sits at the end.
   .pk-bar__end {
     margin-inline-start: auto;
   }
@@ -554,11 +1024,6 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
       background: var(--pk-muted-bg);
       color: var(--pk-fg);
     }
-  }
-
-  .pk-bar__launcher[aria-current='page'] {
-    background: color-mix(in oklab, var(--pk-primary) 12%, transparent);
-    color: var(--pk-primary);
   }
 
   .pk-bar__avatar {
@@ -598,51 +1063,6 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     top: 4px;
     right: 3px;
     box-shadow: 0 0 0 2px var(--pk-card);
-  }
-
-  .pk-bar__module {
-    display: inline-flex;
-    gap: 10px;
-    align-items: center;
-    min-width: 0;
-    padding: 4px 8px 4px 4px;
-    border-radius: 12px;
-    color: var(--pk-fg);
-    font-family: var(--pk-font-heading);
-    font-size: 17px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    text-decoration: none;
-    white-space: nowrap;
-  }
-
-  a.pk-bar__module:hover {
-    background: var(--pk-muted-bg);
-  }
-
-  .pk-bar__module-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .pk-bar__brand-sub {
-    color: var(--pk-muted-fg);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.16em;
-  }
-
-  .pk-bar__chip {
-    display: inline-flex;
-    flex-shrink: 0;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
-    box-shadow: 0 4px 12px -4px color-mix(in oklab, var(--pk-tile-from) 70%, transparent);
-    color: #FFFFFF;
   }
 
   .pk-bar__chev {
@@ -853,80 +1273,204 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
   }
 
-  // ---- launcher ----------------------------------------------------------------------------------
-  .pk-launcher {
-    max-width: 1120px;
-    margin: 0 auto;
-    padding: clamp(20px, 5vw, 56px) 0 64px;
+  // ---- menu search (CommandPalette.tsx, portalled into <body>) -----------------------------------------
+  .pk-bar__search {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    box-sizing: border-box;
+    width: clamp(220px, 28vw, 340px);
+    height: 40px;
+    padding: 0 8px 0 12px;
+    border: 1px solid var(--pk-border);
+    border-radius: 10px;
+    background: var(--pk-page);
+    color: var(--pk-muted-fg);
+    font: inherit;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--pk-input);
+      color: var(--pk-fg);
+    }
+
+    svg {
+      flex: none;
+    }
   }
 
-  .pk-launcher__head {
-    margin-bottom: clamp(24px, 4vw, 40px);
+  .pk-bar__search-text {
+    flex: 1;
+    text-align: start;
+  }
+
+  .pk-bar__kbd,
+  .pk-cmd__kbd {
+    flex: none;
+    padding: 2px 6px;
+    border: 1px solid var(--pk-border);
+    border-radius: 6px;
+    background: var(--pk-card);
+    color: var(--pk-muted-fg);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .pk-cmd {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 12vh 16px 16px;
+  }
+
+  .pk-cmd__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 0.45);
+  }
+
+  .pk-cmd__dialog {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(640px, 100%);
+    max-height: 70vh;
+    overflow: hidden;
+    border: 1px solid var(--pk-border);
+    border-radius: 16px;
+    background: var(--pk-card);
+    box-shadow: 0 24px 60px -16px rgb(15 23 42 / 0.45);
+    color: var(--pk-fg);
+    font-size: 14px;
+  }
+
+  .pk-cmd__field {
+    display: flex;
+    flex: none;
+    gap: 10px;
+    align-items: center;
+    height: 56px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--pk-border);
+    color: var(--pk-muted-fg);
+  }
+
+  .pk-cmd__input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--pk-fg);
+    font: inherit;
+    font-size: 16px; // ≥ 16px: no iOS zoom on focus
+
+    &::-webkit-search-cancel-button {
+      display: none;
+    }
+  }
+
+  .pk-cmd__list {
+    margin: 0;
+    padding: 8px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    list-style: none;
+  }
+
+  .pk-cmd__opt {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+
+    &[aria-selected='true'] {
+      background: color-mix(in oklab, var(--pk-primary) 10%, transparent);
+    }
+  }
+
+  .pk-cmd__chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
+    color: #FFFFFF;
+  }
+
+  .pk-cmd__text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .pk-cmd__label {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .pk-cmd__path {
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+  }
+
+  .pk-cmd__empty {
+    padding: 20px 12px;
+    color: var(--pk-muted-fg);
     text-align: center;
   }
 
-  .pk-launcher__hello {
-    margin: 0;
-    color: var(--pk-muted-fg);
-    font-size: 16px;
-  }
-
-  .pk-launcher__name {
-    margin: 2px 0 10px;
-    font-size: clamp(26px, 3.4vw, 36px);
-    line-height: 1.15;
-  }
-
-  .pk-launcher__role {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 10px;
-    align-items: center;
-    justify-content: center;
-    margin: 0;
-    color: var(--pk-muted-fg);
-    font-size: 15px;
-  }
-
-  .pk-launcher__role-pill {
-    padding: 3px 10px;
-    border-radius: 999px;
-    background: color-mix(in oklab, var(--pk-primary) 12%, var(--pk-card));
-    color: var(--pk-primary);
-    font-size: 13px;
-    font-weight: 700;
+  // ---- module landing page tiles (/admin/modul/<id>, LauncherGrid): Nexus quick-action cards ---------
+  .pk-launcher {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: clamp(16px, 3vw, 32px) 0 64px;
   }
 
   .pk-launcher__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-    gap: clamp(12px, 2.4vw, 28px) clamp(8px, 2vw, 20px);
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  @media (max-width: 560px) {
-    .pk-launcher__grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-  }
-
-  .pk-launcher__empty {
-    color: var(--pk-muted-fg);
-    text-align: center;
-  }
-
   .pk-tile {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    display: grid;
+    grid-template-rows: auto auto;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 2px 12px;
     align-items: center;
-    padding: 10px 4px;
-    border-radius: 18px;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 14px 16px;
+    border: 1px solid var(--pk-border);
+    border-radius: var(--style-radius-l);
+    background: var(--pk-card);
+    box-shadow: var(--pk-shadow);
     color: var(--pk-fg);
-    text-align: center;
     text-decoration: none;
+    transition:
+      box-shadow 0.15s ease,
+      border-color 0.15s ease;
+
+    &:hover {
+      border-color: color-mix(in oklab, var(--pk-primary) 35%, var(--pk-border));
+      box-shadow: var(--pk-shadow-hover);
+    }
 
     &:focus-visible {
       outline: var(--accessibility-outline);
@@ -937,60 +1481,54 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   .pk-tile__icon {
     position: relative;
     display: flex;
+    grid-row: 1 / span 2;
     align-items: center;
     justify-content: center;
-    width: clamp(64px, 18vw, 92px);
+    width: 44px;
     aspect-ratio: 1;
-    margin-bottom: 6px;
-    border-radius: 24%;
-    background:
-      radial-gradient(120% 90% at 20% 0%, rgb(255 255 255 / 0.22), transparent 55%),
-      linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.25),
-      0 10px 24px -10px color-mix(in oklab, var(--pk-tile-from) 75%, transparent);
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
+    box-shadow: 0 6px 14px -8px color-mix(in oklab, var(--pk-tile-from) 75%, transparent);
     color: #FFFFFF;
   }
 
   .pk-tile__badge {
     position: absolute;
     top: -6px;
-    right: -6px;
+    right: -8px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 24px;
-    height: 24px;
-    padding: 0 7px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
     border-radius: 999px;
     background: var(--pk-tone-bad);
-    box-shadow: 0 0 0 3px var(--pk-bg);
+    box-shadow: 0 0 0 2px var(--pk-card);
     color: #FFFFFF;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
   }
 
   .pk-tile__label {
+    align-self: end;
     font-family: var(--pk-font-heading);
     font-size: 15px;
     font-weight: 600;
-    line-height: 1.2;
+    line-height: 1.25;
   }
 
   .pk-tile__hint {
+    align-self: start;
     color: var(--pk-muted-fg);
-    font-size: 12px;
+    font-size: 12.5px;
     line-height: 1.3;
   }
 
-  @media (max-width: 560px) {
-    .pk-tile__hint {
-      display: none;
-    }
-
-    .pk-tile__label {
-      font-size: 13px;
-    }
+  .pk-home-empty {
+    padding: 48px 0;
+    color: var(--pk-muted-fg);
+    text-align: center;
   }
 
   @media (max-width: 768px) {
@@ -999,13 +1537,18 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
       padding: 0 8px;
     }
 
-    .pk-bar__brand-sub {
-      display: none;
+    .pk-bar__search {
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border-color: transparent;
+      background: transparent;
     }
 
-    .pk-bar__module {
-      gap: 8px;
-      font-size: 15px;
+    .pk-bar__search-text,
+    .pk-bar__kbd {
+      display: none;
     }
   }
 }
@@ -1016,8 +1559,9 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 // =================================================================================================
 @layer payload {
   .pk-crumbs {
+    grid-area: crumbs;
     min-width: 0;
-    padding: 12px var(--gutter-h) 0;
+    padding: 14px var(--gutter-h) 0;
     color: var(--pk-muted-fg);
     font-size: 13px; // px: Payload's root font-size is 13px
     line-height: 20px;
@@ -1465,13 +2009,6 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     &:hover:not(:disabled) {
       background: var(--pk-primary-hover);
       color: var(--pk-on-primary);
-    }
-  }
-
-  // very narrow bars: the module chip stays, its name gives way to the PT switcher
-  @media (max-width: 440px) {
-    .pk-bar:has(.pk-pt) .pk-bar__module-name {
-      display: none;
     }
   }
 
