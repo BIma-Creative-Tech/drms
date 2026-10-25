@@ -14,6 +14,8 @@ import { PROGRESS_STYLE } from '@/admin/views/progress-ui'
  * D2510 PR-4 (ADR 0033): the custom pages in the Nexus look — page header chip per route, soft badges that keep
  * their data-pk-* hooks, the custom-page CSS section (tokens only, wrap not ellipsis), no inline-style helpers left.
  */
+// alias: the kit badges take `children` as a typed prop (react/no-children-prop only knows createElement)
+const h = createElement
 const src = (p: string) => readFileSync(fileURLToPath(new URL(`../../${p}`, import.meta.url)), 'utf8')
 
 describe('page header module chip (page-ui.tsx)', () => {
@@ -34,10 +36,10 @@ describe('page header module chip (page-ui.tsx)', () => {
 
 describe('soft badges keep the hooks', () => {
   it('Badge: kit markup, legacy tones mapped, data-* / aria-label / title forwarded', () => {
-    const html = renderToStaticMarkup(createElement(Badge, { tone: 'muted', title: 't', 'aria-label': 'Label', 'data-pk-queue-vendor': 7, children: 'Pembayaran vendor' }))
+    const html = renderToStaticMarkup(h(Badge, { tone: 'muted', title: 't', 'aria-label': 'Label', 'data-pk-queue-vendor': 7, children: 'Pembayaran vendor' }))
     expect(html).toBe('<span class="pk-nx-badge" data-tone="neutral" title="t" aria-label="Label" data-pk-queue-vendor="7">Pembayaran vendor</span>')
-    expect(renderToStaticMarkup(createElement(Badge, { tone: 'bad', children: 'x' }))).toContain('data-tone="bad"')
-    expect(renderToStaticMarkup(createElement(Badge, { tone: 'info', children: 'x' }))).toContain('data-tone="info"')
+    expect(renderToStaticMarkup(h(Badge, { tone: 'bad', children: 'x' }))).toContain('data-tone="bad"')
+    expect(renderToStaticMarkup(h(Badge, { tone: 'info', children: 'x' }))).toContain('data-tone="info"')
     expect(NX_TABLE).toBe('pk-nx-table')
   })
 

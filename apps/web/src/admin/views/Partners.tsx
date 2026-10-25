@@ -7,6 +7,7 @@ import { CLIENT_CREATE_ROLES, loadClientForm, loadVendorForm, PartnerFormError, 
 
 import { ClientForm, VendorForm } from '../components/partners/PartnerForm'
 import { Frame, PageHead } from './frame'
+import { Badge } from './page-ui'
 import { NoAccess } from './NoAccess'
 
 /**
@@ -32,7 +33,7 @@ const notFound = (props: AdminViewServerProps, name: string, title: string, back
   </Frame>
 )
 
-const statusBadge = (active: boolean) => <span className={`pk-badge ${active ? 'ok' : 'none'}`}>{active ? 'Aktif' : 'Nonaktif'}</span>
+const statusBadge = (active: boolean) => <Badge tone={active ? 'ok' : 'muted'}>{active ? 'Aktif' : 'Nonaktif'}</Badge>
 
 export async function KlienView(props: AdminViewServerProps) {
   const req = props.initPageResult.req

@@ -7,6 +7,7 @@ import { loadUserOnboarding, mayOnboard, OnboardingError } from '@/domain/user-o
 
 import { UserOnboardingForm } from '../components/users/UserOnboardingForm'
 import { Frame, PageHead } from './frame'
+import { Badge } from './page-ui'
 import { NoAccess } from './NoAccess'
 
 /**
@@ -47,8 +48,8 @@ export async function PenggunaView(props: AdminViewServerProps) {
         <div className="pk-kact">
           {u ? (
             <>
-              <span className={`pk-badge ${u.active ? 'ok' : 'none'}`}>{u.active ? 'Aktif' : 'Nonaktif'}</span>
-              {u.groupAdmin ? <span className="pk-badge">Admin grup</span> : null}
+              <Badge tone={u.active ? 'ok' : 'muted'}>{u.active ? 'Aktif' : 'Nonaktif'}</Badge>
+              {u.groupAdmin ? <Badge tone="primary">Admin grup</Badge> : null}
               <Link className="pk-kbtn sm" href={`/admin/collections/users/${u.id}`} prefetch={false}>
                 Form akun (tanda tangan, Admin grup) ↗
               </Link>
