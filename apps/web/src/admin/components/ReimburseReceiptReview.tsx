@@ -4,10 +4,12 @@ import React from 'react'
 import { detail } from '@/domain/expense/dto'
 import { formatRupiah } from '@/lib/money'
 
+import { Badge, NX_TABLE } from '../views/page-ui'
 import { ActionButton } from './ActionButton'
 import { DocSummaryProvider } from './feedback/DocContext'
 import { expenseRequestSummary } from './feedback/summaries'
 import { TableScroll } from './TableScroll'
+import { Panel } from './ui/nexus'
 
 type Detail = Awaited<ReturnType<typeof detail>>
 
@@ -21,6 +23,7 @@ type Detail = Awaited<ReturnType<typeof detail>>
  * is authoritative) and call the existing /api/v1 endpoints with an Idempotency-Key.
  * No DefaultTemplate import here → server-renderable in integration tests.
  * DRMS 24/10: the popups name the request (DocSummaryProvider per request) and, for Valid / Tolak, the receipt.
+ * D2510 (ADR 0033): one Nexus card, each request an item card, receipts in the custom-view table, soft badges.
  */
 export type ReimburseReview = { review: Detail[]; revision: Detail[] }
 
@@ -42,19 +45,6 @@ export async function loadReimburseReview(req: PayloadRequest): Promise<Reimburs
 }
 
 const rp = (v: number | null | undefined) => (v === null || v === undefined ? '—' : formatRupiah(v))
-const table: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: 13 }
-const th: React.CSSProperties = { textAlign: 'left', borderBottom: '2px solid var(--theme-elevation-150)', padding: '6px 8px', whiteSpace: 'nowrap' }
-const td: React.CSSProperties = { borderBottom: '1px solid var(--theme-elevation-100)', padding: '6px 8px', verticalAlign: 'top' }
-const num: React.CSSProperties = { ...td, textAlign: 'right', whiteSpace: 'nowrap' }
-const badge = (tone: 'ok' | 'warn' | 'bad' | 'muted'): React.CSSProperties => ({
-  display: 'inline-block',
-  padding: '1px 6px',
-  borderRadius: 8,
-  fontSize: 11,
-  fontWeight: 600,
-  color: tone === 'muted' ? 'var(--theme-elevation-800)' : '#FFFFFF', // ≥ 4.5:1 on every --pk-tone-* (src/theme/tokens.ts)
-  background: tone === 'ok' ? 'var(--pk-tone-ok)' : tone === 'warn' ? 'var(--pk-tone-warn)' : tone === 'bad' ? 'var(--pk-tone-bad)' : 'var(--theme-elevation-150)',
-})
 const RECEIPT_STATUS: Record<string, { text: string; tone: 'ok' | 'bad' | 'muted' }> = {
   valid: { text: 'valid', tone: 'ok' },
   rejected: { text: 'ditolak', tone: 'bad' },
@@ -65,8 +55,8 @@ type Flag = Detail['flags'][number]
 
 function FlagItem({ d, f, canReview }: { d: Detail; f: Flag; canReview: boolean }) {
   return (
-    <li style={{ marginBottom: 4 }} data-pk-flag={f.id}>
-      <span style={badge(f.status === 'reviewed' ? 'muted' : f.level === 'warning' ? 'warn' : 'muted')}>{f.kindLabel}</span> {f.message}
+    <li data-pk-flag={f.id}>
+      <Badge tone={f.status === 'reviewed' ? 'muted' : f.level === 'warning' ? 'warn' : 'muted'}>{f.kindLabel}</Badge> {f.message}
       {f.status === 'reviewed' ? <em> (sudah diperiksa{f.reviewNote ? `: ${f.reviewNote}` : ''})</em> : null}
       {canReview && f.status === 'open' ? (
         <>
@@ -94,27 +84,21 @@ function RequestReview({ d }: { d: Detail }) {
   const openWarnings = d.flags.filter((f) => f.status === 'open' && f.level === 'warning').length
   const requestFlags = d.flags.filter((f) => f.receiptId === null)
   const body = (
-    <section
-      id={`reimburse-${d.id}`}
-      data-pk-receipt-review={d.id}
-      style={{ border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16 }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <div>
+    <section id={`reimburse-${d.id}`} className="pk-nx-item" data-pk-receipt-review={d.id}>
+      <div className="pk-nx-item__head">
+        <div className="pk-nx-item__main">
           <strong>
             <a href={`/admin/collections/expense-requests/${d.id}`}>{d.docNo ?? `#${d.id}`}</a>
           </strong>{' '}
-          — {d.title} <span style={badge('muted')}>{d.statusLabel}</span>
-          <div style={{ fontSize: 12 }}>
-            Rekening: {d.bank ? `${d.bank.bankName ?? ''} · ${d.bank.accountHolder ?? ''} · ${d.bank.accountNo ?? ''}` : '—'}
-          </div>
+          — {d.title} <Badge tone="muted">{d.statusLabel}</Badge>
+          <span className="pk-nx-sub">Rekening: {d.bank ? `${d.bank.bankName ?? ''} · ${d.bank.accountHolder ?? ''} · ${d.bank.accountNo ?? ''}` : '—'}</span>
         </div>
-        <div>
+        <div className="pk-nx-item__figs">
           Disetujui <strong>{rp(d.approvedAmount)}</strong> · {active.length} nota · {pending} belum valid · {openWarnings} flag peringatan terbuka
         </div>
       </div>
       {requestFlags.length > 0 ? (
-        <ul style={{ margin: '8px 0', paddingLeft: 18, fontSize: 12 }}>
+        <ul className="pk-nx-flags">
           {requestFlags.map((f) => (
             <FlagItem key={f.id} d={d} f={f} canReview={canReview} />
           ))}
@@ -123,24 +107,26 @@ function RequestReview({ d }: { d: Detail }) {
       {d.lines.map((l) => {
         const rs = active.filter((r) => r.lineId === l.id)
         return (
-          <div key={l.id} style={{ marginTop: 10 }}>
-            <div style={{ fontWeight: 600 }}>
+          <div key={l.id}>
+            <div className="pk-nx-strong">
               Baris {l.no}: {l.description ?? '—'} · {rp(l.total)} · nota {rp(rs.reduce((s, r) => s + r.amount, 0))}
             </div>
             {rs.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'var(--theme-error-500)' }}>Belum ada nota untuk baris ini.</div>
+              <span className="pk-nx-sub" data-tone="bad">
+                Belum ada nota untuk baris ini.
+              </span>
             ) : (
               <TableScroll label="Nota per baris">
-                <table style={{ ...table, marginTop: 4 }}>
+                <table className={`${NX_TABLE} is-full`}>
                   <thead>
                     <tr>
-                      <th style={th}>Foto</th>
-                      <th style={th}>Nota</th>
-                      <th style={th}>Tanggal</th>
-                      <th style={{ ...th, textAlign: 'right' }}>Nominal</th>
-                      <th style={th}>Status</th>
-                      <th style={th}>Flag</th>
-                      <th style={th}>Aksi</th>
+                      <th>Foto</th>
+                      <th>Nota</th>
+                      <th>Tanggal</th>
+                      <th className="n">Nominal</th>
+                      <th>Status</th>
+                      <th>Flag</th>
+                      <th>Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -152,37 +138,38 @@ function RequestReview({ d }: { d: Detail }) {
                       const receiptSummary = [['Pengajuan', d.docNo ?? `#${d.id}`], ['Baris', `${l.no}. ${l.description ?? '—'}`], ['Vendor / toko', r.vendorName], ['No. nota', r.receiptNo], ['Tanggal nota', r.receiptDate], ['Nominal', rp(r.amount)]] as const
                       return (
                         <tr key={r.id} data-pk-receipt={r.id}>
-                          <td style={td}>
+                          <td>
                             {r.imageId ? (
                               <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`receipts-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · baris ${l.no} · ${rp(r.amount)}`}>
                                 {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
-                                <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 80, height: 80, objectFit: 'cover' }} />
+                                <img className="pk-nx-thumb" src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} width={80} height={80} />
                               </a>
                             ) : (
                               '—'
                             )}
                           </td>
-                          <td style={td}>
+                          <td>
                             {r.vendorName}
-                            <div style={{ fontSize: 12 }}>No. {r.receiptNo ?? '—'}</div>
+                            <span className="pk-nx-sub">No. {r.receiptNo ?? '—'}</span>
                           </td>
-                          <td style={td}>{r.receiptDate}</td>
-                          <td style={num}>{rp(r.amount)}</td>
-                          <td style={td}>
-                            <span style={badge(st.tone)}>{st.text}</span>
+                          <td>{r.receiptDate}</td>
+                          <td className="n">{rp(r.amount)}</td>
+                          <td>
+                            <Badge tone={st.tone}>{st.text}</Badge>
                           </td>
-                          <td style={td}>
+                          <td>
                             {flags.length === 0 ? (
                               '—'
                             ) : (
-                              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+                              <ul className="pk-nx-flags">
                                 {flags.map((f) => (
                                   <FlagItem key={f.id} d={d} f={f} canReview={canReview} />
                                 ))}
                               </ul>
                             )}
                           </td>
-                          <td style={td}>
+                          <td>
+                            <div className="pk-nx-acts">
                             {canVerify && r.status !== 'valid' ? <ActionButton url={`${base}/receipts/${r.id}/verify`} label="Valid" object={receipt} summary={receiptSummary} testId="receipt-valid" /> : null}
                             {canReject && r.status !== 'rejected' ? (
                               <ActionButton
@@ -194,6 +181,7 @@ function RequestReview({ d }: { d: Detail }) {
                                 testId="receipt-reject"
                               />
                             ) : null}
+                            </div>
                           </td>
                         </tr>
                       )
@@ -206,7 +194,7 @@ function RequestReview({ d }: { d: Detail }) {
         )
       })}
       {canVerifyAll ? (
-        <div style={{ marginTop: 10 }}>
+        <div className="pk-nx-acts">
           <ActionButton
             url={`${base}/verify-receipts`}
             label="Verifikasi semua nota"
@@ -215,7 +203,7 @@ function RequestReview({ d }: { d: Detail }) {
             testId="verify-receipts"
           />
           {pending > 0 || openWarnings > 0 ? (
-            <span style={{ fontSize: 12 }}>
+            <span className="pk-nx-muted">
               Syarat: semua nota valid ({pending} belum) dan semua flag peringatan ditandai diperiksa ({openWarnings} terbuka).
             </span>
           ) : null}
@@ -228,20 +216,23 @@ function RequestReview({ d }: { d: Detail }) {
 
 export function ReimburseReceiptReview({ data }: { data: ReimburseReview }) {
   return (
-    <div data-pk-section="reimburse-review">
-      <h2>Verifikasi nota Reimburse ({data.review.length})</h2>
-      <p style={{ marginTop: 0, fontSize: 13 }}>
+    <Panel id="verifikasi-nota" icon="tReceipt" title={`Verifikasi nota Reimburse (${data.review.length})`} data-pk-section="reimburse-review">
+      <p className="pk-nx-lead">
         Reimburse yang sudah disetujui diverifikasi notanya dulu. Setelah <strong>Verifikasi semua nota</strong>, status menjadi{' '}
         <strong>Nota Terverifikasi (Antri Transfer)</strong> dan pengajuan muncul di tabel transfer di bawah.
       </p>
-      {data.review.length === 0 ? <p style={{ color: 'var(--theme-elevation-600)' }}>Tidak ada nota Reimburse yang menunggu verifikasi.</p> : null}
-      {data.review.map((d) => (
-        <RequestReview key={d.id} d={d} />
-      ))}
+      {data.review.length === 0 ? <p className="pk-nx-empty">Tidak ada nota Reimburse yang menunggu verifikasi.</p> : null}
+      {data.review.length > 0 ? (
+        <div className="pk-nx-items">
+          {data.review.map((d) => (
+            <RequestReview key={d.id} d={d} />
+          ))}
+        </div>
+      ) : null}
       {data.revision.length > 0 ? (
-        <>
-          <h3>Menunggu revisi nota pemohon ({data.revision.length})</h3>
-          <ul style={{ fontSize: 13 }}>
+        <div className="pk-nx-subsec">
+          <h3 className="pk-nx-subsec__title">Menunggu revisi nota pemohon ({data.revision.length})</h3>
+          <ul className="pk-nx-flags">
             {data.revision.map((d) => (
               <li key={d.id}>
                 <a href={`/admin/collections/expense-requests/${d.id}`}>{d.docNo ?? `#${d.id}`}</a> — {d.title} ·{' '}
@@ -252,9 +243,9 @@ export function ReimburseReceiptReview({ data }: { data: ReimburseReview }) {
               </li>
             ))}
           </ul>
-        </>
+        </div>
       ) : null}
-    </div>
+    </Panel>
   )
 }
 

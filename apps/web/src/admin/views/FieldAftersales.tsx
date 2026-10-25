@@ -17,10 +17,11 @@ import { xlsxEnabled } from '@/lib/xlsx'
 import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseListQuery } from '@/admin/list-query'
 
+import { PageHead } from './frame'
 import { BtnLink, dateParam, EditLink, editModeOf, FIELD_CREATORS, FIELD_OFFICE, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf } from './field-ui'
 import { ptCodes, ptOptionsOf, ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
-import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, rp, StatusPill, type Col } from './viz'
+import { Bento, Card, DataTable, EmptyState, KpiRow, KpiTile, rp, StatusPill, type Col } from './viz'
 import { DateInput } from '../components/DateInput'
 
 /**
@@ -94,7 +95,7 @@ export async function FieldAftersalesRecap(props: AdminViewServerProps) {
   ]
   return (
     <FieldFrame props={props} name="aftersales">
-      <DashHead title={`Aftersales sparepart · Minggu ${d.week.label}`} note="PO masuk vs terkirim vs belum kirim per pelanggan · status PO = status saat ini">
+      <PageHead props={props} title={`Aftersales sparepart · Minggu ${d.week.label}`} note="PO masuk vs terkirim vs belum kirim per pelanggan · status PO = status saat ini">
         <div className="pk-kact">
           {creator ? (
             <BtnLink href={newHref({})} primary icon="add" attr="aktivitas-baru">
@@ -105,7 +106,7 @@ export async function FieldAftersalesRecap(props: AdminViewServerProps) {
             Daftar aktivitas
           </BtnLink>
         </div>
-      </DashHead>
+      </PageHead>
       <form className="pk-filter" method="get" action={recapHref} role="search" aria-label="Pilih minggu" data-pk-filter="aftersales">
         <label>
           Minggu
@@ -266,7 +267,7 @@ export async function FieldActivityList(props: AdminViewServerProps) {
   const office = hasRoleAny(req, ...FIELD_OFFICE)
   return (
     <FieldFrame props={props} name="aktivitas-aftersales">
-      <DashHead title="Aktivitas aftersales" note="Penawaran, PO masuk, pengiriman, penagihan, kunjungan · terbaru di atas">
+      <PageHead props={props} title="Aktivitas aftersales" note="Penawaran, PO masuk, pengiriman, penagihan, kunjungan · terbaru di atas">
         <div className="pk-kact">
           {creator ? (
             <BtnLink href={newHref({})} primary icon="add" attr="aktivitas-baru">
@@ -282,7 +283,7 @@ export async function FieldActivityList(props: AdminViewServerProps) {
             PO belum kirim
           </BtnLink>
         </div>
-      </DashHead>
+      </PageHead>
       <form className="pk-filter" method="get" action={listHref} role="search" aria-label="Filter aktivitas" data-pk-filter="aktivitas">
         <label className="pk-filter__search">
           Cari
@@ -430,13 +431,13 @@ export async function FieldActivityNew(props: AdminViewServerProps) {
   const kind = one(sp.jenis)
   return (
     <FieldFrame props={props} name="aktivitas-baru">
-      <DashHead title="Catat aktivitas aftersales" note="Satu baris per aktivitas · bisa diedit pelapor 24 jam, setelah itu koreksi oleh PM/Direktur">
+      <PageHead props={props} title="Catat aktivitas aftersales" note="Satu baris per aktivitas · bisa diedit pelapor 24 jam, setelah itu koreksi oleh PM/Direktur">
         <div className="pk-kact">
           <BtnLink href={listHref} icon="arrowLeft">
             Aktivitas aftersales
           </BtnLink>
         </div>
-      </DashHead>
+      </PageHead>
       <Bento>
         <Card id="activity-form" title="Aktivitas baru" span={8}>
           {d.projects.length === 0 ? (
@@ -482,7 +483,7 @@ export async function FieldActivityDetail(props: AdminViewServerProps) {
   if (!d) {
     return (
       <FieldFrame props={props} name="aktivitas-detail">
-        <DashHead title="Aktivitas tidak ditemukan">{back}</DashHead>
+        <PageHead props={props} title="Aktivitas tidak ditemukan">{back}</PageHead>
       </FieldFrame>
     )
   }
@@ -495,7 +496,7 @@ export async function FieldActivityDetail(props: AdminViewServerProps) {
   const items = a.items as Array<{ name: string; partNo?: string | null; qty: number; uom?: string | null }>
   return (
     <FieldFrame props={props} name="aktivitas-detail">
-      <DashHead title={`${ACTIVITY_KIND_LABELS[kind]}${a.docNo ? ` · ${a.docNo}` : ''}`} note={`${longDate(a.activityDate)} · ${a.client.name ?? '—'} · ${a.project.code ?? ''} ${a.project.name ?? ''}`}>
+      <PageHead props={props} title={`${ACTIVITY_KIND_LABELS[kind]}${a.docNo ? ` · ${a.docNo}` : ''}`} note={`${longDate(a.activityDate)} · ${a.client.name ?? '—'} · ${a.project.code ?? ''} ${a.project.name ?? ''}`}>
         <div className="pk-kact">
           {back}
           {open && creator ? (
@@ -514,7 +515,7 @@ export async function FieldActivityDetail(props: AdminViewServerProps) {
             </EditLink>
           ) : null}
         </div>
-      </DashHead>
+      </PageHead>
       {one(sp.baru) === '1' ? (
         <Alert tone="ok" attr="created">
           <p>Aktivitas tersimpan.</p>
@@ -641,7 +642,7 @@ export async function FieldActivityEdit(props: AdminViewServerProps) {
   if (!d) {
     return (
       <FieldFrame props={props} name="aktivitas-ubah">
-        <DashHead title="Aktivitas tidak ditemukan">{back(null)}</DashHead>
+        <PageHead props={props} title="Aktivitas tidak ditemukan">{back(null)}</PageHead>
       </FieldFrame>
     )
   }
@@ -652,7 +653,7 @@ export async function FieldActivityEdit(props: AdminViewServerProps) {
   if (!allowed || a.companyId === null) {
     return (
       <FieldFrame props={props} name="aktivitas-ubah">
-        <DashHead title={title}>{back(a.id)}</DashHead>
+        <PageHead props={props} title={title}>{back(a.id)}</PageHead>
         <Alert tone="bad" attr="not-editable">
           <p>{mode === 'edit' ? 'Aktivitas ini tidak dapat diubah lagi: hanya pelapor, dalam 24 jam sejak dibuat. Setelah itu koreksi oleh PM project / Direktur.' : 'Koreksi aktivitas hanya oleh PM project (tim) atau Direktur.'}</p>
         </Alert>
@@ -662,9 +663,9 @@ export async function FieldActivityEdit(props: AdminViewServerProps) {
   const companyId = a.companyId
   return (
     <FieldFrame props={props} name="aktivitas-ubah">
-      <DashHead title={title} note={mode === 'edit' ? 'Pelapor, dalam 24 jam sejak dibuat · hanya isian yang berubah yang dikirim · tercatat di riwayat' : 'Koreksi PM project / Direktur dengan alasan · PO yang dibatalkan tidak dapat dibuka lagi'}>
+      <PageHead props={props} title={title} note={mode === 'edit' ? 'Pelapor, dalam 24 jam sejak dibuat · hanya isian yang berubah yang dikirim · tercatat di riwayat' : 'Koreksi PM project / Direktur dengan alasan · PO yang dibatalkan tidak dapat dibuka lagi'}>
         <div className="pk-kact">{back(a.id)}</div>
-      </DashHead>
+      </PageHead>
       <Bento>
         <Card id="activity-form" title={mode === 'edit' ? 'Ubah aktivitas (24 jam)' : 'Koreksi aktivitas'} span={8}>
           <ActivityForm

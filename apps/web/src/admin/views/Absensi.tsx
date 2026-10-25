@@ -26,11 +26,12 @@ import { withReqTransaction } from '@/lib/system-tx'
 import { tzOffsetMinutes } from '@/lib/time'
 import { formatServerTime } from '@/pdf/format'
 
+import { PageHead } from './frame'
 import { ChartHover } from './ChartHover'
 import { F3Root } from './f3-ui'
 import { foreignPtParam, PtChip, ptOptionsOf, ptView, type PtView } from './pt'
 import { EditButton, PtNotAllowed } from './shared'
-import { Bento, Card, DashHead, DataTable, EmptyState, HBarList, KpiRow, KpiTile, StatusPill, TableView, VIZ_STYLE } from './viz'
+import { Bento, Card, DataTable, EmptyState, HBarList, KpiRow, KpiTile, StatusPill, TableView, VIZ_STYLE } from './viz'
 import { settings as companySettings } from '@/domain/companies'
 import { NoAccess } from './NoAccess'
 import { DateInput } from '../components/DateInput'
@@ -90,7 +91,7 @@ export const ABSENSI_STYLE = `
 .pk-f3 .pk-cal .cell .d { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; font-size: 12px; color: var(--pk-fg); }
 .pk-f3 .pk-cal .cell .g { font-size: 12px; }
 .pk-f3 .pk-cal .cell .tm { color: var(--pk-fg); font-variant-numeric: tabular-nums; }
-.pk-f3 .pk-cal .cell .hn { color: var(--pk-muted-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-f3 .pk-cal .cell .hn { color: var(--pk-muted-fg); overflow-wrap: anywhere; } /* DRMS 16/10: the holiday name wraps in its cell, never an ellipsis */
 .pk-f3 .pk-cal .cell.today { outline: 2px solid var(--pk-ring); outline-offset: 1px; }
 .pk-f3 .pk-cal a.cell { text-decoration: none; } .pk-f3 .pk-cal a.cell:hover { filter: brightness(1.03); box-shadow: var(--pk-shadow-hover); }
 .pk-f3 .pk-cal a.cell:focus-visible { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
@@ -124,7 +125,7 @@ export const ABSENSI_STYLE = `
 .pk-f3 .pk-mem .tms { display: flex; gap: 14px; font-size: 12px; color: var(--pk-muted-fg); font-variant-numeric: tabular-nums; }
 .pk-f3 .pk-mem .tms b { color: var(--pk-fg); font-size: 14px; }
 .pk-f3 .pk-mem .tags { display: flex; flex-wrap: wrap; gap: 4px 6px; }
-.pk-f3 .pk-chip, .pk-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid var(--pk-border); color: var(--pk-muted-fg); background: var(--pk-card); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.pk-f3 .pk-chip, .pk-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid var(--pk-border); color: var(--pk-muted-fg); background: var(--pk-card); max-width: 100%; overflow-wrap: anywhere; } /* D2510: location names wrap (owner rule 2026-10-16), no ellipsis */
 .pk-f3 .pk-chip.proj::before { content: 'P'; font-size: 9px; font-weight: 800; color: var(--pk-primary); }
 .pk-f3 .pk-chip.cc::before { content: 'PB'; font-size: 9px; font-weight: 800; color: var(--pk-tone-warn-text); }
 .pk-f3 .pk-chip.site::before { content: 'S'; font-size: 9px; font-weight: 800; color: var(--pk-tone-ok-text); }
@@ -281,7 +282,7 @@ function Failed({ props, name, title, err, req }: { props: AdminViewServerProps;
   if (!status || status >= 500) req.payload.logger.error({ msg: 'attendance view failed', view: name, err: msg })
   return (
     <Frame props={props} name={name}>
-      <DashHead title={title} />
+      <PageHead props={props} title={title} />
       <Alert tone="bad" attr="error">
         {status && status < 500 ? msg : 'Data tidak dapat dimuat. Coba lagi.'}
       </Alert>
@@ -397,7 +398,7 @@ export async function AbsensiToday(props: AdminViewServerProps) {
   const pct = (n: number) => (c.total > 0 ? `${Math.round((n / c.total) * 100)}%` : '0%')
   return (
     <Frame props={props} name="absensi-today">
-      <DashHead title="Absensi · Tim hari ini" note={`${WD_LONG[wdOf(r.date) - 1]}, ${dayMonth(r.date)} (WITA) · ${r.scope === 'team' ? 'anggota tim di project/pusat biaya Anda' : 'semua karyawan yang ditugaskan'}${r.date === today ? '' : ' · tanggal lampau'}`} />
+      <PageHead props={props} title="Absensi · Tim hari ini" note={`${WD_LONG[wdOf(r.date) - 1]}, ${dayMonth(r.date)} (WITA) · ${r.scope === 'team' ? 'anggota tim di project/pusat biaya Anda' : 'semua karyawan yang ditugaskan'}${r.date === today ? '' : ' · tanggal lampau'}`} />
       <SubNav active="today" scope={scope} absenkan={isAdminStaff(req)} />
       <form className="pk-filter" method="get" action="/admin/absensi" role="search" aria-label="Filter tim hari ini" data-pk-filter="absensi-today">
         <label className="pk-filter__search">
@@ -671,7 +672,7 @@ export async function AbsensiAbsen(props: AdminViewServerProps) {
   const { scope, locations, privacyBlocked } = data
   return (
     <Frame props={props} name="absensi-absen">
-      <DashHead title="Absensi · Absen" note="Absen masuk / pulang dari web, aturan sama dengan aplikasi Android." />
+      <PageHead props={props} title="Absensi · Absen" note="Absen masuk / pulang dari web, aturan sama dengan aplikasi Android." />
       <SubNav active="absen" scope={scope} absenkan={isAdminStaff(req)} />
       <Card id="self-check" title="Absen hari ini" span={12}>
         <SelfCheckForm locations={locations} privacyBlocked={privacyBlocked} />
@@ -709,7 +710,7 @@ export async function AbsensiAbsenkan(props: AdminViewServerProps) {
   const label = (company: number, text: string) => (multi ? `[${ptCode(company)}] ${text}` : text)
   return (
     <Frame props={props} name="absensi-absenkan">
-      <DashHead title="Absensi · Absenkan karyawan" note="Admin Staff: absen masuk / pulang atas nama karyawan PT (juga tanpa akun). PM: anggota tim project / pusat biaya Anda, di lokasi tim. Foto dan GPS dari perangkat Anda; nama Anda dan alasannya tercatat." />
+      <PageHead props={props} title="Absensi · Absenkan karyawan" note="Admin Staff: absen masuk / pulang atas nama karyawan PT (juga tanpa akun). PM: anggota tim project / pusat biaya Anda, di lokasi tim. Foto dan GPS dari perangkat Anda; nama Anda dan alasannya tercatat." />
       <SubNav active="absenkan" scope={scope} absenkan />
       <Card id="on-behalf" title="Absenkan karyawan" span={12}>
         <OnBehalfForm
@@ -791,7 +792,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
   }
   return (
     <Frame props={props} name={d.recap ? 'absensi-rekap' : 'absensi-rekap-tim'}>
-      <DashHead title={d.recap ? `Rekap absensi · ${d.recap.employee.name}` : d.scope ? 'Absensi · Rekap bulanan tim' : 'Rekap absensi saya'} note={`${periodLabel(d.month)} · zona ${d.tz} · koreksi T10 diterapkan`}>
+      <PageHead props={props} title={d.recap ? `Rekap absensi · ${d.recap.employee.name}` : d.scope ? 'Absensi · Rekap bulanan tim' : 'Rekap absensi saya'} note={`${periodLabel(d.month)} · zona ${d.tz} · koreksi T10 diterapkan`}>
         <div className="pk-kact">
           <Link className="pk-kbtn sm" href={monthHref(sp, shiftMonth(d.month, -1))} aria-label="Bulan sebelumnya" data-pk-link="prev-month">
             ‹ {periodLabel(shiftMonth(d.month, -1))}
@@ -802,7 +803,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
             </Link>
           ) : null}
         </div>
-      </DashHead>
+      </PageHead>
       <SubNav active="rekap" scope={d.scope} absenkan={isAdminStaff(req)} />
       {d.scope ? (
         <form className="pk-filter" method="get" action="/admin/absensi/rekap" role="search" aria-label="Pilih karyawan dan bulan" data-pk-filter="absensi-rekap">
@@ -1264,7 +1265,7 @@ export async function AbsensiJadwal(props: AdminViewServerProps) {
   const y = Number(d.year)
   return (
     <Frame props={props} name="absensi-jadwal">
-      <DashHead title="Absensi · Jadwal & hari libur" note="Dasar perhitungan terlambat / pulang cepat / tidak hadir (Q-30) dan geofence pusat biaya (Q-40)." />
+      <PageHead props={props} title="Absensi · Jadwal & hari libur" note="Dasar perhitungan terlambat / pulang cepat / tidak hadir (Q-30) dan geofence pusat biaya (Q-40)." />
       <SubNav active="jadwal" scope={scope} absenkan={isAdminStaff(req)} />
       {!canWrite ? (
         <Alert tone="info" attr="read-only">

@@ -39,12 +39,13 @@ import type { PillTone } from '@/domain/reports/viz'
 import { withReqTransaction } from '@/lib/system-tx'
 import { formatServerTime } from '@/pdf/format'
 
+import { PageHead } from './frame'
 import { ChartHover } from './ChartHover'
 import { F3Root } from './f3-ui'
 import { foreignPtParam, PtChip, ptOptions, ptView, type PtView } from './pt'
 import { PtNotAllowed } from './shared'
 import { PerPt } from './pt-breakdown'
-import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, rp, StatusPill, VIZ_STYLE, type Col } from './viz'
+import { Bento, Card, DataTable, EmptyState, KpiRow, KpiTile, rp, StatusPill, VIZ_STYLE, type Col } from './viz'
 import { NoAccess } from './NoAccess'
 
 /**
@@ -67,7 +68,7 @@ const PAGE_STYLE = `
 .pk-f3 form.pk-filter .pk-kbtn { align-self: flex-end; }
 .pk-f3 .pk-pager { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--pk-muted-fg); }
 .pk-f3 .pk-kpi.dim { opacity: .75; }
-@media (max-width: 559px) { .pk-f3 .pk-dash-head .pk-kact { width: 100%; } .pk-f3 .pk-dash-head .pk-kact > * { flex: 1 1 auto; } }
+@media (max-width: 559px) { .pk-f3 .pk-nx-head .pk-kact { width: 100%; } .pk-f3 .pk-nx-head .pk-kact > * { flex: 1 1 auto; } }
 .pk-f3 .pk-ptpick { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .pk-f3 .pk-ptpick li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 .pk-f3 .pk-ptpick .pk-kbtn { gap: 8px; }
@@ -242,7 +243,7 @@ export async function KasBook(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="kas">
       <ChartHover>
-        <DashHead title="Kas" note={`Buku kas per ${dayMonth(todayDate)} (WITA) · ${lockText(pt, locks)} · termasuk void & jurnal balik`}>
+        <PageHead props={props} title="Kas" note={`Buku kas per ${dayMonth(todayDate)} (WITA) · ${lockText(pt, locks)} · termasuk void & jurnal balik`}>
           <div className="pk-kact">
             {canWrite ? (
               <>
@@ -258,7 +259,7 @@ export async function KasBook(props: AdminViewServerProps) {
               Tutup buku
             </Link>
           </div>
-        </DashHead>
+        </PageHead>
 
         {flash ? (
           <div className="pk-alert ok" role="status" data-pk-flash={flash.entryNo}>
@@ -314,14 +315,14 @@ export async function KasBook(props: AdminViewServerProps) {
         </Bento>
         </div>
 
-        <FilterBar q={q} lk={lk} filtered={filtered} pt={pt} pts={multi ? acc.view : []} />
-
         <Bento label="Buku kas">
           <Card
             id="kas-book"
             title="Buku kas"
             sub={`${page.totalDocs} transaksi${filtered ? ' (terfilter)' : ''} · terbaru dulu · baris void tetap tampil, jurnal baliknya tertaut`}
           >
+            {/* D2510 (Nexus): the filters are the toolbar row of the book card */}
+            <FilterBar q={q} lk={lk} filtered={filtered} pt={pt} pts={multi ? acc.view : []} />
             <LedgerTable rows={page.rows} lk={d.lk} lockOf={lockOf} writeIn={writeIn} canWrite={canWrite} filtered={filtered} pt={multi && q.pt === undefined ? pt : null} />
             <Pager q={q} page={page.page} totalPages={page.totalPages} />
           </Card>
@@ -681,9 +682,9 @@ export async function KasNew(props: AdminViewServerProps) {
     const locks = await withReqTransaction(req, () => lockDates(req, acc.write))
     return (
       <Frame props={props} name="kas-baru">
-        <DashHead title="Catat kas masuk / keluar" note="Anda Finance di beberapa PT. Pilih PT transaksi ini — akun, project, pusat biaya dan kategori mengikuti PT tersebut.">
+        <PageHead props={props} title="Catat kas masuk / keluar" note="Anda Finance di beberapa PT. Pilih PT transaksi ini — akun, project, pusat biaya dan kategori mengikuti PT tersebut.">
           {back}
-        </DashHead>
+        </PageHead>
         <PtChooser pt={pt} pts={acc.write} locks={locks} href={(c) => `/admin/kas/baru?arah=${arah}&pt=${c}`} title="Pilih PT" note="Kas masuk/keluar dicatat di buku kas satu PT." />
       </Frame>
     )
@@ -691,9 +692,9 @@ export async function KasNew(props: AdminViewServerProps) {
   const { todayDate, lockDate, lk } = await formContext(req, company)
   return (
     <Frame props={props} name="kas-baru">
-      <DashHead title="Catat kas masuk / keluar" note={`${acc.write.length > 1 ? `PT ${ptCode(pt, company)} — ${pt.ref(company)?.name ?? ''} · ` : ''}Nomor KM/KK diberikan otomatis saat disimpan. Saldo akun langsung berubah.`}>
+      <PageHead props={props} title="Catat kas masuk / keluar" note={`${acc.write.length > 1 ? `PT ${ptCode(pt, company)} — ${pt.ref(company)?.name ?? ''} · ` : ''}Nomor KM/KK diberikan otomatis saat disimpan. Saldo akun langsung berubah.`}>
         {back}
-      </DashHead>
+      </PageHead>
       <PtTabs pt={pt} pts={acc.write} current={company} href={(c) => `/admin/kas/baru?arah=${arah}&pt=${c}`} />
       <Bento>
         <Card id="kas-form" title="Transaksi baru" span={8}>
@@ -727,16 +728,16 @@ export async function KasEdit(props: AdminViewServerProps) {
   if (!e) {
     return (
       <Frame props={props} name="kas-ubah">
-        <DashHead title="Transaksi tidak ditemukan">{back}</DashHead>
+        <PageHead props={props} title="Transaksi tidak ditemukan">{back}</PageHead>
       </Frame>
     )
   }
   const editable = canEdit(e, lockDate)
   return (
     <Frame props={props} name="kas-ubah">
-      <DashHead title={`Edit ${e.entryNo}`} note="Keterangan, sumber/kategori, pembebanan, kendaraan dan bukti. Tanggal, akun dan nominal terkunci. Alasan wajib.">
+      <PageHead props={props} title={`Edit ${e.entryNo}`} note="Keterangan, sumber/kategori, pembebanan, kendaraan dan bukti. Tanggal, akun dan nominal terkunci. Alasan wajib.">
         {back}
-      </DashHead>
+      </PageHead>
       {editable ? (
         <Bento>
           <Card id="kas-form" title="Ubah transaksi" span={8}>
@@ -809,11 +810,11 @@ export async function TutupBuku(props: AdminViewServerProps) {
     const locks = await withReqTransaction(req, () => lockDates(req, acc.close))
     return (
       <Frame props={props} name="tutup-buku">
-        <DashHead title="Tutup buku" note="Tutup buku dilakukan per PT: menutup satu PT tidak mengunci PT lain. Pilih PT yang akan dikelola.">
+        <PageHead props={props} title="Tutup buku" note="Tutup buku dilakukan per PT: menutup satu PT tidak mengunci PT lain. Pilih PT yang akan dikelola.">
           <Link className="pk-kbtn" href="/admin/kas">
             ← Buku kas
           </Link>
-        </DashHead>
+        </PageHead>
         <PtChooser pt={pt} pts={acc.close} locks={locks} href={(c) => `/admin/tutup-buku?pt=${c}`} title="Pilih PT" note="Tanggal kunci saat ini per PT." />
       </Frame>
     )
@@ -962,14 +963,14 @@ export async function TutupBuku(props: AdminViewServerProps) {
   ]
   return (
     <Frame props={props} name="tutup-buku">
-      <DashHead
+      <PageHead props={props}
         title={acc.close.length > 1 ? `Tutup buku · ${ptCode(pt, company)}` : 'Tutup buku'}
         note={`${acc.close.length > 1 ? `${pt.ref(company)?.name ?? ''} · ` : ''}Tutup bulan yang sudah lewat. Buka kembali hanya oleh Direktur, untuk periode tertutup terakhir, dengan alasan.`}
       >
         <Link className="pk-kbtn" href={`/admin/kas${acc.close.length > 1 ? `?pt=${company}` : ''}`}>
           ← Buku kas
         </Link>
-      </DashHead>
+      </PageHead>
       <PtTabs pt={pt} pts={acc.close} current={company} href={(c) => `/admin/tutup-buku?pt=${c}`} />
       <Bento label="Status periode">
         <KpiRow cols={3}>

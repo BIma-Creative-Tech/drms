@@ -21,6 +21,11 @@ APK 0.12.0 keeps working. Folded into the next web release section.
     "+ Buat baru" in the head, filter bar row, Nexus table with soft status badges and ghost row actions, pager and
     page size in the foot; long text still wraps); edit / create views show their fields in white cards under a
     sticky white toolbar, tabs and collapsibles tidied.
+  - Custom pages (PR-4): every custom view (Kas, Absensi, Persetujuan, Antrian Transfer, Verifikasi LPJ, Laporan,
+    laporan lapangan, Pinjaman, RAP, Progress, Addendum, Pengguna, Notifikasi, Keamanan akun, Riwayat) opens with the
+    shared page header (module chip, muted line, actions right) over Nexus cards; queue / inbox lists in cards with
+    the new table style, soft status badges and item cards; filters as the card's toolbar row; soft alerts, tab boxes.
+    Same data, texts, buttons and popups; long texts wrap (progress bars, holiday names, location chips no longer cut).
 - **APK restyle after the Banani reference "Project Monitoring Hub" (D2510, user 2026-10-25), web palette kept** (ADR
   0015 tokens unchanged; layout and components only). Presentation-only: same providers, routes, keys, texts and popups.
   - Kit `lib/shared/widgets/pk_ui.dart` (hero band, cards, icon chips, soft status pills, KPI tiles, section headers,

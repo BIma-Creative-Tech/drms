@@ -17,9 +17,10 @@ import { ListToolbar, Pager } from '../components/list/ListToolbar'
 import { MoneyForm } from '../components/MoneyForm'
 import { ShortfallPanel } from '../components/ShortfallPanel'
 import { LpjPhotoGrid } from '../components/lpj/LpjPhotoGrid'
+import { Panel } from '../components/ui/nexus'
 import { allowedValues, idValues, pageOfFind, parseListQuery, searchWhere } from '../list-query'
 import { accountsOf, PtChip, PtScopeNote, ptView } from './pt'
-import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
+import { Badge, Empty, Forbidden, NX_TABLE, Shell, TableScroll, allowed, docLink, rp } from './shared'
 
 type Detail = Awaited<ReturnType<typeof detail>>
 
@@ -101,33 +102,34 @@ export async function LpjVerification(props: AdminViewServerProps) {
           { key: 'tahap', label: 'Tahap', multi: true, options: [{ value: 'lpj_submitted', label: 'LPJ diajukan' }, { value: 'lpj_verified', label: 'Menunggu penyelesaian selisih' }] },
         ]}
       />
-      <h2>LPJ diajukan ({submitted.length})</h2>
+      <Panel id="lpj-diajukan" icon="tReceiptSearch" title={`LPJ diajukan (${submitted.length})`}>
       {submitted.length === 0 ? <Empty text="Tidak ada LPJ yang menunggu verifikasi." /> : null}
+      <div className="pk-nx-items">
       {submitted.map((d) => (
         <DocSummaryProvider key={d.id} {...lpjDoc(d)}>
-        <section style={{ border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-            <div>
+        <section className="pk-nx-item" data-pk-lpj-item={d.id}>
+          <div className="pk-nx-item__head">
+            <div className="pk-nx-item__main">
               {pt.multi ? (
                 <>
                   <PtChip pt={pt.ref(companyOf.get(d.id))} />{' '}
                 </>
               ) : null}
               <strong>{docLink(d.id, d.docNo ?? `#${d.id}`)}</strong> — {d.title} · LPJ {d.settlement ? <a href={docHref('settlement', d.settlement.id)!}>{d.settlement.docNo ?? `#${d.settlement.id}`}</a> : ''} · kiriman ke-{d.settlement?.submitCount ?? 1}
-              <div style={{ fontSize: 12 }}>Uraian penggunaan: {d.settlement?.usageNotes ?? '—'}</div>
+              <span className="pk-nx-sub">Uraian penggunaan: {d.settlement?.usageNotes ?? '—'}</span>
               {/* point 13: LPJ photos of the requester (lightbox) */}
               {d.settlement?.photos.length ? <LpjPhotoGrid ids={d.settlement.photos} group={`lpj-photos-${d.id}`} label={`Foto LPJ ${d.settlement.docNo ?? ''}`.trim()} /> : null}
             </div>
-            <div>
+            <div className="pk-nx-item__figs">
               Ditransfer <strong>{rp(d.transferredTotal)}</strong> · Nota <strong>{rp(d.settlement?.receiptsTotal)}</strong> · Selisih{' '}
               <strong>{rp(d.settlement?.difference)}</strong>
             </div>
           </div>
           {d.flags.length > 0 ? (
-            <ul style={{ margin: '8px 0', paddingLeft: 18, fontSize: 12 }}>
+            <ul className="pk-nx-flags">
               {d.flags.map((f) => (
                 <li key={f.id} data-pk-flag={f.id}>
-                  <span style={badge(f.status === 'reviewed' ? 'muted' : f.level === 'warning' ? 'warn' : 'muted')}>{f.kindLabel}</span> baris {f.lineNo ?? '—'}: {f.message}
+                  <Badge tone={f.status === 'reviewed' ? 'muted' : f.level === 'warning' ? 'warn' : 'muted'}>{f.kindLabel}</Badge> baris {f.lineNo ?? '—'}: {f.message}
                   {f.status === 'reviewed' ? <em> (sudah diperiksa{f.reviewNote ? `: ${f.reviewNote}` : ''})</em> : null}
                   {/* S3e (US-21, S-08): Finance marks the flag reviewed (audit flag_reviewed), same endpoint as the Reimburse review. */}
                   {finance && f.status === 'open' && d.allowedActions.includes('review_flag') ? (
@@ -142,16 +144,16 @@ export async function LpjVerification(props: AdminViewServerProps) {
           ) : null}
           <div className="pk-lwide">
           <TableScroll label="Nota LPJ">
-            <table style={{ ...table, marginTop: 8 }}>
+            <table className={NX_TABLE}>
               <thead>
                 <tr>
-                  <th style={th}>Foto</th>
-                  <th style={th}>Baris</th>
-                  <th style={th}>Nota</th>
-                  <th style={th}>Tanggal</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Nominal</th>
-                  <th style={th}>Status</th>
-                  <th style={th}>Aksi</th>
+                  <th>Foto</th>
+                  <th>Baris</th>
+                  <th>Nota</th>
+                  <th>Tanggal</th>
+                  <th className="n">Nominal</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -160,32 +162,32 @@ export async function LpjVerification(props: AdminViewServerProps) {
                   .map((r) => (
                     // DRMS 13/10 Umum #7: the row opens the receipt; photo link and Valid/Tolak keep their own action
                     <ClickableRow key={r.id} href={`/admin/collections/receipts/${r.id}`}>
-                      <td style={td}>
+                      <td>
                         {r.imageId ? (
                           <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`lpj-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · ${rp(r.amount)}`}>
                             {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
-                            <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 80, height: 80, objectFit: 'cover' }} />
+                            <img className="pk-nx-thumb" src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} width={80} height={80} />
                           </a>
                         ) : (
                           '—'
                         )}
                       </td>
-                      <td style={td}>{r.lineNo ?? '—'}</td>
-                      <td style={td}>
+                      <td>{r.lineNo ?? '—'}</td>
+                      <td>
                         {r.vendorName}
-                        <div style={{ fontSize: 12 }}>No. {r.receiptNo ?? '—'}</div>
+                        <span className="pk-nx-sub">No. {r.receiptNo ?? '—'}</span>
                       </td>
-                      <td style={td}>{r.receiptDate}</td>
-                      <td style={num}>{rp(r.amount)}</td>
-                      <td style={td}>
-                        <span style={badge(r.status === 'valid' ? 'ok' : r.status === 'rejected' ? 'bad' : 'muted')}>{r.status === 'valid' ? 'valid' : r.status === 'rejected' ? 'ditolak' : 'menunggu'}</span>
+                      <td>{r.receiptDate}</td>
+                      <td className="n">{rp(r.amount)}</td>
+                      <td>
+                        <Badge tone={r.status === 'valid' ? 'ok' : r.status === 'rejected' ? 'bad' : 'muted'}>{r.status === 'valid' ? 'valid' : r.status === 'rejected' ? 'ditolak' : 'menunggu'}</Badge>
                       </td>
-                      <td style={td}>
+                      <td>
                         {finance && d.allowedActions.includes('receipt_verify') ? (
-                          <>
+                          <div className="pk-nx-acts">
                             {r.status !== 'valid' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/verify`} label="Valid" {...receiptDoc(d, r)} /> : null}
                             {r.status !== 'rejected' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/reject`} label="Tolak" {...receiptDoc(d, r)} prompt={{ field: 'reason', message: 'Alasan nota ditolak (wajib):', minLength: 3 }} /> : null}
-                          </>
+                          </div>
                         ) : null}
                       </td>
                     </ClickableRow>
@@ -203,23 +205,23 @@ export async function LpjVerification(props: AdminViewServerProps) {
                   <div className="pk-lcard__head">
                     <span className="pk-lcard__title">
                       {r.vendorName}
-                      {r.lineNo ? <span style={{ fontWeight: 400, color: 'var(--pk-muted-fg)' }}> · baris {r.lineNo}</span> : null}
+                      {r.lineNo ? <span className="pk-nx-muted"> · baris {r.lineNo}</span> : null}
                     </span>
                     <span className="pk-lcard__total">{rp(r.amount)}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 4 }}>
+                  <div className="pk-nx-media">
                     {r.imageId ? (
                       <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`lpj-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · ${rp(r.amount)}`}>
                         {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
-                        <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 4 }} />
+                        <img className="pk-nx-thumb" src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} width={64} height={64} />
                       </a>
                     ) : null}
-                    <div style={{ minWidth: 0 }}>
+                    <div className="pk-nx-media__body">
                       <div className="pk-lcard__meta">
                         No. {r.receiptNo ?? '—'} · {r.receiptDate}
                       </div>
-                      <div className="pk-lcard__chips" style={{ marginTop: 4 }}>
-                        <span style={badge(r.status === 'valid' ? 'ok' : r.status === 'rejected' ? 'bad' : 'muted')}>{r.status === 'valid' ? 'valid' : r.status === 'rejected' ? 'ditolak' : 'menunggu'}</span>
+                      <div className="pk-lcard__chips pk-nx-chips">
+                        <Badge tone={r.status === 'valid' ? 'ok' : r.status === 'rejected' ? 'bad' : 'muted'}>{r.status === 'valid' ? 'valid' : r.status === 'rejected' ? 'ditolak' : 'menunggu'}</Badge>
                       </div>
                     </div>
                   </div>
@@ -233,7 +235,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
               ))}
           </div>
           {finance ? (
-            <div style={{ marginTop: 8 }}>
+            <div className="pk-nx-acts">
               {d.allowedActions.includes('lpj_verify') ? (
                 <ActionButton url={`${base(d.id)}/lpj/verify`} label="Verifikasi LPJ" variant="primary" confirm="Verifikasi LPJ? Total terverifikasi = jumlah nota valid." />
               ) : null}
@@ -245,16 +247,19 @@ export async function LpjVerification(props: AdminViewServerProps) {
         </section>
         </DocSummaryProvider>
       ))}
+      </div>
+      </Panel>
 
-      <h2>Menunggu penyelesaian selisih ({verified.length})</h2>
+      <Panel id="lpj-selisih" icon="tMoneyChange" title={`Menunggu penyelesaian selisih (${verified.length})`}>
       {verified.length === 0 ? <Empty text="Tidak ada LPJ terverifikasi yang menunggu penyelesaian." /> : null}
+      <div className="pk-nx-items">
       {verified.map((d) => {
         const s = d.settlement!
         const amount = Math.abs(s.difference ?? 0)
         return (
           <DocSummaryProvider key={d.id} {...lpjDoc(d)}>
-          <section style={{ border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16 }}>
-            <div>
+          <section className="pk-nx-item" data-pk-lpj-item={d.id}>
+            <div className="pk-nx-item__main">
               {pt.multi ? (
                 <>
                   <PtChip pt={pt.ref(companyOf.get(d.id))} />{' '}
@@ -263,7 +268,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
               <strong>{docLink(d.id, d.docNo ?? `#${d.id}`)}</strong> — {d.title} · LPJ <a href={docHref('settlement', s.id)!}>{s.docNo ?? `#${s.id}`}</a>
             </div>
             {s.photos.length ? <LpjPhotoGrid ids={s.photos} group={`lpj-photos-${d.id}`} label={`Foto LPJ ${s.docNo ?? ''}`.trim()} size={56} /> : null}
-            <div style={{ margin: '6px 0' }}>
+            <div className="pk-nx-item__figs">
               Ditransfer {rp(s.transferredTotal)} · Nota terverifikasi {rp(s.verifiedReceiptsTotal)} · Selisih {rp(s.difference)} —{' '}
               <strong>{s.settlementType ? SETTLEMENT_TYPE_LABELS[s.settlementType] : '—'}</strong>
             </div>
@@ -296,6 +301,8 @@ export async function LpjVerification(props: AdminViewServerProps) {
           </DocSummaryProvider>
         )
       })}
+      </div>
+      </Panel>
       <style>{KAS_STYLE}</style>
       <Pager id="verifikasi-lpj" path="/admin/verifikasi-lpj" sp={props.searchParams} page={page} unit="LPJ" />
     </Shell>
