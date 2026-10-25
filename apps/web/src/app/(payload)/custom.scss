@@ -427,17 +427,23 @@
 }
 
 // =================================================================================================
-// Odoo-style navigation (2026-09-27): top module bar (src/admin/shell/ModuleBar.tsx, rendered as
-// admin.components.Nav) + module launcher at /admin (src/admin/views/Launcher*.tsx).
-// Payload 3.90.1 templates/Default lays Nav and the page out as a 2-column grid with a sidebar
-// toggler; here the template becomes a column (bar on top, full-width content) and the sidebar
-// toggler/hamburgers are hidden. Breadcrumbs = the slim .pk-crumbs line under the bar (no AppHeader row).
+// D2510 Nexus-style shell (user 2026-10-25, ADR 0033 — supersedes the Odoo top bar of ADR 0014): left
+// sidebar (src/admin/shell/AppSidebar.tsx) + slim top bar (ModuleBar.tsx) + breadcrumb line, all rendered
+// as admin.components.Nav. Payload 3.90.1 templates/Default puts Nav and `.template-default__wrap` side by
+// side in `.template-default`; here that element becomes a grid: sidebar column on the left (full 264px,
+// compact 76px via the `pk-side` cookie), bar / crumbs / page stacked on the right. ≤ 1024px: one column,
+// the sidebar is an off-canvas drawer. Payload's own sidebar toggler/hamburgers stay hidden.
+// Page = soft grey surface (Nexus base-200) under white cards — layout mix only, tokens.ts untouched.
 // =================================================================================================
 $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, pengguna, master, media, pengaturan, sistem;
+$pk-side-full: 264px;
+$pk-side-compact: 76px;
 
 @layer payload {
   :root {
-    --pk-bar-h: 60px;
+    --pk-bar-h: 64px;
+    --pk-page: color-mix(in oklab, var(--pk-muted-bg) 50%, var(--pk-bg));
+    --theme-bg: var(--pk-page);
     @each $m in $pk-modules {
       --pk-mod-#{$m}-from: var(--pk-light-mod-#{$m}-from);
       --pk-mod-#{$m}-to: var(--pk-light-mod-#{$m}-to);
@@ -445,6 +451,8 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   }
 
   html[data-theme='dark'] {
+    --pk-page: var(--pk-bg);
+    --theme-bg: var(--pk-page);
     @each $m in $pk-modules {
       --pk-mod-#{$m}-from: var(--pk-dark-mod-#{$m}-from);
       --pk-mod-#{$m}-to: var(--pk-dark-mod-#{$m}-to);
@@ -463,14 +471,36 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     scroll-padding-top: calc(var(--pk-bar-h) + 8px);
   }
 
-  // ---- template: bar on top, content full width -------------------------------------------------
+  // left edge of the page area (loading overlay, fixed panels): the sidebar column on desktop
+  @media (min-width: 1025px) {
+    :root:has(.pk-side) {
+      --pk-side-inset: #{$pk-side-full};
+    }
+
+    :root:has(.pk-side[data-compact]) {
+      --pk-side-inset: #{$pk-side-compact};
+    }
+  }
+
+  // ---- template: sidebar | (bar, crumbs, page) -------------------------------------------------------
   .template-default,
   .template-default--nav-open,
   .template-default--nav-hydrated,
   .template-default--nav-hydrated.template-default--nav-open {
-    display: flex;
-    flex-direction: column;
-    grid-template-columns: none;
+    --pk-side-w: #{$pk-side-full};
+    display: grid;
+    grid-template-areas:
+      'side bar'
+      'side crumbs'
+      'side main';
+    grid-template-rows: auto auto 1fr;
+    grid-template-columns: var(--pk-side-w) minmax(0, 1fr);
+    min-height: 100dvh;
+    background: var(--pk-page);
+  }
+
+  .template-default:has(> .pk-side[data-compact]) {
+    --pk-side-w: #{$pk-side-compact};
   }
 
   .template-default__nav-toggler-wrapper,
@@ -480,6 +510,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   }
 
   .template-default__wrap {
+    grid-area: main;
     min-width: 0;
     width: 100%;
   }
@@ -498,6 +529,445 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     top: var(--pk-bar-h);
   }
 
+  @media (max-width: 1024px) {
+    .template-default,
+    .template-default--nav-open,
+    .template-default--nav-hydrated,
+    .template-default--nav-hydrated.template-default--nav-open {
+      grid-template-areas:
+        'bar'
+        'crumbs'
+        'main';
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  // ---- sidebar ---------------------------------------------------------------------------------------
+  .pk-side {
+    position: sticky;
+    top: 0;
+    z-index: 26; // above the bar (25) — the compact sidebar expands over the page; below modals/drawers (30)
+    display: flex;
+    flex-direction: column;
+    grid-area: side;
+    box-sizing: border-box;
+    width: var(--pk-side-w, #{$pk-side-full});
+    height: 100dvh;
+    border-right: 1px solid var(--pk-border);
+    background: var(--pk-card);
+    color: var(--pk-fg);
+    font-size: 14px; // px: Payload's root font-size is 13px
+    transition:
+      width 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+
+  .pk-side__brand {
+    display: flex;
+    flex: none;
+    gap: 6px;
+    align-items: center;
+    height: var(--pk-bar-h);
+    padding: 0 10px 0 20px;
+  }
+
+  .pk-side__logo {
+    display: flex;
+    flex: 1;
+    gap: 10px;
+    align-items: center;
+    min-width: 0;
+    border-radius: 10px;
+    color: var(--pk-fg);
+    text-decoration: none;
+
+    .pk-mark {
+      flex: none;
+    }
+
+    &:focus-visible {
+      outline: var(--accessibility-outline);
+      outline-offset: 2px;
+    }
+  }
+
+  .pk-side__logo-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.15;
+    white-space: nowrap;
+
+    strong {
+      font-family: var(--pk-font-heading);
+      font-size: 16px;
+      letter-spacing: -0.01em;
+    }
+
+    span {
+      color: var(--pk-muted-fg);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+    }
+  }
+
+  .pk-side__collapse,
+  .pk-side__close {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--pk-muted-fg);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--pk-muted-bg);
+      color: var(--pk-fg);
+    }
+  }
+
+  .pk-side__close {
+    display: none;
+  }
+
+  .pk-side__scroll {
+    flex: 1;
+    min-height: 0;
+    padding: 4px 12px 16px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .pk-side__empty {
+    margin: 8px;
+    color: var(--pk-muted-fg);
+  }
+
+  .pk-side__mods,
+  .pk-side__sec ul {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pk-side__mod {
+    position: relative;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 42px;
+    padding: 5px 10px 5px 6px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--pk-fg);
+    font: inherit;
+    font-weight: 500;
+    text-align: start;
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--pk-muted-bg);
+    }
+
+    &[data-active] {
+      font-weight: 600;
+    }
+
+    &[aria-current='page'] {
+      background: color-mix(in oklab, var(--pk-primary) 10%, transparent);
+      color: var(--pk-primary);
+    }
+
+    &:focus-visible {
+      outline: var(--accessibility-outline);
+      outline-offset: -2px;
+    }
+  }
+
+  .pk-side__chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: var(--pk-muted-bg);
+    color: var(--pk-muted-fg);
+    transition:
+      background 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .pk-side__mod:hover .pk-side__chip,
+  .pk-side__mod[data-active] .pk-side__chip {
+    background: linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
+    box-shadow: 0 4px 10px -4px color-mix(in oklab, var(--pk-tile-from) 70%, transparent);
+    color: #FFFFFF;
+  }
+
+  .pk-side__label {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .pk-side__chev {
+    flex: none;
+    color: var(--pk-muted-fg);
+    transition: transform 0.18s ease;
+  }
+
+  li[data-open] > .pk-side__mod .pk-side__chev {
+    transform: rotate(180deg);
+  }
+
+  .pk-side__sub {
+    margin: 2px 0 6px 20px;
+    padding-left: 10px;
+    border-left: 1px solid var(--pk-border);
+  }
+
+  .pk-side__sec + .pk-side__sec {
+    margin-top: 4px;
+  }
+
+  .pk-side__sec-label {
+    margin: 8px 0 2px;
+    padding: 0 10px;
+    color: var(--pk-muted-fg);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .pk-side__item {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    min-height: 34px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    color: var(--pk-muted-fg);
+    font-size: 13.5px;
+    line-height: 1.3;
+    text-decoration: none;
+
+    svg {
+      flex: none;
+    }
+
+    &:hover {
+      background: var(--pk-muted-bg);
+      color: var(--pk-fg);
+    }
+
+    &[aria-current='page'] {
+      background: color-mix(in oklab, var(--pk-primary) 10%, transparent);
+      color: var(--pk-primary);
+      font-weight: 600;
+    }
+
+    &:focus-visible {
+      outline: var(--accessibility-outline);
+      outline-offset: -2px;
+    }
+  }
+
+  // Nexus "badge-soft": tinted pill, dark text (≥ 4.5:1 in both modes)
+  .pk-side__count {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--pk-tone-bad-text) 14%, var(--pk-card));
+    color: var(--pk-tone-bad-text);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .pk-side__foot {
+    flex: none;
+    padding: 12px;
+    border-top: 1px solid var(--pk-border);
+  }
+
+  .pk-side__user {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 8px;
+    border-radius: 12px;
+    background: color-mix(in oklab, var(--pk-muted-bg) 60%, transparent);
+    color: var(--pk-fg);
+    text-decoration: none;
+
+    &:hover {
+      background: var(--pk-muted-bg);
+    }
+
+    &:focus-visible {
+      outline: var(--accessibility-outline);
+      outline-offset: 2px;
+    }
+  }
+
+  .pk-side__avatar {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--pk-light-primary), var(--pk-mod-proyek-from));
+    color: #FFFFFF;
+    font-family: var(--pk-font-heading);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .pk-side__who {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.3;
+
+    strong {
+      overflow-wrap: anywhere;
+      font-size: 13.5px;
+    }
+
+    span {
+      color: var(--pk-muted-fg);
+      font-size: 12px;
+    }
+  }
+
+  .pk-side__backdrop {
+    display: none;
+  }
+
+  // compact (desktop): icons only; hover / keyboard focus expands it over the page (Nexus "dense" mode)
+  @media (min-width: 1025px) {
+    .pk-side[data-compact]:is(:hover, :focus-within) {
+      width: $pk-side-full;
+      box-shadow: 0 16px 40px -12px rgb(15 23 42 / 0.28);
+    }
+
+    .pk-side[data-compact]:not(:hover, :focus-within) {
+      .pk-side__brand {
+        justify-content: center;
+        padding: 0;
+      }
+
+      .pk-side__logo {
+        flex: none;
+      }
+
+      .pk-side__logo-text,
+      .pk-side__collapse,
+      .pk-side__label,
+      .pk-side__chev,
+      .pk-side__sub,
+      .pk-side__who {
+        display: none;
+      }
+
+      .pk-side__mod {
+        justify-content: center;
+        padding: 5px;
+      }
+
+      // the count shrinks to a dot on the chip
+      .pk-side__mod .pk-side__count {
+        position: absolute;
+        top: 4px;
+        right: 9px;
+        min-width: 9px;
+        height: 9px;
+        padding: 0;
+        background: var(--pk-tone-bad);
+        box-shadow: 0 0 0 2px var(--pk-card);
+        font-size: 0;
+      }
+
+      .pk-side__user {
+        justify-content: center;
+        padding: 4px;
+        background: transparent;
+      }
+    }
+  }
+
+  // drawer (≤ 1024px)
+  @media (max-width: 1024px) {
+    .pk-side {
+      position: fixed;
+      inset: 0 auto 0 0;
+      z-index: 40; // over the bar and Payload's sticky rows while open
+      width: min(300px, 86vw);
+      visibility: hidden;
+      transform: translateX(-105%);
+      transition:
+        transform 0.22s ease,
+        visibility 0s linear 0.22s;
+    }
+
+    .pk-side[data-open] {
+      box-shadow: 0 24px 60px -16px rgb(15 23 42 / 0.45);
+      visibility: visible;
+      transform: none;
+      transition: transform 0.22s ease;
+    }
+
+    .pk-side__collapse {
+      display: none;
+    }
+
+    .pk-side__close {
+      display: inline-flex;
+    }
+
+    .pk-side__backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 39;
+      display: block;
+      background: rgb(15 23 42 / 0.45);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pk-side,
+    .pk-side[data-open],
+    .pk-side__chip,
+    .pk-side__chev {
+      transition: none;
+    }
+  }
+
   // ---- bar ---------------------------------------------------------------------------------------
   .pk-bar {
     position: sticky;
@@ -507,9 +977,10 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     gap: 12px;
     align-items: center;
     height: var(--pk-bar-h);
-    padding: 0 var(--gutter-h);
+    grid-area: bar;
+    padding: 0 clamp(12px, 2vw, 24px);
     border-bottom: 1px solid color-mix(in oklab, var(--pk-border) 85%, transparent);
-    background-color: color-mix(in oklab, var(--pk-card) 82%, transparent);
+    background-color: color-mix(in oklab, var(--pk-card) 86%, transparent);
     backdrop-filter: blur(16px) saturate(160%);
     color: var(--pk-fg);
     font-size: 14px; // px: Payload's root font-size is 13px, rem would shrink the bar
@@ -523,13 +994,12 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     align-items: center;
   }
 
-  // The module name may shrink (ellipsis) so the bell/avatar never leave the viewport.
+  // The search field may shrink so the bell/avatar never leave the viewport.
   .pk-bar__start {
     flex-shrink: 1;
     min-width: 0;
   }
 
-  // DRMS 13/10 #9: no module menu in the middle any more — the right group sits at the end.
   .pk-bar__end {
     margin-inline-start: auto;
   }
@@ -554,11 +1024,6 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
       background: var(--pk-muted-bg);
       color: var(--pk-fg);
     }
-  }
-
-  .pk-bar__launcher[aria-current='page'] {
-    background: color-mix(in oklab, var(--pk-primary) 12%, transparent);
-    color: var(--pk-primary);
   }
 
   .pk-bar__avatar {
@@ -598,51 +1063,6 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     top: 4px;
     right: 3px;
     box-shadow: 0 0 0 2px var(--pk-card);
-  }
-
-  .pk-bar__module {
-    display: inline-flex;
-    gap: 10px;
-    align-items: center;
-    min-width: 0;
-    padding: 4px 8px 4px 4px;
-    border-radius: 12px;
-    color: var(--pk-fg);
-    font-family: var(--pk-font-heading);
-    font-size: 17px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    text-decoration: none;
-    white-space: nowrap;
-  }
-
-  a.pk-bar__module:hover {
-    background: var(--pk-muted-bg);
-  }
-
-  .pk-bar__module-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .pk-bar__brand-sub {
-    color: var(--pk-muted-fg);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.16em;
-  }
-
-  .pk-bar__chip {
-    display: inline-flex;
-    flex-shrink: 0;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
-    box-shadow: 0 4px 12px -4px color-mix(in oklab, var(--pk-tile-from) 70%, transparent);
-    color: #FFFFFF;
   }
 
   .pk-bar__chev {
@@ -853,80 +1273,204 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
   }
 
-  // ---- launcher ----------------------------------------------------------------------------------
-  .pk-launcher {
-    max-width: 1120px;
-    margin: 0 auto;
-    padding: clamp(20px, 5vw, 56px) 0 64px;
+  // ---- menu search (CommandPalette.tsx, portalled into <body>) -----------------------------------------
+  .pk-bar__search {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    box-sizing: border-box;
+    width: clamp(220px, 28vw, 340px);
+    height: 40px;
+    padding: 0 8px 0 12px;
+    border: 1px solid var(--pk-border);
+    border-radius: 10px;
+    background: var(--pk-page);
+    color: var(--pk-muted-fg);
+    font: inherit;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--pk-input);
+      color: var(--pk-fg);
+    }
+
+    svg {
+      flex: none;
+    }
   }
 
-  .pk-launcher__head {
-    margin-bottom: clamp(24px, 4vw, 40px);
+  .pk-bar__search-text {
+    flex: 1;
+    text-align: start;
+  }
+
+  .pk-bar__kbd,
+  .pk-cmd__kbd {
+    flex: none;
+    padding: 2px 6px;
+    border: 1px solid var(--pk-border);
+    border-radius: 6px;
+    background: var(--pk-card);
+    color: var(--pk-muted-fg);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .pk-cmd {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 12vh 16px 16px;
+  }
+
+  .pk-cmd__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 0.45);
+  }
+
+  .pk-cmd__dialog {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(640px, 100%);
+    max-height: 70vh;
+    overflow: hidden;
+    border: 1px solid var(--pk-border);
+    border-radius: 16px;
+    background: var(--pk-card);
+    box-shadow: 0 24px 60px -16px rgb(15 23 42 / 0.45);
+    color: var(--pk-fg);
+    font-size: 14px;
+  }
+
+  .pk-cmd__field {
+    display: flex;
+    flex: none;
+    gap: 10px;
+    align-items: center;
+    height: 56px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--pk-border);
+    color: var(--pk-muted-fg);
+  }
+
+  .pk-cmd__input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--pk-fg);
+    font: inherit;
+    font-size: 16px; // ≥ 16px: no iOS zoom on focus
+
+    &::-webkit-search-cancel-button {
+      display: none;
+    }
+  }
+
+  .pk-cmd__list {
+    margin: 0;
+    padding: 8px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    list-style: none;
+  }
+
+  .pk-cmd__opt {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+
+    &[aria-selected='true'] {
+      background: color-mix(in oklab, var(--pk-primary) 10%, transparent);
+    }
+  }
+
+  .pk-cmd__chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
+    color: #FFFFFF;
+  }
+
+  .pk-cmd__text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .pk-cmd__label {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .pk-cmd__path {
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+  }
+
+  .pk-cmd__empty {
+    padding: 20px 12px;
+    color: var(--pk-muted-fg);
     text-align: center;
   }
 
-  .pk-launcher__hello {
-    margin: 0;
-    color: var(--pk-muted-fg);
-    font-size: 16px;
-  }
-
-  .pk-launcher__name {
-    margin: 2px 0 10px;
-    font-size: clamp(26px, 3.4vw, 36px);
-    line-height: 1.15;
-  }
-
-  .pk-launcher__role {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 10px;
-    align-items: center;
-    justify-content: center;
-    margin: 0;
-    color: var(--pk-muted-fg);
-    font-size: 15px;
-  }
-
-  .pk-launcher__role-pill {
-    padding: 3px 10px;
-    border-radius: 999px;
-    background: color-mix(in oklab, var(--pk-primary) 12%, var(--pk-card));
-    color: var(--pk-primary);
-    font-size: 13px;
-    font-weight: 700;
+  // ---- module landing page tiles (/admin/modul/<id>, LauncherGrid): Nexus quick-action cards ---------
+  .pk-launcher {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: clamp(16px, 3vw, 32px) 0 64px;
   }
 
   .pk-launcher__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-    gap: clamp(12px, 2.4vw, 28px) clamp(8px, 2vw, 20px);
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  @media (max-width: 560px) {
-    .pk-launcher__grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-  }
-
-  .pk-launcher__empty {
-    color: var(--pk-muted-fg);
-    text-align: center;
-  }
-
   .pk-tile {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    display: grid;
+    grid-template-rows: auto auto;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 2px 12px;
     align-items: center;
-    padding: 10px 4px;
-    border-radius: 18px;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 14px 16px;
+    border: 1px solid var(--pk-border);
+    border-radius: var(--style-radius-l);
+    background: var(--pk-card);
+    box-shadow: var(--pk-shadow);
     color: var(--pk-fg);
-    text-align: center;
     text-decoration: none;
+    transition:
+      box-shadow 0.15s ease,
+      border-color 0.15s ease;
+
+    &:hover {
+      border-color: color-mix(in oklab, var(--pk-primary) 35%, var(--pk-border));
+      box-shadow: var(--pk-shadow-hover);
+    }
 
     &:focus-visible {
       outline: var(--accessibility-outline);
@@ -937,60 +1481,54 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   .pk-tile__icon {
     position: relative;
     display: flex;
+    grid-row: 1 / span 2;
     align-items: center;
     justify-content: center;
-    width: clamp(64px, 18vw, 92px);
+    width: 44px;
     aspect-ratio: 1;
-    margin-bottom: 6px;
-    border-radius: 24%;
-    background:
-      radial-gradient(120% 90% at 20% 0%, rgb(255 255 255 / 0.22), transparent 55%),
-      linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.25),
-      0 10px 24px -10px color-mix(in oklab, var(--pk-tile-from) 75%, transparent);
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
+    box-shadow: 0 6px 14px -8px color-mix(in oklab, var(--pk-tile-from) 75%, transparent);
     color: #FFFFFF;
   }
 
   .pk-tile__badge {
     position: absolute;
     top: -6px;
-    right: -6px;
+    right: -8px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 24px;
-    height: 24px;
-    padding: 0 7px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
     border-radius: 999px;
     background: var(--pk-tone-bad);
-    box-shadow: 0 0 0 3px var(--pk-bg);
+    box-shadow: 0 0 0 2px var(--pk-card);
     color: #FFFFFF;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
   }
 
   .pk-tile__label {
+    align-self: end;
     font-family: var(--pk-font-heading);
     font-size: 15px;
     font-weight: 600;
-    line-height: 1.2;
+    line-height: 1.25;
   }
 
   .pk-tile__hint {
+    align-self: start;
     color: var(--pk-muted-fg);
-    font-size: 12px;
+    font-size: 12.5px;
     line-height: 1.3;
   }
 
-  @media (max-width: 560px) {
-    .pk-tile__hint {
-      display: none;
-    }
-
-    .pk-tile__label {
-      font-size: 13px;
-    }
+  .pk-home-empty {
+    padding: 48px 0;
+    color: var(--pk-muted-fg);
+    text-align: center;
   }
 
   @media (max-width: 768px) {
@@ -999,13 +1537,18 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
       padding: 0 8px;
     }
 
-    .pk-bar__brand-sub {
-      display: none;
+    .pk-bar__search {
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border-color: transparent;
+      background: transparent;
     }
 
-    .pk-bar__module {
-      gap: 8px;
-      font-size: 15px;
+    .pk-bar__search-text,
+    .pk-bar__kbd {
+      display: none;
     }
   }
 }
@@ -1016,8 +1559,9 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 // =================================================================================================
 @layer payload {
   .pk-crumbs {
+    grid-area: crumbs;
     min-width: 0;
-    padding: 12px var(--gutter-h) 0;
+    padding: 14px var(--gutter-h) 0;
     color: var(--pk-muted-fg);
     font-size: 13px; // px: Payload's root font-size is 13px
     line-height: 20px;
@@ -1465,13 +2009,6 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     &:hover:not(:disabled) {
       background: var(--pk-primary-hover);
       color: var(--pk-on-primary);
-    }
-  }
-
-  // very narrow bars: the module chip stays, its name gives way to the PT switcher
-  @media (max-width: 440px) {
-    .pk-bar:has(.pk-pt) .pk-bar__module-name {
-      display: none;
     }
   }
 
@@ -2877,11 +3414,9 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
       padding-top: 16px;
     }
 
-    // stacked sidebar: same gap below the last main field as between fields
+    // stacked sidebar: its own card (D2510) under the main card, one field gap apart
     .document-fields__sidebar-wrap {
       margin-top: var(--pk-field-gap);
-      padding-top: var(--pk-field-gap);
-      border-top: 1px solid var(--pk-border);
     }
   }
 
@@ -3021,6 +3556,16 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     background: transparent;
   }
 
+  // D2510: the bar as a row of a Nexus card (PkListView): no box of its own, a line above, card padding
+  .pk-ltb--flush {
+    margin: 0;
+    padding: 14px 20px 16px;
+    border: 0;
+    border-top: 1px solid var(--pk-border);
+    border-radius: 0;
+    background: transparent;
+  }
+
   .pk-pager {
     display: flex;
     flex-wrap: wrap;
@@ -3044,6 +3589,35 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     font-weight: 600;
   }
 
+  // D2510: page size next to the count (PkListView card foot; the select joins the toolbar form by `form=`)
+  .pk-pager__per {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    margin-right: auto;
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+    font-weight: 600;
+
+    select {
+      min-width: 72px;
+      min-height: 34px;
+      padding: 2px 8px;
+      border: 1px solid var(--pk-input);
+      border-radius: var(--style-radius-s);
+      background: var(--theme-input-bg, var(--pk-card));
+      color: var(--pk-fg);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 400;
+
+      &:focus-visible {
+        outline: 2px solid var(--pk-ring);
+        outline-offset: 1px;
+      }
+    }
+  }
+
   @media (max-width: 640px) {
     .pk-ltb__field {
       flex: 1 1 calc(50% - 6px);
@@ -3062,10 +3636,15 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     .pk-ltb__actions {
       flex-basis: 100%;
     }
+
+    .pk-ltb--flush {
+      padding: 12px 16px 14px;
+    }
   }
 
   @media (pointer: coarse) {
     .pk-ltb__field :is(input:not([type='checkbox'], [type='radio']), select),
+    .pk-pager__per select,
     .pk-ltb__btn {
       min-height: 44px;
     }
@@ -3256,31 +3835,71 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
   }
 
-  // PkListView (src/admin/pk-list/PkListView.tsx)
+  // PkListView (src/admin/pk-list/PkListView.tsx). D2510 (ADR 0033): one Nexus card (.pk-nx-card.pk-plist__card) —
+  // head (module-tinted glyph, title, total badge, actions), filter bar row, table edge to edge, pager in the foot.
+  // The card itself, the table look and the status badges: section "D2510 list & form (Nexus)".
   .pk-plist__wrap {
+    padding-top: clamp(12px, 2vw, 20px);
     padding-bottom: 24px;
   }
 
   .pk-plist__head {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 12px 14px;
     align-items: center;
-    margin: 24px 0 16px;
+    padding: 18px 20px 14px;
+  }
+
+  .pk-plist__chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--pk-tile-from, var(--pk-primary)), var(--pk-tile-to, var(--pk-primary-hover)));
+    box-shadow: 0 6px 14px -8px color-mix(in oklab, var(--pk-tile-from, var(--pk-primary)) 75%, transparent);
+    color: #FFFFFF;
+  }
+
+  .pk-plist__heading {
+    display: flex;
+    flex: 1 1 220px;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    align-items: center;
+    min-width: 0;
   }
 
   .pk-plist__title {
+    min-width: 0;
     margin: 0;
+    font-size: clamp(18px, 1.9vw, 22px);
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .pk-plist__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto;
   }
 
   .pk-plist__desc {
-    margin: -8px 0 12px;
+    flex-basis: 100%;
+    margin: 0;
     color: var(--pk-muted-fg);
+    font-size: 13px;
   }
 
   .pk-plist__note,
   .pk-plist__error {
-    margin: 0 0 12px;
+    margin: 0;
+    padding: 0 20px 12px;
     font-size: 13px;
   }
 
@@ -3289,17 +3908,57 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     font-weight: 600;
   }
 
+  .pk-plist__slot {
+    min-width: 0;
+    padding: 0 20px 12px;
+  }
+
   .pk-plist__empty {
     display: grid;
     gap: 12px;
-    justify-items: start;
-    padding: 24px 16px;
+    justify-items: center;
+    margin: 4px 20px 20px;
+    padding: 32px 16px;
     border: 1px dashed var(--pk-border);
     border-radius: var(--style-radius-l);
-    color: var(--theme-elevation-600);
+    color: var(--pk-muted-fg);
+    text-align: center;
 
     p {
       margin: 0;
+    }
+  }
+
+  .pk-plist__foot {
+    padding: 12px 20px;
+
+    .pk-pager {
+      margin: 0;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .pk-plist__head {
+      padding: 14px 16px 12px;
+    }
+
+    .pk-plist__actions {
+      width: 100%;
+      margin-left: 0;
+    }
+
+    .pk-plist__note,
+    .pk-plist__error,
+    .pk-plist__slot {
+      padding-inline: 16px;
+    }
+
+    .pk-plist__empty {
+      margin-inline: 16px;
+    }
+
+    .pk-plist__foot {
+      padding: 10px 16px;
     }
   }
 
@@ -3309,12 +3968,14 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   // terpotong"): a long text WRAPS inside the same 360 px (.pk-plist__cell) instead of ending in an ellipsis — the
   // column keeps its width, only that row grows. No `min-width: max-content` on the table: with percentage columns
   // the table's max-content would be scaled up — its min-content (cells of a fixed max-content width) already keeps it
-  // from squeezing.
+  // from squeezing. D2510: the table runs edge to edge in the list card (a line above, no box of its own), Nexus row
+  // rhythm — 12 px × 16 px cells, 20 px at the card edges.
   .pk-plist__table {
-    border: 1px solid var(--pk-border);
-    border-radius: var(--style-radius-l);
+    border: 0;
+    border-top: 1px solid var(--pk-border);
+    border-radius: 0;
     background: var(--pk-card);
-    box-shadow: var(--pk-shadow);
+    box-shadow: none;
 
     table {
       width: 100%;
@@ -3325,10 +3986,22 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     td {
       width: 1%;
       min-width: 0;
-      padding: 8px 12px;
+      padding: 12px 16px;
       text-align: left;
       vertical-align: middle;
       white-space: nowrap;
+
+      &:first-child {
+        padding-inline-start: 20px;
+      }
+
+      &:last-child {
+        padding-inline-end: 20px;
+      }
+    }
+
+    th {
+      padding-block: 10px;
     }
 
     .pk-plist__fill {
@@ -3952,4 +4625,1010 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   .pk-relcreate__drawer .pk-uo {
     max-width: none;
   }
+}
+
+// =================================================================================================
+// D2510 list & form (Nexus) (user 2026-10-25, ADR 0033): the chrome of every collection list and every Payload
+// edit / create view on the grey page — white cards (kit tokens: --pk-card, --pk-border, --pk-shadow, radius-l).
+// Lists: PkListView card (markup: src/admin/pk-list/PkListView.tsx; head/foot rules in "Umum #3–#8" above) and
+// Payload's DefaultListView (media libraries, trash) as the same card, CSS only. Tables: muted header, roomy rows
+// without zebra, hover tint, status cells as soft badges, ghost row actions. Long text still WRAPS (DRMS 16/10) — no
+// ellipsis anywhere here. Edit views: doc-controls = the sticky toolbar under the top bar (meta / "Membuat …" left,
+// primary action right), main fields and sidebar fields = card boxes, tabs / collapsibles / groups tidied.
+// =================================================================================================
+@layer payload {
+  // ---- list card ----------------------------------------------------------------------------------------
+  .pk-plist__card {
+    // the "Kolom" / checklist panels open over the table: nothing clips the card
+    overflow: visible;
+  }
+
+  // the table box is the scroller (TableScroll stays a plain wrapper): no margin / page-coloured scroll shadows
+  .pk-plist__card .pk-tscroll {
+    margin: 0;
+    background: none;
+  }
+
+  // header row: small muted labels on a faint tint (opaque — it is sticky, DRMS 15/10 #7)
+  .pk-plist__card .pk-plist__table > table > thead > tr > th {
+    background: color-mix(in oklab, var(--pk-muted-bg) 60%, var(--pk-card));
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .pk-plist__card .pk-plist__sort:hover {
+    color: var(--pk-primary-hover);
+  }
+
+  // rows: a hairline between rows instead of zebra, hover tint; the pinned "Aksi" cell repaints the same colours
+  .pk-plist__card .table tbody tr {
+    border-bottom: 1px solid color-mix(in oklab, var(--pk-border) 75%, transparent);
+
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
+
+  .pk-plist__card .table tbody tr:nth-child(odd) {
+    background: transparent;
+  }
+
+  .pk-plist__card .table tbody tr:hover {
+    background: color-mix(in oklab, var(--pk-primary) 5%, transparent);
+  }
+
+  .pk-plist__card .table tbody tr:nth-child(odd) td.cell-rowActions {
+    background: var(--pk-card);
+  }
+
+  .pk-plist__card .table tbody tr:hover td.cell-rowActions {
+    background:
+      linear-gradient(color-mix(in oklab, var(--pk-primary) 5%, transparent), color-mix(in oklab, var(--pk-primary) 5%, transparent)),
+      var(--pk-card);
+  }
+
+  // status cells → soft badges (daisyUI badge-soft, kit tones): request status (RequestStatusCell data-pk-status),
+  // booleans (BoolCell data-pk-bool: Aktif / Ya), the PT "Aktif" pill. The word stays (never colour alone); a long
+  // label wraps inside the cell.
+  .pk-plist__cell :is([data-pk-status], [data-pk-bool], .pk-status-pill) {
+    --pk-nx-tone: var(--pk-muted-fg);
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    min-height: 22px;
+    padding: 2px 8px;
+    border: 0;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--pk-nx-tone) 14%, var(--pk-card));
+    color: var(--pk-nx-tone);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: normal;
+  }
+
+  .pk-plist__cell :is([data-pk-bool='true'], .pk-status-pill:not(.pk-status-pill--off)),
+  .pk-plist__cell [data-pk-status='lpj_verified'],
+  .pk-plist__cell [data-pk-status='completed'] {
+    --pk-nx-tone: var(--pk-tone-ok-text);
+  }
+
+  .pk-plist__cell :is([data-pk-status='approved'], [data-pk-status='receipts_verified'], [data-pk-status='transferred'], [data-pk-status='receipts_complete'], [data-pk-status='lpj_submitted']) {
+    --pk-nx-tone: var(--pk-primary-hover);
+  }
+
+  .pk-plist__cell :is([data-pk-status='pending_ack'], [data-pk-status='pending_approval'], [data-pk-status='receipt_revision'], [data-pk-status='lpj_revision']) {
+    --pk-nx-tone: var(--pk-tone-warn-text);
+  }
+
+  .pk-plist__cell :is([data-pk-status='rejected'], [data-pk-status='cancelled']) {
+    --pk-nx-tone: var(--pk-tone-bad-text);
+  }
+
+  // row actions = ghost buttons (Nexus square ghost button); "Ubah" a soft primary tint, destructive the bad tone.
+  // Same size and focus ring as before (32 px, 44 px on touch — row-actions section).
+  .pk-plist__card .pk-row-act {
+    border-color: transparent;
+    background: transparent;
+    color: var(--pk-fg);
+
+    &:hover {
+      border-color: transparent;
+      background: var(--pk-muted-bg);
+      color: var(--pk-fg);
+    }
+
+    &[data-kind='edit'] {
+      border-color: transparent;
+      background: color-mix(in oklab, var(--pk-primary) 10%, var(--pk-card));
+      color: var(--pk-primary-hover);
+
+      &:hover {
+        border-color: var(--pk-primary);
+        background: var(--pk-primary);
+        color: var(--pk-on-primary);
+      }
+    }
+
+    &:is([data-kind='hapus'], [data-kind='batalkan']) {
+      border-color: transparent;
+      color: var(--pk-tone-bad-text);
+
+      &:hover {
+        border-color: transparent;
+        background: color-mix(in oklab, var(--pk-tone-bad-text) 10%, var(--pk-card));
+        color: var(--pk-tone-bad-text);
+      }
+    }
+  }
+
+  // ---- Payload's DefaultListView (media libraries, trash) as the same card — page views only (drawers are portalled
+  // outside .template-default__wrap and keep Payload's look). Inside the card Payload's gutter-based bleed (the
+  // mid-break table runs to the edges) uses the card padding.
+  .template-default__wrap .collection-list__wrap {
+    margin: clamp(12px, 2vw, 20px) var(--gutter-h) 24px;
+    padding: 18px 20px 16px;
+    border: 1px solid color-mix(in oklab, var(--pk-border) 80%, transparent);
+    border-radius: var(--style-radius-l);
+    background: var(--pk-card);
+    box-shadow: var(--pk-shadow);
+
+    > * {
+      --gutter-h: 20px;
+    }
+
+    .list-header {
+      gap: 8px 12px;
+    }
+
+    .list-header__title {
+      font-size: clamp(18px, 1.9vw, 22px);
+      line-height: 1.25;
+    }
+
+    .table {
+      border: 0;
+      border-top: 1px solid var(--pk-border);
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .table thead th {
+      background: color-mix(in oklab, var(--pk-muted-bg) 60%, var(--pk-card));
+      font-size: 12px;
+    }
+
+    .table tbody tr {
+      border-bottom: 1px solid color-mix(in oklab, var(--pk-border) 75%, transparent);
+    }
+
+    .table tbody tr:nth-child(odd) {
+      background: transparent;
+    }
+
+    .table tbody tr:hover {
+      background: color-mix(in oklab, var(--pk-primary) 5%, transparent);
+    }
+
+    // Payload clamps list cells to 4 lines: wrap in full instead (DRMS 16/10)
+    .table table [class^='cell'] > :is(p, span, a) {
+      display: inline;
+      overflow: visible;
+      -webkit-line-clamp: unset;
+      line-clamp: none;
+    }
+
+    .page-controls {
+      padding-top: 12px;
+      border-top: 1px solid var(--pk-border);
+      color: var(--pk-muted-fg);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .template-default__wrap .collection-list__wrap {
+      padding: 14px 16px;
+
+      > * {
+        --gutter-h: 16px;
+      }
+    }
+  }
+
+  // ---- edit / create views ------------------------------------------------------------------------------
+  // Title row on the page: wraps instead of Payload's one-line ellipsis; the line under it goes (the toolbar
+  // below draws its own edge).
+  .doc-header::after {
+    display: none;
+  }
+
+  .doc-header__title {
+    overflow: visible;
+    font-size: clamp(20px, 2.2vw, 26px);
+    line-height: 1.2;
+    white-space: normal;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+
+  // The sticky document-controls row (below the top bar since PR-1) = a white toolbar like the top bar: frosted card
+  // surface (Payload's blur layer recoloured; --theme-bg feeds its gradients / mid-break row), hairline + soft shadow.
+  .doc-controls {
+    --theme-bg: var(--pk-card);
+    border-bottom: 1px solid color-mix(in oklab, var(--pk-border) 80%, transparent);
+    box-shadow: 0 8px 18px -16px rgb(15 23 42 / 45%);
+
+    &::before {
+      background: var(--pk-card);
+      opacity: 0.92;
+    }
+  }
+
+  .doc-controls__divider {
+    display: none;
+  }
+
+  .doc-controls__label {
+    color: var(--pk-muted-fg);
+  }
+
+  // create view: "Membuat <X> Baru" is the only meta item — it reads as the toolbar title
+  .doc-controls__meta > .doc-controls__list-item:only-child .doc-controls__value {
+    font-family: var(--pk-font-heading);
+    font-size: 15px;
+    letter-spacing: -0.01em;
+  }
+
+  // Fields in card boxes: the main column and the sidebar each one white card on the grey page. Payload's
+  // gutter-based bleeds inside (tabs / groups run to the edges) use the card padding.
+  .document-fields {
+    --pk-card-pad: 24px;
+  }
+
+  .document-fields__fields,
+  .document-fields__sidebar-fields > .render-fields:not(:empty),
+  .document-fields__edit > .auth-fields {
+    --gutter-h: var(--pk-card-pad);
+    min-width: 0;
+    padding: var(--pk-card-pad);
+    border: 1px solid color-mix(in oklab, var(--pk-border) 80%, transparent);
+    border-radius: var(--style-radius-l);
+    background: var(--pk-card);
+    box-shadow: var(--pk-shadow);
+  }
+
+  .document-fields__edit > .auth-fields {
+    margin-bottom: 16px;
+  }
+
+  // no extra space at the card's bottom edge (beats the row margin of "DRMS 10/10 #5")
+  .document-fields .render-fields.document-fields__fields > :last-child {
+    margin-bottom: 0;
+  }
+
+  // the main card no longer draws a border towards the sidebar; tabs / groups at the top level bleed evenly
+  .document-fields--has-sidebar {
+    --main-border: none;
+  }
+
+  .document-fields .document-fields__fields > :is(.tabs-field, .group-field) {
+    margin-right: calc(var(--gutter-h) * -1);
+    margin-left: calc(var(--gutter-h) * -1);
+  }
+
+  @media (min-width: 1025px) {
+    // one 24 px gap between the main card and the sidebar card (Payload: 2 × 40 px of gutter)
+    .document-fields--has-sidebar {
+      --main-gutter-h-right: 12px;
+      --sidebar-gutter-h-left: 12px;
+    }
+
+    // the sticky sidebar starts below the top bar AND the controls row (it slid under the bar)
+    .template-default__wrap .document-fields__sidebar-wrap:not(:has(.document-fields__sidebar-fields > .render-fields:empty)) {
+      top: calc(var(--pk-bar-h) + var(--doc-controls-height));
+      height: calc(100dvh - var(--pk-bar-h) - var(--doc-controls-height));
+    }
+  }
+
+  @media (max-width: 1024px) {
+    // stacked: the sidebar card follows the main card directly
+    .document-fields:has(.document-fields__sidebar-fields > .render-fields:not(:empty)) .document-fields__edit {
+      padding-bottom: 0;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .document-fields {
+      --pk-card-pad: 16px;
+    }
+  }
+
+  // Tabs: muted labels at full opacity (AA), the active tab in the text colour with a brand underline
+  .tabs-field__tabs-wrap {
+    margin-bottom: 20px;
+  }
+
+  .tabs-field__tabs {
+    border-bottom-color: var(--pk-border);
+  }
+
+  .tabs-field__tab-button {
+    padding-bottom: 12px;
+    color: var(--pk-muted-fg);
+    font-family: var(--pk-font-heading);
+    font-size: 15px;
+    font-weight: 600;
+    opacity: 1;
+
+    &:hover {
+      color: var(--pk-fg);
+      opacity: 1;
+    }
+
+    &::after {
+      background: var(--pk-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--pk-ring);
+      outline-offset: 2px;
+    }
+  }
+
+  .tabs-field__tab-button--active {
+    color: var(--pk-fg);
+
+    &::after {
+      height: 2px;
+    }
+  }
+
+  // Collapsibles / array rows: soft bordered boxes, tinted head, card body
+  .collapsible--style-default {
+    border-color: var(--pk-border);
+
+    &:hover {
+      border-color: color-mix(in oklab, var(--pk-primary) 35%, var(--pk-border));
+    }
+
+    > .collapsible__toggle-wrap {
+      background: color-mix(in oklab, var(--pk-muted-bg) 60%, var(--pk-card));
+
+      &:not(.toggle-disabled):hover {
+        background: var(--pk-muted-bg);
+      }
+    }
+  }
+
+  .collapsible__content {
+    background-color: var(--pk-card);
+  }
+
+  // Groups: hairlines in the border token
+  .group-field {
+    border-color: var(--pk-border);
+  }
+}
+
+// =================================================================================================
+// D2510 Nexus kit (src/admin/components/ui/nexus.tsx, ADR 0033): page header, card, soft badge, status dot,
+// progress — daisyUI patterns on the --pk-* tokens. Pages compose these instead of their own card/badge CSS.
+// Tones: text = the *-text token (≥ 4.5:1 on its own 14% tint in both modes), dot/bar = the solid tone.
+// =================================================================================================
+@layer payload {
+  [data-tone] {
+    --pk-nx-tone: var(--pk-muted-fg);
+    --pk-nx-solid: var(--pk-muted-fg);
+  }
+
+  [data-tone='primary'] {
+    --pk-nx-tone: var(--pk-primary);
+    --pk-nx-solid: var(--pk-primary);
+  }
+
+  [data-tone='info'] {
+    --pk-nx-tone: var(--pk-primary);
+    --pk-nx-solid: var(--color-blue-400, var(--pk-primary));
+  }
+
+  [data-tone='ok'] {
+    --pk-nx-tone: var(--pk-tone-ok-text);
+    --pk-nx-solid: var(--pk-tone-ok);
+  }
+
+  [data-tone='warn'] {
+    --pk-nx-tone: var(--pk-tone-warn-text);
+    --pk-nx-solid: var(--pk-tone-warn);
+  }
+
+  [data-tone='bad'] {
+    --pk-nx-tone: var(--pk-tone-bad-text);
+    --pk-nx-solid: var(--pk-tone-bad);
+  }
+
+  .pk-nx-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    align-items: center;
+    margin: clamp(12px, 2vw, 20px) 0 clamp(16px, 2.4vw, 24px);
+  }
+
+  .pk-nx-head__chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--pk-tile-from, var(--pk-primary)), var(--pk-tile-to, var(--pk-primary-hover)));
+    box-shadow: 0 6px 14px -8px color-mix(in oklab, var(--pk-tile-from, var(--pk-primary)) 75%, transparent);
+    color: #FFFFFF;
+  }
+
+  .pk-nx-head__text {
+    flex: 1 1 260px;
+    min-width: 0;
+  }
+
+  .pk-nx-head__title {
+    margin: 0;
+    font-size: clamp(20px, 2.2vw, 26px);
+    line-height: 1.2;
+  }
+
+  .pk-nx-head__sub {
+    margin: 4px 0 0;
+    color: var(--pk-muted-fg);
+    font-size: 13.5px;
+  }
+
+  .pk-nx-head__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .pk-nx-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border: 1px solid color-mix(in oklab, var(--pk-border) 80%, transparent);
+    border-radius: var(--style-radius-l);
+    background: var(--pk-card);
+    box-shadow: var(--pk-shadow);
+    color: var(--pk-card-fg);
+  }
+
+  .pk-nx-card__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    align-items: center;
+    padding: 16px 20px 0;
+  }
+
+  .pk-nx-card__glyph {
+    flex: none;
+    color: var(--pk-muted-fg);
+  }
+
+  .pk-nx-card__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .pk-nx-card__note {
+    margin-left: 6px;
+    color: var(--pk-muted-fg);
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    font-weight: 400;
+  }
+
+  .pk-nx-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .pk-nx-card__body {
+    flex: 1;
+    min-width: 0;
+    padding: 14px 20px 18px;
+  }
+
+  .pk-nx-card__body.is-flush {
+    padding: 10px 0 0;
+  }
+
+  .pk-nx-card__foot {
+    padding: 12px 20px;
+    border-top: 1px solid var(--pk-border);
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+  }
+
+  .pk-nx-badge {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    min-height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--pk-nx-tone) 14%, var(--pk-card));
+    color: var(--pk-nx-tone);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .pk-nx-status {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .pk-nx-status__dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--pk-nx-solid);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--pk-nx-solid) 18%, transparent);
+  }
+
+  .pk-nx-progress {
+    display: block;
+    overflow: hidden;
+    height: 8px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--pk-nx-solid) 14%, var(--pk-muted-bg));
+  }
+
+  .pk-nx-progress__bar {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--pk-nx-solid);
+  }
+
+  @media (max-width: 640px) {
+    .pk-nx-card__head {
+      padding: 14px 16px 0;
+    }
+
+    .pk-nx-card__body {
+      padding: 12px 16px 16px;
+    }
+
+    .pk-nx-card__foot {
+      padding: 10px 16px;
+    }
+  }
+}
+
+// =================================================================================================
+// D2510 custom pages (Nexus) — PR-4 (ADR 0033): the custom views (src/admin/views: Shell / Frame / FieldFrame
+// pages, inbox and queue sections, Laporan, Riwayat, module landing) as a column of Nexus cards under the shared
+// PageHeader. Builds on the kit above (pk-nx-card / -badge / [data-tone]); adds the custom-page pieces: page column,
+// table, item cards, callouts, sub lines, thumbnails. Colours = --pk-* tokens only (light + dark), long text wraps
+// (owner rule 2026-10-16, never an ellipsis), 44px targets on touch, ≤ 640px the cards tighten (kit).
+// =================================================================================================
+@layer payload {
+  // ---- page column (Shell / Riwayat / module landing): cards stacked with one gap ----------------------
+  .pk-nx-page {
+    display: grid;
+    gap: clamp(16px, 2vw, 20px);
+    min-width: 0;
+    padding-bottom: 32px;
+
+    > * {
+      min-width: 0;
+    }
+
+    // the list toolbar / pager of a standalone list keep their own spacing inside the column
+    > .pk-ltb,
+    > .pk-pager {
+      margin: 0;
+    }
+  }
+
+  // Riwayat = a document tab under Payload's own header → a little air above the card
+  .pk-nx-page--tab {
+    padding-top: 16px;
+  }
+
+  .pk-nx-back {
+    margin: 0;
+
+    .pk-pbtn {
+      margin: 0;
+    }
+  }
+
+  // ---- card body pieces ------------------------------------------------------------------------------
+  .pk-nx-card__body {
+    > .pk-ltb {
+      margin-top: 0;
+    }
+
+    > .pk-tscroll:last-child,
+    > .pk-pager:last-child,
+    > :last-child {
+      margin-bottom: 0;
+    }
+
+    > .pk-pager {
+      margin-top: 12px;
+    }
+  }
+
+  .pk-nx-lead {
+    margin: 0 0 12px;
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .pk-nx-empty {
+    margin: 0;
+    padding: 24px 12px;
+    color: var(--pk-muted-fg);
+    font-size: 13.5px;
+    text-align: center;
+  }
+
+  .pk-nx-sub {
+    display: block;
+    margin-top: 2px;
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+    line-height: 1.45;
+
+    &[data-tone] {
+      color: var(--pk-nx-tone);
+      font-weight: 600;
+    }
+  }
+
+  .pk-nx-muted {
+    color: var(--pk-muted-fg);
+    font-weight: 400;
+  }
+
+  .pk-nx-strong {
+    font-weight: 600;
+  }
+
+  .pk-nx-nowrap {
+    white-space: nowrap;
+  }
+
+  .pk-nx-wrap {
+    overflow-wrap: anywhere;
+  }
+
+  .pk-nx-gap {
+    margin-top: 8px;
+  }
+
+  .pk-nx-gap-b {
+    margin-bottom: 16px;
+  }
+
+  // badges / chips under a cell's main text
+  .pk-nx-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    margin-top: 4px;
+  }
+
+  // a linked badge ("Dana kurang", "Selisih nota"): the badge is the target, focus ring on the link
+  .pk-nx-badge-link {
+    display: inline-flex;
+    border-radius: 999px;
+    text-decoration: none;
+
+    &:hover .pk-nx-badge {
+      background: color-mix(in oklab, var(--pk-nx-tone) 22%, var(--pk-card));
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--pk-ring);
+      outline-offset: 2px;
+    }
+  }
+
+  // buttons of one row / item (Setujui + Tolak, Valid + Tolak)
+  .pk-nx-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+
+    .pk-pbtn {
+      margin: 0;
+    }
+  }
+
+  // tinted note inside a card (self-approval, G1, "Anda yang mengajukan", PT not allowed)
+  .pk-nx-callout {
+    margin: 0 0 10px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in oklab, var(--pk-nx-tone, var(--pk-muted-fg)) 28%, var(--pk-border));
+    border-radius: var(--style-radius-m);
+    background: color-mix(in oklab, var(--pk-nx-tone, var(--pk-muted-fg)) 8%, var(--pk-card));
+    color: var(--pk-fg);
+    font-size: 13px;
+    line-height: 1.5;
+
+    &:only-child {
+      margin: 0;
+    }
+  }
+
+  // sub-section inside a card ("Pengembalian pinjaman")
+  .pk-nx-subsec {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--pk-border);
+  }
+
+  .pk-nx-subsec__title {
+    margin: 0 0 10px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  // export links in a card head (Laporan)
+  .pk-nx-exports {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    color: var(--pk-muted-fg);
+    font-size: 12.5px;
+  }
+
+  // ---- table (custom views): muted header row, roomy rows, soft hover ----------------------------------
+  .pk-nx-table {
+    width: auto;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+
+    &.is-full {
+      width: 100%;
+    }
+
+    > thead > tr > th {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--pk-border);
+      background: color-mix(in oklab, var(--pk-muted-bg) 55%, var(--pk-card));
+      color: var(--pk-muted-fg);
+      font-size: 12px;
+      font-weight: 600;
+      text-align: left;
+      white-space: nowrap;
+
+      &:first-child {
+        border-top-left-radius: var(--style-radius-m);
+      }
+
+      &:last-child {
+        border-top-right-radius: var(--style-radius-m);
+      }
+    }
+
+    > tbody > tr > td {
+      padding: 11px 14px;
+      border-bottom: 1px solid color-mix(in oklab, var(--pk-border) 75%, transparent);
+      vertical-align: top;
+    }
+
+    > tbody:last-child > tr:last-child > td {
+      border-bottom: 0;
+    }
+
+    > tbody > tr:hover > td {
+      background: color-mix(in oklab, var(--pk-primary) 4%, var(--pk-card));
+    }
+
+    // the transfer form row under a queue item belongs to that item
+    > tbody > tr.pk-nx-subrow > td {
+      padding-top: 0;
+      background: transparent;
+    }
+
+    > tbody + tbody > tr:first-child > td {
+      border-top: 1px solid var(--pk-border);
+    }
+
+    :is(th, td).n {
+      text-align: right;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    // a badge inside a cell wraps with its cell (long vendor / account names) instead of overflowing it
+    .pk-nx-badge {
+      white-space: normal;
+    }
+  }
+
+  // inside the scroll box the frozen header row (wide-tables block above) keeps the muted tint
+  .pk-tscroll > table.pk-nx-table > thead > tr > th {
+    background: color-mix(in oklab, var(--pk-muted-bg) 55%, var(--pk-card));
+  }
+
+  .pk-nx-thumb {
+    display: block;
+    object-fit: cover;
+    border: 1px solid var(--pk-border);
+    border-radius: var(--style-radius-m);
+    background: var(--pk-muted-bg);
+  }
+
+  // ---- item cards inside a card (LPJ, loan / inter-PT transfer orders) --------------------------------
+  .pk-nx-items {
+    display: grid;
+    gap: 12px;
+  }
+
+  .pk-nx-item {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+    padding: 14px 16px;
+    border: 1px solid color-mix(in oklab, var(--pk-border) 85%, transparent);
+    border-radius: var(--style-radius-l);
+    background: color-mix(in oklab, var(--pk-muted-bg) 28%, var(--pk-card));
+
+    > * {
+      margin: 0;
+    }
+  }
+
+  .pk-nx-item__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .pk-nx-item__main {
+    flex: 1 1 320px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .pk-nx-item__meta {
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+
+  .pk-nx-item__figs {
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+
+    strong {
+      color: var(--pk-fg);
+    }
+  }
+
+  .pk-nx-flags {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    font-size: 12.5px;
+    list-style: none;
+
+    > li {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 6px;
+      align-items: center;
+    }
+  }
+
+  .pk-nx-media {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-top: 4px;
+  }
+
+  .pk-nx-media__body {
+    min-width: 0;
+  }
+
+  // ---- module landing (/admin/modul/<id>): section = card, tiles = flat quick actions inside it -------
+  .pk-modland .pk-nx-head {
+    margin-top: 0;
+  }
+
+  .pk-modland .pk-nx-card .pk-tile {
+    background: color-mix(in oklab, var(--pk-muted-bg) 35%, var(--pk-card));
+    box-shadow: none;
+
+    &:hover {
+      background: var(--pk-card);
+      box-shadow: var(--pk-shadow);
+    }
+  }
+
+  .pk-modland__section + .pk-modland__section {
+    margin-top: 0;
+  }
+
+  @media (pointer: coarse) {
+    .pk-nx-badge-link {
+      min-height: 44px;
+      align-items: center;
+    }
+  }
+}
+
+// Unlayered on purpose: the custom views' style strings (F3_STYLE, VIZ_STYLE — inline <style>, i.e. unlayered) would
+// beat any `@layer payload` rule. Only inside a Nexus card: the report table's own card box (.pk-scroll) and the
+// standalone section margins step back so the card is the one surface.
+.pk-f3 .pk-nx-card .pk-scroll {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.pk-f3 .pk-nx-card .pk-table th {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--pk-border);
+  background: color-mix(in oklab, var(--pk-muted-bg) 55%, var(--pk-card));
+  font-size: 12px;
+}
+
+.pk-f3 .pk-nx-card .pk-table td {
+  padding: 11px 14px;
+  border-bottom-color: color-mix(in oklab, var(--pk-border) 75%, transparent);
+}
+
+.pk-f3 .pk-nx-card .pk-empty {
+  margin: 0;
+  padding: 24px 12px;
+  text-align: center;
+}
+
+// filter forms of the custom views (F3_STYLE .pk-filter): standalone = a toolbar card; inside a card = its toolbar row
+.pk-f3[data-pk-view] form.pk-filter {
+  gap: 10px 14px;
+  padding: 12px 16px;
+  border-color: color-mix(in oklab, var(--pk-border) 80%, transparent);
+  border-radius: var(--style-radius-l);
+  box-shadow: var(--pk-shadow);
+}
+
+.pk-f3[data-pk-view] :is(.pk-card, .pk-nx-card) form.pk-filter {
+  margin: 0 0 14px;
+  padding: 0 0 14px;
+  border: 0;
+  border-bottom: 1px solid var(--pk-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }

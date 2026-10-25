@@ -10,8 +10,9 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { docHref } from '../doc-links'
+import { Panel } from '../components/ui/nexus'
 
-import { Empty, TableScroll, table, td, th } from './shared'
+import { Empty, NX_TABLE, TableScroll } from './shared'
 import { settings as companySettings } from '@/domain/companies'
 
 /**
@@ -53,55 +54,55 @@ export async function RiwayatView(props: DocumentViewServerProps) {
   const tz = (await companySettings(req)).timezone || process.env.TZ || DEFAULT_TZ
   return (
     <Gutter>
+      <div className="pk-nx-page pk-nx-page--tab">
       {collection?.slug === 'expense-requests' && Number.isSafeInteger(id) ? (
-        <p style={{ margin: '16px 0 0' }}>
-          <a className="btn btn--style-secondary btn--size-small pk-pbtn" style={{ margin: 0 }} href={`/admin/collections/expense-requests/${id}`} data-pk-link="back-to-request">
+        <p className="pk-nx-back">
+          <a className="btn btn--style-secondary btn--size-small pk-pbtn" href={`/admin/collections/expense-requests/${id}`} data-pk-link="back-to-request">
             ← Kembali ke pengajuan
           </a>
         </p>
       ) : null}
-      <h2 style={{ margin: '16px 0' }}>Riwayat</h2>
+      {/* D2510: the history as a Nexus card (muted header row, soft rows); texts / columns unchanged */}
+      <Panel id="riwayat" icon="tShieldSearch" title="Riwayat">
       {denied ? <Empty text="Dokumen tidak ditemukan." /> : rows.length === 0 ? <Empty text="Belum ada riwayat." /> : null}
       {rows.length > 0 ? (
         <TableScroll label="Riwayat dokumen">
-          <table style={table}>
+          <table className={NX_TABLE}>
             <thead>
               <tr>
-                <th style={th}>Waktu (server)</th>
-                <th style={th}>Oleh</th>
-                <th style={th}>Dokumen</th>
-                <th style={th}>Aksi</th>
-                <th style={th}>Field</th>
-                <th style={th}>Lama → Baru</th>
-                <th style={th}>Alasan</th>
-                <th style={th}>Sumber / perangkat</th>
+                <th>Waktu (server)</th>
+                <th>Oleh</th>
+                <th>Dokumen</th>
+                <th>Aksi</th>
+                <th>Field</th>
+                <th>Lama → Baru</th>
+                <th>Alasan</th>
+                <th>Sumber / perangkat</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td style={{ ...td, whiteSpace: 'nowrap' }}>{formatServerTime(r.serverTime, tz)}</td>
-                  <td style={td}>
+                  <td className="pk-nx-nowrap">{formatServerTime(r.serverTime, tz)}</td>
+                  <td>
                     {actorText(r)}
-                    {r.userRoles ? <div style={{ fontSize: 11 }}>{r.userRoles}</div> : null}
+                    {r.userRoles ? <span className="pk-nx-sub">{r.userRoles}</span> : null}
                   </td>
-                  <td style={td}>
+                  <td>
                     {DOC_LABELS[r.docType] ?? r.docType}
-                    {r.docNo && r.docType !== 'expense_request' ? <div style={{ fontSize: 11 }}>{docHref(r.docType, r.docId) ? <a href={docHref(r.docType, r.docId)!}>{r.docNo}</a> : r.docNo}</div> : null}
+                    {r.docNo && r.docType !== 'expense_request' ? <span className="pk-nx-sub">{docHref(r.docType, r.docId) ? <a href={docHref(r.docType, r.docId)!}>{r.docNo}</a> : r.docNo}</span> : null}
                   </td>
-                  <td style={td}>{ACTION_LABELS[r.action] ?? r.action}</td>
-                  <td style={td}>
+                  <td>{ACTION_LABELS[r.action] ?? r.action}</td>
+                  <td>
                     {r.field ?? '—'}
                     {r.lineNo ? ` (baris ${r.lineNo})` : ''}
                   </td>
-                  <td style={td}>
-                    {r.statusFrom || r.statusTo ? `${r.statusFrom ?? '—'} → ${r.statusTo ?? '—'}` : `${show(r.oldValue)} → ${show(r.newValue)}`}
-                  </td>
-                  <td style={td}>{r.reason ?? '—'}</td>
-                  <td style={td}>
+                  <td>{r.statusFrom || r.statusTo ? `${r.statusFrom ?? '—'} → ${r.statusTo ?? '—'}` : `${show(r.oldValue)} → ${show(r.newValue)}`}</td>
+                  <td>{r.reason ?? '—'}</td>
+                  <td>
                     {r.source ?? '—'}
                     {r.appVersion ? ` ${r.appVersion}` : ''}
-                    {r.deviceId ? <div style={{ fontSize: 11 }}>perangkat {r.deviceId.slice(0, 8)}…</div> : null}
+                    {r.deviceId ? <span className="pk-nx-sub">perangkat {r.deviceId.slice(0, 8)}…</span> : null}
                   </td>
                 </tr>
               ))}
@@ -109,6 +110,8 @@ export async function RiwayatView(props: DocumentViewServerProps) {
           </table>
         </TableScroll>
       ) : null}
+      </Panel>
+      </div>
     </Gutter>
   )
 }

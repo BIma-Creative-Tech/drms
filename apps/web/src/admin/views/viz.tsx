@@ -2,6 +2,7 @@ import React from 'react'
 
 import { ClickableRow } from '@/admin/components/list/ClickableRow'
 import { PagedBody } from '@/admin/components/list/PagedBody'
+import { Progress, StatusDot, type Tone } from '@/admin/components/ui/nexus'
 import { DEFAULT_PAGE_SIZE } from '@/admin/list-query'
 import { Icon as Glyph } from '@/admin/modules/Icon'
 import type { IconName } from '@/admin/modules/icons'
@@ -28,6 +29,11 @@ import { formatNumber, formatRupiah, rupiahOrDash } from '@/lib/money'
  * - light + dark via html[data-theme] (Payload), container queries for narrow cards,
  *   one subtle enter animation, none with prefers-reduced-motion.
  * All text goes through React escaping. `data-pk-*` = stable UAT selectors.
+ * D2510 (ADR 0033, Nexus look): cards = faint border + soft shadow + roomy body, head = muted glyph + title + muted
+ * note + small outlined buttons; stat tiles = icon chip right, muted label, big value (smaller muted "Rp"), delta as a
+ * soft badge (kit `pk-nx-badge`); status pills / budget badges = soft badges; tables = muted header row, roomy rows;
+ * new MetricRow ("Sale Metrics": status dot + label, value, muted comparison), ProgressRow, QuickActions, Segmented.
+ * Class names stay (Frame pages, progress-ui and tests use them); data text wraps, never an ellipsis (DRMS 16/10).
  */
 export const VIZ_STYLE = `
 .pk-f3 {
@@ -45,54 +51,126 @@ html[data-theme='dark'] .pk-f3 {
   --viz-mute: var(--color-base-650); --viz-axis: var(--color-base-700);
 }
 .pk-f3 .pk-dash-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 16px; margin: 24px 0 16px; }
-.pk-f3 .pk-dash-head h1 { margin: 0; font-size: 28px; line-height: 1.2; }
+.pk-f3 .pk-dash-head h1 { margin: 0; font-size: clamp(20px, 2.2vw, 26px); line-height: 1.2; } /* = kit PageHeader title */
 .pk-f3 .pk-dash-head p { margin: 4px 0 0; color: var(--pk-muted-fg); font-size: 13px; }
-.pk-f3 .pk-bento { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; margin: 0 0 24px; }
-.pk-f3 .pk-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
-.pk-f3 .pk-kpis.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .pk-f3 .pk-kpis.c6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-@media (max-width: 1279px) { .pk-f3 .pk-kpis.c6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 1099px) { .pk-f3 .pk-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pk-f3 .pk-kpis.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 899px) { .pk-f3 .pk-kpis.c6, .pk-f3 .pk-kpis.c3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 559px) { .pk-f3 .pk-kpis, .pk-f3 .pk-kpis.c3, .pk-f3 .pk-kpis.c6 { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
-.pk-f3 .pk-card { grid-column: span 12; min-width: 0; background: var(--pk-card); border: 1px solid var(--pk-border); border-radius: var(--style-radius-l); box-shadow: var(--pk-shadow); padding: 16px 18px; container-type: inline-size; display: flex; flex-direction: column; }
+.pk-f3 .pk-bento { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 20px; margin: 0 0 24px; }
+.pk-f3 .pk-kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+.pk-f3 .pk-kpis.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .pk-f3 .pk-kpis.c5 { grid-template-columns: repeat(5, minmax(0, 1fr)); } .pk-f3 .pk-kpis.c6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+@media (max-width: 1279px) { .pk-f3 .pk-kpis.c5, .pk-f3 .pk-kpis.c6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1099px) { .pk-f3 .pk-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; } .pk-f3 .pk-kpis.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 899px) { .pk-f3 .pk-kpis.c5, .pk-f3 .pk-kpis.c6, .pk-f3 .pk-kpis.c3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 559px) { .pk-f3 .pk-kpis, .pk-f3 .pk-kpis.c3, .pk-f3 .pk-kpis.c5, .pk-f3 .pk-kpis.c6 { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
+/* card (Nexus "card bg-base-100"): faint border, very soft shadow, radius l, roomy body */
+.pk-f3 .pk-card { --pk-tw-bleed: 20px; grid-column: span 12; min-width: 0; background: var(--pk-card); border: 1px solid color-mix(in oklab, var(--pk-border) 80%, transparent); border-radius: var(--style-radius-l); box-shadow: var(--pk-shadow); padding: 18px 20px 20px; container-type: inline-size; display: flex; flex-direction: column; }
 .pk-f3 .pk-card.s3 { grid-column: span 3; } .pk-f3 .pk-card.s4 { grid-column: span 4; } .pk-f3 .pk-card.s5 { grid-column: span 5; }
 .pk-f3 .pk-card.s6 { grid-column: span 6; } .pk-f3 .pk-card.s7 { grid-column: span 7; } .pk-f3 .pk-card.s8 { grid-column: span 8; }
 @media (max-width: 1279px) { .pk-f3 .pk-card.s3, .pk-f3 .pk-card.s4, .pk-f3 .pk-card.s5 { grid-column: span 6; } .pk-f3 .pk-card.s7, .pk-f3 .pk-card.s8 { grid-column: span 12; } }
 @media (max-width: 899px) { .pk-f3 .pk-card.s3, .pk-f3 .pk-card.s4, .pk-f3 .pk-card.s5, .pk-f3 .pk-card.s6 { grid-column: span 12; } .pk-f3 .pk-bento { gap: 12px; } }
-.pk-f3 .pk-card-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; margin: 0 0 12px; }
-.pk-f3 .pk-card-h h2 { margin: 0; font-size: 16px; line-height: 1.3; }
-.pk-f3 .pk-card-h .sub { display: block; margin-top: 2px; font-size: 12px; color: var(--pk-muted-fg); font-family: var(--font-body); letter-spacing: 0; font-weight: 400; }
-.pk-f3 .pk-card-h { align-items: center; }
+@media (max-width: 640px) { .pk-f3 .pk-card { --pk-tw-bleed: 16px; padding: 14px 16px 16px; } }
+/* card head: muted glyph + title (+ muted note under it) + small outlined button(s) on the right */
+.pk-f3 .pk-card-h { display: flex; align-items: center; justify-content: space-between; gap: 8px 10px; flex-wrap: wrap; margin: 0 0 14px; }
+.pk-f3 .pk-card-h > .gl { flex: none; align-self: flex-start; margin-top: 1px; color: var(--pk-muted-fg); }
+.pk-f3 .pk-card-h h2 { flex: 1 1 200px; min-width: 0; margin: 0; font-size: 15px; font-weight: 600; line-height: 1.3; overflow-wrap: break-word; }
+.pk-f3 .pk-card-h .sub { display: block; margin-top: 3px; font-size: 12.5px; line-height: 1.4; color: var(--pk-muted-fg); font-family: var(--font-body); letter-spacing: 0; font-weight: 400; }
+.pk-f3 .pk-card-h .acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .pk-f3 .pk-card-h .pk-btn { flex: none; }
+.pk-f3 .pk-card-h .pk-btn.sm, .pk-f3 .pk-es .pk-btn.sm { min-height: 30px; padding: 0 10px; border-color: var(--pk-border); font-size: 12.5px; }
+.pk-f3 .pk-card-h .pk-btn.sm:hover, .pk-f3 .pk-es .pk-btn.sm:hover { border-color: var(--pk-primary); }
+@media (pointer: coarse) { .pk-f3 .pk-card-h .pk-btn.sm, .pk-f3 .pk-es .pk-btn.sm { min-height: 44px; } }
 .pk-f3 .pk-card-b { flex: 1; min-width: 0; }
-.pk-f3 .pk-card-f { margin: 12px 0 0; font-size: 12px; color: var(--pk-muted-fg); }
-/* stat tiles */
-.pk-f3 .pk-kpi { position: relative; background: var(--pk-card); border: 1px solid var(--pk-border); border-radius: var(--style-radius-l); box-shadow: var(--pk-shadow); padding: 14px 16px 12px; min-width: 0; display: flex; flex-direction: column; gap: 4px; transition: box-shadow .2s ease, border-color .2s ease; }
+.pk-f3 .pk-card-f { margin: 16px calc(-1 * var(--pk-tw-bleed)) 0; padding: 12px var(--pk-tw-bleed) 0; border-top: 1px solid var(--pk-border); font-size: 12px; color: var(--pk-muted-fg); }
+/* stat tiles (Nexus stat): muted label left, icon chip right, big value, delta badge + muted "vs …" */
+.pk-f3 .pk-kpi { position: relative; background: var(--pk-card); border: 1px solid color-mix(in oklab, var(--pk-border) 80%, transparent); border-radius: var(--style-radius-l); box-shadow: var(--pk-shadow); padding: 18px 20px 16px; min-width: 0; display: flex; flex-direction: column; gap: 6px; transition: box-shadow .2s ease, border-color .2s ease; }
 .pk-f3 .pk-kpi:has(a.pk-kpi-link:hover) { box-shadow: var(--pk-shadow-hover); border-color: color-mix(in oklab, var(--pk-primary) 35%, var(--pk-border)); }
-.pk-f3 .pk-kpi-l { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--pk-muted-fg); margin: 0; }
-.pk-f3 .pk-kpi-l .ic { width: 28px; height: 28px; border-radius: 8px; display: inline-grid; place-items: center; background: color-mix(in oklab, var(--pk-primary) 12%, transparent); color: var(--pk-primary); flex: none; }
-.pk-f3 .pk-kpi-l .ic svg { width: 16px; height: 16px; }
+.pk-f3 .pk-kpi-l { display: flex; flex-direction: row-reverse; align-items: flex-start; justify-content: space-between; gap: 10px; font-size: 13px; font-weight: 500; line-height: 1.35; color: var(--pk-muted-fg); margin: 0; overflow-wrap: break-word; }
+.pk-f3 .pk-kpi-l .ic { width: 40px; height: 40px; border-radius: 12px; display: inline-grid; place-items: center; background: color-mix(in oklab, var(--pk-primary) 12%, var(--pk-card)); color: var(--pk-primary); flex: none; }
+.pk-f3 .pk-kpi-l .ic svg { width: 20px; height: 20px; }
+.pk-f3 .pk-kpi-l .lt { flex: 1 1 auto; min-width: 0; padding-top: 2px; }
 /* DRMS 13/10 #10: tiles show the full Rupiah value — the size follows the tile width (container query units) so a full billion-rupiah amount stays on one line (no amount example here: this CSS is inlined in pages Staff can open) */
 .pk-f3 .pk-kpi { container-type: inline-size; }
-.pk-f3 .pk-kpi-v { font-family: var(--pk-font-heading); font-size: clamp(16px, 10cqi, 26px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; margin: 6px 0 0; color: var(--pk-fg); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-.pk-f3 .pk-kpi.hero .pk-kpi-v { font-size: clamp(20px, 10cqi, 48px); }
-.pk-f3 .pk-kpi-x { font-size: 12px; color: var(--pk-muted-fg); margin: 0; font-variant-numeric: tabular-nums; }
+.pk-f3 .pk-kpi-v { font-family: var(--pk-font-heading); font-size: clamp(18px, 11cqi, 28px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; margin: 2px 0 0; color: var(--pk-fg); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.pk-f3 .pk-kpi.hero .pk-kpi-v { font-size: clamp(22px, 10cqi, 44px); }
+.pk-f3 .cur { font-size: .62em; font-weight: 600; letter-spacing: 0; color: var(--pk-muted-fg); }
+.pk-f3 .pk-kpi-x { font-size: 12px; line-height: 1.5; color: var(--pk-muted-fg); margin: 0; font-variant-numeric: tabular-nums; }
 .pk-f3 .pk-kpi-x b { color: var(--pk-fg); font-weight: 600; }
 .pk-f3 .pk-kpi a.pk-kpi-link { position: absolute; inset: 0; border-radius: inherit; }
 .pk-f3 .pk-kpi a.pk-kpi-link:focus-visible { outline: var(--accessibility-outline); outline-offset: 2px; }
-/* the whole tile is the link (a.pk-kpi-link); its hint reads as a button, not as text */
-.pk-f3 .pk-kpi .pk-kpi-more { margin-top: auto; align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; border: 1px solid color-mix(in oklab, var(--pk-primary) 45%, var(--pk-input)); border-radius: var(--style-radius-m); background: color-mix(in oklab, var(--pk-primary) 8%, var(--pk-card)); font-size: 12px; font-weight: 600; color: var(--pk-primary-hover); white-space: nowrap; }
+/* the whole tile is the link (a.pk-kpi-link); its hint reads as a small outlined button, not as text */
+.pk-f3 .pk-kpi .pk-kpi-more { margin-top: auto; align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; border: 1px solid var(--pk-border); border-radius: var(--style-radius-m); background: var(--pk-card); font-size: 12px; font-weight: 600; color: var(--pk-primary-hover); white-space: nowrap; }
 .pk-f3 .pk-kpi .pk-kpi-more svg { flex: none; }
 .pk-f3 .pk-kpi:has(a.pk-kpi-link:hover) .pk-kpi-more { background: var(--pk-primary); border-color: var(--pk-primary); color: var(--pk-on-primary); }
 .pk-f3 .pk-kpi:has(a.pk-kpi-link:focus-visible) .pk-kpi-more { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
-.pk-f3 .pk-delta { display: block; margin: 0; font-size: 12px; line-height: 1.45; font-weight: 600; color: var(--pk-muted-fg); }
-.pk-f3 .pk-delta > span:first-child { margin-right: 4px; font-size: 10px; }
-.pk-f3 .pk-delta.good { color: var(--pk-tone-ok-text); } .pk-f3 .pk-delta.bad { color: var(--pk-tone-bad-text); }
-.pk-f3 .pk-delta span { font-weight: 400; color: var(--pk-muted-fg); }
+@media (pointer: coarse) { .pk-f3 .pk-kpi .pk-kpi-more { min-height: 44px; } }
+/* delta = soft badge (kit pk-nx-badge, tone ok/bad/neutral) with ↑/↓ + muted "vs …" */
+.pk-f3 .pk-delta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0; font-size: 12px; line-height: 1.45; color: var(--pk-muted-fg); }
+.pk-f3 .pk-delta .pk-nx-badge { white-space: normal; border-radius: 10px; font-variant-numeric: tabular-nums; }
+.pk-f3 .pk-delta .ar { font-weight: 700; }
+.pk-f3 .pk-delta .vs { font-weight: 400; color: var(--pk-muted-fg); }
+/* "Sale Metrics": status dot + label, big value, muted comparison line — 3 (or n) columns, 2 / 1 on narrow cards */
+.pk-f3 .pk-metrics { display: grid; grid-template-columns: repeat(var(--pk-mc, 3), minmax(0, 1fr)); gap: 16px 24px; margin: 0; padding: 0; list-style: none; }
+.pk-f3 .pk-metrics > li { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.pk-f3 .pk-metrics > li + li { border-left: 1px solid var(--pk-border); padding-left: 12px; margin-left: -12px; }
+.pk-f3 .pk-metric-l { margin: 0; font-size: 13px; color: var(--pk-muted-fg); overflow-wrap: break-word; }
+.pk-f3 .pk-metric-v { margin: 0; font-family: var(--pk-font-heading); font-size: clamp(18px, 6cqi, 24px); font-weight: 700; line-height: 1.2; color: var(--pk-fg); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.pk-f3 .pk-metric-v a { color: inherit; text-decoration: none; } .pk-f3 .pk-metric-v a:hover { color: var(--pk-primary); text-decoration: underline; }
+.pk-f3 .pk-metric-x { margin: 0; font-size: 12px; color: var(--pk-muted-fg); overflow-wrap: break-word; }
+.pk-f3 .pk-metric-x b { color: var(--pk-fg); font-weight: 600; }
+@container (max-width: 560px) { .pk-f3 .pk-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pk-f3 .pk-metrics > li + li { border-left: 0; padding-left: 0; margin-left: 0; } }
+@container (max-width: 300px) { .pk-f3 .pk-metrics { grid-template-columns: minmax(0, 1fr); } }
+/* progress rows (kit Progress): label + value on one line, bar under it, muted sub-line */
+.pk-f3 .pk-prows { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.pk-f3 .pk-prow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: baseline; color: inherit; text-decoration: none; border-radius: 8px; padding: 4px 6px; margin: 0 -6px; }
+.pk-f3 a.pk-prow:hover { background: color-mix(in oklab, var(--pk-primary) 6%, transparent); }
+.pk-f3 a.pk-prow:focus-visible { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
+.pk-f3 .pk-prow .l { font-size: 13px; font-weight: 600; min-width: 0; overflow-wrap: break-word; }
+.pk-f3 .pk-prow .v { font-size: 12px; color: var(--pk-muted-fg); text-align: right; font-variant-numeric: tabular-nums; }
+.pk-f3 .pk-prow .v b { color: var(--pk-fg); font-weight: 700; font-size: 13px; }
+.pk-f3 .pk-prow .pk-nx-progress { grid-column: 1 / -1; }
+.pk-f3 .pk-prow .x { grid-column: 1 / -1; font-size: 12px; color: var(--pk-muted-fg); overflow-wrap: break-word; }
+/* quick actions (Finance "Quick Actions"): square icon buttons with a label */
+.pk-f3 .pk-qa { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.pk-f3 .pk-qa a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 96px; height: 100%; box-sizing: border-box; padding: 12px 8px; border: 1px solid var(--pk-border); border-radius: var(--style-radius-m); background: var(--pk-card); color: var(--pk-fg); text-align: center; text-decoration: none; font-size: 12.5px; font-weight: 600; line-height: 1.3; overflow-wrap: break-word; transition: border-color .15s ease, background-color .15s ease; }
+.pk-f3 .pk-qa a .qi { width: 40px; height: 40px; border-radius: 12px; display: inline-grid; place-items: center; background: color-mix(in oklab, var(--pk-primary) 12%, var(--pk-card)); color: var(--pk-primary); }
+.pk-f3 .pk-qa a.primary .qi { background: var(--pk-primary); color: var(--pk-on-primary); }
+.pk-f3 .pk-qa a:hover { border-color: var(--pk-primary); background: color-mix(in oklab, var(--pk-primary) 5%, var(--pk-card)); }
+.pk-f3 .pk-qa a:focus-visible { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
+/* segmented control (role / range tabs in the page header) */
+.pk-f3 .pk-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border: 1px solid var(--pk-border); border-radius: var(--style-radius-m); background: color-mix(in oklab, var(--pk-muted-bg) 70%, var(--pk-card)); }
+.pk-f3 .pk-seg a { display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border-radius: calc(var(--style-radius-m) - 3px); color: var(--pk-muted-fg); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.pk-f3 .pk-seg a:hover { color: var(--pk-fg); }
+.pk-f3 .pk-seg a[aria-current='page'] { background: var(--pk-card); color: var(--pk-primary-hover); box-shadow: var(--pk-shadow); }
+.pk-f3 .pk-seg a:focus-visible { outline: 2px solid var(--pk-ring); outline-offset: 1px; }
+@media (pointer: coarse) { .pk-f3 .pk-seg a { min-height: 44px; } }
+/* Finance hero "Saldo kas total": big amount + delta, nested mini cards per cash account */
+.pk-f3 .pk-hero-v { margin: 0; font-family: var(--pk-font-heading); font-size: clamp(26px, 7cqi, 40px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; color: var(--pk-fg); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.pk-f3 .pk-hero-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 24px; margin: 0 0 16px; }
+.pk-f3 .pk-hero-top > div { min-width: 0; display: grid; gap: 6px; }
+.pk-f3 .pk-hero-top svg.pk-spark { width: min(220px, 100%); height: 40px; }
+.pk-f3 .pk-accs { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.pk-f3 .pk-acc { position: relative; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--pk-border); border-radius: var(--style-radius-m); background: color-mix(in oklab, var(--pk-muted-bg) 45%, var(--pk-card)); }
+.pk-f3 .pk-acc-h { display: flex; align-items: flex-start; gap: 8px; }
+.pk-f3 .pk-acc-h .qi { flex: none; width: 32px; height: 32px; border-radius: 10px; display: inline-grid; place-items: center; background: color-mix(in oklab, var(--pk-primary) 12%, var(--pk-card)); color: var(--pk-primary); }
+.pk-f3 .pk-acc-n { flex: 1; min-width: 0; margin: 0; font-size: 13px; font-weight: 600; line-height: 1.35; overflow-wrap: break-word; }
+.pk-f3 .pk-acc-m { flex: none; display: inline-grid; place-items: center; width: 32px; height: 32px; margin: -4px -6px 0 0; border-radius: 8px; color: var(--pk-muted-fg); text-decoration: none; font-size: 18px; font-weight: 700; line-height: 1; }
+.pk-f3 .pk-acc-m:hover { background: color-mix(in oklab, var(--pk-primary) 8%, transparent); color: var(--pk-primary); }
+.pk-f3 .pk-acc-m:focus-visible { outline: 2px solid var(--pk-ring); outline-offset: 1px; }
+@media (pointer: coarse) { .pk-f3 .pk-acc-m { width: 44px; height: 44px; margin: -10px -12px -6px 0; } }
+.pk-f3 .pk-acc-v { margin: 0; font-family: var(--pk-font-heading); font-size: 18px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.pk-f3 .pk-acc-x { margin: 0; font-size: 12px; color: var(--pk-muted-fg); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
+.pk-f3 .pk-acc-x b { color: var(--pk-fg); font-weight: 600; }
+/* a column of stacked cards inside the bento grid */
+.pk-f3 .pk-stack { grid-column: span 12; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+.pk-f3 .pk-stack > .pk-card { flex: 1 1 auto; }
+.pk-f3 .pk-stack.s4 { grid-column: span 4; } .pk-f3 .pk-stack.s5 { grid-column: span 5; }
+@media (max-width: 1279px) { .pk-f3 .pk-stack.s4, .pk-f3 .pk-stack.s5 { grid-column: span 12; } }
+@media (max-width: 899px) { .pk-f3 .pk-stack { gap: 12px; } }
+/* greeting / action row of a role body */
+.pk-f3 .pk-dash-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: -4px 0 20px; }
+.pk-f3 .pk-dash-bar > .pk-note { flex: 1 1 260px; margin: 0; }
 .pk-f3 svg.pk-spark { width: 100%; height: 34px; display: block; margin: 6px 0 2px; }
 .pk-f3 svg.pk-spark rect { fill: var(--viz-mute); } .pk-f3 svg.pk-spark rect.cur { fill: var(--viz-1); }
 .pk-f3 svg.pk-spark line { stroke: var(--viz-axis); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.pk-f3 .pk-meter { height: 8px; border-radius: 999px; background: color-mix(in oklab, var(--viz-1) 16%, var(--viz-track)); overflow: hidden; margin: 8px 0 4px; }
+.pk-f3 .pk-meter { height: 8px; border-radius: 999px; background: color-mix(in oklab, var(--viz-1) 14%, var(--viz-track)); overflow: hidden; margin: 8px 0 4px; } /* same bar as the kit's Progress */
 .pk-f3 .pk-meter > span { display: block; height: 100%; border-radius: 999px; background: var(--viz-1); }
 .pk-f3 .pk-meter.warn > span { background: var(--pk-tone-warn); } .pk-f3 .pk-meter.over > span { background: var(--pk-tone-bad); }
 .pk-f3 .pk-split { display: flex; height: 8px; gap: 2px; margin: 8px 0 4px; }
@@ -128,7 +206,7 @@ html[data-theme='dark'] .pk-f3 {
 .pk-f3 .pk-hbars { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .pk-f3 .pk-hbar { display: grid; grid-template-columns: minmax(0, 38%) minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; color: inherit; text-decoration: none; border-radius: 6px; padding: 2px 4px; margin: 0 -4px; }
 .pk-f3 a.pk-hbar:hover, .pk-f3 .pk-hbar:focus-visible { background: color-mix(in oklab, var(--pk-primary) 6%, transparent); }
-.pk-f3 .pk-hbar .l { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-f3 .pk-hbar .l { font-size: 13px; min-width: 0; overflow-wrap: break-word; } /* DRMS 16/10: names wrap, no ellipsis */
 .pk-f3 .pk-hbar .t { position: relative; height: 12px; }
 .pk-f3 .pk-hbar .t > span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0 4px 4px 0; min-width: 2px; }
 .pk-f3 .pk-hbar .v { font-size: 12px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--pk-muted-fg); }
@@ -138,7 +216,7 @@ html[data-theme='dark'] .pk-f3 {
 /* bullet rows */
 .pk-f3 .pk-bullet { display: grid; grid-template-columns: minmax(0, 34%) minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; color: inherit; text-decoration: none; padding: 4px; margin: 0 -4px; border-radius: 6px; }
 .pk-f3 a.pk-bullet:hover, .pk-f3 a.pk-bullet:focus-visible { background: color-mix(in oklab, var(--pk-primary) 6%, transparent); }
-.pk-f3 .pk-bullet .l { font-size: 13px; min-width: 0; } .pk-f3 .pk-bullet .l span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-f3 .pk-bullet .l { font-size: 13px; min-width: 0; } .pk-f3 .pk-bullet .l span { display: block; overflow-wrap: break-word; }
 .pk-f3 .pk-bullet .l small { display: block; color: var(--pk-muted-fg); font-size: 11px; }
 .pk-f3 .pk-bullet .t { position: relative; height: 18px; background: var(--viz-track); border-radius: 4px; }
 .pk-f3 .pk-bullet .t .c { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0 4px 4px 0; background: var(--viz-soft); }
@@ -149,16 +227,20 @@ html[data-theme='dark'] .pk-f3 {
 @container (max-width: 460px) { .pk-f3 .pk-bullet { grid-template-columns: minmax(0, 1fr) auto; } .pk-f3 .pk-bullet .t { grid-column: 1 / -1; grid-row: 2; } }
 /* tables */
 .pk-f3 .pk-tw { position: relative; overflow-x: auto; margin: 0 calc(-1 * var(--pk-tw-bleed, 0px)); padding: 0 var(--pk-tw-bleed, 0px); }
-.pk-f3 .pk-card { --pk-tw-bleed: 18px; } /* bleed to the card edge only inside a card (its padding); elsewhere no negative margin → no page overflow at 390 px (MC4-03) */
+/* --pk-tw-bleed = the card padding (set on .pk-card): bleed to the card edge only inside a card; elsewhere no negative margin → no page overflow at 390 px (MC4-03) */
 /* DRMS 15/10 #6: page tables hug their columns; inside a card and in editors (inputs) they keep the full width */
 .pk-f3 table.pk-t { width: auto; border-collapse: collapse; font-size: 13px; }
 .pk-f3 .pk-card table.pk-t, .pk-f3 table.pk-t:has(input, select, textarea) { width: 100%; }
-.pk-f3 .pk-t th { text-align: left; font-size: 12px; font-weight: 600; color: var(--pk-muted-fg); padding: 8px 12px; border-bottom: 1px solid var(--pk-border); white-space: nowrap; }
+/* Nexus table: muted header row, roomy rows, row hover; the first / last cell line up with the card padding */
+.pk-f3 .pk-t th { text-align: left; font-size: 12px; font-weight: 600; color: var(--pk-muted-fg); padding: 10px 14px; background: color-mix(in oklab, var(--pk-muted-bg) 55%, var(--pk-card)); border-top: 1px solid var(--pk-border); border-bottom: 1px solid var(--pk-border); white-space: nowrap; }
+.pk-f3 .pk-card .pk-t th:first-child, .pk-f3 .pk-card .pk-t td:first-child { padding-left: var(--pk-tw-bleed); }
+.pk-f3 .pk-card .pk-t th:last-child, .pk-f3 .pk-card .pk-t td:last-child { padding-right: var(--pk-tw-bleed); }
 .pk-f3 .pk-t th[aria-sort] { color: var(--pk-fg); }
 .pk-f3 .pk-t th .so { margin-left: 4px; font-size: 10px; opacity: .8; }
-.pk-f3 .pk-t td { padding: 8px 12px; border-bottom: 1px solid var(--pk-border); vertical-align: middle; }
+.pk-f3 .pk-t td { padding: 12px 14px; border-bottom: 1px solid var(--pk-border); vertical-align: middle; overflow-wrap: break-word; }
+.pk-f3 .pk-t tfoot td { font-weight: 700; border-top: 1px solid var(--pk-border); border-bottom: 0; }
 .pk-f3 .pk-t tbody tr:last-child td { border-bottom: 0; }
-.pk-f3 .pk-t tbody tr:hover td { background: color-mix(in oklab, var(--pk-primary) 4%, transparent); }
+.pk-f3 .pk-t tbody tr:hover td { background: color-mix(in oklab, var(--pk-primary) 5%, transparent); }
 .pk-f3 .pk-t .n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pk-f3 .pk-t td a { color: var(--pk-primary); font-weight: 600; text-decoration: none; } .pk-f3 .pk-t td a:hover { text-decoration: underline; }
 .pk-f3 .pk-t .sub { display: block; color: var(--pk-muted-fg); font-size: 12px; max-width: 32ch; overflow-wrap: break-word; } /* DRMS 16/10: wraps inside 32ch, no ellipsis */
@@ -168,22 +250,24 @@ html[data-theme='dark'] .pk-f3 {
 @container (max-width: 640px) { .pk-f3 .pk-t .sec { display: none; } }
 .pk-f3 .pk-t .nw { white-space: nowrap; }
 /* pills */
-.pk-f3 .pk-pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; line-height: 18px; white-space: nowrap; color: var(--pk-muted-fg); background: color-mix(in oklab, var(--pk-muted-fg) 12%, transparent); }
-.pk-f3 .pk-pill.progress { color: var(--pk-primary); background: color-mix(in oklab, var(--pk-primary) 12%, transparent); }
-.pk-f3 .pk-pill.ok { color: var(--pk-tone-ok-text); background: color-mix(in oklab, var(--pk-tone-ok-text) 12%, transparent); }
-.pk-f3 .pk-pill.warn { color: var(--pk-tone-warn-text); background: color-mix(in oklab, var(--pk-tone-warn-text) 12%, transparent); }
-.pk-f3 .pk-pill.bad { color: var(--pk-tone-bad-text); background: color-mix(in oklab, var(--pk-tone-bad-text) 12%, transparent); }
+/* status pills = soft badges (same box as the kit's pk-nx-badge: text = *-text token on its own 14% tint) */
+.pk-f3 .pk-pill { --pk-pill: var(--pk-muted-fg); display: inline-flex; align-items: center; gap: 5px; min-height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1.2; white-space: nowrap; color: var(--pk-pill); background: color-mix(in oklab, var(--pk-pill) 14%, var(--pk-card)); }
+.pk-f3 .pk-pill.progress { --pk-pill: var(--pk-primary); } .pk-f3 .pk-pill.ok { --pk-pill: var(--pk-tone-ok-text); }
+.pk-f3 .pk-pill.warn { --pk-pill: var(--pk-tone-warn-text); } .pk-f3 .pk-pill.bad { --pk-pill: var(--pk-tone-bad-text); }
+.pk-f3 .pk-pill > span[aria-hidden] { font-size: 10px; }
 /* table view of a chart */
 .pk-f3 details.pk-tv { margin: 12px 0 0; font-size: 12px; }
-.pk-f3 details.pk-tv summary { cursor: pointer; color: var(--pk-muted-fg); font-weight: 600; width: fit-content; }
+.pk-f3 details.pk-tv summary { cursor: pointer; color: var(--pk-muted-fg); font-weight: 600; width: fit-content; min-height: 28px; display: flex; align-items: center; }
+.pk-f3 details.pk-tv summary:hover { color: var(--pk-primary); }
+@media (pointer: coarse) { .pk-f3 details.pk-tv summary { min-height: 44px; } }
 .pk-f3 details.pk-tv[open] summary { margin-bottom: 6px; }
 /* empty state */
-.pk-f3 .pk-es { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; padding: 20px 12px; color: var(--pk-muted-fg); font-size: 13px; min-height: 96px; }
-.pk-f3 .pk-es > svg { width: 28px; height: 28px; opacity: .7; }
+.pk-f3 .pk-es { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; padding: 24px 12px; color: var(--pk-muted-fg); font-size: 13px; min-height: 96px; }
+.pk-f3 .pk-es > svg { width: 40px; height: 40px; padding: 9px; box-sizing: border-box; border-radius: 12px; background: var(--viz-track); opacity: .85; }
 .pk-f3 .pk-es .pk-btn { margin-top: 4px; }
 /* tooltip */
 .pk-hover-root { position: relative; }
-.pk-f3 .pk-tip { position: absolute; z-index: 20; pointer-events: none; transform: translate(12px, -50%); min-width: 150px; max-width: 280px; padding: 8px 10px; border-radius: 8px; background: var(--pk-card); color: var(--pk-fg); border: 1px solid var(--pk-border); box-shadow: 0 8px 24px -6px rgb(15 23 42 / .25); font-size: 12px; }
+.pk-f3 .pk-tip { position: absolute; z-index: 20; pointer-events: none; transform: translate(12px, -50%); min-width: 150px; max-width: 280px; padding: 10px 12px; border-radius: var(--style-radius-m); background: var(--pk-card); color: var(--pk-fg); border: 1px solid var(--pk-border); box-shadow: 0 8px 24px -6px rgb(15 23 42 / .25); font-size: 12px; }
 .pk-f3 .pk-tip.flip { transform: translate(calc(-100% - 12px), -50%); }
 .pk-f3 .pk-tip-t { color: var(--pk-muted-fg); margin-bottom: 4px; }
 .pk-f3 .pk-tip-r { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -257,7 +341,7 @@ export function Bento({ children, label }: { children: React.ReactNode; label?: 
   )
 }
 
-export function KpiRow({ children, cols = 4 }: { children: React.ReactNode; cols?: 3 | 4 | 6 }) {
+export function KpiRow({ children, cols = 4 }: { children: React.ReactNode; cols?: 3 | 4 | 5 | 6 }) {
   return <div className={`pk-kpis c${cols}`}>{children}</div>
 }
 
@@ -292,16 +376,53 @@ export function ActionLink({ href, label }: { href: string; label: string }) {
 }
 
 type Span = 3 | 4 | 5 | 6 | 7 | 8 | 12
-export function Card({ id, title, sub, span = 12, action, foot, i = 0, children }: { id: string; title: string; sub?: React.ReactNode; span?: Span; action?: { href: string; label: string }; foot?: React.ReactNode; i?: number; children: React.ReactNode }) {
+/**
+ * Bento card (Nexus card): head = optional muted `icon` glyph + title (+ muted `sub` note) + small outlined buttons on
+ * the right (`actions` nodes, then the `action` link); body; optional muted foot. Root classes stay `pk-card s{span}`
+ * (tests and progress-ui.tsx rely on them).
+ */
+export function Card({
+  id,
+  title,
+  sub,
+  span = 12,
+  action,
+  actions,
+  icon,
+  className,
+  foot,
+  i = 0,
+  children,
+}: {
+  id: string
+  title: string
+  sub?: React.ReactNode
+  span?: Span
+  action?: { href: string; label: string }
+  /** extra small buttons in the head (before `action`) */
+  actions?: React.ReactNode
+  /** muted head glyph (Iconsax, @/admin/modules/icons) */
+  icon?: IconName
+  className?: string
+  foot?: React.ReactNode
+  i?: number
+  children: React.ReactNode
+}) {
   const hid = `pk-card-${id}`
   return (
-    <section className={`pk-card s${span} pk-anim`} style={{ '--i': i } as React.CSSProperties} aria-labelledby={hid} data-pk-card={id}>
+    <section className={`pk-card s${span} pk-anim${className ? ` ${className}` : ''}`} style={{ '--i': i } as React.CSSProperties} aria-labelledby={hid} data-pk-card={id}>
       <div className="pk-card-h">
+        {icon ? <Glyph name={icon} size={18} className="gl" /> : null}
         <h2 id={hid}>
           {title}
           {sub ? <span className="sub">{sub}</span> : null}
         </h2>
-        {action ? <ActionLink href={action.href} label={action.label} /> : null}
+        {action || actions ? (
+          <div className="acts">
+            {actions}
+            {action ? <ActionLink href={action.href} label={action.label} /> : null}
+          </div>
+        ) : null}
       </div>
       <div className="pk-card-b">{children}</div>
       {foot ? <p className="pk-card-f">{foot}</p> : null}
@@ -340,21 +461,40 @@ export function DashboardSkeleton() {
 
 export type DeltaSpec = { diff: number; pct: number | null; dir: 'up' | 'down' | 'flat' }
 
-/** Signed change vs a named period; colour = direction × whether up is good (neutral = ink only). */
+/**
+ * Signed change vs a named period as a soft badge (↑/↓ + amount + %) and a muted "vs …"; tone = direction × whether
+ * up is good (neutral = gray). The sign is text, never colour alone.
+ */
 export function Delta({ d, good = 'neutral', vs, money = true }: { d: DeltaSpec; good?: 'up' | 'down' | 'neutral'; vs: string; money?: boolean }) {
   const cls = good === 'neutral' || d.dir === 'flat' ? '' : (d.dir === good ? 'good' : 'bad')
-  const arrow = d.dir === 'up' ? '▲' : d.dir === 'down' ? '▼' : '■'
+  const arrow = d.dir === 'up' ? '↑' : d.dir === 'down' ? '↓' : '→'
   const abs = money ? rp(Math.abs(d.diff)) : formatNumber(Math.abs(d.diff))
   const sign = d.dir === 'up' ? '+' : d.dir === 'down' ? '−' : '±'
   return (
     <p className={`pk-delta ${cls}`}>
-      <span aria-hidden style={{ color: 'inherit', fontWeight: 600 }}>
-        {arrow}
-      </span>
-      {sign}
-      {abs}
-      {d.pct !== null ? ` (${sign}${Math.abs(d.pct).toFixed(1).replace('.', ',')}%)` : ''} <span>{vs}</span>
+      <span className="pk-nx-badge" data-tone={cls === 'good' ? 'ok' : cls === 'bad' ? 'bad' : 'neutral'}>
+        <span className="ar" aria-hidden>
+          {arrow}
+        </span>
+        {sign}
+        {abs}
+        {d.pct !== null ? ` (${sign}${Math.abs(d.pct).toFixed(1).replace('.', ',')}%)` : ''}
+      </span>{' '}
+      <span className="vs">{vs}</span>
     </p>
+  )
+}
+
+const RP_TEXT = /^([−-]?)Rp\s?(.+)$/
+/** "Rp 12.500.000" → smaller muted "Rp" + the number (Nexus stat value); any other node unchanged. */
+export function moneyValue(v: React.ReactNode): React.ReactNode {
+  const m = typeof v === 'string' ? RP_TEXT.exec(v) : null
+  if (!m) return v
+  return (
+    <>
+      {m[1]}
+      <span className="cur">Rp</span> {m[2]}
+    </>
   )
 }
 
@@ -416,16 +556,18 @@ export function KpiTile({
   i?: number
   children?: React.ReactNode
 }) {
+  const shown = moneyValue(value)
   return (
     <div className={`pk-kpi pk-anim${hero ? ' hero' : ''}`} style={{ '--i': i } as React.CSSProperties} data-pk-tile={id}>
       <p className="pk-kpi-l">
         <span className="ic">
           <Icon name={icon} />
         </span>
-        {label}
+        <span className="lt">{label}</span>
       </p>
-      <p className="pk-kpi-v" data-pk-kpi={kpi} title={title}>
-        {value}
+      {/* the exact text stays in the title when the "Rp" prefix is split off */}
+      <p className="pk-kpi-v" data-pk-kpi={kpi} title={title ?? (shown !== value ? (value as string) : undefined)}>
+        {shown}
       </p>
       {children}
       {href ? (
@@ -437,6 +579,100 @@ export function KpiTile({
         </>
       ) : null}
     </div>
+  )
+}
+
+// ---------------------------------------------------------------- metrics, progress rows, quick actions, segmented
+
+export type Metric = {
+  key: string
+  label: string
+  value: React.ReactNode
+  tone?: Tone
+  /** muted comparison / context line ("vs …") */
+  sub?: React.ReactNode
+  href?: string
+  /** data-pk-kpi of the value (stable UAT selector) */
+  kpi?: string
+}
+
+/** Nexus "Sale Metrics": status dot + label, big value, muted comparison line; `cols` per row (2 / 1 on narrow cards). */
+export function MetricRow({ items, cols = 3, label }: { items: Metric[]; cols?: 2 | 3 | 4; label: string }) {
+  return (
+    <ul className="pk-metrics" style={{ '--pk-mc': cols } as React.CSSProperties} aria-label={label} data-pk-metrics={label}>
+      {items.map((m) => (
+        <li key={m.key} data-pk-metric={m.key}>
+          <p className="pk-metric-l">
+            <StatusDot tone={m.tone ?? 'primary'} label={m.label} />
+          </p>
+          <p className="pk-metric-v" data-pk-kpi={m.kpi}>
+            {m.href ? <a href={m.href}>{moneyValue(m.value)}</a> : moneyValue(m.value)}
+          </p>
+          {m.sub ? <p className="pk-metric-x">{m.sub}</p> : null}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+export type ProgressItem = { key: string; label: React.ReactNode; value: number | null; right: React.ReactNode; sub?: React.ReactNode; tone?: Tone; href?: string; attrs?: Record<string, string> }
+
+/** Rows of label + value, a kit Progress bar (0–100 %) and a muted sub-line (budget used, targets). */
+export function ProgressRows({ id, items, empty, aria }: { id: string; items: ProgressItem[]; empty: string; aria: (it: ProgressItem) => string }) {
+  if (items.length === 0) return <EmptyState text={empty} />
+  return (
+    <ul className="pk-prows" data-pk-chart={id}>
+      {items.map((it) => {
+        const body = (
+          <>
+            <span className="l">{it.label}</span>
+            <span className="v">{it.right}</span>
+            <Progress value={it.value ?? 0} label={aria(it)} tone={it.tone} />
+            {it.sub ? <span className="x">{it.sub}</span> : null}
+          </>
+        )
+        return (
+          <li key={it.key} {...it.attrs}>
+            {it.href ? (
+              <a className="pk-prow" href={it.href}>
+                {body}
+              </a>
+            ) : (
+              <div className="pk-prow">{body}</div>
+            )}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+export type QuickAction = { key: string; href: string; label: string; icon: IconName; primary?: boolean }
+
+/** Finance "Quick Actions": square icon buttons with a label (links to existing pages only). */
+export function QuickActions({ items, label }: { items: QuickAction[]; label: string }) {
+  return (
+    <ul className="pk-qa" aria-label={label} data-pk-quick={label}>
+      {items.map((q) => (
+        <li key={q.key}>
+          <a href={q.href} className={q.primary ? 'primary' : undefined} data-pk-quick-action={q.key}>
+            <span className="qi" aria-hidden>
+              <Glyph name={q.icon} size={20} />
+            </span>
+            <span>{q.label}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Segmented control of links (role / range tabs): `aria-current="page"` marks the active one. */
+export function Segmented({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <nav className="pk-seg" aria-label={label}>
+      {children}
+    </nav>
   )
 }
 

@@ -40,8 +40,8 @@
 
   .pk-loading {
     position: fixed;
-    inset: var(--pk-bar-h, 0) 0 0 0;
-    z-index: 24; // navigation: under the module bar (25) so the shell stays visible
+    inset: var(--pk-bar-h, 0) 0 0 var(--pk-side-inset, 0);
+    z-index: 24; // navigation: under the bar (25) and the sidebar (26) so the shell stays visible
     display: flex;
     align-items: center;
     justify-content: center;

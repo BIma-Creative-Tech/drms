@@ -8,6 +8,7 @@ import { REQUEST_TYPE_LABELS, REQUEST_TYPES } from '@/domain/expense/types'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { ActionButton } from '../components/ActionButton'
+import { Panel } from '../components/ui/nexus'
 import { ListToolbar, Pager } from '../components/list/ListToolbar'
 import { allowedValues, idValues, matchesQuery, paginate, parseListQuery } from '../list-query'
 import { ClickableRow } from '../components/list/ClickableRow'
@@ -15,7 +16,7 @@ import { AddendumInboxSection } from './Addendum'
 import { LoanInboxSection } from './Loans'
 import { ShortfallInboxSection } from './ShortfallInbox'
 import { itemCompany, PtChip, PtScopeNote, ptView } from './pt'
-import { Empty, Shell, TableScroll, badge, docLink, num, rp, table, td, th } from './shared'
+import { Badge, Empty, NX_TABLE, Shell, TableScroll, docLink, rp } from './shared'
 
 /**
  * "Persetujuan" (M04, US-26/US-42/US-59): requests waiting for the logged-in user's "Diketahui"
@@ -48,11 +49,17 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
   })
   const items = page.items
   return (
-    <Shell props={props} title="Persetujuan">
+    <Shell
+      props={props}
+      title="Persetujuan"
+      sub={
+        <>
+          Pengajuan yang menunggu keputusan Anda. Merah = anggaran project sesudah disetujui melebihi {pt.multi ? 'ambang PT pengajuan' : `${budgetWarnPct}%`}.{pt.multi ? ' Keputusan selalu memakai peran Anda di PT dokumen.' : ''}
+        </>
+      }
+    >
       <PtScopeNote pt={pt} />
-      <p style={{ marginTop: 0 }}>
-        Pengajuan yang menunggu keputusan Anda. Merah = anggaran project sesudah disetujui melebihi {pt.multi ? 'ambang PT pengajuan' : `${budgetWarnPct}%`}.{pt.multi ? ' Keputusan selalu memakai peran Anda di PT dokumen.' : ''}
-      </p>
+      <Panel id="pengajuan" icon="tReceiptText" title="Pengajuan" note={`(${page.total})`} data-pk-inbox="requests">
       {all > 0 || lq.q || ptIds.length ? (
         <ListToolbar
           id="persetujuan"
@@ -71,72 +78,74 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
         <Empty text={all === 0 ? 'Tidak ada pengajuan yang menunggu keputusan Anda.' : 'Tidak ada pengajuan yang cocok dengan pencarian / filter.'} />
       ) : (
         <TableScroll label="Daftar persetujuan">
-          <table style={table}>
+          <table className={NX_TABLE}>
             <thead>
               <tr>
-                {pt.multi ? <th style={th}>PT</th> : null}
-                <th style={th}>Nomor / Judul</th>
-                <th style={th}>Jenis</th>
-                <th style={th}>Project / Pusat biaya</th>
-                <th style={th}>Pemohon</th>
-                <th style={{ ...th, textAlign: 'right' }}>Grand total</th>
-                <th style={th}>Dampak anggaran</th>
-                <th style={th}>Flag</th>
-                <th style={th}>Langkah</th>
-                <th style={th}>Aksi</th>
+                {pt.multi ? <th>PT</th> : null}
+                <th>Nomor / Judul</th>
+                <th>Jenis</th>
+                <th>Project / Pusat biaya</th>
+                <th>Pemohon</th>
+                <th className="n">Grand total</th>
+                <th>Dampak anggaran</th>
+                <th>Flag</th>
+                <th>Langkah</th>
+                <th>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {items.map((r) => (
                 <ClickableRow key={r.id} href={`/admin/collections/expense-requests/${r.id}`} data-pk-inbox-item={r.id}>
                   {pt.multi ? (
-                    <td style={td}>
+                    <td>
                       <PtChip pt={pt.ref(itemCompany(r))} />
                     </td>
                   ) : null}
-                  <td style={td}>
-                    {docLink(r.id, r.docNo ?? `#${r.id}`)}
+                  <td>
+                    <span className="pk-nx-strong">{docLink(r.id, r.docNo ?? `#${r.id}`)}</span>
                     <div>{r.title}</div>
                   </td>
-                  <td style={td}>{r.typeLabel}</td>
-                  <td style={td}>{r.scope || '—'}</td>
-                  <td style={td}>{r.requesters || '—'}</td>
-                  <td style={num}>{rp(r.grandTotal)}</td>
-                  <td style={td}>
+                  <td>{r.typeLabel}</td>
+                  <td>{r.scope || '—'}</td>
+                  <td>{r.requesters || '—'}</td>
+                  <td className="n">{rp(r.grandTotal)}</td>
+                  <td>
                     {r.budget.pctBefore === null ? (
-                      <span style={badge('muted')}>tanpa anggaran</span>
+                      <Badge tone="muted">tanpa anggaran</Badge>
                     ) : (
-                      <span style={badge(r.budget.overWarn ? 'bad' : 'ok')}>
+                      <Badge tone={r.budget.overWarn ? 'bad' : 'ok'}>
                         {r.budget.pctBefore}% → {r.budget.pctAfter}%
-                      </span>
+                      </Badge>
                     )}
                   </td>
-                  <td style={td}>
-                    {r.flags.warning > 0 ? <span style={badge('warn')}>{r.flags.warning} peringatan</span> : null}{' '}
-                    {r.flags.info > 0 ? <span style={badge('muted')}>{r.flags.info} info</span> : null}
+                  <td>
+                    {r.flags.warning > 0 ? <Badge tone="warn">{r.flags.warning} peringatan</Badge> : null}{' '}
+                    {r.flags.info > 0 ? <Badge tone="muted">{r.flags.info} info</Badge> : null}
                     {r.flags.warning + r.flags.info === 0 ? '—' : null}
                   </td>
-                  <td style={td}>
+                  <td>
                     {r.stepLabel}
-                    {r.selfApproval ? <div style={{ fontSize: 11 }}>{selfApprovalNote(r.selfApproval)}</div> : null}
+                    {r.selfApproval ? <span className="pk-nx-sub">{selfApprovalNote(r.selfApproval)}</span> : null}
                   </td>
-                  <td style={td}>
+                  <td>
+                    <div className="pk-nx-acts">
                     {(() => {
                       // ADR 0013/0021 labels + confirmations, shared with the request detail (decision-texts.ts)
                       const t = decisionText({ step: r.step, docNo: r.docNo, grandTotal: r.grandTotal, decisionFlow: r.decisionFlow, decisionBy: r.decisionBy, finalStep: r.finalStep })
                       // ADR 0029 §2: the PT's available funds are short (fund check on) → no "Setujui" here; the detail explains + offers the loan
                       if (r.fundShort) {
                         return (
-                          <a href={`/admin/collections/expense-requests/${r.id}`} style={{ textDecoration: 'none' }} data-pk-fund-short={r.id}>
-                            <span style={badge('bad')} title="Dana tersedia PT kurang — lihat rincian, tolak atau perintahkan pinjaman antar-PT">
+                          <a href={`/admin/collections/expense-requests/${r.id}`} className="pk-nx-badge-link" data-pk-fund-short={r.id}>
+                            <Badge tone="bad" title="Dana tersedia PT kurang — lihat rincian, tolak atau perintahkan pinjaman antar-PT">
                               Dana kurang {rp(r.fundShort)}
-                            </span>
+                            </Badge>
                           </a>
                         )
                       }
                       return <ActionButton url={`/api/v1/expense-requests/${r.id}/${r.step}`} label={t.label} variant="primary" confirm={t.confirm} {...inboxDoc(r)} />
                     })()}
                     <ActionButton url={`/api/v1/expense-requests/${r.id}/reject`} label="Tolak" prompt={REJECT_PROMPT} {...inboxDoc(r)} />
+                    </div>
                   </td>
                 </ClickableRow>
               ))}
@@ -145,6 +154,7 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
         </TableScroll>
       )}
       {items.length > 0 ? <Pager id="persetujuan" path="/admin/persetujuan" sp={props.searchParams} page={page} unit="pengajuan" /> : null}
+      </Panel>
       {/* E5: Addendum RAB waiting for the caller (Direktur "Setujui" / Finance approval). */}
       <AddendumInboxSection req={req} />
       {/* QA-06 / ADR 0019: LPJ shortfall above approved + tolerance (Direktur → Finance). */}

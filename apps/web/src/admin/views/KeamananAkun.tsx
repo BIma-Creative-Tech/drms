@@ -6,7 +6,7 @@ import { DEFAULT_TZ } from '@/lib/time'
 
 import { ConfirmSubmit, SecurityResult } from '../components/security/SecurityFeedback'
 import { TwoFactorDisable } from '../components/security/TwoFactorDisable'
-import { Frame } from './frame'
+import { Frame, PageHead } from './frame'
 import { dateTimeId } from './progress-ui'
 
 /**
@@ -17,23 +17,24 @@ import { dateTimeId } from './progress-ui'
  */
 const STYLE = `
 .pk-sec { max-width: 720px; }
-.pk-sec h1 { font-family: var(--pk-font-heading); margin: 24px 0 6px; }
-.pk-sec .pk-sec__lead { color: var(--pk-muted-fg); margin: 0 0 20px; }
-.pk-sec .pk-sec__card { background: var(--pk-card); border: 1px solid var(--pk-border); border-radius: var(--style-radius-l); box-shadow: var(--pk-shadow); padding: 18px 20px; margin: 0 0 16px; }
+.pk-sec .pk-sec__card { background: var(--pk-card); border: 1px solid color-mix(in oklab, var(--pk-border) 80%, transparent); border-radius: var(--style-radius-l); box-shadow: var(--pk-shadow); padding: 18px 20px; margin: 0 0 16px; }
 .pk-sec .pk-sec__head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 8px; }
-.pk-sec .pk-sec__head h2 { font-family: var(--pk-font-heading); font-size: 17px; margin: 0; }
-.pk-sec .pk-sec__state { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; border: 1px solid currentColor; }
+.pk-sec .pk-sec__head h2, .pk-sec .pk-sec__card > h2 { font-size: 15px; font-weight: 600; line-height: 1.3; margin: 0; }
+.pk-sec .pk-sec__card > h2 { margin: 0 0 6px; }
+/* D2510: soft badge (Nexus kit) — the tone token as text on its own 14 % tint */
+.pk-sec .pk-sec__state { display: inline-flex; align-items: center; gap: 6px; min-height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 600; background: color-mix(in oklab, currentColor 14%, var(--pk-card)); }
 .pk-sec .pk-sec__state[data-state="active"] { color: var(--pk-tone-ok-text); }
 .pk-sec .pk-sec__state[data-state="inactive"] { color: var(--pk-muted-fg); }
 .pk-sec .pk-sec__state[data-state="unknown"] { color: var(--pk-tone-warn-text); }
 .pk-sec .pk-sec__list { list-style: none; margin: 12px 0 0; padding: 0; }
 .pk-sec .pk-sec__list li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--pk-border); }
 .pk-sec .pk-sec__meta { color: var(--pk-muted-fg); font-size: 12px; }
-.pk-sec .pk-sec__msg { border-radius: var(--style-radius-m); padding: 10px 14px; margin: 0 0 16px; border: 1px solid currentColor; font-weight: 600; }
+.pk-sec .pk-sec__msg { border-radius: var(--style-radius-m); padding: 10px 14px; margin: 0 0 16px; border: 1px solid color-mix(in oklab, currentColor 35%, var(--pk-border)); background: color-mix(in oklab, currentColor 8%, var(--pk-card)); font-weight: 600; }
 .pk-sec .pk-sec__msg[data-tone="ok"] { color: var(--pk-tone-ok-text); }
 .pk-sec .pk-sec__msg[data-tone="warn"] { color: var(--pk-tone-warn-text); }
 .pk-sec .pk-sec__msg[data-tone="bad"] { color: var(--pk-tone-bad-text); }
 .pk-sec ol.pk-sec__steps { margin: 8px 0 14px; padding-left: 20px; }
+.pk-sec ul.pk-sec__tips { margin: 0; padding-left: 20px; }
 .pk-sec ol.pk-sec__steps li { margin: 2px 0; }
 .pk-sec .pk-btn--danger { background: var(--pk-tone-bad); border-color: var(--pk-tone-bad); color: #FFFFFF; }
 .pk-sec .pk-btn--danger:hover { color: #FFFFFF; filter: brightness(0.95); }
@@ -54,12 +55,17 @@ export async function KeamananAkunView(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="keamanan-akun">
       <style>{STYLE}</style>
+      <PageHead
+        props={props}
+        title="Keamanan akun"
+        note={
+          <>
+            Pengaturan ini hanya untuk akun Anda sendiri{user.email ? <> ({user.email})</> : null}. 2FA bersifat pilihan: Anda yang memutuskan untuk
+            mengaktifkan atau menonaktifkannya.
+          </>
+        }
+      />
       <div className="pk-sec">
-        <h1>Keamanan akun</h1>
-        <p className="pk-sec__lead">
-          Pengaturan ini hanya untuk akun Anda sendiri{user.email ? <> ({user.email})</> : null}. 2FA bersifat pilihan: Anda yang memutuskan untuk
-          mengaktifkan atau menonaktifkannya.
-        </p>
         {result ? (
           <div className="pk-sec__msg" data-tone={result.tone} role={result.tone === 'bad' ? 'alert' : 'status'} data-pk-2fa-result={String(raw)}>
             {result.text}
@@ -125,10 +131,8 @@ export async function KeamananAkunView(props: AdminViewServerProps) {
         </section>
 
         <section className="pk-sec__card" aria-labelledby="pk-sec-tips">
-          <h2 id="pk-sec-tips" style={{ fontSize: 15, margin: '0 0 6px' }}>
-            Perlu diketahui
-          </h2>
-          <ul style={{ margin: 0, paddingLeft: 20 }}>
+          <h2 id="pk-sec-tips">Perlu diketahui</h2>
+          <ul className="pk-sec__tips">
             <li>Aplikasi Android: bila 2FA aktif, isi kolom &quot;Kode autentikator&quot; yang muncul setelah login pertama gagal.</li>
             <li>HP hilang atau aplikasi autentikator terhapus? Hubungi Admin untuk mereset 2FA akun Anda.</li>
             <li>Setiap perubahan 2FA dicatat di audit log.</li>

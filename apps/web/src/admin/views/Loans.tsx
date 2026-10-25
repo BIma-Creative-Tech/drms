@@ -9,6 +9,7 @@ import { DocSummaryProvider } from '@/admin/components/feedback/DocContext'
 import { ConfirmAction } from '@/admin/components/addendum/ConfirmAction'
 import { ReasonAction } from '@/admin/components/kas/ReasonAction'
 import { KAS_STYLE } from '@/admin/components/kas/style'
+import { Panel } from '@/admin/components/ui/nexus'
 import { ListToolbar, Pager } from '@/admin/components/list/ListToolbar'
 import { LoanExecuteForm } from '@/admin/components/loans/LoanExecuteForm'
 import { LoanForm } from '@/admin/components/loans/LoanForm'
@@ -23,11 +24,12 @@ import { withReqTransaction, withSystemTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
 
 import { F3Root } from './f3-ui'
-import { Frame } from './frame'
+import { Frame, PageHead } from './frame'
 import { NoAccess } from './NoAccess'
+import { Badge } from './page-ui'
 import { Alert, dateId, dateTimeId } from './progress-ui'
 import { PtChip, ptView, type PtView } from './pt'
-import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, Meter, rp, StatusPill, VIZ_STYLE, type Col } from './viz'
+import { Bento, Card, DataTable, EmptyState, KpiRow, KpiTile, Meter, rp, StatusPill, VIZ_STYLE, type Col } from './viz'
 
 /**
  * ADR 0022 web: "Pinjaman antar project" — list (D8: search, filters, numbered pages, cards ≤ 640 px), new Draft
@@ -197,7 +199,7 @@ export async function LoanList(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="pinjaman">
       <style>{STYLE}</style>
-      <DashHead title="Pinjaman antar project" note="Diajukan PM project peminjam atau Finance · disetujui Direktur lalu Owner · dana ditransfer Finance lewat Antrian Transfer (kas keluar/masuk) · otomatis bila transfer dibayar dari akun lain">
+      <PageHead props={props} title="Pinjaman antar project" note="Diajukan PM project peminjam atau Finance · disetujui Direktur lalu Owner · dana ditransfer Finance lewat Antrian Transfer (kas keluar/masuk) · otomatis bila transfer dibayar dari akun lain">
         <div className="pk-kact">
           {d.canCreate ? (
             <Link className="pk-kbtn primary" href="/admin/pinjaman/baru" data-pk-link="pinjaman-baru">
@@ -213,7 +215,7 @@ export async function LoanList(props: AdminViewServerProps) {
             Laporan
           </Link>
         </div>
-      </DashHead>
+      </PageHead>
       <Bento label="Ringkasan pinjaman">
         <KpiRow cols={3}>
           <KpiTile id="loan-pending" icon="clock" label="Menunggu persetujuan" value={String(d.totals.pending)} kpi="loan-pending" href={`/admin/pinjaman?status=pending_approval`} more="Lihat" i={0}>
@@ -282,7 +284,7 @@ export async function LoanNew(props: AdminViewServerProps) {
   if (!d || d.options.borrowers.length === 0) {
     return (
       <Frame props={props} name="pinjaman-baru">
-        <DashHead title="Ajukan pinjaman antar project">{back}</DashHead>
+        <PageHead props={props} title="Ajukan pinjaman antar project">{back}</PageHead>
         <Alert tone="bad" attr="denied">
           <p>Pinjaman antar project diajukan oleh PM project peminjam atau Finance PT. Anda belum menjadi PM project yang aktif dan bukan Finance.</p>
         </Alert>
@@ -293,9 +295,9 @@ export async function LoanNew(props: AdminViewServerProps) {
   const initial = sp.project && /^\d{1,10}$/.test(sp.project) ? Number(sp.project) : undefined
   return (
     <Frame props={props} name="pinjaman-baru">
-      <DashHead title="Ajukan pinjaman antar project" note="Nomor PJ diberikan saat diajukan. Direktur lalu Owner menyetujui; PM project pemberi diberi tahu.">
+      <PageHead props={props} title="Ajukan pinjaman antar project" note="Nomor PJ diberikan saat diajukan. Direktur lalu Owner menyetujui; PM project pemberi diberi tahu.">
         {back}
-      </DashHead>
+      </PageHead>
       <Bento>
         <Card id="loan-form" title="Pinjaman baru" span={8}>
           <LoanForm borrowers={d.options.borrowers} lenders={d.options.lenders} today={d.today} initialBorrower={d.options.borrowers.some((p) => p.id === initial) ? initial : undefined} />
@@ -341,7 +343,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
   if (!d) {
     return (
       <Frame props={props} name="pinjaman-detail">
-        <DashHead title="Pinjaman tidak ditemukan">{back}</DashHead>
+        <PageHead props={props} title="Pinjaman tidak ditemukan">{back}</PageHead>
       </Frame>
     )
   }
@@ -471,7 +473,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
   const page = (
     <Frame props={props} name="pinjaman-detail">
       <style>{STYLE}</style>
-      <DashHead title={title} note={`${l.kindLabel} · ${l.originLabel} · ${lenderText(l)} → ${projectText(l.borrowerProject)} · ${l.origin === 'transfer' ? 'dicatat' : 'diajukan'} ${l.createdBy.name ?? '—'}`}>
+      <PageHead props={props} title={title} note={`${l.kindLabel} · ${l.originLabel} · ${lenderText(l)} → ${projectText(l.borrowerProject)} · ${l.origin === 'transfer' ? 'dicatat' : 'diajukan'} ${l.createdBy.name ?? '—'}`}>
         <div className="pk-kact">
           {back}
           <Link className="pk-kbtn" href={`/admin/collections/projects/${l.borrowerProject.id}/pinjaman`}>
@@ -484,7 +486,7 @@ export async function LoanDetail(props: AdminViewServerProps) {
             </Link>
           ) : null}
         </div>
-      </DashHead>
+      </PageHead>
       {sp.diajukan ? (
         <Alert tone="ok" attr="submitted">
           <p>
@@ -753,8 +755,7 @@ export async function LoanInboxSection({ req }: { req: PayloadRequest }) {
     <F3Root name="loan-inbox">
       <style>{VIZ_STYLE}</style>
       <style>{KAS_STYLE}</style>
-      <section id="pinjaman" style={{ marginTop: 32 }} data-pk-inbox="pinjaman">
-        <h2 style={{ margin: '0 0 8px' }}>Pinjaman antar project</h2>
+      <Panel id="pinjaman" icon="tMoneyChange" title="Pinjaman antar project" data-pk-inbox="pinjaman">
         {items.length === 0 && repayments.length === 0 ? (
           <EmptyState text="Tidak ada pinjaman antar project yang menunggu keputusan Anda." />
         ) : null}
@@ -820,8 +821,8 @@ export async function LoanInboxSection({ req }: { req: PayloadRequest }) {
           />
         ) : null}
         {repayments.length > 0 ? (
-          <div style={{ marginTop: 16 }} data-pk-inbox="pinjaman-pengembalian">
-            <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>Pengembalian pinjaman ({repayments.length})</h3>
+          <div className="pk-nx-subsec" data-pk-inbox="pinjaman-pengembalian">
+            <h3 className="pk-nx-subsec__title">Pengembalian pinjaman ({repayments.length})</h3>
             <DataTable
               id="loan-repayment-inbox"
               caption="Pengembalian pinjaman yang menunggu keputusan saya"
@@ -875,7 +876,7 @@ export async function LoanInboxSection({ req }: { req: PayloadRequest }) {
             />
           </div>
         ) : null}
-      </section>
+      </Panel>
     </F3Root>
   )
 }
@@ -894,29 +895,33 @@ export async function LoanTransferOrderSection({ req, companyIds }: { req: Paylo
   const { items, count } = await withSystemTransaction(req.payload, req.user, (r) => loanTransferOrders(r, { companyIds: companyIds ?? null }))
   const projectName = (p: { code: string | null; name: string | null } | null) => (p ? `${p.code ?? ''} ${p.name ?? ''}`.trim() : '—')
   return (
-    <section id="pinjaman-antar-project" style={{ marginTop: 32 }} data-pk-queue="project-loan">
-      <h2 style={{ margin: '0 0 8px' }}>Transfer pinjaman antar project ({count})</h2>
-      <p style={{ fontSize: 13, color: 'var(--pk-muted-fg)', margin: '0 0 8px' }}>
+    <Panel id="pinjaman-antar-project" icon="tMoneyChange" title={`Transfer pinjaman antar project (${count})`} data-pk-queue="project-loan">
+      <p className="pk-nx-lead">
         Pinjaman dana dan pengembalian yang sudah disetujui Direktur dan Owner. Eksekusi transfer mencatat kas keluar di akun asal (project asal) dan kas masuk di akun tujuan (project tujuan) sekaligus. Akun mengikuti pusat biaya saat disetujui.
       </p>
       {items.length === 0 ? (
-        <p style={{ fontSize: 13 }}>Tidak ada transfer pinjaman antar project yang menunggu.</p>
+        <p className="pk-nx-empty">Tidak ada transfer pinjaman antar project yang menunggu.</p>
       ) : (
-        items.map((it) => (
-          <article key={it.key} id={it.anchor} data-pk-loan-order={it.key} style={{ border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 12 }}>
-            <p style={{ margin: '0 0 6px' }}>
-              <StatusPill tone="wait" label={it.title} />{' '}
+        <div className="pk-nx-items">
+        {items.map((it) => (
+          <article key={it.key} id={it.anchor} className="pk-nx-item" data-pk-loan-order={it.key}>
+            <p className="pk-nx-item__main">
+              <Badge tone="info">
+                <span aria-hidden>◷</span> {it.title}
+              </Badge>{' '}
               <a href={it.href}>
                 <strong>{it.docNo ?? `#${it.loanId}`}</strong>
               </a>{' '}
               · {projectName(it.fromProject)} → {projectName(it.toProject)} · <b>{rp(it.amount)}</b> · {it.kind === 'loan' ? 'tanggal pinjaman' : 'rencana'} {dateId(it.date)} · diajukan {it.submittedBy.name ?? '—'}
             </p>
-            <p style={{ margin: '0 0 6px', fontSize: 13 }}>
+            <p className="pk-nx-item__meta">
               Dari <b>{it.fromAccount?.name ?? '—'}</b> ke <b>{it.toAccount?.name ?? '—'}</b> · {it.note ?? it.reason}
             </p>
             {it.selfSubmitted && it.canExecute ? (
-              <p className="pk-note" style={{ margin: '0 0 6px', fontSize: 13 }} data-pk-loan-order-self={it.key}>
-                <StatusPill tone="warn" label="Catatan" /> Anda yang mengajukan; boleh dieksekusi sendiri (tercatat di audit).
+              <p className="pk-nx-callout" data-tone="warn" data-pk-loan-order-self={it.key}>
+                <Badge tone="warn">
+                  <span aria-hidden>▲</span> Catatan
+                </Badge> Anda yang mengajukan; boleh dieksekusi sendiri (tercatat di audit).
               </p>
             ) : null}
             {it.canExecute && hasRole(req, 'pk-finance', it.companyId) ? (
@@ -936,12 +941,13 @@ export async function LoanTransferOrderSection({ req, companyIds }: { req: Paylo
                 testId={`loan-execute-${it.key}`}
               />
             ) : (
-              <p style={{ margin: 0, fontSize: 12 }}>Dieksekusi oleh Finance PT ini.</p>
+              <p className="pk-nx-sub">Dieksekusi oleh Finance PT ini.</p>
             )}
           </article>
-        ))
+        ))}
+        </div>
       )}
-    </section>
+    </Panel>
   )
 }
 
@@ -966,11 +972,11 @@ export async function LoanEdit(props: AdminViewServerProps) {
   if (!d) {
     return (
       <Frame props={props} name="pinjaman-ubah">
-        <DashHead title="Pinjaman tidak ditemukan">
+        <PageHead props={props} title="Pinjaman tidak ditemukan">
           <Link className="pk-kbtn" href="/admin/pinjaman">
             ← Pinjaman antar project
           </Link>
-        </DashHead>
+        </PageHead>
       </Frame>
     )
   }
@@ -983,7 +989,7 @@ export async function LoanEdit(props: AdminViewServerProps) {
   if (!d.options) {
     return (
       <Frame props={props} name="pinjaman-ubah">
-        <DashHead title={`Ubah ${l.docNo ?? `draft pinjaman #${l.id}`}`}>{back}</DashHead>
+        <PageHead props={props} title={`Ubah ${l.docNo ?? `draft pinjaman #${l.id}`}`}>{back}</PageHead>
         <Alert tone="bad" attr="not-editable">
           <p>Hanya draft milik pembuatnya (PM project peminjam atau Finance) yang dapat diubah. Pinjaman yang sudah diajukan tidak dapat diubah lagi.</p>
         </Alert>
@@ -992,9 +998,9 @@ export async function LoanEdit(props: AdminViewServerProps) {
   }
   return (
     <Frame props={props} name="pinjaman-ubah">
-      <DashHead title={`Ubah draft pinjaman #${l.id}`} note="Nomor PJ diberikan saat diajukan. Direktur lalu Owner menyetujui; PM project pemberi diberi tahu.">
+      <PageHead props={props} title={`Ubah draft pinjaman #${l.id}`} note="Nomor PJ diberikan saat diajukan. Direktur lalu Owner menyetujui; PM project pemberi diberi tahu.">
         {back}
-      </DashHead>
+      </PageHead>
       <Bento>
         <Card id="loan-form" title="Ubah draft" span={8}>
           <LoanForm

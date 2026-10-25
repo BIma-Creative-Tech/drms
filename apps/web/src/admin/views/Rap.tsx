@@ -17,12 +17,12 @@ import { loadRap, rapTemplatesFor } from '@/domain/rap/service'
 import { formatNumber } from '@/lib/money'
 import { withReqTransaction } from '@/lib/system-tx'
 
-import { Frame } from './frame'
+import { Frame, PageHead } from './frame'
 import { NoAccess } from './NoAccess'
 import { Alert } from './progress-ui'
 import { foreignPtParam, PtChip, PtScopeNote, ptView } from './pt'
 import { PtNotAllowed } from './shared'
-import { Card, DashHead, EmptyState, KpiRow, KpiTile, rp, StatusPill } from './viz'
+import { Card, EmptyState, KpiRow, KpiTile, rp, StatusPill } from './viz'
 
 /**
  * DRMS 13/10 Wave 3 — "Proyek › RAP", its own sub-menu under Proyek (client: "Form RAP + upload, submenu sendiri di
@@ -78,9 +78,9 @@ export async function RapIndex(props: AdminViewServerProps) {
   const cols = 4 + (pt.multi ? 1 : 0) // PT?, Project, Jenis, Status, RAP
   return (
     <Frame props={props} name="rap">
-      <DashHead title="RAP proyek" note="Rencana anggaran pelaksanaan per project · klik baris untuk membuka dan mengisi RAP">
+      <PageHead props={props} title="RAP proyek" note="Rencana anggaran pelaksanaan per project · klik baris untuk membuka dan mengisi RAP">
         <PtScopeNote pt={pt} />
-      </DashHead>
+      </PageHead>
       {missing > 0 ? (
         <Alert tone="bad" attr="rap-missing-count">
           <p>
@@ -227,11 +227,11 @@ export async function RapProject(props: AdminViewServerProps) {
   if (!data) {
     return (
       <Frame props={props} name="rap-project">
-        <DashHead title="RAP project">
+        <PageHead props={props} title="RAP project">
           <Link className="pk-kbtn" href={BASE}>
             ← Semua RAP
           </Link>
-        </DashHead>
+        </PageHead>
         <EmptyState text="Project tidak ditemukan atau tidak dapat Anda buka." />
       </Frame>
     )
@@ -259,7 +259,7 @@ export async function RapProject(props: AdminViewServerProps) {
   const kind = kindOf(p.kind)
   return (
     <Frame props={props} name="rap-project">
-      <DashHead
+      <PageHead props={props}
         title={`RAP · ${p.code ?? ''} ${p.name ?? ''}`.trim()}
         note={
           <>
@@ -285,7 +285,7 @@ export async function RapProject(props: AdminViewServerProps) {
             </Link>
           ) : null}
         </div>
-      </DashHead>
+      </PageHead>
       {rap.items.filter((i) => i.active).length === 0 && rap.rapRequired ? (
         <Alert tone="bad" attr="rap-missing">
           <p>

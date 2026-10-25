@@ -6,11 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-**APK 0.13.0 (tag `mobile-v0.13.0`, PR #140), APK-only release:** server stays 0.20.0, no migration, no API change;
-APK 0.12.0 keeps working. Folded into the next web release section.
+## [0.21.0] - 2026-10-25
+
+**Web admin in the Nexus layout (D2510, ADR 0033) + APK 0.13.0 restyle (tag `mobile-v0.13.0`, PR #140, already
+published).** Presentation only: no migration, no API change, no token change; APK 0.12.0 / 0.13.0 keep working.
+Rollback = image 0.20.0.
 
 ### Changed
 
+- **Web admin: Nexus-style shell (D2510, user 2026-10-25, ADR 0033)** after the Nexus daisyUI CRM / Corporate Finance
+  dashboards, web palette kept (no token change). Left sidebar with every visible module (collapsible groups, section
+  labels, badges; compact icon mode remembered per browser; drawer ≤ 1024px), slim top bar with menu search (Ctrl+K /
+  ⌘K), "+ Buat", PT switcher, bell and avatar menu; soft grey page under white cards. `/admin` opens the role
+  dashboard (first menu item) instead of the module launcher; module landing pages show their menus as cards.
+  Breadcrumb home outside a module = "Beranda".
+  - Dashboard per role (PR-2): Nexus cards / stat tiles (icon chip, muted "Rp", delta soft badge), soft status
+    badges, roomy card tables, metric rows; Finance in the Corporate Finance style (hero "Saldo kas total" with a mini
+    card per cash account, project budget progress, quick actions); role / range tabs as a segmented control. Same
+    data, links and `data-pk-*` hooks.
+  - List & form chrome (PR-3): every collection list is one card (module glyph, title, total badge, "Kolom" /
+    "+ Buat baru" in the head, filter bar row, Nexus table with soft status badges and ghost row actions, pager and
+    page size in the foot; long text still wraps); edit / create views show their fields in white cards under a
+    sticky white toolbar, tabs and collapsibles tidied.
+  - Custom pages (PR-4): every custom view (Kas, Absensi, Persetujuan, Antrian Transfer, Verifikasi LPJ, Laporan,
+    laporan lapangan, Pinjaman, RAP, Progress, Addendum, Pengguna, Notifikasi, Keamanan akun, Riwayat) opens with the
+    shared page header (module chip, muted line, actions right) over Nexus cards; queue / inbox lists in cards with
+    the new table style, soft status badges and item cards; filters as the card's toolbar row; soft alerts, tab boxes.
+    Same data, texts, buttons and popups; long texts wrap (progress bars, holiday names, location chips no longer cut).
 - **APK restyle after the Banani reference "Project Monitoring Hub" (D2510, user 2026-10-25), web palette kept** (ADR
   0015 tokens unchanged; layout and components only). Presentation-only: same providers, routes, keys, texts and popups.
   - Kit `lib/shared/widgets/pk_ui.dart` (hero band, cards, icon chips, soft status pills, KPI tiles, section headers,

@@ -6,9 +6,9 @@ import { isGroupAdmin, userId } from '@/access/roles'
 import { loadUserOnboarding, mayOnboard, OnboardingError } from '@/domain/user-onboarding/service'
 
 import { UserOnboardingForm } from '../components/users/UserOnboardingForm'
-import { Frame } from './frame'
+import { Frame, PageHead } from './frame'
+import { Badge } from './page-ui'
 import { NoAccess } from './NoAccess'
-import { DashHead } from './viz'
 
 /**
  * DRMS 13/10 Wave 3 — "Pengguna" (create `/admin/pengguna/baru`, edit `/admin/pengguna/<id>`): ONE tabbed form for
@@ -32,24 +32,24 @@ export async function PenggunaView(props: AdminViewServerProps) {
   if (!detail) {
     return (
       <Frame props={props} name="pengguna">
-        <DashHead title="Pengguna tidak ditemukan" note="Pengguna ini tidak ada atau bukan pengguna PT Anda.">
+        <PageHead props={props} title="Pengguna tidak ditemukan" note="Pengguna ini tidak ada atau bukan pengguna PT Anda.">
           {back}
-        </DashHead>
+        </PageHead>
       </Frame>
     )
   }
   const u = detail.user
   return (
     <Frame props={props} name="pengguna">
-      <DashHead
+      <PageHead props={props}
         title={create ? 'Pengguna baru' : u?.name || u?.email || 'Pengguna'}
         note={create ? 'Akun login, akses per PT, data karyawan dan rekening — disimpan sekaligus.' : u?.email}
       >
         <div className="pk-kact">
           {u ? (
             <>
-              <span className={`pk-badge ${u.active ? 'ok' : 'none'}`}>{u.active ? 'Aktif' : 'Nonaktif'}</span>
-              {u.groupAdmin ? <span className="pk-badge">Admin grup</span> : null}
+              <Badge tone={u.active ? 'ok' : 'muted'}>{u.active ? 'Aktif' : 'Nonaktif'}</Badge>
+              {u.groupAdmin ? <Badge tone="primary">Admin grup</Badge> : null}
               <Link className="pk-kbtn sm" href={`/admin/collections/users/${u.id}`} prefetch={false}>
                 Form akun (tanda tangan, Admin grup) ↗
               </Link>
@@ -57,7 +57,7 @@ export async function PenggunaView(props: AdminViewServerProps) {
           ) : null}
           {back}
         </div>
-      </DashHead>
+      </PageHead>
       <UserOnboardingForm key={u?.id ?? 'baru'} mode={create ? 'create' : 'update'} detail={detail} self={u !== null && u.id === userId(req)} groupAdmin={isGroupAdmin(req)} />
     </Frame>
   )

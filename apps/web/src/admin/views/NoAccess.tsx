@@ -5,9 +5,8 @@ import React from 'react'
 import { KAS_STYLE } from '@/admin/components/kas/style'
 
 import { F3Root } from './f3-ui'
-import { Frame } from './frame'
+import { Frame, PageHead } from './frame'
 import { NO_ACCESS_TITLE, NoAccessBody } from './no-access-body'
-import { DashHead } from './viz'
 
 export { NO_ACCESS_BACK, NO_ACCESS_TEXT, NO_ACCESS_TITLE, NoAccessBody } from './no-access-body'
 
@@ -15,7 +14,7 @@ export { NO_ACCESS_BACK, NO_ACCESS_TEXT, NO_ACCESS_TITLE, NoAccessBody } from '.
 export function NoAccess({ props, hint }: { props: AdminViewServerProps; hint?: React.ReactNode }) {
   return (
     <Frame props={props} name="no-access">
-      <DashHead title={NO_ACCESS_TITLE} />
+      <PageHead props={props} title={NO_ACCESS_TITLE} />
       <NoAccessBody hint={hint} />
     </Frame>
   )
@@ -31,7 +30,7 @@ export function UnauthorizedView() {
     <div style={{ maxWidth: 560, margin: '48px auto', padding: '0 16px' }}>
       <F3Root name="unauthorized">
         <style>{KAS_STYLE}</style>
-        <h1 style={{ margin: '0 0 16px' }}>{NO_ACCESS_TITLE}</h1>
+        <PageHead title={NO_ACCESS_TITLE} />
         <NoAccessBody
           hint={
             <>

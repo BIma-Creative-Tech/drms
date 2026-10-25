@@ -3,6 +3,7 @@ import React from 'react'
 
 import { ActionButton } from '@/admin/components/ActionButton'
 import { KAS_STYLE } from '@/admin/components/kas/style'
+import { Panel } from '@/admin/components/ui/nexus'
 import { shortfallInbox } from '@/domain/expense/shortfall-approval'
 import { withReqTransaction } from '@/lib/system-tx'
 
@@ -27,8 +28,7 @@ export async function ShortfallInboxSection({ req }: { req: PayloadRequest }) {
     <F3Root name="shortfall-inbox">
       <style>{VIZ_STYLE}</style>
       <style>{KAS_STYLE}</style>
-      <section id="kekurangan-lpj" style={{ marginTop: 32 }} data-pk-inbox="shortfall">
-        <h2 style={{ margin: '0 0 8px' }}>Kekurangan LPJ di atas nominal disetujui</h2>
+      <Panel id="kekurangan-lpj" icon="tReceiptSearch" title="Kekurangan LPJ di atas nominal disetujui" data-pk-inbox="shortfall">
         <DataTable
           id="shortfall-inbox"
           caption="Persetujuan kekurangan LPJ yang menunggu keputusan saya"
@@ -95,7 +95,7 @@ export async function ShortfallInboxSection({ req }: { req: PayloadRequest }) {
           ]}
           empty={<EmptyState text="Tidak ada kekurangan LPJ yang menunggu keputusan Anda." />}
         />
-      </section>
+      </Panel>
     </F3Root>
   )
 }

@@ -10,6 +10,8 @@ import React, { useEffect, useRef } from 'react'
  * are dropped from the URL and every change resets the page (`hal`).
  * DRMS 13/10 Umum #4: a repeated field name (multi-select) becomes one comma-joined param; the checklist
  * dropdowns (MultiSelect: unnamed checkboxes, applied with "Terapkan") never trigger a navigation per tick.
+ * D2510: a control outside the form that belongs to it (`form=` attribute, e.g. PkListView's page size in the card
+ * foot) applies too — changes are read on the document and kept when the control's form is this form.
  */
 export function AutoSubmit({ pageKey = 'hal' }: { pageKey?: string }) {
   const marker = useRef<HTMLSpanElement>(null)
@@ -36,7 +38,7 @@ export function AutoSubmit({ pageKey = 'hal' }: { pageKey?: string }) {
     }
     const onChange = (e: Event) => {
       const t = e.target as HTMLInputElement | HTMLSelectElement | null
-      if (!t || (t as HTMLInputElement).type === 'search' || !t.name || t.closest('[data-pk-multi]')) return
+      if (!t || t.form !== form || (t as HTMLInputElement).type === 'search' || !t.name || t.closest('[data-pk-multi]')) return
       clearTimeout(timer)
       go()
     }
@@ -46,12 +48,12 @@ export function AutoSubmit({ pageKey = 'hal' }: { pageKey?: string }) {
       go()
     }
     form.addEventListener('input', onInput)
-    form.addEventListener('change', onChange)
+    document.addEventListener('change', onChange)
     form.addEventListener('submit', onSubmit)
     return () => {
       clearTimeout(timer)
       form.removeEventListener('input', onInput)
-      form.removeEventListener('change', onChange)
+      document.removeEventListener('change', onChange)
       form.removeEventListener('submit', onSubmit)
     }
   }, [router, pageKey])

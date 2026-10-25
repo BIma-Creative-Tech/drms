@@ -129,7 +129,7 @@ describe('registry guard: every entity maps to exactly one module', () => {
         for (const i of s.items) if ('view' in i && !i.view.startsWith('/collections/')) expect(paths, `${m.id}: ${i.view}`).toContain(i.view)
   })
 
-  it('launcher = dashboard view, role dashboard = /dashboard (exact)', async () => {
+  it('/admin = dashboard view (D2510: redirects to the first menu item), role dashboard = /dashboard (exact)', async () => {
     const { F3_ADMIN_VIEWS } = await import('@/admin/config')
     expect(F3_ADMIN_VIEWS.dashboard.Component).toBe('@/admin/views/Launcher#Launcher')
     expect(F3_ADMIN_VIEWS.dashboardPage).toMatchObject({ path: '/dashboard', exact: true, Component: '@/admin/views/Dashboard#DashboardPage' })
@@ -330,6 +330,8 @@ describe('server helpers', () => {
 })
 
 describe('ModuleBar (SSR with mocked pathname/theme)', () => {
+  /** The opening tag that carries `attr` (attribute order of the rendered element does not matter). */
+  const tag = (html: string, attr: string) => html.match(new RegExp(`<[a-z]+\\b[^>]*${attr.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}[^>]*>`))?.[0] ?? ''
   async function bar(path: string, roles: Role[], steps: Array<{ label: unknown; url?: string }> = []) {
     nav.path = path
     nav.steps = steps
@@ -339,28 +341,47 @@ describe('ModuleBar (SSR with mocked pathname/theme)', () => {
     return renderToString(createElement(ModuleBar, { modules, user, bell: createElement('a', { 'data-pk-nav-link': 'notifikasi' }), logout: null }))
   }
 
-  it('launcher page: brand, launcher link current, no module menu', async () => {
-    const html = await bar('/admin', ['pk-finance'])
-    expect(html).toContain('data-module="launcher"')
-    expect(html).toContain('data-pk-nav-link="launcher"')
-    expect(html).toMatch(/data-pk-nav-link="launcher"[^>]*aria-current="page"|aria-current="page"[^>]*data-pk-nav-link="launcher"/)
-    expect(html).not.toContain('pk-bar__nav')
+  it('D2510: sidebar + slim bar — every visible module in the sidebar, toggle + search in the bar, no launcher', async () => {
+    const html = await bar('/admin/dashboard', ['pk-finance'])
+    expect(html).toContain('data-pk-nav="sidebar"')
+    expect(html).toContain('data-pk-nav="bar"')
+    expect(html).toContain('data-module="dashboard"')
+    expect(html).toContain('data-pk-nav-link="sidebar-toggle"')
+    expect(html).toContain('data-pk-nav-link="search"')
+    expect(html).not.toContain('data-pk-nav-link="launcher"')
+    expect(html).not.toContain('data-pk-nav-link="module-home"')
+    for (const m of await modulesFor(['pk-finance'], 2)) expect(html, m.id).toContain(`data-pk-side-mod="${m.id}"`)
+    // single-item module = a plain link, current page marked
+    expect(tag(html, 'data-pk-side-mod="dashboard"')).toContain('href="/admin/dashboard"')
+    expect(tag(html, 'data-pk-side-mod="dashboard"')).toContain('aria-current="page"')
     expect(html).toContain('data-pk-nav-link="notifikasi"')
     expect(html).toContain('data-pk-avatar')
+    expect(html).toContain('data-pk-nav-link="side-profile"')
+    // the palette is mounted only when opened
+    expect(html).not.toContain('data-pk-cmd')
   })
 
-  it('DRMS 13/10 #9: Persetujuan module — no module menu in the bar; module name → landing page, module badge kept', async () => {
+  it('D2510: the group of the current module is open with its item current; other groups closed; badges kept', async () => {
     const html = await bar('/admin/persetujuan', ['pk-owner'])
     expect(html).toContain('data-module="persetujuan"')
-    expect(html).not.toContain('pk-bar__nav')
-    expect(html).not.toContain('pk-bar__link')
-    expect(html).not.toContain('data-pk-burger')
-    expect(html).not.toContain('href="/admin/persetujuan"')
-    expect(html).toMatch(/data-pk-nav-link="module-home"[^>]*href="\/admin\/modul\/persetujuan"/)
-    expect(html).toContain('pk-bar__count')
-    // PT switcher slot, bell and avatar stay
+    expect(tag(html, 'data-pk-side-mod="persetujuan"')).toContain('aria-expanded="true"')
+    expect(tag(html, 'data-pk-side-link="persetujuan"')).toContain('aria-current="page"')
+    expect(tag(html, 'data-pk-side-mod="keuangan"')).toContain('aria-expanded="false"')
+    expect(html).toContain('pk-side__count')
     expect(html).toContain('data-pk-nav-link="notifikasi"')
-    expect(html).toContain('data-pk-avatar')
+  })
+
+  it('D2510: compact mode from the server cookie; the sidebar lists every menu item once per placement', async () => {
+    nav.path = '/admin/kas'
+    nav.steps = []
+    const { ModuleBar } = await import('@/admin/shell/ModuleBar')
+    const modules = await modulesFor(['pk-finance'], 2)
+    const user = navUser({ id: 42, roles: ['pk-finance'], name: 'Uji Coba' } as unknown as TypedUser)
+    const html = renderToString(createElement(ModuleBar, { modules, user, sidebarMode: 'compact', bell: null, logout: null }))
+    expect(tag(html, 'data-pk-nav="sidebar"')).toContain('data-compact="true"')
+    const links = [...html.matchAll(/data-pk-side-link="[^"]*"/g)].length
+    const items = modules.filter((m) => m.sections.flatMap((s) => s.items).length >= 2).reduce((n, m) => n + m.sections.reduce((k, s) => k + s.items.length, 0), 0)
+    expect(links).toBe(items)
   })
 
   it('DRMS 13/10 #9: every former menu entry stays reachable as a landing tile of its module', async () => {
@@ -374,7 +395,7 @@ describe('ModuleBar (SSR with mocked pathname/theme)', () => {
     }
   })
 
-  it('breadcrumb line: none on the launcher (no empty row), module home on entity pages and (D9) custom views', async () => {
+  it('breadcrumb line: none on /admin and the dashboard (no empty row), module home on entity pages and (D9) custom views', async () => {
     const kas = await bar('/admin/kas', ['pk-finance'])
     expect(kas).toMatch(/data-pk-crumb="home"[^>]*href="\/admin\/modul\/keuangan"/)
     expect(kas).toMatch(/aria-current="page"[^>]*>.*?Buku kas/)
@@ -470,20 +491,20 @@ describe('breadcrumbs (deriveCrumbs)', () => {
     ])
   })
 
-  it('D9: the landing page itself shows "Semua modul › module"', () => {
+  it('D9: the landing page itself shows "Beranda › module"', () => {
     expect(crumbs('/admin/modul/keuangan', keu, null)).toEqual([
-      ['Semua modul', '/admin', ''],
+      ['Beranda', '/admin', ''],
       ['Keuangan', null, 'current'],
     ])
   })
 
-  it('outside every module (account, entity hidden from the menu): home = "Semua modul" → launcher', () => {
+  it('outside every module (account, entity hidden from the menu): home = "Beranda" → /admin', () => {
     expect(crumbs('/admin/account', null, [{ label: 'Akun' }])).toEqual([
-      ['Semua modul', '/admin', ''],
+      ['Beranda', '/admin', ''],
       ['Akun', null, 'current'],
     ])
     expect(crumbs('/admin/account', null, null)).toEqual([
-      ['Semua modul', '/admin', ''],
+      ['Beranda', '/admin', ''],
       ['Akun', null, 'current'],
     ])
   })

@@ -19,11 +19,12 @@ import { ListToolbar, Pager } from '@/admin/components/list/ListToolbar'
 import { matchesQuery, paginate, parseListQuery } from '@/admin/list-query'
 
 import { EditButton } from './shared'
+import { PageHead } from './frame'
 import { BtnLink, EditLink, editModeOf, FIELD_CREATORS, FIELD_OFFICE, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf, Tabs, UnitStatusPill, dateParam } from './field-ui'
 import { ProjectTimeline } from './field-timeline'
 import { ptOptionsOf, ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
-import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText, StatusPill, type Col } from './viz'
+import { Bento, Card, DataTable, EmptyState, KpiRow, KpiTile, pctText, StatusPill, type Col } from './viz'
 
 /**
  * FR1 "Unit & kontrak" (ADR 0020, plan B; mockup Web-Timesheet): contract list (projects of kind
@@ -135,7 +136,7 @@ export async function FieldContracts(props: AdminViewServerProps) {
   ]
   return (
     <FieldFrame props={props} name="unit-kontrak">
-      <DashHead title="Unit & kontrak" note={`Kontrak sewa unit (project berjenis kontrak unit) · ${monthLabel(d.month)} s/d ${dateId(d.today)}`}>
+      <PageHead props={props} title="Unit & kontrak" note={`Kontrak sewa unit (project berjenis kontrak unit) · ${monthLabel(d.month)} s/d ${dateId(d.today)}`}>
         <div className="pk-kact">
           {creator ? (
             <BtnLink href={tsNewHref({})} primary icon="add" attr="timesheet-baru">
@@ -151,7 +152,7 @@ export async function FieldContracts(props: AdminViewServerProps) {
             </BtnLink>
           ) : null}
         </div>
-      </DashHead>
+      </PageHead>
       <Bento label="Unit & kontrak">
         <Card id="contracts" title="Kontrak unit" sub={`${page.total} kontrak · klik Buka untuk matriks timesheet, rekap dan unit`}>
           {d.projects.length > 0 ? <ListToolbar id="unit-kontrak" action="/admin/unit-kontrak" query={lq} label="Cari kontrak" search={{ placeholder: 'Kode atau nama project…' }} /> : null}
@@ -199,9 +200,9 @@ export async function FieldContractDetail(props: AdminViewServerProps) {
   if (!d) {
     return (
       <FieldFrame props={props} name="kontrak-detail">
-        <DashHead title="Kontrak tidak ditemukan" note="Project bukan kontrak unit, tidak dalam cakupan Anda, atau laporan lapangan PT-nya belum aktif.">
+        <PageHead props={props} title="Kontrak tidak ditemukan" note="Project bukan kontrak unit, tidak dalam cakupan Anda, atau laporan lapangan PT-nya belum aktif.">
           {back}
-        </DashHead>
+        </PageHead>
       </FieldFrame>
     )
   }
@@ -221,7 +222,7 @@ export async function FieldContractDetail(props: AdminViewServerProps) {
   const exportQ = new URLSearchParams({ bulan: month, project: String(project.id) })
   return (
     <FieldFrame props={props} name="kontrak-detail">
-      <DashHead title={`${project.code} ${project.name}`} note={<>Kontrak unit · {activeNow.length} unit aktif hari ini{project.status === 'arsip' ? ' · diarsipkan' : project.status === 'dibatalkan' ? ' · dibatalkan' : ''}</>}>
+      <PageHead props={props} title={`${project.code} ${project.name}`} note={<>Kontrak unit · {activeNow.length} unit aktif hari ini{project.status === 'arsip' ? ' · diarsipkan' : project.status === 'dibatalkan' ? ' · dibatalkan' : ''}</>}>
         <div className="pk-kact">
           {back}
           {creator ? (
@@ -235,7 +236,7 @@ export async function FieldContractDetail(props: AdminViewServerProps) {
             </BtnLink>
           ) : null}
         </div>
-      </DashHead>
+      </PageHead>
       <Tabs label="Bagian kontrak" tabs={tabs} current={tab} />
       {tab === 'timesheet' || tab === 'rekap' ? <MonthBar base={contractHref(project.id)} tab={tab} month={month} today={today} exports={office ? exportLinks('rekap-timesheet-kontrak', exportQ) : []} /> : null}
       {tab === 'timesheet' ? <MatrixCard m={m} today={today} projectId={project.id} creator={creator} /> : null}
@@ -594,7 +595,7 @@ export async function FieldUnitDetail(props: AdminViewServerProps) {
   if (!d) {
     return (
       <FieldFrame props={props} name="unit-detail">
-        <DashHead title="Unit tidak ditemukan">{back}</DashHead>
+        <PageHead props={props} title="Unit tidak ditemukan">{back}</PageHead>
       </FieldFrame>
     )
   }
@@ -626,7 +627,7 @@ export async function FieldUnitDetail(props: AdminViewServerProps) {
   const creator = mayCreateIn(req, unit.companyId)
   return (
     <FieldFrame props={props} name="unit-detail">
-      <DashHead title={unit.label} note={[unit.type, unit.brandModel].filter(Boolean).join(' · ') || (unit.kind === 'alat_berat' ? 'Alat berat' : 'Kendaraan')}>
+      <PageHead props={props} title={unit.label} note={[unit.type, unit.brandModel].filter(Boolean).join(' · ') || (unit.kind === 'alat_berat' ? 'Alat berat' : 'Kendaraan')}>
         <div className="pk-kact">
           {back}
           {creator ? (
@@ -645,7 +646,7 @@ export async function FieldUnitDetail(props: AdminViewServerProps) {
             </BtnLink>
           ) : null}
         </div>
-      </DashHead>
+      </PageHead>
       <Bento label="Unit">
         <KpiRow cols={3}>
           <KpiTile id="u-status" icon="check" label="Status" value={<UnitStatusPill status={unit.status} />} kpi="unit-status" i={0}>
@@ -773,13 +774,13 @@ export async function FieldTimesheetNew(props: AdminViewServerProps) {
   const initialProject = idParam(sp.project)
   return (
     <FieldFrame props={props} name="timesheet-baru">
-      <DashHead title="Isi timesheet unit" note="Satu timesheet per unit per hari · HM opsional (±1× seminggu), HM awal otomatis dari HM akhir terakhir yang tercatat · bisa diedit pelapor 24 jam, setelah itu koreksi oleh PM/Direktur">
+      <PageHead props={props} title="Isi timesheet unit" note="Satu timesheet per unit per hari · HM opsional (±1× seminggu), HM awal otomatis dari HM akhir terakhir yang tercatat · bisa diedit pelapor 24 jam, setelah itu koreksi oleh PM/Direktur">
         <div className="pk-kact">
           <BtnLink href={initialProject ? contractHref(initialProject) : '/admin/unit-kontrak'} icon="arrowLeft">
             Kembali
           </BtnLink>
         </div>
-      </DashHead>
+      </PageHead>
       <Bento>
         <Card id="timesheet-form" title="Timesheet harian" span={8}>
           {tsProjects.length === 0 ? (
@@ -818,7 +819,7 @@ export async function FieldTimesheetDetail(props: AdminViewServerProps) {
   if (!d) {
     return (
       <FieldFrame props={props} name="timesheet-detail">
-        <DashHead title="Timesheet tidak ditemukan">{back}</DashHead>
+        <PageHead props={props} title="Timesheet tidak ditemukan">{back}</PageHead>
       </FieldFrame>
     )
   }
@@ -827,7 +828,7 @@ export async function FieldTimesheetDetail(props: AdminViewServerProps) {
   const unitName = t.unit.label ?? `Unit #${t.unit.id}`
   return (
     <FieldFrame props={props} name="timesheet-detail">
-      <DashHead title={`Timesheet ${unitName} · ${dateId(t.reportDate)}`} note={`${t.project.code ?? ''} ${t.project.name ?? ''} · ${longDate(t.reportDate)}`}>
+      <PageHead props={props} title={`Timesheet ${unitName} · ${dateId(t.reportDate)}`} note={`${t.project.code ?? ''} ${t.project.name ?? ''} · ${longDate(t.reportDate)}`}>
         <div className="pk-kact">
           <BtnLink href={contractHref(t.project.id, `?tab=timesheet&bulan=${t.reportDate.slice(0, 7)}`)} icon="arrowLeft">
             Matriks kontrak
@@ -844,7 +845,7 @@ export async function FieldTimesheetDetail(props: AdminViewServerProps) {
             </EditLink>
           ) : null}
         </div>
-      </DashHead>
+      </PageHead>
       {one(sp.baru) === '1' ? (
         <Alert tone="ok" attr="created">
           <p>Timesheet tersimpan.</p>
@@ -958,7 +959,7 @@ export async function FieldTimesheetEdit(props: AdminViewServerProps) {
   if (!d) {
     return (
       <FieldFrame props={props} name="timesheet-ubah">
-        <DashHead title="Timesheet tidak ditemukan">{back(null)}</DashHead>
+        <PageHead props={props} title="Timesheet tidak ditemukan">{back(null)}</PageHead>
       </FieldFrame>
     )
   }
@@ -969,7 +970,7 @@ export async function FieldTimesheetEdit(props: AdminViewServerProps) {
   if (!allowed || t.companyId === null) {
     return (
       <FieldFrame props={props} name="timesheet-ubah">
-        <DashHead title={title}>{back(t.id)}</DashHead>
+        <PageHead props={props} title={title}>{back(t.id)}</PageHead>
         <Alert tone="bad" attr="not-editable">
           <p>{mode === 'edit' ? 'Timesheet ini tidak dapat diubah lagi: hanya pelapor, dalam 24 jam sejak dibuat. Setelah itu koreksi oleh PM project / Direktur.' : 'Koreksi timesheet hanya oleh PM project (tim) atau Direktur.'}</p>
         </Alert>
@@ -984,9 +985,9 @@ export async function FieldTimesheetEdit(props: AdminViewServerProps) {
   }
   return (
     <FieldFrame props={props} name="timesheet-ubah">
-      <DashHead title={title} note={mode === 'edit' ? 'Pelapor, dalam 24 jam sejak dibuat · hanya isian yang berubah yang dikirim · tercatat di riwayat' : 'Koreksi PM project / Direktur dengan alasan · timesheet ditandai “dikoreksi” dan HM terakhir unit dihitung ulang'}>
+      <PageHead props={props} title={title} note={mode === 'edit' ? 'Pelapor, dalam 24 jam sejak dibuat · hanya isian yang berubah yang dikirim · tercatat di riwayat' : 'Koreksi PM project / Direktur dengan alasan · timesheet ditandai “dikoreksi” dan HM terakhir unit dihitung ulang'}>
         <div className="pk-kact">{back(t.id)}</div>
-      </DashHead>
+      </PageHead>
       <Bento>
         <Card id="timesheet-form" title={mode === 'edit' ? 'Ubah timesheet (24 jam)' : 'Koreksi timesheet'} span={8}>
           <TimesheetForm
