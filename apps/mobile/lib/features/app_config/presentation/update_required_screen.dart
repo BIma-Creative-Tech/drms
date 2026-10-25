@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/theme.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/pk_ui.dart';
 import '../application/app_config_providers.dart';
 import 'release_notes.dart';
 
@@ -19,6 +21,8 @@ class UpdateRequiredScreen extends ConsumerWidget {
     final minimum = cfg?.minAppVersion ?? ref.watch(upgradeRequiredProvider) ?? '?';
     final latest = cfg?.latestAppVersion;
     final notes = cfg?.releaseNotes ?? const <String>[];
+    final theme = Theme.of(context);
+    final pk = context.pk;
     return Scaffold(
       body: SafeArea(
         child: LayoutBuilder(
@@ -31,27 +35,39 @@ class UpdateRequiredScreen extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.system_update, size: 72),
-                  const SizedBox(height: 16),
+                  Center(
+                    child: Container(
+                      width: 88,
+                      height: 88,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: pk.infoBg, shape: BoxShape.circle),
+                      child: Icon(Icons.system_update, size: 44, color: pk.infoOn),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   Text(
                     t.updateRequiredTitle,
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineSmall,
+                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 12),
-                  Text(t.updateRequiredBody(current, minimum), textAlign: TextAlign.center),
+                  const SizedBox(height: 10),
+                  Text(
+                    t.updateRequiredBody(current, minimum),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
                   const SizedBox(height: 24),
                   if (latest != null && notes.isNotEmpty) ...[
-                    Card(
-                      margin: EdgeInsets.zero,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: ReleaseNotesList(version: latest, notes: notes),
-                      ),
+                    PkCard(
+                      radius: PkRadius.lg,
+                      child: ReleaseNotesList(version: latest, notes: notes),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                   ],
-                  UpdateDownloadLink(url: cfg?.appDownloadUrl),
+                  PkCard(
+                    radius: PkRadius.lg,
+                    child: UpdateDownloadLink(url: cfg?.appDownloadUrl),
+                  ),
                 ],
               ),
             ),

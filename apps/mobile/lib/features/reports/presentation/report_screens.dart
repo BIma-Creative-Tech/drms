@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/theme.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/platform/report_files.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/icons/iconsax.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_akun.dart';
 import '../data/reports_providers.dart';
 import '../domain/report.dart';
 
@@ -32,52 +36,50 @@ class ReportListScreen extends ConsumerWidget {
 
   Widget _list(BuildContext context, List<ReportSummary> items, bool auditLog) {
     final t = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     // phase 7: the web index links the global Audit Log for its roles
     final audit = auditLog
-        ? ListTile(
-            key: const Key('report-audit-log'),
-            leading: const Icon(Icons.history_edu_outlined),
-            title: Text(t.reportsAuditLog),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/reports/audit-log'),
+        ? PkMenuGroup(
+            children: [
+              PkMenuRow(
+                key: const Key('report-audit-log'),
+                icon: Icons.history_edu_outlined,
+                tone: PkTone.neutral,
+                title: t.reportsAuditLog,
+                onTap: () => context.push('/reports/audit-log'),
+              ),
+            ],
           )
         : null;
     if (items.isEmpty) {
       return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
-          Padding(
-            padding: const EdgeInsets.all(32),
-            child: Text(t.reportsNone, key: const Key('reports-none'), textAlign: TextAlign.center),
-          ),
+          PkEmptyState(key: const Key('reports-none'), icon: PkIcons.report, message: t.reportsNone),
           ?audit,
         ],
       );
     }
-    return ListView.separated(
+    return ListView(
       key: const Key('reports-list'),
-      padding: const EdgeInsets.only(bottom: 24),
-      itemCount: items.length + (audit == null ? 0 : 1),
-      separatorBuilder: (_, _) => const Divider(height: 1),
-      itemBuilder: (_, i) {
-        if (i == items.length) return audit!;
-        final r = items[i];
-        return ListTile(
-          key: Key('report-${r.code}'),
-          leading: const Icon(Icons.assessment_outlined),
-          title: Text(r.title),
-          subtitle: Text(
-            [
-              if (r.description.isNotEmpty) r.description,
-              t.reportsExportLine(r.formats.map((f) => reportFormatLabels[f] ?? f).join(' · ')),
-            ].join('\n'),
-            style: theme.textTheme.bodySmall,
-          ),
-          isThreeLine: r.description.isNotEmpty,
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => context.push('/reports/${r.code}'),
-        );
-      },
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        PkMenuGroup(
+          children: [
+            for (final r in items)
+              PkMenuRow(
+                key: Key('report-${r.code}'),
+                icon: PkIcons.report,
+                title: r.title,
+                subtitle: [
+                  if (r.description.isNotEmpty) r.description,
+                  t.reportsExportLine(r.formats.map((f) => reportFormatLabels[f] ?? f).join(' · ')),
+                ].join('\n'),
+                onTap: () => context.push('/reports/${r.code}'),
+              ),
+          ],
+        ),
+        ?audit,
+      ],
     );
   }
 }
@@ -145,11 +147,15 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-              child: Text(t.reportsDownloaded(name), key: const Key('report-file-name')),
+              child: Text(
+                t.reportsDownloaded(name),
+                key: const Key('report-file-name'),
+                style: Theme.of(c).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
             ),
             ListTile(
               key: const Key('report-file-open'),
-              leading: const Icon(Icons.open_in_new),
+              leading: const PkIconChip(icon: Icons.open_in_new),
               title: Text(t.reportsOpen),
               onTap: () async {
                 Navigator.pop(c);
@@ -158,7 +164,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
             ),
             ListTile(
               key: const Key('report-file-share'),
-              leading: const Icon(Icons.share_outlined),
+              leading: const PkIconChip(icon: Icons.share_outlined),
               title: Text(t.reportsShare),
               onTap: () async {
                 Navigator.pop(c);
@@ -167,7 +173,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
             ),
             ListTile(
               key: const Key('report-file-download'),
-              leading: const Icon(Icons.download_outlined),
+              leading: const PkIconChip(icon: Icons.download_outlined),
               title: Text(t.reportsSaveDownloads),
               onTap: () async {
                 Navigator.pop(c);
@@ -220,6 +226,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
   Widget _body(ReportPage p) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
     final active = [
       for (final f in p.filters)
         if (f.values.isNotEmpty)
@@ -227,46 +234,94 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
     ];
     return ListView(
       key: const Key('report-page'),
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        if (p.description.isNotEmpty) Text(p.description, style: theme.textTheme.bodySmall),
-        const SizedBox(height: 4),
-        Text(
-          p.letterheadPts.isEmpty ? p.letterhead : '${p.letterhead} · PT: ${p.letterheadPts.join(', ')}',
-          key: const Key('report-letterhead'),
-          style: theme.textTheme.labelMedium,
-        ),
-        if (active.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(active.join(' · '), key: const Key('report-active-filters'), style: theme.textTheme.bodySmall),
-          ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            for (final f in p.formats)
-              OutlinedButton.icon(
-                key: Key('report-export-$f'),
-                onPressed: _exporting != null || p.tooBig(f) ? null : () => _export(p, f),
-                icon: _exporting == f
-                    ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.download, size: 18),
-                label: Text(p.tooBig(f) ? t.reportsTooBig(reportFormatLabels[f] ?? f) : (reportFormatLabels[f] ?? f)),
+        // Header: letterhead, what the report contains, active filters, row count and the exports.
+        PkCard(
+          radius: PkRadius.lg,
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const PkIconChip(icon: PkIcons.report, size: 40),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          p.letterheadPts.isEmpty
+                              ? p.letterhead
+                              : '${p.letterhead} · PT: ${p.letterheadPts.join(', ')}',
+                          key: const Key('report-letterhead'),
+                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        if (p.description.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(p.description, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-          ],
-        ),
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            [t.reportsRowCount(p.rowCount), if (p.team) t.reportsTeamScope].join(' · '),
-            key: const Key('report-row-count'),
-            style: theme.textTheme.bodySmall,
+              if (active.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1, right: 6),
+                        child: Icon(Icons.filter_list, size: 16, color: theme.colorScheme.primary),
+                      ),
+                      Expanded(
+                        child: Text(
+                          active.join(' · '),
+                          key: const Key('report-active-filters'),
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(
+                  [t.reportsRowCount(p.rowCount), if (p.team) t.reportsTeamScope].join(' · '),
+                  key: const Key('report-row-count'),
+                  style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                ),
+              ),
+              if (p.formats.isNotEmpty) ...[
+                const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: PkRowDivider(indent: 0)),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    for (final f in p.formats)
+                      OutlinedButton.icon(
+                        key: Key('report-export-$f'),
+                        style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                        onPressed: _exporting != null || p.tooBig(f) ? null : () => _export(p, f),
+                        icon: _exporting == f
+                            ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.download, size: 18),
+                        label: Text(
+                          p.tooBig(f) ? t.reportsTooBig(reportFormatLabels[f] ?? f) : (reportFormatLabels[f] ?? f),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ],
           ),
         ),
-        const SizedBox(height: 12),
         _TableView(table: p.main, onLink: _openLink),
         if (_q.cursor != null || p.nextCursor != null)
           Row(
@@ -290,20 +345,28 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
             ],
           ),
         for (final x in p.extra) ...[const SizedBox(height: 16), _TableView(table: x, onLink: _openLink)],
-        if (p.notes.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          for (final n in p.notes)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text('• $n', style: theme.textTheme.bodySmall),
+        if (p.notes.isNotEmpty)
+          PkCard(
+            margin: const EdgeInsets.only(top: 8),
+            color: context.pk.infoBg,
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final n in p.notes)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text('• $n', style: theme.textTheme.bodySmall?.copyWith(color: context.pk.infoOn)),
+                  ),
+              ],
             ),
-        ],
+          ),
       ],
     );
   }
 }
 
-/// One report table as cards: the row's title column, then "Label: value" per other column; totals in a last card.
+/// One report table as cards: the row's title column, then "Label  value" per other column; totals in a last card.
 class _TableView extends StatelessWidget {
   const _TableView({required this.table, required this.onLink});
   final ReportTableData table;
@@ -313,47 +376,62 @@ class _TableView extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final pk = context.pk;
     final tc = table.titleColumn;
-    Widget lines(Map<String, Object?> cells, {Map<String, String>? links}) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final c in table.columns)
-          if (c != tc && reportCellText(cells[c.key], c.type).isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: '${c.label}: ',
-                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                    ),
-                    TextSpan(
-                      text: reportCellText(cells[c.key], c.type),
-                      style: TextStyle(
-                        fontWeight: c.numeric ? FontWeight.w600 : null,
-                        color: links?[c.key] != null && apkRouteForReportLink(links![c.key]!) != null
-                            ? theme.colorScheme.primary
-                            : null,
+    Widget lines(Map<String, Object?> cells, {Map<String, String>? links, Color? labelColor, Color? valueColor}) =>
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final c in table.columns)
+              if (c != tc && reportCellText(cells[c.key], c.type).isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          c.label,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: labelColor ?? theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          reportCellText(cells[c.key], c.type),
+                          textAlign: c.numeric ? TextAlign.end : TextAlign.start,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: c.numeric ? FontWeight.w700 : FontWeight.w500,
+                            color: links?[c.key] != null && apkRouteForReportLink(links![c.key]!) != null
+                                ? theme.colorScheme.primary
+                                : valueColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                style: theme.textTheme.bodySmall,
-              ),
-            ),
-      ],
-    );
+          ],
+        );
     return Column(
       key: Key('report-table-${table.key}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(table.title, style: theme.textTheme.titleMedium),
-        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
+          child: Text(table.title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+        ),
         if (table.rows.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Text(table.empty ?? t.reportsEmpty, style: theme.textTheme.bodyMedium),
+          PkCard(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              table.empty ?? t.reportsEmpty,
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
           ),
         for (final (i, r) in table.rows.indexed)
           Builder(
@@ -361,46 +439,50 @@ class _TableView extends StatelessWidget {
               final links = i < table.rowLinks.length ? table.rowLinks[i] : null;
               final href = links?['_row'] ?? (tc == null ? null : links?[tc.key]) ?? links?.values.firstOrNull;
               final route = href == null ? null : apkRouteForReportLink(href);
-              return Card(
+              return PkCard(
                 key: Key('report-${table.key}-row-$i'),
-                margin: const EdgeInsets.only(bottom: 8),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: route == null ? null : () => onLink(href),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (tc != null)
-                          Text(
-                            reportCellText(r[tc.key], tc.type).isEmpty ? '—' : reportCellText(r[tc.key], tc.type),
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: route != null ? theme.colorScheme.primary : null,
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                onTap: route == null ? null : () => onLink(href),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (tc != null)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              reportCellText(r[tc.key], tc.type).isEmpty ? '—' : reportCellText(r[tc.key], tc.type),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: route != null ? theme.colorScheme.primary : null,
+                              ),
                             ),
                           ),
-                        lines(r, links: links),
-                      ],
-                    ),
-                  ),
+                          if (route != null) Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.outline),
+                        ],
+                      ),
+                    lines(r, links: links),
+                  ],
                 ),
               );
             },
           ),
         if (table.totals != null && table.rows.isNotEmpty)
-          Card(
+          PkCard(
             key: Key('report-${table.key}-totals'),
-            margin: const EdgeInsets.only(bottom: 8),
-            color: theme.colorScheme.secondaryContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(t.reportsTotal, style: theme.textTheme.titleSmall),
-                  lines(table.totals!),
-                ],
-              ),
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            color: pk.infoBg,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  t.reportsTotal,
+                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: pk.infoOn),
+                ),
+                lines(table.totals!, labelColor: pk.infoOn, valueColor: pk.infoOn),
+              ],
             ),
           ),
       ],
@@ -488,8 +570,8 @@ class _FilterSheetState extends State<_FilterSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(t.reportsFilter, style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
+          Text(t.reportsFilter, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 12),
           Flexible(
             child: ListView(
               shrinkWrap: true,

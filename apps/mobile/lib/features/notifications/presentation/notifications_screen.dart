@@ -85,16 +85,12 @@ class NotificationsScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(notificationsProvider),
           data: (page) => page.items.isEmpty
               ? ListView(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Text(t.notificationsEmpty, textAlign: TextAlign.center),
-                    ),
-                  ],
+                  children: [PkEmptyState(icon: PkIcons.bell, message: t.notificationsEmpty)],
                 )
               : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   itemCount: page.items.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (_, i) => _Tile(n: page.items[i], zone: zone),
                 ),
         ),
@@ -115,37 +111,67 @@ class _Tile extends ConsumerWidget {
       canReadProgress: profile?.canReadProgress ?? false,
       ownAttendance: profile?.hasOwnAttendance ?? true,
     );
-    return ListTile(
-      key: Key('notification-${n.id}'),
-      leading: Icon(
-        n.unread ? Icons.markunread : Icons.drafts,
-        color: n.unread ? Theme.of(context).colorScheme.primary : null,
-      ),
-      title: Row(
-        children: [
-          CompanyChipLead(companyId: n.companyId),
-          Expanded(
-            child: Text(n.title, style: TextStyle(fontWeight: n.unread ? FontWeight.bold : FontWeight.normal)),
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    return PkCard(
+      padding: EdgeInsets.zero,
+      child: ListTile(
+        key: Key('notification-${n.id}'),
+        contentPadding: const EdgeInsets.fromLTRB(14, 6, 10, 6),
+        leading: PkIconChip(icon: PkIcons.bell, tone: n.unread ? PkTone.info : PkTone.neutral, size: 40),
+        title: Row(
+          children: [
+            CompanyChipLead(companyId: n.companyId),
+            Expanded(
+              child: Text(
+                n.title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: n.unread ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+            if (n.unread)
+              Container(
+                width: 8,
+                height: 8,
+                margin: const EdgeInsets.only(left: 6),
+                decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle),
+              ),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(text: '${n.body}\n'),
+                TextSpan(
+                  text: formatServerDateTime(n.createdAt, zone: zone),
+                  style: theme.textTheme.labelSmall?.copyWith(color: muted, fontSize: 12),
+                ),
+              ],
+            ),
+            style: theme.textTheme.bodySmall?.copyWith(color: muted, height: 1.35),
           ),
-        ],
-      ),
-      subtitle: Text('${n.body}\n${formatServerDateTime(n.createdAt, zone: zone)}'),
-      isThreeLine: true,
-      trailing: route == null ? null : const Icon(Icons.chevron_right),
-      // Unknown document types only mark read; a read row without a target is not tappable.
-      onTap: !n.unread && route == null
-          ? null
-          : () async {
-              if (n.unread) {
-                try {
-                  await ref.read(notificationsApiProvider).markRead(n.id);
-                } on Object {
-                  // Reading still works offline-first: the row stays unread until the next refresh.
+        ),
+        isThreeLine: true,
+        trailing: route == null ? null : Icon(Icons.chevron_right, color: muted),
+        // Unknown document types only mark read; a read row without a target is not tappable.
+        onTap: !n.unread && route == null
+            ? null
+            : () async {
+                if (n.unread) {
+                  try {
+                    await ref.read(notificationsApiProvider).markRead(n.id);
+                  } on Object {
+                    // Reading still works offline-first: the row stays unread until the next refresh.
+                  }
+                  ref.invalidate(notificationsProvider);
                 }
-                ref.invalidate(notificationsProvider);
-              }
-              if (route != null && context.mounted) await GoRouter.maybeOf(context)?.push(route);
-            },
+                if (route != null && context.mounted) await GoRouter.maybeOf(context)?.push(route);
+              },
+      ),
     );
   }
 }

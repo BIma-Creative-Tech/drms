@@ -4731,5 +4731,7 @@
         "type": "int"
       }
     }
-  }
+  },
+  "akunGroupAccount": "Akun",
+  "akunGroupApp": "Aplikasi"
 }

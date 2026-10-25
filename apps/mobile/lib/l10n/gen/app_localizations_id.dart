@@ -6214,4 +6214,10 @@ class AppLocalizationsId extends AppLocalizations {
   String homeTransferWaiting(int count) {
     return '$count menunggu transfer';
   }
+
+  @override
+  String get akunGroupAccount => 'Akun';
+
+  @override
+  String get akunGroupApp => 'Aplikasi';
 }
