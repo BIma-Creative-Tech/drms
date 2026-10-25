@@ -18,17 +18,14 @@ class ReceiptMismatchChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final color = context.pk.warnText;
+    // D2510: soft pill (tone fill + readable text) like PkPill.
+    final color = context.pk.warnOn;
     final detail = receiptAmount != null && total != null
         ? t.receiptMismatchDetail(formatRupiah(receiptAmount!), formatRupiah(total!))
         : null;
     final chip = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: context.pk.warnBg, borderRadius: BorderRadius.circular(999)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -36,7 +33,8 @@ class ReceiptMismatchChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             count == null ? t.receiptMismatchChip : t.receiptMismatchCount(count!),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w600),
+            style: Theme.of(context).textTheme.labelSmall
+                ?.copyWith(color: color, fontWeight: FontWeight.w700, fontSize: 12),
           ),
         ],
       ),

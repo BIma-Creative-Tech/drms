@@ -60,7 +60,7 @@ class _StepTile extends StatelessWidget {
       fontWeight: current ? FontWeight.w700 : FontWeight.w500,
       color: s.state == TurnState.rejected ? context.pk.badText : null,
     );
-    final badgeStyle = theme.textTheme.labelSmall?.copyWith(color: scheme.primary, fontWeight: FontWeight.w700);
+    final badgeStyle = theme.textTheme.labelSmall?.copyWith(color: context.pk.infoOn, fontWeight: FontWeight.w700);
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -72,7 +72,7 @@ class _StepTile extends StatelessWidget {
                 Icon(icon, color: color, size: 22),
                 if (!last)
                   Expanded(
-                    child: Center(child: Container(width: 2, color: scheme.outlineVariant)),
+                    child: Center(child: Container(width: 2, color: context.pk.border)),
                   ),
               ],
             ),
@@ -88,18 +88,15 @@ class _StepTile extends StatelessWidget {
                   if (current)
                     Container(
                       key: const Key('step-current'),
-                      margin: const EdgeInsets.only(top: 2),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: scheme.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
+                      margin: const EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: context.pk.infoBg, borderRadius: BorderRadius.circular(999)),
                       child: Text(t.turnLabel, style: badgeStyle),
                     ),
                   if (meta.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
-                      child: Text(meta, style: theme.textTheme.bodySmall),
+                      child: Text(meta, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
                     ),
                 ],
               ),

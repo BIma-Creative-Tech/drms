@@ -6,6 +6,7 @@ import '../../../../core/format/rupiah.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../../shared/widgets/async_body.dart' as async_body;
 import '../../../../shared/widgets/form_grid.dart';
+import '../../../../shared/widgets/pk_ui.dart';
 import '../../../projects/application/projects_providers.dart';
 import '../../../projects/domain/project.dart';
 
@@ -20,14 +21,11 @@ class RapOverBudgetChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final color = context.pk.badText;
+    // D2510: soft pill (tone fill + readable text) like PkPill.
+    final color = context.pk.badOn;
     final chip = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: context.pk.badBg, borderRadius: BorderRadius.circular(999)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -35,7 +33,8 @@ class RapOverBudgetChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             t.rapOverBudgetChip,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w600),
+            style: Theme.of(context).textTheme.labelSmall
+                ?.copyWith(color: color, fontWeight: FontWeight.w700, fontSize: 12),
           ),
         ],
       ),
@@ -55,16 +54,7 @@ class RapProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(4),
-      child: LinearProgressIndicator(
-        value: item.progress ?? 0,
-        minHeight: 6,
-        color: item.overBudget ? context.pk.badText : theme.colorScheme.primary,
-        backgroundColor: theme.colorScheme.surfaceContainerHighest,
-      ),
-    );
+    return PkProgressBar(value: item.progress ?? 0, height: 6, color: item.overBudget ? context.pk.badText : null);
   }
 }
 
