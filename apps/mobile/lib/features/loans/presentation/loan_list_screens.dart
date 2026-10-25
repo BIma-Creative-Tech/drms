@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../app/theme.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_proyek.dart';
 import '../domain/intercompany_loan.dart';
 import '../domain/loan.dart';
 import 'intercompany_loan_providers.dart';
@@ -80,10 +81,10 @@ class _LoanFilterBar extends StatelessWidget {
     );
     final statusLabel = statuses.where((s) => s.$1 == f.status).firstOrNull?.$2;
     return SizedBox(
-      height: 52,
+      height: 60,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -140,36 +141,16 @@ class _LoanFilterBar extends StatelessWidget {
   }
 }
 
-Widget _kpi(BuildContext context, String key, String label, String value, String sub, {VoidCallback? onTap}) {
-  final theme = Theme.of(context);
-  return Expanded(
-    child: Card(
-      key: Key(key),
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: theme.textTheme.labelSmall),
-              Text(
-                value,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              Text(sub, style: theme.textTheme.bodySmall),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
+Widget _kpi(
+  BuildContext context,
+  String key,
+  String label,
+  String value,
+  String sub, {
+  required Object icon,
+  PkTone tone = PkTone.info,
+  VoidCallback? onTap,
+}) => PkMiniKpi(key: Key(key), icon: icon, label: label, value: value, sub: sub, tone: tone, onTap: onTap);
 
 /// User 2026-10-19 (phase 3): the web "Pinjaman antar project" list (`/admin/pinjaman`) — tiles, search + filters,
 /// newest first, "+ Ajukan pinjaman" for a PM of a borrower project, "Menunggu saya (n)" for the Direktur.
@@ -214,7 +195,6 @@ class _LoanListScreenState extends ConsumerState<LoanListScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     final value = ref.watch(loanListProvider(_f));
     final s = value.value?.summary;
     return Scaffold(
@@ -249,14 +229,13 @@ class _LoanListScreenState extends ConsumerState<LoanListScreen> {
               padding: const EdgeInsets.only(bottom: 88),
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  child: Text(t.loanListNote, style: theme.textTheme.bodySmall),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Text(t.loanListNote, style: pkMetaStyle(context)),
                 ),
                 if (sum != null) ...[
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: PkKpiRow(
                       children: [
                         _kpi(
                           context,
@@ -264,31 +243,35 @@ class _LoanListScreenState extends ConsumerState<LoanListScreen> {
                           t.loanKpiPending,
                           '${sum.pending}',
                           sum.inboxCount == 0 ? t.loanKpiPendingNone : t.loanKpiPendingMine(sum.inboxCount),
+                          icon: Icons.hourglass_top,
+                          tone: sum.inboxCount > 0 ? PkTone.warn : PkTone.info,
                           onTap: () => _set(LoanListFilter(status: LoanStatus.pendingApproval.code)),
                         ),
-                        const SizedBox(width: 6),
-                        _kpi(
-                          context,
-                          'loan-kpi-outstanding',
-                          t.loanOutstanding,
-                          formatRupiah(sum.outstanding),
-                          t.loanKpiOutstandingSub(formatRupiah(sum.amount), formatRupiah(sum.repaid)),
-                        ),
-                        const SizedBox(width: 6),
                         _kpi(
                           context,
                           'loan-kpi-overdue',
                           t.loanOverdueOnly,
                           '${sum.overdueCount}',
                           sum.overdueCount == 0 ? t.loanKpiOverdueNone : t.loanKpiOverdueSum(formatRupiah(sum.overdue)),
+                          icon: Icons.warning_amber_rounded,
+                          tone: sum.overdueCount > 0 ? PkTone.bad : PkTone.ok,
                           onTap: () => _set(const LoanListFilter(overdue: true)),
+                        ),
+                        _kpi(
+                          context,
+                          'loan-kpi-outstanding',
+                          t.loanOutstanding,
+                          formatRupiah(sum.outstanding),
+                          t.loanKpiOutstandingSub(formatRupiah(sum.amount), formatRupiah(sum.repaid)),
+                          icon: Icons.account_balance_wallet_outlined,
+                          tone: PkTone.primary,
                         ),
                       ],
                     ),
                   ),
                   if (sum.inboxCount > 0)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                       child: OutlinedButton.icon(
                         key: const Key('loan-list-inbox'),
                         onPressed: () => context.go('/inbox'),
@@ -298,7 +281,7 @@ class _LoanListScreenState extends ConsumerState<LoanListScreen> {
                     ),
                 ],
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: ListSearchField(
                     key: const Key('loan-list-search'),
                     hint: t.loanListSearchHint,
@@ -314,17 +297,14 @@ class _LoanListScreenState extends ConsumerState<LoanListScreen> {
                   onChanged: _set,
                 ),
                 if (items.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Text(
-                      _f.active ? t.loanListEmptyFiltered : t.loanListEmpty,
-                      key: const Key('loan-list-empty'),
-                      textAlign: TextAlign.center,
-                    ),
+                  PkEmptyState(
+                    key: const Key('loan-list-empty'),
+                    icon: Icons.swap_horiz,
+                    message: _f.active ? t.loanListEmptyFiltered : t.loanListEmpty,
                   ),
                 for (final l in items)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: LoanCard(loan: l),
                   ),
                 if (_page < page.totalPages)
@@ -386,7 +366,6 @@ class _IcLoanListScreenState extends ConsumerState<IcLoanListScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     final value = ref.watch(icLoanListProvider(_f));
     return Scaffold(
       appBar: AppBar(title: Text(t.icLoanListTitle)),
@@ -409,14 +388,13 @@ class _IcLoanListScreenState extends ConsumerState<IcLoanListScreen> {
               padding: const EdgeInsets.only(bottom: 24),
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  child: Text(t.icLoanListNote, style: theme.textTheme.bodySmall),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Text(t.icLoanListNote, style: pkMetaStyle(context)),
                 ),
                 if (sum != null) ...[
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: PkKpiRow(
                       children: [
                         _kpi(
                           context,
@@ -424,24 +402,28 @@ class _IcLoanListScreenState extends ConsumerState<IcLoanListScreen> {
                           t.icLoanKpiReceivable,
                           formatRupiah(sum.receivable),
                           t.icLoanSideLender,
+                          icon: Icons.call_made,
+                          tone: PkTone.ok,
                           onTap: () => _set(const LoanListFilter(role: 'lender')),
                         ),
-                        const SizedBox(width: 6),
                         _kpi(
                           context,
                           'icloan-kpi-payable',
                           t.icLoanKpiPayable,
                           formatRupiah(sum.payable),
                           t.icLoanSideBorrower,
+                          icon: Icons.call_received,
+                          tone: PkTone.warn,
                           onTap: () => _set(const LoanListFilter(role: 'borrower')),
                         ),
-                        const SizedBox(width: 6),
                         _kpi(
                           context,
                           'icloan-kpi-overdue',
                           t.loanOverdueOnly,
                           formatRupiah(sum.overdue),
                           t.icLoanKpiOverdueSub,
+                          icon: Icons.warning_amber_rounded,
+                          tone: sum.overdue > 0 ? PkTone.bad : PkTone.ok,
                           onTap: () => _set(const LoanListFilter(overdue: true)),
                         ),
                       ],
@@ -449,7 +431,7 @@ class _IcLoanListScreenState extends ConsumerState<IcLoanListScreen> {
                   ),
                   if (sum.queueCount > 0)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                       child: OutlinedButton.icon(
                         key: const Key('icloan-list-queue'),
                         onPressed: () => context.push('/finance'),
@@ -459,7 +441,7 @@ class _IcLoanListScreenState extends ConsumerState<IcLoanListScreen> {
                     ),
                 ],
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: ListSearchField(
                     key: const Key('icloan-list-search'),
                     hint: t.icLoanListSearchHint,
@@ -475,17 +457,14 @@ class _IcLoanListScreenState extends ConsumerState<IcLoanListScreen> {
                   onChanged: _set,
                 ),
                 if (items.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Text(
-                      _f.active ? t.icLoanListEmptyFiltered : t.icLoanListEmpty,
-                      key: const Key('icloan-list-empty'),
-                      textAlign: TextAlign.center,
-                    ),
+                  PkEmptyState(
+                    key: const Key('icloan-list-empty'),
+                    icon: Icons.business,
+                    message: _f.active ? t.icLoanListEmptyFiltered : t.icLoanListEmpty,
                   ),
                 for (final l in items)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: _IcLoanCard(loan: l),
                   ),
                 if (_page < page.totalPages)
@@ -514,46 +493,59 @@ class _IcLoanCard extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final l = loan;
-    return Card(
+    return PkCard(
       key: Key('icloan-${l.id}'),
       margin: const EdgeInsets.only(bottom: 10),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.push(icLoanPath(l.id)),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(l.docNo, style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
-                  IcLoanStatusChip(loan: l),
-                  if (l.overdue)
-                    Text(
-                      t.loanOverdueDays(l.daysOverdue),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: context.pk.warnText,
-                        fontWeight: FontWeight.w700,
+      padding: const EdgeInsets.all(14),
+      onTap: () => context.push(icLoanPath(l.id)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PkIconChip(icon: Icons.business, tone: l.overdue ? PkTone.bad : PkTone.info, size: 38),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l.docNo,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(t.icLoanFlow(l.lenderCode, l.borrowerCode), style: pkTitleStyle(context)),
+                const SizedBox(height: 2),
+                Text(
+                  l.status.active
+                      ? t.icLoanCardFigures(formatRupiah(l.amount), formatRupiah(l.outstanding))
+                      : formatRupiah(l.amount),
+                  style: pkAmountStyle(
+                    context,
+                    base: theme.textTheme.bodyMedium,
+                  )?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    IcLoanStatusChip(loan: l),
+                    if (l.overdue)
+                      PkPill(
+                        icon: Icons.warning_amber_rounded,
+                        tone: PkTone.bad,
+                        label: t.loanOverdueDays(l.daysOverdue),
                       ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(t.icLoanFlow(l.lenderCode, l.borrowerCode), style: theme.textTheme.titleSmall),
-              Text(
-                l.status.active
-                    ? t.icLoanCardFigures(formatRupiah(l.amount), formatRupiah(l.outstanding))
-                    : formatRupiah(l.amount),
-                style: theme.textTheme.bodyMedium?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
-              ),
-              Text(t.loanDueOn(formatDateOnly(l.dueDate)), style: theme.textTheme.bodySmall),
-            ],
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(t.loanDueOn(formatDateOnly(l.dueDate)), style: pkMetaStyle(context)),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

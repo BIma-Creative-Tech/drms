@@ -6201,4 +6201,23 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get deleteDraftDone => 'Draft dihapus.';
+
+  @override
+  String get homeAccountsTitle => 'Kas & bank';
+
+  @override
+  String homeAccountsCount(int count) {
+    return '$count rekening';
+  }
+
+  @override
+  String homeTransferWaiting(int count) {
+    return '$count menunggu transfer';
+  }
+
+  @override
+  String get akunGroupAccount => 'Akun';
+
+  @override
+  String get akunGroupApp => 'Aplikasi';
 }

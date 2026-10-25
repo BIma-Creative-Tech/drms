@@ -5,13 +5,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../app/theme.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/icons/iconsax.dart';
 import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/online_only_button.dart';
+import '../../../shared/widgets/pk_ui.dart';
 import '../data/records_providers.dart';
 import '../domain/record_form.dart';
 
@@ -363,8 +366,18 @@ class _RecordFormState extends ConsumerState<_RecordForm> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final pk = context.pk;
     final edit = widget.id != null;
+    final fields = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (i, f) in widget.def.fields.indexed)
+          Padding(
+            padding: EdgeInsets.only(top: i == 0 ? 4 : 0, bottom: 12),
+            child: _field(f),
+          ),
+      ],
+    );
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -382,28 +395,42 @@ class _RecordFormState extends ConsumerState<_RecordForm> {
           padding: const EdgeInsets.all(16),
           children: [
             if (_summary != null)
-              Card(
+              PkCard(
                 key: const Key('record-form-error'),
-                color: theme.colorScheme.errorContainer,
+                color: pk.badBg,
                 margin: const EdgeInsets.only(bottom: 12),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(_summary!),
-                      for (final e in _errors.entries)
-                        Text(
-                          '• ${e.key == 'changeReason' ? t.cashReason : widget.def.fields.where((f) => f.key == e.key).firstOrNull?.label ?? e.key}: ${e.value}',
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.error_outline, color: pk.badOn, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DefaultTextStyle.merge(
+                        style: TextStyle(color: pk.badOn),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_summary!, style: const TextStyle(fontWeight: FontWeight.w700)),
+                            for (final e in _errors.entries)
+                              Text(
+                                '• ${e.key == 'changeReason' ? t.cashReason : widget.def.fields.where((f) => f.key == e.key).firstOrNull?.label ?? e.key}: ${e.value}',
+                              ),
+                          ],
                         ),
-                    ],
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            for (final f in widget.def.fields) Padding(padding: const EdgeInsets.only(bottom: 12), child: _field(f)),
+            if (widget.global)
+              PkCard(margin: const EdgeInsets.only(bottom: 12), child: fields)
+            else
+              PkSectionCard(title: widget.def.label, icon: PkIcons.master, child: fields),
             if (_needsReason)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+              PkSectionCard(
+                title: t.cashReason,
+                icon: Icons.edit_note,
                 child: TextField(
                   key: const Key('record-reason'),
                   controller: _reason,
@@ -417,7 +444,7 @@ class _RecordFormState extends ConsumerState<_RecordForm> {
                   ),
                 ),
               ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             OnlineOnlyButton(
               key: const Key('record-save'),
               label: _busy ? t.cashSaving : t.save,

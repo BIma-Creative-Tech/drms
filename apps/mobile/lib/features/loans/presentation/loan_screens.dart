@@ -16,6 +16,8 @@ import '../../../shared/widgets/doc_no_chip.dart';
 import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/online_only_button.dart';
 import '../../../shared/widgets/pick_hint.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_proyek.dart';
 import '../../../shared/widgets/reason_dialog.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../auth/application/auth_controller.dart';
@@ -54,11 +56,11 @@ class ProjectLoansTab extends ConsumerWidget {
         onRetry: () => ref.invalidate(provider),
         data: (page) => ListView(
           key: const Key('project-loans'),
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
             if (canCreate)
               Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.only(bottom: 14),
                 child: OnlineOnlyButton(
                   key: const Key('loan-new'),
                   label: t.loanNew,
@@ -70,12 +72,7 @@ class ProjectLoansTab extends ConsumerWidget {
                 ),
               ),
             if (page.items.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Center(
-                  child: Text(t.loanEmpty, key: const Key('project-loans-empty'), textAlign: TextAlign.center),
-                ),
-              ),
+              PkEmptyState(key: const Key('project-loans-empty'), icon: Icons.swap_horiz, message: t.loanEmpty),
             for (final l in page.items) LoanCard(loan: l, projectId: projectId),
           ],
         ),
@@ -269,7 +266,6 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     final initial = widget.initial;
     final canSubmit = initial == null || initial.allowedActions.contains(LoanAction.submit);
     final options = ref.watch(loanOptionsProvider);
@@ -294,8 +290,8 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
         data: (o) {
           if (initial == null && o.borrowers.isEmpty) {
             return Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(t.loanNoBorrower, key: const Key('loan-no-borrower')),
+              padding: const EdgeInsets.all(16),
+              child: PkNote(t.loanNoBorrower, key: const Key('loan-no-borrower'), margin: EdgeInsets.zero),
             );
           }
           final fixedBorrower = initial != null || (widget.projectId != null && o.canBorrowFor(widget.projectId!));
@@ -318,129 +314,140 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               // DRMS 13/10 Umum #2 / D4: label left of the field, two columns on wide screens.
-              FormGrid(
-                rowGap: 16,
-                children: [
-                  if (fixedBorrower)
-                    FormGridCell(
-                      label: t.loanBorrower,
-                      builder: (label) => InputDecorator(
-                        key: const Key('loan-borrower-fixed'),
-                        decoration: InputDecoration(labelText: label, prefixIcon: const Icon(Icons.call_received)),
-                        child: Text(borrowerLabel),
+              PkCard(
+                radius: PkRadius.lg,
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+                child: FormGrid(
+                  rowGap: 16,
+                  children: [
+                    if (fixedBorrower)
+                      FormGridCell(
+                        label: t.loanBorrower,
+                        builder: (label) => InputDecorator(
+                          key: const Key('loan-borrower-fixed'),
+                          decoration: InputDecoration(labelText: label, prefixIcon: const Icon(Icons.call_received)),
+                          child: Text(borrowerLabel),
+                        ),
+                      )
+                    else
+                      FormGridCell(
+                        label: t.loanBorrower,
+                        builder: (label) => DropdownButtonFormField<int>(
+                          key: const Key('loan-borrower'),
+                          hint: Text(pickHintFor(t, t.loanBorrower)),
+                          initialValue: _borrowerId,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            labelText: label,
+                            prefixIcon: const Icon(Icons.call_received),
+                            errorText: _errors['borrower'],
+                          ),
+                          items: [
+                            for (final b in o.borrowers)
+                              DropdownMenuItem(
+                                value: b.id,
+                                child: Text(b.label, overflow: TextOverflow.ellipsis),
+                              ),
+                          ],
+                          onChanged: _busy
+                              ? null
+                              : (v) => setState(() {
+                                  _borrowerId = v;
+                                  if (!o.lendersFor(v).any((l) => l.id == _lenderId)) _lenderId = null;
+                                }),
+                        ),
                       ),
-                    )
-                  else
                     FormGridCell(
-                      label: t.loanBorrower,
+                      label: t.loanLender,
                       builder: (label) => DropdownButtonFormField<int>(
-                        key: const Key('loan-borrower'),
-                        hint: Text(pickHintFor(t, t.loanBorrower)),
-                        initialValue: _borrowerId,
+                        key: ValueKey('loan-lender-$_borrowerId'),
+                        hint: Text(pickHintFor(t, t.loanLender)),
+                        initialValue: lenderItems.any((l) => l.id == _lenderId) ? _lenderId : null,
                         isExpanded: true,
                         decoration: InputDecoration(
                           labelText: label,
-                          prefixIcon: const Icon(Icons.call_received),
-                          errorText: _errors['borrower'],
+                          prefixIcon: const Icon(Icons.call_made),
+                          errorText: _errors['lender'],
                         ),
                         items: [
-                          for (final b in o.borrowers)
+                          for (final l in lenderItems)
                             DropdownMenuItem(
-                              value: b.id,
-                              child: Text(b.label, overflow: TextOverflow.ellipsis),
+                              value: l.id,
+                              child: Text(l.label, overflow: TextOverflow.ellipsis),
                             ),
                         ],
-                        onChanged: _busy
-                            ? null
-                            : (v) => setState(() {
-                                _borrowerId = v;
-                                if (!o.lendersFor(v).any((l) => l.id == _lenderId)) _lenderId = null;
-                              }),
+                        onChanged: _busy ? null : (v) => setState(() => _lenderId = v),
                       ),
                     ),
-                  FormGridCell(
-                    label: t.loanLender,
-                    builder: (label) => DropdownButtonFormField<int>(
-                      key: ValueKey('loan-lender-$_borrowerId'),
-                      hint: Text(pickHintFor(t, t.loanLender)),
-                      initialValue: lenderItems.any((l) => l.id == _lenderId) ? _lenderId : null,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        labelText: label,
-                        prefixIcon: const Icon(Icons.call_made),
-                        errorText: _errors['lender'],
-                      ),
-                      items: [
-                        for (final l in lenderItems)
-                          DropdownMenuItem(
-                            value: l.id,
-                            child: Text(l.label, overflow: TextOverflow.ellipsis),
+                    FormGridCell(
+                      label: t.loanKind,
+                      stackedLabel: true,
+                      child: SegmentedButton<String>(
+                        key: const Key('loan-kind'),
+                        segments: [
+                          ButtonSegment(
+                            value: 'dana',
+                            label: Text(t.loanKindDana),
+                            icon: const Icon(Icons.payments_outlined),
                           ),
-                      ],
-                      onChanged: _busy ? null : (v) => setState(() => _lenderId = v),
+                          ButtonSegment(
+                            value: 'barang',
+                            label: Text(t.loanKindBarang),
+                            icon: const Icon(Icons.inventory_2_outlined),
+                          ),
+                        ],
+                        selected: {_kind},
+                        onSelectionChanged: _busy ? null : (s) => setState(() => _kind = s.first),
+                      ),
                     ),
-                  ),
-                  FormGridCell(
-                    label: t.loanKind,
-                    stackedLabel: true,
-                    child: SegmentedButton<String>(
-                      key: const Key('loan-kind'),
-                      segments: [
-                        ButtonSegment(
-                          value: 'dana',
-                          label: Text(t.loanKindDana),
-                          icon: const Icon(Icons.payments_outlined),
-                        ),
-                        ButtonSegment(
-                          value: 'barang',
-                          label: Text(t.loanKindBarang),
-                          icon: const Icon(Icons.inventory_2_outlined),
-                        ),
-                      ],
-                      selected: {_kind},
-                      onSelectionChanged: _busy ? null : (s) => setState(() => _kind = s.first),
+                    FormGridCell(
+                      label: t.loanAmount,
+                      builder: (label) => TextField(
+                        key: const Key('loan-amount'),
+                        controller: _amount,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: const [RupiahInputFormatter()],
+                        decoration: InputDecoration(labelText: label, prefixText: 'Rp ', errorText: _errors['amount']),
+                      ),
                     ),
-                  ),
-                  FormGridCell(
-                    label: t.loanAmount,
-                    builder: (label) => TextField(
-                      key: const Key('loan-amount'),
-                      controller: _amount,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: const [RupiahInputFormatter()],
-                      decoration: InputDecoration(labelText: label, prefixText: 'Rp ', errorText: _errors['amount']),
+                    FormGridCell(
+                      label: t.loanReason,
+                      full: true,
+                      builder: (label) => TextField(
+                        key: const Key('loan-reason'),
+                        controller: _reason,
+                        minLines: 2,
+                        maxLines: 5,
+                        maxLength: 1000,
+                        decoration: InputDecoration(labelText: label, errorText: _errors['reason']),
+                      ),
                     ),
-                  ),
-                  FormGridCell(
-                    label: t.loanReason,
-                    full: true,
-                    builder: (label) => TextField(
-                      key: const Key('loan-reason'),
-                      controller: _reason,
-                      minLines: 2,
-                      maxLines: 5,
-                      maxLength: 1000,
-                      decoration: InputDecoration(labelText: label, errorText: _errors['reason']),
+                    FormGridCell(
+                      label: t.loanDate,
+                      builder: (label) => dateField(label, _loanDate, due: false, errorKey: 'loanDate'),
                     ),
-                  ),
-                  FormGridCell(
-                    label: t.loanDate,
-                    builder: (label) => dateField(label, _loanDate, due: false, errorKey: 'loanDate'),
-                  ),
-                  FormGridCell(
-                    label: t.loanDueDate,
-                    builder: (label) => dateField(label, _dueDate, due: true, errorKey: 'dueDate'),
-                  ),
-                ],
+                    FormGridCell(
+                      label: t.loanDueDate,
+                      builder: (label) => dateField(label, _dueDate, due: true, errorKey: 'dueDate'),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               if (_error != null)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    _error!,
-                    key: const Key('loan-error'),
-                    style: TextStyle(color: theme.colorScheme.error),
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: context.pk.badBg,
+                      borderRadius: BorderRadius.circular(PkRadius.sm + 2),
+                    ),
+                    child: Text(
+                      _error!,
+                      key: const Key('loan-error'),
+                      style: TextStyle(color: context.pk.badOn),
+                    ),
                   ),
                 ),
               if (canSubmit) ...[
@@ -735,40 +742,9 @@ class _LoanBody extends ConsumerWidget {
     final zone = ref.watch(currentProfileProvider)?.timezone;
     final l = loan;
     final acts = l.allowedActions;
-    Widget row(String k, String v, {Key? key, TextStyle? style}) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(width: 140, child: Text(k, style: theme.textTheme.bodySmall)),
-          Expanded(
-            child: Text(v, key: key, style: style),
-          ),
-        ],
-      ),
-    );
-    Widget section(String title) => Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 4),
-      child: Text(title, style: theme.textTheme.titleMedium),
-    );
-    Widget note(String text, {Key? key, Color? color}) => Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Row(
-        key: key,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.info_outline, size: 18, color: color ?? theme.colorScheme.primary),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(text, style: theme.textTheme.bodySmall?.copyWith(color: color)),
-          ),
-        ],
-      ),
-    );
-    final money = theme.textTheme.bodyMedium?.copyWith(
-      fontWeight: FontWeight.w600,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
+    Widget row(String k, String v, {Key? key, TextStyle? style}) => PkKeyRow(k, v, valueKey: key, style: style);
+    Widget note(String text, {Key? key, PkTone tone = PkTone.info}) => PkNote(text, key: key, tone: tone);
+    final money = pkAmountStyle(context, base: theme.textTheme.bodyMedium);
     final submitted = l.submittedAt != null;
     final waiting = l.status == LoanStatus.pendingApproval;
     // user decision 2026-10-24: Direktur (level 1) then Owner (level 2); an older server's single decision is level 1
@@ -793,139 +769,234 @@ class _LoanBody extends ConsumerWidget {
       formatServerDateTime(d.decidedAt, zone: zone),
     ].join(' · ');
 
+    PkStepState step({required bool done, bool bad = false, bool waiting = false}) => bad
+        ? PkStepState.bad
+        : done
+        ? PkStepState.done
+        : waiting
+        ? PkStepState.waiting
+        : PkStepState.todo;
+    final repaidShare = l.amount <= 0 ? 0.0 : l.repaidTotal / l.amount;
+
     return ListView(
       key: const Key('loan-detail'),
       padding: const EdgeInsets.all(16),
       children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            if (l.docNo != null) DocNoChip(docNo: l.docNo!),
-            LoanStatusChip(loan: l),
-            if (l.overdue) LoanOverdueChip(loan: l),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(t.loanFlow(l.lenderLabel, l.borrower.label), style: theme.textTheme.titleMedium),
-        const SizedBox(height: 8),
-        row(t.loanKind, l.kindLabel, key: const Key('loan-kind-value')),
-        // ADR 0031: origin (manual / automatic of a transfer)
-        if (l.originLabel.isNotEmpty)
-          row(
-            t.loanOrigin,
-            l.transfer == null ? l.originLabel : t.loanOriginTransfer(l.originLabel, l.transfer!.label),
-            key: const Key('loan-origin-value'),
-          ),
-        // ADR 0031: an automatic loan's lender is the paying account (no lender project)
-        row(l.lender == null ? t.loanLenderAccount : t.loanLender, l.lenderLabel, key: const Key('loan-lender-value')),
-        if (l.lender != null && l.lenderCashAccount != null)
-          row(t.loanLenderPusatBiaya, l.lenderCashAccount!.label, key: const Key('loan-lender-pb-value')),
-        row(t.loanBorrower, l.borrower.label, key: const Key('loan-borrower-value')),
-        if (l.borrowerCashAccount != null)
-          row(t.loanBorrowerPusatBiaya, l.borrowerCashAccount!.label, key: const Key('loan-borrower-pb-value')),
-        row(t.loanAmount, formatRupiah(l.amount), key: const Key('loan-amount-value'), style: money),
-        // Repaid / outstanding count from the final approval on (Draft / Menunggu: nothing is owed yet).
-        if (active) ...[
-          row(t.loanRepaid, formatRupiah(l.repaidTotal), key: const Key('loan-repaid-value'), style: money),
-          row(
-            t.loanOutstanding,
-            formatRupiah(l.outstanding),
-            key: const Key('loan-outstanding-value'),
-            style: money?.copyWith(color: l.overdue ? context.pk.warnText : null),
-          ),
-        ],
-        row(t.loanDate, formatDateOnly(l.loanDate)),
-        row(t.loanDueDate, formatDateOnly(l.dueDate), key: const Key('loan-due-value')),
-        row(t.loanCash, cashText(), key: const Key('loan-cash-value')),
-        if (l.awaitingDisbursement)
-          note(
-            t.loanAwaitingDisbursement(l.lenderCashAccount?.label ?? '—', l.borrowerCashAccount?.label ?? '—'),
-            key: const Key('loan-awaiting-disbursement'),
-          ),
-        section(t.loanReason),
-        Text(l.reason),
-        if (l.samePm) note(l.samePmNote ?? 'PM peminjam = PM pemberi', key: const Key('loan-same-pm')),
-        if (l.g1Note != null) note(l.g1Note!, key: const Key('loan-g1-note'), color: context.pk.warnText),
-        if (l.rejectReason != null)
-          note(t.addendumRejectedBecause(l.rejectReason!), key: const Key('loan-rejected'), color: context.pk.badText),
-        if (l.cancelReason != null) note(t.addendumCancelledBecause(l.cancelReason!), key: const Key('loan-cancelled')),
-        section(t.loanTimeline),
-        // ADR 0031: an automatic loan has one step (the transfer); a cash-backed manual loan adds Finance's transfer
-        if (l.automatic)
-          _Step(
-            key: const Key('loan-step-transfer'),
-            done: !cancelled,
-            title: t.loanStepAutomatic(l.transfer?.label ?? '-'),
-            subtitle: [
-              cancelled ? t.loanStepCancelled : t.loanStepRecorded,
-              if (l.createdBy?.name != null) l.createdBy!.name!,
-              if (submitted) formatServerDateTime(l.submittedAt, zone: zone),
-            ].join(' · '),
-            last: true,
-          ),
-        if (!l.automatic) ...[
-          _Step(
-            key: const Key('loan-step-submit'),
-            done: submitted,
-            title: l.submitterRole == 'finance' ? t.loanStepSubmittedFinance : t.loanStepSubmitted,
-            subtitle: [
-              if (l.createdBy?.name != null) l.createdBy!.name!,
-              if (submitted) formatServerDateTime(l.submittedAt, zone: zone) else t.loanStepNotYet,
-            ].join(' · '),
-          ),
-          _Step(
-            key: const Key('loan-step-direktur'),
-            done: direktur != null,
-            bad: direktur != null && !direktur.approved,
-            waiting: waiting && !l.waitingOwner,
-            title: t.loanStepDirektur,
-            subtitle: direktur != null
-                ? decisionText(direktur)
-                : (waiting && !l.waitingOwner ? t.loanStepWaiting : t.loanStepNotYet),
-            last: !ownerStep && !l.cashBacked,
-          ),
-          if (ownerStep)
-            _Step(
-              key: const Key('loan-step-owner'),
-              done: owner != null,
-              bad: owner != null && !owner.approved,
-              waiting: l.waitingOwner,
-              title: t.loanStepOwner,
-              subtitle: owner != null ? decisionText(owner) : (l.waitingOwner ? t.loanStepWaiting : t.loanStepNotYet),
-              last: !l.cashBacked,
-            ),
-          if (l.cashBacked)
-            _Step(
-              key: const Key('loan-step-disburse'),
-              done: l.disbursedAt != null,
-              waiting: l.awaitingDisbursement,
-              title: t.loanStepDisburse,
-              subtitle: l.disbursedAt != null
-                  ? [
-                      t.loanStepDisbursed,
-                      if (l.disbursedBy?.name != null) l.disbursedBy!.name!,
-                      formatServerDateTime(l.disbursedAt, zone: zone),
-                    ].join(' · ')
-                  : (l.awaitingDisbursement ? t.loanStepWaiting : t.loanStepNotYet),
-              last: true,
-            ),
-        ],
-        if (active || l.repayments.isNotEmpty) ...[
-          section(t.loanRepayments),
-          if (l.repayments.isEmpty)
-            Text(t.loanRepaymentsEmpty, style: theme.textTheme.bodySmall)
-          else
-            for (final r in l.repayments)
-              _RepaymentTile(
-                r: r,
-                // an older server offers the void on the loan only (`mayVoidRepayment`)
-                actions: {...r.allowedActions, if (l.mayVoidRepayment && r.posted) LoanRepaymentAction.voidRepayment},
-                onAction: busy ? null : (a) => onRepaymentAction(r, a),
+        // headline card: number + status, lender → borrower, the amount (and the repaid share once approved)
+        PkCard(
+          radius: PkRadius.lg,
+          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (l.docNo != null) DocNoChip(docNo: l.docNo!),
+                  LoanStatusChip(loan: l),
+                  if (l.overdue) LoanOverdueChip(loan: l),
+                ],
               ),
-        ],
-        const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const PkIconChip(icon: Icons.swap_horiz, tone: PkTone.primary, size: 40),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          t.loanFlow(l.lenderLabel, l.borrower.label),
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, height: 1.3),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          formatRupiah(l.amount),
+                          key: const Key('loan-amount-value'),
+                          style: pkAmountStyle(context, base: theme.textTheme.headlineSmall, fontSize: 24),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (active) ...[const SizedBox(height: 12), PkProgressBar(value: repaidShare, color: context.pk.okText)],
+            ],
+          ),
+        ),
+        PkCard(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              row(t.loanKind, l.kindLabel, key: const Key('loan-kind-value')),
+              // ADR 0031: origin (manual / automatic of a transfer)
+              if (l.originLabel.isNotEmpty)
+                row(
+                  t.loanOrigin,
+                  l.transfer == null ? l.originLabel : t.loanOriginTransfer(l.originLabel, l.transfer!.label),
+                  key: const Key('loan-origin-value'),
+                ),
+              // ADR 0031: an automatic loan's lender is the paying account (no lender project)
+              row(
+                l.lender == null ? t.loanLenderAccount : t.loanLender,
+                l.lenderLabel,
+                key: const Key('loan-lender-value'),
+              ),
+              if (l.lender != null && l.lenderCashAccount != null)
+                row(t.loanLenderPusatBiaya, l.lenderCashAccount!.label, key: const Key('loan-lender-pb-value')),
+              row(t.loanBorrower, l.borrower.label, key: const Key('loan-borrower-value')),
+              if (l.borrowerCashAccount != null)
+                row(t.loanBorrowerPusatBiaya, l.borrowerCashAccount!.label, key: const Key('loan-borrower-pb-value')),
+              // Repaid / outstanding count from the final approval on (Draft / Menunggu: nothing is owed yet).
+              if (active) ...[
+                row(t.loanRepaid, formatRupiah(l.repaidTotal), key: const Key('loan-repaid-value'), style: money),
+                row(
+                  t.loanOutstanding,
+                  formatRupiah(l.outstanding),
+                  key: const Key('loan-outstanding-value'),
+                  style: money?.copyWith(color: l.overdue ? context.pk.badText : null),
+                ),
+              ],
+              row(t.loanDate, formatDateOnly(l.loanDate)),
+              row(t.loanDueDate, formatDateOnly(l.dueDate), key: const Key('loan-due-value')),
+              row(t.loanCash, cashText(), key: const Key('loan-cash-value')),
+              if (l.awaitingDisbursement)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: note(
+                    t.loanAwaitingDisbursement(l.lenderCashAccount?.label ?? '—', l.borrowerCashAccount?.label ?? '—'),
+                    key: const Key('loan-awaiting-disbursement'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        PkSectionCard(
+          title: t.loanReason,
+          icon: Icons.notes,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(l.reason),
+              if (l.samePm) note(l.samePmNote ?? 'PM peminjam = PM pemberi', key: const Key('loan-same-pm')),
+              if (l.g1Note != null) note(l.g1Note!, key: const Key('loan-g1-note'), tone: PkTone.warn),
+              if (l.rejectReason != null)
+                note(t.addendumRejectedBecause(l.rejectReason!), key: const Key('loan-rejected'), tone: PkTone.bad),
+              if (l.cancelReason != null)
+                note(
+                  t.addendumCancelledBecause(l.cancelReason!),
+                  key: const Key('loan-cancelled'),
+                  tone: PkTone.neutral,
+                ),
+            ],
+          ),
+        ),
+        PkSectionCard(
+          title: t.loanTimeline,
+          icon: Icons.timeline,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ADR 0031: an automatic loan has one step (the transfer); a cash-backed manual loan adds Finance's
+                // transfer
+                if (l.automatic)
+                  PkTimelineStep(
+                    key: const Key('loan-step-transfer'),
+                    state: step(done: !cancelled),
+                    title: t.loanStepAutomatic(l.transfer?.label ?? '-'),
+                    subtitle: [
+                      cancelled ? t.loanStepCancelled : t.loanStepRecorded,
+                      if (l.createdBy?.name != null) l.createdBy!.name!,
+                      if (submitted) formatServerDateTime(l.submittedAt, zone: zone),
+                    ].join(' · '),
+                    last: true,
+                  ),
+                if (!l.automatic) ...[
+                  PkTimelineStep(
+                    key: const Key('loan-step-submit'),
+                    state: step(done: submitted),
+                    title: l.submitterRole == 'finance' ? t.loanStepSubmittedFinance : t.loanStepSubmitted,
+                    subtitle: [
+                      if (l.createdBy?.name != null) l.createdBy!.name!,
+                      if (submitted) formatServerDateTime(l.submittedAt, zone: zone) else t.loanStepNotYet,
+                    ].join(' · '),
+                  ),
+                  PkTimelineStep(
+                    key: const Key('loan-step-direktur'),
+                    state: step(
+                      done: direktur != null,
+                      bad: direktur != null && !direktur.approved,
+                      waiting: waiting && !l.waitingOwner,
+                    ),
+                    title: t.loanStepDirektur,
+                    subtitle: direktur != null
+                        ? decisionText(direktur)
+                        : (waiting && !l.waitingOwner ? t.loanStepWaiting : t.loanStepNotYet),
+                    last: !ownerStep && !l.cashBacked,
+                  ),
+                  if (ownerStep)
+                    PkTimelineStep(
+                      key: const Key('loan-step-owner'),
+                      state: step(done: owner != null, bad: owner != null && !owner.approved, waiting: l.waitingOwner),
+                      title: t.loanStepOwner,
+                      subtitle: owner != null
+                          ? decisionText(owner)
+                          : (l.waitingOwner ? t.loanStepWaiting : t.loanStepNotYet),
+                      last: !l.cashBacked,
+                    ),
+                  if (l.cashBacked)
+                    PkTimelineStep(
+                      key: const Key('loan-step-disburse'),
+                      state: step(done: l.disbursedAt != null, waiting: l.awaitingDisbursement),
+                      title: t.loanStepDisburse,
+                      subtitle: l.disbursedAt != null
+                          ? [
+                              t.loanStepDisbursed,
+                              if (l.disbursedBy?.name != null) l.disbursedBy!.name!,
+                              formatServerDateTime(l.disbursedAt, zone: zone),
+                            ].join(' · ')
+                          : (l.awaitingDisbursement ? t.loanStepWaiting : t.loanStepNotYet),
+                      last: true,
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        if (active || l.repayments.isNotEmpty)
+          PkSectionCard(
+            key: const Key('loan-repayments'),
+            title: t.loanRepayments,
+            icon: Icons.keyboard_return,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (l.repayments.isEmpty)
+                  Text(t.loanRepaymentsEmpty, style: pkMetaStyle(context))
+                else
+                  for (final r in l.repayments)
+                    _RepaymentTile(
+                      r: r,
+                      // an older server offers the void on the loan only (`mayVoidRepayment`)
+                      actions: {
+                        ...r.allowedActions,
+                        if (l.mayVoidRepayment && r.posted) LoanRepaymentAction.voidRepayment,
+                      },
+                      onAction: busy ? null : (a) => onRepaymentAction(r, a),
+                    ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 4),
         if (acts.contains(LoanAction.disburse))
           _action(LoanAction.disburse, t.loanOpenTransferQueue, Icons.account_balance),
         if (acts.contains(LoanAction.repay))
@@ -953,62 +1024,6 @@ class _LoanBody extends ConsumerWidget {
   );
 }
 
-class _Step extends StatelessWidget {
-  const _Step({
-    super.key,
-    required this.done,
-    required this.title,
-    required this.subtitle,
-    this.bad = false,
-    this.waiting = false,
-    this.last = false,
-  });
-  final bool done;
-  final bool bad;
-  final bool waiting;
-  final bool last;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final (IconData icon, Color color) = bad
-        ? (Icons.cancel, context.pk.badText)
-        : done
-        ? (Icons.check_circle, context.pk.okText)
-        : waiting
-        ? (Icons.hourglass_top, context.pk.warnText)
-        : (Icons.radio_button_unchecked, theme.colorScheme.outline);
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Column(
-            children: [
-              Icon(icon, size: 20, color: color),
-              if (!last) Expanded(child: Container(width: 2, color: theme.colorScheme.outlineVariant)),
-            ],
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-                  Text(subtitle, style: theme.textTheme.bodySmall),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _RepaymentTile extends StatelessWidget {
   const _RepaymentTile({required this.r, required this.actions, this.onAction});
   final LoanRepayment r;
@@ -1034,99 +1049,102 @@ class _RepaymentTile extends StatelessWidget {
       LoanRepaymentAction.execute => (Icons.account_balance, t.loanOpenTransferQueue),
       LoanRepaymentAction.voidRepayment => (Icons.block, t.cashVoid),
     };
-    return Card(
+    return Container(
       key: Key('loan-repayment-${r.id}'),
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    r.posted && r.seq != null ? t.loanRepaymentSeq(r.seq!) : t.loanRepayments,
-                    style: theme.textTheme.labelLarge,
-                  ),
+      margin: const EdgeInsets.only(top: 4, bottom: 6),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: r.status.closed ? theme.colorScheme.surfaceContainerHighest : null,
+        border: Border.all(color: context.pk.border),
+        borderRadius: BorderRadius.circular(PkRadius.sm + 2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  r.posted && r.seq != null ? t.loanRepaymentSeq(r.seq!) : t.loanRepayments,
+                  style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
-                Text(
-                  formatRupiah(r.amount),
-                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700).merge(strike),
-                ),
-              ],
-            ),
-            // user decision 2026-10-24: a request waits for the Direktur / Owner, then for Finance's transfer
-            if (r.open)
-              Text(
-                r.statusLabel.isEmpty ? r.status.code : r.statusLabel,
-                key: Key('loan-repayment-status-${r.id}'),
-                style: theme.textTheme.bodySmall?.copyWith(color: context.pk.warnText, fontWeight: FontWeight.w600),
               ),
+              Text(
+                formatRupiah(r.amount),
+                style: pkAmountStyle(context, base: theme.textTheme.bodyMedium)?.merge(strike),
+              ),
+            ],
+          ),
+          // user decision 2026-10-24: a request waits for the Direktur / Owner, then for Finance's transfer
+          if (r.open)
+            Text(
+              r.statusLabel.isEmpty ? r.status.code : r.statusLabel,
+              key: Key('loan-repayment-status-${r.id}'),
+              style: theme.textTheme.bodySmall?.copyWith(color: context.pk.warnText, fontWeight: FontWeight.w600),
+            ),
+          Text(
+            [
+              if (r.open) t.loanRepayPlannedOn(formatDateOnly(r.plannedDate ?? r.repayDate)),
+              if (!r.open) formatDateOnly(r.repayDate),
+              if (by != null) submitted ? t.loanSubmittedBy(by) : t.loanRecordedBy(by),
+              if (r.executedByName != null) t.loanRepaymentExecutedBy(r.executedByName!),
+            ].join(' · '),
+            style: theme.textTheme.bodySmall?.merge(strike),
+          ),
+          if ((r.note ?? '').isNotEmpty) Text(r.note!, style: theme.textTheme.bodySmall?.merge(strike)),
+          for (final d in r.decisions)
             Text(
               [
-                if (r.open) t.loanRepayPlannedOn(formatDateOnly(r.plannedDate ?? r.repayDate)),
-                if (!r.open) formatDateOnly(r.repayDate),
-                if (by != null) submitted ? t.loanSubmittedBy(by) : t.loanRecordedBy(by),
-                if (r.executedByName != null) t.loanRepaymentExecutedBy(r.executedByName!),
+                d.levelLabel ?? (d.level == 2 ? t.loanStepOwner : t.loanStepDirektur),
+                d.approved ? t.loanDecApproved : t.loanDecRejected,
+                if (d.actorName != null) d.actorName!,
               ].join(' · '),
+              key: Key('loan-repayment-${r.id}-decision-${d.level}'),
+              style: theme.textTheme.bodySmall,
+            ),
+          // ADR 0031: KK (borrower) / KM (lender) of a cash-backed loan's repayment
+          if (r.cash case final c?)
+            Text(
+              t.loanRepaymentCash(c.kk ?? '—', c.km ?? '—'),
+              key: Key('loan-repayment-cash-${r.id}'),
               style: theme.textTheme.bodySmall?.merge(strike),
             ),
-            if ((r.note ?? '').isNotEmpty) Text(r.note!, style: theme.textTheme.bodySmall?.merge(strike)),
-            for (final d in r.decisions)
-              Text(
-                [
-                  d.levelLabel ?? (d.level == 2 ? t.loanStepOwner : t.loanStepDirektur),
-                  d.approved ? t.loanDecApproved : t.loanDecRejected,
-                  if (d.actorName != null) d.actorName!,
-                ].join(' · '),
-                key: Key('loan-repayment-${r.id}-decision-${d.level}'),
-                style: theme.textTheme.bodySmall,
+          if (r.status == LoanRepaymentStatus.voided)
+            Text(
+              r.voidReason == null ? t.loanRepaymentVoid : t.loanRepaymentVoidReason(r.voidReason!),
+              key: Key('loan-repayment-void-${r.id}'),
+              style: theme.textTheme.bodySmall?.copyWith(color: context.pk.badText),
+            ),
+          if (r.status == LoanRepaymentStatus.rejected)
+            Text(
+              t.loanRepaymentRejected(r.rejectReason ?? '—'),
+              key: Key('loan-repayment-rejected-${r.id}'),
+              style: theme.textTheme.bodySmall?.copyWith(color: context.pk.badText),
+            ),
+          if (r.status == LoanRepaymentStatus.cancelled)
+            Text(
+              t.loanRepaymentCancelled(r.cancelReason ?? '—'),
+              key: Key('loan-repayment-cancelled-${r.id}'),
+              style: theme.textTheme.bodySmall,
+            ),
+          if (actions.isNotEmpty && onAction != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Wrap(
+                spacing: 4,
+                children: [
+                  for (final a in LoanRepaymentAction.values)
+                    if (actions.contains(a))
+                      TextButton.icon(
+                        key: Key('loan-repayment-${r.id}-${a.code}'),
+                        onPressed: () => onAction!(a),
+                        icon: Icon(button(a).$1, size: 18),
+                        label: Text(button(a).$2),
+                      ),
+                ],
               ),
-            // ADR 0031: KK (borrower) / KM (lender) of a cash-backed loan's repayment
-            if (r.cash case final c?)
-              Text(
-                t.loanRepaymentCash(c.kk ?? '—', c.km ?? '—'),
-                key: Key('loan-repayment-cash-${r.id}'),
-                style: theme.textTheme.bodySmall?.merge(strike),
-              ),
-            if (r.status == LoanRepaymentStatus.voided)
-              Text(
-                r.voidReason == null ? t.loanRepaymentVoid : t.loanRepaymentVoidReason(r.voidReason!),
-                key: Key('loan-repayment-void-${r.id}'),
-                style: theme.textTheme.bodySmall?.copyWith(color: context.pk.badText),
-              ),
-            if (r.status == LoanRepaymentStatus.rejected)
-              Text(
-                t.loanRepaymentRejected(r.rejectReason ?? '—'),
-                key: Key('loan-repayment-rejected-${r.id}'),
-                style: theme.textTheme.bodySmall?.copyWith(color: context.pk.badText),
-              ),
-            if (r.status == LoanRepaymentStatus.cancelled)
-              Text(
-                t.loanRepaymentCancelled(r.cancelReason ?? '—'),
-                key: Key('loan-repayment-cancelled-${r.id}'),
-                style: theme.textTheme.bodySmall,
-              ),
-            if (actions.isNotEmpty && onAction != null)
-              Align(
-                alignment: Alignment.centerRight,
-                child: Wrap(
-                  spacing: 4,
-                  children: [
-                    for (final a in LoanRepaymentAction.values)
-                      if (actions.contains(a))
-                        TextButton.icon(
-                          key: Key('loan-repayment-${r.id}-${a.code}'),
-                          onPressed: () => onAction!(a),
-                          icon: Icon(button(a).$1, size: 18),
-                          label: Text(button(a).$2),
-                        ),
-                  ],
-                ),
-              ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -1147,44 +1165,50 @@ class _LoanDecisionBar extends ConsumerWidget {
     final canApprove = a.contains(LoanAction.approve);
     final canReject = a.contains(LoanAction.reject);
     if (!canApprove && !canReject) return const SizedBox.shrink();
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              loan.waitingOwner ? t.loanStepOwner : t.loanStepDirektur,
-              key: const Key('loan-decision-step'),
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                if (canReject)
-                  Expanded(
-                    child: OnlineOnlyButton(
-                      key: const Key('loan-action-reject'),
-                      label: t.loanReject,
-                      icon: Icons.close,
-                      outlined: true,
-                      onPressed: busy ? null : () => onAction(LoanAction.reject),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: context.pk.card,
+        border: Border(top: BorderSide(color: context.pk.border)),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                loan.waitingOwner ? t.loanStepOwner : t.loanStepDirektur,
+                key: const Key('loan-decision-step'),
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  if (canReject)
+                    Expanded(
+                      child: OnlineOnlyButton(
+                        key: const Key('loan-action-reject'),
+                        label: t.loanReject,
+                        icon: Icons.close,
+                        outlined: true,
+                        onPressed: busy ? null : () => onAction(LoanAction.reject),
+                      ),
                     ),
-                  ),
-                if (canReject && canApprove) const SizedBox(width: 12),
-                if (canApprove)
-                  Expanded(
-                    child: OnlineOnlyButton(
-                      key: const Key('loan-action-approve'),
-                      label: t.loanApprove,
-                      icon: Icons.check,
-                      onPressed: busy ? null : () => onAction(LoanAction.approve),
+                  if (canReject && canApprove) const SizedBox(width: 12),
+                  if (canApprove)
+                    Expanded(
+                      child: OnlineOnlyButton(
+                        key: const Key('loan-action-approve'),
+                        label: t.loanApprove,
+                        icon: Icons.check,
+                        onPressed: busy ? null : () => onAction(LoanAction.approve),
+                      ),
                     ),
-                  ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1310,8 +1334,9 @@ class _RepaymentSheetState extends State<_RepaymentSheet> {
         children: [
           Text(
             _request ? t.loanRepayRequestTitle(l.title) : t.loanRepayTitle(l.title),
-            style: theme.textTheme.titleMedium,
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
+          const SizedBox(height: 4),
           Text(
             _request
                 ? t.loanRepayable(formatRupiah(l.repayableAmount))

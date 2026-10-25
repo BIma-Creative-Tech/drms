@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/theme.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/format/dates.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/pk_ui.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../masters/domain/master_item.dart';
 import '../../companies/presentation/company_chip.dart';
@@ -85,15 +87,14 @@ class _ReportsTab extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
         children: [
           if (local.isNotEmpty) ...[
-            Text(t.progressLocalTitle, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
+            PkSectionHeader(title: t.progressLocalTitle, padding: const EdgeInsets.only(bottom: 10)),
             for (final d in local) _LocalCard(draft: d),
-            const SizedBox(height: 16),
+            const SizedBox(height: 6),
           ],
-          Row(
-            children: [Expanded(child: Text(t.progressServerTitle, style: Theme.of(context).textTheme.titleMedium))],
+          PkSectionHeader(
+            title: t.progressServerTitle,
+            padding: EdgeInsets.only(top: local.isEmpty ? 0 : 14, bottom: 10),
           ),
-          const SizedBox(height: 8),
           if (projects.length > 1)
             DropdownButtonFormField<int?>(
               key: const Key('progress-filter'),
@@ -112,7 +113,7 @@ class _ReportsTab extends ConsumerWidget {
               ],
               onChanged: onFilter,
             ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           if (!online && !page.hasValue)
             _Notice(icon: Icons.cloud_off, text: t.progressListOffline)
           else
@@ -136,16 +137,7 @@ class _Notice extends StatelessWidget {
   final IconData icon;
   final String text;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 24),
-    child: Column(
-      children: [
-        Icon(icon, size: 40, color: Theme.of(context).colorScheme.outline),
-        const SizedBox(height: 8),
-        Text(text, textAlign: TextAlign.center),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) => PkEmptyState(icon: icon, message: text);
 }
 
 class _LocalCard extends ConsumerWidget {
@@ -155,53 +147,70 @@ class _LocalCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final d = draft;
     final needsDecision =
         d.conflictCopy != null &&
         (d.syncState == ProgressSyncState.conflict || d.syncState == ProgressSyncState.rejected);
-    return Card(
+    return PkCard(
       key: Key('progress-local-${d.clientUuid}'),
-      child: InkWell(
-        onTap: () =>
-            context.push(needsDecision ? '/progress/conflict/${d.clientUuid}' : '/progress/draft/${d.clientUuid}'),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CompanyChipLead(companyId: d.companyId, always: true),
-                  Expanded(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      onTap: () =>
+          context.push(needsDecision ? '/progress/conflict/${d.clientUuid}' : '/progress/draft/${d.clientUuid}'),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PkIconChip(icon: needsDecision ? Icons.call_split : Icons.phone_android, tone: PkTone.warn, size: 40),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CompanyChipLead(companyId: d.companyId, always: true),
+                    Expanded(
+                      child: Text(
+                        d.projectLabel.isEmpty ? '#${d.projectId}' : d.projectLabel,
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ProgressStateChip(state: d.syncState),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  [
+                    if (d.stageLabel.isNotEmpty) d.stageLabel,
+                    '${d.pctBefore == null ? '' : '${fmtPct(d.pctBefore!)} → '}${fmtPct(d.pctAfter)}',
+                    if (d.isEdit) t.progressEditTag,
+                    t.progressPhotoCount(d.photoTotal),
+                  ].join(' · '),
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+                if (d.lastError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(d.lastError!, style: theme.textTheme.bodySmall?.copyWith(color: context.pk.badText)),
+                  ),
+                if (needsDecision)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      d.projectLabel.isEmpty ? '#${d.projectId}' : d.projectLabel,
-                      style: Theme.of(context).textTheme.titleSmall,
+                      t.progressConflictHint,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                  ProgressStateChip(state: d.syncState),
-                ],
-              ),
-              Text(
-                [
-                  if (d.stageLabel.isNotEmpty) d.stageLabel,
-                  '${d.pctBefore == null ? '' : '${fmtPct(d.pctBefore!)} → '}${fmtPct(d.pctAfter)}',
-                  if (d.isEdit) t.progressEditTag,
-                  t.progressPhotoCount(d.photoTotal),
-                ].join(' · '),
-              ),
-              if (d.lastError != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(d.lastError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                ),
-              if (needsDecision)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(t.progressConflictHint, style: Theme.of(context).textTheme.bodySmall),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -217,54 +226,63 @@ class _ReportCard extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final r = report;
     final theme = Theme.of(context);
-    return Card(
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    return PkCard(
       key: Key('progress-report-${r.id}'),
-      child: InkWell(
-        onTap: () => context.push('/progress/report/${r.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (r.photos.isNotEmpty) ...[
-                ServerPhotoThumb(photoId: r.photos.first.id, size: 64, group: [for (final p in r.photos) p.id]),
-                const SizedBox(width: 12),
-              ],
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      onTap: () => context.push('/progress/report/${r.id}'),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (r.photos.isNotEmpty)
+            ServerPhotoThumb(photoId: r.photos.first.id, size: 64, group: [for (final p in r.photos) p.id])
+          else
+            const PkIconChip(icon: Icons.trending_up, tone: PkTone.info, size: 40),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        CompanyChipLead(companyId: r.companyId),
-                        Expanded(
-                          child: Text(
-                            [r.docNo ?? '', formatDateOnly(r.reportDate)].where((e) => e.isNotEmpty).join(' · '),
-                            style: theme.textTheme.labelMedium,
-                          ),
+                    CompanyChipLead(companyId: r.companyId),
+                    Expanded(
+                      child: Text(
+                        [r.docNo ?? '', formatDateOnly(r.reportDate)].where((e) => e.isNotEmpty).join(' · '),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
                         ),
-                      ],
-                    ),
-                    Text(r.projectLabel, style: theme.textTheme.titleSmall),
-                    Text('${r.stageName ?? '-'} · ${fmtPct(r.pctBefore)} → ${fmtPct(r.pctAfter)}'),
-                    Text(r.work, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 6,
-                      children: [
-                        if (r.photos.length > 1)
-                          Text(t.progressPhotoCount(r.photos.length), style: theme.textTheme.bodySmall),
-                        if (r.offline) Text(t.progressOfflineTag, style: theme.textTheme.bodySmall),
-                        if (r.editable) Text(t.progressEditableTag, style: theme.textTheme.bodySmall),
-                        if (r.reporterName != null) Text(r.reporterName!, style: theme.textTheme.bodySmall),
-                      ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ],
+                Text(r.projectLabel, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 2),
+                Text(
+                  '${r.stageName ?? '-'} · ${fmtPct(r.pctBefore)} → ${fmtPct(r.pctAfter)}',
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                Text(r.work, maxLines: 2, overflow: TextOverflow.ellipsis, style: muted),
+                if (r.photos.length > 1 || r.offline || r.editable || r.reporterName != null) ...[
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (r.photos.length > 1) PkPill(label: t.progressPhotoCount(r.photos.length), icon: Icons.photo),
+                      if (r.offline) PkPill(label: t.progressOfflineTag, tone: PkTone.warn, icon: Icons.cloud_off),
+                      if (r.editable) PkPill(label: t.progressEditableTag, tone: PkTone.info, icon: Icons.edit),
+                      if (r.reporterName != null) Text(r.reporterName!, style: muted),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -285,20 +303,25 @@ class _ProjectsTab extends ConsumerWidget {
         data: (list) => ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
           children: [
-            Text(t.progressProjectsIntro, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 4),
+            Text(
+              t.progressProjectsIntro,
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 8),
             Wrap(
               spacing: 16,
+              runSpacing: 6,
               children: [
                 _Legend(color: progressSeriesPhysical, label: t.progressPhysical),
                 _Legend(color: progressSeriesBudget, label: t.progressBudgetUsed),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             if (list.projects.isEmpty) _Notice(icon: Icons.domain_disabled, text: t.progressProjectsEmpty),
             for (final p in list.projects)
               Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.only(bottom: 10),
                 child: ProjectProgressCard(item: p),
               ),
           ],

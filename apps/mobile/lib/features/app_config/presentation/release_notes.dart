@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/theme.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/pk_ui.dart';
 import '../domain/app_config.dart';
 
 /// "Yang baru di versi X" + bullets from `GET /app/config` `releaseNotes` (plain text, rendered as text).
@@ -17,8 +19,19 @@ class ReleaseNotesList extends StatelessWidget {
       key: const Key('release-notes'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(AppLocalizations.of(context).releaseNotesTitle(version), style: theme.textTheme.titleMedium),
-        const SizedBox(height: 8),
+        Row(
+          children: [
+            const PkIconChip(icon: Icons.auto_awesome_outlined, size: 32),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                AppLocalizations.of(context).releaseNotesTitle(version),
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         for (final n in notes)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
@@ -53,16 +66,29 @@ class UpdateDownloadLink extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final url = this.url;
     if (url == null) return Text(t.updateContactAdmin, textAlign: TextAlign.center);
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(t.updateDownloadHint, textAlign: TextAlign.center),
-        SelectableText(
-          url,
+        Text(
+          t.updateDownloadHint,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(PkRadius.sm),
+          ),
+          child: SelectableText(
+            url,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
+        const SizedBox(height: 10),
         OutlinedButton.icon(
           key: const Key('update-copy-link'),
           onPressed: () => Clipboard.setData(ClipboardData(text: url)),
@@ -100,17 +126,19 @@ class UpdateAvailableSheet extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.system_update, color: Theme.of(context).colorScheme.primary),
+              const PkIconChip(icon: Icons.system_update, size: 44),
               const SizedBox(width: 12),
               Expanded(child: Text(t.updateAvailable(latest), style: Theme.of(context).textTheme.titleLarge)),
             ],
           ),
           const SizedBox(height: 16),
           if (cfg.releaseNotes.isNotEmpty && cfg.latestAppVersion != null) ...[
-            ReleaseNotesList(version: latest, notes: cfg.releaseNotes),
+            PkCard(
+              child: ReleaseNotesList(version: latest, notes: cfg.releaseNotes),
+            ),
             const SizedBox(height: 16),
           ],
-          Text(t.updateHowTo),
+          Text(t.updateHowTo, style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 16),
           UpdateDownloadLink(url: cfg.appDownloadUrl),
         ],

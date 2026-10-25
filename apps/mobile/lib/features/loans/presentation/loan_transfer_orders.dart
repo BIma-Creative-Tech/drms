@@ -11,6 +11,8 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/online_only_button.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_proyek.dart';
 import '../../companies/presentation/company_chip.dart';
 import '../../finance/application/finance_providers.dart';
 import '../../finance/presentation/transfer_form_screen.dart' show transferOverridePrompt;
@@ -71,12 +73,8 @@ class LoanTransferOrderSection extends ConsumerWidget {
         key: const Key('loan-transfer-orders'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-            child: Text(t.loanTransferOrdersTitle(items.length), style: Theme.of(context).textTheme.titleMedium),
-          ),
+          PkListTitle(t.loanTransferOrdersTitle(items.length), padding: const EdgeInsets.only(bottom: 10)),
           for (final o in items) LoanTransferOrderCard(order: o),
-          const Divider(height: 16),
         ],
       ),
     );
@@ -172,81 +170,88 @@ class _LoanTransferOrderCardState extends ConsumerState<LoanTransferOrderCard> {
     final o = widget.order;
     final from = o.fromAccount?.label ?? '—';
     final to = o.toAccount?.label ?? '—';
-    return Card(
+    return PkCard(
       key: Key('loan-order-${o.key}'),
       margin: const EdgeInsets.only(bottom: 10),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.push('/loans/${o.loanId}'),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
+      padding: const EdgeInsets.all(14),
+      onTap: () => context.push('/loans/${o.loanId}'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CompanyChipLead(companyId: o.companyId),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              PkIconChip(
+                icon: o.repayment ? Icons.keyboard_return : Icons.swap_horiz,
+                tone: o.repayment ? PkTone.ok : PkTone.info,
+                size: 38,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Text(
-                          o.docNo ?? '#${o.loanId}',
-                          style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary),
+                        CompanyChipLead(companyId: o.companyId),
+                        Flexible(
+                          child: Text(
+                            o.docNo ?? '#${o.loanId}',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
-                        Text(o.title, style: theme.textTheme.titleMedium),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    formatRupiah(o.amount),
-                    key: Key('loan-order-${o.key}-amount'),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(t.loanFlow(from, to), key: Key('loan-order-${o.key}-accounts'), style: theme.textTheme.bodyMedium),
-              if (o.fromProject != null || o.toProject != null)
-                Text(
-                  t.loanFlow(o.fromProject?.label ?? '—', o.toProject?.label ?? '—'),
-                  style: theme.textTheme.bodySmall,
+                    Text(o.title, style: pkTitleStyle(context)),
+                  ],
                 ),
+              ),
+              const SizedBox(width: 8),
               Text(
-                [
-                  if (o.date != null) formatDateOnly(o.date),
-                  if (o.submittedBy?.name != null) t.loanSubmittedBy(o.submittedBy!.name!),
-                ].join(' · '),
-                style: theme.textTheme.bodySmall,
+                formatRupiah(o.amount),
+                key: Key('loan-order-${o.key}-amount'),
+                style: pkAmountStyle(context, base: theme.textTheme.titleMedium),
               ),
-              if ((o.note ?? o.reason).isNotEmpty)
-                Text(o.note ?? o.reason, maxLines: 2, overflow: TextOverflow.ellipsis),
-              if (o.selfSubmitted)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    t.loanTransferOrderSelf,
-                    key: Key('loan-order-${o.key}-self'),
-                    style: theme.textTheme.bodySmall?.copyWith(color: context.pk.warnText, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              if (o.canExecute) ...[
-                const SizedBox(height: 10),
-                OnlineOnlyButton(
-                  key: Key('loan-order-${o.key}-execute'),
-                  label: t.loanTransferOrderExecute,
-                  icon: Icons.account_balance,
-                  onPressed: _busy ? null : _execute,
-                ),
-              ],
             ],
           ),
-        ),
+          const SizedBox(height: 8),
+          Text(t.loanFlow(from, to), key: Key('loan-order-${o.key}-accounts'), style: theme.textTheme.bodyMedium),
+          if (o.fromProject != null || o.toProject != null)
+            Text(t.loanFlow(o.fromProject?.label ?? '—', o.toProject?.label ?? '—'), style: pkMetaStyle(context)),
+          Text(
+            [
+              if (o.date != null) formatDateOnly(o.date),
+              if (o.submittedBy?.name != null) t.loanSubmittedBy(o.submittedBy!.name!),
+            ].join(' · '),
+            style: pkMetaStyle(context),
+          ),
+          if ((o.note ?? o.reason).isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(o.note ?? o.reason, maxLines: 2, overflow: TextOverflow.ellipsis),
+            ),
+          if (o.selfSubmitted)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                t.loanTransferOrderSelf,
+                key: Key('loan-order-${o.key}-self'),
+                style: theme.textTheme.bodySmall?.copyWith(color: context.pk.warnText, fontWeight: FontWeight.w600),
+              ),
+            ),
+          if (o.canExecute) ...[
+            const SizedBox(height: 12),
+            OnlineOnlyButton(
+              key: Key('loan-order-${o.key}-execute'),
+              label: t.loanTransferOrderExecute,
+              icon: Icons.account_balance,
+              onPressed: _busy ? null : _execute,
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -296,7 +301,7 @@ class _ExecuteSheetState extends State<_ExecuteSheet> {
         children: [
           Text(
             t.loanTransferOrderExecuteTitle(o.docNo ?? '#${o.loanId}'),
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 4),
           Text(

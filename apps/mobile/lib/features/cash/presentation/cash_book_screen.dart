@@ -11,6 +11,8 @@ import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
 import '../../../shared/widgets/photo_viewer.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_proyek.dart';
 import '../../../shared/widgets/reason_dialog.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../companies/presentation/company_chip.dart';
@@ -102,29 +104,35 @@ class _CashBookScreenState extends ConsumerState<CashBookScreen> {
         ),
       ),
       bottomNavigationBar: book != null && book.canWrite
-          ? SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        key: const Key('cash-new-in'),
-                        onPressed: () => _newEntry(book, inbound: true),
-                        icon: const Icon(Icons.south),
-                        label: Text(t.cashIn),
+          ? DecoratedBox(
+              decoration: BoxDecoration(
+                color: context.pk.card,
+                border: Border(top: BorderSide(color: context.pk.border)),
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          key: const Key('cash-new-in'),
+                          onPressed: () => _newEntry(book, inbound: true),
+                          icon: const Icon(Icons.south),
+                          label: Text(t.cashIn),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton.icon(
-                        key: const Key('cash-new-out'),
-                        onPressed: () => _newEntry(book, inbound: false),
-                        icon: const Icon(Icons.north),
-                        label: Text(t.cashOut),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton.icon(
+                          key: const Key('cash-new-out'),
+                          onPressed: () => _newEntry(book, inbound: false),
+                          icon: const Icon(Icons.north),
+                          label: Text(t.cashOut),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             )
@@ -134,7 +142,6 @@ class _CashBookScreenState extends ConsumerState<CashBookScreen> {
 
   Widget _body(BuildContext context, CashBook b) {
     final t = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     final p = ref.watch(currentProfileProvider);
     final multi = b.pts.length > 1;
     String code(int? c) => p?.companyCode(c ?? -1) ?? '#$c';
@@ -154,9 +161,9 @@ class _CashBookScreenState extends ConsumerState<CashBookScreen> {
     final more = _page < b.totalPages;
     return ListView(
       key: const Key('cash-book'),
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        Text('${t.cashAsOf(dayMonth(b.today))} · $lockText', style: theme.textTheme.bodySmall),
+        Text('${t.cashAsOf(dayMonth(b.today))} · $lockText', style: pkMetaStyle(context)),
         const SizedBox(height: 4),
         Text(
           t.cashIcReceiving(
@@ -167,26 +174,23 @@ class _CashBookScreenState extends ConsumerState<CashBookScreen> {
                 .join(' · '),
           ),
           key: const Key('cash-ic-receiving'),
-          style: theme.textTheme.bodySmall,
+          style: pkMetaStyle(context),
         ),
         if (!b.canWrite)
-          Card(
+          PkNote(
+            multi ? t.cashReadOnlyMulti : t.cashReadOnly,
             key: const Key('cash-read-only'),
-            margin: const EdgeInsets.only(top: 8),
-            color: theme.colorScheme.secondaryContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(multi ? t.cashReadOnlyMulti : t.cashReadOnly),
-            ),
+            icon: Icons.visibility_outlined,
+            margin: const EdgeInsets.only(top: 10),
           ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         _BalanceTiles(
           book: b,
           multi: multi && _filter.pt == null,
           selected: _filter.accounts,
           onAccount: (id) => _setFilter(_filter.copyWith(accounts: {id})),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
         ListSearchField(
           key: const Key('cash-search'),
           hint: t.cashSearchHint,
@@ -197,23 +201,17 @@ class _CashBookScreenState extends ConsumerState<CashBookScreen> {
         const SizedBox(height: 4),
         Text(
           t.cashBookSub(b.totalDocs, _filter.active || _filter.q.isNotEmpty ? t.cashFiltered : ''),
-          style: theme.textTheme.bodySmall,
+          style: pkMetaStyle(context),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         if (rows.isEmpty)
-          Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              children: [
-                Text(
-                  _filter.active || _filter.q.isNotEmpty ? t.cashEmptyFiltered : t.cashEmpty,
-                  key: const Key('cash-empty'),
-                  textAlign: TextAlign.center,
-                ),
-                if (_filter.active || _filter.q.isNotEmpty)
-                  TextButton(onPressed: () => _setFilter(const CashFilter()), child: Text(t.cashClearFilter)),
-              ],
-            ),
+          PkEmptyState(
+            key: const Key('cash-empty'),
+            icon: Icons.menu_book_outlined,
+            message: _filter.active || _filter.q.isNotEmpty ? t.cashEmptyFiltered : t.cashEmpty,
+            action: _filter.active || _filter.q.isNotEmpty
+                ? TextButton(onPressed: () => _setFilter(const CashFilter()), child: Text(t.cashClearFilter))
+                : null,
           )
         else ...[
           for (final r in rows)
@@ -231,7 +229,7 @@ class _CashBookScreenState extends ConsumerState<CashBookScreen> {
               child: Text(
                 t.cashShownOf(rows.length, b.totalDocs),
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall,
+                style: pkMetaStyle(context),
               ),
             ),
         ],
@@ -253,94 +251,132 @@ class _BalanceTiles extends ConsumerWidget {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final p = ref.watch(currentProfileProvider);
-    final money = theme.textTheme.titleMedium?.copyWith(
-      fontWeight: FontWeight.w700,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Card(
+        // headline card (Banani "BalanceHero" on a white card): total balance, accounts, per PT
+        PkCard(
           key: const Key('cash-total'),
-          margin: EdgeInsets.zero,
-          color: theme.colorScheme.primaryContainer,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(t.cashTotal, style: theme.textTheme.labelLarge),
-                Text(formatRupiah(book.total), key: const Key('cash-total-value'), style: money),
-                Text(t.cashTotalSub(book.accounts.length), style: theme.textTheme.bodySmall),
-                if (multi)
-                  for (final e in book.byPt.entries)
-                    Text(
-                      '${p?.companyCode(e.key) ?? '#${e.key}'} · ${formatRupiah(e.value)}',
-                      style: theme.textTheme.bodySmall,
+          radius: PkRadius.lg,
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const PkIconChip(icon: Icons.account_balance_wallet_outlined, tone: PkTone.primary, size: 34),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      t.cashTotal,
+                      style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                formatRupiah(book.total),
+                key: const Key('cash-total-value'),
+                style: pkAmountStyle(context, base: theme.textTheme.headlineSmall, fontSize: 28),
+              ),
+              const SizedBox(height: 2),
+              Text(t.cashTotalSub(book.accounts.length), style: pkMetaStyle(context)),
+              if (multi) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final e in book.byPt.entries)
+                      PkPill(label: '${p?.companyCode(e.key) ?? '#${e.key}'} · ${formatRupiah(e.value)}'),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (book.accounts.isNotEmpty) ...[
+          PkListTitle(t.cashAccountLabel, padding: const EdgeInsets.only(top: 18, bottom: 8)),
+          // Banani "CashAccounts": one card, a row per account (round icon, name, flows, balance); a row filters
+          PkCard(
+            padding: const EdgeInsets.all(6),
+            child: Column(
+              children: [
+                for (final a in book.accounts)
+                  _AccountRow(
+                    key: Key('cash-acc-${a.cashAccountId}'),
+                    name: multi ? '${p?.companyCode(a.companyId ?? -1) ?? ''} · ${a.name}' : a.name,
+                    balance: a.balance,
+                    flows: t.cashFlows(periodLabel(book.flowPeriod), formatRupiah(a.flowIn), formatRupiah(a.flowOut)),
+                    selected: selected.contains(a.cashAccountId),
+                    onTap: () => onAccount(a.cashAccountId),
+                  ),
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        LayoutBuilder(
-          builder: (context, c) {
-            final cols = c.maxWidth >= 600 ? 3 : 2;
-            final w = (c.maxWidth - 8 * (cols - 1)) / cols;
-            return Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final a in book.accounts)
-                  SizedBox(
-                    width: w,
-                    child: Card(
-                      key: Key('cash-acc-${a.cashAccountId}'),
-                      margin: EdgeInsets.zero,
-                      shape: selected.contains(a.cashAccountId)
-                          ? RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(color: theme.colorScheme.primary, width: 2),
-                            )
-                          : null,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => onAccount(a.cashAccountId),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                multi ? '${p?.companyCode(a.companyId ?? -1) ?? ''} · ${a.name}' : a.name,
-                                style: theme.textTheme.labelMedium,
-                              ),
-                              Text(
-                                formatRupiah(a.balance),
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  fontFeatures: const [FontFeature.tabularFigures()],
-                                ),
-                              ),
-                              Text(
-                                t.cashFlows(
-                                  periodLabel(book.flowPeriod),
-                                  formatRupiah(a.flowIn),
-                                  formatRupiah(a.flowOut),
-                                ),
-                                style: theme.textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
+        ],
       ],
+    );
+  }
+}
+
+/// One cash account row of the balance card.
+class _AccountRow extends StatelessWidget {
+  const _AccountRow({
+    super.key,
+    required this.name,
+    required this.balance,
+    required this.flows,
+    required this.selected,
+    required this.onTap,
+  });
+  final String name;
+  final int balance;
+  final String flows;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final negative = balance < 0;
+    return Material(
+      color: selected ? context.pk.infoBg : Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(PkRadius.sm + 2),
+        side: selected ? BorderSide(color: theme.colorScheme.primary) : BorderSide.none,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              PkIconChip(
+                icon: Icons.account_balance_outlined,
+                tone: selected ? PkTone.primary : (negative ? PkTone.bad : PkTone.neutral),
+                size: 40,
+                round: true,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(flows, style: pkMetaStyle(context)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(formatRupiah(balance), style: pkAmountStyle(context, color: negative ? context.pk.badText : null)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -502,80 +538,79 @@ class CashEntryCard extends ConsumerWidget {
     final theme = Theme.of(context);
     final r = row;
     final lk = book.lookups;
-    final (pillText, pillColor) = r.voided
-        ? (t.cashStatusVoid, context.pk.badText)
+    final (pillText, pillTone) = r.voided
+        ? (t.cashStatusVoid, PkTone.bad)
         : r.isReversal
-        ? (t.cashStatusReversal, context.pk.warnText)
-        : (t.cashStatusPosted, context.pk.okText);
+        ? (t.cashStatusReversal, PkTone.warn)
+        : (t.cashStatusPosted, PkTone.ok);
     final scope =
         CashLookups.labelOf(lk.projects, r.projectId) ?? CashLookups.labelOf(lk.costCenters, r.costCenterId) ?? '—';
     final cat = [
       CashLookups.labelOf(lk.categories, r.categoryId) ?? CashLookups.labelOf(lk.sources, r.cashInSourceId),
       CashLookups.labelOf(lk.vehicles, r.vehicleId),
     ].whereType<String>().join(' · ');
-    final small = theme.textTheme.bodySmall;
+    final small = pkMetaStyle(context);
     final strike = r.voided ? const TextStyle(decoration: TextDecoration.lineThrough) : null;
-    return Card(
+    return PkCard(
       key: Key('cash-row-${r.id}'),
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
       color: r.voided ? theme.colorScheme.surfaceContainerHighest : null,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => showCashEntrySheet(context, ref, row: r, book: book, onChanged: onChanged),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (showPt) CompanyChipLead(companyId: r.companyId),
-                  Expanded(child: Text(dayMonth(r.entryDate), style: theme.textTheme.labelMedium)),
-                  _Pill(text: pillText, color: pillColor),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          r.entryNo,
-                          key: Key('cash-row-${r.id}-no'),
-                          style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary),
-                        ),
-                        Text(r.description ?? r.sourceLabel, style: theme.textTheme.bodyMedium?.merge(strike)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    '${r.inbound ? '+' : '−'} ${formatRupiah(r.amount)}',
-                    key: Key('cash-row-${r.id}-amount'),
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: r.inbound ? context.pk.okText : null,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        )
-                        .merge(strike),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(CashLookups.labelOf(lk.accounts, r.cashAccountId) ?? '#${r.cashAccountId}', style: small),
-              Text('$scope · ${cat.isEmpty ? r.sourceLabel : cat}', style: small),
-              ...cashRowLinks(
-                t,
-                r,
-              ).map((l) => Text(l, style: small?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
-            ],
+      onTap: () => showCashEntrySheet(context, ref, row: r, book: book, onChanged: onChanged),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PkIconChip(
+            icon: r.inbound ? Icons.south_west : Icons.north_east,
+            tone: r.voided ? PkTone.neutral : (r.inbound ? PkTone.ok : PkTone.warn),
+            size: 38,
+            round: true,
           ),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (showPt) CompanyChipLead(companyId: r.companyId),
+                    Expanded(
+                      child: Text(
+                        r.entryNo,
+                        key: Key('cash-row-${r.id}-no'),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Text(dayMonth(r.entryDate), style: pkMetaStyle(context)),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: Text(r.description ?? r.sourceLabel, style: pkTitleStyle(context)?.merge(strike))),
+                    const SizedBox(width: 10),
+                    Text(
+                      '${r.inbound ? '+' : '−'} ${formatRupiah(r.amount)}',
+                      key: Key('cash-row-${r.id}-amount'),
+                      style: pkAmountStyle(context, color: r.inbound ? context.pk.okText : null)?.merge(strike),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(CashLookups.labelOf(lk.accounts, r.cashAccountId) ?? '#${r.cashAccountId}', style: small),
+                Text('$scope · ${cat.isEmpty ? r.sourceLabel : cat}', style: small),
+                ...cashRowLinks(t, r).map((l) => Text(l, style: small)),
+                const SizedBox(height: 8),
+                PkPill(label: pillText, tone: pillTone),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -589,22 +624,6 @@ List<String> cashRowLinks(AppLocalizations t, CashRow r) => [
   if (r.request != null) t.cashRequestLink(r.request!.no),
   if (r.intercompany != null) r.intercompany!.text,
 ];
-
-class _Pill extends StatelessWidget {
-  const _Pill({required this.text, required this.color});
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-    decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999)),
-    child: Text(
-      text,
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w700),
-    ),
-  );
-}
 
 /// Row sheet: the entry's fields and the actions of Finance of its PT (the server decides: `canEdit` / `canVoid`,
 /// `voidHint` when there is no Void). Void asks for a reason (web ReasonAction text).
@@ -709,18 +728,7 @@ class _CashEntrySheetState extends ConsumerState<_CashEntrySheet> {
     final r = widget.row;
     final lk = widget.book.lookups;
     final p = ref.watch(currentProfileProvider);
-    Widget line(String k, String? v) => v == null || v.isEmpty
-        ? const SizedBox.shrink()
-        : Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(width: 130, child: Text(k, style: theme.textTheme.bodySmall)),
-                Expanded(child: Text(v)),
-              ],
-            ),
-          );
+    Widget line(String k, String? v) => v == null || v.isEmpty ? const SizedBox.shrink() : PkKeyRow(k, v);
     return SafeArea(
       child: SingleChildScrollView(
         key: const Key('cash-sheet'),
@@ -729,8 +737,24 @@ class _CashEntrySheetState extends ConsumerState<_CashEntrySheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children:
               [
-                    Text(r.entryNo, style: theme.textTheme.titleLarge),
-                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        PkIconChip(
+                          icon: r.inbound ? Icons.south_west : Icons.north_east,
+                          tone: r.voided ? PkTone.neutral : (r.inbound ? PkTone.ok : PkTone.warn),
+                          size: 40,
+                          round: true,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            r.entryNo,
+                            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     if (widget.book.pts.length > 1)
                       line(
                         t.cashPt,
@@ -753,16 +777,8 @@ class _CashEntrySheetState extends ConsumerState<_CashEntrySheet> {
                     line(t.cashVehicle, CashLookups.labelOf(lk.vehicles, r.vehicleId)),
                     line(t.cashDescription, r.description),
                     line(t.cashSource, r.sourceLabel),
-                    for (final l in cashRowLinks(t, r)) Text(l, style: theme.textTheme.bodySmall),
-                    if (r.voidHint != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          r.voidHint!,
-                          key: const Key('cash-void-hint'),
-                          style: theme.textTheme.bodySmall?.copyWith(color: context.pk.warnText),
-                        ),
-                      ),
+                    for (final l in cashRowLinks(t, r)) Text(l, style: pkMetaStyle(context)),
+                    if (r.voidHint != null) PkNote(r.voidHint!, key: const Key('cash-void-hint'), tone: PkTone.warn),
                     const SizedBox(height: 16),
                     if (r.proofId != null)
                       OutlinedButton.icon(

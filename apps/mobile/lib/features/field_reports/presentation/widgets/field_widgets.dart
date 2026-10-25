@@ -12,6 +12,8 @@ import '../../../../core/logging/log.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../../shared/widgets/action_feedback.dart';
 import '../../../../shared/widgets/form_grid.dart';
+import '../../../../shared/widgets/pk_ui.dart';
+import '../../../../shared/widgets/pk_ui_lapangan.dart';
 import '../../../expense/presentation/camera_capture_screen.dart';
 import '../../../progress/presentation/widgets/progress_widgets.dart' show LocalPhotoThumb;
 import '../../application/field_service.dart';
@@ -31,6 +33,14 @@ final fieldPhotoCaptureProvider = Provider<FieldPhotoCapture>(
 
 /// `21 Sep 2026 12.05 WITA` of a server instant.
 String formatEditableUntil(String? iso, String? zone) => formatServerDateTime(iso, zone: zone);
+
+/// Glyph of a report type (hub tiles, history rows, conflict header).
+IconData fieldReportIcon(FieldReportType type) => switch (type) {
+  FieldReportType.serviceReport => Icons.build_circle_outlined,
+  FieldReportType.unitTimesheet => Icons.timer_outlined,
+  FieldReportType.aftersalesActivity => Icons.local_shipping_outlined,
+  FieldReportType.dailyReport => Icons.engineering_outlined,
+};
 
 /// "Kam, 9 Okt 2026".
 String fieldDateLabel(String ymd) {
@@ -97,7 +107,8 @@ class DraftAutosaver {
   }
 }
 
-/// White card section of the mockups ("Unit", "Pekerjaan", "Sparepart dipakai", …).
+/// White card section of the mockups ("Unit", "Pekerjaan", "Sparepart dipakai", …). D2510: hairline card,
+/// radius 14, bold title; [highlight] = primary 2 dp border (the section that needs attention).
 class FieldSection extends StatelessWidget {
   const FieldSection({super.key, required this.title, required this.children, this.trailing, this.highlight = false});
   final String title;
@@ -108,37 +119,40 @@ class FieldSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: highlight ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
-          width: highlight ? 2 : 1,
+    final pk = context.pk;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: pk.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(PkRadius.md),
+          side: BorderSide(color: highlight ? theme.colorScheme.primary : pk.border, width: highlight ? 2 : 1),
         ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(child: Text(title, style: theme.textTheme.titleMedium)),
-                ?trailing,
-              ],
-            ),
-            const SizedBox(height: 10),
-            ...children,
-          ],
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  ),
+                  ?trailing,
+                ],
+              ),
+              const SizedBox(height: 12),
+              ...children,
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Small helper / warning line under a field (icon + text, never colour alone).
+/// Small helper / warning line under a field (icon + text, never colour alone): plain muted text, or a soft
+/// orange ([warn]) / red ([error]) box.
 class FieldNote extends StatelessWidget {
   const FieldNote({super.key, required this.text, this.warn = false, this.error = false});
   final String text;
@@ -148,27 +162,18 @@ class FieldNote extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = error ? theme.colorScheme.error : (warn ? context.pk.warnText : theme.colorScheme.onSurfaceVariant);
+    if (warn || error) {
+      return PkNotice(
+        text: text,
+        tone: error ? PkTone.bad : PkTone.warn,
+        icon: error ? Icons.error_outline : Icons.info_outline,
+        dense: true,
+        margin: const EdgeInsets.only(top: 6),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.only(top: 6),
-      child: Container(
-        padding: warn || error ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6) : EdgeInsets.zero,
-        decoration: warn || error
-            ? BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(8))
-            : null,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (warn || error) ...[
-              Icon(error ? Icons.error_outline : Icons.info_outline, size: 16, color: color),
-              const SizedBox(width: 6),
-            ],
-            Expanded(
-              child: Text(text, style: theme.textTheme.bodySmall?.copyWith(color: color)),
-            ),
-          ],
-        ),
-      ),
+      child: Text(text, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
     );
   }
 }
@@ -221,12 +226,12 @@ class ChoiceGrid<T> extends StatelessWidget {
     child: Material(
       color: sel ? (selectedColor?.call(o) ?? scheme.primary) : scheme.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(PkRadius.sm + 2),
         side: sel ? BorderSide.none : BorderSide(color: scheme.outlineVariant),
       ),
       child: InkWell(
         key: Key('$keyPrefix-${code?.call(o) ?? '$o'}'),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(PkRadius.sm + 2),
         onTap: onSelected == null ? null : () => onSelected!(o),
         child: Semantics(
           selected: sel,
@@ -529,7 +534,10 @@ class PhotoGroup extends StatelessWidget {
                   key: addKey,
                   style: OutlinedButton.styleFrom(
                     padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    foregroundColor: theme.colorScheme.primary,
+                    backgroundColor: context.pk.infoBg.withValues(alpha: 0.5),
+                    side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.4)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: onAdd,
                   child: Tooltip(message: t.fieldAddPhoto, child: const Icon(Icons.add_a_photo)),
@@ -589,7 +597,7 @@ class FieldDateField extends StatelessWidget {
   }
 }
 
-/// Local state of a field report as chip (icon + label; never colour alone).
+/// Local state of a field report as a soft pill (icon + label; never colour alone).
 class FieldStateChip extends StatelessWidget {
   const FieldStateChip({super.key, required this.state});
   final FieldSyncState state;
@@ -597,18 +605,14 @@ class FieldStateChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final (IconData icon, Color? color, String label) = switch (state) {
-      FieldSyncState.local => (Icons.edit_note, null, t.fieldStateDraft),
-      FieldSyncState.queued => (Icons.schedule, context.pk.warnText, t.fieldStateQueued),
-      FieldSyncState.synced => (Icons.cloud_done, context.pk.okText, t.fieldStateSent),
-      FieldSyncState.conflict => (Icons.call_split, context.pk.warnText, t.fieldStateConflict),
-      FieldSyncState.rejected => (Icons.error, context.pk.badText, t.fieldStateRejected),
+    final (IconData icon, PkTone tone, String label) = switch (state) {
+      FieldSyncState.local => (Icons.edit_note, PkTone.neutral, t.fieldStateDraft),
+      FieldSyncState.queued => (Icons.schedule, PkTone.warn, t.fieldStateQueued),
+      FieldSyncState.synced => (Icons.cloud_done, PkTone.ok, t.fieldStateSent),
+      FieldSyncState.conflict => (Icons.call_split, PkTone.warn, t.fieldStateConflict),
+      FieldSyncState.rejected => (Icons.error, PkTone.bad, t.fieldStateRejected),
     };
-    return Chip(
-      avatar: Icon(icon, size: 18, color: color),
-      label: Text(label),
-      visualDensity: VisualDensity.compact,
-    );
+    return PkPill(icon: icon, tone: tone, label: label);
   }
 }
 
@@ -624,16 +628,12 @@ class DraftSavedPill extends StatelessWidget {
         ? const SizedBox.shrink()
         : Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: Container(
-              key: const Key('field-draft-saved'),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: context.pk.okText.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                AppLocalizations.of(context).fieldDraftSaved,
-                style: TextStyle(color: context.pk.okText, fontWeight: FontWeight.w600, fontSize: 12),
+            child: Center(
+              child: PkPill(
+                key: const Key('field-draft-saved'),
+                label: AppLocalizations.of(context).fieldDraftSaved,
+                tone: PkTone.ok,
+                icon: Icons.check,
               ),
             ),
           ),
@@ -647,14 +647,14 @@ class HoursBar extends StatelessWidget {
   final double standby;
   final double breakdown;
 
-  static const workColor = Color(0xFF2563EB);
-  static const standbyColor = Color(0xFFF59E0B);
-  static const breakdownColor = Color(0xFFDC2626);
-
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    // work = primary · standby = orange · breakdown = red (theme colours, D2510: no hex in feature code)
+    final workColor = theme.colorScheme.primary;
+    final standbyColor = context.pk.warn;
+    final breakdownColor = context.pk.bad;
     final total = work + standby + breakdown;
     final over = total > maxHoursPerDay + 1e-9;
     int flex(double v) => (v.clamp(0, maxHoursPerDay) * 100).round();
@@ -668,23 +668,23 @@ class HoursBar extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(99),
             child: SizedBox(
-              height: 10,
+              height: 12,
               child: Row(
                 children: [
                   if (work > 0)
                     Expanded(
                       flex: flex(work),
-                      child: const ColoredBox(color: workColor),
+                      child: ColoredBox(color: workColor),
                     ),
                   if (standby > 0)
                     Expanded(
                       flex: flex(standby),
-                      child: const ColoredBox(color: standbyColor),
+                      child: ColoredBox(color: standbyColor),
                     ),
                   if (breakdown > 0)
                     Expanded(
                       flex: flex(breakdown),
-                      child: const ColoredBox(color: breakdownColor),
+                      child: ColoredBox(color: breakdownColor),
                     ),
                   if (rest > 0)
                     Expanded(
@@ -754,7 +754,7 @@ class _UnitPickerState extends State<_UnitPicker> {
                           final u = list[i];
                           return ListTile(
                             key: Key('unit-option-${u.id}'),
-                            leading: const Icon(Icons.agriculture),
+                            leading: const PkIconChip(icon: Icons.agriculture, tone: PkTone.warn),
                             title: Text(u.title),
                             subtitle: Text(unitSubtitle(t, u)),
                             onTap: () => Navigator.of(context).pop(u),

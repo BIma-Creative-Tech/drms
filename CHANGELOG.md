@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**APK 0.13.0 (tag `mobile-v0.13.0`, PR #140), APK-only release:** server stays 0.20.0, no migration, no API change;
+APK 0.12.0 keeps working. Folded into the next web release section.
+
+### Changed
+
+- **APK restyle after the Banani reference "Project Monitoring Hub" (D2510, user 2026-10-25), web palette kept** (ADR
+  0015 tokens unchanged; layout and components only). Presentation-only: same providers, routes, keys, texts and popups.
+  - Kit `lib/shared/widgets/pk_ui.dart` (hero band, cards, icon chips, soft status pills, KPI tiles, section headers,
+    progress bars, quick actions, avatar, info rows, section cards, empty state) + `PkColors` hero / soft-status colours
+    and `PkRadius`; group helpers in `pk_ui_{keuangan,lapangan,proyek,akun}.dart`.
+  - **Beranda** (supersedes the launcher-only home of 2026-10-18): hero (PT, bell, avatar, greeting, role), role summary
+    with its two main actions, quick actions, KPI tiles, projects needing attention, cash accounts, the first two
+    approvals with inline Setujui / Tolak (same decision sheet, signature, fund check and popups as the detail), then a
+    3-column module grid. Bottom bar: waiting counts on Persetujuan / Antrian Transfer.
+  - Splash and login with the brand hero; every other screen restyled one by one: pengajuan (list, detail, draft / line
+    editor, LPJ, history), Persetujuan + decision sheet, Antrian Transfer + transfer form, addendum; absensi (today hero
+    card, 60 dp check-in / check-out, recap calendar, team, on-behalf, schedule), laporan lapangan, progress; proyek
+    (list, detail tabs, RAP), buku kas, tutup buku, pinjaman antar project / antar PT; Profil (hero + grouped rows),
+    Keamanan, Antrean sinkron, notifications, PT switcher, module landing pages (menu rows), master data, users, access
+    matrix, klien / vendor, laporan, dashboard cards.
+  - CI: workflow `mobile-preview` (pushes to `feat/d2510-apk-ui-**`, or by hand) runs `flutter analyze` and the
+    `test_preview/` screenshot tests (light + dark) and uploads them as artifact `mobile-preview-shots`; the broken
+    loans / sites previews are fixed and new previews cover every group.
+
 ## [0.20.0] - 2026-10-24
 
 **Client feedback 24/10 (D2410, PR #138); APK 0.12.0.** Five streams on top of 0.19.3 (0.19.2/0.19.3 = security

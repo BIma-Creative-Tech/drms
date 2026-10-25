@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/theme.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/media/photo_compressor.dart';
@@ -17,6 +18,8 @@ import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/online_only_button.dart';
 import '../../../shared/widgets/photo_viewer.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_proyek.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/presentation/receipt_capture.dart';
 import '../../expense/presentation/widgets/master_picker.dart';
@@ -382,252 +385,255 @@ class _CashEntryFormScreenState extends ConsumerState<CashEntryFormScreen> {
                         'PT ${p?.companyCode(widget.pt.companyId) ?? ''} — ${p?.company(widget.pt.companyId)?.name ?? ''}',
                       t.cashNewNote,
                     ].join(' · '),
-              style: theme.textTheme.bodySmall,
+              style: pkMetaStyle(context),
             ),
             const SizedBox(height: 12),
             if (_summary != null)
-              Card(
+              PkCard(
                 key: const Key('cash-form-error'),
-                color: theme.colorScheme.errorContainer,
+                color: context.pk.badBg,
                 margin: const EdgeInsets.only(bottom: 12),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(12),
+                child: DefaultTextStyle.merge(
+                  style: TextStyle(color: context.pk.badOn),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [Text(_summary!), for (final v in _errors.values) Text('• $v')],
                   ),
                 ),
               ),
-            Text(t.cashKind, style: theme.textTheme.labelLarge),
-            const SizedBox(height: 6),
-            SegmentedButton<bool>(
-              key: const Key('cash-direction'),
-              segments: [
-                ButtonSegment(value: true, icon: const Icon(Icons.south), label: Text(t.cashIn)),
-                ButtonSegment(value: false, icon: const Icon(Icons.north), label: Text(t.cashOut)),
-              ],
-              selected: {_in},
-              onSelectionChanged: _edit ? null : (s) => setState(() => _in = s.first),
-            ),
-            const SizedBox(height: 16),
-            FormGrid(
-              children: [
-                FormGridCell(
-                  label: t.cashDate,
-                  builder: (label) => InkWell(
-                    key: const Key('cash-date'),
-                    onTap: _edit ? null : _pickDate,
-                    child: InputDecorator(
-                      decoration: InputDecoration(
-                        labelText: label,
-                        enabled: !_edit,
-                        errorText: _errors['entryDate'],
-                        helperText: _edit
-                            ? null
-                            : [
-                                lock == null ? t.cashDateNoLock : t.cashDateLock(lock),
-                                if (opening != null) t.cashDateOpening(dmy(opening)),
-                                t.cashDateNoFuture,
-                              ].join(' '),
-                        helperMaxLines: 3,
-                        suffixIcon: const Icon(Icons.event),
-                      ),
-                      child: Text(formatDateOnly(_date), key: const Key('cash-date-value')),
-                    ),
-                  ),
-                ),
-                FormGridCell(
-                  label: t.cashAccountLabel,
-                  // locked in edit mode (ADR 0005 §5: amount / date / account change = void + new entry)
-                  child: IgnorePointer(
-                    ignoring: _edit,
-                    child: Opacity(
-                      opacity: _edit ? 0.6 : 1,
-                      child: MasterPickerField(
-                        key: const Key('cash-account'),
-                        label: t.cashAccountLabel,
-                        items: accounts,
-                        value: _accountId,
-                        allowNone: false,
-                        errorText: _errors['cashAccountId'],
-                        onChanged: (v) => setState(() => _accountId = v),
-                      ),
-                    ),
-                  ),
-                ),
-                FormGridCell(
-                  label: t.cashAmount,
-                  builder: (label) => TextField(
-                    key: const Key('cash-amount'),
-                    controller: _amount,
-                    enabled: !_edit,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: const [RupiahInputFormatter()],
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      labelText: label,
-                      prefixText: 'Rp ',
-                      errorText: _errors['amount'],
-                      helperText: _edit
-                          ? t.cashLockedHelp
-                          : '${t.cashAmountHelp}${amount != null ? ' · ${formatRupiah(amount)}' : ''}',
-                      helperMaxLines: 2,
-                    ),
-                  ),
-                ),
-                if (_in)
-                  FormGridCell(
-                    label: t.cashSourceIn,
-                    child: MasterPickerField(
-                      key: const Key('cash-source'),
-                      label: t.cashSourceIn,
-                      items: _items(lk.sources, keep: [e?.cashInSourceId]),
-                      value: _sourceId,
-                      errorText: _errors['cashInSourceId'],
-                      onChanged: (v) => setState(() => _sourceId = v),
-                    ),
-                  )
-                else
-                  FormGridCell(
-                    label: t.cashCategory,
-                    child: MasterPickerField(
-                      key: const Key('cash-category'),
-                      label: t.cashCategory,
-                      items: _items(lk.categories, keep: [e?.categoryId]),
-                      value: _categoryId,
-                      errorText: _errors['categoryId'],
-                      onChanged: (v) => setState(() => _categoryId = v),
-                    ),
-                  ),
-                FormGridCell(
-                  label: t.cashScope,
-                  full: true,
-                  stackedLabel: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SegmentedButton<CashScope>(
-                        key: const Key('cash-scope'),
-                        segments: [
-                          ButtonSegment(value: CashScope.project, label: Text(t.cashProject)),
-                          // ADR 0031: the old cost-center option stays only on a legacy entry
-                          if (e?.costCenterId != null)
-                            ButtonSegment(value: CashScope.costCenter, label: Text(t.costCenterLegacyLabel)),
-                          ButtonSegment(value: CashScope.none, label: Text(t.cashScopeNone)),
-                        ],
-                        selected: {_scope},
-                        onSelectionChanged: (s) => setState(() => _scope = s.first),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(t.cashScopeHelp, style: theme.textTheme.bodySmall),
-                    ],
-                  ),
-                ),
-                if (_scope == CashScope.project)
-                  FormGridCell(
-                    label: t.cashProject,
-                    child: MasterPickerField(
-                      key: const Key('cash-project'),
-                      label: t.cashProject,
-                      items: _items(lk.projects, keep: [e?.projectId]),
-                      value: _projectId,
-                      allowNone: false,
-                      errorText: _errors['projectId'],
-                      onChanged: (v) => setState(() => _projectId = v),
-                    ),
-                  ),
-                if (_scope == CashScope.costCenter)
-                  FormGridCell(
-                    label: t.costCenterLegacyLabel,
-                    child: MasterPickerField(
-                      key: const Key('cash-cost-center'),
-                      label: t.costCenterLegacyLabel,
-                      items: _items(lk.costCenters, keep: [e?.costCenterId]),
-                      value: _costCenterId,
-                      allowNone: false,
-                      errorText: _errors['costCenterId'],
-                      onChanged: (v) => setState(() => _costCenterId = v),
-                    ),
-                  ),
-                if (!_in)
-                  FormGridCell(
-                    label: t.cashVehicleOptional,
-                    child: MasterPickerField(
-                      key: const Key('cash-vehicle'),
-                      label: t.cashVehicleOptional,
-                      hint: t.cashVehicleNone,
-                      items: _items(lk.vehicles, keep: [e?.vehicleId]),
-                      value: _vehicleId,
-                      errorText: _errors['vehicleId'],
-                      helperText: category?.requiresVehicle == true ? t.cashVehicleHint : null,
-                      onChanged: (v) => setState(() => _vehicleId = v),
-                    ),
-                  ),
-                FormGridCell(
-                  label: t.cashDescription,
-                  full: true,
-                  builder: (label) => TextField(
-                    key: const Key('cash-description'),
-                    controller: _description,
-                    minLines: 2,
-                    maxLines: 5,
-                    maxLength: 1000,
-                    decoration: InputDecoration(labelText: label, errorText: _errors['description']),
-                  ),
-                ),
-                FormGridCell(
-                  label: _edit && e!.proofId != null ? t.cashProofReplace : t.cashProofOptional,
-                  full: true,
-                  stackedLabel: true,
-                  child: _ProofField(
-                    proof: _proof,
-                    currentId: e?.proofId,
-                    onAdd: (fromCamera) => _addProof(fromCamera: fromCamera),
-                  ),
-                ),
-                if (_edit)
-                  FormGridCell(
-                    label: t.cashReason,
-                    full: true,
-                    builder: (label) => TextField(
-                      key: const Key('cash-reason'),
-                      controller: _reason,
-                      minLines: 2,
-                      maxLines: 4,
-                      maxLength: 1000,
-                      decoration: InputDecoration(
-                        labelText: label,
-                        errorText: _errors['reason'],
-                        helperText: t.cashReasonHelp,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(t.cashRulesTitle, style: theme.textTheme.titleSmall),
-                    for (final rule in [
-                      t.cashRule1,
-                      t.cashRule2,
-                      lock == null ? t.cashRule3 : t.cashRule3Lock(dayMonth(lock)),
-                      t.cashRule4,
-                    ])
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text('• $rule', style: theme.textTheme.bodySmall),
-                      ),
-                  ],
-                ),
+            PkSectionCard(
+              title: t.cashKind,
+              icon: _in ? Icons.south_west : Icons.north_east,
+              child: SegmentedButton<bool>(
+                key: const Key('cash-direction'),
+                segments: [
+                  ButtonSegment(value: true, icon: const Icon(Icons.south), label: Text(t.cashIn)),
+                  ButtonSegment(value: false, icon: const Icon(Icons.north), label: Text(t.cashOut)),
+                ],
+                selected: {_in},
+                onSelectionChanged: _edit ? null : (s) => setState(() => _in = s.first),
               ),
             ),
-            const SizedBox(height: 20),
+            PkCard(
+              radius: PkRadius.lg,
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+              child: FormGrid(
+                children: [
+                  FormGridCell(
+                    label: t.cashDate,
+                    builder: (label) => InkWell(
+                      key: const Key('cash-date'),
+                      onTap: _edit ? null : _pickDate,
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: label,
+                          enabled: !_edit,
+                          errorText: _errors['entryDate'],
+                          helperText: _edit
+                              ? null
+                              : [
+                                  lock == null ? t.cashDateNoLock : t.cashDateLock(lock),
+                                  if (opening != null) t.cashDateOpening(dmy(opening)),
+                                  t.cashDateNoFuture,
+                                ].join(' '),
+                          helperMaxLines: 3,
+                          suffixIcon: const Icon(Icons.event),
+                        ),
+                        child: Text(formatDateOnly(_date), key: const Key('cash-date-value')),
+                      ),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.cashAccountLabel,
+                    // locked in edit mode (ADR 0005 §5: amount / date / account change = void + new entry)
+                    child: IgnorePointer(
+                      ignoring: _edit,
+                      child: Opacity(
+                        opacity: _edit ? 0.6 : 1,
+                        child: MasterPickerField(
+                          key: const Key('cash-account'),
+                          label: t.cashAccountLabel,
+                          items: accounts,
+                          value: _accountId,
+                          allowNone: false,
+                          errorText: _errors['cashAccountId'],
+                          onChanged: (v) => setState(() => _accountId = v),
+                        ),
+                      ),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.cashAmount,
+                    builder: (label) => TextField(
+                      key: const Key('cash-amount'),
+                      controller: _amount,
+                      enabled: !_edit,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: const [RupiahInputFormatter()],
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        labelText: label,
+                        prefixText: 'Rp ',
+                        errorText: _errors['amount'],
+                        helperText: _edit
+                            ? t.cashLockedHelp
+                            : '${t.cashAmountHelp}${amount != null ? ' · ${formatRupiah(amount)}' : ''}',
+                        helperMaxLines: 2,
+                      ),
+                    ),
+                  ),
+                  if (_in)
+                    FormGridCell(
+                      label: t.cashSourceIn,
+                      child: MasterPickerField(
+                        key: const Key('cash-source'),
+                        label: t.cashSourceIn,
+                        items: _items(lk.sources, keep: [e?.cashInSourceId]),
+                        value: _sourceId,
+                        errorText: _errors['cashInSourceId'],
+                        onChanged: (v) => setState(() => _sourceId = v),
+                      ),
+                    )
+                  else
+                    FormGridCell(
+                      label: t.cashCategory,
+                      child: MasterPickerField(
+                        key: const Key('cash-category'),
+                        label: t.cashCategory,
+                        items: _items(lk.categories, keep: [e?.categoryId]),
+                        value: _categoryId,
+                        errorText: _errors['categoryId'],
+                        onChanged: (v) => setState(() => _categoryId = v),
+                      ),
+                    ),
+                  FormGridCell(
+                    label: t.cashScope,
+                    full: true,
+                    stackedLabel: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SegmentedButton<CashScope>(
+                          key: const Key('cash-scope'),
+                          segments: [
+                            ButtonSegment(value: CashScope.project, label: Text(t.cashProject)),
+                            // ADR 0031: the old cost-center option stays only on a legacy entry
+                            if (e?.costCenterId != null)
+                              ButtonSegment(value: CashScope.costCenter, label: Text(t.costCenterLegacyLabel)),
+                            ButtonSegment(value: CashScope.none, label: Text(t.cashScopeNone)),
+                          ],
+                          selected: {_scope},
+                          onSelectionChanged: (s) => setState(() => _scope = s.first),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(t.cashScopeHelp, style: theme.textTheme.bodySmall),
+                      ],
+                    ),
+                  ),
+                  if (_scope == CashScope.project)
+                    FormGridCell(
+                      label: t.cashProject,
+                      child: MasterPickerField(
+                        key: const Key('cash-project'),
+                        label: t.cashProject,
+                        items: _items(lk.projects, keep: [e?.projectId]),
+                        value: _projectId,
+                        allowNone: false,
+                        errorText: _errors['projectId'],
+                        onChanged: (v) => setState(() => _projectId = v),
+                      ),
+                    ),
+                  if (_scope == CashScope.costCenter)
+                    FormGridCell(
+                      label: t.costCenterLegacyLabel,
+                      child: MasterPickerField(
+                        key: const Key('cash-cost-center'),
+                        label: t.costCenterLegacyLabel,
+                        items: _items(lk.costCenters, keep: [e?.costCenterId]),
+                        value: _costCenterId,
+                        allowNone: false,
+                        errorText: _errors['costCenterId'],
+                        onChanged: (v) => setState(() => _costCenterId = v),
+                      ),
+                    ),
+                  if (!_in)
+                    FormGridCell(
+                      label: t.cashVehicleOptional,
+                      child: MasterPickerField(
+                        key: const Key('cash-vehicle'),
+                        label: t.cashVehicleOptional,
+                        hint: t.cashVehicleNone,
+                        items: _items(lk.vehicles, keep: [e?.vehicleId]),
+                        value: _vehicleId,
+                        errorText: _errors['vehicleId'],
+                        helperText: category?.requiresVehicle == true ? t.cashVehicleHint : null,
+                        onChanged: (v) => setState(() => _vehicleId = v),
+                      ),
+                    ),
+                  FormGridCell(
+                    label: t.cashDescription,
+                    full: true,
+                    builder: (label) => TextField(
+                      key: const Key('cash-description'),
+                      controller: _description,
+                      minLines: 2,
+                      maxLines: 5,
+                      maxLength: 1000,
+                      decoration: InputDecoration(labelText: label, errorText: _errors['description']),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: _edit && e!.proofId != null ? t.cashProofReplace : t.cashProofOptional,
+                    full: true,
+                    stackedLabel: true,
+                    child: _ProofField(
+                      proof: _proof,
+                      currentId: e?.proofId,
+                      onAdd: (fromCamera) => _addProof(fromCamera: fromCamera),
+                    ),
+                  ),
+                  if (_edit)
+                    FormGridCell(
+                      label: t.cashReason,
+                      full: true,
+                      builder: (label) => TextField(
+                        key: const Key('cash-reason'),
+                        controller: _reason,
+                        minLines: 2,
+                        maxLines: 4,
+                        maxLength: 1000,
+                        decoration: InputDecoration(
+                          labelText: label,
+                          errorText: _errors['reason'],
+                          helperText: t.cashReasonHelp,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            PkSectionCard(
+              title: t.cashRulesTitle,
+              icon: Icons.rule,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final rule in [
+                    t.cashRule1,
+                    t.cashRule2,
+                    lock == null ? t.cashRule3 : t.cashRule3Lock(dayMonth(lock)),
+                    t.cashRule4,
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text('• $rule', style: pkMetaStyle(context)),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
             OnlineOnlyButton(
               key: const Key('cash-submit'),
               label: _busy

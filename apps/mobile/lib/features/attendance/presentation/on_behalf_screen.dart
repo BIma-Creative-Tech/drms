@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/theme.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/location/location_service.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/pk_ui.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
 import '../../privacy/application/privacy_providers.dart';
@@ -164,102 +166,131 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
           final usable = site != null && (site.hasGeofence || site.unrestricted);
           final canSubmit = enabled && !privacyBlocked && !_busy && who != null && usable;
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             children: [
               if (privacyBlocked) const PrivacyAttendanceBlock(from: 'on-behalf'),
               if (!enabled) InfoCard(text: t.attendanceDisabled, error: true),
               InfoCard(text: t.onBehalfIntro),
               if (list.isEmpty) InfoCard(text: t.onBehalfNoTeam, error: true),
-              DropdownButtonFormField<int>(
-                hint: Text(t.pickEmployee),
-                key: const Key('on-behalf-employee'),
-                initialValue: who?.employeeId,
-                isExpanded: true,
-                decoration: InputDecoration(labelText: t.onBehalfEmployee, prefixIcon: const Icon(Icons.person)),
-                items: [
-                  for (final c in list)
-                    DropdownMenuItem(
-                      value: c.employeeId,
-                      child: Text(c.hasAccount ? c.name : '${c.name} · ${t.onBehalfNoAccount}'),
+              const SizedBox(height: 6),
+              PkCard(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DropdownButtonFormField<int>(
+                      hint: Text(t.pickEmployee),
+                      key: const Key('on-behalf-employee'),
+                      initialValue: who?.employeeId,
+                      isExpanded: true,
+                      decoration: InputDecoration(labelText: t.onBehalfEmployee, prefixIcon: const Icon(Icons.person)),
+                      items: [
+                        for (final c in list)
+                          DropdownMenuItem(
+                            value: c.employeeId,
+                            child: Text(c.hasAccount ? c.name : '${c.name} · ${t.onBehalfNoAccount}'),
+                          ),
+                      ],
+                      onChanged: _busy
+                          ? null
+                          : (v) => setState(() {
+                              _employeeId = v;
+                              _siteKey = null;
+                            }),
                     ),
-                ],
-                onChanged: _busy
-                    ? null
-                    : (v) => setState(() {
-                        _employeeId = v;
-                        _siteKey = null;
-                      }),
-              ),
-              const SizedBox(height: 12),
-              if (who != null)
-                DropdownButtonFormField<String>(
-                  hint: Text(t.pickLocation),
-                  key: const Key('on-behalf-site'),
-                  initialValue: site?.key,
-                  isExpanded: true,
-                  decoration: InputDecoration(labelText: t.attendanceLocation, prefixIcon: const Icon(Icons.place)),
-                  items: [for (final s in who.sites) DropdownMenuItem(value: s.key, child: Text(siteLabel(t, s)))],
-                  onChanged: _busy ? null : (v) => setState(() => _siteKey = v),
-                ),
-              const SizedBox(height: 12),
-              SegmentedButton<AttendanceKind>(
-                key: const Key('on-behalf-kind'),
-                segments: [
-                  ButtonSegment(
-                    value: AttendanceKind.checkIn,
-                    icon: const Icon(Icons.login),
-                    label: Text(t.attendanceCheckIn),
-                  ),
-                  ButtonSegment(
-                    value: AttendanceKind.checkOut,
-                    icon: const Icon(Icons.logout),
-                    label: Text(t.attendanceCheckOut),
-                  ),
-                ],
-                selected: {_kind},
-                onSelectionChanged: _busy ? null : (s) => setState(() => _kind = s.first),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                key: const Key('on-behalf-reason'),
-                controller: _reason,
-                maxLength: 500,
-                decoration: InputDecoration(
-                  labelText: t.onBehalfReason,
-                  hintText: t.onBehalfReasonHint,
-                  errorText: _reasonError,
+                    if (who != null) ...[
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        hint: Text(t.pickLocation),
+                        key: const Key('on-behalf-site'),
+                        initialValue: site?.key,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: t.attendanceLocation,
+                          prefixIcon: const Icon(Icons.place),
+                        ),
+                        items: [
+                          for (final s in who.sites) DropdownMenuItem(value: s.key, child: Text(siteLabel(t, s))),
+                        ],
+                        onChanged: _busy ? null : (v) => setState(() => _siteKey = v),
+                      ),
+                    ],
+                    if (site != null && !site.hasGeofence && !site.unrestricted)
+                      InfoCard(text: t.attendanceNoGeofence, error: true),
+                  ],
                 ),
               ),
-              Text(t.onBehalfCamera, style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 8),
-              SegmentedButton<CameraLens>(
-                key: const Key('on-behalf-lens'),
-                segments: [
-                  ButtonSegment(
-                    value: CameraLens.back,
-                    icon: const Icon(Icons.photo_camera_back),
-                    label: Text(t.lensBack),
-                  ),
-                  ButtonSegment(
-                    value: CameraLens.front,
-                    icon: const Icon(Icons.photo_camera_front),
-                    label: Text(t.lensFront),
-                  ),
-                ],
-                selected: {_lens},
-                onSelectionChanged: _busy ? null : (s) => setState(() => _lens = s.first),
+              PkCard(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SegmentedButton<AttendanceKind>(
+                      key: const Key('on-behalf-kind'),
+                      segments: [
+                        ButtonSegment(
+                          value: AttendanceKind.checkIn,
+                          icon: const Icon(Icons.login),
+                          label: Text(t.attendanceCheckIn),
+                        ),
+                        ButtonSegment(
+                          value: AttendanceKind.checkOut,
+                          icon: const Icon(Icons.logout),
+                          label: Text(t.attendanceCheckOut),
+                        ),
+                      ],
+                      selected: {_kind},
+                      onSelectionChanged: _busy ? null : (s) => setState(() => _kind = s.first),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      key: const Key('on-behalf-reason'),
+                      controller: _reason,
+                      maxLength: 500,
+                      decoration: InputDecoration(
+                        labelText: t.onBehalfReason,
+                        hintText: t.onBehalfReasonHint,
+                        errorText: _reasonError,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              if (site != null && !site.hasGeofence && !site.unrestricted)
-                InfoCard(text: t.attendanceNoGeofence, error: true),
-              const SizedBox(height: 16),
+              PkSectionCard(
+                title: t.onBehalfCamera,
+                icon: Icons.photo_camera_outlined,
+                child: SegmentedButton<CameraLens>(
+                  key: const Key('on-behalf-lens'),
+                  segments: [
+                    ButtonSegment(
+                      value: CameraLens.back,
+                      icon: const Icon(Icons.photo_camera_back),
+                      label: Text(t.lensBack),
+                    ),
+                    ButtonSegment(
+                      value: CameraLens.front,
+                      icon: const Icon(Icons.photo_camera_front),
+                      label: Text(t.lensFront),
+                    ),
+                  ],
+                  selected: {_lens},
+                  onSelectionChanged: _busy ? null : (s) => setState(() => _lens = s.first),
+                ),
+              ),
+              const SizedBox(height: 4),
               FilledButton.icon(
                 key: const Key('on-behalf-submit'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(56),
+                  textStyle: const TextStyle(fontFamily: PkFonts.body, fontSize: 16, fontWeight: FontWeight.w700),
+                ),
                 onPressed: canSubmit ? () => _record(who, site) : null,
                 icon: _busy
                     ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.how_to_reg),
                 label: Text(_kind == AttendanceKind.checkIn ? t.onBehalfCheckIn : t.onBehalfCheckOut),
               ),
+              const SizedBox(height: 8),
               if (_notice != null) InfoCard(key: const Key('on-behalf-notice'), text: _notice!, error: _noticeError),
             ],
           );

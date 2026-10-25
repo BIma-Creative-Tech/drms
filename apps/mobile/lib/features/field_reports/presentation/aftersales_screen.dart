@@ -339,7 +339,7 @@ class _AftersalesScreenState extends ConsumerState<AftersalesScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           if (_base?.lastError != null) FieldNote(text: _base!.lastError!, error: true),
           if (_isEdit && _base?.editableUntil != null)
@@ -610,7 +610,7 @@ class _AftersalesScreenState extends ConsumerState<AftersalesScreen> {
               const SizedBox(height: 8),
               FilledButton(
                 key: const Key('activity-submit'),
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                 onPressed: _busy || _projectId == null ? null : _submit,
                 child: _busy
                     ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
@@ -656,26 +656,42 @@ class _AftersalesScreenState extends ConsumerState<AftersalesScreen> {
             Card(
               key: const Key('activity-follow-ups'),
               elevation: 0,
-              color: context.pk.warnText.withValues(alpha: 0.10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: context.pk.warnText.withValues(alpha: 0.4)),
-              ),
+              margin: EdgeInsets.zero,
+              color: context.pk.warnBg,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(PkRadius.md)),
               child: Padding(
                 padding: const EdgeInsets.all(14),
-                child: Column(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      t.fieldNeedsFollowUp,
-                      style: theme.textTheme.titleMedium?.copyWith(color: context.pk.warnText),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(color: context.pk.card, borderRadius: BorderRadius.circular(12)),
+                      child: Icon(Icons.notifications_active_outlined, color: context.pk.warnOn, size: 20),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      [
-                        t.fieldOpenPosCount(allPos.length),
-                        if (day?.value != null) t.fieldFollowUpsToday(day!.value!.followUpsDue),
-                      ].join(' · '),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            t.fieldNeedsFollowUp,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: context.pk.warnOn,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            [
+                              t.fieldOpenPosCount(allPos.length),
+                              if (day?.value != null) t.fieldFollowUpsToday(day!.value!.followUpsDue),
+                            ].join(' · '),
+                            style: TextStyle(color: context.pk.warnOn),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -711,17 +727,19 @@ class _ActivityRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(6),
+              constraints: const BoxConstraints(minWidth: 36),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: context.pk.infoBg, borderRadius: BorderRadius.circular(PkRadius.sm)),
+              child: Text(
+                tag,
+                style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700, color: context.pk.infoOn),
               ),
-              child: Text(tag, style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700)),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -735,7 +753,7 @@ class _ActivityRow extends StatelessWidget {
                 ],
               ),
             ),
-            if (state != null) FieldStateChip(state: state!),
+            if (state != null) ...[const SizedBox(width: 8), FieldStateChip(state: state!)],
           ],
         ),
       ),

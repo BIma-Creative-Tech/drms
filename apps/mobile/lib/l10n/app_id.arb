@@ -4714,5 +4714,24 @@
   "accountSignatureRemoveAction": "Hapus tanda tangan",
   "actionDeleteDraft": "Hapus draft",
   "deleteDraftServerConfirm": "Draft dihapus dari daftar dan tidak dapat dikirim lagi; nomor yang sudah terbit tidak dipakai ulang.",
-  "deleteDraftDone": "Draft dihapus."
+  "deleteDraftDone": "Draft dihapus.",
+  "homeAccountsTitle": "Kas & bank",
+  "homeAccountsCount": "{count} rekening",
+  "@homeAccountsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeTransferWaiting": "{count} menunggu transfer",
+  "@homeTransferWaiting": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "akunGroupAccount": "Akun",
+  "akunGroupApp": "Aplikasi"
 }

@@ -7,6 +7,7 @@ import '../../../app/providers.dart';
 import '../../../core/format/dates.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/pk_ui.dart';
 import '../../auth/application/auth_controller.dart';
 import '../domain/expense_request.dart';
 
@@ -80,15 +81,10 @@ class HistoryScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(requestHistoryProvider(id)),
           data: (rows) => rows.isEmpty
               ? ListView(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Center(child: Text(t.historyEmpty)),
-                    ),
-                  ],
+                  children: [PkEmptyState(icon: Icons.history, message: t.historyEmpty)],
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   itemCount: rows.length,
                   itemBuilder: (_, i) => _HistoryCard(entry: rows[rows.length - 1 - i], zone: zone),
                 ),
@@ -115,48 +111,65 @@ class _HistoryCard extends StatelessWidget {
       if (e.appVersion != null) e.appVersion!,
       if (e.deviceId != null) 'perangkat ${e.deviceId!.length > 8 ? '${e.deviceId!.substring(0, 8)}…' : e.deviceId}',
     ].join(' · ');
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
     Widget kv(String k, String v) => Padding(
-      padding: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.only(top: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 96, child: Text(k, style: theme.textTheme.bodySmall)),
-          Expanded(child: Text(v, style: theme.textTheme.bodyMedium)),
+          SizedBox(width: 96, child: Text(k, style: muted)),
+          Expanded(
+            child: Text(v, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
+          ),
         ],
       ),
     );
-    return Card(
+    final tone = switch (e.action) {
+      'approve' || 'acknowledge' || 'verify' || 'number_issued' => PkTone.ok,
+      'reject' || 'void' || 'access_denied' || 'delete_attempt' => PkTone.bad,
+      'flag_raised' || 'approval_policy_exception' => PkTone.warn,
+      _ => PkTone.info,
+    };
+    // D2510: a bordered card with an action icon chip, the document as a pill, muted meta.
+    return PkCard(
       margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PkIconChip(icon: Icons.history, tone: tone, size: 34),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(
-                    historyActionLabels[e.action] ?? e.action,
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        historyActionLabels[e.action] ?? e.action,
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 170),
+                      child: PkPill(label: e.docNo != null && e.docType != 'expense_request' ? '$doc ${e.docNo}' : doc),
+                    ),
+                  ],
                 ),
-                Chip(
-                  label: Text(e.docNo != null && e.docType != 'expense_request' ? '$doc ${e.docNo}' : doc),
-                  visualDensity: VisualDensity.compact,
-                ),
+                const SizedBox(height: 2),
+                Text('${formatServerDateTime(e.serverTime, zone: zone)} · ${historyActor(e)}', style: muted),
+                if (field != null) kv(t.historyField, field),
+                if (e.statusFrom != null || e.statusTo != null || e.oldValue != null || e.newValue != null)
+                  kv(t.historyChange, historyChange(e)),
+                if (e.reason != null) kv(t.historyReason, e.reason!),
+                kv(t.historySource, source),
               ],
             ),
-            Text(
-              '${formatServerDateTime(e.serverTime, zone: zone)} · ${historyActor(e)}',
-              style: theme.textTheme.bodySmall,
-            ),
-            if (field != null) kv(t.historyField, field),
-            if (e.statusFrom != null || e.statusTo != null || e.oldValue != null || e.newValue != null)
-              kv(t.historyChange, historyChange(e)),
-            if (e.reason != null) kv(t.historyReason, e.reason!),
-            kv(t.historySource, source),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

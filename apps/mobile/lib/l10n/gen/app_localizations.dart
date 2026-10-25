@@ -10800,6 +10800,36 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Draft dihapus.'**
   String get deleteDraftDone;
+
+  /// No description provided for @homeAccountsTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Kas & bank'**
+  String get homeAccountsTitle;
+
+  /// No description provided for @homeAccountsCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} rekening'**
+  String homeAccountsCount(int count);
+
+  /// No description provided for @homeTransferWaiting.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} menunggu transfer'**
+  String homeTransferWaiting(int count);
+
+  /// No description provided for @akunGroupAccount.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun'**
+  String get akunGroupAccount;
+
+  /// No description provided for @akunGroupApp.
+  ///
+  /// In id, this message translates to:
+  /// **'Aplikasi'**
+  String get akunGroupApp;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

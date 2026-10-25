@@ -7,19 +7,26 @@ import '../icons/iconsax.dart';
 /// white Iconsax WalletMoney glyph. Used on the splash and login screens only (the launcher icon and the
 /// native splash assets are unchanged).
 class BrandMark extends StatelessWidget {
-  const BrandMark({super.key, this.size = 72});
+  const BrandMark({super.key, this.size = 72, this.onHero = false});
   final double size;
+
+  /// D2510: on the blue hero band — light-blue tile with the dark-blue glyph instead of the gradient.
+  final bool onHero;
 
   @override
   Widget build(BuildContext context) {
-    final g = context.pk.gradient(PkModule.dashboard);
+    final pk = context.pk;
+    final g = pk.gradient(PkModule.dashboard);
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(size * 0.28),
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [g.from, g.to]),
+        color: onHero ? pk.heroPill : null,
+        gradient: onHero
+            ? null
+            : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [g.from, g.to]),
         boxShadow: [
           BoxShadow(
-            color: g.from.withValues(alpha: 0.35),
+            color: (onHero ? const Color(0xFF000000) : g.from).withValues(alpha: onHero ? 0.25 : 0.35),
             blurRadius: 24,
             offset: const Offset(0, 10),
             spreadRadius: -8,
@@ -29,7 +36,7 @@ class BrandMark extends StatelessWidget {
       child: SizedBox.square(
         dimension: size,
         child: Center(
-          child: PkIcon(PkIcons.finance, size: size * 0.54, color: const Color(0xFFFFFFFF)),
+          child: PkIcon(PkIcons.finance, size: size * 0.54, color: onHero ? pk.onHeroPill : const Color(0xFFFFFFFF)),
         ),
       ),
     );

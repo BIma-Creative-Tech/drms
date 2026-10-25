@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/theme.dart';
 import '../../../core/format/dates.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/pk_ui.dart';
 import '../../attendance/presentation/attendance_widgets.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/privacy_providers.dart';
@@ -63,7 +65,13 @@ class PrivacyNoticeScreen extends ConsumerWidget {
             : ListView(
                 key: const Key('privacy-notice-body'),
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                children: [MarkdownView(blocks: parseMarkdown(n.markdown))],
+                children: [
+                  PkCard(
+                    radius: PkRadius.lg,
+                    padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
+                    child: MarkdownView(blocks: parseMarkdown(n.markdown)),
+                  ),
+                ],
               ),
       ),
       bottomNavigationBar: SafeArea(

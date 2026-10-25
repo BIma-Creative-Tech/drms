@@ -17,6 +17,7 @@ import '../application/attendance_providers.dart';
 import '../application/attendance_service.dart';
 import '../domain/attendance.dart';
 import '../domain/attendance_recap.dart';
+import '../../../shared/widgets/pk_ui.dart';
 import 'recap_view.dart';
 
 ({Color color, IconData icon, String label}) memberStatusVisual(MemberStatus s, AppLocalizations t, PkColors pk) =>
@@ -59,11 +60,19 @@ class _TeamTodayViewState extends ConsumerState<TeamTodayView> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
             children: [
-              Text(
-                '${formatDateOnly(team.date)}${team.holidayName == null ? '' : ' · ${team.holidayName}'}',
-                style: Theme.of(context).textTheme.titleMedium,
+              Row(
+                children: [
+                  const PkIconChip(icon: Icons.groups_outlined, tone: PkTone.primary, size: 40),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '${formatDateOnly(team.date)}${team.holidayName == null ? '' : ' · ${team.holidayName}'}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -97,8 +106,9 @@ class _TeamTodayViewState extends ConsumerState<TeamTodayView> {
                 const SizedBox(height: 12),
                 // Flag "Absensi dari APK" off for the PT(s): the button stays visible but disabled, with the
                 // reason, instead of disappearing (the server would reject an on-behalf check-in anyway).
-                OutlinedButton.icon(
+                FilledButton.tonalIcon(
                   key: const Key('team-on-behalf'),
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                   onPressed: canOnBehalf ? () => context.push('/attendance/on-behalf') : null,
                   icon: const Icon(Icons.how_to_reg),
                   label: Text(t.onBehalfAction),
@@ -117,12 +127,8 @@ class _TeamTodayViewState extends ConsumerState<TeamTodayView> {
                     ),
                   ),
               ],
-              const SizedBox(height: 12),
-              if (members.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Center(child: Text(t.teamEmpty)),
-                ),
+              const SizedBox(height: 16),
+              if (members.isEmpty) PkEmptyState(icon: Icons.group_off_outlined, message: t.teamEmpty),
               for (final m in members) _MemberCard(member: m, date: team.date, zone: team.timezone),
             ],
           );
@@ -159,123 +165,123 @@ class _MemberCard extends ConsumerWidget {
         if (l.checkOut != null) (l, AttendanceKind.checkOut, l.checkOut!),
       ],
     ];
-    return Card(
+    final tone = switch (m.status) {
+      MemberStatus.belumAbsen => PkTone.warn,
+      MemberStatus.hadir => PkTone.info,
+      MemberStatus.selesai => PkTone.ok,
+    };
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    final times = [
+      if (m.checkInLocal != null) '${t.teamIn} ${m.checkInLocal}',
+      if (m.checkOutLocal != null) '${t.teamOut} ${m.checkOutLocal}',
+    ];
+    return PkCard(
       key: Key('team-member-${m.employee.id}'),
-      child: InkWell(
-        onTap: () => context.push('/attendance/recap/${m.employee.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      onTap: () => context.push('/attendance/recap/${m.employee.id}'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: v.color.withValues(alpha: 0.15),
-                    child: Icon(v.icon, color: v.color),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              PkAvatar(name: m.employee.name, size: 44),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            CompanyChipLead(companyId: m.companyId),
-                            Flexible(child: Text(m.employee.name, style: theme.textTheme.titleSmall)),
-                          ],
-                        ),
-                        Text(
-                          [
-                            v.label,
-                            if (m.checkInLocal != null) '${t.teamIn} ${m.checkInLocal}',
-                            if (m.checkOutLocal != null) '${t.teamOut} ${m.checkOutLocal}',
-                          ].join(' · '),
-                        ),
-                        if (m.assigned.isNotEmpty)
-                          Text(
-                            m.assigned.map((a) => a.label).join(', '),
-                            style: theme.textTheme.bodySmall,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                        CompanyChipLead(companyId: m.companyId),
+                        Flexible(
+                          child: Text(
+                            m.employee.name,
+                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                           ),
+                        ),
                       ],
                     ),
-                  ),
-                ],
+                    if (times.isNotEmpty)
+                      Text(times.join(' · '), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                    if (m.assigned.isNotEmpty)
+                      Text(
+                        m.assigned.map((a) => a.label).join(', '),
+                        style: muted,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
               ),
-              if (m.lateMinutes > 0 || m.onBehalf || m.corrected)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Wrap(
-                    spacing: 6,
-                    children: [
-                      if (m.lateMinutes > 0) _Tag(icon: Icons.alarm, text: t.recapLateBy(m.lateMinutes)),
-                      if (m.onBehalf) _Tag(icon: Icons.how_to_reg, text: t.teamOnBehalfTag),
-                      if (m.corrected) _Tag(icon: Icons.edit_calendar, text: t.teamCorrectedTag),
-                    ],
-                  ),
-                ),
-              if (canOnBehalf || (canCorrect && marks.isNotEmpty))
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      if (canOnBehalf)
-                        FilledButton.tonalIcon(
-                          key: Key('team-absenkan-${m.employee.id}'),
-                          style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-                          onPressed: () => context.push(
-                            '/attendance/on-behalf?employee=${m.employee.id}'
-                            '&kind=${m.status == MemberStatus.hadir ? 'check_out' : 'check_in'}',
-                          ),
-                          icon: const Icon(Icons.how_to_reg),
-                          label: Text(m.status == MemberStatus.hadir ? t.onBehalfCheckOut : t.onBehalfCheckIn),
-                        ),
-                      if (canCorrect)
-                        for (final (l, kind, mark) in marks)
-                          OutlinedButton.icon(
-                            key: Key('team-correct-${mark.id}'),
-                            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
-                            onPressed: () =>
-                                showDialog<bool>(
-                                  context: context,
-                                  builder: (_) => CorrectionDialog(
-                                    attendanceId: mark.id,
-                                    kind: kind,
-                                    localDate: date,
-                                    currentIso: mark.time,
-                                    zone: zone,
-                                    title: '${m.employee.name} · ${l.location.label}',
-                                  ),
-                                ).then((ok) {
-                                  if (ok == true) ref.invalidate(teamTodayProvider(null));
-                                }),
-                            icon: const Icon(Icons.edit_calendar),
-                            label: Text(
-                              '${kind == AttendanceKind.checkIn ? t.teamIn : t.teamOut} ${localHm(mark.time, zone)}',
-                            ),
-                          ),
-                    ],
-                  ),
-                ),
+              const SizedBox(width: 8),
+              PkPill(label: v.label, tone: tone, icon: v.icon),
             ],
           ),
-        ),
+          if (m.lateMinutes > 0 || m.onBehalf || m.corrected)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, left: 56),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  if (m.lateMinutes > 0)
+                    PkPill(icon: Icons.alarm, label: t.recapLateBy(m.lateMinutes), tone: PkTone.warn),
+                  if (m.onBehalf) PkPill(icon: Icons.how_to_reg, label: t.teamOnBehalfTag),
+                  if (m.corrected) PkPill(icon: Icons.edit_calendar, label: t.teamCorrectedTag),
+                ],
+              ),
+            ),
+          if (canOnBehalf || (canCorrect && marks.isNotEmpty))
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (canOnBehalf)
+                    FilledButton.tonalIcon(
+                      key: Key('team-absenkan-${m.employee.id}'),
+                      style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+                      onPressed: () => context.push(
+                        '/attendance/on-behalf?employee=${m.employee.id}'
+                        '&kind=${m.status == MemberStatus.hadir ? 'check_out' : 'check_in'}',
+                      ),
+                      icon: const Icon(Icons.how_to_reg),
+                      label: Text(m.status == MemberStatus.hadir ? t.onBehalfCheckOut : t.onBehalfCheckIn),
+                    ),
+                  if (canCorrect)
+                    for (final (l, kind, mark) in marks)
+                      OutlinedButton.icon(
+                        key: Key('team-correct-${mark.id}'),
+                        style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                        onPressed: () =>
+                            showDialog<bool>(
+                              context: context,
+                              builder: (_) => CorrectionDialog(
+                                attendanceId: mark.id,
+                                kind: kind,
+                                localDate: date,
+                                currentIso: mark.time,
+                                zone: zone,
+                                title: '${m.employee.name} · ${l.location.label}',
+                              ),
+                            ).then((ok) {
+                              if (ok == true) ref.invalidate(teamTodayProvider(null));
+                            }),
+                        icon: const Icon(Icons.edit_calendar),
+                        label: Text(
+                          '${kind == AttendanceKind.checkIn ? t.teamIn : t.teamOut} ${localHm(mark.time, zone)}',
+                        ),
+                      ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
-}
-
-class _Tag extends StatelessWidget {
-  const _Tag({required this.icon, required this.text});
-  final IconData icon;
-  final String text;
-  @override
-  Widget build(BuildContext context) =>
-      Chip(avatar: Icon(icon, size: 16), label: Text(text), visualDensity: VisualDensity.compact);
 }
 
 /// US-15 (T10) correction of one time: same local date, reason mandatory, online only. The server

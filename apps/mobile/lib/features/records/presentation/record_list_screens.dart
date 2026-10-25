@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../app/theme.dart';
 import '../../../core/platform/report_files.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
 import '../../../shared/widgets/photo_viewer.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_akun.dart';
 import '../../../shared/widgets/reason_dialog.dart';
 import '../../clients/client_form.dart';
 import '../../clients/vendor_form.dart';
@@ -110,54 +113,68 @@ class _RecordListScreenState extends ConsumerState<RecordListScreen> {
                   final cols = page.columns;
                   return ListView(
                     key: const Key('records-list'),
-                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                     children: [
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text(t.recordsCount(page.totalDocs), style: theme.textTheme.bodySmall),
+                        padding: const EdgeInsets.fromLTRB(4, 4, 4, 10),
+                        child: Text(
+                          t.recordsCount(page.totalDocs),
+                          style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        ),
                       ),
                       if (items.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: Text(
-                            _q.isEmpty ? t.recordsEmpty : t.recordsEmptySearch,
-                            key: const Key('records-empty'),
-                            textAlign: TextAlign.center,
-                          ),
+                        PkEmptyState(
+                          key: const Key('records-empty'),
+                          icon: Icons.inventory_2_outlined,
+                          message: _q.isEmpty ? t.recordsEmpty : t.recordsEmptySearch,
                         ),
                       for (final r in items)
-                        Card(
+                        PkCard(
                           key: Key('record-${r.id}'),
-                          margin: const EdgeInsets.only(bottom: 8),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            onTap: () => context.push('/data/${widget.collection}/${r.id}'),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(r.title, style: theme.textTheme.titleSmall),
-                                  for (final c in cols)
-                                    if ((r.cells[c.key] ?? '').isNotEmpty && r.cells[c.key] != r.title)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 2),
-                                        child: Text.rich(
-                                          TextSpan(
-                                            children: [
-                                              TextSpan(
-                                                text: '${c.label}: ',
-                                                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                                              ),
-                                              TextSpan(text: r.cells[c.key]),
-                                            ],
-                                          ),
-                                          style: theme.textTheme.bodySmall,
-                                        ),
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+                          onTap: () => context.push('/data/${widget.collection}/${r.id}'),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const PkIconChip(icon: Icons.description_outlined, size: 38),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      r.title,
+                                      style: theme.textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
                                       ),
-                                ],
+                                    ),
+                                    for (final c in cols)
+                                      if ((r.cells[c.key] ?? '').isNotEmpty && r.cells[c.key] != r.title)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 3),
+                                          child: Text.rich(
+                                            TextSpan(
+                                              children: [
+                                                TextSpan(
+                                                  text: '${c.label}: ',
+                                                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                                                ),
+                                                TextSpan(
+                                                  text: r.cells[c.key],
+                                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                                ),
+                                              ],
+                                            ),
+                                            style: theme.textTheme.bodySmall,
+                                          ),
+                                        ),
+                                  ],
+                                ),
                               ),
-                            ),
+                              Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.onSurfaceVariant),
+                            ],
                           ),
                         ),
                       if (_page < page.totalPages)
@@ -176,7 +193,7 @@ class _RecordListScreenState extends ConsumerState<RecordListScreen> {
                           child: Text(
                             t.recordsShownOf(items.length, page.totalDocs),
                             textAlign: TextAlign.center,
-                            style: theme.textTheme.bodySmall,
+                            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                           ),
                         ),
                     ],
@@ -323,29 +340,61 @@ class RecordDetailScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(recordDetailProvider((collection, id))),
           data: (d) => ListView(
             key: const Key('record-detail'),
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             children: [
-              Text(d.label, style: theme.textTheme.labelMedium),
-              Text(d.title, style: theme.textTheme.titleLarge),
-              const SizedBox(height: 12),
-              if (d.file != null) _FilePreview(file: d.file!),
-              for (final f in d.fields)
-                Padding(
-                  key: Key('record-field-${f.key}'),
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        f.label,
-                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              PkCard(
+                radius: PkRadius.lg,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    const PkIconChip(icon: Icons.description_outlined, size: 44),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            d.label,
+                            style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          ),
+                          Text(d.title, style: theme.textTheme.titleLarge),
+                        ],
                       ),
-                      Text(f.value == null || f.value!.isEmpty ? '—' : f.value!, style: theme.textTheme.bodyMedium),
+                    ),
+                  ],
+                ),
+              ),
+              if (d.file != null) _FilePreview(file: d.file!),
+              if (d.fields.isNotEmpty)
+                PkCard(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final (i, f) in d.fields.indexed) ...[
+                        if (i > 0) const PkRowDivider(indent: 0),
+                        PkStackedField(
+                          key: Key('record-field-${f.key}'),
+                          label: f.label,
+                          value: f.value == null || f.value!.isEmpty ? '—' : f.value!,
+                        ),
+                      ],
                     ],
                   ),
                 ),
-              const SizedBox(height: 8),
-              Text(t.recordsReadOnly, style: theme.textTheme.bodySmall),
+              Row(
+                children: [
+                  Icon(Icons.lock_outline, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      t.recordsReadOnly,
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -383,7 +432,7 @@ class _FilePreview extends ConsumerWidget {
               ),
             ]),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(PkRadius.md),
               child: Image.memory(value, height: 220, fit: BoxFit.cover),
             ),
           ),

@@ -5,12 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../app/theme.dart';
 import '../../core/network/api_exception.dart';
 import '../../l10n/gen/app_localizations.dart';
 import '../../shared/widgets/action_feedback.dart';
 import '../../shared/widgets/async_body.dart';
+import '../../shared/icons/iconsax.dart';
 import '../../shared/widgets/online_only_button.dart';
+import '../../shared/widgets/pk_ui.dart';
+import '../../shared/widgets/pk_ui_akun.dart';
 import '../records/data/records_providers.dart';
+import '../users/onboarding_screen.dart' show FormErrorCard;
 import 'client_form.dart';
 
 /// `/clients/new` and `/clients/:id` (DRMS 16/10 web "Klien" page, phase 5a): PT (create, several PTs), Nama, Alamat,
@@ -144,88 +149,106 @@ class _ClientFormState extends ConsumerState<_ClientForm> {
           key: const Key('client-form'),
           padding: const EdgeInsets.all(16),
           children: [
-            if (readOnly) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(t.recordNoRight)),
+            if (readOnly) PartnerReadOnlyNote(text: t.recordNoRight),
             if (_summary != null)
-              Card(
+              FormErrorCard(
                 key: const Key('client-form-error'),
-                color: theme.colorScheme.errorContainer,
-                margin: const EdgeInsets.only(bottom: 12),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text([_summary!, ..._errors.values.map((e) => '• $e')].join('\n')),
-                ),
+                text: [_summary!, ..._errors.values.map((e) => '• $e')].join('\n'),
               ),
-            if (!_edit && d.companies.length > 1)
-              DropdownButtonFormField<int>(
-                key: const Key('client-company'),
-                initialValue: _company,
-                isExpanded: true,
-                decoration: InputDecoration(labelText: '${t.cashPt} *', errorText: _errors['client.company']),
-                items: [for (final (id, name) in d.companies) DropdownMenuItem(value: id, child: Text(name))],
-                onChanged: (v) => setState(() => _company = v),
-              ),
-            TextField(
-              key: const Key('client-name'),
-              controller: _name,
-              maxLength: 160,
-              decoration: InputDecoration(labelText: '${t.clientName} *', errorText: _errors['client.name']),
-            ),
-            TextField(
-              key: const Key('client-address'),
-              controller: _address,
-              maxLength: 500,
-              minLines: 1,
-              maxLines: 4,
-              decoration: InputDecoration(labelText: t.clientAddress),
-            ),
-            if (_edit)
-              SwitchListTile(
-                key: const Key('client-active'),
-                contentPadding: EdgeInsets.zero,
-                title: Text(t.rapActive),
-                value: _active,
-                onChanged: (v) => setState(() => _active = v),
-              ),
-            if (_needsReason)
-              TextField(
-                key: const Key('client-reason'),
-                controller: _reason,
-                maxLength: 1000,
-                decoration: InputDecoration(labelText: '${t.cashReason} *', errorText: _errors['reason']),
-              ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(child: Text(t.clientContacts, style: theme.textTheme.titleMedium)),
-                TextButton.icon(
-                  key: const Key('client-contact-add'),
-                  onPressed: _contacts.length >= 20 ? null : () => _editContact(),
-                  icon: const Icon(Icons.person_add_alt),
-                  label: Text(t.recordAdd),
-                ),
-              ],
-            ),
-            if (_contacts.isEmpty) Text(t.clientNoContacts, style: theme.textTheme.bodySmall),
-            for (final (i, c) in _contacts.indexed)
-              Card(
-                key: Key('client-contact-$i'),
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  title: Text(c.isPrimary ? '${c.name} · ${t.clientPrimary}' : c.name),
-                  subtitle: Text([?c.position, ?c.phone, ?c.email].join(' · ')),
-                  onTap: () => _editContact(i),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => setState(() => _contacts.removeAt(i)),
+            PkCard(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!_edit && d.companies.length > 1) ...[
+                    DropdownButtonFormField<int>(
+                      key: const Key('client-company'),
+                      initialValue: _company,
+                      isExpanded: true,
+                      decoration: InputDecoration(labelText: '${t.cashPt} *', errorText: _errors['client.company']),
+                      items: [for (final (id, name) in d.companies) DropdownMenuItem(value: id, child: Text(name))],
+                      onChanged: (v) => setState(() => _company = v),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  TextField(
+                    key: const Key('client-name'),
+                    controller: _name,
+                    maxLength: 160,
+                    decoration: InputDecoration(labelText: '${t.clientName} *', errorText: _errors['client.name']),
                   ),
+                  const SizedBox(height: 4),
+                  TextField(
+                    key: const Key('client-address'),
+                    controller: _address,
+                    maxLength: 500,
+                    minLines: 1,
+                    maxLines: 4,
+                    decoration: InputDecoration(labelText: t.clientAddress),
+                  ),
+                  if (_edit)
+                    SwitchListTile(
+                      key: const Key('client-active'),
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(t.rapActive),
+                      value: _active,
+                      onChanged: (v) => setState(() => _active = v),
+                    ),
+                  if (_needsReason)
+                    TextField(
+                      key: const Key('client-reason'),
+                      controller: _reason,
+                      maxLength: 1000,
+                      decoration: InputDecoration(labelText: '${t.cashReason} *', errorText: _errors['reason']),
+                    ),
+                ],
+              ),
+            ),
+            PkSectionCard(
+              title: t.clientContacts,
+              icon: PkIcons.users,
+              trailing: TextButton.icon(
+                key: const Key('client-contact-add'),
+                onPressed: _contacts.length >= 20 ? null : () => _editContact(),
+                icon: const Icon(Icons.person_add_alt),
+                label: Text(t.recordAdd),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_contacts.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Text(
+                        t.clientNoContacts,
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                    ),
+                  for (final (i, c) in _contacts.indexed) ...[
+                    if (i > 0) const PkRowDivider(indent: 52),
+                    PartnerContactRow(
+                      key: Key('client-contact-$i'),
+                      contact: c,
+                      onTap: () => _editContact(i),
+                      onDelete: () => setState(() => _contacts.removeAt(i)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (d.projects.isNotEmpty)
+              PkSectionCard(
+                title: t.clientProjects,
+                icon: PkIcons.project,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final p in d.projects)
+                      Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Text('• $p')),
+                  ],
                 ),
               ),
-            if (d.projects.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(t.clientProjects, style: theme.textTheme.titleMedium),
-              for (final p in d.projects) Text('• $p'),
-            ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 4),
             if (!readOnly)
               OnlineOnlyButton(
                 key: const Key('client-save'),
@@ -234,6 +257,74 @@ class _ClientFormState extends ConsumerState<_ClientForm> {
                 onPressed: _busy ? null : _save,
               ),
             const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "Tidak ada hak" note above a read-only partner form.
+class PartnerReadOnlyNote extends StatelessWidget {
+  const PartnerReadOnlyNote({super.key, required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final pk = context.pk;
+    return PkCard(
+      color: pk.infoBg,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          Icon(Icons.lock_outline, size: 18, color: pk.infoOn),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text, style: TextStyle(color: pk.infoOn)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One Kontak PIC row (client / vendor form): initials, name (+ "Utama"), jabatan · HP · email, delete.
+class PartnerContactRow extends StatelessWidget {
+  const PartnerContactRow({super.key, required this.contact, required this.onTap, required this.onDelete});
+  final ClientContact contact;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final c = contact;
+    final meta = [?c.position, ?c.phone, ?c.email].join(' · ');
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(PkRadius.sm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            PkAvatar(name: c.name, size: 40),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    c.isPrimary ? '${c.name} · ${t.clientPrimary}' : c.name,
+                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  if (meta.isNotEmpty)
+                    Text(meta, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+            IconButton(icon: const Icon(Icons.delete_outline), onPressed: onDelete),
           ],
         ),
       ),
