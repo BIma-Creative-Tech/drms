@@ -152,6 +152,9 @@ abstract class TransferInfo with _$TransferInfo {
 
     /// ADR 0031: the automatic inter-project loan of a transfer paid from another account.
     TransferLoanRef? projectLoan,
+
+    /// D2510: the bank proof (`media-transfer-proofs` id, image or PDF); null from an older server.
+    int? proofId,
   }) = _TransferInfo;
 
   bool get isVoid => status == 'void';

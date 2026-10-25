@@ -318,7 +318,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: ':code',
-            builder: (_, s) => ReportScreen(code: s.pathParameters['code'] ?? ''),
+            builder: (_, s) =>
+                ReportScreen(code: s.pathParameters['code'] ?? '', initialParams: s.uri.queryParametersAll),
           ),
         ],
       ),

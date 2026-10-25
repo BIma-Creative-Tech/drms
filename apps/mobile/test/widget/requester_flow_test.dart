@@ -14,6 +14,7 @@ import 'package:proyekkas/features/expense/presentation/receipt_capture.dart';
 import 'package:proyekkas/features/expense/presentation/request_detail_screen.dart';
 import 'package:proyekkas/features/expense/presentation/requester_actions.dart';
 import 'package:proyekkas/features/expense/presentation/widgets/receipt_thumb.dart';
+import 'package:proyekkas/shared/widgets/media_thumb.dart';
 
 import '../support/fake_dio_adapter.dart';
 import '../support/fixtures.dart';
@@ -73,6 +74,9 @@ Future<void> pumpDetail(WidgetTester tester, Map<String, dynamic> json, FakeExpe
       overrides: [
         requestDetailProvider(42).overrideWith((ref) async => detailFromJson(json)),
         receiptThumbProvider(901).overrideWith((ref) => Future.error(const NetworkException())),
+        // D2510: the transfer proof thumbnail (no real HTTP — an answer would mark the fake connectivity online)
+        mediaImageProvider(('/media/transfer-proofs/9/file', true))
+            .overrideWith((ref) => Future.error(const NetworkException())),
         expenseApiProvider.overrideWithValue(api.api),
       ],
     );

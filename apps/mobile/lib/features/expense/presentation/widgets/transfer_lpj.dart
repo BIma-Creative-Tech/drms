@@ -4,6 +4,7 @@ import '../../../../core/format/dates.dart';
 import '../../../../core/format/rupiah.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../../shared/widgets/doc_no_chip.dart';
+import '../../../../shared/widgets/media_thumb.dart';
 import '../../../../shared/widgets/pk_ui.dart';
 import '../../../../shared/widgets/pk_ui_keuangan.dart';
 import '../../domain/expense_request.dart';
@@ -42,40 +43,67 @@ class TransferSection extends StatelessWidget {
           for (final tr in detail.transfers)
             PkTile(
               margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                key: Key('transfer-${tr.id}'),
-                // d1010 (12b): no transfer screen on the APK — a tap copies the TRF number.
-                onTap: tr.docNo == null ? null : () => DocNoChip.copy(context, tr.docNo!),
-                contentPadding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-                leading: PkIconChip(
-                  icon: tr.isVoid ? Icons.money_off : Icons.account_balance,
-                  tone: tr.isVoid ? PkTone.bad : PkTone.ok,
-                ),
-                title: Text(
-                  '${tr.kindLabel} · ${formatRupiah(tr.amount)}',
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                subtitle: Text(
-                  [
-                    // item 11: date + time of the proof when recorded with a time
-                    '${tr.docNo ?? '-'} · ${tr.transferAt != null ? formatServerDateTime(tr.transferAt, zone: zone) : formatDateOnly(tr.transferDate)}',
-                    // ADR 0031: the Pusat Biaya the transfer is charged to (D2 legacy: the cost center chosen by Finance)
-                    if (tr.cashAccount != null)
-                      '${t.fieldCostCenter}: ${tr.cashAccount!.label}'
-                    else if (tr.costCenter != null)
-                      '${t.fieldCostCenter}: ${'${tr.costCenter!.code ?? ''} ${tr.costCenter!.name ?? ''}'.trim()}',
-                    // ADR 0031: paid from another account → the automatic inter-project loan
-                    if (tr.paidFromCashAccount != null) t.transferPaidFrom(tr.paidFromCashAccount!.label),
-                    if (tr.projectLoan != null)
-                      t.transferProjectLoan(tr.projectLoan!.docNo ?? '#${tr.projectLoan!.id}'),
-                    if (tr.bankRef != null) '${t.transferRef}: ${tr.bankRef}',
-                    if (tr.isVoid && tr.voidReason != null) t.transferVoidReason(tr.voidReason!),
-                  ].join('\n'),
-                ),
-                trailing: PkPill(
-                  label: tr.isVoid ? t.transferVoid : t.transferPosted,
-                  tone: tr.isVoid ? PkTone.bad : PkTone.ok,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ListTile(
+                    key: Key('transfer-${tr.id}'),
+                    // d1010 (12b): no transfer screen on the APK — a tap copies the TRF number.
+                    onTap: tr.docNo == null ? null : () => DocNoChip.copy(context, tr.docNo!),
+                    contentPadding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                    leading: PkIconChip(
+                      icon: tr.isVoid ? Icons.money_off : Icons.account_balance,
+                      tone: tr.isVoid ? PkTone.bad : PkTone.ok,
+                    ),
+                    title: Text(
+                      '${tr.kindLabel} · ${formatRupiah(tr.amount)}',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: Text(
+                      [
+                        // item 11: date + time of the proof when recorded with a time
+                        '${tr.docNo ?? '-'} · ${tr.transferAt != null ? formatServerDateTime(tr.transferAt, zone: zone) : formatDateOnly(tr.transferDate)}',
+                        // ADR 0031: the Pusat Biaya the transfer is charged to (D2 legacy: the cost center chosen by Finance)
+                        if (tr.cashAccount != null)
+                          '${t.fieldCostCenter}: ${tr.cashAccount!.label}'
+                        else if (tr.costCenter != null)
+                          '${t.fieldCostCenter}: ${'${tr.costCenter!.code ?? ''} ${tr.costCenter!.name ?? ''}'.trim()}',
+                        // ADR 0031: paid from another account → the automatic inter-project loan
+                        if (tr.paidFromCashAccount != null) t.transferPaidFrom(tr.paidFromCashAccount!.label),
+                        if (tr.projectLoan != null)
+                          t.transferProjectLoan(tr.projectLoan!.docNo ?? '#${tr.projectLoan!.id}'),
+                        if (tr.bankRef != null) '${t.transferRef}: ${tr.bankRef}',
+                        if (tr.isVoid && tr.voidReason != null) t.transferVoidReason(tr.voidReason!),
+                      ].join('\n'),
+                    ),
+                    trailing: PkPill(
+                      label: tr.isVoid ? t.transferVoid : t.transferPosted,
+                      tone: tr.isVoid ? PkTone.bad : PkTone.ok,
+                    ),
+                  ),
+                  // D2510 (user 2026-10-25): the bank proof as a thumbnail (tap = viewer; a PDF opens as a file). The server
+                  // decides who may read it — a refused proof shows the "cannot be loaded" tile.
+                  if (tr.proofId case final proof?)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                      child: Row(
+                        children: [
+                          MediaThumb(
+                            key: Key('transfer-proof-${tr.id}'),
+                            size: 56,
+                            photo: MediaPhoto.media(
+                              'transfer-proofs',
+                              proof,
+                              caption: '${t.transferProofLabel} ${tr.docNo ?? ''}'.trim(),
+                              fileName: 'bukti-transfer-${tr.docNo ?? tr.id}',
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(t.transferProofLabel, style: theme.textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                ],
               ),
             ),
           if (detail.transferredTotal > 0)

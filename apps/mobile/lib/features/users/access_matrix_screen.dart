@@ -265,6 +265,12 @@ class _AccessMatrixScreenState extends ConsumerState<AccessMatrixScreen> {
     final groupAdmin = viewer['groupAdmin'] == true;
     final adminOf = {for (final c in _list(viewer['adminOf'])) _int(c)};
     final companies = [for (final c in _list(j['companies'])) _map(c)];
+    // D2510: the user's name / avatar opens the user (same target as the "Edit" button).
+    Future<void> openUser(Object? id) async {
+      await context.push('/users/$id');
+      ref.invalidate(accessMatrixProvider);
+    }
+
     final roles = [
       for (final r in _list(j['roles']))
         (value: '${_map(r)['value']}', label: '${_map(r)['short'] ?? _map(r)['label']}'),
@@ -304,21 +310,37 @@ class _AccessMatrixScreenState extends ConsumerState<AccessMatrixScreen> {
               children: [
                 Row(
                   children: [
-                    PkAvatar(name: '${u['name'] ?? ''}', size: 40),
-                    const SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${u['name']}',
-                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, fontSize: 15),
-                          ),
-                          Text(
-                            '${u['email']}',
-                            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                          ),
-                        ],
+                      child: InkWell(
+                        key: Key('matrix-head-${u['id']}'),
+                        borderRadius: BorderRadius.circular(PkRadius.sm),
+                        onTap: () => openUser(u['id']),
+                        child: Row(
+                          children: [
+                            PkAvatar(name: '${u['name'] ?? ''}', size: 40),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${u['name']}',
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${u['email']}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     if (u['active'] == false) PkPill(label: t.rapInactive, tone: PkTone.bad),
@@ -326,10 +348,7 @@ class _AccessMatrixScreenState extends ConsumerState<AccessMatrixScreen> {
                       key: Key('matrix-open-${u['id']}'),
                       tooltip: t.recordEdit,
                       icon: const Icon(Icons.manage_accounts_outlined),
-                      onPressed: () async {
-                        await context.push('/users/${u['id']}');
-                        ref.invalidate(accessMatrixProvider);
-                      },
+                      onPressed: () => openUser(u['id']),
                     ),
                   ],
                 ),

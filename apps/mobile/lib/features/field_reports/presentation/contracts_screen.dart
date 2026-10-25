@@ -127,7 +127,13 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
                           children: [
                             for (final c in r.contracts)
                               ListTile(
+                                key: Key('contract-unit-${c['id']}'),
                                 dense: true,
+                                // D2510: the contract opens its record (period, unit, status; rates stay hidden)
+                                onTap: c['id'] is num ? () => context.push('/data/contract-units/${c['id']}') : null,
+                                trailing: c['id'] is num
+                                    ? Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.outline)
+                                    : null,
                                 leading: Icon(
                                   c['filledToday'] == true ? Icons.check_circle : Icons.radio_button_unchecked,
                                   color: c['filledToday'] == true ? context.pk.okText : theme.colorScheme.outline,
@@ -165,6 +171,11 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
                           margin: const EdgeInsets.only(bottom: 8),
                           padding: const EdgeInsets.symmetric(vertical: 2),
                           child: ListTile(
+                            // D2510: the unit opens its record (the web "Kendaraan & unit" document)
+                            onTap: u['id'] is num ? () => context.push('/data/vehicles/${u['id']}') : null,
+                            trailing: u['id'] is num
+                                ? Icon(Icons.chevron_right, color: theme.colorScheme.outline)
+                                : null,
                             leading: const PkIconChip(icon: Icons.agriculture, tone: PkTone.warn),
                             title: Text('${u['label'] ?? ''}'),
                             subtitle: Text(

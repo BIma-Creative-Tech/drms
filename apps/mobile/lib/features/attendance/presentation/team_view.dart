@@ -17,6 +17,7 @@ import '../application/attendance_providers.dart';
 import '../application/attendance_service.dart';
 import '../domain/attendance.dart';
 import '../domain/attendance_recap.dart';
+import '../../../shared/widgets/media_thumb.dart';
 import '../../../shared/widgets/pk_ui.dart';
 import 'recap_view.dart';
 
@@ -230,6 +231,24 @@ class _MemberCard extends ConsumerWidget {
                     PkPill(icon: Icons.alarm, label: t.recapLateBy(m.lateMinutes), tone: PkTone.warn),
                   if (m.onBehalf) PkPill(icon: Icons.how_to_reg, label: t.teamOnBehalfTag),
                   if (m.corrected) PkPill(icon: Icons.edit_calendar, label: t.teamCorrectedTag),
+                ],
+              ),
+            ),
+          // D2510 (user 2026-10-25): today's check-in / check-out selfies as thumbnails (tap = viewer).
+          if (marks.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 10, left: 56),
+              child: MediaThumbStrip(
+                key: Key('team-selfies-${m.employee.id}'),
+                size: 56,
+                photos: [
+                  for (final (l, kind, mark) in marks)
+                    MediaPhoto.selfie(
+                      mark.id,
+                      caption:
+                          '${m.employee.name} · ${kind == AttendanceKind.checkIn ? t.attendanceCheckIn : t.attendanceCheckOut} '
+                          '${localHm(mark.time, zone)} · ${l.location.label}',
+                    ),
                 ],
               ),
             ),

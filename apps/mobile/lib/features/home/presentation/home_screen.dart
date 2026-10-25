@@ -35,6 +35,7 @@ import '../../progress/application/progress_providers.dart';
 import '../../progress/domain/progress.dart';
 import '../../progress/presentation/widgets/progress_widgets.dart' show ProjectProgressCompactCard;
 import '../application/menu_providers.dart';
+import '../domain/route_access.dart';
 import 'module_landing_screen.dart';
 
 /// Beranda (D2510, Banani reference "Dashboard Home", user 2026-10-25 — supersedes the launcher-only home of
@@ -754,6 +755,8 @@ class _ProjectsSection extends ConsumerWidget {
     final t = AppLocalizations.of(context);
     final list = ref.watch(projectProgressProvider).value;
     if (list == null || list.projects.isEmpty) return const SizedBox.shrink();
+    // D2510: one project → that project (not the whole list) when the user may see it.
+    final canOpen = ref.watch(currentProfileProvider)?.canSeeProjects ?? false;
     int rank(ProgressTone tone) => switch (tone) {
       ProgressTone.bad => 0,
       ProgressTone.warn => 1,
@@ -777,7 +780,10 @@ class _ProjectsSection extends ConsumerWidget {
         for (final p in sorted.take(3))
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: ProjectProgressCompactCard(item: p, onTap: () => context.push('/progress?tab=projects')),
+            child: ProjectProgressCompactCard(
+              item: p,
+              onTap: () => context.push(canOpen ? '/projects/${p.id}' : '/progress?tab=projects'),
+            ),
           ),
       ],
     );
@@ -797,6 +803,7 @@ class _AccountsSection extends ConsumerWidget {
         ? ref.watch(direkturDashboardProvider).value?.accounts
         : ref.watch(financeDashboardProvider).value?.accounts;
     if (accounts == null || accounts.isEmpty) return const SizedBox.shrink();
+    final canOpenBook = canOpenApkRoute('/cash', ref.watch(currentProfileProvider));
     final top = [...accounts]..sort((a, b) => b.balance.compareTo(a.balance));
     return Column(
       key: const Key('home-accounts'),
@@ -810,40 +817,48 @@ class _AccountsSection extends ConsumerWidget {
             children: [
               for (final (i, a) in top.take(3).indexed) ...[
                 if (i > 0) const Divider(height: 1),
-                Padding(
+                // D2510: an account opens the cash book filtered to it (Buku kas: Finance / Direktur).
+                InkWell(
                   key: Key('home-account-${a.id}'),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Row(
-                    children: [
-                      PkIconChip(
-                        icon: Icons.account_balance,
-                        tone: a.balance < 0 ? PkTone.bad : PkTone.neutral,
-                        size: 40,
-                        round: true,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(a.name, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                            if (a.code case final code?)
-                              Text(
-                                code,
-                                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                              ),
-                          ],
+                  onTap: canOpenBook ? () => context.push('/cash?akun=${a.id}') : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Row(
+                      children: [
+                        PkIconChip(
+                          icon: Icons.account_balance,
+                          tone: a.balance < 0 ? PkTone.bad : PkTone.neutral,
+                          size: 40,
+                          round: true,
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        formatRupiahShort(a.balance),
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: a.balance < 0 ? context.pk.badText : null,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(a.name, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                              if (a.code case final code?)
+                                Text(
+                                  code,
+                                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Text(
+                          formatRupiahShort(a.balance),
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: a.balance < 0 ? context.pk.badText : null,
+                          ),
+                        ),
+                        if (canOpenBook) ...[
+                          const SizedBox(width: 4),
+                          Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.outline),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
               ],

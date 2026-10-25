@@ -5,6 +5,7 @@ import '../../../../app/providers.dart';
 import '../../../../core/platform/report_files.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../../shared/widgets/async_body.dart';
+import '../../../../shared/widgets/media_thumb.dart';
 import '../../../../shared/widgets/pk_ui.dart';
 import '../../domain/draft.dart';
 import '../../domain/expense_request.dart';
@@ -156,27 +157,44 @@ class _RequestAttachmentListState extends ConsumerState<RequestAttachmentList> {
   }
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
+  Widget build(BuildContext context) {
+    // D2510 (user 2026-10-25): a photo attachment shows its thumbnail and opens in the in-app viewer (swiping through
+    // the request's photo attachments); a PDF stays a file link (viewer app / share sheet).
+    final photos = [
       for (final a in widget.attachments)
-        ListTile(
-          key: Key('detail-attachment-${a.id}'),
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          leading: PkIconChip(
-            icon: a.isPdf ? Icons.picture_as_pdf : Icons.image,
-            tone: a.isPdf ? PkTone.bad : PkTone.info,
-            size: 34,
+        if (!a.isPdf) MediaPhoto.media('attachments', a.id, caption: a.label),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final a in widget.attachments)
+          ListTile(
+            key: Key('detail-attachment-${a.id}'),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: a.isPdf
+                ? const PkIconChip(icon: Icons.picture_as_pdf, tone: PkTone.bad, size: 34)
+                : MediaThumb(
+                    photo: MediaPhoto.media('attachments', a.id, caption: a.label),
+                    group: photos,
+                    size: 40,
+                  ),
+            title: Text(a.label, style: const TextStyle(fontWeight: FontWeight.w600)),
+            trailing: _opening == a.id
+                ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : Icon(a.isPdf ? Icons.open_in_new : Icons.zoom_in),
+            onTap: _opening != null
+                ? null
+                : a.isPdf
+                ? () => _open(a)
+                : () {
+                    final p = MediaPhoto.media('attachments', a.id, caption: a.label);
+                    showMediaViewer(context, photos, initialIndex: photos.indexOf(p));
+                  },
           ),
-          title: Text(a.label, style: const TextStyle(fontWeight: FontWeight.w600)),
-          trailing: _opening == a.id
-              ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.open_in_new),
-          onTap: _opening == null ? () => _open(a) : null,
-        ),
-    ],
-  );
+      ],
+    );
+  }
 }
 
 /// Cache file name of a downloaded attachment (ReportFileProvider name rule: letters, digits, `._-`), keeping a known

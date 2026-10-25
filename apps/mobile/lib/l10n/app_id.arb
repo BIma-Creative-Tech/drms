@@ -2519,7 +2519,7 @@
   },
   "transferRecord": "Catat transfer",
   "lpjQueueEmpty": "Tidak ada LPJ yang menunggu verifikasi.",
-  "lpjReadOnlyHint": "Hanya lihat: buka pengajuan untuk melihat LPJ-nya. Verifikasi LPJ dilakukan di web (Verifikasi LPJ).",
+  "lpjReadOnlyHint": "Buka pengajuan untuk memeriksa nota dan memverifikasi LPJ.",
   "transferNotInQueue": "Pengajuan ini tidak lagi ada di antrian transfer (mungkin sudah ditransfer).",
   "transferAtLabel": "Tanggal & jam transfer",
   "transferAtHelp": "Sesuai bukti transfer bank.",
@@ -4733,5 +4733,32 @@
     }
   },
   "akunGroupAccount": "Akun",
-  "akunGroupApp": "Aplikasi"
+  "akunGroupApp": "Aplikasi",
+  "lpjActionRevision": "Minta revisi",
+  "lpjVerifyNote": "Total terverifikasi = jumlah nota valid. Nota yang masih menunggu harus diputuskan dulu (valid / tolak).",
+  "lpjRevisionNoteLabel": "Catatan revisi untuk pemohon",
+  "lpjRevisionNoteHint": "Wajib, minimal 3 karakter.",
+  "lpjVerifiedDone": "LPJ terverifikasi.",
+  "lpjRevisionDone": "LPJ dikembalikan ke pemohon untuk direvisi.",
+  "lpjPendingReceipts": "{count} nota belum diputuskan (valid / tolak).",
+  "@lpjPendingReceipts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "receiptActionVerify": "Validasi nota",
+  "receiptActionReject": "Tolak nota",
+  "receiptValidButton": "Valid",
+  "receiptRejectReasonLabel": "Alasan nota ditolak",
+  "receiptVerifiedDone": "Nota ditandai valid.",
+  "receiptRejectedDone": "Nota ditolak.",
+  "flagReviewAction": "Tandai flag diperiksa",
+  "flagReviewNoteLabel": "Catatan pemeriksaan (opsional)",
+  "flagReviewedDone": "Flag ditandai sudah diperiksa.",
+  "flagReviewedLabel": "Sudah diperiksa",
+  "mediaOpenPhoto": "Buka foto",
+  "mediaOpenFile": "Buka file",
+  "mediaNotImage": "File ini bukan gambar (mis. PDF). Ketuk thumbnail-nya untuk membuka sebagai file."
 }

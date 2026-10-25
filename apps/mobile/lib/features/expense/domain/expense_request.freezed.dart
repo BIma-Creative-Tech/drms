@@ -1277,7 +1277,8 @@ mixin _$TransferInfo {
  RefItem? get costCenter; String? get bankRef; String get status; String? get voidReason;/// ADR 0031: the account the transfer is charged to (the project's Pusat Biaya).
  AccountRef? get cashAccount;/// ADR 0031: the account actually paid from when it is not the Pusat Biaya (null = paid from it).
  AccountRef? get paidFromCashAccount;/// ADR 0031: the automatic inter-project loan of a transfer paid from another account.
- TransferLoanRef? get projectLoan;
+ TransferLoanRef? get projectLoan;/// D2510: the bank proof (`media-transfer-proofs` id, image or PDF); null from an older server.
+ int? get proofId;
 /// Create a copy of TransferInfo
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1289,20 +1290,20 @@ $TransferInfoCopyWith<TransferInfo> get copyWith => _$TransferInfoCopyWithImpl<T
 @override
 bool operator ==(Object other) {
   final _this = this as TransferInfo;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is TransferInfo&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.docNo, _this.docNo) || other.docNo == _this.docNo)&&(identical(other.kind, _this.kind) || other.kind == _this.kind)&&(identical(other.amount, _this.amount) || other.amount == _this.amount)&&(identical(other.transferDate, _this.transferDate) || other.transferDate == _this.transferDate)&&(identical(other.transferAt, _this.transferAt) || other.transferAt == _this.transferAt)&&(identical(other.costCenter, _this.costCenter) || other.costCenter == _this.costCenter)&&(identical(other.bankRef, _this.bankRef) || other.bankRef == _this.bankRef)&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.voidReason, _this.voidReason) || other.voidReason == _this.voidReason)&&(identical(other.cashAccount, _this.cashAccount) || other.cashAccount == _this.cashAccount)&&(identical(other.paidFromCashAccount, _this.paidFromCashAccount) || other.paidFromCashAccount == _this.paidFromCashAccount)&&(identical(other.projectLoan, _this.projectLoan) || other.projectLoan == _this.projectLoan));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is TransferInfo&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.docNo, _this.docNo) || other.docNo == _this.docNo)&&(identical(other.kind, _this.kind) || other.kind == _this.kind)&&(identical(other.amount, _this.amount) || other.amount == _this.amount)&&(identical(other.transferDate, _this.transferDate) || other.transferDate == _this.transferDate)&&(identical(other.transferAt, _this.transferAt) || other.transferAt == _this.transferAt)&&(identical(other.costCenter, _this.costCenter) || other.costCenter == _this.costCenter)&&(identical(other.bankRef, _this.bankRef) || other.bankRef == _this.bankRef)&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.voidReason, _this.voidReason) || other.voidReason == _this.voidReason)&&(identical(other.cashAccount, _this.cashAccount) || other.cashAccount == _this.cashAccount)&&(identical(other.paidFromCashAccount, _this.paidFromCashAccount) || other.paidFromCashAccount == _this.paidFromCashAccount)&&(identical(other.projectLoan, _this.projectLoan) || other.projectLoan == _this.projectLoan)&&(identical(other.proofId, _this.proofId) || other.proofId == _this.proofId));
 }
 
 
 @override
 int get hashCode {
   final _this = this as TransferInfo;
-  return Object.hash(runtimeType,_this.id,_this.docNo,_this.kind,_this.amount,_this.transferDate,_this.transferAt,_this.costCenter,_this.bankRef,_this.status,_this.voidReason,_this.cashAccount,_this.paidFromCashAccount,_this.projectLoan);
+  return Object.hash(runtimeType,_this.id,_this.docNo,_this.kind,_this.amount,_this.transferDate,_this.transferAt,_this.costCenter,_this.bankRef,_this.status,_this.voidReason,_this.cashAccount,_this.paidFromCashAccount,_this.projectLoan,_this.proofId);
 }
 
 @override
 String toString() {
   final _this = this as TransferInfo;
-  return 'TransferInfo(id: ${_this.id}, docNo: ${_this.docNo}, kind: ${_this.kind}, amount: ${_this.amount}, transferDate: ${_this.transferDate}, transferAt: ${_this.transferAt}, costCenter: ${_this.costCenter}, bankRef: ${_this.bankRef}, status: ${_this.status}, voidReason: ${_this.voidReason}, cashAccount: ${_this.cashAccount}, paidFromCashAccount: ${_this.paidFromCashAccount}, projectLoan: ${_this.projectLoan})';
+  return 'TransferInfo(id: ${_this.id}, docNo: ${_this.docNo}, kind: ${_this.kind}, amount: ${_this.amount}, transferDate: ${_this.transferDate}, transferAt: ${_this.transferAt}, costCenter: ${_this.costCenter}, bankRef: ${_this.bankRef}, status: ${_this.status}, voidReason: ${_this.voidReason}, cashAccount: ${_this.cashAccount}, paidFromCashAccount: ${_this.paidFromCashAccount}, projectLoan: ${_this.projectLoan}, proofId: ${_this.proofId})';
 }
 
 
@@ -1313,7 +1314,7 @@ abstract mixin class $TransferInfoCopyWith<$Res>  {
   factory $TransferInfoCopyWith(TransferInfo value, $Res Function(TransferInfo) _then) = _$TransferInfoCopyWithImpl;
 @useResult
 $Res call({
- int id, String? docNo, String kind, int amount, String? transferDate, String? transferAt, RefItem? costCenter, String? bankRef, String status, String? voidReason, AccountRef? cashAccount, AccountRef? paidFromCashAccount, TransferLoanRef? projectLoan
+ int id, String? docNo, String kind, int amount, String? transferDate, String? transferAt, RefItem? costCenter, String? bankRef, String status, String? voidReason, AccountRef? cashAccount, AccountRef? paidFromCashAccount, TransferLoanRef? projectLoan, int? proofId
 });
 
 
@@ -1330,7 +1331,7 @@ class _$TransferInfoCopyWithImpl<$Res>
 
 /// Create a copy of TransferInfo
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? docNo = freezed,Object? kind = null,Object? amount = null,Object? transferDate = freezed,Object? transferAt = freezed,Object? costCenter = freezed,Object? bankRef = freezed,Object? status = null,Object? voidReason = freezed,Object? cashAccount = freezed,Object? paidFromCashAccount = freezed,Object? projectLoan = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? docNo = freezed,Object? kind = null,Object? amount = null,Object? transferDate = freezed,Object? transferAt = freezed,Object? costCenter = freezed,Object? bankRef = freezed,Object? status = null,Object? voidReason = freezed,Object? cashAccount = freezed,Object? paidFromCashAccount = freezed,Object? projectLoan = freezed,Object? proofId = freezed,}) {
   return _then(TransferInfo(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,docNo: freezed == docNo ? _self.docNo : docNo // ignore: cast_nullable_to_non_nullable
@@ -1345,7 +1346,8 @@ as String,voidReason: freezed == voidReason ? _self.voidReason : voidReason // i
 as String?,cashAccount: freezed == cashAccount ? _self.cashAccount : cashAccount // ignore: cast_nullable_to_non_nullable
 as AccountRef?,paidFromCashAccount: freezed == paidFromCashAccount ? _self.paidFromCashAccount : paidFromCashAccount // ignore: cast_nullable_to_non_nullable
 as AccountRef?,projectLoan: freezed == projectLoan ? _self.projectLoan : projectLoan // ignore: cast_nullable_to_non_nullable
-as TransferLoanRef?,
+as TransferLoanRef?,proofId: freezed == proofId ? _self.proofId : proofId // ignore: cast_nullable_to_non_nullable
+as int?,
   ));
 }
 /// Create a copy of TransferInfo
@@ -1442,10 +1444,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String? docNo,  String kind,  int amount,  String? transferDate,  String? transferAt,  RefItem? costCenter,  String? bankRef,  String status,  String? voidReason,  AccountRef? cashAccount,  AccountRef? paidFromCashAccount,  TransferLoanRef? projectLoan)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String? docNo,  String kind,  int amount,  String? transferDate,  String? transferAt,  RefItem? costCenter,  String? bankRef,  String status,  String? voidReason,  AccountRef? cashAccount,  AccountRef? paidFromCashAccount,  TransferLoanRef? projectLoan,  int? proofId)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _TransferInfo() when $default != null:
-return $default(_that.id,_that.docNo,_that.kind,_that.amount,_that.transferDate,_that.transferAt,_that.costCenter,_that.bankRef,_that.status,_that.voidReason,_that.cashAccount,_that.paidFromCashAccount,_that.projectLoan);case _:
+return $default(_that.id,_that.docNo,_that.kind,_that.amount,_that.transferDate,_that.transferAt,_that.costCenter,_that.bankRef,_that.status,_that.voidReason,_that.cashAccount,_that.paidFromCashAccount,_that.projectLoan,_that.proofId);case _:
   return orElse();
 
 }
@@ -1463,10 +1465,10 @@ return $default(_that.id,_that.docNo,_that.kind,_that.amount,_that.transferDate,
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String? docNo,  String kind,  int amount,  String? transferDate,  String? transferAt,  RefItem? costCenter,  String? bankRef,  String status,  String? voidReason,  AccountRef? cashAccount,  AccountRef? paidFromCashAccount,  TransferLoanRef? projectLoan)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String? docNo,  String kind,  int amount,  String? transferDate,  String? transferAt,  RefItem? costCenter,  String? bankRef,  String status,  String? voidReason,  AccountRef? cashAccount,  AccountRef? paidFromCashAccount,  TransferLoanRef? projectLoan,  int? proofId)  $default,) {final _that = this;
 switch (_that) {
 case _TransferInfo():
-return $default(_that.id,_that.docNo,_that.kind,_that.amount,_that.transferDate,_that.transferAt,_that.costCenter,_that.bankRef,_that.status,_that.voidReason,_that.cashAccount,_that.paidFromCashAccount,_that.projectLoan);case _:
+return $default(_that.id,_that.docNo,_that.kind,_that.amount,_that.transferDate,_that.transferAt,_that.costCenter,_that.bankRef,_that.status,_that.voidReason,_that.cashAccount,_that.paidFromCashAccount,_that.projectLoan,_that.proofId);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1483,10 +1485,10 @@ return $default(_that.id,_that.docNo,_that.kind,_that.amount,_that.transferDate,
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String? docNo,  String kind,  int amount,  String? transferDate,  String? transferAt,  RefItem? costCenter,  String? bankRef,  String status,  String? voidReason,  AccountRef? cashAccount,  AccountRef? paidFromCashAccount,  TransferLoanRef? projectLoan)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String? docNo,  String kind,  int amount,  String? transferDate,  String? transferAt,  RefItem? costCenter,  String? bankRef,  String status,  String? voidReason,  AccountRef? cashAccount,  AccountRef? paidFromCashAccount,  TransferLoanRef? projectLoan,  int? proofId)?  $default,) {final _that = this;
 switch (_that) {
 case _TransferInfo() when $default != null:
-return $default(_that.id,_that.docNo,_that.kind,_that.amount,_that.transferDate,_that.transferAt,_that.costCenter,_that.bankRef,_that.status,_that.voidReason,_that.cashAccount,_that.paidFromCashAccount,_that.projectLoan);case _:
+return $default(_that.id,_that.docNo,_that.kind,_that.amount,_that.transferDate,_that.transferAt,_that.costCenter,_that.bankRef,_that.status,_that.voidReason,_that.cashAccount,_that.paidFromCashAccount,_that.projectLoan,_that.proofId);case _:
   return null;
 
 }
@@ -1498,7 +1500,7 @@ return $default(_that.id,_that.docNo,_that.kind,_that.amount,_that.transferDate,
 
 
 class _TransferInfo extends TransferInfo {
-  const _TransferInfo({required this.id, this.docNo, required this.kind, required this.amount, this.transferDate, this.transferAt, this.costCenter, this.bankRef, required this.status, this.voidReason, this.cashAccount, this.paidFromCashAccount, this.projectLoan}): super._();
+  const _TransferInfo({required this.id, this.docNo, required this.kind, required this.amount, this.transferDate, this.transferAt, this.costCenter, this.bankRef, required this.status, this.voidReason, this.cashAccount, this.paidFromCashAccount, this.projectLoan, this.proofId}): super._();
   
 
 @override final  int id;
@@ -1519,6 +1521,8 @@ class _TransferInfo extends TransferInfo {
 @override final  AccountRef? paidFromCashAccount;
 /// ADR 0031: the automatic inter-project loan of a transfer paid from another account.
 @override final  TransferLoanRef? projectLoan;
+/// D2510: the bank proof (`media-transfer-proofs` id, image or PDF); null from an older server.
+@override final  int? proofId;
 
 /// Create a copy of TransferInfo
 /// with the given fields replaced by the non-null parameter values.
@@ -1530,18 +1534,18 @@ _$TransferInfoCopyWith<_TransferInfo> get copyWith => __$TransferInfoCopyWithImp
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _TransferInfo&&(identical(other.id, id) || other.id == id)&&(identical(other.docNo, docNo) || other.docNo == docNo)&&(identical(other.kind, kind) || other.kind == kind)&&(identical(other.amount, amount) || other.amount == amount)&&(identical(other.transferDate, transferDate) || other.transferDate == transferDate)&&(identical(other.transferAt, transferAt) || other.transferAt == transferAt)&&(identical(other.costCenter, costCenter) || other.costCenter == costCenter)&&(identical(other.bankRef, bankRef) || other.bankRef == bankRef)&&(identical(other.status, status) || other.status == status)&&(identical(other.voidReason, voidReason) || other.voidReason == voidReason)&&(identical(other.cashAccount, cashAccount) || other.cashAccount == cashAccount)&&(identical(other.paidFromCashAccount, paidFromCashAccount) || other.paidFromCashAccount == paidFromCashAccount)&&(identical(other.projectLoan, projectLoan) || other.projectLoan == projectLoan));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _TransferInfo&&(identical(other.id, id) || other.id == id)&&(identical(other.docNo, docNo) || other.docNo == docNo)&&(identical(other.kind, kind) || other.kind == kind)&&(identical(other.amount, amount) || other.amount == amount)&&(identical(other.transferDate, transferDate) || other.transferDate == transferDate)&&(identical(other.transferAt, transferAt) || other.transferAt == transferAt)&&(identical(other.costCenter, costCenter) || other.costCenter == costCenter)&&(identical(other.bankRef, bankRef) || other.bankRef == bankRef)&&(identical(other.status, status) || other.status == status)&&(identical(other.voidReason, voidReason) || other.voidReason == voidReason)&&(identical(other.cashAccount, cashAccount) || other.cashAccount == cashAccount)&&(identical(other.paidFromCashAccount, paidFromCashAccount) || other.paidFromCashAccount == paidFromCashAccount)&&(identical(other.projectLoan, projectLoan) || other.projectLoan == projectLoan)&&(identical(other.proofId, proofId) || other.proofId == proofId));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,docNo,kind,amount,transferDate,transferAt,costCenter,bankRef,status,voidReason,cashAccount,paidFromCashAccount,projectLoan);
+    return Object.hash(runtimeType,id,docNo,kind,amount,transferDate,transferAt,costCenter,bankRef,status,voidReason,cashAccount,paidFromCashAccount,projectLoan,proofId);
 }
 
 @override
 String toString() {
-    return 'TransferInfo(id: $id, docNo: $docNo, kind: $kind, amount: $amount, transferDate: $transferDate, transferAt: $transferAt, costCenter: $costCenter, bankRef: $bankRef, status: $status, voidReason: $voidReason, cashAccount: $cashAccount, paidFromCashAccount: $paidFromCashAccount, projectLoan: $projectLoan)';
+    return 'TransferInfo(id: $id, docNo: $docNo, kind: $kind, amount: $amount, transferDate: $transferDate, transferAt: $transferAt, costCenter: $costCenter, bankRef: $bankRef, status: $status, voidReason: $voidReason, cashAccount: $cashAccount, paidFromCashAccount: $paidFromCashAccount, projectLoan: $projectLoan, proofId: $proofId)';
 }
 
 
@@ -1552,7 +1556,7 @@ abstract mixin class _$TransferInfoCopyWith<$Res> implements $TransferInfoCopyWi
   factory _$TransferInfoCopyWith(_TransferInfo value, $Res Function(_TransferInfo) _then) = __$TransferInfoCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String? docNo, String kind, int amount, String? transferDate, String? transferAt, RefItem? costCenter, String? bankRef, String status, String? voidReason, AccountRef? cashAccount, AccountRef? paidFromCashAccount, TransferLoanRef? projectLoan
+ int id, String? docNo, String kind, int amount, String? transferDate, String? transferAt, RefItem? costCenter, String? bankRef, String status, String? voidReason, AccountRef? cashAccount, AccountRef? paidFromCashAccount, TransferLoanRef? projectLoan, int? proofId
 });
 
 
@@ -1569,7 +1573,7 @@ class __$TransferInfoCopyWithImpl<$Res>
 
 /// Create a copy of TransferInfo
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? docNo = freezed,Object? kind = null,Object? amount = null,Object? transferDate = freezed,Object? transferAt = freezed,Object? costCenter = freezed,Object? bankRef = freezed,Object? status = null,Object? voidReason = freezed,Object? cashAccount = freezed,Object? paidFromCashAccount = freezed,Object? projectLoan = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? docNo = freezed,Object? kind = null,Object? amount = null,Object? transferDate = freezed,Object? transferAt = freezed,Object? costCenter = freezed,Object? bankRef = freezed,Object? status = null,Object? voidReason = freezed,Object? cashAccount = freezed,Object? paidFromCashAccount = freezed,Object? projectLoan = freezed,Object? proofId = freezed,}) {
   return _then(_TransferInfo(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,docNo: freezed == docNo ? _self.docNo : docNo // ignore: cast_nullable_to_non_nullable
@@ -1584,7 +1588,8 @@ as String,voidReason: freezed == voidReason ? _self.voidReason : voidReason // i
 as String?,cashAccount: freezed == cashAccount ? _self.cashAccount : cashAccount // ignore: cast_nullable_to_non_nullable
 as AccountRef?,paidFromCashAccount: freezed == paidFromCashAccount ? _self.paidFromCashAccount : paidFromCashAccount // ignore: cast_nullable_to_non_nullable
 as AccountRef?,projectLoan: freezed == projectLoan ? _self.projectLoan : projectLoan // ignore: cast_nullable_to_non_nullable
-as TransferLoanRef?,
+as TransferLoanRef?,proofId: freezed == proofId ? _self.proofId : proofId // ignore: cast_nullable_to_non_nullable
+as int?,
   ));
 }
 

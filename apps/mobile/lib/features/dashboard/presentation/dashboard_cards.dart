@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
@@ -10,7 +11,9 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/icons/iconsax.dart';
 import '../../../shared/widgets/pk_ui.dart';
 import '../../../shared/widgets/pk_ui_akun.dart';
+import '../../auth/application/auth_controller.dart';
 import '../../expense/domain/request_status.dart';
+import '../../home/domain/route_access.dart';
 import '../domain/dashboard.dart';
 import 'charts.dart';
 
@@ -525,15 +528,16 @@ class CompletenessCard extends StatelessWidget {
   }
 }
 
-/// "Transaksi kas terbaru" (cash book incl. void & reversal).
-class RecentCashCard extends StatelessWidget {
+/// "Transaksi kas terbaru" (cash book incl. void & reversal). D2510: a row opens its request (else the cash entry).
+class RecentCashCard extends ConsumerWidget {
   const RecentCashCard({super.key, required this.rows});
   final List<RecentCashEntry> rows;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     final pk = context.pk;
+    final profile = ref.watch(currentProfileProvider);
     return DashSection(
       key: const Key('dash-recent-cash'),
       title: t.kpiRecentCashTitle,
@@ -545,6 +549,7 @@ class RecentCashCard extends StatelessWidget {
                 _Row(
                   key: Key('dash-cash-${r.id}'),
                   title: r.entryNo ?? '#${r.id}',
+                  onTap: canOpenApkRoute(r.route, profile) ? () => context.push(r.route) : null,
                   icon: r.incoming ? Icons.south_west : Icons.north_east,
                   tone: r.voided
                       ? PkTone.neutral

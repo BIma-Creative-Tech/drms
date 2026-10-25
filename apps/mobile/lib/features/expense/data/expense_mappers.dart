@@ -414,6 +414,7 @@ ExpenseDetail detailFromJson(Json j) {
             cashAccount: accountRefFromJson(m['cashAccount']),
             paidFromCashAccount: accountRefFromJson(m['paidFromCashAccount']),
             projectLoan: transferLoanFromJson(m['projectLoan']),
+            proofId: _intN(m['proofId']),
           ),
     ],
     transferredTotal: _int(j['transferredTotal']),

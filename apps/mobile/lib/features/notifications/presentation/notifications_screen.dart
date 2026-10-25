@@ -7,6 +7,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../companies/presentation/company_chip.dart';
+import '../../home/domain/route_access.dart';
 import '../application/notifications_providers.dart';
 import '../domain/app_notification.dart';
 import '../../../shared/icons/iconsax.dart';
@@ -110,6 +111,8 @@ class _Tile extends ConsumerWidget {
     final route = n.route(
       canReadProgress: profile?.canReadProgress ?? false,
       ownAttendance: profile?.hasOwnAttendance ?? true,
+      canSeeProjects: profile?.canSeeProjects ?? false,
+      canOpen: (r) => canOpenApkRoute(r, profile),
     );
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;

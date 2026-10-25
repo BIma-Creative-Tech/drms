@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../l10n/gen/app_localizations.dart';
+import '../../../auth/application/auth_controller.dart';
 import '../../../../shared/widgets/pk_ui.dart';
 import '../../application/progress_providers.dart';
 import '../../domain/progress.dart';
@@ -19,6 +20,8 @@ class ProjectProgressSummary extends ConsumerWidget {
     final t = AppLocalizations.of(context);
     final list = ref.watch(projectProgressProvider).value;
     if (list == null || list.projects.isEmpty) return const SizedBox.shrink();
+    // D2510: one project → that project (not the whole list) when the user may see it.
+    final canOpen = ref.watch(currentProfileProvider)?.canSeeProjects ?? false;
     int rank(ProgressTone tone) => switch (tone) {
       ProgressTone.bad => 0,
       ProgressTone.warn => 1,
@@ -43,7 +46,10 @@ class ProjectProgressSummary extends ConsumerWidget {
         for (final p in sorted.take(3))
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: ProjectProgressCard(item: p, onTap: () => context.push('/progress?tab=projects')),
+            child: ProjectProgressCard(
+              item: p,
+              onTap: () => context.push(canOpen ? '/projects/${p.id}' : '/progress?tab=projects'),
+            ),
           ),
       ],
     );

@@ -3556,8 +3556,7 @@ class AppLocalizationsId extends AppLocalizations {
   String get lpjQueueEmpty => 'Tidak ada LPJ yang menunggu verifikasi.';
 
   @override
-  String get lpjReadOnlyHint =>
-      'Hanya lihat: buka pengajuan untuk melihat LPJ-nya. Verifikasi LPJ dilakukan di web (Verifikasi LPJ).';
+  String get lpjReadOnlyHint => 'Buka pengajuan untuk memeriksa nota dan memverifikasi LPJ.';
 
   @override
   String get transferNotInQueue => 'Pengajuan ini tidak lagi ada di antrian transfer (mungkin sudah ditransfer).';
@@ -6220,4 +6219,67 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get akunGroupApp => 'Aplikasi';
+
+  @override
+  String get lpjActionRevision => 'Minta revisi';
+
+  @override
+  String get lpjVerifyNote =>
+      'Total terverifikasi = jumlah nota valid. Nota yang masih menunggu harus diputuskan dulu (valid / tolak).';
+
+  @override
+  String get lpjRevisionNoteLabel => 'Catatan revisi untuk pemohon';
+
+  @override
+  String get lpjRevisionNoteHint => 'Wajib, minimal 3 karakter.';
+
+  @override
+  String get lpjVerifiedDone => 'LPJ terverifikasi.';
+
+  @override
+  String get lpjRevisionDone => 'LPJ dikembalikan ke pemohon untuk direvisi.';
+
+  @override
+  String lpjPendingReceipts(int count) {
+    return '$count nota belum diputuskan (valid / tolak).';
+  }
+
+  @override
+  String get receiptActionVerify => 'Validasi nota';
+
+  @override
+  String get receiptActionReject => 'Tolak nota';
+
+  @override
+  String get receiptValidButton => 'Valid';
+
+  @override
+  String get receiptRejectReasonLabel => 'Alasan nota ditolak';
+
+  @override
+  String get receiptVerifiedDone => 'Nota ditandai valid.';
+
+  @override
+  String get receiptRejectedDone => 'Nota ditolak.';
+
+  @override
+  String get flagReviewAction => 'Tandai flag diperiksa';
+
+  @override
+  String get flagReviewNoteLabel => 'Catatan pemeriksaan (opsional)';
+
+  @override
+  String get flagReviewedDone => 'Flag ditandai sudah diperiksa.';
+
+  @override
+  String get flagReviewedLabel => 'Sudah diperiksa';
+
+  @override
+  String get mediaOpenPhoto => 'Buka foto';
+
+  @override
+  String get mediaOpenFile => 'Buka file';
+
+  @override
+  String get mediaNotImage => 'File ini bukan gambar (mis. PDF). Ketuk thumbnail-nya untuk membuka sebagai file.';
 }

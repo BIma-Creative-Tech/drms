@@ -13,6 +13,7 @@ import '../../../shared/widgets/pk_ui.dart';
 import '../../../shared/widgets/pk_ui_proyek.dart';
 import '../../../shared/widgets/reason_dialog.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../home/domain/route_access.dart';
 import '../application/cash_providers.dart';
 import '../domain/cash_book.dart';
 
@@ -179,6 +180,7 @@ class _PeriodClosingScreenState extends ConsumerState<PeriodClosingScreen> {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final p = ref.watch(currentProfileProvider);
+    final canOpenHistory = canOpenApkRoute('/data/period-closings/0', p);
     final multi = o.locks.length > 1;
     Widget kpi(String key, String label, String value, String sub, {required Object icon, PkTone tone = PkTone.info}) =>
         PkMiniKpi(key: Key('closing-kpi-$key'), icon: icon, label: label, value: value, sub: sub, tone: tone);
@@ -265,6 +267,8 @@ class _PeriodClosingScreenState extends ConsumerState<PeriodClosingScreen> {
             key: Key('closing-history-${h.id}'),
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(14),
+            // D2510: a history row opens its record (the web "Riwayat tutup buku" document)
+            onTap: canOpenHistory ? () => context.push('/data/period-closings/${h.id}') : null,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -299,6 +303,10 @@ class _PeriodClosingScreenState extends ConsumerState<PeriodClosingScreen> {
                     ],
                   ),
                 ),
+                if (canOpenHistory) ...[
+                  const SizedBox(width: 4),
+                  Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.outline),
+                ],
               ],
             ),
           ),
