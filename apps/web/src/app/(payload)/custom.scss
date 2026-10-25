@@ -4490,3 +4490,209 @@ $pk-side-compact: 76px;
     max-width: none;
   }
 }
+
+// =================================================================================================
+// D2510 Nexus kit (src/admin/components/ui/nexus.tsx, ADR 0033): page header, card, soft badge, status dot,
+// progress — daisyUI patterns on the --pk-* tokens. Pages compose these instead of their own card/badge CSS.
+// Tones: text = the *-text token (≥ 4.5:1 on its own 14% tint in both modes), dot/bar = the solid tone.
+// =================================================================================================
+@layer payload {
+  [data-tone] {
+    --pk-nx-tone: var(--pk-muted-fg);
+    --pk-nx-solid: var(--pk-muted-fg);
+  }
+
+  [data-tone='primary'] {
+    --pk-nx-tone: var(--pk-primary);
+    --pk-nx-solid: var(--pk-primary);
+  }
+
+  [data-tone='info'] {
+    --pk-nx-tone: var(--pk-primary);
+    --pk-nx-solid: var(--color-blue-400, var(--pk-primary));
+  }
+
+  [data-tone='ok'] {
+    --pk-nx-tone: var(--pk-tone-ok-text);
+    --pk-nx-solid: var(--pk-tone-ok);
+  }
+
+  [data-tone='warn'] {
+    --pk-nx-tone: var(--pk-tone-warn-text);
+    --pk-nx-solid: var(--pk-tone-warn);
+  }
+
+  [data-tone='bad'] {
+    --pk-nx-tone: var(--pk-tone-bad-text);
+    --pk-nx-solid: var(--pk-tone-bad);
+  }
+
+  .pk-nx-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    align-items: center;
+    margin: clamp(12px, 2vw, 20px) 0 clamp(16px, 2.4vw, 24px);
+  }
+
+  .pk-nx-head__chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--pk-tile-from, var(--pk-primary)), var(--pk-tile-to, var(--pk-primary-hover)));
+    box-shadow: 0 6px 14px -8px color-mix(in oklab, var(--pk-tile-from, var(--pk-primary)) 75%, transparent);
+    color: #FFFFFF;
+  }
+
+  .pk-nx-head__text {
+    flex: 1 1 260px;
+    min-width: 0;
+  }
+
+  .pk-nx-head__title {
+    margin: 0;
+    font-size: clamp(20px, 2.2vw, 26px);
+    line-height: 1.2;
+  }
+
+  .pk-nx-head__sub {
+    margin: 4px 0 0;
+    color: var(--pk-muted-fg);
+    font-size: 13.5px;
+  }
+
+  .pk-nx-head__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .pk-nx-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border: 1px solid color-mix(in oklab, var(--pk-border) 80%, transparent);
+    border-radius: var(--style-radius-l);
+    background: var(--pk-card);
+    box-shadow: var(--pk-shadow);
+    color: var(--pk-card-fg);
+  }
+
+  .pk-nx-card__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    align-items: center;
+    padding: 16px 20px 0;
+  }
+
+  .pk-nx-card__glyph {
+    flex: none;
+    color: var(--pk-muted-fg);
+  }
+
+  .pk-nx-card__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .pk-nx-card__note {
+    margin-left: 6px;
+    color: var(--pk-muted-fg);
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    font-weight: 400;
+  }
+
+  .pk-nx-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .pk-nx-card__body {
+    flex: 1;
+    min-width: 0;
+    padding: 14px 20px 18px;
+  }
+
+  .pk-nx-card__body.is-flush {
+    padding: 10px 0 0;
+  }
+
+  .pk-nx-card__foot {
+    padding: 12px 20px;
+    border-top: 1px solid var(--pk-border);
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+  }
+
+  .pk-nx-badge {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    min-height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--pk-nx-tone) 14%, var(--pk-card));
+    color: var(--pk-nx-tone);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .pk-nx-status {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .pk-nx-status__dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--pk-nx-solid);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--pk-nx-solid) 18%, transparent);
+  }
+
+  .pk-nx-progress {
+    display: block;
+    overflow: hidden;
+    height: 8px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--pk-nx-solid) 14%, var(--pk-muted-bg));
+  }
+
+  .pk-nx-progress__bar {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--pk-nx-solid);
+  }
+
+  @media (max-width: 640px) {
+    .pk-nx-card__head {
+      padding: 14px 16px 0;
+    }
+
+    .pk-nx-card__body {
+      padding: 12px 16px 16px;
+    }
+
+    .pk-nx-card__foot {
+      padding: 10px 16px;
+    }
+  }
+}
