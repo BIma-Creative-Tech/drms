@@ -14,6 +14,7 @@ import { isNonImage, MEDIA_KIND_OF, mediaFileUrl, mediaThumbSource, selfieSource
 import { THUMB_STYLE } from '@/admin/components/media/thumb-style'
 import { isMediaUpload, UPLOAD_CELL, UPLOAD_PREVIEW_FIELD, withDisplayCells } from '@/admin/display-cells'
 import { FileCollectionEnum } from '@/api/v1/schemas-flow'
+import { MediaSelfies } from '@/collections/media'
 
 /**
  * D2510 image preview (web 0.21.1, user 2026-10-25: "untuk setiap link image atau detail yang memiliki image link
@@ -224,5 +225,20 @@ describe('Payload upload fields (display-cells.ts)', () => {
     const map = src('src/app/(payload)/admin/importMap.js')
     expect(map).toContain(`"${UPLOAD_CELL}"`)
     expect(map).toContain(`"${UPLOAD_PREVIEW_FIELD}"`)
+  })
+})
+
+describe('media-selfies: Payload read = the uploader only, library hidden (0.21.1 security)', () => {
+  const read = MediaSelfies.access!.read as (a: unknown) => unknown
+  it('every role — office, Admin Staff, PM, group admin — gets its own uploads only; anonymous nothing; also for static files', () => {
+    for (const roles of [['pk-admin'], ['pk-owner'], ['pk-finance'], ['pk-admin-staff'], ['pk-pm'], ['pk-staff']]) {
+      expect(read({ req: { user: { id: 7, roles, groupAdmin: roles[0] === 'pk-admin' }, context: {} } }), roles.join()).toEqual({ uploadedBy: { equals: 7 } })
+      expect(read({ req: { user: { id: 7, roles }, context: {} }, isReadingStaticFile: true, data: { filename: 'x.jpg' } }), roles.join()).toEqual({ uploadedBy: { equals: 7 } })
+    }
+    expect(read({ req: { user: null, context: {} } })).toBe(false)
+  })
+
+  it('not in the admin nav / routes', () => {
+    expect(MediaSelfies.admin?.hidden).toBe(true)
   })
 })

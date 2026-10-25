@@ -172,21 +172,20 @@ const officeSignatures = officeRule(async (req, ids) => {
   return or.length === 0 ? false : or.length === 1 ? or[0]! : { or }
 })
 
-/** ADR 0032: Admin Staff reads the attendance selfies of the PTs where it holds the role (+ its own uploads). */
-const adminStaffSelfies: Rule = async ({ req }) => {
-  const own: Where = { uploadedBy: { equals: (req.user as { id?: number } | null)?.id ?? -1 } }
-  const ids = companiesWithRole(req, ['pk-admin-staff'])
-  return ids.length ? { or: [{ ownerCompany: { in: ids } }, own] } : own
+/**
+ * D2510 (web 0.21.1, user 2026-10-25): the Payload side of `media-selfies` — REST find / findByID
+ * (`/api/media-selfies[/<id>]`), the static file route `/api/media-selfies/file/<name>` and every admin view on it —
+ * answers ONLY the uploader's own rows. Office roles, Admin Staff and PMs used to read the selfies of their PTs / team
+ * here WITHOUT an audit row (the Media → Selfie absensi library, upload previews); they now go through the audited
+ * endpoints only: GET /api/v1/attendance/{id}/selfie and GET /api/v1/media/selfies/{id}/file (+ signed URL), whose
+ * visibility = read access of the referencing attendance (Q-33) and which audit someone else's selfie
+ * `view_sensitive`. The uploader keeps its own capture (web / APK check-in, on-behalf photo): upload response, own
+ * unlinked upload through the v1 file endpoint. The collection is hidden from the admin nav / routes (`hidden` below).
+ */
+const selfieRead: Access = ({ req }) => {
+  const uid = (req.user as { id?: number } | null)?.id
+  return uid === undefined ? false : { uploadedBy: { equals: uid } }
 }
-
-const ownOrOffice: Access = byRoleAny({
-  'pk-admin': officeOwned,
-  'pk-owner': officeOwned,
-  'pk-finance': officeOwned,
-  'pk-pm': ownUser('uploadedBy'),
-  'pk-staff': ownUser('uploadedBy'),
-  'pk-admin-staff': adminStaffSelfies,
-})
 
 const signatureRead: Access = byRoleAny({
   'pk-admin': officeSignatures,
@@ -326,10 +325,12 @@ export const MediaSelfies = mediaCollection({
   ownerCompany: true,
   // Owner decision 2026-10-09: web self check-in/out is every role, so every role may upload a selfie
   // (previously staff/pm/admin only, from when only the APK captured attendance).
-  access: { read: focused('media-selfies', ownOrOffice, false), create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-admin', 'pk-owner', 'pk-finance', 'pk-operator', 'pk-admin-staff') },
+  access: { read: selfieRead, create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-admin', 'pk-owner', 'pk-finance', 'pk-operator', 'pk-admin-staff') },
   // ADR 0018 (owner 2026-10-05): no selfie of an uploader without the current privacy acknowledgement while
   // "Versi APK minimum" ≥ 0.3.3 (403 PRIVACY_ACK_REQUIRED, audited access_denied).
   createGuard: assertSelfieUploadAllowed,
+  // D2510 (0.21.1): the library would only list the caller's own uploads (selfieRead) — no menu, no admin route
+  hidden: true,
   // E6 S2 (Q-33): set by the selfieRetention job when the file was deleted from the volume. The row
   // stays as a tombstone (attendances.selfie_id is NOT NULL and append-only), without the image.
   // D7 (DRMS 10/10, ADR 0010 addendum 2026-10-12): set once by the worker job `stampSelfie` when the timestamp

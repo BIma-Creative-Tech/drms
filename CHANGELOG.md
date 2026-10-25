@@ -8,8 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.21.1] - 2026-10-25
 
-**Web fix: image previews + popup for every image link (D2510, user 2026-10-25).** Web only: no migration, no API
-change, no access / CSP change, no token change; APK unchanged (APK 0.13.1 — Finance LPJ, tappable rows, photo
+**Web fix: image previews + popup for every image link, selfies only through audited endpoints (D2510, user
+2026-10-25).** Web only: no migration, no API change, no CSP change, no token change; one access tightening (selfies,
+see Security); APK unchanged (APK 0.13.1 — Finance LPJ, tappable rows, photo
 previews — is a separate APK-only release, branch `fix/d2510-apk-tap-lpj`). Rollback = image 0.21.0.
 
 ### Fixed
@@ -34,6 +35,19 @@ previews — is a separate APK-only release, branch `fix/d2510-apk-tap-lpj`). Ro
 - **Payload views:** every upload field to a media collection shows thumbnails in the collection list (was the file
   name); read-only ones (attendance selfie, transfer / cash proof, approval signature) show the authorized preview in
   the edit form; editable upload fields keep Payload's own field.
+
+### Security
+
+- **No unaudited path to attendance selfies any more (user decision 2026-10-25).** The Payload side of
+  `media-selfies` (REST `/api/media-selfies` list and by id, the static file route `/api/media-selfies/file/<name>`,
+  the Media → Selfie absensi library, Payload upload previews, populated `selfie` relations) answers only the
+  uploader's own rows: Admin, Direktur, Finance and Admin Staff (and the PM, already before) no longer see other
+  people's selfies there without an audit row. Every legitimate viewer goes through the audited
+  `GET /api/v1/attendance/{id}/selfie` or `GET /api/v1/media/selfies/{id}/file` (+ signed URL): visibility = read
+  access of the referencing attendance (Q-33), someone else's selfie audited `view_sensitive` (throttled). The
+  library is hidden from the admin menu and routes and from `/me/modules` (APK). Uploads (web + APK), check-in /
+  on-behalf and the uploader's own capture are unchanged. ADR 0004 (revision 2026-10-25) and ADR 0018 amended.
+  Note: a face reference photo (`employees.faceRefPhoto`, unused — 0 rows) is only previewable by its uploader.
 
 ## [0.21.0] - 2026-10-25
 

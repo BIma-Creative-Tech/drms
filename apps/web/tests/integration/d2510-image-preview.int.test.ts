@@ -13,7 +13,7 @@ import { AbsensiRekap, AbsensiToday } from '@/admin/views/Absensi'
 import { resetAppConfigCache } from '@/api/v1/endpoints/app'
 import { resetRateLimits } from '@/lib/rate-limit'
 
-import { api, makeWorld, upload, type FlowUser, type World } from './flow-world'
+import { api, makeFlowUser, makeWorld, upload, type FlowUser, type World } from './flow-world'
 import { getTestPayload, sqlAs, updateCompany } from './helpers'
 
 /**
@@ -25,7 +25,10 @@ import { getTestPayload, sqlAs, updateCompany } from './helpers'
  */
 let w: World
 let attendanceId = 0
+let selfieId = 0
+let selfieFile = ''
 let today = ''
+let adminStaff: FlowUser
 const SITE = { lat: -2.41, lng: 113.91 }
 
 type Props = AdminViewServerProps
@@ -66,6 +69,9 @@ beforeAll(async () => {
   const r = await api('POST', '/api/v1/attendance/check-in', w.users.staffA, { project_id: w.project, lat: SITE.lat, lng: SITE.lng, accuracy_m: 10, selfie_media_id: up.body.id })
   expect(r.status, JSON.stringify(r.body)).toBe(201)
   attendanceId = r.body.id as number
+  selfieId = up.body.id as number
+  selfieFile = String((await sqlAs('app', 'SELECT filename FROM media_selfies WHERE id = $1', [selfieId])).rows[0].filename)
+  adminStaff = await makeFlowUser(['pk-admin-staff'], 'ip-admin-staff', null)
   today = String((await sqlAs('app', 'SELECT local_date::text AS d FROM attendances WHERE id = $1', [attendanceId])).rows[0].d)
 })
 
@@ -125,5 +131,65 @@ describe('attendance selfie previews (web 0.21.1)', () => {
     expect(fieldOf('receipts', 'image').admin?.components?.Field).toBeUndefined()
     // LPJ photos keep their own lightbox field
     expect(fieldOf('settlements', 'photos').admin?.components?.Field).toBe('@/admin/components/LpjPhotosField#LpjPhotosField')
+  })
+})
+
+/**
+ * D2510 (user 2026-10-25, closed in 0.21.1): no unaudited path to someone else's selfie. The Payload side of
+ * media-selfies (REST list / by id, static file route) answers the uploader's own rows only; every other viewer
+ * goes through the audited /api/v1 endpoints; the library is hidden from the admin / APK nav.
+ */
+describe('selfies: Payload routes closed, audited endpoints only (web 0.21.1)', () => {
+  const audits = async (docType: string, docId: number, user: FlowUser) =>
+    Number((await sqlAs('app', "SELECT count(*)::int AS n FROM audit_logs WHERE action = 'view_sensitive' AND doc_type = $1 AND doc_id = $2 AND user_id = $3", [docType, String(docId), user.id])).rows[0].n)
+
+  it('Admin, Finance, Direktur, Admin Staff, PM of the team: static file / REST by id → 403|404, the REST list does not contain it', async () => {
+    resetRateLimits()
+    for (const [name, u] of [['admin', w.users.admin], ['finance', w.users.finance], ['owner', w.users.owner], ['admin-staff', adminStaff], ['pm', w.users.pm]] as const) {
+      expect([403, 404], `${name} static file`).toContain((await api('GET', `/api/media-selfies/file/${selfieFile}`, u)).status)
+      expect([403, 404], `${name} by id`).toContain((await api('GET', `/api/media-selfies/${selfieId}?depth=0`, u)).status)
+      const list = await api('GET', '/api/media-selfies?limit=200&depth=0', u)
+      expect(list.status, `${name} list`).toBe(200)
+      expect((list.body.docs as Array<{ id: number }>).map((d) => d.id), `${name} list`).not.toContain(selfieId)
+      // an attendance read through REST does not populate the selfie document for them either
+      const att = await api('GET', `/api/attendances/${attendanceId}?depth=1`, u)
+      if (att.status === 200) expect(typeof att.body.selfie === 'object' && att.body.selfie !== null, `${name} populated selfie`).toBe(false)
+    }
+    expect((await api('GET', `/api/media-selfies/file/${selfieFile}`, null)).status).not.toBe(200)
+  })
+
+  it('the uploader keeps its own capture (Payload file + v1 file endpoint, not audited as someone else)', async () => {
+    resetRateLimits()
+    expect((await api('GET', `/api/media-selfies/file/${selfieFile}`, w.users.staffA)).status).toBe(200)
+    expect((await api('GET', `/api/v1/media/selfies/${selfieId}/file`, w.users.staffA)).status).toBe(200)
+    expect((await api('GET', `/api/v1/attendance/${attendanceId}/selfie`, w.users.staffA)).status).toBe(200)
+    expect(await audits('attendance', attendanceId, w.users.staffA)).toBe(0)
+  })
+
+  it('allowed viewers still get the selfie through the audited endpoints: 200 + one view_sensitive row each', async () => {
+    resetRateLimits()
+    for (const [name, u] of [['admin', w.users.admin], ['finance', w.users.finance], ['admin-staff', adminStaff]] as const) {
+      const a = await api('GET', `/api/v1/attendance/${attendanceId}/selfie`, u)
+      expect(a.status, `${name} attendance selfie`).toBe(200)
+      expect(await audits('attendance', attendanceId, u), `${name} audit attendance`).toBe(1)
+      const m = await api('GET', `/api/v1/media/selfies/${selfieId}/file`, u)
+      expect(m.status, `${name} media file`).toBe(200)
+      expect(m.headers.get('content-type')).toBe('image/jpeg')
+      expect(await audits('media_selfies', selfieId, u), `${name} audit media`).toBe(1)
+    }
+    // not a viewer of that attendance: still 404 on both
+    expect((await api('GET', `/api/v1/media/selfies/${selfieId}/file`, w.users.staffB)).status).toBe(404)
+    expect((await api('GET', `/api/v1/media/selfies/${selfieId}/file`, w.users.otherPm)).status).toBe(404)
+  })
+
+  it('Media → Selfie absensi is hidden from the admin nav and the APK module list', async () => {
+    const p = await getTestPayload()
+    expect(p.collections['media-selfies'].config.admin.hidden).toBe(true)
+    resetRateLimits()
+    const mods = await api('GET', '/api/v1/me/modules', w.users.admin)
+    expect(mods.status, JSON.stringify(mods.body).slice(0, 300)).toBe(200)
+    const text = JSON.stringify(mods.body)
+    expect(text).toContain('media-receipts')
+    expect(text).not.toContain('media-selfies')
   })
 })
