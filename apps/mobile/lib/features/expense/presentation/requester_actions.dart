@@ -13,6 +13,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/online_only_button.dart';
+import '../../../shared/widgets/pk_ui.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/expense_providers.dart';
 import '../data/expense_api.dart';
@@ -101,14 +102,17 @@ class RequesterActionsSection extends ConsumerWidget {
         ),
     ];
     if (buttons.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Divider(height: 32),
-        Text(t.requesterActionsTitle, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        for (final b in buttons) Padding(padding: const EdgeInsets.only(bottom: 8), child: b),
-      ],
+    // D2510: the actions as a titled section card.
+    return PkSectionCard(
+      title: t.requesterActionsTitle,
+      icon: Icons.task_alt,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 4),
+          for (final b in buttons) Padding(padding: const EdgeInsets.only(bottom: 8), child: b),
+        ],
+      ),
     );
   }
 
@@ -223,15 +227,26 @@ class RequestLifecycleActions extends ConsumerWidget {
         ),
     ];
     if (buttons.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Divider(height: 32),
-        Text(t.lifecycleActionsTitle, style: Theme.of(context).textTheme.titleMedium),
-        if (isDraft && !canEditHere) Padding(padding: const EdgeInsets.only(top: 4), child: Text(t.editOnWebHint)),
-        const SizedBox(height: 8),
-        for (final b in buttons) Padding(padding: const EdgeInsets.only(bottom: 8), child: b),
-      ],
+    // D2510: the actions as a titled section card.
+    return PkSectionCard(
+      title: t.lifecycleActionsTitle,
+      icon: Icons.tune,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (isDraft && !canEditHere)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                t.editOnWebHint,
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ),
+          const SizedBox(height: 4),
+          for (final b in buttons) Padding(padding: const EdgeInsets.only(bottom: 8), child: b),
+        ],
+      ),
     );
   }
 
