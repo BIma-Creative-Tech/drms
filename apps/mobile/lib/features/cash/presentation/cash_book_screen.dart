@@ -251,10 +251,6 @@ class _BalanceTiles extends ConsumerWidget {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final p = ref.watch(currentProfileProvider);
-    final money = theme.textTheme.titleMedium?.copyWith(
-      fontWeight: FontWeight.w700,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
