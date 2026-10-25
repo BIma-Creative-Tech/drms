@@ -15,6 +15,7 @@ import '../../sync/application/sync_coordinator.dart';
 import '../application/field_providers.dart';
 import '../domain/field_models.dart';
 import '../domain/field_rules.dart';
+import 'field_hub_screen.dart' show FieldRecordSheet;
 import 'service_report_screen.dart' show confirmDiscard;
 import 'widgets/field_widgets.dart';
 import '../../../shared/widgets/pick_hint.dart';
@@ -650,6 +651,13 @@ class _AftersalesScreenState extends ConsumerState<AftersalesScreen> {
                       if (r.followUpDate != null) t.fieldFollowUpShort(fieldDateLabel(r.followUpDate!)),
                       if (r.value != null) formatRupiah(r.value!),
                     ].where((e) => e.isNotEmpty).join(' · '),
+                    // D2510: a sent activity opens its detail (the same sheet as the field hub history)
+                    onTap: () => showModalBottomSheet<void>(
+                      context: context,
+                      showDragHandle: true,
+                      isScrollControlled: true,
+                      builder: (_) => FieldRecordSheet(record: r, zone: profile?.timezone),
+                    ),
                   ),
               ],
             ),
@@ -754,6 +762,10 @@ class _ActivityRow extends StatelessWidget {
               ),
             ),
             if (state != null) ...[const SizedBox(width: 8), FieldStateChip(state: state!)],
+            if (onTap != null) ...[
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.outline),
+            ],
           ],
         ),
       ),

@@ -295,6 +295,8 @@ class _ProjectsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     final data = ref.watch(projectProgressProvider);
+    // D2510: a project card opens the project (detail with its RAP, requests and loans) when the user may see it.
+    final canOpen = ref.watch(currentProfileProvider)?.canSeeProjects ?? false;
     return RefreshIndicator(
       onRefresh: () async => ref.invalidate(projectProgressProvider),
       child: AsyncBody(
@@ -322,7 +324,7 @@ class _ProjectsTab extends ConsumerWidget {
             for (final p in list.projects)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: ProjectProgressCard(item: p),
+                child: ProjectProgressCard(item: p, onTap: canOpen ? () => context.push('/projects/${p.id}') : null),
               ),
           ],
         ),

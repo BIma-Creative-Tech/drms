@@ -10,6 +10,9 @@ import '../../../shared/icons/iconsax.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/pk_ui.dart';
 import '../../../shared/widgets/pk_ui_akun.dart';
+import '../../auth/application/auth_controller.dart';
+import '../../home/domain/route_access.dart';
+import '../../home/domain/web_route_map.dart';
 import '../data/reports_providers.dart';
 import '../domain/report.dart';
 
@@ -87,17 +90,20 @@ class ReportListScreen extends ConsumerWidget {
 /// `/reports/:code`: the web report page — filter form ("Terapkan" / "Reset"), letterhead, exports (CSV / Excel / PDF;
 /// XLSX above 10 000 and PDF above 500 rows disabled like the web), the main table and the extra tables as cards
 /// (long text wraps), totals, notes and the keyset pages ("Halaman pertama" / "Berikutnya"). A document number opens
-/// its APK screen where there is one.
+/// its APK screen where there is one (D2510: a report → report link opens with its filters, [initialParams]).
 class ReportScreen extends ConsumerStatefulWidget {
-  const ReportScreen({super.key, required this.code});
+  const ReportScreen({super.key, required this.code, this.initialParams = const {}});
   final String code;
+
+  /// Filters from the route query (`/reports/buku-kas?dari=…&akun=…`).
+  final Map<String, List<String>> initialParams;
 
   @override
   ConsumerState<ReportScreen> createState() => _ReportScreenState();
 }
 
 class _ReportScreenState extends ConsumerState<ReportScreen> {
-  late ReportQuery _q = ReportQuery(widget.code);
+  late ReportQuery _q = ReportQuery(widget.code, params: widget.initialParams);
   String? _exporting;
 
   Future<void> _editFilters(ReportPage page) async {
@@ -189,10 +195,19 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
     );
   }
 
-  void _openLink(String? href) {
-    if (href == null) return;
+  /// D2510: the APK screen of a report link when there is one AND the user may open it (else the cell stays text).
+  String? _route(String? href) {
+    if (href == null) return null;
     final route = apkRouteForReportLink(href);
-    if (route != null) context.push(route);
+    return route != null && canOpenApkRoute(route, ref.read(currentProfileProvider)) ? route : null;
+  }
+
+  void _openLink(String route) {
+    if (isShellRoute(route)) {
+      context.go(route);
+    } else {
+      context.push(route);
+    }
   }
 
   @override
@@ -200,6 +215,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
     final t = AppLocalizations.of(context);
     final value = ref.watch(reportPageProvider(_q));
     final page = value.value;
+    ref.watch(currentProfileProvider); // the links follow the roles ([_route])
     return Scaffold(
       appBar: AppBar(
         title: Text(page?.title ?? t.reportsTitle),
@@ -322,7 +338,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
             ],
           ),
         ),
-        _TableView(table: p.main, onLink: _openLink),
+        _TableView(table: p.main, route: _route, onOpen: _openLink),
         if (_q.cursor != null || p.nextCursor != null)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -344,7 +360,10 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
                 ),
             ],
           ),
-        for (final x in p.extra) ...[const SizedBox(height: 16), _TableView(table: x, onLink: _openLink)],
+        for (final x in p.extra) ...[
+          const SizedBox(height: 16),
+          _TableView(table: x, route: _route, onOpen: _openLink),
+        ],
         if (p.notes.isNotEmpty)
           PkCard(
             margin: const EdgeInsets.only(top: 8),
@@ -368,9 +387,12 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
 
 /// One report table as cards: the row's title column, then "Label  value" per other column; totals in a last card.
 class _TableView extends StatelessWidget {
-  const _TableView({required this.table, required this.onLink});
+  const _TableView({required this.table, required this.route, required this.onOpen});
   final ReportTableData table;
-  final void Function(String? href) onLink;
+
+  /// The APK route of a link the user may open, else null.
+  final String? Function(String? href) route;
+  final void Function(String route) onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -406,9 +428,7 @@ class _TableView extends StatelessWidget {
                           textAlign: c.numeric ? TextAlign.end : TextAlign.start,
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontWeight: c.numeric ? FontWeight.w700 : FontWeight.w500,
-                            color: links?[c.key] != null && apkRouteForReportLink(links![c.key]!) != null
-                                ? theme.colorScheme.primary
-                                : valueColor,
+                            color: route(links?[c.key]) != null ? theme.colorScheme.primary : valueColor,
                           ),
                         ),
                       ),
@@ -437,13 +457,18 @@ class _TableView extends StatelessWidget {
           Builder(
             builder: (context) {
               final links = i < table.rowLinks.length ? table.rowLinks[i] : null;
-              final href = links?['_row'] ?? (tc == null ? null : links?[tc.key]) ?? links?.values.firstOrNull;
-              final route = href == null ? null : apkRouteForReportLink(href);
+              // D2510: the FIRST link that opens an APK screen — the row, then the title cell, then any cell (an audit-log
+              // row's only link is its "dokumen" cell).
+              final target = [
+                links?['_row'],
+                if (tc != null) links?[tc.key],
+                ...?links?.values,
+              ].map(route).nonNulls.firstOrNull;
               return PkCard(
                 key: Key('report-${table.key}-row-$i'),
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                onTap: route == null ? null : () => onLink(href),
+                onTap: target == null ? null : () => onOpen(target),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -455,14 +480,19 @@ class _TableView extends StatelessWidget {
                               reportCellText(r[tc.key], tc.type).isEmpty ? '—' : reportCellText(r[tc.key], tc.type),
                               style: theme.textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w700,
-                                color: route != null ? theme.colorScheme.primary : null,
+                                color: target != null ? theme.colorScheme.primary : null,
                               ),
                             ),
                           ),
-                          if (route != null) Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.outline),
+                          if (target != null) Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.outline),
                         ],
                       ),
                     lines(r, links: links),
+                    if (tc == null && target != null)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.outline),
+                      ),
                   ],
                 ),
               );

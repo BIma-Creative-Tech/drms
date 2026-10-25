@@ -2,6 +2,8 @@
 // `GET /reports/{code}` (one report page: filter form, tables, notes, letterhead, export formats and limits).
 // Parsing is tolerant (unknown fields ignored, missing ones defaulted).
 
+import '../../home/domain/web_route_map.dart';
+
 int _int(Object? v, [int fallback = 0]) =>
     v is num ? v.toInt() : (v is String ? int.tryParse(v) ?? fallback : fallback);
 String? _strN(Object? v) => v == null ? null : '$v';
@@ -253,24 +255,55 @@ class ReportQuery {
 String _paramsKey(Map<String, List<String>> p) =>
     (p.entries.map((e) => '${e.key}=${e.value.join(',')}').toList()..sort()).join('&');
 
-/// Web admin href of a report row / cell → the APK screen (null = no APK screen; the cell is plain text).
+/// Web admin href of a report row / cell → the APK screen (null = no APK screen; the cell is plain text). D2510: also
+/// the history tab, the field-report detail pages, every web collection document whose list is the APK `/data` list,
+/// report → report links WITH their filters, an employee's attendance recap and the web menu pages with an APK screen
+/// (Verifikasi LPJ, Antrian Transfer, Unit & kontrak, …). Whether the user may open it: `canOpenApkRoute`.
 String? apkRouteForReportLink(String href) {
-  final m = RegExp(r'^/admin/(.+?)/?$').firstMatch(href);
+  final uri = Uri.tryParse(href);
+  if (uri == null) return null;
+  final m = RegExp(r'^/admin/(.+?)/?$').firstMatch(uri.path);
   if (m == null) return null;
   final p = m.group(1)!;
+  final q = uri.queryParametersAll;
   for (final (re, to) in [
-    (RegExp(r'^collections/expense-requests/(\d+)$'), '/requests/'),
-    (RegExp(r'^pinjaman/detail/(\d+)$'), '/loans/'),
-    (RegExp(r'^pinjaman-antar-pt/detail/(\d+)$'), '/intercompany-loans/'),
-    (RegExp(r'^collections/projects/(\d+)$'), '/projects/'),
-    (RegExp(r'^collections/budget-addenda/(\d+)$'), '/addenda/'),
-    (RegExp(r'^progress/laporan/(\d+)$'), '/progress/report/'),
+    (r'^collections/expense-requests/(\d+)$', '/requests/#'),
+    (r'^collections/expense-requests/(\d+)/riwayat$', '/requests/#/history'),
+    (r'^pinjaman/detail/(\d+)$', '/loans/#'),
+    (r'^collections/project-loans/(\d+)$', '/loans/#'),
+    (r'^pinjaman-antar-pt/detail/(\d+)$', '/intercompany-loans/#'),
+    (r'^collections/projects/(\d+)$', '/projects/#'),
+    (r'^progress/project/(\d+)$', '/projects/#'),
+    (r'^collections/budget-addenda/(\d+)$', '/addenda/#'),
+    (r'^addendum/detail/(\d+)$', '/addenda/#'),
+    (r'^progress/laporan/(\d+)$', '/progress/report/#'),
+    // field reports: the web detail views (ADR 0020) → the generic APK record detail
+    (r'^unit-kontrak/timesheet/detail/(\d+)$', '/data/unit-timesheets/#'),
+    (r'^aftersales/aktivitas/detail/(\d+)$', '/data/aftersales-activities/#'),
+    (r'^laporan-servis/detail/(\d+)$', '/data/service-reports/#'),
+    (r'^laporan-harian/detail/(\d+)$', '/data/daily-reports/#'),
   ]) {
-    final x = re.firstMatch(p);
-    if (x != null) return '$to${x.group(1)}';
+    final x = RegExp(re).firstMatch(p);
+    if (x != null) return to.replaceFirst('#', x.group(1)!);
   }
-  final data = RegExp(
-    r'^collections/(transfers|settlements|cash-entries|receipts|receipt-flags|expense-line-snapshots|period-closings|project-loan-repayments|cash-accounts|cash-in-sources)/(\d+)$',
-  ).firstMatch(p);
-  return data == null ? null : '/data/${data.group(1)}/${data.group(2)}';
+  // A web collection document whose list the APK shows as `/data/<slug>` (cash-entries, receipts, daily-reports, …).
+  final doc = RegExp(r'^collections/([a-z0-9-]+)/(\d+)$').firstMatch(p);
+  if (doc != null) {
+    final slug = doc.group(1)!;
+    return webToApk['/collections/$slug'] == '/data/$slug' ? '/data/$slug/${doc.group(2)}' : null;
+  }
+  // Report → report: the filters travel along (`/reports/buku-kas?dari=…&akun=…`).
+  final report = RegExp(r'^laporan/([a-z0-9-]+)$').firstMatch(p);
+  if (report != null) {
+    return Uri(path: '/reports/${report.group(1)}', queryParameters: q.isEmpty ? null : q).toString();
+  }
+  // "Rekap absensi" of one employee (the recap screen has its own month picker).
+  if (p == 'absensi/rekap') {
+    final employee = int.tryParse(q['karyawan']?.firstOrNull ?? '');
+    if (employee != null) return '/attendance/recap/$employee';
+  }
+  // The contract matrix of one project → the APK "Unit & kontrak" page.
+  if (RegExp(r'^unit-kontrak/kontrak/\d+$').hasMatch(p)) return '/contracts';
+  // A web menu page with an APK screen (verifikasi-lpj, antrian-transfer, unit-kontrak, …).
+  return apkTargetFor('/$p')?.route;
 }

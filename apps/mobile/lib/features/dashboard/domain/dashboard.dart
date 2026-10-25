@@ -501,6 +501,7 @@ class RecentCashEntry {
     this.label = '',
     this.sourceType = '',
     this.counterpart,
+    this.requestId,
   });
   final int id;
   final String? entryNo;
@@ -516,6 +517,12 @@ class RecentCashEntry {
 
   /// ADR 0028: the other leg of a payment between PTs, when the server sends it (`intercompany`).
   final CashCounterpart? counterpart;
+
+  /// D2510: the expense request the entry belongs to (`requestId`; null for a manual entry / older server).
+  final int? requestId;
+
+  /// D2510: what a tap opens — the request when the entry has one, else the cash entry record.
+  String get route => requestId != null ? '/requests/$requestId' : '/data/cash-entries/$id';
 
   /// "Sumber" label (web `SOURCE`): "Antar PT" for the Kas Masuk of a payment from another PT and for the paying PT's
   /// KK (source type `transfer`, marked by its counterpart).
@@ -537,6 +544,7 @@ class RecentCashEntry {
         label: _s(r['requestDocNo'] ?? r['label']),
         sourceType: _s(r['sourceType']),
         counterpart: CashCounterpart.fromJson(r['intercompany']),
+        requestId: r['requestId'] is num ? (r['requestId'] as num).toInt() : null,
       ),
   ];
 }
