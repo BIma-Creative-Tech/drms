@@ -184,7 +184,11 @@ describe('selfies: Payload routes closed, audited endpoints only (web 0.21.1)', 
 
   it('Media → Selfie absensi is hidden from the admin nav and the APK module list', async () => {
     const p = await getTestPayload()
-    expect(p.collections['media-selfies'].config.admin.hidden).toBe(true)
+    // withStaffPanelVisibility wraps `hidden` in a function of the user: hidden for every role
+    const hidden = p.collections['media-selfies'].config.admin.hidden as boolean | ((a: { user: unknown }) => boolean)
+    for (const u of [w.users.admin, w.users.finance, w.users.owner, w.users.pm, w.users.staffA, adminStaff]) {
+      expect(typeof hidden === 'function' ? hidden({ user: { ...u, collection: 'users' } }) : hidden, u.email).toBe(true)
+    }
     resetRateLimits()
     const mods = await api('GET', '/api/v1/me/modules', w.users.admin)
     expect(mods.status, JSON.stringify(mods.body).slice(0, 300)).toBe(200)
