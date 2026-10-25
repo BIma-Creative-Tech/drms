@@ -4,10 +4,11 @@
  * only (--pk-* / --viz-*), light + dark via html[data-theme]; touch targets 44 px on coarse pointers.
  */
 export const FIELD_STYLE = `
-.pk-f3 .pk-ftabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 16px; border-bottom: 1px solid var(--pk-border); }
-.pk-f3 .pk-ftabs a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; font-size: 14px; font-weight: 600; color: var(--pk-muted-fg); text-decoration: none; border-bottom: 3px solid transparent; margin-bottom: -1px; border-radius: var(--style-radius-s) var(--style-radius-s) 0 0; }
-.pk-f3 .pk-ftabs a:hover { color: var(--pk-fg); background: color-mix(in oklab, var(--pk-primary) 6%, transparent); }
-.pk-f3 .pk-ftabs a[aria-current='page'] { color: var(--pk-primary-hover); border-bottom-color: var(--pk-primary); }
+/* D2510 (Nexus tabs-box): the tab bar is a segmented box, the current tab a raised card-coloured pill */
+.pk-f3 .pk-ftabs { display: flex; flex-wrap: wrap; gap: 4px; width: fit-content; max-width: 100%; box-sizing: border-box; margin: 0 0 16px; padding: 4px; border: 1px solid var(--pk-border); border-radius: var(--style-radius-l); background: var(--pk-muted-bg); }
+.pk-f3 .pk-ftabs a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; font-size: 13.5px; font-weight: 600; color: var(--pk-muted-fg); text-decoration: none; border-radius: var(--style-radius-m); }
+.pk-f3 .pk-ftabs a:hover { color: var(--pk-fg); background: color-mix(in oklab, var(--pk-card) 55%, transparent); }
+.pk-f3 .pk-ftabs a[aria-current='page'] { color: var(--pk-primary-hover); background: var(--pk-card); box-shadow: 0 1px 2px rgb(15 23 42 / .12), 0 0 0 1px color-mix(in oklab, var(--pk-border) 70%, transparent); }
 .pk-f3 .pk-ftabs a:focus-visible, .pk-f3 .pk-chips a:focus-visible, .pk-f3 .pk-mx a:focus-visible { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
 .pk-f3 .pk-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 14px; }
 .pk-f3 .pk-chips > span { font-size: 13px; font-weight: 600; color: var(--pk-muted-fg); }
@@ -61,7 +62,7 @@ export const FIELD_STYLE = `
 @media (max-width: 559px) { .pk-f3 .pk-ftl li { flex-wrap: wrap; } .pk-f3 .pk-ftl li .b { flex-basis: calc(100% - 100px); } }
 /* follow-up list */
 .pk-f3 .pk-todo { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.pk-f3 .pk-todo li { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: var(--style-radius-m); background: color-mix(in oklab, var(--pk-muted-fg) 8%, var(--pk-card)); }
+.pk-f3 .pk-todo li { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: var(--style-radius-m); border: 1px solid color-mix(in oklab, var(--pk-border) 70%, transparent); background: color-mix(in oklab, var(--pk-muted-fg) 6%, var(--pk-card)); }
 .pk-f3 .pk-todo li.bad { background: color-mix(in oklab, var(--pk-tone-bad-text) 9%, var(--pk-card)); }
 .pk-f3 .pk-todo li.warn { background: color-mix(in oklab, var(--pk-tone-warn-text) 11%, var(--pk-card)); }
 .pk-f3 .pk-todo li .b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }

@@ -4696,3 +4696,418 @@ $pk-side-compact: 76px;
     }
   }
 }
+
+// =================================================================================================
+// D2510 custom pages (Nexus) — PR-4 (ADR 0033): the custom views (src/admin/views: Shell / Frame / FieldFrame
+// pages, inbox and queue sections, Laporan, Riwayat, module landing) as a column of Nexus cards under the shared
+// PageHeader. Builds on the kit above (pk-nx-card / -badge / [data-tone]); adds the custom-page pieces: page column,
+// table, item cards, callouts, sub lines, thumbnails. Colours = --pk-* tokens only (light + dark), long text wraps
+// (owner rule 2026-10-16, never an ellipsis), 44px targets on touch, ≤ 640px the cards tighten (kit).
+// =================================================================================================
+@layer payload {
+  // ---- page column (Shell / Riwayat / module landing): cards stacked with one gap ----------------------
+  .pk-nx-page {
+    display: grid;
+    gap: clamp(16px, 2vw, 20px);
+    min-width: 0;
+    padding-bottom: 32px;
+
+    > * {
+      min-width: 0;
+    }
+
+    // the list toolbar / pager of a standalone list keep their own spacing inside the column
+    > .pk-ltb,
+    > .pk-pager {
+      margin: 0;
+    }
+  }
+
+  // Riwayat = a document tab under Payload's own header → a little air above the card
+  .pk-nx-page--tab {
+    padding-top: 16px;
+  }
+
+  .pk-nx-back {
+    margin: 0;
+
+    .pk-pbtn {
+      margin: 0;
+    }
+  }
+
+  // ---- card body pieces ------------------------------------------------------------------------------
+  .pk-nx-card__body {
+    > .pk-ltb {
+      margin-top: 0;
+    }
+
+    > .pk-tscroll:last-child,
+    > .pk-pager:last-child,
+    > :last-child {
+      margin-bottom: 0;
+    }
+
+    > .pk-pager {
+      margin-top: 12px;
+    }
+  }
+
+  .pk-nx-lead {
+    margin: 0 0 12px;
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .pk-nx-empty {
+    margin: 0;
+    padding: 24px 12px;
+    color: var(--pk-muted-fg);
+    font-size: 13.5px;
+    text-align: center;
+  }
+
+  .pk-nx-sub {
+    display: block;
+    margin-top: 2px;
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+    line-height: 1.45;
+
+    &[data-tone] {
+      color: var(--pk-nx-tone);
+      font-weight: 600;
+    }
+  }
+
+  .pk-nx-muted {
+    color: var(--pk-muted-fg);
+    font-weight: 400;
+  }
+
+  .pk-nx-strong {
+    font-weight: 600;
+  }
+
+  .pk-nx-nowrap {
+    white-space: nowrap;
+  }
+
+  .pk-nx-wrap {
+    overflow-wrap: anywhere;
+  }
+
+  .pk-nx-gap {
+    margin-top: 8px;
+  }
+
+  .pk-nx-gap-b {
+    margin-bottom: 16px;
+  }
+
+  // badges / chips under a cell's main text
+  .pk-nx-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    margin-top: 4px;
+  }
+
+  // a linked badge ("Dana kurang", "Selisih nota"): the badge is the target, focus ring on the link
+  .pk-nx-badge-link {
+    display: inline-flex;
+    border-radius: 999px;
+    text-decoration: none;
+
+    &:hover .pk-nx-badge {
+      background: color-mix(in oklab, var(--pk-nx-tone) 22%, var(--pk-card));
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--pk-ring);
+      outline-offset: 2px;
+    }
+  }
+
+  // buttons of one row / item (Setujui + Tolak, Valid + Tolak)
+  .pk-nx-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+
+    .pk-pbtn {
+      margin: 0;
+    }
+  }
+
+  // tinted note inside a card (self-approval, G1, "Anda yang mengajukan", PT not allowed)
+  .pk-nx-callout {
+    margin: 0 0 10px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in oklab, var(--pk-nx-tone, var(--pk-muted-fg)) 28%, var(--pk-border));
+    border-radius: var(--style-radius-m);
+    background: color-mix(in oklab, var(--pk-nx-tone, var(--pk-muted-fg)) 8%, var(--pk-card));
+    color: var(--pk-fg);
+    font-size: 13px;
+    line-height: 1.5;
+
+    &:only-child {
+      margin: 0;
+    }
+  }
+
+  // sub-section inside a card ("Pengembalian pinjaman")
+  .pk-nx-subsec {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--pk-border);
+  }
+
+  .pk-nx-subsec__title {
+    margin: 0 0 10px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  // export links in a card head (Laporan)
+  .pk-nx-exports {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    color: var(--pk-muted-fg);
+    font-size: 12.5px;
+  }
+
+  // ---- table (custom views): muted header row, roomy rows, soft hover ----------------------------------
+  .pk-nx-table {
+    width: auto;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+
+    &.is-full {
+      width: 100%;
+    }
+
+    > thead > tr > th {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--pk-border);
+      background: color-mix(in oklab, var(--pk-muted-bg) 55%, var(--pk-card));
+      color: var(--pk-muted-fg);
+      font-size: 12px;
+      font-weight: 600;
+      text-align: left;
+      white-space: nowrap;
+
+      &:first-child {
+        border-top-left-radius: var(--style-radius-m);
+      }
+
+      &:last-child {
+        border-top-right-radius: var(--style-radius-m);
+      }
+    }
+
+    > tbody > tr > td {
+      padding: 11px 14px;
+      border-bottom: 1px solid color-mix(in oklab, var(--pk-border) 75%, transparent);
+      vertical-align: top;
+    }
+
+    > tbody:last-child > tr:last-child > td {
+      border-bottom: 0;
+    }
+
+    > tbody > tr:hover > td {
+      background: color-mix(in oklab, var(--pk-primary) 4%, var(--pk-card));
+    }
+
+    // the transfer form row under a queue item belongs to that item
+    > tbody > tr.pk-nx-subrow > td {
+      padding-top: 0;
+      background: transparent;
+    }
+
+    > tbody + tbody > tr:first-child > td {
+      border-top: 1px solid var(--pk-border);
+    }
+
+    :is(th, td).n {
+      text-align: right;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    // a badge inside a cell wraps with its cell (long vendor / account names) instead of overflowing it
+    .pk-nx-badge {
+      white-space: normal;
+    }
+  }
+
+  // inside the scroll box the frozen header row (wide-tables block above) keeps the muted tint
+  .pk-tscroll > table.pk-nx-table > thead > tr > th {
+    background: color-mix(in oklab, var(--pk-muted-bg) 55%, var(--pk-card));
+  }
+
+  .pk-nx-thumb {
+    display: block;
+    object-fit: cover;
+    border: 1px solid var(--pk-border);
+    border-radius: var(--style-radius-m);
+    background: var(--pk-muted-bg);
+  }
+
+  // ---- item cards inside a card (LPJ, loan / inter-PT transfer orders) --------------------------------
+  .pk-nx-items {
+    display: grid;
+    gap: 12px;
+  }
+
+  .pk-nx-item {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+    padding: 14px 16px;
+    border: 1px solid color-mix(in oklab, var(--pk-border) 85%, transparent);
+    border-radius: var(--style-radius-l);
+    background: color-mix(in oklab, var(--pk-muted-bg) 28%, var(--pk-card));
+
+    > * {
+      margin: 0;
+    }
+  }
+
+  .pk-nx-item__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .pk-nx-item__main {
+    flex: 1 1 320px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .pk-nx-item__meta {
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+
+  .pk-nx-item__figs {
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+
+    strong {
+      color: var(--pk-fg);
+    }
+  }
+
+  .pk-nx-flags {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    font-size: 12.5px;
+    list-style: none;
+
+    > li {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 6px;
+      align-items: center;
+    }
+  }
+
+  .pk-nx-media {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-top: 4px;
+  }
+
+  .pk-nx-media__body {
+    min-width: 0;
+  }
+
+  // ---- module landing (/admin/modul/<id>): section = card, tiles = flat quick actions inside it -------
+  .pk-modland .pk-nx-head {
+    margin-top: 0;
+  }
+
+  .pk-modland .pk-nx-card .pk-tile {
+    background: color-mix(in oklab, var(--pk-muted-bg) 35%, var(--pk-card));
+    box-shadow: none;
+
+    &:hover {
+      background: var(--pk-card);
+      box-shadow: var(--pk-shadow);
+    }
+  }
+
+  .pk-modland__section + .pk-modland__section {
+    margin-top: 0;
+  }
+
+  @media (pointer: coarse) {
+    .pk-nx-badge-link {
+      min-height: 44px;
+      align-items: center;
+    }
+  }
+}
+
+// Unlayered on purpose: the custom views' style strings (F3_STYLE, VIZ_STYLE — inline <style>, i.e. unlayered) would
+// beat any `@layer payload` rule. Only inside a Nexus card: the report table's own card box (.pk-scroll) and the
+// standalone section margins step back so the card is the one surface.
+.pk-f3 .pk-nx-card .pk-scroll {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.pk-f3 .pk-nx-card .pk-table th {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--pk-border);
+  background: color-mix(in oklab, var(--pk-muted-bg) 55%, var(--pk-card));
+  font-size: 12px;
+}
+
+.pk-f3 .pk-nx-card .pk-table td {
+  padding: 11px 14px;
+  border-bottom-color: color-mix(in oklab, var(--pk-border) 75%, transparent);
+}
+
+.pk-f3 .pk-nx-card .pk-empty {
+  margin: 0;
+  padding: 24px 12px;
+  text-align: center;
+}
+
+// filter forms of the custom views (F3_STYLE .pk-filter): standalone = a toolbar card; inside a card = its toolbar row
+.pk-f3[data-pk-view] form.pk-filter {
+  gap: 10px 14px;
+  padding: 12px 16px;
+  border-color: color-mix(in oklab, var(--pk-border) 80%, transparent);
+  border-radius: var(--style-radius-l);
+  box-shadow: var(--pk-shadow);
+}
+
+.pk-f3[data-pk-view] :is(.pk-card, .pk-nx-card) form.pk-filter {
+  margin: 0 0 14px;
+  padding: 0 0 14px;
+  border: 0;
+  border-bottom: 1px solid var(--pk-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}

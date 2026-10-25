@@ -6,9 +6,8 @@ import { creatableCompanies } from '@/fields/company'
 import { CLIENT_CREATE_ROLES, loadClientForm, loadVendorForm, PartnerFormError, VENDOR_CREATE_ROLES } from '@/domain/partners/service'
 
 import { ClientForm, VendorForm } from '../components/partners/PartnerForm'
-import { Frame } from './frame'
+import { Frame, PageHead } from './frame'
 import { NoAccess } from './NoAccess'
-import { DashHead } from './viz'
 
 /**
  * DRMS 16/10 — "Klien" (`/admin/klien/baru`, `/admin/klien/<id>`) and "Vendor" (`/admin/vendor/baru`,
@@ -27,9 +26,9 @@ function parse(props: AdminViewServerProps): Parsed {
 
 const notFound = (props: AdminViewServerProps, name: string, title: string, back: React.ReactNode) => (
   <Frame props={props} name={name}>
-    <DashHead title={title} note="Data ini tidak ada atau bukan data PT Anda.">
+    <PageHead props={props} title={title} note="Data ini tidak ada atau bukan data PT Anda.">
       {back}
-    </DashHead>
+    </PageHead>
   </Frame>
 )
 
@@ -49,12 +48,12 @@ export async function KlienView(props: AdminViewServerProps) {
   const c = detail.client
   return (
     <Frame props={props} name="klien">
-      <DashHead title={create ? 'Klien baru' : c?.name || 'Klien'} note={create ? 'Detail klien dan kontak PIC — disimpan sekaligus.' : 'Detail klien, kontak PIC dan proyeknya.'}>
+      <PageHead props={props} title={create ? 'Klien baru' : c?.name || 'Klien'} note={create ? 'Detail klien dan kontak PIC — disimpan sekaligus.' : 'Detail klien, kontak PIC dan proyeknya.'}>
         <div className="pk-kact">
           {c ? statusBadge(c.active) : null}
           {back}
         </div>
-      </DashHead>
+      </PageHead>
       <ClientForm key={c?.id ?? 'baru'} mode={create ? 'create' : 'update'} detail={detail} notice={saved ? 'Klien tersimpan.' : null} />
     </Frame>
   )
@@ -74,12 +73,12 @@ export async function VendorView(props: AdminViewServerProps) {
   const v = detail.vendor
   return (
     <Frame props={props} name="vendor">
-      <DashHead title={create ? 'Vendor baru' : v?.name || 'Vendor'} note={create ? 'Detail vendor, rekening dan kontak PIC — disimpan sekaligus.' : 'Detail vendor, rekening tujuan pembayaran dan kontak PIC.'}>
+      <PageHead props={props} title={create ? 'Vendor baru' : v?.name || 'Vendor'} note={create ? 'Detail vendor, rekening dan kontak PIC — disimpan sekaligus.' : 'Detail vendor, rekening tujuan pembayaran dan kontak PIC.'}>
         <div className="pk-kact">
           {v ? statusBadge(v.active) : null}
           {back}
         </div>
-      </DashHead>
+      </PageHead>
       <VendorForm key={v?.id ?? 'baru'} mode={create ? 'create' : 'update'} detail={detail} notice={saved ? 'Vendor tersimpan.' : null} />
     </Frame>
   )

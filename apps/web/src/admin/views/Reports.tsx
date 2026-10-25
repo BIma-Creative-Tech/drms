@@ -3,6 +3,8 @@ import Link from 'next/link'
 import React from 'react'
 
 import { hasRoleAny } from '@/access/roles'
+import { KAS_STYLE } from '@/admin/components/kas/style'
+import { Panel } from '@/admin/components/ui/nexus'
 import { Icon } from '@/admin/modules/Icon'
 import { writeAudit } from '@/audit/writer'
 import { exportLetterhead, PDF_MAX_ROWS } from '@/domain/reports/export'
@@ -16,7 +18,7 @@ import { formatServerTime } from '@/pdf/format'
 
 import { Empty, F3Root, FilterForm, ReportTable } from './f3-ui'
 import { foreignPtParam } from './pt'
-import { PtNotAllowed, Shell } from './shared'
+import { Badge, NX_TABLE, PtNotAllowed, Shell, TableScroll } from './shared'
 import { NoAccess } from './NoAccess'
 
 /**
@@ -40,13 +42,26 @@ export async function ReportsIndex(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const list = REPORTS.filter((r) => hasRoleAny(req, ...r.roles))
   return (
-    <Shell props={props} title="Laporan">
+    <Shell
+      props={props}
+      title="Laporan"
+      actions={
+        hasRoleAny(req, ...AUDIT_REPORT.roles) ? (
+          <Link className="pk-kbtn sm" href="/admin/audit-log" data-pk-link="audit-log">
+            <span>Audit Log</span>
+            <Icon name="arrowRight" size={16} />
+          </Link>
+        ) : null
+      }
+    >
       <F3Root name="laporan">
+        <style>{KAS_STYLE}</style>
+        <Panel id="daftar-laporan" icon="report" title="Daftar laporan" note={list.length ? `(${list.length})` : undefined}>
         {list.length === 0 ? (
           <Empty text="Laporan kantor tidak tersedia untuk peran Anda." />
         ) : (
-          <div className="pk-scroll">
-            <table className="pk-table" data-pk-table="reports">
+          <TableScroll label="Daftar laporan">
+            <table className={NX_TABLE} data-pk-table="reports">
               <thead>
                 <tr>
                   <th>Laporan</th>
@@ -58,29 +73,29 @@ export async function ReportsIndex(props: AdminViewServerProps) {
                 {list.map((r) => (
                   <tr key={r.code} data-pk-report={r.code}>
                     <td>
-                      <a href={`/admin/laporan/${r.code}`}>{r.title}</a>
+                      <a className="pk-nx-strong" href={`/admin/laporan/${r.code}`}>
+                        {r.title}
+                      </a>
                     </td>
                     <td className="pk-secondary">{r.description}</td>
                     <td className="pk-secondary">
-                      {r.formats
-                        .filter((f) => f !== 'xlsx' || xlsxEnabled())
-                        .map((f) => FORMAT_LABEL[f])
-                        .join(' · ')}
+                      <span className="pk-nx-chips">
+                        {r.formats
+                          .filter((f) => f !== 'xlsx' || xlsxEnabled())
+                          .map((f) => (
+                            <Badge key={f} tone="muted">
+                              {FORMAT_LABEL[f]}
+                            </Badge>
+                          ))}
+                      </span>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
-        {hasRoleAny(req, ...AUDIT_REPORT.roles) ? (
-          <p className="pk-actions">
-            <Link className="pk-btn sm" href="/admin/audit-log" data-pk-link="audit-log">
-              <span>Audit Log</span>
-              <Icon name="arrowRight" size={16} />
-            </Link>
-          </p>
-        ) : null}
+        </Panel>
       </F3Root>
     </Shell>
   )
@@ -91,7 +106,20 @@ export async function ReportView(props: AdminViewServerProps) {
   const segments = (props.params as { segments?: string[] } | undefined)?.segments ?? []
   const code = segments[1] ?? ''
   const def = reportByCode(code)
-  if (!def || def.code === 'audit-log') return <Shell props={props} title="Laporan tidak ditemukan"><p><Link href="/admin/laporan">← Daftar laporan</Link></p></Shell>
+  if (!def || def.code === 'audit-log')
+    return (
+      <Shell
+        props={props}
+        title="Laporan tidak ditemukan"
+        actions={
+          <Link className="pk-kbtn sm" href="/admin/laporan">
+            ← Daftar laporan
+          </Link>
+        }
+      >
+        <style>{KAS_STYLE}</style>
+      </Shell>
+    )
   if (!hasRoleAny(req, ...def.roles)) return <Denied props={props} def={def} />
   if (foreignPtParam(req, props.searchParams)) return <PtNotAllowed props={props} title={def.title} />
   const scope = def.scope ? await def.scope(req) : await officeScope(req)
@@ -143,16 +171,21 @@ async function ReportPage({ props, def, scope, base }: { props: AdminViewServerP
   }
   const body = loaded ? <ReportBody def={def} scope={scope} base={base} cursor={cursor} filterSp={filterSp} {...loaded} /> : <Empty text="Data tidak dapat dimuat. Coba lagi atau persempit filter." />
   return (
-    <Shell props={props} title={def.code === 'audit-log' ? 'Audit Log' : `Laporan › ${def.title}`}>
+    <Shell
+      props={props}
+      title={def.code === 'audit-log' ? 'Audit Log' : `Laporan › ${def.title}`}
+      sub={def.description}
+      actions={
+        def.code === 'audit-log' ? null : (
+          <Link className="pk-kbtn sm" href="/admin/laporan" data-pk-link="daftar-laporan">
+            <Icon name="arrowLeft" size={16} />
+            Daftar laporan
+          </Link>
+        )
+      }
+    >
       <F3Root name={`laporan-${def.code}`}>
-        {def.code === 'audit-log' ? null : (
-          <p className="pk-actions">
-            <Link className="pk-btn sm" href="/admin/laporan" data-pk-link="daftar-laporan">
-              <Icon name="arrowLeft" size={16} />
-              Daftar laporan
-            </Link>
-          </p>
-        )}
+        <style>{KAS_STYLE}</style>
         {body}
       </F3Root>
     </Shell>
@@ -186,36 +219,46 @@ function ReportBody({
     return (
       <>
         <FilterForm fields={fields} action={base} />
-        <p className="pk-note" data-pk-letterhead={kop.kind}>
-          {kop.kind === 'group' ? (
+        <Panel
+          id={`${def.code}-main`}
+          icon="report"
+          title={res.main.title}
+          actions={
+            <div className="pk-nx-exports" data-pk-exports>
+              <span>Export:</span>
+              {formats.map((f) => {
+                const tooBig = (f === 'xlsx' && rowCount > XLSX_MAX_ROWS) || (f === 'pdf' && rowCount > PDF_MAX_ROWS)
+                return tooBig ? (
+                  <span key={f} className="pk-btn sm" aria-disabled="true" title="Persempit filter atau pakai CSV" data-pk-export={f} data-pk-disabled="true">
+                    {FORMAT_LABEL[f]} (terlalu banyak baris)
+                  </span>
+                ) : (
+                  <a key={f} className="pk-btn sm" href={`/api/v1/reports/${def.code}/${f}${q ? `?${q}` : ''}`} data-pk-export={f}>
+                    {FORMAT_LABEL[f]}
+                  </a>
+                )
+              })}
+            </div>
+          }
+          foot={
             <>
-              {kop.name} · PT: {kop.companies.map((c) => c.shortCode).join(', ')}
-            </>
-          ) : (
-            kop.name
-          )}
-        </p>
-        <div className="pk-actions" data-pk-exports>
-          <span>Export:</span>
-          {formats.map((f) => {
-            const tooBig = (f === 'xlsx' && rowCount > XLSX_MAX_ROWS) || (f === 'pdf' && rowCount > PDF_MAX_ROWS)
-            return tooBig ? (
-              <span key={f} className="pk-btn" aria-disabled="true" title="Persempit filter atau pakai CSV" data-pk-export={f} data-pk-disabled="true">
-                {FORMAT_LABEL[f]} (terlalu banyak baris)
+              <span data-pk-letterhead={kop.kind}>
+                {kop.kind === 'group' ? (
+                  <>
+                    {kop.name} · PT: {kop.companies.map((c) => c.shortCode).join(', ')}
+                  </>
+                ) : (
+                  kop.name
+                )}
               </span>
-            ) : (
-              <a key={f} className="pk-btn" href={`/api/v1/reports/${def.code}/${f}${q ? `?${q}` : ''}`} data-pk-export={f}>
-                {FORMAT_LABEL[f]}
-              </a>
-            )
-          })}
-          <span className="pk-note" data-pk-row-count={rowCount}>
-            Dibuat {formatServerTime(new Date().toISOString(), ctx.tz)} · {formatNumber(rowCount)} baris
-            {scope.kind === 'team' ? ' · cakupan tim saya' : ''}
-          </span>
-        </div>
-        <section className="pk-block">
-          <h2>{res.main.title}</h2>
+              {' · '}
+              <span data-pk-row-count={rowCount}>
+                Dibuat {formatServerTime(new Date().toISOString(), ctx.tz)} · {formatNumber(rowCount)} baris
+                {scope.kind === 'team' ? ' · cakupan tim saya' : ''}
+              </span>
+            </>
+          }
+        >
           <ReportTable t={res.main} id={`${def.code}-main`} />
           {def.paged ? (
             <p className="pk-actions">
@@ -231,12 +274,11 @@ function ReportBody({
               ) : null}
             </p>
           ) : null}
-        </section>
+        </Panel>
         {res.extra.map((t) => (
-          <section key={t.key} className="pk-block">
-            <h2>{t.title}</h2>
+          <Panel key={t.key} id={`${def.code}-${t.key}`} icon="tChart" title={t.title}>
             <ReportTable t={t} id={`${def.code}-${t.key}`} />
-          </section>
+          </Panel>
         ))}
         {res.notes.map((n, i) => (
           <p key={i} className="pk-note">

@@ -5,12 +5,15 @@ import Link from 'next/link'
 import React from 'react'
 
 import { hasRoleAny, type Role } from '@/access/roles'
+import { PageHeader } from '@/admin/components/ui/nexus'
 import { Icon } from '@/admin/modules/Icon'
 import { rupiahOrDash } from '@/lib/money'
 
 import { NoAccess } from './NoAccess'
+import { pageModuleOf, type BadgeTone } from './page-ui'
 
 export { TableScroll } from '../components/TableScroll'
+export { Badge, NX_TABLE, type BadgeTone } from './page-ui'
 
 /**
  * Shared bits of the F2 admin custom views (architecture §8, phase plan F2 "admin custom views"):
@@ -19,8 +22,10 @@ export { TableScroll } from '../components/TableScroll'
  * Everything here is server-rendered text (React escaping); actions are client components that
  * call /api/v1 (the server re-checks every action).
  */
-export function Shell({ props, title, children }: { props: AdminViewServerProps; title: string; children: React.ReactNode }) {
+export function Shell({ props, title, sub, actions, children }: { props: AdminViewServerProps; title: string; sub?: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode }) {
   const { initPageResult, params, searchParams } = props
+  // D2510 (ADR 0033): the shared Nexus page header (module chip, muted line, actions) over a column of cards
+  const m = pageModuleOf(props)
   return (
     <DefaultTemplate
       i18n={initPageResult.req.i18n}
@@ -33,8 +38,8 @@ export function Shell({ props, title, children }: { props: AdminViewServerProps;
       visibleEntities={initPageResult.visibleEntities}
     >
       <Gutter>
-        <h1 style={{ margin: '24px 0 16px' }}>{title}</h1>
-        {children}
+        <PageHeader title={title} sub={sub} actions={actions} mod={m?.mod} icon={m?.icon} />
+        <div className="pk-nx-page">{children}</div>
       </Gutter>
     </DefaultTemplate>
   )
@@ -49,7 +54,9 @@ export function Forbidden({ props }: { props: AdminViewServerProps; title?: stri
 export function PtNotAllowed({ props, title }: { props: AdminViewServerProps; title: string }) {
   return (
     <Shell props={props} title={title}>
-      <p data-pk-denied="pt">PT yang diminta bukan PT Anda (atau tidak termasuk PT yang dipilih di pemilih PT).</p>
+      <p className="pk-nx-callout" data-tone="bad" role="alert" data-pk-denied="pt">
+        PT yang diminta bukan PT Anda (atau tidak termasuk PT yang dipilih di pemilih PT).
+      </p>
     </Shell>
   )
 }
@@ -59,15 +66,18 @@ export function allowed(req: PayloadRequest, roles: Role[]): boolean {
 }
 
 /**
- * DRMS 15/10 #6 (owner: "jarak antar kolom terlalu lebar"): the custom-view tables hug their columns (width auto)
- * instead of spreading a few columns over the whole page; wide ones still scroll inside TableScroll, whose header row
- * stays frozen (custom.scss .pk-tscroll). Cell padding = the generic list (8 × 12 px).
+ * @deprecated D2510: the former inline-style helpers — kept so older call sites still compile; the custom views use
+ * `NX_TABLE` + `td.n` and `<Badge>` instead.
  */
 export const table: React.CSSProperties = { width: 'auto', borderCollapse: 'collapse', fontSize: 13 }
+/** @deprecated D2510: `.pk-nx-table th`. */
 export const th: React.CSSProperties = { textAlign: 'left', borderBottom: '2px solid var(--theme-elevation-150)', padding: '8px 12px', whiteSpace: 'nowrap' }
+/** @deprecated D2510: `.pk-nx-table td`. */
 export const td: React.CSSProperties = { borderBottom: '1px solid var(--theme-elevation-100)', padding: '8px 12px', verticalAlign: 'top' }
+/** @deprecated D2510: `.pk-nx-table td.n`. */
 export const num: React.CSSProperties = { ...td, textAlign: 'right', whiteSpace: 'nowrap' }
-export const badge = (tone: 'ok' | 'warn' | 'bad' | 'muted'): React.CSSProperties => ({
+/** @deprecated D2510: `<Badge tone>`. */
+export const badge = (tone: BadgeTone): React.CSSProperties => ({
   display: 'inline-block',
   padding: '1px 6px',
   borderRadius: 8,
@@ -97,6 +107,7 @@ export function docLink(id: number, label: string) {
   return <a href={`/admin/collections/expense-requests/${id}`}>{label}</a>
 }
 
+/** Empty state inside a card: centred muted line (Nexus). */
 export function Empty({ text }: { text: string }) {
-  return <p style={{ color: 'var(--theme-elevation-600)' }}>{text}</p>
+  return <p className="pk-nx-empty">{text}</p>
 }

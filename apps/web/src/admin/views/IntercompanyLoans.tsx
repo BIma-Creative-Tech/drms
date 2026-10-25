@@ -8,6 +8,7 @@ import { IcLoanInstructForm } from '@/admin/components/icloans/IcLoanInstructFor
 import { IcLoanMoneyForm } from '@/admin/components/icloans/IcLoanMoneyForm'
 import { ReasonAction } from '@/admin/components/kas/ReasonAction'
 import { ListToolbar, Pager } from '@/admin/components/list/ListToolbar'
+import { Panel } from '@/admin/components/ui/nexus'
 import { allowedValues, pageOfFind, parseListQuery, type ListQuery } from '@/admin/list-query'
 import { companyRefs } from '@/domain/companies'
 import { settings } from '@/domain/expense/common'
@@ -18,11 +19,12 @@ import type { PillTone } from '@/domain/reports/viz'
 import { withReqTransaction, withSystemTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
 
-import { Frame } from './frame'
+import { Frame, PageHead } from './frame'
 import { NoAccess } from './NoAccess'
+import { Badge } from './page-ui'
 import { Alert, dateId, dateTimeId } from './progress-ui'
 import { PtChip } from './pt'
-import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, Meter, rp, StatusPill, type Col } from './viz'
+import { Bento, Card, DataTable, EmptyState, KpiRow, KpiTile, Meter, rp, StatusPill, type Col } from './viz'
 
 /**
  * ADR 0029 web: "Pinjaman antar-PT" (Keuangan) — list (D8: search, filters, numbered pages), the Owner's instruction
@@ -139,7 +141,7 @@ export async function IcLoanList(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="pinjaman-antar-pt">
       <style>{STYLE}</style>
-      <DashHead title="Pinjaman antar-PT" note="Diperintahkan Owner · dicairkan Finance PT pemberi · dikembalikan Finance PT peminjam · uang nyata antar PT grup (KK + KM otomatis), tanpa bunga">
+      <PageHead props={props} title="Pinjaman antar-PT" note="Diperintahkan Owner · dicairkan Finance PT pemberi · dikembalikan Finance PT peminjam · uang nyata antar PT grup (KK + KM otomatis), tanpa bunga">
         <div className="pk-kact">
           {canInstruct ? (
             <Link className="pk-kbtn primary" href={`${BASE}/baru`} data-pk-link="icloan-baru">
@@ -155,7 +157,7 @@ export async function IcLoanList(props: AdminViewServerProps) {
             Laporan
           </Link>
         </div>
-      </DashHead>
+      </PageHead>
       <Bento label="Ringkasan pinjaman antar-PT">
         <KpiRow cols={3}>
           <KpiTile id="icl-receivable" icon="up" label="Piutang antar-PT (sisa)" value={rp(sum('receivable'))} title={rp(sum('receivable'))} kpi="icloan-receivable" href={`${BASE}?peran=lender`} more="Lihat" i={0} />
@@ -188,9 +190,9 @@ export async function IcLoanNew(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const mine = ownerPts(req)
   const head = (
-    <DashHead title="Perintahkan pinjaman antar-PT" note="Nomor PJA dari PT pemberi. Finance PT pemberi mencairkan dari Antrian Transfer; Owner menyetujui ulang pengajuan setelah dana masuk.">
+    <PageHead props={props} title="Perintahkan pinjaman antar-PT" note="Nomor PJA dari PT pemberi. Finance PT pemberi mencairkan dari Antrian Transfer; Owner menyetujui ulang pengajuan setelah dana masuk.">
       {back}
-    </DashHead>
+    </PageHead>
   )
   if (mine.length < 2) {
     return (
@@ -265,7 +267,7 @@ export async function IcLoanDetail(props: AdminViewServerProps) {
   if (!d) {
     return (
       <Frame props={props} name="pinjaman-antar-pt-detail">
-        <DashHead title="Pinjaman antar-PT tidak ditemukan">{back}</DashHead>
+        <PageHead props={props} title="Pinjaman antar-PT tidak ditemukan">{back}</PageHead>
       </Frame>
     )
   }
@@ -336,9 +338,9 @@ export async function IcLoanDetail(props: AdminViewServerProps) {
   const page = (
     <Frame props={props} name="pinjaman-antar-pt-detail">
       <style>{STYLE}</style>
-      <DashHead title={l.docNo} note={`PT ${lender} → PT ${borrower} · diperintahkan ${l.createdBy.name ?? '—'} · ${dateId(l.instructionDate)}`}>
+      <PageHead props={props} title={l.docNo} note={`PT ${lender} → PT ${borrower} · diperintahkan ${l.createdBy.name ?? '—'} · ${dateId(l.instructionDate)}`}>
         <div className="pk-kact">{back}</div>
-      </DashHead>
+      </PageHead>
       {sp.baru ? (
         <Alert tone="ok" attr="instructed">
           <p>
@@ -379,14 +381,12 @@ export async function IcLoanDetail(props: AdminViewServerProps) {
         </div>
       ) : null}
       {acts.has('disburse') ? (
-        <section style={{ marginBottom: 16 }} data-pk-icloan-disburse>
-          <h2 style={{ fontSize: 16, margin: '0 0 8px' }}>Cairkan pinjaman</h2>
+        <Panel icon="tCardSend" title="Cairkan pinjaman" className="pk-nx-gap-b" data-pk-icloan-disburse="true">
           <IcLoanMoneyForm url={`/api/v1/intercompany-loans/${l.id}/disburse`} submitLabel="Catat pencairan" accounts={d.lenderAccounts} amountText={`Transfer ${rp(l.amount)} dari PT ${lender} ke rekening penerimaan antar-PT PT ${borrower}`} testId="icloan-disburse" />
-        </section>
+        </Panel>
       ) : null}
       {acts.has('repay') ? (
-        <section style={{ marginBottom: 16 }} data-pk-icloan-repay>
-          <h2 style={{ fontSize: 16, margin: '0 0 8px' }}>Catat pengembalian</h2>
+        <Panel icon="tMoneyRecive" title="Catat pengembalian" className="pk-nx-gap-b" data-pk-icloan-repay="true">
           <IcLoanMoneyForm
             url={`/api/v1/intercompany-loans/${l.id}/repayments`}
             submitLabel="Catat pengembalian"
@@ -395,7 +395,7 @@ export async function IcLoanDetail(props: AdminViewServerProps) {
             amount={{ max: l.outstanding }}
             testId="icloan-repay"
           />
-        </section>
+        </Panel>
       ) : null}
       <Bento label="Pinjaman antar-PT">
         <KpiRow cols={4}>
@@ -482,23 +482,23 @@ export async function IcLoanQueueSection({ req }: { req: PayloadRequest }) {
     return { q, accounts }
   })
   return (
-    <section id="pencairan-pinjaman" style={{ marginTop: 32 }} data-pk-queue="icloan">
-      <h2 style={{ margin: '0 0 8px' }}>Pencairan pinjaman antar-PT ({d.q.count})</h2>
-      <p style={{ fontSize: 13, color: 'var(--pk-muted-fg)', margin: '0 0 8px' }}>
+    <Panel id="pencairan-pinjaman" icon="tCardReceive" title={`Pencairan pinjaman antar-PT (${d.q.count})`} data-pk-queue="icloan">
+      <p className="pk-nx-lead">
         Perintah Owner: transfer dari PT pemberi ke rekening penerimaan antar-PT PT peminjam. KK tercatat di PT Anda, KM otomatis di PT peminjam. Pencairan tidak boleh dicatat oleh pembuat perintah (G1); dana tersedia PT diperiksa ulang.
       </p>
       {d.q.items.length === 0 ? (
-        <p style={{ fontSize: 13 }}>Tidak ada pinjaman antar-PT yang menunggu pencairan.</p>
+        <p className="pk-nx-empty">Tidak ada pinjaman antar-PT yang menunggu pencairan.</p>
       ) : (
-        d.q.items.map((it) => (
-          <article key={it.id} data-pk-icloan-queue-item={it.id} style={{ border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 12 }}>
-            <p style={{ margin: '0 0 6px' }}>
+        <div className="pk-nx-items">
+        {d.q.items.map((it) => (
+          <article key={it.id} className="pk-nx-item" data-pk-icloan-queue-item={it.id}>
+            <p className="pk-nx-item__main">
               <a href={icLoanHref(it.id)}>
                 <strong>{it.docNo}</strong>
               </a>{' '}
               · PT {pt(it.lender)} → PT {pt(it.borrower)} · {rp(it.amount)} · jatuh tempo {dateId(it.dueDate)} · diperintahkan {it.createdBy.name ?? '—'}
             </p>
-            <p style={{ margin: '0 0 6px', fontSize: 13 }}>
+            <p className="pk-nx-item__meta">
               Tujuan: {it.destination ? `${it.destination.bankName ?? ''} · ${it.destination.accountHolder} · ${it.destination.accountNoMasked ?? ''}` : 'PT peminjam belum menetapkan rekening penerimaan antar-PT'} · {it.reason}
             </p>
             {it.canDisburse && it.lender && hasRole(req, 'pk-finance', it.lender.id) ? (
@@ -506,14 +506,18 @@ export async function IcLoanQueueSection({ req }: { req: PayloadRequest }) {
                 <IcLoanMoneyForm url={`/api/v1/intercompany-loans/${it.id}/disburse`} submitLabel="Catat pencairan" accounts={d.accounts.get(it.lender.id) ?? []} amountText={`Transfer ${rp(it.amount)}`} testId={`icloan-disburse-${it.id}`} />
               </DocSummaryProvider>
             ) : it.g1Note ? (
-              <p className="pk-note" style={{ margin: 0 }}>
-                <StatusPill tone="warn" label="G1" /> {it.g1Note}
+              <p className="pk-nx-callout" data-tone="warn">
+                <Badge tone="warn">
+                  <span aria-hidden>▲</span> G1
+                </Badge>{' '}
+                {it.g1Note}
               </p>
             ) : null}
           </article>
-        ))
+        ))}
+        </div>
       )}
-    </section>
+    </Panel>
   )
 }
 

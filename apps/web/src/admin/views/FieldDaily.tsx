@@ -18,10 +18,11 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseListQuery } from '@/admin/list-query'
 
+import { PageHead } from './frame'
 import { BtnLink, dateParam, FIELD_CREATORS, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf } from './field-ui'
 import { ptOptionsOf, ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
-import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, type Col } from './viz'
+import { Bento, Card, DataTable, EmptyState, KpiRow, KpiTile, type Col } from './viz'
 import { DateInput } from '../components/DateInput'
 
 /**
@@ -98,7 +99,7 @@ export async function FieldDailyList(props: AdminViewServerProps) {
   ]
   return (
     <FieldFrame props={props} name="laporan-harian">
-      <DashHead title="Laporan harian" note="Project konstruksi · volume pekerjaan per item RAP menggerakkan progress tahapan · terbaru di atas">
+      <PageHead props={props} title="Laporan harian" note="Project konstruksi · volume pekerjaan per item RAP menggerakkan progress tahapan · terbaru di atas">
         <div className="pk-kact">
           {creator ? (
             <BtnLink href="/admin/laporan-harian/baru" primary icon="add" attr="harian-baru">
@@ -107,7 +108,7 @@ export async function FieldDailyList(props: AdminViewServerProps) {
           ) : null}
           {q.project ? <BtnLink href={rapHref(q.project)}>RAP & rekap</BtnLink> : null}
         </div>
-      </DashHead>
+      </PageHead>
       <form className="pk-filter" method="get" action={listHref} role="search" aria-label="Filter laporan harian" data-pk-filter="laporan-harian">
         <label className="pk-filter__search">
           Cari
@@ -238,13 +239,13 @@ export async function FieldDailyNew(props: AdminViewServerProps) {
   })
   return (
     <FieldFrame props={props} name="harian-baru">
-      <DashHead title="Laporan harian" note="Nomor LH dibuat otomatis · satu laporan per project per hari · bisa diedit pelapor 24 jam, setelah itu koreksi oleh PM/Direktur">
+      <PageHead props={props} title="Laporan harian" note="Nomor LH dibuat otomatis · satu laporan per project per hari · bisa diedit pelapor 24 jam, setelah itu koreksi oleh PM/Direktur">
         <div className="pk-kact">
           <BtnLink href={listHref} icon="arrowLeft">
             Laporan harian
           </BtnLink>
         </div>
-      </DashHead>
+      </PageHead>
       <Bento>
         <Card id="daily-form" title="Laporan baru" span={8}>
           {d.projects.length === 0 ? (
@@ -316,7 +317,7 @@ export async function FieldDailyDetail(props: AdminViewServerProps) {
   if (!d) {
     return (
       <FieldFrame props={props} name="harian-detail">
-        <DashHead title="Laporan tidak ditemukan">{back}</DashHead>
+        <PageHead props={props} title="Laporan tidak ditemukan">{back}</PageHead>
       </FieldFrame>
     )
   }
@@ -326,13 +327,13 @@ export async function FieldDailyDetail(props: AdminViewServerProps) {
   if (mode && form) {
     return (
       <FieldFrame props={props} name={`harian-${mode}`}>
-        <DashHead title={`${mode === 'edit' ? 'Ubah' : 'Koreksi'} ${r.docNo ?? `laporan #${r.id}`}`} note={`${longDate(r.reportDate)} · ${r.project.code ?? ''} ${r.project.name ?? ''}`}>
+        <PageHead props={props} title={`${mode === 'edit' ? 'Ubah' : 'Koreksi'} ${r.docNo ?? `laporan #${r.id}`}`} note={`${longDate(r.reportDate)} · ${r.project.code ?? ''} ${r.project.name ?? ''}`}>
           <div className="pk-kact">
             <BtnLink href={detailHref(r.id)} icon="arrowLeft">
               Kembali ke laporan
             </BtnLink>
           </div>
-        </DashHead>
+        </PageHead>
         <Bento>
           {/* UI feedback 17/10 #5: same layout as "Laporan baru" (form 8 + "Aturan" 4) */}
           <Card id="daily-form" title={mode === 'edit' ? 'Ubah (24 jam)' : 'Koreksi'} sub={mode === 'correction' ? 'Selisih dicatat sebagai koreksi dengan alasan; laporan ditandai “dikoreksi”.' : 'Selisih volume dicatat di riwayat.'} span={8}>
@@ -354,7 +355,7 @@ export async function FieldDailyDetail(props: AdminViewServerProps) {
   const ledger = r.ledger ?? []
   return (
     <FieldFrame props={props} name="harian-detail">
-      <DashHead title={r.docNo ?? `Laporan harian #${r.id}`} note={`${longDate(r.reportDate)} · ${r.project.code ?? ''} ${r.project.name ?? ''}`}>
+      <PageHead props={props} title={r.docNo ?? `Laporan harian #${r.id}`} note={`${longDate(r.reportDate)} · ${r.project.code ?? ''} ${r.project.name ?? ''}`}>
         <div className="pk-kact">
           {back}
           <BtnLink href={rapHref(r.project.id)}>RAP project</BtnLink>
@@ -369,7 +370,7 @@ export async function FieldDailyDetail(props: AdminViewServerProps) {
             </BtnLink>
           ) : null}
         </div>
-      </DashHead>
+      </PageHead>
       {one(sp.baru) === '1' || one(sp.disimpan) === '1' ? (
         <Alert tone="ok" attr="created">
           <p>
@@ -489,7 +490,7 @@ export async function FieldDailyRap(props: AdminViewServerProps) {
   if (!d) {
     return (
       <FieldFrame props={props} name="harian-rap">
-        <DashHead title="Project konstruksi tidak ditemukan">{back}</DashHead>
+        <PageHead props={props} title="Project konstruksi tidak ditemukan">{back}</PageHead>
       </FieldFrame>
     )
   }
@@ -518,7 +519,7 @@ export async function FieldDailyRap(props: AdminViewServerProps) {
   ]
   return (
     <FieldFrame props={props} name="harian-rap">
-      <DashHead title={`RAP · ${p.label}`} note={rap.locked ? 'RAP terkunci (sudah ada realisasi): perubahan hanya oleh Direktur/Admin dengan alasan' : 'Progress tahapan dihitung dari realisasi volume pekerjaan'}>
+      <PageHead props={props} title={`RAP · ${p.label}`} note={rap.locked ? 'RAP terkunci (sudah ada realisasi): perubahan hanya oleh Direktur/Admin dengan alasan' : 'Progress tahapan dihitung dari realisasi volume pekerjaan'}>
         <div className="pk-kact">
           {back}
           <BtnLink href={`${listHref}?project=${p.id}`}>Laporan project ini</BtnLink>
@@ -529,7 +530,7 @@ export async function FieldDailyRap(props: AdminViewServerProps) {
             Template kosong
           </a>
         </div>
-      </DashHead>
+      </PageHead>
       <Bento label="RAP project">
         <KpiRow cols={4}>
           <KpiTile id="r-items" icon="doc" label="Item pekerjaan / material" value={`${work.filter((i) => i.active).length} / ${material.filter((i) => i.active).length}`} kpi="rap-items" i={0} />
