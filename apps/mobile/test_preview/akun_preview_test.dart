@@ -229,6 +229,24 @@ Future<void> _seedQueue(AppDatabase db) async {
   await add(SyncItemType.attendanceCheckOut, 'applied');
 }
 
+/// Lets real async work finish (drift queries of the Antrean screen run outside the fake clock), then settles with a
+/// bound: a screen whose spinner keeps running is shot as it is instead of timing out.
+Future<void> _settle(WidgetTester tester) async {
+  for (var i = 0; i < 5; i++) {
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 40)));
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+  try {
+    await tester.pumpAndSettle(
+      const Duration(milliseconds: 100),
+      EnginePhase.sendSemanticsUpdate,
+      const Duration(seconds: 3),
+    );
+  } on FlutterError {
+    // still animating (indeterminate progress) — take the frame as is
+  }
+}
+
 Future<void> _scrollTo(WidgetTester tester, String key, {double alignment = 0.1}) async {
   final target = find.byKey(Key(key));
   final list = find.byWidgetPredicate((w) => w is Scrollable && axisDirectionToAxis(w.axisDirection) == Axis.vertical);
@@ -343,7 +361,7 @@ Future<void> _shot(
   );
   await tester.pumpAndSettle();
   container.read(routerProvider).go(location);
-  await tester.pumpAndSettle();
+  await _settle(tester);
   if (act != null) {
     await act(tester);
     await tester.pumpAndSettle();
