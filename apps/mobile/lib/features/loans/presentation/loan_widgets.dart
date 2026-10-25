@@ -124,7 +124,7 @@ class LoanCard extends StatelessWidget {
                       PkPill(
                         key: Key('loan-role-${l.id}'),
                         icon: borrows ? Icons.call_received : Icons.call_made,
-                        tone: PkTone.primary,
+                        tone: PkTone.info,
                         label: borrows ? t.loanRoleBorrower : t.loanRoleLender,
                       ),
                     LoanStatusChip(loan: l),
@@ -172,8 +172,8 @@ class LoanInboxSection extends ConsumerWidget {
         key: const Key('loan-inbox'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PkSectionHeader(
-            title: inbox.count == 0 ? t.loanTitle : t.loanInboxTitle(inbox.count),
+          PkListTitle(
+            inbox.count == 0 ? t.loanTitle : t.loanInboxTitle(inbox.count),
             padding: const EdgeInsets.only(bottom: 10),
           ),
           if (inbox.count == 0)

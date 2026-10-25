@@ -317,7 +317,13 @@ class _RapManageScreenState extends ConsumerState<RapManageScreen> {
                               if (i.inUse)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 6),
-                                  child: PkPill(label: t.rapInUse, tone: PkTone.warn, icon: Icons.lock_clock_outlined),
+                                  child: Text(
+                                    t.rapInUse,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: context.pk.warnText,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
                                 ),
                             ],
                           ),

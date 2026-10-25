@@ -73,7 +73,7 @@ class LoanTransferOrderSection extends ConsumerWidget {
         key: const Key('loan-transfer-orders'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PkSectionHeader(title: t.loanTransferOrdersTitle(items.length), padding: const EdgeInsets.only(bottom: 10)),
+          PkListTitle(t.loanTransferOrdersTitle(items.length), padding: const EdgeInsets.only(bottom: 10)),
           for (final o in items) LoanTransferOrderCard(order: o),
         ],
       ),

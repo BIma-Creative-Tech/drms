@@ -1321,7 +1321,7 @@ class IcLoanQueueSection extends ConsumerWidget {
         key: const Key('icloan-queue'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PkSectionHeader(title: t.icLoanQueueTitle(items.length), padding: const EdgeInsets.only(bottom: 10)),
+          PkListTitle(t.icLoanQueueTitle(items.length), padding: const EdgeInsets.only(bottom: 10)),
           for (final l in items) IcLoanQueueCard(loan: l),
         ],
       ),

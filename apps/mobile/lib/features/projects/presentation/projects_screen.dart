@@ -199,15 +199,7 @@ class ProjectCard extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                Expanded(
-                  child: Text(
-                    p.rapPlanned == null
-                        ? t.projectRapUsed
-                        : '${formatRupiah(p.rapRealised ?? 0)} / ${formatRupiah(p.rapPlanned!)}',
-                    style: muted,
-                  ),
-                ),
-                if (p.rapPlanned != null) Text('${t.projectRapUsed} ', style: muted),
+                Expanded(child: Text(t.projectRapUsed, style: muted)),
                 Text(
                   formatPercent(pct, digits: 0),
                   style: theme.textTheme.labelMedium?.copyWith(
@@ -217,6 +209,17 @@ class ProjectCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (p.rapPlanned != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  '${formatRupiah(p.rapRealised ?? 0)} / ${formatRupiah(p.rapPlanned!)}',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
             if ((p.rapOverBudgetItems ?? 0) > 0)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
