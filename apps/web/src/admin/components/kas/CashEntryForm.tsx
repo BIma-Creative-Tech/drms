@@ -11,6 +11,8 @@ import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson, uploadAttachment } from './client'
 import { OverrideDialog, overridePromptOf, type OverridePrompt } from './OverrideDialog'
 import { DateInput } from '../DateInput'
+import { ImageThumb } from '../media/ImageThumb'
+import { mediaThumbSource } from '../media/media-url'
 import { WrapSelect } from '../WrapSelect'
 
 /**
@@ -407,10 +409,9 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
           <label htmlFor={id('proof')}>{edit && entry.proofId ? 'Ganti bukti (opsional)' : 'Bukti (opsional)'}</label>
           {edit && entry.proofId ? (
             <p className="help" data-pk-proof-current>
-              <a href={`/api/v1/media/attachments/${entry.proofId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox="kas-proof-current" data-pk-lightbox-title="Bukti saat ini">
-                Lihat bukti saat ini
-              </a>{' '}
-              — pilih file baru untuk menggantinya.
+              {/* D2510 (web 0.21.1): preview of the stored proof (lightbox; a PDF → file link) */}
+              <ImageThumb src={mediaThumbSource('attachments', entry.proofId)} group="kas-proof-current" title={`Bukti saat ini ${entry.entryNo}`} size={72} fileLabel="Lihat bukti saat ini" />{' '}
+              Bukti saat ini — pilih file baru untuk menggantinya.
             </p>
           ) : null}
           <input id={id('proof')} type="file" name="proof" accept="application/pdf,image/jpeg,image/png" aria-describedby={id('proof-h')} data-pk-field="proof" />

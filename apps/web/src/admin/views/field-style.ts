@@ -114,7 +114,7 @@ export const FIELD_STYLE = `
 @media (pointer: coarse) { .pk-f3 .pk-line :is(input:not([type='checkbox'], [type='radio']), textarea) { min-height: 44px; } }
 .pk-f3 .pk-photos { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
 .pk-f3 .pk-photos li { display: grid; gap: 6px; justify-items: start; }
-.pk-f3 .pk-photos img { width: 96px; height: 96px; object-fit: cover; border-radius: var(--style-radius-m); border: 1px solid var(--pk-border); background: var(--viz-track); display: block; }
+.pk-f3 .pk-photos li > img { width: 96px; height: 96px; object-fit: cover; border-radius: var(--style-radius-m); border: 1px solid var(--pk-border); background: var(--viz-track); display: block; }
 .pk-f3 .pk-photos li.add { align-self: center; }
 .pk-f3 .pk-photos .pk-photo-tag { font-size: 11.5px; color: var(--pk-muted-fg); } /* edit pages: a stored photo (never removed) */
 .pk-f3 .pk-photos label.pk-kbtn:has(+ input:focus-visible) { outline: 2px solid var(--pk-ring); outline-offset: 2px; }

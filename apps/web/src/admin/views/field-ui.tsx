@@ -9,6 +9,7 @@ import type { HistoryEntry } from '@/domain/field/web'
 import { enabledCompanies } from '@/domain/field/web'
 import { UNIT_STATUS_LABELS, type UnitStatus } from '@/domain/field/rules'
 
+import { ImageThumb } from '../components/media/ImageThumb'
 import { dateTimeId } from './progress-ui'
 import { FIELD_STYLE } from './field-style'
 import { Frame } from './frame'
@@ -162,16 +163,14 @@ export function FlagPills({ flags }: { flags: readonly string[] }) {
 
 type Photo = { id: number; url: string; thumbUrl: string; width: number | null; height: number | null }
 
-export function PhotoGallery({ photos, label, empty = 'Tanpa foto.' }: { photos: readonly Photo[]; label: string; empty?: string }) {
+/** D2510 (web 0.21.1): shared ImageThumb per photo (lightbox group = the report; `caption` = date / unit / location). */
+export function PhotoGallery({ photos, label, empty = 'Tanpa foto.', caption }: { photos: readonly Photo[]; label: string; empty?: string; caption?: string }) {
   if (photos.length === 0) return <EmptyState text={empty} />
   return (
     <ul className="pk-gallery" data-pk-gallery>
       {photos.map((p, i) => (
         <li key={p.id}>
-          <a href={p.url} target="_blank" rel="noopener noreferrer" aria-label={`Foto ${i + 1} dari ${photos.length}, buka ukuran penuh`} data-pk-lightbox={`photos-${photos[0]!.id}`} data-pk-lightbox-title={`Foto ${i + 1} ${label}`}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API thumbnail */}
-            <img src={p.thumbUrl} alt={`Foto ${i + 1} ${label}`} loading="lazy" width={p.width ?? undefined} height={p.height ?? undefined} />
-          </a>
+          <ImageThumb src={{ href: p.url, thumb: p.thumbUrl, fallback: 'full' }} size="fill" group={`photos-${photos[0]!.id}`} title={`Foto ${i + 1} ${label}`} caption={caption} label={`Foto ${i + 1} dari ${photos.length}, buka ukuran penuh`} data-pk-photo={p.id} />
         </li>
       ))}
     </ul>

@@ -62,8 +62,7 @@ export const PROGRESS_STYLE = `
 .pk-f3 .pk-gallery img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .2s ease; }
 .pk-f3 .pk-gallery a:hover img { transform: scale(1.03); }
 @media (prefers-reduced-motion: reduce) { .pk-f3 .pk-gallery img { transition: none; } }
-.pk-f3 .pk-thumbs { display: flex; gap: 4px; }
-.pk-f3 .pk-thumbs img { width: 36px; height: 28px; object-fit: cover; border-radius: 4px; border: 1px solid var(--pk-border); background: var(--viz-track); }
+.pk-f3 .pk-thumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; } /* D2510 0.21.1: ImageThumb (36 px) previews in list cells */
 .pk-f3 .pk-dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; margin: 0; font-size: 13px; }
 .pk-f3 .pk-dl dt { color: var(--pk-muted-fg); } .pk-f3 .pk-dl dd { margin: 0; overflow-wrap: anywhere; }
 .pk-f3 .pk-pre { white-space: pre-wrap; margin: 0; font-size: 13px; line-height: 1.55; }

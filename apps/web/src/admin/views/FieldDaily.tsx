@@ -446,7 +446,7 @@ export async function FieldDailyDetail(props: AdminViewServerProps) {
           </Card>
         ) : null}
         <Card id="daily-photos" title="Foto" span={7} i={7}>
-          <PhotoGallery photos={r.photos} label={`laporan ${r.docNo ?? r.id}`} empty="Laporan ini tanpa foto." />
+          <PhotoGallery photos={r.photos} label={`laporan ${r.docNo ?? r.id}`} empty="Laporan ini tanpa foto." caption={`${longDate(r.reportDate)} · ${r.project.code ?? ''} ${r.project.name ?? ''}`.trim()} />
         </Card>
         <Card id="daily-ledger" title="Riwayat volume" sub="Tidak pernah dihapus: perubahan dicatat sebagai selisih" span={5} i={8}>
           <DataTable

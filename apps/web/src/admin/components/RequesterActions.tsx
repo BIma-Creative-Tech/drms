@@ -11,6 +11,8 @@ import { confirmAction, confirmLabel, confirmTitle, failureTitle, isDangerAction
 import { TableScroll } from './TableScroll'
 import { DateInput } from './DateInput'
 import { LpjPhotoGrid } from './lpj/LpjPhotoGrid'
+import { ImageThumb } from './media/ImageThumb'
+import { mediaThumbSource } from './media/media-url'
 import { LpjPhotosEditor } from './lpj/LpjPhotosEditor'
 import { WrapSelect } from './WrapSelect'
 import { isMultilineText, WrapText } from './WrapText'
@@ -423,10 +425,7 @@ export function RequesterActions(p: RequesterActionsProps) {
                     <tr key={r.id} style={{ opacity: r.status === 'removed' ? 0.5 : 1 }}>
                       <td style={{ padding: 4, verticalAlign: 'top' }}>
                         {r.imageId ? (
-                          <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`own-receipts-${p.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id}`}>
-                            {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
-                            <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 64, height: 64, objectFit: 'cover' }} />
-                          </a>
+                          <ImageThumb src={mediaThumbSource('receipts', r.imageId)} group={`own-receipts-${p.id}`} title={`Nota ${r.receiptNo ?? r.id}`} alt={`Nota ${r.receiptNo ?? r.id}`} size={64} data-pk-receipt-thumb={r.id} />
                         ) : (
                           '—'
                         )}

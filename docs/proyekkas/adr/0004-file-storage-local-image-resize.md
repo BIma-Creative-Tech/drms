@@ -190,7 +190,8 @@ Verified in `apps/web/src/lib/signed-url.ts`, `apps/web/src/api/v1/endpoints/med
   readable 404 — no existence leak for normal reads). The signed path answers 403 (not 404) for "no access" because
   the E9 acceptance criterion requires it; the caller already holds a URL minted for that file.
 - **Selfies** are now also served here (`{collection}` = `selfies`): uploader, office roles, and everyone who may
-  read an attendance that references the selfie (same rule as `GET /api/v1/attendance/{id}/selfie`); a retention
+  read an attendance that references the selfie (same rule as `GET /api/v1/attendance/{id}/selfie`; since 0.21.1 the
+  office roles get there through the attendance, see the 2026-10-25 revision); a retention
   tombstone (`removedAt`) → 404. Every response adds `Referrer-Policy: no-referrer` (the signed query must not leak
   through a Referer).
 - **APK impact:** none required — the APK keeps using the bearer path (`progress_api.dart`, `expense_api.dart`).
@@ -210,3 +211,11 @@ Verified in `apps/web/src/lib/signed-url.ts`, `apps/web/src/api/v1/endpoints/med
 - **2026-09-26 (E9, S3 track A):** §4b added — signed, time-limited media URLs implemented (HMAC-SHA256, TTL 5 min,
   key rotation via `MEDIA_URL_KEYS`, re-check of the user's access, 403 for expired/invalid/no access); selfies
   served by the media file endpoint. Status stays accepted.
+- **2026-10-25 (D2510, web 0.21.1, user decision):** selfies have **no unaudited read path** any more. The Payload side
+  of `media-selfies` — REST list / by id, `GET /api/media-selfies/file/<name>`, the admin library and upload
+  previews — answers only the uploader's own rows (`selfieRead`); office roles (Admin, Direktur, Finance), Admin
+  Staff and the PM of the team read a selfie only through `GET /api/v1/attendance/{id}/selfie` or
+  `GET /api/v1/media/selfies/{id}/file` (+ signed URL), visibility = read access of the referencing attendance
+  (Q-33), someone else's selfie audited `view_sensitive` (throttled per viewer + file). The Media → Selfie absensi
+  library is hidden (`admin.hidden`: no admin menu / route, not in `/me/modules`). Upload (web + APK), check-in and
+  the uploader's own capture are unchanged. Status stays accepted.

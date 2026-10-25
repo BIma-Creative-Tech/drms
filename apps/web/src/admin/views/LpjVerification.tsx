@@ -17,6 +17,8 @@ import { ListToolbar, Pager } from '../components/list/ListToolbar'
 import { MoneyForm } from '../components/MoneyForm'
 import { ShortfallPanel } from '../components/ShortfallPanel'
 import { LpjPhotoGrid } from '../components/lpj/LpjPhotoGrid'
+import { ImageThumb } from '../components/media/ImageThumb'
+import { mediaThumbSource } from '../components/media/media-url'
 import { Panel } from '../components/ui/nexus'
 import { allowedValues, idValues, pageOfFind, parseListQuery, searchWhere } from '../list-query'
 import { accountsOf, PtChip, PtScopeNote, ptView } from './pt'
@@ -164,10 +166,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
                     <ClickableRow key={r.id} href={`/admin/collections/receipts/${r.id}`}>
                       <td>
                         {r.imageId ? (
-                          <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`lpj-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · ${rp(r.amount)}`}>
-                            {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
-                            <img className="pk-nx-thumb" src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} width={80} height={80} />
-                          </a>
+                          <ImageThumb src={mediaThumbSource('receipts', r.imageId)} group={`lpj-${d.id}`} title={`Nota ${r.receiptNo ?? r.id} · ${rp(r.amount)}`} caption={`${r.vendorName} · ${r.receiptDate}`} alt={`Nota ${r.receiptNo ?? r.id}`} size={80} data-pk-receipt-thumb={r.id} />
                         ) : (
                           '—'
                         )}
@@ -211,10 +210,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
                   </div>
                   <div className="pk-nx-media">
                     {r.imageId ? (
-                      <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`lpj-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · ${rp(r.amount)}`}>
-                        {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
-                        <img className="pk-nx-thumb" src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} width={64} height={64} />
-                      </a>
+                      <ImageThumb src={mediaThumbSource('receipts', r.imageId)} group={`lpj-${d.id}`} title={`Nota ${r.receiptNo ?? r.id} · ${rp(r.amount)}`} caption={`${r.vendorName} · ${r.receiptDate}`} alt={`Nota ${r.receiptNo ?? r.id}`} size={64} data-pk-receipt-thumb={r.id} />
                     ) : null}
                     <div className="pk-nx-media__body">
                       <div className="pk-lcard__meta">

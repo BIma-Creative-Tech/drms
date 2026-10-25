@@ -12,6 +12,8 @@ import { newIdemKey, sendJson, uploadSelfie } from '../kas/client'
 import { gpsErrorMessage, policyBlocks } from './camera'
 import { CAMERA_STYLE, CameraCapture } from './CameraCapture'
 import { DateInput } from '../DateInput'
+import { ImageThumb } from '../media/ImageThumb'
+import { selfieSource } from '../media/media-url'
 import { WrapSelect } from '../WrapSelect'
 import { WrapText } from '../WrapText'
 
@@ -21,7 +23,7 @@ import { WrapText } from '../WrapText'
  * state; one Idempotency-Key per opened dialog). The server re-checks everything:
  * - CorrectionDialog → POST /api/v1/attendance/{id}/correct (PM team / Admin, never own, reason ≥ 3,
  *   same local date, not in the future; audit old → new).
- * - SelfieButton → GET /api/v1/attendance/{id}/selfie, requested ONLY when the dialog opens (the
+ * - SelfieThumb → GET /api/v1/attendance/{id}/selfie as a lazy thumbnail + the shared lightbox (D2510 0.21.1; the
  *   view of someone else's selfie is audited `view_sensitive`); 404 = removed by retention.
  * Styles: KAS_STYLE + ABSENSI_STYLE rendered once by the host view.
  */
@@ -179,11 +181,15 @@ export function CorrectionDialog(p: CorrectionDialogProps) {
   )
 }
 
-export function SelfieButton({ attendanceId, label, available, own }: { attendanceId: number; label: string; available: boolean; own: boolean }) {
-  const ref = useRef<HTMLDialogElement>(null)
-  const [shown, setShown] = useState(false)
-  const [failed, setFailed] = useState(false)
-  const uid = useId()
+/**
+ * D2510 image preview (web 0.21.1, user 2026-10-25: "user belum bisa melihat preview foto absensi"): the selfie of a
+ * check-in / check-out as a thumbnail that opens the shared lightbox (was a "Selfie" text button opening a dialog —
+ * no preview anywhere in the views). Same audited endpoint GET /api/v1/attendance/{id}/selfie (attendance read
+ * access; viewing someone else's selfie is audited `view_sensitive`, throttled per viewer + attendance); lazy, so
+ * only the rows on screen are requested. `group` = one record (a day of the rekap, a member of the board): ← → in
+ * the lightbox move between its masuk / pulang selfies. Removed by retention (Q-33) → "Selfie dihapus".
+ */
+export function SelfieThumb({ attendanceId, label, available, group, caption, size = 48 }: { attendanceId: number; label: string; available: boolean; group?: string; caption?: string | null; size?: number }) {
   if (!available) {
     return (
       <span className="pk-chip muted" title="File selfie sudah dihapus setelah masa retensi (Q-33); data absensi tetap." data-pk-selfie-removed={attendanceId}>
@@ -192,43 +198,18 @@ export function SelfieButton({ attendanceId, label, available, own }: { attendan
     )
   }
   return (
-    <>
-      <button
-        type="button"
-        className="pk-kbtn sm"
-        onClick={() => {
-          setFailed(false)
-          setShown(true)
-          ref.current?.showModal()
-        }}
-        data-pk-action="selfie"
-        data-pk-attendance={attendanceId}
-        aria-label={`Lihat selfie ${label}`}
-      >
-        Selfie
-      </button>
-      <dialog ref={ref} className="pk-dlg pk-selfie-dlg" aria-labelledby={`${uid}-t`} onClose={() => setShown(false)}>
-        <form method="dialog">
-          <h2 id={`${uid}-t`}>Selfie · {label}</h2>
-          {!own ? <p className="desc">Data pribadi (UU PDP). Membuka selfie orang lain tercatat di audit log.</p> : null}
-          <div className="pk-selfie-box">
-            {shown && !failed ? (
-              // DRMS 10/10 12c: the shared lightbox (zoom) on top of this dialog; same audited endpoint
-              <a href={`/api/v1/attendance/${attendanceId}/selfie`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`selfie-${attendanceId}`} data-pk-lightbox-title={`Selfie · ${label}`} title="Perbesar selfie">
-                {/* eslint-disable-next-line @next/next/no-img-element -- private, audited, no-store image from /api/v1 (next/image would cache it) */}
-                <img src={`/api/v1/attendance/${attendanceId}/selfie`} alt={`Selfie absensi ${label}`} onError={() => setFailed(true)} referrerPolicy="no-referrer" data-pk-selfie-img />
-              </a>
-            ) : null}
-            {failed ? <p className="pk-kerr">Selfie tidak tersedia (mungkin sudah melewati masa retensi).</p> : null}
-          </div>
-          <div className="foot">
-            <button type="submit" className="pk-kbtn">
-              Tutup
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <ImageThumb
+      src={selfieSource(attendanceId)}
+      group={group ?? `selfie-${attendanceId}`}
+      title={`Selfie ${label}`}
+      caption={caption}
+      alt={`Selfie absensi ${label}`}
+      label={`Lihat selfie ${label}`}
+      size={size}
+      data-pk-action="selfie"
+      data-pk-attendance={attendanceId}
+      imgAttrs={{ 'data-pk-selfie-img': '' }}
+    />
   )
 }
 

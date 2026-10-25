@@ -80,3 +80,6 @@
   when everybody must acknowledge again.
 - The selfie retention stated in the notice (§4) must equal the `selfieRetentionMonths` default (unit test). Changing
   a PT's retention away from 6 months requires updating the notice.
+- **Amendment 2026-10-25 (web 0.21.1, user decision):** viewing a selfie collected under this notice is always
+  audited for anyone but the uploader — the unaudited Payload route to `media-selfies` is closed (ADR 0004 revision
+  2026-10-25); the notice text is unchanged.

@@ -604,7 +604,7 @@ export async function FieldActivityDetail(props: AdminViewServerProps) {
           </Card>
         ) : null}
         <Card id="activity-photos" title="Foto bukti" span={kind === 'po_masuk' ? 5 : 7} i={7}>
-          <PhotoGallery photos={a.photos} label={`aktivitas ${a.docNo ?? a.id}`} empty="Tanpa foto." />
+          <PhotoGallery photos={a.photos} label={`aktivitas ${a.docNo ?? a.id}`} empty="Tanpa foto." caption={`${longDate(a.activityDate)} · ${a.client.name ?? '—'}`} />
         </Card>
         <Card id="activity-history" title="Riwayat & koreksi" span={kind === 'po_masuk' ? 12 : 5} i={8}>
           <History entries={history} tz={tz} />

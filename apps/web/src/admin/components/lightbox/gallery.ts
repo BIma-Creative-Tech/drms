@@ -5,7 +5,8 @@
  */
 export const LIGHTBOX_ATTR = 'data-pk-lightbox'
 
-export type LightboxItem = { src: string; title: string }
+/** `caption` (D2510 0.21.1, `data-pk-lightbox-caption`): second line under the title — date / time / location. */
+export type LightboxItem = { src: string; title: string; caption?: string }
 
 export type ZoomMode = 'fit' | 'actual'
 
@@ -46,8 +47,8 @@ export function swipeAction(dx: number, dy: number): 'next' | 'prev' | null {
 }
 
 /** Group members in DOM order + the index of the clicked link. */
-export function collect(anchors: ReadonlyArray<{ href: string; title: string }>, clickedHref: string, clickedIndex?: number): { items: LightboxItem[]; index: number } {
-  const items = anchors.map((a) => ({ src: a.href, title: a.title }))
+export function collect(anchors: ReadonlyArray<{ href: string; title: string; caption?: string | null }>, clickedHref: string, clickedIndex?: number): { items: LightboxItem[]; index: number } {
+  const items = anchors.map((a): LightboxItem => (a.caption ? { src: a.href, title: a.title, caption: a.caption } : { src: a.href, title: a.title }))
   const index = clickedIndex ?? Math.max(0, items.findIndex((i) => i.src === clickedHref))
   return { items, index }
 }

@@ -22,6 +22,7 @@ import { timelineTypesFor } from '@/domain/field/views'
 import { enabledCompanies, type ProjectOpt } from '@/domain/field/web'
 import { kindOf } from '@/domain/field/rules'
 
+import { ImageThumb } from '../components/media/ImageThumb'
 import { ChartHover } from './ChartHover'
 import { FIELD_STYLE, Tabs } from './field-ui'
 import { ProjectTimeline } from './field-timeline'
@@ -435,10 +436,18 @@ export async function ProgressReportList(props: AdminViewServerProps) {
         r.photos.length === 0 ? (
           '—'
         ) : (
-          <span className="pk-thumbs">
-            {r.photos.slice(0, 3).map((p) => (
-              // eslint-disable-next-line @next/next/no-img-element -- authenticated API thumbnail, not a static asset
-              <img key={p.id} src={p.thumbUrl} alt="" loading="lazy" width={36} height={28} />
+          // D2510 (web 0.21.1): the first three photos as real previews (lightbox; the row link stays on the rest of the row)
+          <span className="pk-thumbs" data-pk-report-thumbs={r.id}>
+            {r.photos.slice(0, 3).map((p, i) => (
+              <ImageThumb
+                key={p.id}
+                src={{ href: p.url, thumb: p.thumbUrl, fallback: 'full' }}
+                size={36}
+                group={`progress-list-${r.id}`}
+                title={`Foto ${i + 1} laporan ${r.docNo ?? r.id}`}
+                caption={`${r.reportDate}${r.stage.name ? ` · ${r.stage.name}` : ''}`}
+                data-pk-photo={p.id}
+              />
             ))}
             {r.photos.length > 3 ? <small>+{r.photos.length - 3}</small> : null}
           </span>
@@ -640,10 +649,15 @@ export async function ProgressReportDetail(props: AdminViewServerProps) {
             <ul className="pk-gallery" data-pk-gallery={r.id}>
               {r.photos.map((p, i) => (
                 <li key={p.id}>
-                  <a href={p.url} target="_blank" rel="noopener noreferrer" aria-label={`Foto ${i + 1} dari ${r.photos.length}, buka ukuran penuh`} data-pk-lightbox={`progress-${r.id}`} data-pk-lightbox-title={`Foto ${i + 1} laporan ${r.docNo ?? r.id}`}>
-                    {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API thumbnail */}
-                    <img src={p.thumbUrl} alt={`Foto ${i + 1} laporan ${r.docNo ?? r.id}`} loading="lazy" width={p.width ?? undefined} height={p.height ?? undefined} />
-                  </a>
+                  <ImageThumb
+                    src={{ href: p.url, thumb: p.thumbUrl, fallback: 'full' }}
+                    size="fill"
+                    group={`progress-${r.id}`}
+                    title={`Foto ${i + 1} laporan ${r.docNo ?? r.id}`}
+                    caption={`${r.reportDate}${r.stage.name ? ` · ${r.stage.name}` : ''}`}
+                    label={`Foto ${i + 1} dari ${r.photos.length}, buka ukuran penuh`}
+                    data-pk-photo={p.id}
+                  />
                 </li>
               ))}
             </ul>

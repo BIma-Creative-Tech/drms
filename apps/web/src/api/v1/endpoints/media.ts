@@ -176,6 +176,8 @@ async function signatureOnVisibleRequest(req: PayloadRequest, mediaId: number): 
 /**
  * E9: a selfie is also readable by everyone who may read the ATTENDANCE referencing it (PM team,
  * Q-33) — same rule as GET /attendance/{id}/selfie, evaluated with the caller's access.
+ * D2510 (web 0.21.1): this is now THE path of office roles / Admin Staff / PM to a selfie — the collection's own
+ * read rule answers the uploader only (collections/media/index.ts `selfieRead`), and this endpoint audits the view.
  */
 async function selfieOnVisibleAttendance(req: PayloadRequest, mediaId: number): Promise<boolean> {
   const res = await req.payload.find({
