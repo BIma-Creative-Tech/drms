@@ -3,10 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/theme.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/brand_mark.dart';
-import '../../../shared/widgets/module_tile.dart' show StagingBadge;
+import '../../../shared/widgets/pk_ui.dart';
 import '../application/auth_controller.dart';
 import '../data/password_login_client.dart' show PasswordLoginError;
 
@@ -101,7 +102,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final env = ref.watch(appEnvProvider);
-    return Scaffold(body: SafeArea(child: env.usesPasswordLogin ? _passwordBody(context) : _browserBody(context)));
+    return Scaffold(body: env.usesPasswordLogin ? _passwordBody(context) : _browserBody(context));
   }
 
   String? _notice(AppLocalizations t) {
@@ -115,25 +116,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         : null;
   }
 
-  List<Widget> _header(BuildContext context, String subtitle) {
+  /// D2510: brand hero band (Banani splash look) — mark, title, staging pill, subtitle.
+  Widget _hero(BuildContext context, String subtitle) {
     final t = AppLocalizations.of(context);
     final env = ref.watch(appEnvProvider);
-    return [
-      const Center(child: BrandMark(size: 80)),
-      const SizedBox(height: 20),
-      Text(t.loginTitle, textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineMedium),
-      if (!env.isProd)
-        Padding(
-          padding: const EdgeInsets.only(top: 10),
-          child: Center(child: StagingBadge(label: t.stagingBadge)),
-        ),
-      const SizedBox(height: 12),
-      Text(
-        subtitle,
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+    final pk = context.pk;
+    final theme = Theme.of(context);
+    return PkHeroHeader(
+      padding: const EdgeInsets.fromLTRB(24, 40, 24, 56),
+      child: Column(
+        children: [
+          const BrandMark(size: 76, onHero: true),
+          const SizedBox(height: 20),
+          Text(
+            t.loginTitle,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.headlineMedium?.copyWith(color: pk.onHero, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge?.copyWith(color: pk.onHero.withValues(alpha: 0.8)),
+          ),
+          if (!env.isProd) ...[const SizedBox(height: 14), PkHeroPill(label: t.stagingBadge, dot: true)],
+        ],
       ),
-    ];
+    );
   }
 
   Widget _noticeCard(BuildContext context, String notice) => Card(
@@ -172,24 +181,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final t = AppLocalizations.of(context);
     final online = ref.watch(connectivityProvider);
     final notice = _notice(t);
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Spacer(),
-          ..._header(context, t.loginSubtitle),
-          const Spacer(),
-          if (notice != null) _noticeCard(context, notice),
-          if (_error != null) _errorText(context),
-          _submitButton(t, online: online, onPressed: _login),
-          if (!online)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(t.loginNeedsInternet, textAlign: TextAlign.center),
-            ),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _hero(context, t.loginSubtitle),
+        const Spacer(),
+        SafeArea(
+          top: false,
+          minimum: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (notice != null) _noticeCard(context, notice),
+              if (_error != null) _errorText(context),
+              _submitButton(t, online: online, onPressed: _login),
+              if (!online)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(t.loginNeedsInternet, textAlign: TextAlign.center),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -197,107 +211,127 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final t = AppLocalizations.of(context);
     final online = ref.watch(connectivityProvider);
     final notice = _notice(t);
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: AutofillGroup(
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  ..._header(context, t.loginSubtitlePassword),
-                  const SizedBox(height: 24),
-                  if (notice != null) ...[_noticeCard(context, notice), const SizedBox(height: 12)],
-                  TextFormField(
-                    key: const Key('login-username'),
-                    controller: _username,
-                    enabled: !_busy,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    autofillHints: const [AutofillHints.username, AutofillHints.email],
-                    decoration: InputDecoration(
-                      labelText: t.loginUsernameLabel,
-                      prefixIcon: const Icon(Icons.person_outline),
-                    ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? t.loginUsernameRequired : null,
-                    onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
+    // The form card overlaps the hero band by 32 dp (Banani card-on-hero look).
+    return SingleChildScrollView(
+      padding: EdgeInsets.only(bottom: 24 + MediaQuery.paddingOf(context).bottom),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _hero(context, t.loginSubtitlePassword),
+          Transform.translate(
+            offset: const Offset(0, -32),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: PkCard(
+                    radius: PkRadius.lg,
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+                    child: _passwordForm(context, online: online, notice: notice),
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    key: const Key('login-password'),
-                    controller: _password,
-                    focusNode: _passwordFocus,
-                    enabled: !_busy,
-                    obscureText: _obscurePassword,
-                    keyboardType: TextInputType.visiblePassword,
-                    textInputAction: _showTotp ? TextInputAction.next : TextInputAction.done,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    autofillHints: const [AutofillHints.password],
-                    decoration: InputDecoration(
-                      labelText: t.loginPasswordLabel,
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        key: const Key('login-password-toggle'),
-                        tooltip: _obscurePassword ? t.loginShowPassword : t.loginHidePassword,
-                        icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                      ),
-                    ),
-                    validator: (v) => (v == null || v.isEmpty) ? t.loginPasswordRequired : null,
-                    onFieldSubmitted: (_) {
-                      if (_showTotp) {
-                        _totpFocus.requestFocus();
-                      } else if (online) {
-                        _submitPassword();
-                      }
-                    },
-                  ),
-                  if (_showTotp) ...[
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      key: const Key('login-totp'),
-                      controller: _totp,
-                      focusNode: _totpFocus,
-                      enabled: !_busy,
-                      keyboardType: TextInputType.number,
-                      textInputAction: TextInputAction.done,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      maxLength: 6,
-                      autofillHints: const [AutofillHints.oneTimeCode],
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
-                      decoration: InputDecoration(
-                        labelText: t.loginTotpLabel,
-                        helperText: t.loginTotpHelper,
-                        helperMaxLines: 3,
-                        prefixIcon: const Icon(Icons.pin_outlined),
-                      ),
-                      validator: (v) => (v == null || v.isEmpty || v.length == 6) ? null : t.loginTotpInvalidLength,
-                      onFieldSubmitted: (_) {
-                        if (online) _submitPassword();
-                      },
-                    ),
-                  ],
-                  if (_error != null) _errorText(context) else const SizedBox(height: 16),
-                  _submitButton(t, online: online, onPressed: _submitPassword),
-                  if (!online)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(t.loginNeedsInternet, textAlign: TextAlign.center),
-                    ),
-                  const SizedBox(height: 16),
-                  Text(t.loginForgotPassword, key: const Key('login-forgot'), textAlign: TextAlign.center),
-                ],
+                ),
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _passwordForm(BuildContext context, {required bool online, required String? notice}) {
+    final t = AppLocalizations.of(context);
+    return AutofillGroup(
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (notice != null) ...[_noticeCard(context, notice), const SizedBox(height: 12)],
+            TextFormField(
+              key: const Key('login-username'),
+              controller: _username,
+              enabled: !_busy,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autocorrect: false,
+              enableSuggestions: false,
+              autofillHints: const [AutofillHints.username, AutofillHints.email],
+              decoration: InputDecoration(
+                labelText: t.loginUsernameLabel,
+                prefixIcon: const Icon(Icons.person_outline),
+              ),
+              validator: (v) => (v == null || v.trim().isEmpty) ? t.loginUsernameRequired : null,
+              onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              key: const Key('login-password'),
+              controller: _password,
+              focusNode: _passwordFocus,
+              enabled: !_busy,
+              obscureText: _obscurePassword,
+              keyboardType: TextInputType.visiblePassword,
+              textInputAction: _showTotp ? TextInputAction.next : TextInputAction.done,
+              autocorrect: false,
+              enableSuggestions: false,
+              autofillHints: const [AutofillHints.password],
+              decoration: InputDecoration(
+                labelText: t.loginPasswordLabel,
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  key: const Key('login-password-toggle'),
+                  tooltip: _obscurePassword ? t.loginShowPassword : t.loginHidePassword,
+                  icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                ),
+              ),
+              validator: (v) => (v == null || v.isEmpty) ? t.loginPasswordRequired : null,
+              onFieldSubmitted: (_) {
+                if (_showTotp) {
+                  _totpFocus.requestFocus();
+                } else if (online) {
+                  _submitPassword();
+                }
+              },
+            ),
+            if (_showTotp) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                key: const Key('login-totp'),
+                controller: _totp,
+                focusNode: _totpFocus,
+                enabled: !_busy,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+                autocorrect: false,
+                enableSuggestions: false,
+                maxLength: 6,
+                autofillHints: const [AutofillHints.oneTimeCode],
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
+                decoration: InputDecoration(
+                  labelText: t.loginTotpLabel,
+                  helperText: t.loginTotpHelper,
+                  helperMaxLines: 3,
+                  prefixIcon: const Icon(Icons.pin_outlined),
+                ),
+                validator: (v) => (v == null || v.isEmpty || v.length == 6) ? null : t.loginTotpInvalidLength,
+                onFieldSubmitted: (_) {
+                  if (online) _submitPassword();
+                },
+              ),
+            ],
+            if (_error != null) _errorText(context) else const SizedBox(height: 16),
+            _submitButton(t, online: online, onPressed: _submitPassword),
+            if (!online)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(t.loginNeedsInternet, textAlign: TextAlign.center),
+              ),
+            const SizedBox(height: 16),
+            Text(t.loginForgotPassword, key: const Key('login-forgot'), textAlign: TextAlign.center),
+          ],
         ),
       ),
     );
