@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/theme.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/location/location_service.dart';
 import '../../../core/media/photo_compressor.dart';
@@ -281,7 +282,7 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
                 key: const Key('on-behalf-submit'),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(56),
-                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  textStyle: const TextStyle(fontFamily: PkFonts.body, fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 onPressed: canSubmit ? () => _record(who, site) : null,
                 icon: _busy

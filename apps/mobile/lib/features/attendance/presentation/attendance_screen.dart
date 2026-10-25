@@ -451,7 +451,7 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
 
   static final _bigButton = FilledButton.styleFrom(
     minimumSize: const Size.fromHeight(60),
-    textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+    textStyle: const TextStyle(fontFamily: PkFonts.body, fontSize: 17, fontWeight: FontWeight.w700),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(PkRadius.md)),
   );
 }
