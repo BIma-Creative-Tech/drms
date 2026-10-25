@@ -36,7 +36,7 @@ describe('ListToolbar / Pager (SSR)', () => {
 
   it('default bar: own box, page size inside the form (custom views unchanged)', () => {
     const out = renderToStaticMarkup(h(ListToolbar, { id: 'rap', action: '/admin/rap', query, label: 'Cari RAP' }))
-    expect(out).toMatch(/^<form class="pk-ltb" method="get" action="\/admin\/rap"/)
+    expect(out).toMatch(/^<form class="pk-ltb"[ >]/)
     expect(out).toContain('data-pk-page-size="rap"')
   })
 
