@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**APK 0.13.1 (APK-only, server 0.21.0)** (branch `fix/d2510-apk-tap-lpj`, pubspec `0.13.1+1`, release notes
+`docs/release-notes/apk/0.13.1.md`): no server change, no migration, no API change; APK 0.13.0 keeps working. Folded
+into the next web release section.
+
+### Added
+
+- **APK: Finance LPJ actions (D2510, user 2026-10-25)** on the request detail, the web "Verifikasi LPJ" parity: per
+  receipt Valid / Tolak (reason ≥ 3), "Tandai flag diperiksa" (optional note), bottom bar "Minta revisi" (note ≥ 3) /
+  "Verifikasi LPJ" — shown only for the `allowedActions` the server lists (`receipt_verify`, `review_flag`,
+  `lpj_request_revision`, `lpj_verify`). Confirm before + result after (D2410); a 409 "Masih ada n nota yang belum
+  diputuskan" shows the server text. Detail and LPJ queue refresh after each call; "settle" stays web-only.
+
+### Fixed
+
+- **APK: photo previews (D2510, user 2026-10-25).** Attendance selfies had no preview: the only way to see one was
+  a small photo button inside the recap day sheet; the team list and the attendance record showed none (the server
+  record detail names the file only). Now a shared `MediaThumb` (authorized bytes through the `ApiClient` —
+  `/media/<kind>/<id>/file?variant=thumb`, `/attendance/<id>/selfie`; never `Image.network`, which carries no auth
+  header) opens the shared fullscreen viewer (pinch zoom, swipe within the record, close, caption): selfies on the
+  recap day sheet, "Tim hari ini" and the `/data/attendances` record; field-report photos in the record sheet;
+  transfer proofs on the request detail (`transfers[].proofId` now parsed); photo attachments of a request. A PDF (no
+  thumbnail variant → 404 → the file) stays a file link.
+- **APK: rows that could not be tapped (D2510).** Laporan: `apkRouteForReportLink` maps the history tab, the
+  field-report detail pages, every web collection document whose APK list is `/data/<slug>`, report → report links
+  with their filters (`ReportScreen.initialParams` from the route query), an employee's attendance recap and the menu
+  pages with an APK screen; a row opens the first link that maps (row, title cell, any cell — audit-log "dokumen").
+  Notifications: `project_loan`, `cash_entry` and the field-report doc types; `project` without progress access opens
+  the project. Progress / Beranda project cards open the project; Beranda cash accounts open the cash book of that
+  account; dashboard "Kas terbaru" opens the request (else the cash entry); Aftersales "Hari ini" sent rows, Unit &
+  kontrak (contract → contract unit, unit → vehicle record), Akses PT user header and Tutup buku history open their
+  detail. `canOpenApkRoute` keeps a target the user cannot read unlinked.
+
 ## [0.21.0] - 2026-10-25
 
 **Web admin in the Nexus layout (D2510, ADR 0033) + APK 0.13.0 restyle (tag `mobile-v0.13.0`, PR #140, already
