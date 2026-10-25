@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-10-25
+
+**Web fix: image previews + popup for every image link (D2510, user 2026-10-25).** Web only: no migration, no API
+change, no access / CSP change, no token change; APK unchanged (APK 0.13.1 — Finance LPJ, tappable rows, photo
+previews — is a separate APK-only release, branch `fix/d2510-apk-tap-lpj`). Rollback = image 0.21.0.
+
+### Fixed
+
+- **Attendance photos had no preview on the web.** The selfie of a check-in / check-out was only reachable through a
+  "Selfie" text button in the Aksi column of the per-employee rekap (a dialog); "Tim hari ini" and "Rekap saya"
+  showed none, and the Payload Absensi record previewed through the generic `/api/media-selfies` route, whose media
+  read rule never lets a PM see his team's selfie (Q-33 visibility runs through the attendance). Now the selfies are
+  lazy thumbnails on the "Tim hari ini" member cards and in the rekap (per karyawan and "Rekap saya"), each opening
+  the shared lightbox (caption: masuk / pulang, time, location, date; ← → between the selfies of the day / member).
+  Same audited endpoint `GET /api/v1/attendance/{id}/selfie` (attendance read access; someone else's selfie still
+  audited `view_sensitive`); a selfie removed by retention keeps the "Selfie dihapus" chip.
+- **Every image link of the web admin is a preview that opens in a popup:** one shared thumbnail
+  (`src/admin/components/media/ImageThumb.tsx`: fixed size, `object-fit: cover`, lazy, alt text, keyboard link
+  opening the lightbox — Esc closes and returns the focus, ← → within the record, caption, "Buka di tab baru"; no JS /
+  Ctrl-click = new tab; thumbnail → full file → file link fallback) for receipts and LPJ photos (Verifikasi LPJ,
+  Verifikasi nota Reimburse, request detail lines, own receipts), transfer proofs (request detail — was a "bukti"
+  text link —, Pinjaman antar-PT movements), cash proofs (Buku kas list — was a "Bukti" button —, KK / KM edit form),
+  the request's invoice / PT document file and its Lampiran (images previewed, PDFs stay file links with their
+  name), field-report / progress galleries and the photo cells of the Progress and Laporan servis lists. Lightbox
+  title and caption wrap instead of an ellipsis.
+- **Payload views:** every upload field to a media collection shows thumbnails in the collection list (was the file
+  name); read-only ones (attendance selfie, transfer / cash proof, approval signature) show the authorized preview in
+  the edit form; editable upload fields keep Payload's own field.
+
 ## [0.21.0] - 2026-10-25
 
 **Web admin in the Nexus layout (D2510, ADR 0033) + APK 0.13.0 restyle (tag `mobile-v0.13.0`, PR #140, already
