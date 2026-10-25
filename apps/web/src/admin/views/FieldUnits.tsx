@@ -921,7 +921,7 @@ export async function FieldTimesheetDetail(props: AdminViewServerProps) {
           <MetaRows d={t} tz={tz} />
         </Card>
         <Card id="ts-photo" title="Foto meter HM" span={5} i={5}>
-          <PhotoGallery photos={t.hmPhoto ? [t.hmPhoto] : []} label={`meter HM ${unitName}`} empty={t.hmStart === null ? 'Tanpa foto HM (HM tidak diisi).' : 'Tanpa foto HM.'} />
+          <PhotoGallery photos={t.hmPhoto ? [t.hmPhoto] : []} label={`meter HM ${unitName}`} caption={longDate(t.reportDate)} empty={t.hmStart === null ? 'Tanpa foto HM (HM tidak diisi).' : 'Tanpa foto HM.'} />
         </Card>
         <Card id="ts-history" title="Riwayat & koreksi" span={7} i={6}>
           <History entries={history} tz={tz} />

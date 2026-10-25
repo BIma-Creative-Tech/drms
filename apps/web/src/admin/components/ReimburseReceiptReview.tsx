@@ -8,6 +8,8 @@ import { Badge, NX_TABLE } from '../views/page-ui'
 import { ActionButton } from './ActionButton'
 import { DocSummaryProvider } from './feedback/DocContext'
 import { expenseRequestSummary } from './feedback/summaries'
+import { ImageThumb } from './media/ImageThumb'
+import { mediaThumbSource } from './media/media-url'
 import { TableScroll } from './TableScroll'
 import { Panel } from './ui/nexus'
 
@@ -140,10 +142,7 @@ function RequestReview({ d }: { d: Detail }) {
                         <tr key={r.id} data-pk-receipt={r.id}>
                           <td>
                             {r.imageId ? (
-                              <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`receipts-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · baris ${l.no} · ${rp(r.amount)}`}>
-                                {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
-                                <img className="pk-nx-thumb" src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} width={80} height={80} />
-                              </a>
+                              <ImageThumb src={mediaThumbSource('receipts', r.imageId)} group={`receipts-${d.id}`} title={`Nota ${r.receiptNo ?? r.id} · baris ${l.no} · ${rp(r.amount)}`} caption={`${r.vendorName} · ${r.receiptDate}`} alt={`Nota ${r.receiptNo ?? r.id}`} size={80} data-pk-receipt-thumb={r.id} />
                             ) : (
                               '—'
                             )}

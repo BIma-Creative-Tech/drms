@@ -5,7 +5,7 @@ import Link from 'next/link'
 import React from 'react'
 
 import { hasRoleAny, membershipsOf, ownEmployees, relId, userId } from '@/access/roles'
-import { CorrectionDialog, DefaultSchedule, GeofenceForm, HolidayAdd, OnBehalfForm, ScheduleAssign, SelfCheckForm, SelfieButton, type Option, type SelfCheckLocation } from '@/admin/components/absensi/AttendanceActions'
+import { CorrectionDialog, DefaultSchedule, GeofenceForm, HolidayAdd, OnBehalfForm, ScheduleAssign, SelfCheckForm, SelfieThumb, type Option, type SelfCheckLocation } from '@/admin/components/absensi/AttendanceActions'
 import { KAS_STYLE } from '@/admin/components/kas/style'
 import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
 import { matchesQuery, spValue } from '@/admin/list-query'
@@ -125,6 +125,7 @@ export const ABSENSI_STYLE = `
 .pk-f3 .pk-mem .tms { display: flex; gap: 14px; font-size: 12px; color: var(--pk-muted-fg); font-variant-numeric: tabular-nums; }
 .pk-f3 .pk-mem .tms b { color: var(--pk-fg); font-size: 14px; }
 .pk-f3 .pk-mem .tags { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.pk-f3 .pk-mem .pk-thumb-list { display: flex; flex-wrap: wrap; gap: 8px; } /* D2510 0.21.1: selfie thumbnails (the column's ul is a grid) */
 .pk-f3 .pk-chip, .pk-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid var(--pk-border); color: var(--pk-muted-fg); background: var(--pk-card); max-width: 100%; overflow-wrap: anywhere; } /* D2510: location names wrap (owner rule 2026-10-16), no ellipsis */
 .pk-f3 .pk-chip.proj::before { content: 'P'; font-size: 9px; font-weight: 800; color: var(--pk-primary); }
 .pk-f3 .pk-chip.cc::before { content: 'PB'; font-size: 9px; font-weight: 800; color: var(--pk-tone-warn-text); }
@@ -141,9 +142,6 @@ export const ABSENSI_STYLE = `
 .pk-ba .lbl { display: block; font-size: 11px; color: var(--pk-muted-fg); font-weight: 600; }
 .pk-ba b { font-size: 20px; font-variant-numeric: tabular-nums; }
 .pk-ba .arrow { font-size: 18px; color: var(--pk-muted-fg); }
-.pk-selfie-dlg { width: min(420px, calc(100vw - 32px)); }
-.pk-selfie-box { display: grid; place-items: center; min-height: 200px; background: var(--pk-muted-bg); border-radius: var(--style-radius-m); overflow: hidden; }
-.pk-selfie-box img { display: block; max-width: 100%; max-height: 60dvh; height: auto; }
 .pk-okmsg { color: var(--pk-tone-ok-text); font-size: 12px; font-weight: 600; margin: 0; }
 .pk-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .pk-inline.wrap { align-items: flex-end; }
@@ -298,8 +296,15 @@ function Failed({ props, name, title, err, req }: { props: AdminViewServerProps;
 
 // ---------------------------------------------------------------- Tim hari ini (US-13)
 
-function MemberCard({ m, tz, month, pt }: { m: TeamTodayRow; tz: string; month: string; pt: PtView }) {
+function MemberCard({ m, tz, month, pt, date, selfies }: { m: TeamTodayRow; tz: string; month: string; pt: PtView; date: string; selfies: Map<number, boolean> }) {
   const where = m.locations.length ? m.locations.map((l) => l.location) : m.assigned
+  // D2510 (web 0.21.1): the check-in / check-out selfies of the day as thumbnails (lightbox group = this member)
+  const shots = m.locations.flatMap((l) =>
+    (['checkIn', 'checkOut'] as const).flatMap((k) => {
+      const s = l[k]
+      return s ? [{ s, k, loc: l.location }] : []
+    }),
+  )
   return (
     <li className="pk-mem" data-pk-member={m.employee.id} data-pk-member-status={m.status}>
       <div className="top">
@@ -316,6 +321,28 @@ function MemberCard({ m, tz, month, pt }: { m: TeamTodayRow; tz: string; month: 
             Pulang <b>{m.checkOutLocal ?? '—'}</b>
           </span>
         </div>
+      ) : null}
+      {shots.length > 0 ? (
+        <ul className="pk-thumb-list" aria-label={`Selfie ${m.employee.name}`} data-pk-member-selfies={m.employee.id}>
+          {shots.map(({ s, k, loc }) => {
+            const kind = k === 'checkIn' ? 'Masuk' : 'Pulang'
+            return (
+              <li key={`${k}:${s.id}`}>
+                <SelfieThumb
+                  attendanceId={s.id}
+                  label={`${kind.toLowerCase()} ${m.employee.name}`}
+                  available={selfies.get(s.id) !== false}
+                  group={`att-today-${m.employee.id}`}
+                  caption={`${kind} ${hhmm(s.time, tz)} · ${locLabel(loc)} · ${WD_LONG[wdOf(date) - 1] ?? ''} ${dayMonth(date)}`}
+                  size={44}
+                />
+                <small>
+                  {kind} {hhmm(s.time, tz)}
+                </small>
+              </li>
+            )
+          })}
+        </ul>
       ) : null}
       <div className="tags">
         {where.map((l) => (
@@ -340,22 +367,24 @@ export async function AbsensiToday(props: AdminViewServerProps) {
   const sp = (props.searchParams ?? {}) as SP
   if (foreignPtParam(req, props.searchParams)) return <PtNotAllowed props={props} title="Absensi hari ini" />
   const pt = await ptView(req)
-  let data: { scope: AttScope | null; r: TeamTodayResult | null; loc: { projects: Opt[]; costCenters: Opt[] }; today: string; lateCount: number; pts: number[]; chosen: number | undefined } | null = null
+  let data: { scope: AttScope | null; r: TeamTodayResult | null; loc: { projects: Opt[]; costCenters: Opt[] }; today: string; lateCount: number; pts: number[]; chosen: number | undefined; selfies: Map<number, boolean> } | null = null
   try {
     data = await withReqTransaction(req, async () => {
       const scope = await attendanceScope(req)
       const ctx = await attendanceContext(req)
       const pts = scopePts(scope, pt)
       const chosen = ptParam(sp, pts)
-      if (!scope) return { scope, r: null, loc: { projects: [], costCenters: [] }, today: ctx.today, lateCount: 0, pts, chosen }
+      if (!scope) return { scope, r: null, loc: { projects: [], costCenters: [] }, today: ctx.today, lateCount: 0, pts, chosen, selfies: new Map<number, boolean>() }
       const date = /^\d{4}-\d{2}-\d{2}$/.test(one(sp, 'tanggal')) && one(sp, 'tanggal') <= ctx.today ? one(sp, 'tanggal') : ctx.today
       const r = await teamTodayFor(req, { date, projectId: idParam(sp, 'project'), costCenterId: idParam(sp, 'pusat'), companyIds: chosen ? [chosen] : undefined })
-      return { scope, r, loc: await scopeLocations(req, scope), today: ctx.today, lateCount: r.members.filter((m) => m.lateMinutes > 0).length, pts, chosen }
+      // D2510: which selfie files still exist (retention, Q-33) — the board shows them as thumbnails
+      const stampIds = r.members.flatMap((m) => m.locations.flatMap((l) => [l.checkIn?.id, l.checkOut?.id])).filter((x): x is number => typeof x === 'number')
+      return { scope, r, loc: await scopeLocations(req, scope), today: ctx.today, lateCount: r.members.filter((m) => m.lateMinutes > 0).length, pts, chosen, selfies: await selfieState(req, stampIds) }
     })
   } catch (err) {
     return <Failed props={props} name="absensi-today" title="Absensi · Tim hari ini" err={err} req={req} />
   }
-  const { scope, r, loc, today, lateCount, pts, chosen } = data
+  const { scope, r, loc, today, lateCount, pts, chosen, selfies } = data
   if (!scope || !r) {
     return (
       <NoAccess
@@ -388,7 +417,7 @@ export async function AbsensiToday(props: AdminViewServerProps) {
         ) : (
           <ul>
             {list.map((m) => (
-              <MemberCard key={m.employee.id} m={m} tz={r.timezone} month={month} pt={pt} />
+              <MemberCard key={m.employee.id} m={m} tz={r.timezone} month={month} pt={pt} date={r.date} selfies={selfies} />
             ))}
           </ul>
         )}
@@ -494,7 +523,7 @@ export async function AbsensiToday(props: AdminViewServerProps) {
       )}
       <p className="pk-note">
         Waktu = zona perusahaan ({r.timezone}), memakai koreksi terakhir (T10). Lokasi: <span className="pk-chip proj">project</span> <span className="pk-chip cc">pusat biaya</span> tempat absen (atau yang ditugaskan bila belum
-        absen).
+        absen). Klik foto selfie untuk memperbesar; membuka selfie orang lain tercatat di audit log.
       </p>
     </Frame>
   )
@@ -985,7 +1014,13 @@ function EmployeeRecap({ d, recap }: { d: RekapData; recap: MonthlyRecap }) {
                                 <span className="pk-actk" aria-hidden>
                                   {k === 'checkIn' ? 'Masuk' : 'Pulang'}
                                 </span>
-                                <SelfieButton attendanceId={s.id} label={`${kindLabel} ${dayShort(x.date)}`} available={d.selfies.get(s.id) !== false} own={d.own} />
+                                <SelfieThumb
+                                  attendanceId={s.id}
+                                  label={`${kindLabel} ${dayShort(x.date)}`}
+                                  available={d.selfies.get(s.id) !== false}
+                                  group={`att-${recap.employee.id}-${x.date}`}
+                                  caption={`${recap.employee.name} · ${k === 'checkIn' ? 'Masuk' : 'Pulang'} ${hhmm(s.time, d.tz)} · ${locLabel(l.location)} · ${WD_LONG[x.weekday - 1] ?? ''} ${dayMonth(x.date)}`}
+                                />
                                 {d.canCorrect ? (
                                   <CorrectionDialog
                                     attendanceId={s.id}
@@ -1039,7 +1074,7 @@ function EmployeeRecap({ d, recap }: { d: RekapData; recap: MonthlyRecap }) {
       </Bento>
       <p className="pk-note">
         Terlambat = menit setelah jam masuk jadwal bila melebihi toleransi (dihitung dari jam masuk); hari libur/non-kerja tidak dihitung terlambat, hanya ditandai. Selfie hanya untuk PM tim, Finance, Direktur,
-        Admin dan karyawan sendiri; membuka selfie orang lain tercatat di audit log.
+        Admin dan karyawan sendiri; membuka selfie orang lain tercatat di audit log. Klik foto selfie untuk memperbesar (← → pindah masuk / pulang).
       </p>
     </>
   )

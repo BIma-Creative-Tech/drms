@@ -5,6 +5,8 @@ import { maskAccountNo } from '@/domain/expense/dto'
 import { formatRupiah } from '@/lib/money'
 import { formatDateLong } from '@/pdf/format'
 
+import { ImageThumb } from '../media/ImageThumb'
+import { isNonImage, mediaThumbSource } from '../media/media-url'
 import { BankReveal } from './BankReveal'
 
 type Detail = Awaited<ReturnType<typeof detail>>
@@ -28,7 +30,7 @@ export type DraftBank = { bankName: string | null; accountHolder: string | null;
  * with the money totals that left the sidebar (Nominal disetujui, Total ditransfer, Total nota terverifikasi LPJ); the
  * grand total stays the footer of "Rincian item".
  */
-export function RequestSummary({ d, ptName, attachments, canRevealBank, draftBank = null }: { d: Detail; ptName: string | null; attachments: Array<{ id: number; name: string }>; canRevealBank: boolean; draftBank?: DraftBank | null }) {
+export function RequestSummary({ d, ptName, attachments, canRevealBank, draftBank = null }: { d: Detail; ptName: string | null; attachments: Array<{ id: number; name: string; mimeType?: string | null }>; canRevealBank: boolean; draftBank?: DraftBank | null }) {
   const scope = d.project ? named(d.project) : d.costCenter ? named(d.costCenter) : ''
   const rows: Array<[string, React.ReactNode, string]> = []
   const add = (label: string, value: React.ReactNode, key: string) => {
@@ -87,9 +89,17 @@ export function RequestSummary({ d, ptName, attachments, canRevealBank, draftBan
     add(
       `File ${docLabel}`,
       d.invoice.fileId ? (
-        <a href={`/api/v1/media/attachments/${d.invoice.fileId}/file`} target="_blank" rel="noopener noreferrer" data-pk-invoice-file>
-          {d.invoice.fileName ?? (vendorPay ? 'Lihat invoice' : 'Lihat dokumen')}
-        </a>
+        // D2510 (web 0.21.1): an image document is previewed (lightbox), a PDF stays a file link with its name
+        <ImageThumb
+          src={mediaThumbSource('attachments', d.invoice.fileId)}
+          group={`request-files-${d.id}`}
+          title={`File ${docLabel}${d.invoice.no ? ` ${d.invoice.no}` : ''}`}
+          caption={d.invoice.date ? formatDateLong(d.invoice.date) : null}
+          file={isNonImage(d.invoice.mimeType, d.invoice.fileName)}
+          fileLabel={d.invoice.fileName ?? (vendorPay ? 'Lihat invoice' : 'Lihat dokumen')}
+          size={72}
+          data-pk-invoice-file=""
+        />
       ) : null,
       'invoiceFile',
     )
@@ -112,11 +122,20 @@ export function RequestSummary({ d, ptName, attachments, canRevealBank, draftBan
   add(
     'Lampiran',
     attachments.length > 0 ? (
-      <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '4px 10px' }}>
-        {attachments.map((a) => (
-          <a key={a.id} href={`/api/v1/media/attachments/${a.id}/file`} target="_blank" rel="noopener noreferrer">
-            {a.name}
-          </a>
+      // D2510 (web 0.21.1): photos as previews (one lightbox group with the invoice file), PDFs as file links
+      <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px 10px' }} data-pk-attachments={attachments.length}>
+        {attachments.map((a, i) => (
+          <ImageThumb
+            key={a.id}
+            src={mediaThumbSource('attachments', a.id)}
+            group={`request-files-${d.id}`}
+            title={`Lampiran ${i + 1}/${attachments.length}`}
+            caption={a.name}
+            file={isNonImage(a.mimeType, a.name)}
+            fileLabel={a.name}
+            size={72}
+            data-pk-attachment={a.id}
+          />
         ))}
       </span>
     ) : null,

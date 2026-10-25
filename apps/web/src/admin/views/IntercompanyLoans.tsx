@@ -24,6 +24,8 @@ import { NoAccess } from './NoAccess'
 import { Badge } from './page-ui'
 import { Alert, dateId, dateTimeId } from './progress-ui'
 import { PtChip } from './pt'
+import { ImageThumb } from '../components/media/ImageThumb'
+import { mediaThumbSource } from '../components/media/media-url'
 import { Bento, Card, DataTable, EmptyState, KpiRow, KpiTile, Meter, rp, StatusPill, type Col } from './viz'
 
 /**
@@ -294,9 +296,8 @@ export async function IcLoanDetail(props: AdminViewServerProps) {
             {m.proofId ? (
               <>
                 {' · '}
-                <a href={`/api/v1/media/transfer-proofs/${m.proofId}/file`} target="_blank" rel="noopener noreferrer">
-                  bukti
-                </a>
+                {/* D2510 (web 0.21.1): proof preview (lightbox over the movements of this loan; a PDF → file link) */}
+                <ImageThumb src={mediaThumbSource('transfer-proofs', m.proofId)} group={`icloan-${l.id}`} title={`Bukti ${m.label}`} caption={`${m.transferAt ? dateTimeId(m.transferAt, tz) : dateId(m.transferDate)} · ${rp(m.amount)}`} size={40} fileLabel="Bukti" data-pk-transfer-proof={m.proofId} />
               </>
             ) : null}
             {m.status === 'void' ? ` · Void: ${m.voidReason ?? ''}` : ''}
