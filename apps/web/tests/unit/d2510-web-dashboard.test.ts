@@ -22,7 +22,7 @@ describe('Card / KpiTile / Delta (Nexus restyle, same hooks)', () => {
     expect(html).toMatch(/class="pk-card s8 pk-anim pk-hero"[^>]*data-pk-card="acc"/)
     expect(html).toContain('aria-labelledby="pk-card-acc"')
     expect(html).toMatch(/<svg class="gl"/)
-    expect(html).toMatch(/<div class="acts"><a href="#x" class="pk-btn sm">Ekspor<\/a><a class="pk-btn sm" href="\/admin\/kas" data-pk-card-action="">/)
+    expect(html).toMatch(/<div class="acts"><a href="#x" class="pk-btn sm">Ekspor<\/a><a class="pk-btn sm" href="\/admin\/kas" data-pk-card-action="true">/)
     // without icon / actions: no glyph, no empty action box (Frame pages keep their markup)
     const plain = await render((h, v) => h(v.Card, { id: 'p', title: 'T', children: 'x' }))
     expect(plain).not.toContain('class="gl"')
