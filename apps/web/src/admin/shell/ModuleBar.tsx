@@ -49,15 +49,6 @@ const MENU_ANIM = {
   exit: { opacity: 0, y: -4, scale: 0.98, transition: { duration: 0.1 } },
 }
 
-function Badge({ n, label }: { n?: number; label?: string }) {
-  if (!n) return null
-  return (
-    <span className="pk-bar__count" aria-label={label ?? `${n} menunggu`}>
-      {n > 99 ? '99+' : n}
-    </span>
-  )
-}
-
 function focusables(root: HTMLElement | null): HTMLElement[] {
   return root ? Array.from(root.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')) : []
 }
