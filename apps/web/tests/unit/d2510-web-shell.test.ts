@@ -70,3 +70,27 @@ describe('shortcut + cookie', () => {
     expect(sidebarCookie('compact')).toBe(`${SIDEBAR_COOKIE}=compact; Path=/admin; Max-Age=31536000; SameSite=Lax`)
   })
 })
+
+describe('Nexus kit (SSR)', () => {
+  it('PageHeader, Panel, SoftBadge, StatusDot, Progress render their hooks and clamp the progress value', async () => {
+    const { createElement: h } = await import('react')
+    const { renderToString } = await import('react-dom/server')
+    const { PageHeader, Panel, Progress, SoftBadge, StatusDot } = await import('@/admin/components/ui/nexus')
+    const html = renderToString(
+      h('div', null, [
+        h(PageHeader, { key: 'h', title: 'Buku kas', sub: 'Per hari ini', icon: 'finance', mod: 'keuangan', actions: h('a', { href: '#' }, 'Ekspor') }),
+        h(Panel, { key: 'p', id: 'acc', title: 'Akun kas', icon: 'finance', note: '(3)', foot: 'kaki', flush: true, 'data-pk-card': 'acc' }, h(SoftBadge, { tone: 'ok' }, 'Aktif')),
+        h(StatusDot, { key: 's', tone: 'warn', label: 'Tertunda' }),
+        h(Progress, { key: 'g', value: 140, label: 'Anggaran terpakai' }),
+      ]),
+    )
+    expect(html).toContain('data-pk-page-head')
+    expect(html).toMatch(/<h1[^>]*>Buku kas<\/h1>/)
+    expect(html).toContain('aria-labelledby="acc-title"')
+    expect(html).toContain('data-pk-card="acc"')
+    expect(html).toContain('pk-nx-card__body is-flush')
+    expect(html).toContain('data-tone="ok"')
+    expect(html).toContain('aria-valuenow="100"')
+    expect(html).toContain('width:100%')
+  })
+})
