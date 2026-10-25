@@ -10932,6 +10932,24 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Sudah diperiksa'**
   String get flagReviewedLabel;
+
+  /// No description provided for @mediaOpenPhoto.
+  ///
+  /// In id, this message translates to:
+  /// **'Buka foto'**
+  String get mediaOpenPhoto;
+
+  /// No description provided for @mediaOpenFile.
+  ///
+  /// In id, this message translates to:
+  /// **'Buka file'**
+  String get mediaOpenFile;
+
+  /// No description provided for @mediaNotImage.
+  ///
+  /// In id, this message translates to:
+  /// **'File ini bukan gambar (mis. PDF). Ketuk thumbnail-nya untuk membuka sebagai file.'**
+  String get mediaNotImage;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

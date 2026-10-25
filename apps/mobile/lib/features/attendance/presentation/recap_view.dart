@@ -5,7 +5,7 @@ import '../../../app/theme.dart';
 import '../../../core/format/dates.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
-import '../../../shared/widgets/photo_viewer.dart';
+import '../../../shared/widgets/media_thumb.dart';
 import '../../dashboard/presentation/charts.dart' show periodLong;
 import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/user_profile.dart';
@@ -463,46 +463,46 @@ class DayDetailSheet extends StatelessWidget {
             for (final l in d.locations)
               PkCard(
                 margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
-                child: Row(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    PkIconChip(
-                      icon: l.outsideArea ? Icons.explore : siteKindIcon(l.location.kind),
-                      tone: l.outsideArea ? PkTone.warn : PkTone.info,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            l.outsideArea ? '${t.attendanceOutsideArea} (ref. ${l.location.label})' : l.location.label,
-                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                          Text(
-                            '${t.attendanceCheckIn}: ${localHm(l.checkIn?.time, zone)} · ${t.attendanceCheckOut}: ${localHm(l.checkOut?.time, zone)}',
-                            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // d1010 (12c): check-in / check-out selfies of this location in the shared viewer.
-                    if (l.checkIn != null || l.checkOut != null)
-                      IconButton(
-                        key: Key('selfie-${l.location.kind.name}-${l.location.id}'),
-                        tooltip: t.attendanceSelfieView,
-                        icon: const Icon(Icons.photo_outlined),
-                        onPressed: () => showPhotoViewer(context, [
-                          for (final (label, mark) in [
-                            (t.attendanceCheckIn, l.checkIn),
-                            (t.attendanceCheckOut, l.checkOut),
-                          ])
-                            if (mark != null)
-                              ViewerPhoto(
-                                caption: '$label ${localHm(mark.time, zone)} · ${l.location.label}',
-                                builder: (_) => _SelfieFull(attendanceId: mark.id),
+                    Row(
+                      children: [
+                        PkIconChip(
+                          icon: l.outsideArea ? Icons.explore : siteKindIcon(l.location.kind),
+                          tone: l.outsideArea ? PkTone.warn : PkTone.info,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l.outsideArea
+                                    ? '${t.attendanceOutsideArea} (ref. ${l.location.label})'
+                                    : l.location.label,
+                                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                               ),
-                        ]),
+                              Text(
+                                '${t.attendanceCheckIn}: ${localHm(l.checkIn?.time, zone)} · ${t.attendanceCheckOut}: ${localHm(l.checkOut?.time, zone)}',
+                                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    // D2510 (user 2026-10-25): the check-in / check-out selfies as thumbnails (before: only a small
+                    // photo button) — a tap opens the shared viewer swiping between both.
+                    if (l.checkIn != null || l.checkOut != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10, left: 48),
+                        child: MediaThumbStrip(
+                          key: Key('selfie-${l.location.kind.name}-${l.location.id}'),
+                          size: 72,
+                          photos: selfiePhotos(t, l, zone),
+                        ),
                       ),
                   ],
                 ),
@@ -514,23 +514,11 @@ class DayDetailSheet extends StatelessWidget {
   }
 }
 
-class _SelfieFull extends ConsumerWidget {
-  const _SelfieFull({required this.attendanceId});
-  final int attendanceId;
-  @override
-  Widget build(BuildContext context, WidgetRef ref) => switch (ref.watch(attendanceSelfieProvider(attendanceId))) {
-    AsyncData(:final value) => Image.memory(value, fit: BoxFit.contain),
-    AsyncError() => Padding(
-      padding: const EdgeInsets.all(24),
-      child: Text(
-        AppLocalizations.of(context).attendanceSelfieUnavailable,
-        style: const TextStyle(color: Colors.white),
-        textAlign: TextAlign.center,
-      ),
-    ),
-    _ => const CircularProgressIndicator(),
-  };
-}
+/// D2510: the selfies of one location/day (check-in first) with their viewer captions.
+List<MediaPhoto> selfiePhotos(AppLocalizations t, LocationDay l, String? zone) => [
+  for (final (label, mark) in [(t.attendanceCheckIn, l.checkIn), (t.attendanceCheckOut, l.checkOut)])
+    if (mark != null) MediaPhoto.selfie(mark.id, caption: '$label ${localHm(mark.time, zone)} · ${l.location.label}'),
+];
 
 /// MC3: own recap of which PT (the user has one employee per PT) — shown only with employees in several
 /// selected PTs.

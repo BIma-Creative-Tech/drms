@@ -4757,5 +4757,8 @@
   "flagReviewAction": "Tandai flag diperiksa",
   "flagReviewNoteLabel": "Catatan pemeriksaan (opsional)",
   "flagReviewedDone": "Flag ditandai sudah diperiksa.",
-  "flagReviewedLabel": "Sudah diperiksa"
+  "flagReviewedLabel": "Sudah diperiksa",
+  "mediaOpenPhoto": "Buka foto",
+  "mediaOpenFile": "Buka file",
+  "mediaNotImage": "File ini bukan gambar (mis. PDF). Ketuk thumbnail-nya untuk membuka sebagai file."
 }

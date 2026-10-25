@@ -8,6 +8,7 @@ import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/media_thumb.dart';
 import '../../../shared/widgets/pk_ui.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../companies/presentation/company_chip.dart';
@@ -433,7 +434,24 @@ class FieldRecordSheet extends StatelessWidget {
             if (r.reporterName != null) Text(t.fieldReporter(r.reporterName!), style: theme.textTheme.bodySmall),
             if (r.flags.isNotEmpty)
               Text(r.flags.map((f) => flagLabel(t, f)).join(' · '), style: theme.textTheme.bodySmall),
-            if (r.photoIds.isNotEmpty) Text(t.fieldPhotoCount(r.photoIds.length), style: theme.textTheme.bodySmall),
+            if (r.photoIds.isNotEmpty) ...[
+              Text(t.fieldPhotoCount(r.photoIds.length), style: theme.textTheme.bodySmall),
+              // D2510 (user 2026-10-25): the report's photos as thumbnails (tap = viewer swiping through all of them).
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: MediaThumbStrip(
+                  key: const Key('field-record-photos'),
+                  photos: [
+                    for (final (i, id) in r.photoIds.indexed)
+                      MediaPhoto.media(
+                        'progress-photos',
+                        id,
+                        caption: '${[r.type.label, ?r.docNo].join(' ')} · ${i + 1}/${r.photoIds.length}',
+                      ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             if (r.editable)
               FilledButton.icon(

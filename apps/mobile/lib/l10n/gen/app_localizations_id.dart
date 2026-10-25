@@ -6273,4 +6273,13 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get flagReviewedLabel => 'Sudah diperiksa';
+
+  @override
+  String get mediaOpenPhoto => 'Buka foto';
+
+  @override
+  String get mediaOpenFile => 'Buka file';
+
+  @override
+  String get mediaNotImage => 'File ini bukan gambar (mis. PDF). Ketuk thumbnail-nya untuk membuka sebagai file.';
 }

@@ -9,6 +9,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
+import '../../../shared/widgets/media_thumb.dart';
 import '../../../shared/widgets/photo_viewer.dart';
 import '../../../shared/widgets/pk_ui.dart';
 import '../../../shared/widgets/pk_ui_akun.dart';
@@ -365,6 +366,22 @@ class RecordDetailScreen extends ConsumerWidget {
                 ),
               ),
               if (d.file != null) _FilePreview(file: d.file!),
+              // D2510 (user 2026-10-25): an attendance row shows its selfie (the web list only names the file).
+              if (collection == 'attendances' && int.tryParse(id) != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      MediaThumb(
+                        key: const Key('record-attendance-selfie'),
+                        size: 96,
+                        photo: MediaPhoto.selfie(int.parse(id), caption: d.title),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(t.attendanceSelfieTitle, style: theme.textTheme.titleSmall)),
+                    ],
+                  ),
+                ),
               if (d.fields.isNotEmpty)
                 PkCard(
                   margin: const EdgeInsets.only(bottom: 12),
