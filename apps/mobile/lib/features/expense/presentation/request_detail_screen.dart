@@ -20,6 +20,7 @@ import '../../auth/application/auth_controller.dart';
 import '../application/expense_providers.dart';
 import '../domain/expense_request.dart';
 import '../domain/turn_timeline.dart';
+import 'finance_lpj_actions.dart';
 import 'requester_actions.dart';
 import 'widgets/attachments.dart';
 import 'widgets/fund_check_panel.dart';
@@ -335,7 +336,15 @@ class _DetailBody extends ConsumerWidget {
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.flag, color: f.level == 'warning' ? context.pk.warnText : theme.colorScheme.outline),
               title: Text(f.kindLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text(f.message),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(f.message),
+                  if (f.status == 'reviewed') Text(t.flagReviewedLabel, key: Key('flag-reviewed-${f.id}')),
+                  // D2510: Finance marks the flag reviewed (web Verifikasi LPJ / Reimburse review)
+                  if (canReviewFlag(d, f)) FlagReviewButton(detail: d, flag: f),
+                ],
+              ),
             ),
         ]),
       const SizedBox(height: 80),
@@ -547,6 +556,14 @@ class _LineCard extends ConsumerWidget {
                       children: [
                         Text(f.kindLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
                         Text(f.message, style: Theme.of(context).textTheme.bodySmall),
+                        if (f.status == 'reviewed')
+                          Text(
+                            t.flagReviewedLabel,
+                            key: Key('flag-reviewed-${f.id}'),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                          ),
+                        // D2510: Finance marks the flag reviewed (web Verifikasi LPJ / Reimburse review)
+                        if (canReviewFlag(detail, f)) FlagReviewButton(detail: detail, flag: f),
                       ],
                     ),
                   ),
@@ -556,35 +573,45 @@ class _LineCard extends ConsumerWidget {
           if (line.notes != null) Text(line.notes!, style: Theme.of(context).textTheme.bodySmall),
           if (receipts.isNotEmpty) const SizedBox(height: 8),
           for (final r in receipts)
-            Container(
+            // D2510: a Material tile (the review buttons keep their ink); Finance decides each receipt here.
+            PkTile(
+              key: Key('receipt-${r.id}'),
               margin: const EdgeInsets.only(top: 6),
-              padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerLow,
-                border: Border.all(color: context.pk.border),
-                borderRadius: BorderRadius.circular(PkRadius.sm),
-              ),
-              child: Row(
-                children: [
-                  ReceiptThumb(imageId: r.imageId, group: photos, caption: receiptCaption(t, line, r)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      '${r.vendorName}\n${r.receiptNo ?? '-'} · ${formatDateOnly(r.receiptDate)} · '
-                      '${receiptStatusLabel(r.status)}',
-                      style: theme.textTheme.bodySmall,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        ReceiptThumb(imageId: r.imageId, group: photos, caption: receiptCaption(t, line, r)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '${r.vendorName}\n${r.receiptNo ?? '-'} · ${formatDateOnly(r.receiptDate)} · '
+                            '${receiptStatusLabel(r.status)}',
+                            key: Key('receipt-${r.id}-text'),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(formatRupiah(r.amount), style: pkMoneyStyle(context)),
+                        if (canRemove && receiptRemovable(r.status))
+                          IconButton(
+                            key: Key('receipt-remove-${r.id}'),
+                            tooltip: t.receiptRemove,
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => removeServerReceipt(context, ref, detail, r),
+                          ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(formatRupiah(r.amount), style: pkMoneyStyle(context)),
-                  if (canRemove && receiptRemovable(r.status))
-                    IconButton(
-                      key: Key('receipt-remove-${r.id}'),
-                      tooltip: t.receiptRemove,
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => removeServerReceipt(context, ref, detail, r),
-                    ),
-                ],
+                    if (canReviewReceipt(detail, r))
+                      Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: ReceiptReviewButtons(detail: detail, receipt: r),
+                      ),
+                  ],
+                ),
               ),
             ),
         ],
@@ -628,6 +655,10 @@ class _DecisionBar extends ConsumerWidget {
           label: Text(t.transferRecord),
         ),
       );
+    }
+    // D2510: Finance on a submitted LPJ — "Minta revisi" / "Verifikasi LPJ" (the web Verifikasi LPJ actions).
+    if (showsFinanceLpjBar(detail) && !canAck && !canApprove && !canReject) {
+      return bar(FinanceLpjBar(detail: detail));
     }
     if (!canAck && !canApprove && !canReject) return const SizedBox.shrink();
 

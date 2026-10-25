@@ -6334,7 +6334,7 @@ abstract class AppLocalizations {
   /// No description provided for @lpjReadOnlyHint.
   ///
   /// In id, this message translates to:
-  /// **'Hanya lihat: buka pengajuan untuk melihat LPJ-nya. Verifikasi LPJ dilakukan di web (Verifikasi LPJ).'**
+  /// **'Buka pengajuan untuk memeriksa nota dan memverifikasi LPJ.'**
   String get lpjReadOnlyHint;
 
   /// No description provided for @transferNotInQueue.
@@ -10830,6 +10830,108 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Aplikasi'**
   String get akunGroupApp;
+
+  /// No description provided for @lpjActionRevision.
+  ///
+  /// In id, this message translates to:
+  /// **'Minta revisi'**
+  String get lpjActionRevision;
+
+  /// No description provided for @lpjVerifyNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Total terverifikasi = jumlah nota valid. Nota yang masih menunggu harus diputuskan dulu (valid / tolak).'**
+  String get lpjVerifyNote;
+
+  /// No description provided for @lpjRevisionNoteLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Catatan revisi untuk pemohon'**
+  String get lpjRevisionNoteLabel;
+
+  /// No description provided for @lpjRevisionNoteHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Wajib, minimal 3 karakter.'**
+  String get lpjRevisionNoteHint;
+
+  /// No description provided for @lpjVerifiedDone.
+  ///
+  /// In id, this message translates to:
+  /// **'LPJ terverifikasi.'**
+  String get lpjVerifiedDone;
+
+  /// No description provided for @lpjRevisionDone.
+  ///
+  /// In id, this message translates to:
+  /// **'LPJ dikembalikan ke pemohon untuk direvisi.'**
+  String get lpjRevisionDone;
+
+  /// No description provided for @lpjPendingReceipts.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} nota belum diputuskan (valid / tolak).'**
+  String lpjPendingReceipts(int count);
+
+  /// No description provided for @receiptActionVerify.
+  ///
+  /// In id, this message translates to:
+  /// **'Validasi nota'**
+  String get receiptActionVerify;
+
+  /// No description provided for @receiptActionReject.
+  ///
+  /// In id, this message translates to:
+  /// **'Tolak nota'**
+  String get receiptActionReject;
+
+  /// No description provided for @receiptValidButton.
+  ///
+  /// In id, this message translates to:
+  /// **'Valid'**
+  String get receiptValidButton;
+
+  /// No description provided for @receiptRejectReasonLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Alasan nota ditolak'**
+  String get receiptRejectReasonLabel;
+
+  /// No description provided for @receiptVerifiedDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Nota ditandai valid.'**
+  String get receiptVerifiedDone;
+
+  /// No description provided for @receiptRejectedDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Nota ditolak.'**
+  String get receiptRejectedDone;
+
+  /// No description provided for @flagReviewAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Tandai flag diperiksa'**
+  String get flagReviewAction;
+
+  /// No description provided for @flagReviewNoteLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Catatan pemeriksaan (opsional)'**
+  String get flagReviewNoteLabel;
+
+  /// No description provided for @flagReviewedDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Flag ditandai sudah diperiksa.'**
+  String get flagReviewedDone;
+
+  /// No description provided for @flagReviewedLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Sudah diperiksa'**
+  String get flagReviewedLabel;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

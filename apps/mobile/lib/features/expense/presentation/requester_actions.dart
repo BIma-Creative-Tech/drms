@@ -483,6 +483,30 @@ Future<void> removeServerReceipt(BuildContext context, WidgetRef ref, ExpenseDet
   }
 }
 
+/// D2510: the text prompt of these actions for other screens (Finance LPJ review): "Yakin ingin <aksi>?" with the
+/// summary, a text field ([required] = min. 3 characters; optional text, when given, also min. 3) and "Ya, <aksi>" —
+/// it IS the confirmation of the action. Pops the trimmed text, null when cancelled. OK key `prompt-ok`.
+Future<String?> showTextPrompt(
+  BuildContext context, {
+  required String action,
+  required String label,
+  required Key fieldKey,
+  List<String?> summary = const [],
+  String? hint,
+  bool required = true,
+}) => showDialog<String>(
+  context: context,
+  builder: (_) => _TextPromptDialog(
+    title: AppLocalizations.of(context).confirmActionTitle(actionPhrase(action)),
+    summary: summary,
+    confirm: action,
+    label: label,
+    hint: hint,
+    required: required,
+    fieldKey: fieldKey,
+  ),
+);
+
 class _TextPromptDialog extends StatefulWidget {
   const _TextPromptDialog({
     required this.title,

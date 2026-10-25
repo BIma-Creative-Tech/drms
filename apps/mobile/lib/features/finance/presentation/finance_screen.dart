@@ -389,7 +389,8 @@ class TransferQueueCard extends ConsumerWidget {
   }
 }
 
-/// "Verifikasi LPJ" (`GET /lpj-queue`): read-only list; the request detail shows the LPJ.
+/// "Verifikasi LPJ" (`GET /lpj-queue`): the LPJ waiting for Finance; a tap opens the request detail, where Finance
+/// decides each receipt (Valid / Tolak), marks flags reviewed and requests a revision or verifies the LPJ (D2510).
 class _LpjQueueView extends ConsumerStatefulWidget {
   const _LpjQueueView();
 
@@ -441,7 +442,7 @@ class _LpjQueueViewState extends ConsumerState<_LpjQueueView> {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   itemCount: items.length + 1,
                   itemBuilder: (_, i) => i == 0
-                      ? PkNoticeCard(dense: true, icon: Icons.visibility_outlined, title: Text(t.lpjReadOnlyHint))
+                      ? PkNoticeCard(dense: true, icon: Icons.fact_check_outlined, title: Text(t.lpjReadOnlyHint))
                       : _LpjTile(r: items[i - 1]),
                 );
               },
