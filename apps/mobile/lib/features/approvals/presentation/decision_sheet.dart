@@ -7,12 +7,15 @@ import 'package:signature/signature.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/theme.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/online_only_button.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_keuangan.dart';
 import '../../expense/application/expense_providers.dart';
 import '../../expense/domain/expense_request.dart';
 import '../../expense/domain/fund_check.dart';
@@ -160,6 +163,10 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
     await showActionFailure(context, message, action: action);
   }
 
+  /// D2510: a decision hint as a soft info note.
+  Widget _hint(Widget text) =>
+      PkNoticeCard(dense: true, icon: Icons.info_outline, margin: const EdgeInsets.only(top: 10), title: text);
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -188,35 +195,46 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
       Decision.approve => approveTitle,
       Decision.reject => t.decisionTitleReject,
     };
+    final theme = Theme.of(context);
+    final tone = widget.decision == Decision.reject ? PkTone.bad : PkTone.ok;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            Text('${d.docNo ?? ''} ${d.title}\n${formatRupiah(d.grandTotal)}'),
+            // D2510: bold title, the request on a soft tile (number + title, amount bold), hints as soft notes.
+            Text(title, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerLow,
+                border: Border.all(color: context.pk.border),
+                borderRadius: BorderRadius.circular(PkRadius.md),
+              ),
+              child: Row(
+                children: [
+                  PkIconChip(icon: widget.decision == Decision.reject ? Icons.close : Icons.check, tone: tone),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '${d.docNo ?? ''} ${d.title}\n${formatRupiah(d.grandTotal)}',
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             if (widget.decision == Decision.acknowledge && pm)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(t.decisionHintPm, key: const Key('decision-hint-pm')),
-              ),
+              _hint(Text(t.decisionHintPm, key: const Key('decision-hint-pm'))),
             if (widget.decision == Decision.acknowledge && direktur)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(t.decisionHintDirektur, key: const Key('decision-hint-direktur')),
-              ),
+              _hint(Text(t.decisionHintDirektur, key: const Key('decision-hint-direktur'))),
             if (widget.decision == Decision.approve && direkturFinal)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(t.decisionHintDirekturFinal, key: const Key('decision-hint-direktur-final')),
-              ),
+              _hint(Text(t.decisionHintDirekturFinal, key: const Key('decision-hint-direktur-final'))),
             if (widget.decision == Decision.approve && ownerFinal)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(t.decisionHintDirekturFinal, key: const Key('decision-hint-owner-final')),
-              ),
+              _hint(Text(t.decisionHintDirekturFinal, key: const Key('decision-hint-owner-final'))),
             // ADR 0029: "Ketersediaan dana PT" (compact) for Finance / Direktur / Owner of the PT
             if (d.fundCheck != null) FundCheckPanel(detail: d, compact: true),
             const SizedBox(height: 12),
@@ -232,7 +250,8 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
             if (d.direkturSignature case final sig?)
               DirekturSignatureCard(signature: sig)
             else ...[
-              Text(t.signatureMode, style: Theme.of(context).textTheme.titleSmall),
+              Text(t.signatureMode, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
               SegmentedButton<SignatureMode>(
                 segments: [
                   ButtonSegment(value: SignatureMode.profile, label: Text(t.signatureProfile)),
@@ -246,8 +265,18 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
                 AspectRatio(
                   aspectRatio: 8 / 3,
                   child: DecoratedBox(
-                    decoration: BoxDecoration(border: Border.all(color: Theme.of(context).colorScheme.outline)),
-                    child: Signature(key: const Key('signature-pad'), controller: _pad, backgroundColor: Colors.white),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: theme.colorScheme.outline),
+                      borderRadius: BorderRadius.circular(PkRadius.sm),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(PkRadius.sm),
+                      child: Signature(
+                        key: const Key('signature-pad'),
+                        controller: _pad,
+                        backgroundColor: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
                 Align(
@@ -290,27 +319,35 @@ class DirekturSignatureCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     final image = ref.watch(direkturSignatureImageProvider(signature.signatureId));
-    return Card(
+    return PkCard(
       key: const Key('direktur-signature'),
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(t.direkturSignatureTitle, style: Theme.of(context).textTheme.titleSmall),
-            if (image case AsyncData(:final value))
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: SizedBox(
-                  height: 72,
-                  child: Image.memory(value, key: const Key('direktur-signature-image'), fit: BoxFit.contain),
-                ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            t.direkturSignatureTitle,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          if (image case AsyncData(:final value))
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: SizedBox(
+                height: 72,
+                child: Image.memory(value, key: const Key('direktur-signature-image'), fit: BoxFit.contain),
               ),
-            Text(signature.label, key: const Key('direktur-signature-name')),
-            Text(t.direkturSignatureHint, style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ),
+            ),
+          Text(
+            signature.label,
+            key: const Key('direktur-signature-name'),
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          Text(
+            t.direkturSignatureHint,
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          ),
+        ],
       ),
     );
   }

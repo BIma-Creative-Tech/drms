@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/providers.dart';
+import '../../../../app/theme.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../../shared/widgets/photo_viewer.dart';
 
@@ -45,11 +46,22 @@ class ReceiptThumb extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     Widget box(Widget child) => SizedBox.square(dimension: size, child: child);
-    if (imageId == null) return box(const Icon(Icons.image_not_supported));
+    // D2510: placeholders on a rounded tinted tile (same radius as the photo).
+    final scheme = Theme.of(context).colorScheme;
+    Widget tile(Widget child) => box(
+      DecoratedBox(
+        decoration: BoxDecoration(color: scheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(PkRadius.sm)),
+        child: IconTheme.merge(
+          data: IconThemeData(color: scheme.onSurfaceVariant),
+          child: Center(child: child),
+        ),
+      ),
+    );
+    if (imageId == null) return tile(const Icon(Icons.image_not_supported));
     return switch (ref.watch(receiptThumbProvider(imageId!))) {
       AsyncData(:final value) => box(
         Material(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(PkRadius.sm),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             key: Key('receipt-thumb-$imageId'),
@@ -62,8 +74,8 @@ class ReceiptThumb extends ConsumerWidget {
           ),
         ),
       ),
-      AsyncError() => box(Tooltip(message: t.receiptThumbFailed, child: const Icon(Icons.broken_image))),
-      _ => box(const Center(child: SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2)))),
+      AsyncError() => tile(Tooltip(message: t.receiptThumbFailed, child: const Icon(Icons.broken_image))),
+      _ => tile(const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))),
     };
   }
 }
