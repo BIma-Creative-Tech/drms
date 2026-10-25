@@ -17,6 +17,10 @@ APK 0.12.0 keeps working. Folded into the next web release section.
   ⌘K), "+ Buat", PT switcher, bell and avatar menu; soft grey page under white cards. `/admin` opens the role
   dashboard (first menu item) instead of the module launcher; module landing pages show their menus as cards.
   Breadcrumb home outside a module = "Beranda".
+  - List & form chrome (PR-3): every collection list is one card (module glyph, title, total badge, "Kolom" /
+    "+ Buat baru" in the head, filter bar row, Nexus table with soft status badges and ghost row actions, pager and
+    page size in the foot; long text still wraps); edit / create views show their fields in white cards under a
+    sticky white toolbar, tabs and collapsibles tidied.
 - **APK restyle after the Banani reference "Project Monitoring Hub" (D2510, user 2026-10-25), web palette kept** (ADR
   0015 tokens unchanged; layout and components only). Presentation-only: same providers, routes, keys, texts and popups.
   - Kit `lib/shared/widgets/pk_ui.dart` (hero band, cards, icon chips, soft status pills, KPI tiles, section headers,

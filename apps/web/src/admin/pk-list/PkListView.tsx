@@ -9,12 +9,15 @@ import React from 'react'
 import { ClickableRow } from '@/admin/components/list/ClickableRow'
 import { ListToolbar, Pager, type ToolbarFilter } from '@/admin/components/list/ListToolbar'
 import { TableScroll } from '@/admin/components/TableScroll'
-import { listHref } from '@/admin/list-query'
+import { SoftBadge } from '@/admin/components/ui/nexus'
+import { DEFAULT_PAGE_SIZE, listHref } from '@/admin/list-query'
+import { Icon } from '@/admin/modules/Icon'
 import { ROW_ACTIONS_FIELD } from '@/admin/row-actions'
 import { ROW_STATE_KEY, softDeleteEntry, type RowState } from '@/domain/soft-delete/registry'
 import { rowStates } from '@/domain/soft-delete/service'
 import { withSystemTransaction } from '@/lib/system-tx'
 
+import { listChrome } from './chrome'
 import { ColumnPicker } from './ColumnPicker'
 import { DELETED_PARAM, loadPkList } from './data'
 import { customEditOf } from './edit-view'
@@ -44,6 +47,9 @@ function clientPropsOf(p: ListViewServerProps): ListViewClientProps {
  * - sortable headers, every row opens the record (ClickableRow), the "Aksi" column stays (RowActionsCell:
  *   "Ubah" when the row is editable, else "Buka"/"Lihat") — NO selection checkboxes, NO bulk edit/delete;
  * - shared Pager (20/50/100), horizontal scroll on narrow screens (TableScroll).
+ * D2510 (ADR 0033, Nexus): the whole list is one card — head = module-tinted glyph + title + total (soft badge) +
+ * actions (slot menu, "Kolom", "Buat baru"), the filter bar as its first row, the table edge to edge, pager and page
+ * size in the foot (the page size joins the bar's form by `form=`). Status cells read as soft badges (custom.scss).
  * Rows come from pk-list/data.ts (`overrideAccess: false`, the PT selection applies); cells are rendered by
  * Payload's own cell pipeline (renderTable → custom Cell components, relationship titles, formats).
  * The collection's beforeList / beforeListTable / afterList / afterListTable / Description slots are kept.
@@ -126,112 +132,139 @@ export async function PkListView(props: ListViewServerProps) {
   // params the bar does not own survive a search / filter change: the sort and an old where[…] deep link
   const keep: Record<string, string | undefined> = { [SORT_PARAM]: query.sort }
   for (const [k, v] of Object.entries(searchParams ?? {})) if (k.startsWith('where[') && typeof v === 'string') keep[k] = v
+  // D2510: the page size lives in the card foot (Pager `perPage`); without a foot (no rows) it rides along hidden
+  if (page.total === 0 && query.per !== DEFAULT_PAGE_SIZE) keep.per = String(query.per)
   const filtered = pkFiltered(query) || data.deleted.mode !== ''
   const tbQuery = toolbarQuery(query, cfg)
   if (data.deleted.allowed) tbQuery.filters[DELETED_PARAM] = data.deleted.mode
 
   const pickerColumns = data.available.filter((n) => n !== ROW_ACTIONS_FIELD).map((name) => ({ name, label: colLabel(name, byAccessor.get(name)?.field) }))
 
+  const chrome = listChrome(slug)
+  const titleId = `pk-plist-${slug}-title`
+  const formId = `pk-ltb-list-${slug}`
+
   return (
     <div className={`pk-plist pk-plist--${slug}`} data-pk-list={slug}>
       <SetStepNav nav={[{ label: plural }]} />
       {props.BeforeList}
       <Gutter className="pk-plist__wrap">
-        <header className="pk-plist__head">
-          <h1 className="pk-plist__title">{plural}</h1>
-          {createHref ? (
-            <Link href={createHref} prefetch={false} className="pk-ltb__btn pk-ltb__btn--primary" data-pk-create={slug}>
-              + Buat baru
-            </Link>
-          ) : null}
-          {props.listMenuItems?.length ? <div className="pk-plist__menu">{props.listMenuItems}</div> : null}
-        </header>
-        {props.Description ? <div className="pk-plist__desc">{props.Description}</div> : null}
-        <ListToolbar
-          id={`list-${slug}`}
-          action={base}
-          query={tbQuery}
-          label={`Cari dan saring ${plural.toLocaleLowerCase('id')}`}
-          search={cfg.searchFields.length ? { placeholder: `${cfg.searchFields.map((n) => colLabel(n)).join(', ')}…` } : undefined}
-          filters={filters}
-          dates={dates}
-          keep={keep}
-          resetHref={query.sort ? listHref(base, {}, { [SORT_PARAM]: query.sort }) : base}
-          filteredHint={filtered}
-          extra={<ColumnPicker slug={slug} columns={pickerColumns} visible={data.columns.filter((n) => n !== ROW_ACTIONS_FIELD)} defaults={cfg.defaultColumns.filter((n) => n !== ROW_ACTIONS_FIELD && data.available.includes(n))} all={cfg.columns.map((c) => c.name)} />}
-        />
-        {data.error ? (
-          <p className="pk-plist__error" role="alert">
-            {data.error}
-          </p>
-        ) : query.linkWhere ? (
-          <p className="pk-plist__note" data-pk-link-filter>
-            Daftar disaring dari tautan (mis. kartu dashboard).{' '}
-            <Link href={base} prefetch={false}>
-              Tampilkan semua
-            </Link>
-          </p>
-        ) : null}
-        {props.BeforeListTable}
-        {docs.length === 0 ? (
-          <div className="pk-plist__empty" data-pk-empty={slug}>
-            <p>{filtered ? 'Tidak ada data yang cocok dengan pencarian / filter.' : `Belum ada data ${plural.toLocaleLowerCase('id')}.`}</p>
-            {!filtered && createHref ? (
-              <Link href={createHref} prefetch={false} className="pk-ltb__btn pk-ltb__btn--primary">
-                + Buat baru
-              </Link>
-            ) : null}
-          </div>
-        ) : (
-          <TableScroll label={`Daftar ${plural.toLocaleLowerCase('id')}`}>
-            <div className="table pk-plist__table">
-              <RelationshipProvider>
-                <table>
-                  <thead>
-                    <tr>
-                      {shown.flatMap((c, ci) => {
-                        const name = c.accessor
-                        const text = colLabel(name, c.field)
-                        const dir = query.sort === name ? 'ascending' : query.sort === `-${name}` ? 'descending' : undefined
-                        return [
-                          ...(ci === fillAt ? [fill()] : []),
-                          <th key={name} scope="col" aria-sort={dir} className={`pk-plist__th cell-${name}`}>
-                            {sortable.has(name) ? (
-                              <Link href={listHref(base, searchParams, { [SORT_PARAM]: nextSort(query.sort, name) })} prefetch={false} className="pk-plist__sort" data-pk-sort={name}>
-                                <span>{text}</span>
-                                <span className="pk-plist__sort-ind" aria-hidden="true">
-                                  {dir === 'ascending' ? '▲' : dir === 'descending' ? '▼' : '↕'}
-                                </span>
-                              </Link>
-                            ) : (
-                              text
-                            )}
-                          </th>,
-                        ]
-                      })}
-                      {fillAt === shown.length ? fill() : null}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {docs.map((doc, i) => (
-                      <ClickableRow key={String(doc.id)} href={rowHref(doc.id)} data-id={String(doc.id)} className={`row-${i + 1}${doc.isDeleted === true ? ' pk-plist__row--deleted' : ''}`} data-pk-deleted={doc.isDeleted === true ? 'true' : undefined}>
-                        {shown.flatMap((c, ci) => [
-                          ...(ci === fillAt ? [fill()] : []),
-                          <td key={c.accessor} className={`cell-${c.accessor}`}>
-                            {c.accessor === ROW_ACTIONS_FIELD ? c.renderedCells[i] : <div className="pk-plist__cell">{c.renderedCells[i]}</div>}
-                          </td>,
-                        ])}
-                        {fillAt === shown.length ? fill() : null}
-                      </ClickableRow>
-                    ))}
-                  </tbody>
-                </table>
-              </RelationshipProvider>
+        <section className="pk-nx-card pk-plist__card" aria-labelledby={titleId}>
+          <header className="pk-plist__head" data-mod={chrome.mod ?? undefined}>
+            <span className="pk-plist__chip" aria-hidden="true">
+              <Icon name={chrome.icon} size={20} />
+            </span>
+            <div className="pk-plist__heading">
+              <h1 className="pk-plist__title" id={titleId}>
+                {plural}
+              </h1>
+              <SoftBadge tone="primary" title={`${page.total} data`}>
+                {page.total.toLocaleString('id-ID')}
+              </SoftBadge>
             </div>
-          </TableScroll>
-        )}
-        {props.AfterListTable}
-        {page.total > 0 ? <Pager id={`list-${slug}`} path={base} sp={searchParams} page={page} unit="data" /> : null}
+            <div className="pk-plist__actions">
+              {props.listMenuItems?.length ? <div className="pk-plist__menu">{props.listMenuItems}</div> : null}
+              <ColumnPicker slug={slug} columns={pickerColumns} visible={data.columns.filter((n) => n !== ROW_ACTIONS_FIELD)} defaults={cfg.defaultColumns.filter((n) => n !== ROW_ACTIONS_FIELD && data.available.includes(n))} all={cfg.columns.map((c) => c.name)} />
+              {createHref ? (
+                <Link href={createHref} prefetch={false} className="pk-ltb__btn pk-ltb__btn--primary" data-pk-create={slug}>
+                  + Buat baru
+                </Link>
+              ) : null}
+            </div>
+            {props.Description ? <div className="pk-plist__desc">{props.Description}</div> : null}
+          </header>
+          <ListToolbar
+            id={`list-${slug}`}
+            formId={formId}
+            flush
+            action={base}
+            query={tbQuery}
+            label={`Cari dan saring ${plural.toLocaleLowerCase('id')}`}
+            search={cfg.searchFields.length ? { placeholder: `${cfg.searchFields.map((n) => colLabel(n)).join(', ')}…` } : undefined}
+            filters={filters}
+            dates={dates}
+            keep={keep}
+            pageSize={false}
+            resetHref={query.sort ? listHref(base, {}, { [SORT_PARAM]: query.sort }) : base}
+            filteredHint={filtered}
+          />
+          {data.error ? (
+            <p className="pk-plist__error" role="alert">
+              {data.error}
+            </p>
+          ) : query.linkWhere ? (
+            <p className="pk-plist__note" data-pk-link-filter>
+              Daftar disaring dari tautan (mis. kartu dashboard).{' '}
+              <Link href={base} prefetch={false}>
+                Tampilkan semua
+              </Link>
+            </p>
+          ) : null}
+          {props.BeforeListTable ? <div className="pk-plist__slot">{props.BeforeListTable}</div> : null}
+          {docs.length === 0 ? (
+            <div className="pk-plist__empty" data-pk-empty={slug}>
+              <p>{filtered ? 'Tidak ada data yang cocok dengan pencarian / filter.' : `Belum ada data ${plural.toLocaleLowerCase('id')}.`}</p>
+              {!filtered && createHref ? (
+                <Link href={createHref} prefetch={false} className="pk-ltb__btn pk-ltb__btn--primary">
+                  + Buat baru
+                </Link>
+              ) : null}
+            </div>
+          ) : (
+            <TableScroll label={`Daftar ${plural.toLocaleLowerCase('id')}`}>
+              <div className="table pk-plist__table">
+                <RelationshipProvider>
+                  <table>
+                    <thead>
+                      <tr>
+                        {shown.flatMap((c, ci) => {
+                          const name = c.accessor
+                          const text = colLabel(name, c.field)
+                          const dir = query.sort === name ? 'ascending' : query.sort === `-${name}` ? 'descending' : undefined
+                          return [
+                            ...(ci === fillAt ? [fill()] : []),
+                            <th key={name} scope="col" aria-sort={dir} className={`pk-plist__th cell-${name}`}>
+                              {sortable.has(name) ? (
+                                <Link href={listHref(base, searchParams, { [SORT_PARAM]: nextSort(query.sort, name) })} prefetch={false} className="pk-plist__sort" data-pk-sort={name}>
+                                  <span>{text}</span>
+                                  <span className="pk-plist__sort-ind" aria-hidden="true">
+                                    {dir === 'ascending' ? '▲' : dir === 'descending' ? '▼' : '↕'}
+                                  </span>
+                                </Link>
+                              ) : (
+                                text
+                              )}
+                            </th>,
+                          ]
+                        })}
+                        {fillAt === shown.length ? fill() : null}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {docs.map((doc, i) => (
+                        <ClickableRow key={String(doc.id)} href={rowHref(doc.id)} data-id={String(doc.id)} className={`row-${i + 1}${doc.isDeleted === true ? ' pk-plist__row--deleted' : ''}`} data-pk-deleted={doc.isDeleted === true ? 'true' : undefined}>
+                          {shown.flatMap((c, ci) => [
+                            ...(ci === fillAt ? [fill()] : []),
+                            <td key={c.accessor} className={`cell-${c.accessor}`}>
+                              {c.accessor === ROW_ACTIONS_FIELD ? c.renderedCells[i] : <div className="pk-plist__cell">{c.renderedCells[i]}</div>}
+                            </td>,
+                          ])}
+                          {fillAt === shown.length ? fill() : null}
+                        </ClickableRow>
+                      ))}
+                    </tbody>
+                  </table>
+                </RelationshipProvider>
+              </div>
+            </TableScroll>
+          )}
+          {props.AfterListTable ? <div className="pk-plist__slot">{props.AfterListTable}</div> : null}
+          {page.total > 0 ? (
+            <footer className="pk-nx-card__foot pk-plist__foot">
+              <Pager id={`list-${slug}`} path={base} sp={searchParams} page={page} unit="data" perPage={{ form: formId, value: query.per }} />
+            </footer>
+          ) : null}
+        </section>
       </Gutter>
       {props.AfterList}
     </div>
