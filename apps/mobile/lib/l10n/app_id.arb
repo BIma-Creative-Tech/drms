@@ -1126,10 +1126,10 @@
   "attendanceDetectNoPoint": "Belum ada lokasi absen dengan titik koordinat. Hubungi Admin.",
   "attendanceAreaChoice": "Area absen di posisi Anda",
   "attendanceTypeOnsite": "Karyawan OnSite: absen di dalam radius lokasi yang dipilih (project / pusat biaya terdaftar PT).",
-  "attendanceTypeNonOnsite": "Karyawan Non-OnSite: absen masuk / pulang di dalam radius lokasi terdaftar PT mana pun; lokasi dipilih otomatis.",
+  "attendanceTypeNonOnsite": "Karyawan Non-OnSite: absen masuk / pulang di mana saja — di dalam radius lokasi terdaftar PT tercatat di lokasi itu (dipilih otomatis), di luar semua lokasi dicatat \"Di luar area\".",
   "attendanceOutsideArea": "Di luar area",
   "attendanceOutsideAreaHint": "Karyawan Non-OnSite: di luar lokasi terdaftar, absen tetap bisa dan dicatat \"Di luar area\".",
-  "attendanceDetectOutsideArea": "Posisi Anda di luar semua lokasi terdaftar: absen dicatat \"Di luar area\" (ref. {name}).",
+  "attendanceDetectOutsideArea": "Di luar lokasi terdaftar — absen dicatat \"Di luar area\" (ref. {name}).",
   "@attendanceDetectOutsideArea": {
     "placeholders": {
       "name": {
@@ -1138,7 +1138,7 @@
     }
   },
   "attendanceNoReference": "Absen \"Di luar area\" belum bisa: site penempatan / kantor pusat PT belum ditetapkan Admin.",
-  "attendanceNonOnsiteOutside": "Anda di luar semua lokasi terdaftar PT. Karyawan Non-OnSite hanya bisa absen di dalam area lokasi project / pusat biaya PT. Mendekatlah ke lokasi terdaftar.",
+  "attendanceNonOnsiteOutside": "Di luar lokasi terdaftar — absen dicatat \"Di luar area\"",
   "distanceInside": "Di dalam area absen",
   "distanceOutside": "Di luar area absen",
   "distanceDetail": "Radius {radius} m + toleransi GPS {allowance} m (akurasi GPS ±{accuracy} m, maks. 50 m dihitung).",
@@ -1264,6 +1264,18 @@
     }
   },
   "recapMemberTitle": "Rekap absensi karyawan",
+  "recapViewOwn": "Saya",
+  "recapViewTeam": "Tim",
+  "recapNoEmployee": "Akun Anda belum terhubung ke data karyawan. Hubungi Admin.",
+  "teamRecapEmpty": "Belum ada karyawan dalam rekap bulan ini.",
+  "teamRecapCount": "{count} karyawan",
+  "@teamRecapCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "teamStatusNotYet": "Belum absen",
   "teamStatusPresent": "Hadir",
   "teamStatusDone": "Selesai",
@@ -4760,5 +4772,133 @@
   "flagReviewedLabel": "Sudah diperiksa",
   "mediaOpenPhoto": "Buka foto",
   "mediaOpenFile": "Buka file",
-  "mediaNotImage": "File ini bukan gambar (mis. PDF). Ketuk thumbnail-nya untuk membuka sebagai file."
+  "mediaNotImage": "File ini bukan gambar (mis. PDF). Ketuk thumbnail-nya untuk membuka sebagai file.",
+  "pliAction": "Instruksi pinjam antar proyek",
+  "@pliAction": {
+    "description": "DRMS 26/10 #1: button of the final decider while the project cash account is short."
+  },
+  "pliTitle": "Instruksi pinjam antar proyek — {doc}",
+  "@pliTitle": {
+    "placeholders": {
+      "doc": {
+        "type": "String"
+      }
+    }
+  },
+  "pliBorrowerAccount": "Akun kas pengajuan",
+  "pliLenders": "Project pemberi (PT yang sama)",
+  "pliNoLenders": "Tidak ada project lain yang aktif di PT ini.",
+  "pliAccount": "Akun kas: {name}",
+  "@pliAccount": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "pliAmount": "Nilai pinjaman",
+  "pliAmountHelp": "Minimal {min} (kekurangan), maksimal {max} (dana bebas pemberi).",
+  "@pliAmountHelp": {
+    "placeholders": {
+      "min": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "pliDueDate": "Jatuh tempo",
+  "pliReason": "Alasan / catatan",
+  "pliReasonHint": "Wajib, minimal 3 karakter. Tercatat di pinjaman dan audit log.",
+  "pliReasonDefault": "Menutup kekurangan dana akun kas {account} untuk pengajuan {doc}",
+  "@pliReasonDefault": {
+    "placeholders": {
+      "account": {
+        "type": "String"
+      },
+      "doc": {
+        "type": "String"
+      }
+    }
+  },
+  "pliChooseLender": "Pilih project pemberi pinjaman.",
+  "pliContinue": "Lanjut",
+  "pliConfirmNote": "Pinjaman langsung disetujui dan masuk Antrian Transfer Finance. Pengajuan tetap menunggu keputusan Anda; setujui setelah Finance mentransfer pinjaman.",
+  "pliConfirmFrom": "Pemberi: {project} — akun kas {account}",
+  "@pliConfirmFrom": {
+    "placeholders": {
+      "project": {
+        "type": "String"
+      },
+      "account": {
+        "type": "String"
+      }
+    }
+  },
+  "pliConfirmTo": "Penerima: {project} — akun kas {account}",
+  "@pliConfirmTo": {
+    "placeholders": {
+      "project": {
+        "type": "String"
+      },
+      "account": {
+        "type": "String"
+      }
+    }
+  },
+  "pliConfirmAmount": "Nilai pinjaman: {amount}",
+  "@pliConfirmAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "pliConfirmDue": "Jatuh tempo: {date}",
+  "@pliConfirmDue": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "pliDone": "Pinjaman {amount} dari {project} masuk Antrian Transfer Finance. Setujui pengajuan setelah transfer dieksekusi.",
+  "@pliDone": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "project": {
+        "type": "String"
+      }
+    }
+  },
+  "pliPending": "Pinjaman {doc} ({amount}): {status}.",
+  "@pliPending": {
+    "placeholders": {
+      "doc": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      },
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "pliInboxBlocked": "Dana bebas akun kas project kurang — instruksikan pinjaman antar proyek atau tolak.",
+  "pliInboxPending": "Pinjaman {doc} menunggu transfer Finance — setujui setelah transfer dieksekusi.",
+  "@pliInboxPending": {
+    "placeholders": {
+      "doc": {
+        "type": "String"
+      }
+    }
+  },
+  "loanStepInstructedOwner": "Instruksi Owner",
+  "@loanStepInstructedOwner": {
+    "description": "DRMS 26/10 #1: first step of an Owner-instructed inter-project loan."
+  }
 }

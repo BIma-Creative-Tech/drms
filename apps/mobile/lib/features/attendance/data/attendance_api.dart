@@ -48,6 +48,13 @@ class AttendanceApi {
     (data) => TeamToday.fromJson(data as Map<String, dynamic>),
   );
 
+  /// DRMS 26/10 #3: monthly summary per employee of the scope (PM team, office roles all of the PT). [company] narrows
+  /// to one PT of the switcher selection (null = the whole selection).
+  Future<TeamMonth> teamMonth({String? month, int? company}) => client.run(
+    (d) => d.get<dynamic>('/attendance/team-month', queryParameters: {'month': ?month, 'company': ?company}),
+    (data) => TeamMonth.fromJson(data as Map<String, dynamic>),
+  );
+
   /// US-15 (T10) correction: same local date, reason 3–500 characters. Online only.
   Future<void> correct(
     int attendanceId, {

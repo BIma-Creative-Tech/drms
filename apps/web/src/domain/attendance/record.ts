@@ -12,7 +12,7 @@ import { getRequestTx } from '@/lib/tx'
 
 import { snapshotOf, type ScheduleSnapshot } from './schedule'
 import { effectiveRadiusM } from './calendar'
-import { CHECK_OUT_ELSEWHERE_FLAG, geofenceRequired, NON_ONSITE_OUTSIDE, NOT_ELIGIBLE_OTHER_PT, pickContaining } from './area'
+import { CHECK_OUT_ELSEWHERE_FLAG, detectArea, geofenceRequired, NON_ONSITE_NO_LOCATION, NOT_ELIGIBLE_OTHER_PT, pickContaining } from './area'
 import { eligibleLocations, employeeAttendance, type EmployeeAttendance } from './eligibility'
 import { pmTeam } from './on-behalf'
 import { companyOf, settings, userOfEmployee as userOfEmployeeLink } from '@/domain/companies'
@@ -23,10 +23,12 @@ import { closedProjectMessage, isClosedProjectStatus } from '@/domain/projects/s
  * US-01/02/14, Q-40). A location is a project or a cost center (ADR 0032: no site any more — a `site` stays only in
  * the history rows of ADR 0023). WHERE an employee may check in follows the employee's attendance type, no team
  * assignment needed (DRMS 13/10 A2) — OnSite: inside the CHOSEN registered location of the own PT; Non-OnSite
- * (ADR 0032): inside ANY registered location of the own PT, picked by the server (`resolveNonOnsite`), outside every
- * one → refused OUTSIDE_GEOFENCE. A PM on-behalf still needs the requested location in the PM's team. Server-side
- * checks, in this order (error codes are part of the APK contract; `NOT_ASSIGNED` = a location outside the employee's PT):
- * MOCK_LOCATION → NOT_FOUND/VALIDATION (location) → NO_GEOFENCE (OnSite) → NOT_ASSIGNED → OUTSIDE_GEOFENCE →
+ * (ADR 0032 amendment 2026-10-26): anywhere — the registered location of the own PT containing the fix, picked by the
+ * server (`resolveNonOnsite`), else "Di luar area" at the nearest one. A PM on-behalf still needs the requested
+ * location in the PM's team. Server-side checks, in this order (error codes are part of the APK contract;
+ * `NOT_ASSIGNED` = a location outside the employee's PT):
+ * MOCK_LOCATION → NOT_FOUND/VALIDATION (location) → NO_GEOFENCE (OnSite; Non-OnSite: the PT has no located location)
+ * → NOT_ASSIGNED → OUTSIDE_GEOFENCE (OnSite) →
  * MEDIA_MISSING / FORBIDDEN (selfie) → ALREADY_CHECKED_IN / NO_CHECK_IN / ALREADY_CHECKED_OUT.
  * On-behalf (source `pm`) additionally: caller holds pk-pm, the location is in the caller's TEAM
  * scope, the employee is not the caller, reason mandatory (schema) — the selfie and GPS come from
@@ -209,31 +211,36 @@ async function pointOf(req: PayloadRequest, loc: Location): Promise<{ lat?: numb
 }
 
 /**
- * Non-OnSite (ADR 0032, user decision 2026-10-24): check-in AND check-out only inside the geofence of ANY registered
- * location of the own PT (no assignment). WHERE the record belongs:
- * - the requested location when the fix lies inside it, else the nearest registered location containing the fix;
- *   none → OUTSIDE_GEOFENCE (no "Di luar area" record any more);
+ * Non-OnSite (ADR 0032 amendment 2026-10-26, DRMS 26/10 user decision — the rule of 14/10 again): check-in AND
+ * check-out ANYWHERE, no assignment. WHERE the record belongs:
+ * - the requested location when the fix lies inside it, else the nearest registered location of the own PT containing
+ *   the fix;
+ * - none contains it → "Di luar area": the NEAREST registered location of the PT, `outsideArea`, `distance_m` = the
+ *   distance to its point. The PT has no registered location with a point at all → NO_GEOFENCE (nothing to reference);
  * - a check-out with an open check-in today closes that pair: recorded at the open check-in's location; when the fix
- *   lies inside ANOTHER registered location the row carries the flag CHECK_OUT_ELSEWHERE and `distance_m` = the
- *   distance to the open location.
+ *   lies inside ANOTHER registered location the row carries the flag CHECK_OUT_ELSEWHERE, outside every location it is
+ *   "Di luar area"; `distance_m` = the distance to the open location.
  */
-async function resolveNonOnsite(req: PayloadRequest, emp: EmployeeAttendance, input: RecordInput, localDate: string, pre: string): Promise<Resolved> {
+async function resolveNonOnsite(req: PayloadRequest, emp: EmployeeAttendance, input: RecordInput, localDate: string, field: string): Promise<Resolved> {
   const fix = { lat: input.lat, lng: input.lng, accuracyM: input.accuracyM }
   const candidates = (await eligibleLocations(req, [emp])).map((l) => ({ ...l, key: `${l.kind}:${l.id}` }))
   const hit = pickContaining(`${input.location.type}:${input.location.id}`, candidates, fix)
-  if (!hit) return reject('OUTSIDE_GEOFENCE', NON_ONSITE_OUTSIDE, `${pre}lat`)
   if (input.kind === 'check_out') {
     const open = await openCheckIn(req, emp.company, emp.id, localDate)
-    if (open && `${open.type}:${open.id}` !== hit.key) {
+    if (open && `${open.type}:${open.id}` !== hit?.key) {
       // the open check-in itself contains the fix too (overlapping geofences) → no flag
       const own = candidates.find((x) => x.key === `${open.type}:${open.id}`)
       const inOwn = own ? pickContaining(own.key, [own], fix) : null
       if (inOwn) return { location: open, distance: inOwn.distanceM, outsideArea: false, flags: [] }
       const d = measure(input, await pointOf(req, open))
-      return { location: open, distance: d ?? 0, outsideArea: false, flags: [CHECK_OUT_ELSEWHERE_FLAG] }
+      if (hit) return { location: open, distance: d ?? 0, outsideArea: false, flags: [CHECK_OUT_ELSEWHERE_FLAG] }
+      return { location: open, distance: d ?? 0, outsideArea: true, flags: d === null ? ['NO_REFERENCE_POINT'] : [] }
     }
   }
-  return { location: { type: hit.kind, id: hit.id }, distance: hit.distanceM, outsideArea: false, flags: [] }
+  if (hit) return { location: { type: hit.kind, id: hit.id }, distance: hit.distanceM, outsideArea: false, flags: [] }
+  const nearest = detectArea(candidates, fix).nearest
+  if (!nearest) return reject('NO_GEOFENCE', NON_ONSITE_NO_LOCATION, field)
+  return { location: { type: nearest.kind, id: nearest.id }, distance: nearest.distanceM, outsideArea: true, flags: [] }
 }
 
 export type RecordResult = { id: number; localDate: string; location: Location; outsideArea: boolean; distanceM: number }
@@ -274,7 +281,7 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
     }
     resolved = { location: input.location, distance: d, outsideArea: false, flags: [] }
   } else {
-    resolved = await resolveNonOnsite(req, emp!, input, localDate, pre)
+    resolved = await resolveNonOnsite(req, emp!, input, localDate, locField)
   }
   const location = resolved.location
   const distance = resolved.distance
@@ -307,7 +314,7 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
       costCenter: location.type === 'cost_center' ? location.id : null,
       // ADR 0023: the DB (pk_attendance_site) fills the project's site for a project check-in; NULL for a cost center
       site: location.type === 'site' ? location.id : null,
-      // DRMS 13/10 A2 "Di luar area" — ADR 0032: never set for a new row (Non-OnSite outside every location is refused)
+      // DRMS 13/10 A2 / 26/10: Non-OnSite outside every registered location ("Di luar area", reference = `location`)
       outsideArea: resolved.outsideArea,
       source: input.source,
       recordedBy: input.recordedBy,

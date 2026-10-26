@@ -35,6 +35,12 @@ final teamTodayProvider = FutureProvider.autoDispose.family<TeamToday, String?>(
   (ref, date) => ref.watch(attendanceApiProvider).teamToday(date: date),
 );
 
+/// DRMS 26/10 #3: team month (`month`, PT filter; null = the switcher selection) — the "Tim" part of "Rekap bulanan".
+final teamMonthProvider = FutureProvider.autoDispose.family<TeamMonth, (String, int?)>((ref, key) {
+  final (month, company) = key;
+  return ref.watch(attendanceApiProvider).teamMonth(month: month, company: company);
+});
+
 /// d1010 (12c): selfie of one attendance (authorized endpoint; own, or PM tim / Finance / Direktur / Admin —
 /// the server decides and audits; never cached on disk).
 final attendanceSelfieProvider = FutureProvider.autoDispose.family<Uint8List, int>(

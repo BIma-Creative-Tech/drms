@@ -527,6 +527,12 @@ InboxItem inboxItemFromJson(Json j) {
       final g? when g > 0 => g,
       _ => null,
     },
+    // DRMS 26/10 #1
+    instructProjectLoan: j['instructProjectLoan'] == true,
+    projectLoanPendingDocNo: switch (_map(j['projectLoanPending'])) {
+      final p? when _intN(p['id']) != null => _strN(p['docNo']) ?? '#${p['id']}',
+      _ => null,
+    },
   );
 }
 

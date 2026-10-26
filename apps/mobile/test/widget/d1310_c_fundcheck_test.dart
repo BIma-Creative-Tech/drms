@@ -261,8 +261,8 @@ void main() {
       expect(find.byKey(const Key('fund-route')), findsNothing);
       expect(
         _text(tester, 'fund-blocked-text'),
-        'Dana pusat biaya CSR SEPASO/KUTIM maupun dana PT tidak cukup — kurang Rp 447.500. Tolak, atau perintahkan '
-        'pinjaman antar-PT.',
+        'Dana bebas akun kas CSR SEPASO/KUTIM tidak cukup — kurang Rp 447.500. Tolak, atau Owner menginstruksikan '
+        'pinjaman antar proyek ke akun ini lalu menyetujui setelah Finance mentransfernya.',
       );
       expect(_onPressed(tester, find.byKey(const Key('action-approve'))), isNull);
     });
@@ -301,8 +301,8 @@ void main() {
       await tester.ensureVisible(find.byKey(const Key('draft')));
       expect(
         inPanel('draft', 'fund-blocked-text'),
-        'Dana pusat biaya CSR SEPASO/KUTIM maupun dana PT tidak cukup — kurang Rp 447.500. Pengajuan Anda tidak dapat '
-        'dikirim sampai dana tersedia; perintahkan pinjaman antar-PT.',
+        'Dana bebas akun kas CSR SEPASO/KUTIM tidak cukup — kurang Rp 447.500. Pengajuan Anda tidak dapat dikirim '
+        'sampai dana akun kas ini mencukupi.',
       );
     });
 

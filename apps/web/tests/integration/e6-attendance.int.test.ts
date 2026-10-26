@@ -415,6 +415,41 @@ describe('tim hari ini (US-13)', () => {
   })
 })
 
+describe('rekap bulanan tim (DRMS 26/10 #3, APK office roles / PM)', () => {
+  type Row = { employee: { id: number; name: string }; companyId: number | null; summary: Record<string, number> }
+  const of = (body: { employees: Row[] }, id: number) => body.employees.find((e) => e.employee.id === id)
+
+  it('PM: team members with the same summary as /attendance/recap; Finance / Direktur (no employee) all of the PT', async () => {
+    const r = await api('GET', `/api/v1/attendance/team-month?month=${MONTH}`, w.users.pm)
+    expect(r.status, JSON.stringify(r.body)).toBe(200)
+    expect(r.body).toMatchObject({ month: MONTH, from: `${MONTH}-01`, to: `${MONTH}-31`, scope: 'team' })
+    const recap = (await api('GET', `/api/v1/attendance/recap?employee_id=${w.emp.b}&month=${MONTH}`, w.users.pm)).body
+    expect(of(r.body, w.emp.b)?.summary).toEqual(recap.summary)
+    expect(of(r.body, w.emp.b)?.companyId).toEqual(expect.any(Number))
+    // the office roles have no own employee (GET /attendance/me → 409) but get the team month of the PT
+    expect((await api('GET', '/api/v1/attendance/me', w.users.finance)).status).toBe(409)
+    for (const u of [w.users.finance, w.users.owner]) {
+      const o = await api('GET', `/api/v1/attendance/team-month?month=${MONTH}`, u)
+      expect(o.status, JSON.stringify(o.body)).toBe(200)
+      expect(o.body.scope).toBe('all')
+      expect(o.body.employees.map((e: Row) => e.employee.id)).toEqual(expect.arrayContaining([w.emp.a, w.emp.b, w.emp.noAccount]))
+      expect(of(o.body, w.emp.b)?.summary).toEqual(recap.summary)
+    }
+  })
+
+  it('scope: other PM none of this team; filter outside the team → empty; staff 403; future / bad month 400', async () => {
+    const o = await api('GET', `/api/v1/attendance/team-month?month=${MONTH}`, w.users.otherPm)
+    expect(o.status).toBe(200)
+    expect(o.body.employees.some((e: Row) => [w.emp.a, w.emp.b, w.emp.noAccount].includes(e.employee.id))).toBe(false)
+    const f = await api('GET', `/api/v1/attendance/team-month?month=${MONTH}&project_id=${w.otherProject}`, w.users.pm)
+    expect(f.status).toBe(200)
+    expect(f.body.employees).toHaveLength(0)
+    expect((await api('GET', `/api/v1/attendance/team-month?month=${MONTH}`, w.users.staffA)).status).toBe(403)
+    expect((await api('GET', '/api/v1/attendance/team-month?month=2099-01', w.users.pm)).status).toBe(400)
+    expect((await api('GET', '/api/v1/attendance/team-month?month=2026-13', w.users.pm)).status).toBe(400)
+  })
+})
+
 describe('selfie viewer (Q-33) and retention (dry run)', () => {
   it('own 200; other staff 404; PM team / Finance 200 with view_sensitive audit', async () => {
     const id = fixture.in03!

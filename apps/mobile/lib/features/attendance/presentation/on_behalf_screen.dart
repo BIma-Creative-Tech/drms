@@ -24,7 +24,8 @@ import 'attendance_widgets.dart';
 /// again on the server) and a photo of the employee with the front or back camera. Queued like an own
 /// check-in (works offline); the server records source = PM with the PM's name. ADR 0032: an Admin Staff picks ANY
 /// employee of its PT (also without an account) and any registered location of it; a Non-OnSite employee is recorded at
-/// the location containing the fix; the server records source = Admin Staff with the user's name.
+/// the location containing the fix (DRMS 26/10: outside all "Di luar area" at the nearest one); the server records
+/// source = Admin Staff with the user's name.
 class OnBehalfScreen extends ConsumerStatefulWidget {
   const OnBehalfScreen({super.key, this.employeeId, this.kind});
   final int? employeeId;
@@ -77,19 +78,27 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
     });
     try {
       final fix = await ref.read(locationServiceProvider).current();
+      var outside = false;
       if (site.unrestricted && !fix.isMocked) {
-        // ADR 0032 (Non-OnSite employee): the registered location of the PT containing the fix, nearest first
+        // ADR 0032 (Non-OnSite employee): the registered location of the PT containing the fix, nearest first;
+        // DRMS 26/10: outside every one → the nearest one, recorded "Di luar area" (no refusal)
         final d = detectArea(who.sites, fix);
         final hit = d.inside.where((m) => m.site.key == site.key).firstOrNull ?? d.inside.firstOrNull;
-        if (hit == null) {
+        final at = hit ?? d.nearest;
+        if (at == null) {
           setState(() {
-            _notice = t.attendanceNonOnsiteOutside;
+            _notice = t.attendanceDetectNoPoint;
             _noticeError = true;
           });
           return;
         }
-        site = hit.site;
-        setState(() => _notice = t.attendanceInside(hit.distanceM, hit.site.radiusM?.round() ?? 0));
+        site = at.site;
+        outside = hit == null;
+        setState(
+          () => _notice = hit != null
+              ? t.attendanceInside(hit.distanceM, hit.site.radiusM?.round() ?? 0)
+              : t.attendanceDetectOutsideArea(at.site.label),
+        );
       } else {
         final res = checkSite(site, fix);
         final problem = siteProblem(t, site, res);
@@ -104,7 +113,8 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
       }
       if (!mounted) return;
       final summary = [who.name, site.label, reason];
-      if (!await confirmAction(context, action: _label(t), summary: summary) || !mounted) return;
+      final note = outside ? t.attendanceNonOnsiteOutside : null;
+      if (!await confirmAction(context, action: _label(t), summary: summary, note: note) || !mounted) return;
       final raw = await ref.read(onBehalfCaptureProvider)(context, t.onBehalfPhotoTitle(who.name), _lens);
       if (raw == null || !mounted) return;
       final online = ref.read(connectivityProvider);

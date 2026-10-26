@@ -126,8 +126,8 @@ export const LoanSummary = z
     kind: z.enum(LOAN_KINDS),
     kindLabel: z.string(),
     origin: z.enum(LOAN_ORIGINS).meta({ description: 'ADR 0031: manual = PM / Finance → Direktur → Owner; transfer = automatic (Finance paid a project request from another account).' }),
-    originLabel: z.string().meta({ description: '"Diajukan PM" / "Diajukan Finance" / "Otomatis dari transfer".' }),
-    submitterRole: z.enum(LOAN_SUBMITTER_ROLES).nullable().meta({ description: '2026-10-24 (#10): the creator filed as borrower PM or as Finance (null for an automatic loan; legacy loans = pm).' }),
+    originLabel: z.string().meta({ description: '"Diajukan PM" / "Diajukan Finance" / "Otomatis dari transfer" / "Instruksi Owner".' }),
+    submitterRole: z.enum(LOAN_SUBMITTER_ROLES).nullable().meta({ description: '2026-10-24 (#10): the creator filed as borrower PM or as Finance (null for an automatic loan; legacy loans = pm). 2026-10-26: owner = instructed by the final decider of `expenseRequest` (born approved, no Direktur / Owner level).' }),
     lenderProject: projectRef.nullable().meta({ description: 'Null for an automatic loan — its lender is `lenderCashAccount`.' }),
     borrowerProject: projectRef,
     lenderCashAccount: accountRef.nullable().meta({ description: 'ADR 0031: Pusat Biaya of the lender (frozen at the approval / the transfer).' }),
@@ -138,6 +138,7 @@ export const LoanSummary = z
     awaitingDisbursement: z.boolean().meta({ description: 'Approved, cash-backed, transfer order not executed yet ("Disetujui – menunggu transfer Finance").' }),
     transferQueueHref: z.string().nullable().meta({ description: '2026-10-24 (#11): web "Antrian Transfer" anchor of the loan\'s transfer order while it waits.' }),
     transfer: z.object({ id, docNo: z.string().nullable() }).nullable().meta({ description: 'ADR 0031: the transfer of an automatic loan.' }),
+    expenseRequest: z.object({ id, docNo: z.string().nullable() }).nullable().meta({ description: '2026-10-26: the expense request an Owner-instructed loan covers (it is approved after this loan\'s transfer).' }),
     amount: rupiah,
     repaidTotal: rupiah,
     outstanding: rupiah.meta({ description: 'amount − posted repayments (Draft / Menunggu: the requested amount; Ditolak / Dibatalkan: 0).' }),
@@ -285,3 +286,57 @@ export const LoanOptions = z
     lenders: z.array(option).meta({ description: 'Open projects of the same PT(s).' }),
   })
   .meta({ id: 'ProjectLoanOptions' })
+
+// ---------------------------------------------------------------- 2026-10-26 (DRMS 26/10 #1): "Instruksi pinjam antar proyek"
+
+const accountFigures = z.object({
+  id,
+  name: z.string(),
+  balance: z.number().int().meta({ description: 'Saldo akun (opening + KM − KK).' }),
+  commitments: rupiah.meta({ description: 'Komitmen (pk_pb_commitments).' }),
+  available: z.number().int().meta({ description: 'Dana bebas = balance − commitments (may be negative).' }),
+})
+
+export const ProjectLoanInstructionInfo = z
+  .object({
+    requestId: id,
+    docNo: z.string().nullable(),
+    title: z.string(),
+    companyId: id,
+    borrowerProject: smallProject,
+    borrowerAccount: accountFigures.meta({ description: 'The project\'s cash account (Pusat Biaya) — the request is checked against its dana bebas only.' }),
+    needed: rupiah.meta({ description: 'The request\'s grand total.' }),
+    shortfall: rupiah.meta({ description: 'needed − borrower dana bebas (0 = enough: approve).' }),
+    minAmount: rupiah.meta({ description: '= shortfall: the smallest loan that lets the request pass.' }),
+    loanDate: date.meta({ description: 'Business date of the PT (the loan date).' }),
+    defaultDueDate: date.meta({ description: 'loanDate + 30 days (editable).' }),
+    canInstruct: z.boolean().meta({ description: 'The caller takes the final decision now, the account is short (fund check on) and no instructed loan waits.' }),
+    cannotReason: z.string().nullable().meta({ description: 'Why canInstruct is false (Indonesian), else null.' }),
+    pendingLoan: z
+      .object({ id, docNo: z.string().nullable(), amount: rupiah, statusLabel: z.string(), lenderProject: z.object({ id, code: z.string().nullable(), name: z.string().nullable() }).nullable(), lenderAccount: accountRef.nullable() })
+      .nullable()
+      .meta({ description: 'The instructed loan waiting for Finance\'s transfer ("Pinjaman PJ/… menunggu transfer Finance").' }),
+    candidates: z
+      .array(
+        z.object({
+          project: smallProject,
+          account: z.object({ id, name: z.string() }).nullable().meta({ description: 'The lender project\'s cash account (null = not mapped).' }),
+          available: z.number().int().nullable().meta({ description: 'Dana bebas of that account (null without account).' }),
+          eligible: z.boolean().meta({ description: 'May be chosen: own active account ≠ the borrower\'s, dana bebas ≥ minAmount.' }),
+          reason: z.enum(['no_account', 'inactive_account', 'same_account', 'insufficient']).nullable(),
+          reasonText: z.string().nullable(),
+        }),
+      )
+      .meta({ description: 'Open projects of the same PT (not the borrower), eligible first by dana bebas descending, then the others.' }),
+  })
+  .meta({ id: 'ProjectLoanInstructionInfo' })
+
+export const ProjectLoanInstruct = z
+  .object({
+    lenderProjectId: id.meta({ description: 'An eligible candidate of GET /expense-requests/{id}/project-loan-lenders.' }),
+    amount: amount.meta({ description: 'Rp: ≥ the shortfall, ≤ the lender account\'s dana bebas (both re-checked under the PT fund lock).' }),
+    reason: reason.meta({ description: 'Alasan / catatan (wajib, min. 3 karakter) — stored on the loan with the request number.' }),
+    dueDate: date.optional().meta({ description: 'Jatuh tempo (default loan date + 30 days; ≥ the loan date).' }),
+  })
+  .strict()
+  .meta({ id: 'ProjectLoanInstruct' })

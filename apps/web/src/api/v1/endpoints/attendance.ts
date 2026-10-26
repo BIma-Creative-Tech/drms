@@ -10,7 +10,7 @@ import { correctAttendance } from '@/domain/attendance/corrections'
 import { eligibleLocations, employeeAttendance, type EmployeeAttendance } from '@/domain/attendance/eligibility'
 import { onBehalfOptions } from '@/domain/attendance/on-behalf'
 import { AttendanceReject, locationOf, recordWebAttendance, recordWebOnBehalf, type Location } from '@/domain/attendance/record'
-import { employeeRecap, myRecap, teamTodayFor } from '@/domain/attendance/service'
+import { employeeRecap, myRecap, teamMonthFor, teamTodayFor } from '@/domain/attendance/service'
 import { fileSize, mediaPath } from '@/lib/media-files'
 import { withReqTransaction } from '@/lib/system-tx'
 
@@ -24,6 +24,7 @@ import {
   AttendanceOnBehalfBody,
   AttendanceOnBehalfOptionsQuery,
   AttendanceRecapQuery,
+  TeamMonthQuery,
   TeamTodayQuery,
 } from '../schemas-attendance'
 
@@ -34,6 +35,7 @@ import {
  * - GET  /attendance/me?month=YYYY-MM                 US-09 own monthly recap (any role with an employee)
  * - GET  /attendance/recap?employee_id=&month=        recap of an employee: PM team / Admin, Owner, Finance
  * - GET  /attendance/team-today?date=&project_id=&cost_center_id=   US-13 (PM team; office roles all)
+ * - GET  /attendance/team-month?month=&project_id=&cost_center_id=  DRMS 26/10 #3: monthly summary per employee (same scope)
  * - GET  /attendance/locations?company=              DRMS 13/10 A2: own eligible check-in locations (APK auto-detect)
  * - POST /attendance/check-in, /attendance/check-out  self-service web absen (every role)
  * - GET  /attendance/on-behalf/options?company=       ADR 0032: employees + locations an Admin Staff may record for
@@ -93,14 +95,36 @@ export const teamTodayEndpoint = v1({
   },
 })
 
+/** DRMS 26/10 #3: APK "Rekap bulanan" of the office roles / PM — the web team grid as JSON (same scope as team-today). */
+export const teamMonthEndpoint = v1({
+  path: '/attendance/team-month',
+  method: 'get',
+  roles: ['pk-pm', 'pk-finance', 'pk-owner', 'pk-admin', 'pk-admin-staff'],
+  rateLimit: READ_LIMIT,
+  handler: async ({ req }) => {
+    const q = TeamMonthQuery.safeParse(params(req))
+    if (!q.success) throw badQuery(q.error.issues)
+    const companyIds = await companyQuery(req)
+    const r = await withReqTransaction(req, () =>
+      teamMonthFor(req, {
+        month: q.data.month,
+        projectId: q.data.project_id ? Number(q.data.project_id) : undefined,
+        costCenterId: q.data.cost_center_id ? Number(q.data.cost_center_id) : undefined,
+        companyIds,
+      }),
+    )
+    return json(r)
+  },
+})
+
 /**
  * DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13): the caller's eligible check-in locations, per own employee in the
  * selected PTs (`?company=` narrows; the APK asks with every membership PT and caches the list for offline use).
  * Both types get every registered location of the PT with a point (projects, cost centers — ADR 0032: no site): OnSite
- * must be inside the chosen one, Non-OnSite inside any of them (picked automatically; outside all → refused). Only id,
- * kind, code, name, point and radius — no money, no budgets. `homeSiteId` / `referenceSite` / `isHeadOffice` / `home`
- * stay in the answer for APK ≤ 0.11.1 and are always null / false. Read-only; the check-in re-validates everything
- * (domain/attendance/record.ts).
+ * must be inside the chosen one, Non-OnSite anywhere (the containing one, picked automatically; outside all → "Di luar
+ * area" at the nearest one, DRMS 26/10). Only id, kind, code, name, point and radius — no money, no budgets.
+ * `homeSiteId` / `referenceSite` / `isHeadOffice` / `home` stay in the answer for APK ≤ 0.11.1 and are always null /
+ * false. Read-only; the check-in re-validates everything (domain/attendance/record.ts).
  */
 export const attendanceLocationsEndpoint = v1({
   path: '/attendance/locations',
@@ -310,6 +334,7 @@ export const ATTENDANCE_ENDPOINTS = [
   attendanceMeEndpoint,
   attendanceRecapEndpoint,
   teamTodayEndpoint,
+  teamMonthEndpoint,
   attendanceLocationsEndpoint,
   attendanceCheckInEndpoint,
   attendanceCheckOutEndpoint,

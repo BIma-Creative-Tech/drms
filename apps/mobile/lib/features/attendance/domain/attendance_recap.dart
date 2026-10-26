@@ -1,7 +1,7 @@
 import '../../../core/format/dates.dart';
 import 'attendance.dart';
 
-/// E6 read models (openapi `AttendanceRecap`, `AttendanceDay`, `AttendanceSummary`, `TeamToday`).
+/// E6 read models (openapi `AttendanceRecap`, `AttendanceDay`, `AttendanceSummary`, `TeamToday`, `TeamMonth`).
 
 int _int(Object? v, [int fallback = 0]) =>
     v is num ? v.toInt() : (v is String ? int.tryParse(v) ?? fallback : fallback);
@@ -326,6 +326,37 @@ class TeamToday {
       members: [for (final m in _list(j['members'])) TeamMember.fromJson(_map(m))],
     );
   }
+}
+
+/// DRMS 26/10 #3: one row of `GET /attendance/team-month` (openapi `TeamMonth`).
+class TeamMonthEntry {
+  const TeamMonthEntry({required this.employee, this.companyId, required this.summary});
+  final PersonRef employee;
+  final int? companyId;
+  final AttendanceSummary summary;
+
+  factory TeamMonthEntry.fromJson(Map<String, dynamic> j) => TeamMonthEntry(
+    employee: PersonRef.fromJson(_map(j['employee'])),
+    companyId: _intN(j['companyId']),
+    summary: AttendanceSummary.fromJson(_map(j['summary'])),
+  );
+}
+
+/// DRMS 26/10 #3: monthly summary per employee of the caller's attendance scope (PM team; office roles the PT) — the
+/// web team grid `/admin/absensi/rekap` as JSON.
+class TeamMonth {
+  const TeamMonth({required this.month, required this.timezone, required this.scope, required this.employees});
+  final String month;
+  final String timezone;
+  final String scope; // all | team
+  final List<TeamMonthEntry> employees;
+
+  factory TeamMonth.fromJson(Map<String, dynamic> j) => TeamMonth(
+    month: '${j['month'] ?? ''}',
+    timezone: '${j['timezone'] ?? 'Asia/Makassar'}',
+    scope: '${j['scope'] ?? 'team'}',
+    employees: [for (final e in _list(j['employees'])) TeamMonthEntry.fromJson(_map(e))],
+  );
 }
 
 /// `YYYY-MM` of [d].

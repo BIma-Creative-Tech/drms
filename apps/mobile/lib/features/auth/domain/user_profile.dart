@@ -394,6 +394,10 @@ abstract class UserProfile with _$UserProfile {
   /// still requires an employee with a team assignment at a geofenced location).
   bool get hasOwnAttendance => roles.isNotEmpty;
 
+  /// DRMS 26/10 #3: an own employee in the scope (PT switcher) — the own monthly recap (`GET /attendance/me`) exists;
+  /// without one the server answers 409 "belum terhubung ke data karyawan" (usual for Owner / Direktur / Finance).
+  bool get hasOwnEmployee => employee != null || scopedCompanies.any((c) => c.employee != null);
+
   /// Owner decision 2026-10-09: "Operator/Anggota" only — attendance, nothing else on the home screen.
   bool get isOperatorOnly => roles.isNotEmpty && roles.every((r) => r == Role.operator);
 

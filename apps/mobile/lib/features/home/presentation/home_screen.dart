@@ -28,6 +28,8 @@ import '../../dashboard/presentation/dashboard_screen.dart' show DashboardRole, 
 import '../../dashboard/presentation/kpi_home.dart';
 import '../../expense/domain/expense_request.dart' show InboxItem;
 import '../../expense/domain/request_status.dart';
+import '../../expense/presentation/widgets/fund_check_panel.dart' show FundShortBadge;
+import '../../expense/presentation/widgets/project_loan_instruct_sheet.dart';
 import '../../finance/application/finance_providers.dart';
 import '../../notifications/application/notifications_providers.dart';
 import '../../notifications/presentation/notifications_screen.dart';
@@ -966,14 +968,35 @@ class ApprovalQuickCard extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
+                // ADR 0029 / DRMS 26/10 #1: short at the final step → "Setujui" disabled with the reason; the final
+                // decider instructs an inter-project loan from here when the project's cash account is short
+                if (it.fundShort case final gap?) ...[
+                  const SizedBox(height: 8),
+                  FundShortBadge(key: Key('home-fund-short-${it.id}'), gap: gap),
+                  if (it.projectLoanPendingDocNo != null || it.instructProjectLoan) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      it.projectLoanPendingDocNo != null
+                          ? t.pliInboxPending(it.projectLoanPendingDocNo!)
+                          : t.pliInboxBlocked,
+                      key: Key('home-fund-reason-${it.id}'),
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                    ),
+                  ],
+                  if (it.instructProjectLoan) ...[
+                    const SizedBox(height: 6),
+                    ProjectLoanInstructButton(requestId: it.id, docNo: it.docNo, filled: false),
+                  ],
+                ],
                 const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
                       child: FilledButton(
                         key: Key('home-approve-${it.id}'),
-                        onPressed: () =>
-                            quickDecision(context, ref, it.id, ack ? Decision.acknowledge : Decision.approve),
+                        onPressed: it.fundShort != null
+                            ? null
+                            : () => quickDecision(context, ref, it.id, ack ? Decision.acknowledge : Decision.approve),
                         style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(44)),
                         child: Text(ack ? t.actionAcknowledge : t.actionApprove),
                       ),

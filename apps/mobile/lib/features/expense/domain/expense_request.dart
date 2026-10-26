@@ -531,6 +531,13 @@ abstract class InboxItem with _$InboxItem {
     /// ADR 0029: "Dana kurang Rp X" — the gap of a final-step row of a PT with the fund check on (Kas roles of the PT);
     /// null when enough / not applicable / a server before ADR 0029.
     int? fundShort,
+
+    /// DRMS 26/10 #1: [fundShort] is the gap of the project's cash account and no instructed loan waits — the card
+    /// offers "Instruksi pinjam antar proyek" (false on older servers).
+    @Default(false) bool instructProjectLoan,
+
+    /// DRMS 26/10 #1: number of the instructed inter-project loan waiting for Finance's transfer, null when none.
+    String? projectLoanPendingDocNo,
   }) = _InboxItem;
 }
 

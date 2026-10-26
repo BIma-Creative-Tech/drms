@@ -4335,7 +4335,10 @@ mixin _$InboxItem {
  int get receiptMismatchFlags;/// MC3: PT of the request (`company.id`) — chip + role check of that PT.
  int? get companyId;/// ADR 0029: "Dana kurang Rp X" — the gap of a final-step row of a PT with the fund check on (Kas roles of the PT);
 /// null when enough / not applicable / a server before ADR 0029.
- int? get fundShort;
+ int? get fundShort;/// DRMS 26/10 #1: [fundShort] is the gap of the project's cash account and no instructed loan waits — the card
+/// offers "Instruksi pinjam antar proyek" (false on older servers).
+ bool get instructProjectLoan;/// DRMS 26/10 #1: number of the instructed inter-project loan waiting for Finance's transfer, null when none.
+ String? get projectLoanPendingDocNo;
 /// Create a copy of InboxItem
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -4347,20 +4350,20 @@ $InboxItemCopyWith<InboxItem> get copyWith => _$InboxItemCopyWithImpl<InboxItem>
 @override
 bool operator ==(Object other) {
   final _this = this as InboxItem;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is InboxItem&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.docNo, _this.docNo) || other.docNo == _this.docNo)&&(identical(other.type, _this.type) || other.type == _this.type)&&(identical(other.typeLabel, _this.typeLabel) || other.typeLabel == _this.typeLabel)&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.statusLabel, _this.statusLabel) || other.statusLabel == _this.statusLabel)&&(identical(other.title, _this.title) || other.title == _this.title)&&(identical(other.scope, _this.scope) || other.scope == _this.scope)&&(identical(other.requesters, _this.requesters) || other.requesters == _this.requesters)&&(identical(other.grandTotal, _this.grandTotal) || other.grandTotal == _this.grandTotal)&&(identical(other.neededDate, _this.neededDate) || other.neededDate == _this.neededDate)&&(identical(other.step, _this.step) || other.step == _this.step)&&(identical(other.level, _this.level) || other.level == _this.level)&&(identical(other.stepLabel, _this.stepLabel) || other.stepLabel == _this.stepLabel)&&(identical(other.decisionFlow, _this.decisionFlow) || other.decisionFlow == _this.decisionFlow)&&(identical(other.budget, _this.budget) || other.budget == _this.budget)&&(identical(other.budgetOverWarn, _this.budgetOverWarn) || other.budgetOverWarn == _this.budgetOverWarn)&&(identical(other.warningFlags, _this.warningFlags) || other.warningFlags == _this.warningFlags)&&(identical(other.infoFlags, _this.infoFlags) || other.infoFlags == _this.infoFlags)&&(identical(other.receiptMismatchFlags, _this.receiptMismatchFlags) || other.receiptMismatchFlags == _this.receiptMismatchFlags)&&(identical(other.companyId, _this.companyId) || other.companyId == _this.companyId)&&(identical(other.fundShort, _this.fundShort) || other.fundShort == _this.fundShort));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is InboxItem&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.docNo, _this.docNo) || other.docNo == _this.docNo)&&(identical(other.type, _this.type) || other.type == _this.type)&&(identical(other.typeLabel, _this.typeLabel) || other.typeLabel == _this.typeLabel)&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.statusLabel, _this.statusLabel) || other.statusLabel == _this.statusLabel)&&(identical(other.title, _this.title) || other.title == _this.title)&&(identical(other.scope, _this.scope) || other.scope == _this.scope)&&(identical(other.requesters, _this.requesters) || other.requesters == _this.requesters)&&(identical(other.grandTotal, _this.grandTotal) || other.grandTotal == _this.grandTotal)&&(identical(other.neededDate, _this.neededDate) || other.neededDate == _this.neededDate)&&(identical(other.step, _this.step) || other.step == _this.step)&&(identical(other.level, _this.level) || other.level == _this.level)&&(identical(other.stepLabel, _this.stepLabel) || other.stepLabel == _this.stepLabel)&&(identical(other.decisionFlow, _this.decisionFlow) || other.decisionFlow == _this.decisionFlow)&&(identical(other.budget, _this.budget) || other.budget == _this.budget)&&(identical(other.budgetOverWarn, _this.budgetOverWarn) || other.budgetOverWarn == _this.budgetOverWarn)&&(identical(other.warningFlags, _this.warningFlags) || other.warningFlags == _this.warningFlags)&&(identical(other.infoFlags, _this.infoFlags) || other.infoFlags == _this.infoFlags)&&(identical(other.receiptMismatchFlags, _this.receiptMismatchFlags) || other.receiptMismatchFlags == _this.receiptMismatchFlags)&&(identical(other.companyId, _this.companyId) || other.companyId == _this.companyId)&&(identical(other.fundShort, _this.fundShort) || other.fundShort == _this.fundShort)&&(identical(other.instructProjectLoan, _this.instructProjectLoan) || other.instructProjectLoan == _this.instructProjectLoan)&&(identical(other.projectLoanPendingDocNo, _this.projectLoanPendingDocNo) || other.projectLoanPendingDocNo == _this.projectLoanPendingDocNo));
 }
 
 
 @override
 int get hashCode {
   final _this = this as InboxItem;
-  return Object.hashAll([runtimeType,_this.id,_this.docNo,_this.type,_this.typeLabel,_this.status,_this.statusLabel,_this.title,_this.scope,_this.requesters,_this.grandTotal,_this.neededDate,_this.step,_this.level,_this.stepLabel,_this.decisionFlow,_this.budget,_this.budgetOverWarn,_this.warningFlags,_this.infoFlags,_this.receiptMismatchFlags,_this.companyId,_this.fundShort]);
+  return Object.hashAll([runtimeType,_this.id,_this.docNo,_this.type,_this.typeLabel,_this.status,_this.statusLabel,_this.title,_this.scope,_this.requesters,_this.grandTotal,_this.neededDate,_this.step,_this.level,_this.stepLabel,_this.decisionFlow,_this.budget,_this.budgetOverWarn,_this.warningFlags,_this.infoFlags,_this.receiptMismatchFlags,_this.companyId,_this.fundShort,_this.instructProjectLoan,_this.projectLoanPendingDocNo]);
 }
 
 @override
 String toString() {
   final _this = this as InboxItem;
-  return 'InboxItem(id: ${_this.id}, docNo: ${_this.docNo}, type: ${_this.type}, typeLabel: ${_this.typeLabel}, status: ${_this.status}, statusLabel: ${_this.statusLabel}, title: ${_this.title}, scope: ${_this.scope}, requesters: ${_this.requesters}, grandTotal: ${_this.grandTotal}, neededDate: ${_this.neededDate}, step: ${_this.step}, level: ${_this.level}, stepLabel: ${_this.stepLabel}, decisionFlow: ${_this.decisionFlow}, budget: ${_this.budget}, budgetOverWarn: ${_this.budgetOverWarn}, warningFlags: ${_this.warningFlags}, infoFlags: ${_this.infoFlags}, receiptMismatchFlags: ${_this.receiptMismatchFlags}, companyId: ${_this.companyId}, fundShort: ${_this.fundShort})';
+  return 'InboxItem(id: ${_this.id}, docNo: ${_this.docNo}, type: ${_this.type}, typeLabel: ${_this.typeLabel}, status: ${_this.status}, statusLabel: ${_this.statusLabel}, title: ${_this.title}, scope: ${_this.scope}, requesters: ${_this.requesters}, grandTotal: ${_this.grandTotal}, neededDate: ${_this.neededDate}, step: ${_this.step}, level: ${_this.level}, stepLabel: ${_this.stepLabel}, decisionFlow: ${_this.decisionFlow}, budget: ${_this.budget}, budgetOverWarn: ${_this.budgetOverWarn}, warningFlags: ${_this.warningFlags}, infoFlags: ${_this.infoFlags}, receiptMismatchFlags: ${_this.receiptMismatchFlags}, companyId: ${_this.companyId}, fundShort: ${_this.fundShort}, instructProjectLoan: ${_this.instructProjectLoan}, projectLoanPendingDocNo: ${_this.projectLoanPendingDocNo})';
 }
 
 
@@ -4371,7 +4374,7 @@ abstract mixin class $InboxItemCopyWith<$Res>  {
   factory $InboxItemCopyWith(InboxItem value, $Res Function(InboxItem) _then) = _$InboxItemCopyWithImpl;
 @useResult
 $Res call({
- int id, String? docNo, RequestType type, String typeLabel, RequestStatus status, String statusLabel, String title, String scope, String requesters, int grandTotal, String? neededDate, String step, int? level, String? stepLabel, bool decisionFlow, BudgetImpact budget, bool budgetOverWarn, int warningFlags, int infoFlags, int receiptMismatchFlags, int? companyId, int? fundShort
+ int id, String? docNo, RequestType type, String typeLabel, RequestStatus status, String statusLabel, String title, String scope, String requesters, int grandTotal, String? neededDate, String step, int? level, String? stepLabel, bool decisionFlow, BudgetImpact budget, bool budgetOverWarn, int warningFlags, int infoFlags, int receiptMismatchFlags, int? companyId, int? fundShort, bool instructProjectLoan, String? projectLoanPendingDocNo
 });
 
 
@@ -4388,7 +4391,7 @@ class _$InboxItemCopyWithImpl<$Res>
 
 /// Create a copy of InboxItem
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? docNo = freezed,Object? type = null,Object? typeLabel = null,Object? status = null,Object? statusLabel = null,Object? title = null,Object? scope = null,Object? requesters = null,Object? grandTotal = null,Object? neededDate = freezed,Object? step = null,Object? level = freezed,Object? stepLabel = freezed,Object? decisionFlow = null,Object? budget = null,Object? budgetOverWarn = null,Object? warningFlags = null,Object? infoFlags = null,Object? receiptMismatchFlags = null,Object? companyId = freezed,Object? fundShort = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? docNo = freezed,Object? type = null,Object? typeLabel = null,Object? status = null,Object? statusLabel = null,Object? title = null,Object? scope = null,Object? requesters = null,Object? grandTotal = null,Object? neededDate = freezed,Object? step = null,Object? level = freezed,Object? stepLabel = freezed,Object? decisionFlow = null,Object? budget = null,Object? budgetOverWarn = null,Object? warningFlags = null,Object? infoFlags = null,Object? receiptMismatchFlags = null,Object? companyId = freezed,Object? fundShort = freezed,Object? instructProjectLoan = null,Object? projectLoanPendingDocNo = freezed,}) {
   return _then(InboxItem(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,docNo: freezed == docNo ? _self.docNo : docNo // ignore: cast_nullable_to_non_nullable
@@ -4412,7 +4415,9 @@ as int,infoFlags: null == infoFlags ? _self.infoFlags : infoFlags // ignore: cas
 as int,receiptMismatchFlags: null == receiptMismatchFlags ? _self.receiptMismatchFlags : receiptMismatchFlags // ignore: cast_nullable_to_non_nullable
 as int,companyId: freezed == companyId ? _self.companyId : companyId // ignore: cast_nullable_to_non_nullable
 as int?,fundShort: freezed == fundShort ? _self.fundShort : fundShort // ignore: cast_nullable_to_non_nullable
-as int?,
+as int?,instructProjectLoan: null == instructProjectLoan ? _self.instructProjectLoan : instructProjectLoan // ignore: cast_nullable_to_non_nullable
+as bool,projectLoanPendingDocNo: freezed == projectLoanPendingDocNo ? _self.projectLoanPendingDocNo : projectLoanPendingDocNo // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 /// Create a copy of InboxItem
@@ -4506,10 +4511,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String? docNo,  RequestType type,  String typeLabel,  RequestStatus status,  String statusLabel,  String title,  String scope,  String requesters,  int grandTotal,  String? neededDate,  String step,  int? level,  String? stepLabel,  bool decisionFlow,  BudgetImpact budget,  bool budgetOverWarn,  int warningFlags,  int infoFlags,  int receiptMismatchFlags,  int? companyId,  int? fundShort)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String? docNo,  RequestType type,  String typeLabel,  RequestStatus status,  String statusLabel,  String title,  String scope,  String requesters,  int grandTotal,  String? neededDate,  String step,  int? level,  String? stepLabel,  bool decisionFlow,  BudgetImpact budget,  bool budgetOverWarn,  int warningFlags,  int infoFlags,  int receiptMismatchFlags,  int? companyId,  int? fundShort,  bool instructProjectLoan,  String? projectLoanPendingDocNo)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _InboxItem() when $default != null:
-return $default(_that.id,_that.docNo,_that.type,_that.typeLabel,_that.status,_that.statusLabel,_that.title,_that.scope,_that.requesters,_that.grandTotal,_that.neededDate,_that.step,_that.level,_that.stepLabel,_that.decisionFlow,_that.budget,_that.budgetOverWarn,_that.warningFlags,_that.infoFlags,_that.receiptMismatchFlags,_that.companyId,_that.fundShort);case _:
+return $default(_that.id,_that.docNo,_that.type,_that.typeLabel,_that.status,_that.statusLabel,_that.title,_that.scope,_that.requesters,_that.grandTotal,_that.neededDate,_that.step,_that.level,_that.stepLabel,_that.decisionFlow,_that.budget,_that.budgetOverWarn,_that.warningFlags,_that.infoFlags,_that.receiptMismatchFlags,_that.companyId,_that.fundShort,_that.instructProjectLoan,_that.projectLoanPendingDocNo);case _:
   return orElse();
 
 }
@@ -4527,10 +4532,10 @@ return $default(_that.id,_that.docNo,_that.type,_that.typeLabel,_that.status,_th
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String? docNo,  RequestType type,  String typeLabel,  RequestStatus status,  String statusLabel,  String title,  String scope,  String requesters,  int grandTotal,  String? neededDate,  String step,  int? level,  String? stepLabel,  bool decisionFlow,  BudgetImpact budget,  bool budgetOverWarn,  int warningFlags,  int infoFlags,  int receiptMismatchFlags,  int? companyId,  int? fundShort)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String? docNo,  RequestType type,  String typeLabel,  RequestStatus status,  String statusLabel,  String title,  String scope,  String requesters,  int grandTotal,  String? neededDate,  String step,  int? level,  String? stepLabel,  bool decisionFlow,  BudgetImpact budget,  bool budgetOverWarn,  int warningFlags,  int infoFlags,  int receiptMismatchFlags,  int? companyId,  int? fundShort,  bool instructProjectLoan,  String? projectLoanPendingDocNo)  $default,) {final _that = this;
 switch (_that) {
 case _InboxItem():
-return $default(_that.id,_that.docNo,_that.type,_that.typeLabel,_that.status,_that.statusLabel,_that.title,_that.scope,_that.requesters,_that.grandTotal,_that.neededDate,_that.step,_that.level,_that.stepLabel,_that.decisionFlow,_that.budget,_that.budgetOverWarn,_that.warningFlags,_that.infoFlags,_that.receiptMismatchFlags,_that.companyId,_that.fundShort);case _:
+return $default(_that.id,_that.docNo,_that.type,_that.typeLabel,_that.status,_that.statusLabel,_that.title,_that.scope,_that.requesters,_that.grandTotal,_that.neededDate,_that.step,_that.level,_that.stepLabel,_that.decisionFlow,_that.budget,_that.budgetOverWarn,_that.warningFlags,_that.infoFlags,_that.receiptMismatchFlags,_that.companyId,_that.fundShort,_that.instructProjectLoan,_that.projectLoanPendingDocNo);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -4547,10 +4552,10 @@ return $default(_that.id,_that.docNo,_that.type,_that.typeLabel,_that.status,_th
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String? docNo,  RequestType type,  String typeLabel,  RequestStatus status,  String statusLabel,  String title,  String scope,  String requesters,  int grandTotal,  String? neededDate,  String step,  int? level,  String? stepLabel,  bool decisionFlow,  BudgetImpact budget,  bool budgetOverWarn,  int warningFlags,  int infoFlags,  int receiptMismatchFlags,  int? companyId,  int? fundShort)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String? docNo,  RequestType type,  String typeLabel,  RequestStatus status,  String statusLabel,  String title,  String scope,  String requesters,  int grandTotal,  String? neededDate,  String step,  int? level,  String? stepLabel,  bool decisionFlow,  BudgetImpact budget,  bool budgetOverWarn,  int warningFlags,  int infoFlags,  int receiptMismatchFlags,  int? companyId,  int? fundShort,  bool instructProjectLoan,  String? projectLoanPendingDocNo)?  $default,) {final _that = this;
 switch (_that) {
 case _InboxItem() when $default != null:
-return $default(_that.id,_that.docNo,_that.type,_that.typeLabel,_that.status,_that.statusLabel,_that.title,_that.scope,_that.requesters,_that.grandTotal,_that.neededDate,_that.step,_that.level,_that.stepLabel,_that.decisionFlow,_that.budget,_that.budgetOverWarn,_that.warningFlags,_that.infoFlags,_that.receiptMismatchFlags,_that.companyId,_that.fundShort);case _:
+return $default(_that.id,_that.docNo,_that.type,_that.typeLabel,_that.status,_that.statusLabel,_that.title,_that.scope,_that.requesters,_that.grandTotal,_that.neededDate,_that.step,_that.level,_that.stepLabel,_that.decisionFlow,_that.budget,_that.budgetOverWarn,_that.warningFlags,_that.infoFlags,_that.receiptMismatchFlags,_that.companyId,_that.fundShort,_that.instructProjectLoan,_that.projectLoanPendingDocNo);case _:
   return null;
 
 }
@@ -4562,7 +4567,7 @@ return $default(_that.id,_that.docNo,_that.type,_that.typeLabel,_that.status,_th
 
 
 class _InboxItem implements InboxItem {
-  const _InboxItem({required this.id, this.docNo, required this.type, required this.typeLabel, required this.status, required this.statusLabel, required this.title, required this.scope, required this.requesters, required this.grandTotal, this.neededDate, required this.step, this.level, this.stepLabel, this.decisionFlow = false, required this.budget, this.budgetOverWarn = false, this.warningFlags = 0, this.infoFlags = 0, this.receiptMismatchFlags = 0, this.companyId, this.fundShort});
+  const _InboxItem({required this.id, this.docNo, required this.type, required this.typeLabel, required this.status, required this.statusLabel, required this.title, required this.scope, required this.requesters, required this.grandTotal, this.neededDate, required this.step, this.level, this.stepLabel, this.decisionFlow = false, required this.budget, this.budgetOverWarn = false, this.warningFlags = 0, this.infoFlags = 0, this.receiptMismatchFlags = 0, this.companyId, this.fundShort, this.instructProjectLoan = false, this.projectLoanPendingDocNo});
   
 
 @override final  int id;
@@ -4591,6 +4596,11 @@ class _InboxItem implements InboxItem {
 /// ADR 0029: "Dana kurang Rp X" — the gap of a final-step row of a PT with the fund check on (Kas roles of the PT);
 /// null when enough / not applicable / a server before ADR 0029.
 @override final  int? fundShort;
+/// DRMS 26/10 #1: [fundShort] is the gap of the project's cash account and no instructed loan waits — the card
+/// offers "Instruksi pinjam antar proyek" (false on older servers).
+@override@JsonKey() final  bool instructProjectLoan;
+/// DRMS 26/10 #1: number of the instructed inter-project loan waiting for Finance's transfer, null when none.
+@override final  String? projectLoanPendingDocNo;
 
 /// Create a copy of InboxItem
 /// with the given fields replaced by the non-null parameter values.
@@ -4602,18 +4612,18 @@ _$InboxItemCopyWith<_InboxItem> get copyWith => __$InboxItemCopyWithImpl<_InboxI
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _InboxItem&&(identical(other.id, id) || other.id == id)&&(identical(other.docNo, docNo) || other.docNo == docNo)&&(identical(other.type, type) || other.type == type)&&(identical(other.typeLabel, typeLabel) || other.typeLabel == typeLabel)&&(identical(other.status, status) || other.status == status)&&(identical(other.statusLabel, statusLabel) || other.statusLabel == statusLabel)&&(identical(other.title, title) || other.title == title)&&(identical(other.scope, scope) || other.scope == scope)&&(identical(other.requesters, requesters) || other.requesters == requesters)&&(identical(other.grandTotal, grandTotal) || other.grandTotal == grandTotal)&&(identical(other.neededDate, neededDate) || other.neededDate == neededDate)&&(identical(other.step, step) || other.step == step)&&(identical(other.level, level) || other.level == level)&&(identical(other.stepLabel, stepLabel) || other.stepLabel == stepLabel)&&(identical(other.decisionFlow, decisionFlow) || other.decisionFlow == decisionFlow)&&(identical(other.budget, budget) || other.budget == budget)&&(identical(other.budgetOverWarn, budgetOverWarn) || other.budgetOverWarn == budgetOverWarn)&&(identical(other.warningFlags, warningFlags) || other.warningFlags == warningFlags)&&(identical(other.infoFlags, infoFlags) || other.infoFlags == infoFlags)&&(identical(other.receiptMismatchFlags, receiptMismatchFlags) || other.receiptMismatchFlags == receiptMismatchFlags)&&(identical(other.companyId, companyId) || other.companyId == companyId)&&(identical(other.fundShort, fundShort) || other.fundShort == fundShort));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _InboxItem&&(identical(other.id, id) || other.id == id)&&(identical(other.docNo, docNo) || other.docNo == docNo)&&(identical(other.type, type) || other.type == type)&&(identical(other.typeLabel, typeLabel) || other.typeLabel == typeLabel)&&(identical(other.status, status) || other.status == status)&&(identical(other.statusLabel, statusLabel) || other.statusLabel == statusLabel)&&(identical(other.title, title) || other.title == title)&&(identical(other.scope, scope) || other.scope == scope)&&(identical(other.requesters, requesters) || other.requesters == requesters)&&(identical(other.grandTotal, grandTotal) || other.grandTotal == grandTotal)&&(identical(other.neededDate, neededDate) || other.neededDate == neededDate)&&(identical(other.step, step) || other.step == step)&&(identical(other.level, level) || other.level == level)&&(identical(other.stepLabel, stepLabel) || other.stepLabel == stepLabel)&&(identical(other.decisionFlow, decisionFlow) || other.decisionFlow == decisionFlow)&&(identical(other.budget, budget) || other.budget == budget)&&(identical(other.budgetOverWarn, budgetOverWarn) || other.budgetOverWarn == budgetOverWarn)&&(identical(other.warningFlags, warningFlags) || other.warningFlags == warningFlags)&&(identical(other.infoFlags, infoFlags) || other.infoFlags == infoFlags)&&(identical(other.receiptMismatchFlags, receiptMismatchFlags) || other.receiptMismatchFlags == receiptMismatchFlags)&&(identical(other.companyId, companyId) || other.companyId == companyId)&&(identical(other.fundShort, fundShort) || other.fundShort == fundShort)&&(identical(other.instructProjectLoan, instructProjectLoan) || other.instructProjectLoan == instructProjectLoan)&&(identical(other.projectLoanPendingDocNo, projectLoanPendingDocNo) || other.projectLoanPendingDocNo == projectLoanPendingDocNo));
 }
 
 
 @override
 int get hashCode {
-    return Object.hashAll([runtimeType,id,docNo,type,typeLabel,status,statusLabel,title,scope,requesters,grandTotal,neededDate,step,level,stepLabel,decisionFlow,budget,budgetOverWarn,warningFlags,infoFlags,receiptMismatchFlags,companyId,fundShort]);
+    return Object.hashAll([runtimeType,id,docNo,type,typeLabel,status,statusLabel,title,scope,requesters,grandTotal,neededDate,step,level,stepLabel,decisionFlow,budget,budgetOverWarn,warningFlags,infoFlags,receiptMismatchFlags,companyId,fundShort,instructProjectLoan,projectLoanPendingDocNo]);
 }
 
 @override
 String toString() {
-    return 'InboxItem(id: $id, docNo: $docNo, type: $type, typeLabel: $typeLabel, status: $status, statusLabel: $statusLabel, title: $title, scope: $scope, requesters: $requesters, grandTotal: $grandTotal, neededDate: $neededDate, step: $step, level: $level, stepLabel: $stepLabel, decisionFlow: $decisionFlow, budget: $budget, budgetOverWarn: $budgetOverWarn, warningFlags: $warningFlags, infoFlags: $infoFlags, receiptMismatchFlags: $receiptMismatchFlags, companyId: $companyId, fundShort: $fundShort)';
+    return 'InboxItem(id: $id, docNo: $docNo, type: $type, typeLabel: $typeLabel, status: $status, statusLabel: $statusLabel, title: $title, scope: $scope, requesters: $requesters, grandTotal: $grandTotal, neededDate: $neededDate, step: $step, level: $level, stepLabel: $stepLabel, decisionFlow: $decisionFlow, budget: $budget, budgetOverWarn: $budgetOverWarn, warningFlags: $warningFlags, infoFlags: $infoFlags, receiptMismatchFlags: $receiptMismatchFlags, companyId: $companyId, fundShort: $fundShort, instructProjectLoan: $instructProjectLoan, projectLoanPendingDocNo: $projectLoanPendingDocNo)';
 }
 
 
@@ -4624,7 +4634,7 @@ abstract mixin class _$InboxItemCopyWith<$Res> implements $InboxItemCopyWith<$Re
   factory _$InboxItemCopyWith(_InboxItem value, $Res Function(_InboxItem) _then) = __$InboxItemCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String? docNo, RequestType type, String typeLabel, RequestStatus status, String statusLabel, String title, String scope, String requesters, int grandTotal, String? neededDate, String step, int? level, String? stepLabel, bool decisionFlow, BudgetImpact budget, bool budgetOverWarn, int warningFlags, int infoFlags, int receiptMismatchFlags, int? companyId, int? fundShort
+ int id, String? docNo, RequestType type, String typeLabel, RequestStatus status, String statusLabel, String title, String scope, String requesters, int grandTotal, String? neededDate, String step, int? level, String? stepLabel, bool decisionFlow, BudgetImpact budget, bool budgetOverWarn, int warningFlags, int infoFlags, int receiptMismatchFlags, int? companyId, int? fundShort, bool instructProjectLoan, String? projectLoanPendingDocNo
 });
 
 
@@ -4641,7 +4651,7 @@ class __$InboxItemCopyWithImpl<$Res>
 
 /// Create a copy of InboxItem
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? docNo = freezed,Object? type = null,Object? typeLabel = null,Object? status = null,Object? statusLabel = null,Object? title = null,Object? scope = null,Object? requesters = null,Object? grandTotal = null,Object? neededDate = freezed,Object? step = null,Object? level = freezed,Object? stepLabel = freezed,Object? decisionFlow = null,Object? budget = null,Object? budgetOverWarn = null,Object? warningFlags = null,Object? infoFlags = null,Object? receiptMismatchFlags = null,Object? companyId = freezed,Object? fundShort = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? docNo = freezed,Object? type = null,Object? typeLabel = null,Object? status = null,Object? statusLabel = null,Object? title = null,Object? scope = null,Object? requesters = null,Object? grandTotal = null,Object? neededDate = freezed,Object? step = null,Object? level = freezed,Object? stepLabel = freezed,Object? decisionFlow = null,Object? budget = null,Object? budgetOverWarn = null,Object? warningFlags = null,Object? infoFlags = null,Object? receiptMismatchFlags = null,Object? companyId = freezed,Object? fundShort = freezed,Object? instructProjectLoan = null,Object? projectLoanPendingDocNo = freezed,}) {
   return _then(_InboxItem(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,docNo: freezed == docNo ? _self.docNo : docNo // ignore: cast_nullable_to_non_nullable
@@ -4665,7 +4675,9 @@ as int,infoFlags: null == infoFlags ? _self.infoFlags : infoFlags // ignore: cas
 as int,receiptMismatchFlags: null == receiptMismatchFlags ? _self.receiptMismatchFlags : receiptMismatchFlags // ignore: cast_nullable_to_non_nullable
 as int,companyId: freezed == companyId ? _self.companyId : companyId // ignore: cast_nullable_to_non_nullable
 as int?,fundShort: freezed == fundShort ? _self.fundShort : fundShort // ignore: cast_nullable_to_non_nullable
-as int?,
+as int?,instructProjectLoan: null == instructProjectLoan ? _self.instructProjectLoan : instructProjectLoan // ignore: cast_nullable_to_non_nullable
+as bool,projectLoanPendingDocNo: freezed == projectLoanPendingDocNo ? _self.projectLoanPendingDocNo : projectLoanPendingDocNo // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 

@@ -356,10 +356,17 @@ export async function LoanDetail(props: AdminViewServerProps) {
   const pending = l.status === 'pending_approval'
   const active = l.status === 'approved' || l.status === 'partially_repaid' || l.status === 'repaid'
   // ADR 0031: an automatic loan has one step (the transfer); a cash-backed manual loan adds Finance's disbursement
+  // DRMS 26/10 #1: an Owner-instructed loan has no Direktur / Owner level — the instruction, then Finance's transfer
+  const instructed = l.submitterRole === 'owner'
   const steps =
     l.origin === 'transfer'
       ? [{ key: 'transfer', label: `Otomatis dari transfer ${l.transfer?.docNo ?? ''}`.trim(), when: l.submittedAt, who: l.createdBy.name, tone: (l.status === 'cancelled' ? 'none' : 'ok') as PillTone, state: l.status === 'cancelled' ? 'Dibatalkan' : 'Dicatat & dicairkan' }]
-      : [
+      : instructed
+        ? [
+            { key: 'instruct', label: `Instruksi Owner (pengajuan ${l.expenseRequest?.docNo ?? '—'})`, when: l.submittedAt, who: l.createdBy.name, tone: 'ok' as PillTone, state: 'Disetujui langsung' },
+            { key: 'cair', label: 'Transfer Finance', when: l.disbursedAt, who: l.disbursedBy?.name ?? null, tone: (l.disbursedAt ? 'ok' : l.awaitingDisbursement ? 'wait' : 'none') as PillTone, state: l.disbursedAt ? 'Ditransfer' : l.awaitingDisbursement ? 'Menunggu (Antrian Transfer)' : l.status === 'cancelled' ? 'Dibatalkan' : 'Belum' },
+          ]
+        : [
           { key: 'submit', label: l.submitterRole === 'finance' ? 'Diajukan Finance' : 'Diajukan PM peminjam', when: l.submittedAt, who: l.createdBy.name, tone: (l.submittedAt ? 'ok' : 'none') as PillTone, state: l.submittedAt ? 'Selesai' : 'Belum' },
           ...([1, 2] as const).map((level) => {
             const key = level === 1 ? 'direktur' : 'owner'

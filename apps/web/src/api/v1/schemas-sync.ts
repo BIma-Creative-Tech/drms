@@ -137,7 +137,8 @@ const oneLocationError = { message: 'Isi salah satu: project_id, cost_center_id,
 /**
  * `attendance.check_in` / `attendance.check_out` (US-01/US-02, ADR 0010 decisions 7/8): own
  * attendance at a registered project OR cost center of the own PT (E6, Q-40; DRMS 13/10 A2: no assignment) with a
- * geofence — OnSite inside the given one, Non-OnSite (ADR 0032) inside any (outside all → OUTSIDE_GEOFENCE). The selfie is uploaded
+ * geofence — OnSite inside the given one, Non-OnSite anywhere (inside one → that one; outside all → "Di luar area" at the
+ * nearest one, DRMS 26/10). The selfie is uploaded
  * first with POST /api/v1/media/selfies. Enabled by company-settings.syncAttendanceEnabled (else
  * `rejected FEATURE_DISABLED`). Corrections (US-15) are POST /api/v1/attendance/{id}/correct.
  */
@@ -145,7 +146,7 @@ export const SyncAttendancePayload = z
   .object({
     project_id: id.optional().meta({ description: 'Project (exactly one of project_id / cost_center_id / site_id).' }),
     cost_center_id: id.optional().meta({ description: 'Cost center / operational location (E6, Q-40).' }),
-    site_id: id.optional().meta({ description: 'ADR 0023 site — ADR 0032: no longer a check-in location (OnSite → VALIDATION; Non-OnSite: a hint only, recorded at the registered location containing the fix).' }),
+    site_id: id.optional().meta({ description: 'ADR 0023 site — ADR 0032: no longer a check-in location (OnSite → VALIDATION; Non-OnSite: a hint only, recorded at the registered location containing the fix, else "Di luar area" at the nearest one).' }),
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
     accuracy_m: z.number().min(0).max(10_000).nullable().optional().meta({ description: 'GPS accuracy radius (m); up to 50 m is added to the geofence radius.' }),

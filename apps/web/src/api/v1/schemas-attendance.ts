@@ -29,6 +29,14 @@ export const TeamTodayQuery = z
     company: companyFilterParam,
   })
   .meta({ id: 'TeamTodayQuery' })
+export const TeamMonthQuery = z
+  .object({
+    month: month.optional().meta({ description: 'Default: current month (company TZ); not in the future.' }),
+    project_id: z.string().regex(/^\d{1,10}$/).optional(),
+    cost_center_id: z.string().regex(/^\d{1,10}$/).optional(),
+    company: companyFilterParam,
+  })
+  .meta({ id: 'TeamMonthQuery' })
 
 export const AttendanceCorrectBody = z
   .object({
@@ -49,7 +57,7 @@ const oneLocationError = { message: 'Isi salah satu: project_id ATAU cost_center
  */
 export const AttendanceCheckBody = z
   .object({
-    project_id: id.optional().meta({ description: 'Project (exactly one of project_id / cost_center_id). OnSite: the fix must be inside it; Non-OnSite (ADR 0032): a hint — recorded at the registered location containing the fix (outside all → 409 OUTSIDE_GEOFENCE).' }),
+    project_id: id.optional().meta({ description: 'Project (exactly one of project_id / cost_center_id). OnSite: the fix must be inside it; Non-OnSite: a hint — recorded at the registered location containing the fix (DRMS 26/10: outside all → recorded "Di luar area" at the nearest one).' }),
     cost_center_id: id.optional().meta({ description: 'Cost center / operational location (E6, Q-40).' }),
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
@@ -71,7 +79,7 @@ export const AttendanceOnBehalfBody = z
   .object({
     employee_id: id.meta({ description: 'employees id of the Admin Staff\'s PT (may have no user account); never the caller\'s own.' }),
     kind: z.enum(['check_in', 'check_out']),
-    project_id: id.optional().meta({ description: 'Project (exactly one of project_id / cost_center_id; a Non-OnSite employee: a hint, the registered location containing the fix is used).' }),
+    project_id: id.optional().meta({ description: 'Project (exactly one of project_id / cost_center_id; a Non-OnSite employee: a hint, the registered location containing the fix is used, else "Di luar area" at the nearest one).' }),
     cost_center_id: id.optional(),
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
@@ -111,8 +119,8 @@ export const AttendanceCheckResult = z
   .object({
     id,
     localDate: businessDate,
-    location: z.object({ type: z.enum(['project', 'cost_center', 'site']), id }).meta({ description: 'Where the record belongs (a Non-OnSite check-in: the registered location containing the fix; a check-out: the open check-in of the day). `site` = history only (ADR 0032).' }),
-    outsideArea: z.boolean().meta({ description: 'DRMS 13/10 A2 "Di luar area" — ADR 0032: always false for a new record (Non-OnSite outside every location is refused).' }),
+    location: z.object({ type: z.enum(['project', 'cost_center', 'site']), id }).meta({ description: 'Where the record belongs (a Non-OnSite check-in: the registered location containing the fix, else — "Di luar area" — the nearest one; a check-out: the open check-in of the day). `site` = history only (ADR 0032).' }),
+    outsideArea: z.boolean().meta({ description: 'DRMS 13/10 A2 / 26/10 "Di luar area": true = a Non-OnSite attendance outside every registered location of the PT (`location` = the reference: the nearest location, a check-out: the open check-in of the day).' }),
     distanceM: z.number().int().meta({ description: 'Distance to the point of `location` (m).' }),
   })
   .meta({ id: 'AttendanceCheckResult' })
@@ -220,6 +228,23 @@ export const TeamToday = z
   })
   .meta({ id: 'TeamToday' })
 
+export const TeamMonth = z
+  .object({
+    month,
+    from: businessDate,
+    to: businessDate,
+    timezone: z.string(),
+    scope: z.enum(['all', 'team']),
+    employees: z.array(
+      z.object({
+        employee: z.object({ id, code: z.string(), name: z.string() }),
+        companyId: z.number().int().nullable().meta({ description: 'PT of the employee (MC2).' }),
+        summary: AttendanceSummary,
+      }),
+    ),
+  })
+  .meta({ id: 'TeamMonth' })
+
 export const AttendanceCorrection = z
   .object({
     id,
@@ -247,12 +272,12 @@ export const AttendanceLocations = z
         z.object({
           id,
           company: id,
-          attendanceType: z.enum(['onsite', 'non_onsite']).meta({ description: 'onsite = inside the chosen registered location of the PT (outside the radius refused); non_onsite (ADR 0032) = inside ANY registered location of the PT (picked automatically; outside all → refused).' }),
+          attendanceType: z.enum(['onsite', 'non_onsite']).meta({ description: 'onsite = inside the chosen registered location of the PT (outside the radius refused); non_onsite (DRMS 26/10) = anywhere: inside a registered location of the PT → that one (picked automatically), outside all → recorded "Di luar area" at the nearest one.' }),
           homeSiteId: id.nullable().meta({ description: 'ADR 0032: always null (sites removed; kept for APK ≤ 0.11.1).' }),
           referenceSite: z
             .object({ id, code: z.string(), name: z.string(), lat: z.number().nullable(), lng: z.number().nullable() })
             .nullable()
-            .meta({ description: 'ADR 0032: always null — no "Di luar area" check-in any more (kept for APK ≤ 0.11.1).' }),
+            .meta({ description: 'ADR 0032: always null (kept for APK ≤ 0.11.1). DRMS 26/10: a "Di luar area" check-in references the nearest registered location, picked by the server.' }),
         }),
       )
       .meta({ description: "The caller's active employees in the selected PTs (one per PT)." }),

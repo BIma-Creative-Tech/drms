@@ -1,7 +1,8 @@
 # ADR 0032 — Hapus site, absensi per lokasi project, role Admin Staff
 
-- **Status:** accepted (user decisions 2026-10-24, DRMS 24/10 stream "absensi"). Staging first; no production deploy
-  without the usual release approval.
+- **Status:** accepted (user decisions 2026-10-24, DRMS 24/10 stream "absensi"); D4 amended 2026-10-26 (see
+  "Amendment 2026-10-26" — Karyawan Non-OnSite anywhere again). Staging first; no production deploy without the usual
+  release approval.
 - **Date:** 2026-10-24
 - **Branch:** `feat/d2410-absensi` (from `origin/main` 0.19.1)
 - **Amends:** ADR 0023 (multiple sites per PT, incl. its amendment 2026-10-13 / revision 2026-10-14 "OnSite / Non-OnSite,
@@ -157,3 +158,35 @@ columns were never dropped.
 3. ~~Should the web on-behalf page also be offered to the PM (team-scoped), or stay Admin Staff only?~~ Decided
    2026-10-24 (user): the PM gets **Absensi → Absenkan karyawan** too, scoped like the APK PM on-behalf (employees and
    locations of the PM's team projects); the Admin Staff stays PT-wide.
+
+## Amendment 2026-10-26 — Karyawan Non-OnSite may check in anywhere again (DRMS 26/10 #2)
+
+User request (2026-10-26): "untuk karyawan non-onsite, ini bisa melakukan absensi dimana pun tidak terbatas pada lokasi
+terdaftar dan tetap bisa mengajukan pengajuan selama di assign di proyek tersebut".
+
+**D4 is replaced for Karyawan Non-OnSite** (the rule of ADR 0023 revision 2026-10-14 returns, without sites):
+
+- Check-in AND check-out **anywhere**, no assignment needed. The fix inside the geofence of an active registered
+  location of the own PT → recorded there exactly as in §2 (the requested one when it contains the fix, else the nearest
+  containing one; a check-out closes the day's open check-in, flag `CHECK_OUT_ELSEWHERE` inside another location).
+- The fix outside every registered location → **not refused**: recorded with `attendances.outside_area = true`
+  ("Di luar area", day / recap flag `OUTSIDE_AREA`) referenced to the **nearest** active registered location of the PT
+  (project or cost center with a point — the home site / head office reference of 14/10 is gone with the sites),
+  `distance_m` = the distance to its point. A check-out with an open check-in closes that pair at the open location,
+  flagged "Di luar area" (`distance_m` to the open location; `NO_REFERENCE_POINT` when it has no point any more).
+- The PT has no registered location with a point at all → refused `NO_GEOFENCE` ("Absen belum bisa dicatat: PT Anda
+  belum punya lokasi terdaftar … Hubungi Admin.") — nothing to reference.
+- One write path (`record.ts resolveNonOnsite`): web self check-in, APK sync (online and offline items), PM on-behalf
+  (the requested location must still be a team location; the employee a team member) and Admin Staff on-behalf (the
+  employee's type rule against the recorder's fix). `NON_ONSITE_OUTSIDE` is now the informative note "Di luar lokasi
+  terdaftar — absen dicatat "Di luar area"" (web + APK show it before the confirmation popup), no longer a refusal.
+- Unchanged: OnSite (inside the CHOSEN location's geofence, else `OUTSIDE_GEOFENCE`), mock location refused, selfie
+  and GPS required, privacy acknowledgement, own PT only. `GET /attendance/locations` keeps `referenceSite` null (the
+  server picks the nearest location itself, so APK ≤ 0.11.1 never sends a site for it). No migration (the column
+  `outside_area` exists since 20261013_620000), no schema change of the API (descriptions only).
+- **Requests (pengajuan) are not widened:** a Non-OnSite employee — like any Staff — files only for active projects it
+  is assigned to (`domain/expense/drafts.ts` G10, the CALLER's assignment scope; the attendance type plays no part).
+- Display: the "Di luar area" chip of the recap stamp (web), the report column "Di luar area (ref. …)", the Absensi list
+  column / filter, the APK recap tile and day flag show the new rows like the 14–24/10 history.
+- Consequence (accepted by the user): office staff can again check in from home / on the road; the record says it was
+  outside, where it is referenced and how far away.

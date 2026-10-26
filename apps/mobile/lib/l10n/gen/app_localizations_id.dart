@@ -1637,7 +1637,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get attendanceTypeNonOnsite =>
-      'Karyawan Non-OnSite: absen masuk / pulang di dalam radius lokasi terdaftar PT mana pun; lokasi dipilih otomatis.';
+      'Karyawan Non-OnSite: absen masuk / pulang di mana saja — di dalam radius lokasi terdaftar PT tercatat di lokasi itu (dipilih otomatis), di luar semua lokasi dicatat \"Di luar area\".';
 
   @override
   String get attendanceOutsideArea => 'Di luar area';
@@ -1648,7 +1648,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String attendanceDetectOutsideArea(String name) {
-    return 'Posisi Anda di luar semua lokasi terdaftar: absen dicatat \"Di luar area\" (ref. $name).';
+    return 'Di luar lokasi terdaftar — absen dicatat \"Di luar area\" (ref. $name).';
   }
 
   @override
@@ -1656,8 +1656,7 @@ class AppLocalizationsId extends AppLocalizations {
       'Absen \"Di luar area\" belum bisa: site penempatan / kantor pusat PT belum ditetapkan Admin.';
 
   @override
-  String get attendanceNonOnsiteOutside =>
-      'Anda di luar semua lokasi terdaftar PT. Karyawan Non-OnSite hanya bisa absen di dalam area lokasi project / pusat biaya PT. Mendekatlah ke lokasi terdaftar.';
+  String get attendanceNonOnsiteOutside => 'Di luar lokasi terdaftar — absen dicatat \"Di luar area\"';
 
   @override
   String get distanceInside => 'Di dalam area absen';
@@ -1789,6 +1788,23 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get recapMemberTitle => 'Rekap absensi karyawan';
+
+  @override
+  String get recapViewOwn => 'Saya';
+
+  @override
+  String get recapViewTeam => 'Tim';
+
+  @override
+  String get recapNoEmployee => 'Akun Anda belum terhubung ke data karyawan. Hubungi Admin.';
+
+  @override
+  String get teamRecapEmpty => 'Belum ada karyawan dalam rekap bulan ini.';
+
+  @override
+  String teamRecapCount(int count) {
+    return '$count karyawan';
+  }
 
   @override
   String get teamStatusNotYet => 'Belum absen';
@@ -6282,4 +6298,99 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get mediaNotImage => 'File ini bukan gambar (mis. PDF). Ketuk thumbnail-nya untuk membuka sebagai file.';
+
+  @override
+  String get pliAction => 'Instruksi pinjam antar proyek';
+
+  @override
+  String pliTitle(String doc) {
+    return 'Instruksi pinjam antar proyek — $doc';
+  }
+
+  @override
+  String get pliBorrowerAccount => 'Akun kas pengajuan';
+
+  @override
+  String get pliLenders => 'Project pemberi (PT yang sama)';
+
+  @override
+  String get pliNoLenders => 'Tidak ada project lain yang aktif di PT ini.';
+
+  @override
+  String pliAccount(String name) {
+    return 'Akun kas: $name';
+  }
+
+  @override
+  String get pliAmount => 'Nilai pinjaman';
+
+  @override
+  String pliAmountHelp(String min, String max) {
+    return 'Minimal $min (kekurangan), maksimal $max (dana bebas pemberi).';
+  }
+
+  @override
+  String get pliDueDate => 'Jatuh tempo';
+
+  @override
+  String get pliReason => 'Alasan / catatan';
+
+  @override
+  String get pliReasonHint => 'Wajib, minimal 3 karakter. Tercatat di pinjaman dan audit log.';
+
+  @override
+  String pliReasonDefault(String account, String doc) {
+    return 'Menutup kekurangan dana akun kas $account untuk pengajuan $doc';
+  }
+
+  @override
+  String get pliChooseLender => 'Pilih project pemberi pinjaman.';
+
+  @override
+  String get pliContinue => 'Lanjut';
+
+  @override
+  String get pliConfirmNote =>
+      'Pinjaman langsung disetujui dan masuk Antrian Transfer Finance. Pengajuan tetap menunggu keputusan Anda; setujui setelah Finance mentransfer pinjaman.';
+
+  @override
+  String pliConfirmFrom(String project, String account) {
+    return 'Pemberi: $project — akun kas $account';
+  }
+
+  @override
+  String pliConfirmTo(String project, String account) {
+    return 'Penerima: $project — akun kas $account';
+  }
+
+  @override
+  String pliConfirmAmount(String amount) {
+    return 'Nilai pinjaman: $amount';
+  }
+
+  @override
+  String pliConfirmDue(String date) {
+    return 'Jatuh tempo: $date';
+  }
+
+  @override
+  String pliDone(String amount, String project) {
+    return 'Pinjaman $amount dari $project masuk Antrian Transfer Finance. Setujui pengajuan setelah transfer dieksekusi.';
+  }
+
+  @override
+  String pliPending(String doc, String amount, String status) {
+    return 'Pinjaman $doc ($amount): $status.';
+  }
+
+  @override
+  String get pliInboxBlocked => 'Dana bebas akun kas project kurang — instruksikan pinjaman antar proyek atau tolak.';
+
+  @override
+  String pliInboxPending(String doc) {
+    return 'Pinjaman $doc menunggu transfer Finance — setujui setelah transfer dieksekusi.';
+  }
+
+  @override
+  String get loanStepInstructedOwner => 'Instruksi Owner';
 }
