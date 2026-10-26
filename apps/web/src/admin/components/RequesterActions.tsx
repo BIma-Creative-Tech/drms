@@ -358,7 +358,7 @@ export function RequesterActions(p: RequesterActionsProps) {
         ) : null}
         {noAttachment ? (
           <div id="pk-attachment-missing" role="note" style={{ margin: '6px 0', color: 'var(--pk-tone-warn-text)', fontWeight: 600 }} data-pk-attachment-missing>
-            Lampiran wajib untuk Reimburse: unggah minimal 1 lampiran (foto/PDF) di kolom Lampiran (tombol Edit, lalu Simpan) sebelum mengirim pengajuan.
+            Lampiran wajib untuk Reimburse: unggah minimal 1 lampiran (foto/PDF, maks. 5 MB per file) di kolom Lampiran (tombol Edit, lalu Simpan) sebelum mengirim pengajuan.
           </div>
         ) : null}
         <div style={{ marginTop: 8 }}>

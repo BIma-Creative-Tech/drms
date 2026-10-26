@@ -79,7 +79,7 @@ import { tasks } from './jobs/tasks'
 import { smtpEmailAdapter } from './email/adapter'
 import { getEnv, parseSmtpEnv, readSecret } from './lib/env'
 import { loggerOptions } from './lib/logger'
-import { MAX_UPLOAD_BYTES } from './collections/media/factory'
+import { MAX_UPLOAD_BYTES } from './collections/media/limits'
 import { withBodyGuard, withGlobalBodyGuard } from './lib/body-guard'
 import { gateSharp, setImageQueueLogger } from './lib/image-queue'
 
@@ -160,7 +160,13 @@ export default buildConfig({
       // one client provider around every admin page (built-in views included), see src/admin/loading.
       // DRMS 10/10 12c: one image lightbox for every thumbnail link `a[data-pk-lightbox]` (src/admin/components/lightbox).
       // DRMS 24/10: the confirmation + result popups of every data-changing action (src/admin/components/feedback).
-      providers: ['@/admin/loading/LoadingProvider#LoadingProvider', '@/admin/components/lightbox/LightboxProvider#LightboxProvider', '@/admin/components/feedback/FeedbackHost#FeedbackHost'],
+      // D2610: size check of files handed to Payload's upload UI before anything is sent (src/admin/components/media).
+      providers: [
+        '@/admin/loading/LoadingProvider#LoadingProvider',
+        '@/admin/components/lightbox/LightboxProvider#LightboxProvider',
+        '@/admin/components/feedback/FeedbackHost#FeedbackHost',
+        '@/admin/components/media/UploadSizeGuard#UploadSizeGuard',
+      ],
       // F3: module launcher at /admin, role dashboards at /admin/dashboard, reports, global audit log.
       views: { ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS, ...ACCOUNT_ADMIN_VIEWS, ...MC2_ADMIN_VIEWS, ...FR1_ADMIN_VIEWS, ...D1010_ADMIN_VIEWS, ...LOAN_ADMIN_VIEWS, ...IC_LOAN_ADMIN_VIEWS, ...RAP_ADMIN_VIEWS, ...USER_ONBOARDING_ADMIN_VIEWS, ...PARTNER_ADMIN_VIEWS },
     },

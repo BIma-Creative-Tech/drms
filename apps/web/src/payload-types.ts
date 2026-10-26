@@ -1546,7 +1546,7 @@ export interface ExpenseRequest {
   invoiceDate?: string | null;
   invoiceDueDate?: string | null;
   /**
-   * Wajib sebelum dikirim. Invoice vendor / tagihan atau memo PT penerima = bukti pembayaran (tanpa LPJ).
+   * Wajib sebelum dikirim, maks. 5 MB per file. Invoice vendor / tagihan atau memo PT penerima = bukti pembayaran (tanpa LPJ).
    */
   invoiceFile?: (number | null) | MediaAttachment;
   bankSnapshot?: {

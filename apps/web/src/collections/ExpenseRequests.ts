@@ -533,7 +533,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       { name: 'invoiceNo', type: 'text', label: 'Nomor invoice / dokumen', maxLength: 64, index: true, admin: { placeholder: 'mis. INV/2026/0012', condition: directPayee(editableInput('invoiceNo')) } },
       businessDateField('invoiceDate', 'Tanggal invoice / dokumen', { admin: { condition: directPayee(editableInput('invoiceDate')) } }),
       businessDateField('invoiceDueDate', 'Jatuh tempo', { admin: { condition: directPayee(editableInput('invoiceDueDate')) } }),
-      { name: 'invoiceFile', type: 'upload', relationTo: 'media-attachments', label: 'File invoice / dokumen (foto / PDF)', admin: { description: 'Wajib sebelum dikirim. Invoice vendor / tagihan atau memo PT penerima = bukti pembayaran (tanpa LPJ).', condition: directPayee(editableInput('invoiceFile')) } },
+      { name: 'invoiceFile', type: 'upload', relationTo: 'media-attachments', label: 'File invoice / dokumen (foto / PDF)', admin: { description: 'Wajib sebelum dikirim, maks. 5 MB per file. Invoice vendor / tagihan atau memo PT penerima = bukti pembayaran (tanpa LPJ).', condition: directPayee(editableInput('invoiceFile')) } },
       {
         name: 'bankSnapshot',
         type: 'group',
@@ -549,7 +549,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       },
       { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000, admin: { condition: editableInput() } },
       // D2410 (point 6): at least one to send a Reimburse (server: validateContent forSubmit); optional for Pengajuan Baru
-      { name: 'attachments', type: 'upload', relationTo: 'media-attachments', hasMany: true, label: 'Lampiran', admin: { description: 'Foto (JPG/PNG) atau PDF. Wajib minimal 1 untuk Reimburse; opsional untuk Pengajuan Baru.', condition: editableInput() } },
+      { name: 'attachments', type: 'upload', relationTo: 'media-attachments', hasMany: true, label: 'Lampiran', admin: { description: 'Foto (JPG/PNG) atau PDF, maks. 5 MB per file. Wajib minimal 1 untuk Reimburse; opsional untuk Pengajuan Baru.', condition: editableInput() } },
       {
         name: 'lines',
         type: 'array',
