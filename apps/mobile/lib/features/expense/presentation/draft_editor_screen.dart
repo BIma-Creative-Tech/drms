@@ -778,7 +778,8 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                         MasterPickerField(
                           key: const Key('draft-project'),
                           label: t.fieldProject,
-                          items: m[MasterTypes.projects] ?? const [],
+                          // D2610: no arsip / selesai / dibatalkan project (server G10 refuses them)
+                          items: requestableProjects(m[MasterTypes.projects] ?? const [], keep: _d.projectId),
                           value: _d.projectId,
                           // ADR 0027 / 0028 / 0031: a vendor / PT grup payment may go without a project (no Pusat Biaya;
                           // Finance picks the paying account)

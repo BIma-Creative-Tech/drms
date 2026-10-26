@@ -17,7 +17,7 @@ import { copyReceiptsForResubmit } from './receipts'
 import { INACTIVE_FOR_DUPLICATES, isBusinessDate, normalizeInvoiceNo, payeeOf, STATUS_LABELS, type PayeeType, type RequestStatus, type RequestType } from './types'
 import { assertDocumentUnused, INTERCOMPANY_NO_ACCOUNT, payeeCompanyErrors } from '@/domain/intercompany/service'
 import { failCoded } from '@/domain/coded-error'
-import { isClosedProjectStatus } from '@/domain/projects/status'
+import { isRequestableProjectStatus } from '@/domain/projects/status'
 import { NOT_DELETED } from '@/domain/soft-delete/where'
 import { softDeleteEntry } from '@/domain/soft-delete/registry'
 
@@ -246,7 +246,7 @@ export async function validateContent(
     const p = await req.payload.findByID({ collection: 'projects', id: c.projectId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
     // D1610: a soft-deleted project is reported like a missing one (findByID still returns it — labels of old documents)
     if (!p || p.isDeleted === true || isForeign(req, relId(p.company) ?? -1)) errors.push({ path: 'projectId', message: 'Project tidak ditemukan.' })
-    else if (isClosedProjectStatus(p.status) || p.status === 'selesai') errors.push({ path: 'projectId', message: p.status === 'dibatalkan' ? 'Project sudah dibatalkan.' : 'Project sudah selesai/diarsipkan.' })
+    else if (!isRequestableProjectStatus(p.status)) errors.push({ path: 'projectId', message: p.status === 'dibatalkan' ? 'Project sudah dibatalkan.' : 'Project sudah selesai/diarsipkan.' })
     else if (!office && !(await scope()).assignedProjects.includes(c.projectId)) fail(403, 'Project di luar penugasan Anda.')
   }
   if (c.costCenterId) {
