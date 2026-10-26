@@ -353,6 +353,7 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'GET /reports/:code/:format': 'selection',
   'GET /attendance/recap': 'document',
   'GET /attendance/team-today': 'selection',
+  'GET /attendance/team-month': 'selection', // DRMS 26/10 #3: APK team "Rekap bulanan" (?company= narrows)
   'GET /attendance/schedule': 'selection', // user 2026-10-19 (APK phase 6): Jadwal & hari libur (context PT)
   'PATCH /attendance/default-schedule': 'named-pt', // body companyId; companies update access in that PT
   // DRMS 13/10 A2: own eligible check-in locations (own employee per selected PT; `?company=` narrows)

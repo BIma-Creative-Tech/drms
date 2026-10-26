@@ -40,6 +40,14 @@ export function registerAttendancePaths(registry: OpenAPIRegistry, h: Helpers): 
   })
   registry.registerPath({
     method: 'get',
+    path: '/attendance/team-month',
+    summary: 'DRMS 26/10 #3: monthly summary per employee of the caller\'s attendance scope (same list and numbers as the web team grid /admin/absensi/rekap): PM team, Admin/Admin Staff/Direktur/Finance all of the PT; day detail via /attendance/recap',
+    security: h.security,
+    request: { headers: h.deviceHeader, query: A.TeamMonthQuery },
+    responses: h.res(200, 'Team month', A.TeamMonth, [400, 401, 403, 426, 429]),
+  })
+  registry.registerPath({
+    method: 'get',
     path: '/attendance/locations',
     summary:
       'DRMS 13/10 A2: registered check-in locations of the caller (own employee per selected PT): every location of the PT with a point (projects, cost centers — ADR 0032: no site; no assignment needed). OnSite must check in inside the chosen one; Non-OnSite inside any of them (picked automatically; outside all → 409 OUTSIDE_GEOFENCE, no "Di luar area" any more). Coordinates and radius only (no money). The APK matches the GPS fix against this list (auto-detect) and caches it for offline check-ins; the server re-validates each check-in',

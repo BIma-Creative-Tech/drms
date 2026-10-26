@@ -29,6 +29,14 @@ export const TeamTodayQuery = z
     company: companyFilterParam,
   })
   .meta({ id: 'TeamTodayQuery' })
+export const TeamMonthQuery = z
+  .object({
+    month: month.optional().meta({ description: 'Default: current month (company TZ); not in the future.' }),
+    project_id: z.string().regex(/^\d{1,10}$/).optional(),
+    cost_center_id: z.string().regex(/^\d{1,10}$/).optional(),
+    company: companyFilterParam,
+  })
+  .meta({ id: 'TeamMonthQuery' })
 
 export const AttendanceCorrectBody = z
   .object({
@@ -219,6 +227,23 @@ export const TeamToday = z
     ),
   })
   .meta({ id: 'TeamToday' })
+
+export const TeamMonth = z
+  .object({
+    month,
+    from: businessDate,
+    to: businessDate,
+    timezone: z.string(),
+    scope: z.enum(['all', 'team']),
+    employees: z.array(
+      z.object({
+        employee: z.object({ id, code: z.string(), name: z.string() }),
+        companyId: z.number().int().nullable().meta({ description: 'PT of the employee (MC2).' }),
+        summary: AttendanceSummary,
+      }),
+    ),
+  })
+  .meta({ id: 'TeamMonth' })
 
 export const AttendanceCorrection = z
   .object({
