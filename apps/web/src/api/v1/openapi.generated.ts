@@ -2450,7 +2450,7 @@ export const openapiDocument = {
                   "string",
                   "null"
                 ],
-                "description": "\"Dana PT tidak cukup — kurang Rp X. Tolak, atau perintahkan pinjaman antar-PT.\""
+                "description": "\"Dana PT tidak cukup — kurang Rp X. Tolak, atau perintahkan pinjaman antar-PT.\"; with a Pusat Biaya (2026-10-26) \"Dana bebas akun kas <name> tidak cukup — kurang Rp X. …\", or, while an instructed loan waits, \"… Pinjaman PJ/… menunggu transfer Finance …\"."
               },
               "balance": {
                 "type": "integer",
@@ -2474,7 +2474,7 @@ export const openapiDocument = {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 10000000000000,
-                "description": "Kurang = max(0, needed − max(available, pusatBiaya.available)) (ADR 0031 amendment: Pusat Biaya first, then PT)."
+                "description": "Kurang = max(0, needed − pusatBiaya.available) for a mapped project (ADR 0031 amendment 2026-10-26: that account only), else max(0, needed − available)."
               },
               "route": {
                 "type": "string",
@@ -2484,14 +2484,14 @@ export const openapiDocument = {
                   "pt",
                   "short"
                 ],
-                "description": "ADR 0031 amendment: pusat_biaya = the project's Pusat Biaya covers the need; other_account = it does not, the PT does (Finance pays from another account → automatic inter-project loan); pt = no Pusat Biaya, the PT covers it; short = neither."
+                "description": "ADR 0031 amendment: pusat_biaya = the project's Pusat Biaya covers the need; pt = no Pusat Biaya, the PT covers it; short = not covered. other_account (the PT covering a short Pusat Biaya) is no longer produced since 2026-10-26."
               },
               "routeText": {
                 "type": [
                   "string",
                   "null"
                 ],
-                "description": "Indonesian one-liner of `route` (null when pt / short)."
+                "description": "Indonesian one-liner of `route` (null unless pusat_biaya)."
               },
               "pusatBiaya": {
                 "type": [
@@ -2707,6 +2707,106 @@ export const openapiDocument = {
                   ]
                 },
                 "description": "Inter-PT loans instructed for this request (linked)."
+              },
+              "projectLoans": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "docNo": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "statusLabel": {
+                      "type": "string",
+                      "description": "Indonesian label (GET /project-loans), e.g. \"Disetujui – menunggu transfer Finance\"."
+                    },
+                    "amount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10000000000000
+                    },
+                    "awaitingTransfer": {
+                      "type": "boolean",
+                      "description": "Approved, transfer order in Antrian Transfer not executed yet."
+                    },
+                    "lenderProject": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
+                        "code": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "code",
+                        "name"
+                      ]
+                    },
+                    "lenderAccount": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "docNo",
+                    "status",
+                    "statusLabel",
+                    "amount",
+                    "awaitingTransfer",
+                    "lenderProject",
+                    "lenderAccount"
+                  ]
+                },
+                "description": "2026-10-26: inter-project loans instructed for this request (\"Instruksi pinjam antar proyek\", project_loans.expense_request_id), oldest first."
+              },
+              "projectLoanPending": {
+                "type": "boolean",
+                "description": "2026-10-26: one of `projectLoans` waits for Finance's transfer — \"Setujui\" stays disabled (blockedText says so), no second instruction."
               }
             },
             "required": [
@@ -2729,7 +2829,9 @@ export const openapiDocument = {
               "excludedSiteAccounts",
               "waitingAtOwner",
               "commitmentItems",
-              "loans"
+              "loans",
+              "projectLoans",
+              "projectLoanPending"
             ],
             "description": "ADR 0029 §2 \"Ketersediaan dana PT\": for Finance / Direktur / Owner of the request's PT while the request waits for a decision (any step; read-only before the final one) or is the Owner's own Draft; null otherwise. `blocked` = the next decision (or the Owner's submit) is refused with 409 FUND_INSUFFICIENT — show \"Setujui\" disabled with `blockedText`, keep \"Tolak\"; `instruct_loan` in allowedActions opens the loan instruction (amount default = gap)."
           },
@@ -3452,6 +3554,7 @@ export const openapiDocument = {
           "settle",
           "settle_reverse",
           "instruct_loan",
+          "instruct_project_loan",
           "delete_draft"
         ]
       },
@@ -4086,6 +4189,346 @@ export const openapiDocument = {
       "EmptyBody": {
         "type": "object",
         "properties": {},
+        "additionalProperties": false
+      },
+      "ProjectLoanInstructionInfo": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "docNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "companyId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "borrowerProject": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name"
+            ]
+          },
+          "borrowerAccount": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": "string"
+              },
+              "balance": {
+                "type": "integer",
+                "description": "Saldo akun (opening + KM − KK)."
+              },
+              "commitments": {
+                "type": "integer",
+                "description": "Komitmen (pk_pb_commitments)."
+              },
+              "available": {
+                "type": "integer",
+                "description": "Dana bebas = balance − commitments (may be negative)."
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "balance",
+              "commitments",
+              "available"
+            ],
+            "description": "The project's cash account (Pusat Biaya) — the request is checked against its dana bebas only."
+          },
+          "needed": {
+            "type": "integer",
+            "description": "The request's grand total."
+          },
+          "shortfall": {
+            "type": "integer",
+            "description": "needed − borrower dana bebas (0 = enough: approve)."
+          },
+          "minAmount": {
+            "type": "integer",
+            "description": "= shortfall: the smallest loan that lets the request pass."
+          },
+          "loanDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Business date of the PT (the loan date)."
+          },
+          "defaultDueDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "loanDate + 30 days (editable)."
+          },
+          "canInstruct": {
+            "type": "boolean",
+            "description": "The caller takes the final decision now, the account is short (fund check on) and no instructed loan waits."
+          },
+          "cannotReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why canInstruct is false (Indonesian), else null."
+          },
+          "pendingLoan": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "docNo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "amount": {
+                "type": "integer"
+              },
+              "statusLabel": {
+                "type": "string"
+              },
+              "lenderProject": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                  },
+                  "code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "code",
+                  "name"
+                ]
+              },
+              "lenderAccount": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "docNo",
+              "amount",
+              "statusLabel",
+              "lenderProject",
+              "lenderAccount"
+            ],
+            "description": "The instructed loan waiting for Finance's transfer (\"Pinjaman PJ/… menunggu transfer Finance\")."
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "project": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name"
+                  ]
+                },
+                "account": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "description": "The lender project's cash account (null = not mapped)."
+                },
+                "available": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Dana bebas of that account (null without account)."
+                },
+                "eligible": {
+                  "type": "boolean",
+                  "description": "May be chosen: own active account ≠ the borrower's, dana bebas ≥ minAmount."
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "no_account",
+                    "inactive_account",
+                    "same_account",
+                    "insufficient",
+                    null
+                  ]
+                },
+                "reasonText": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "project",
+                "account",
+                "available",
+                "eligible",
+                "reason",
+                "reasonText"
+              ]
+            },
+            "description": "Open projects of the same PT (not the borrower), eligible first by dana bebas descending, then the others."
+          }
+        },
+        "required": [
+          "requestId",
+          "docNo",
+          "title",
+          "companyId",
+          "borrowerProject",
+          "borrowerAccount",
+          "needed",
+          "shortfall",
+          "minAmount",
+          "loanDate",
+          "defaultDueDate",
+          "canInstruct",
+          "cannotReason",
+          "pendingLoan",
+          "candidates"
+        ]
+      },
+      "ProjectLoanInstruct": {
+        "type": "object",
+        "properties": {
+          "lenderProjectId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "An eligible candidate of GET /expense-requests/{id}/project-loan-lenders."
+          },
+          "amount": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000000000,
+            "description": "Rp: ≥ the shortfall, ≤ the lender account's dana bebas (both re-checked under the PT fund lock)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Alasan / catatan (wajib, min. 3 karakter) — stored on the loan with the request number."
+          },
+          "dueDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Jatuh tempo (default loan date + 30 days; ≥ the loan date)."
+          }
+        },
+        "required": [
+          "lenderProjectId",
+          "amount",
+          "reason"
+        ],
         "additionalProperties": false
       },
       "RejectBody": {
@@ -6459,6 +6902,33 @@ export const openapiDocument = {
                   "maximum": 10000000000000,
                   "description": "ADR 0029: \"Dana kurang Rp X\" — the gap of a final-step row of a PT with the fund check on (Kas roles of the PT); null when enough / not applicable. Approving it is refused (409 FUND_INSUFFICIENT)."
                 },
+                "instructProjectLoan": {
+                  "type": "boolean",
+                  "description": "2026-10-26: fundShort is the gap of the project's cash account and no instructed loan waits — show \"Instruksi pinjam antar proyek\" (GET /expense-requests/{id}/project-loan-lenders)."
+                },
+                "projectLoanPending": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "docNo": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "docNo"
+                  ],
+                  "description": "2026-10-26: the instructed inter-project loan waiting for Finance's transfer (\"Pinjaman PJ/… menunggu transfer Finance\"); null when none."
+                },
                 "selfApproval": {
                   "type": [
                     "string",
@@ -6552,6 +7022,8 @@ export const openapiDocument = {
                 "decisionBy",
                 "finalStep",
                 "fundShort",
+                "instructProjectLoan",
+                "projectLoanPending",
                 "selfApproval",
                 "budget",
                 "flags"
@@ -19627,7 +20099,7 @@ export const openapiDocument = {
           },
           "originLabel": {
             "type": "string",
-            "description": "\"Diajukan PM\" / \"Diajukan Finance\" / \"Otomatis dari transfer\"."
+            "description": "\"Diajukan PM\" / \"Diajukan Finance\" / \"Otomatis dari transfer\" / \"Instruksi Owner\"."
           },
           "submitterRole": {
             "type": [
@@ -19637,9 +20109,10 @@ export const openapiDocument = {
             "enum": [
               "pm",
               "finance",
+              "owner",
               null
             ],
-            "description": "2026-10-24 (#10): the creator filed as borrower PM or as Finance (null for an automatic loan; legacy loans = pm)."
+            "description": "2026-10-24 (#10): the creator filed as borrower PM or as Finance (null for an automatic loan; legacy loans = pm). 2026-10-26: owner = instructed by the final decider of `expenseRequest` (born approved, no Direktur / Owner level)."
           },
           "lenderProject": {
             "type": [
@@ -19855,6 +20328,29 @@ export const openapiDocument = {
             ],
             "description": "ADR 0031: the transfer of an automatic loan."
           },
+          "expenseRequest": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "docNo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "docNo"
+            ],
+            "description": "2026-10-26: the expense request an Owner-instructed loan covers (it is approved after this loan's transfer)."
+          },
           "amount": {
             "type": "integer"
           },
@@ -20003,6 +20499,7 @@ export const openapiDocument = {
           "awaitingDisbursement",
           "transferQueueHref",
           "transfer",
+          "expenseRequest",
           "amount",
           "repaidTotal",
           "outstanding",
@@ -20710,7 +21207,7 @@ export const openapiDocument = {
           },
           "originLabel": {
             "type": "string",
-            "description": "\"Diajukan PM\" / \"Diajukan Finance\" / \"Otomatis dari transfer\"."
+            "description": "\"Diajukan PM\" / \"Diajukan Finance\" / \"Otomatis dari transfer\" / \"Instruksi Owner\"."
           },
           "submitterRole": {
             "type": [
@@ -20720,9 +21217,10 @@ export const openapiDocument = {
             "enum": [
               "pm",
               "finance",
+              "owner",
               null
             ],
-            "description": "2026-10-24 (#10): the creator filed as borrower PM or as Finance (null for an automatic loan; legacy loans = pm)."
+            "description": "2026-10-24 (#10): the creator filed as borrower PM or as Finance (null for an automatic loan; legacy loans = pm). 2026-10-26: owner = instructed by the final decider of `expenseRequest` (born approved, no Direktur / Owner level)."
           },
           "lenderProject": {
             "type": [
@@ -20937,6 +21435,29 @@ export const openapiDocument = {
               "docNo"
             ],
             "description": "ADR 0031: the transfer of an automatic loan."
+          },
+          "expenseRequest": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "docNo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "docNo"
+            ],
+            "description": "2026-10-26: the expense request an Owner-instructed loan covers (it is approved after this loan's transfer)."
           },
           "amount": {
             "type": "integer"
@@ -21578,6 +22099,7 @@ export const openapiDocument = {
           "awaitingDisbursement",
           "transferQueueHref",
           "transfer",
+          "expenseRequest",
           "amount",
           "repaidTotal",
           "outstanding",
@@ -27930,7 +28452,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/approve": {
       "post": {
-        "summary": "Approve the current level (G1/G2, ADR 0013 / 0026; budget % before → after); PM/Staff/Admin → 403 (audited). ADR 0029: the decision that makes the request \"Disetujui\" (normally the Owner level; a rule without an Owner level: its last level) is refused for a PT with the fund check on when the request's grand total exceeds BOTH the dana bebas of its project's Pusat Biaya and the PT's \"Dana tersedia\" (ADR 0031 amendment: Pusat Biaya first, then PT; per PT only without a mapped project) → 409 code FUND_INSUFFICIENT (companyId, balance, commitments, available = the larger figure, needed, gap; with a Pusat Biaya also pusatBiayaAccountId / pusatBiayaName / pusatBiayaAvailable; audited fund_insufficient); the request stays at its step. Checked decisions store fundBalance / fundCommitments / fundAvailable",
+        "summary": "Approve the current level (G1/G2, ADR 0013 / 0026; budget % before → after); PM/Staff/Admin → 403 (audited). ADR 0029: the decision that makes the request \"Disetujui\" (normally the Owner level; a rule without an Owner level: its last level) is refused for a PT with the fund check on when the request's grand total exceeds the dana bebas of its project's Pusat Biaya (ADR 0031 amendment 2026-10-26: that account only — the PT no longer covers it; the final decider instructs an inter-project loan instead, POST /expense-requests/{id}/project-loan) or, without a mapped project, the PT's \"Dana tersedia\" → 409 code FUND_INSUFFICIENT (companyId, balance, commitments, available = the deciding figure, needed, gap; with a Pusat Biaya also pusatBiayaAccountId / pusatBiayaName / pusatBiayaAvailable; audited fund_insufficient); the request stays at its step. Checked decisions store fundBalance / fundCommitments / fundAvailable",
         "security": [
           {
             "bearer": []
@@ -27987,6 +28509,266 @@ export const openapiDocument = {
         "responses": {
           "200": {
             "description": "Request after the action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseRequestDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/expense-requests/{id}/project-loan-lenders": {
+      "get": {
+        "summary": "DRMS 26/10 #1 \"Instruksi pinjam antar proyek\" (ADR 0031 amendment 2026-10-26): the request's project cash account (dana bebas, shortfall = minAmount), the lender candidates (open projects of the same PT with their own account's dana bebas; no account / inactive / the borrower's account / below minAmount → eligible false + reason), the instructed loan waiting for Finance, `canInstruct` (the final decider while short, fund check on). Kas roles of the request's PT (Finance / Direktur / Owner) else 403; a request without a mapped project → 409",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Instruction data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLoanInstructionInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/expense-requests/{id}/project-loan": {
+      "post": {
+        "summary": "DRMS 26/10 #1: the final decider of a request whose project cash account is short instructs an inter-project loan (lender project + its account → the request's project + account), born APPROVED (submitterRole owner, no Direktur / Owner level, audited approve/ownerInstruction), a transfer order in Antrian Transfer (Finance notified). Shortfall ≤ amount ≤ the lender account's dana bebas, both re-checked under the PT fund lock (409 FUND_INSUFFICIENT / 400). Not the final decider → 403 (audited access_denied); a loan already waits / not short / not at the final step → 409. The request stays waiting; it is approved normally after Finance executed the transfer (the instructor is notified, event project_loan.request_ready). 201 + the request detail",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectLoanInstruct"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Request after the instruction",
             "content": {
               "application/json": {
                 "schema": {
