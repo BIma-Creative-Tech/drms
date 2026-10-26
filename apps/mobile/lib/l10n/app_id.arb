@@ -1264,6 +1264,18 @@
     }
   },
   "recapMemberTitle": "Rekap absensi karyawan",
+  "recapViewOwn": "Saya",
+  "recapViewTeam": "Tim",
+  "recapNoEmployee": "Akun Anda belum terhubung ke data karyawan. Hubungi Admin.",
+  "teamRecapEmpty": "Belum ada karyawan dalam rekap bulan ini.",
+  "teamRecapCount": "{count} karyawan",
+  "@teamRecapCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "teamStatusNotYet": "Belum absen",
   "teamStatusPresent": "Hadir",
   "teamStatusDone": "Selesai",

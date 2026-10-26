@@ -57,39 +57,12 @@ class _RecapViewState extends ConsumerState<RecapView> {
     final t = AppLocalizations.of(context);
     final key = (widget.employeeId, _month);
     final value = ref.watch(attendanceRecapProvider(key));
-    final isCurrent = _month == monthOf(DateTime.now());
     return RefreshIndicator(
       onRefresh: () async => ref.invalidate(attendanceRecapProvider(key)),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
-          PkCard(
-            padding: const EdgeInsets.all(8),
-            child: Row(
-              children: [
-                IconButton.filledTonal(
-                  key: const Key('recap-prev'),
-                  tooltip: t.recapPrevMonth,
-                  onPressed: () => setState(() => _month = shiftMonth(_month, -1)),
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                Expanded(
-                  child: Text(
-                    periodLong(_month),
-                    key: const Key('recap-month'),
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                ),
-                IconButton.filledTonal(
-                  key: const Key('recap-next'),
-                  tooltip: t.recapNextMonth,
-                  onPressed: isCurrent ? null : () => setState(() => _month = shiftMonth(_month, 1)),
-                  icon: const Icon(Icons.chevron_right),
-                ),
-              ],
-            ),
-          ),
+          RecapMonthSwitcher(month: _month, onChanged: (m) => setState(() => _month = m)),
           if (widget.employeeId == null) const _OwnRecapCompanyPicker(),
           const SizedBox(height: 12),
           AsyncBody<AttendanceRecap>(
@@ -145,6 +118,49 @@ class _RecapViewState extends ConsumerState<RecapView> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Month switcher of the recaps (own / member / DRMS 26/10 team): ‹ month › — never past the current month.
+class RecapMonthSwitcher extends StatelessWidget {
+  const RecapMonthSwitcher({super.key, required this.month, required this.onChanged, this.keyPrefix = 'recap'});
+  final String month;
+  final ValueChanged<String> onChanged;
+
+  /// Widget keys `<prefix>-prev`, `<prefix>-month`, `<prefix>-next`.
+  final String keyPrefix;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final isCurrent = month == monthOf(DateTime.now());
+    return PkCard(
+      padding: const EdgeInsets.all(8),
+      child: Row(
+        children: [
+          IconButton.filledTonal(
+            key: Key('$keyPrefix-prev'),
+            tooltip: t.recapPrevMonth,
+            onPressed: () => onChanged(shiftMonth(month, -1)),
+            icon: const Icon(Icons.chevron_left),
+          ),
+          Expanded(
+            child: Text(
+              periodLong(month),
+              key: Key('$keyPrefix-month'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+          IconButton.filledTonal(
+            key: Key('$keyPrefix-next'),
+            tooltip: t.recapNextMonth,
+            onPressed: isCurrent ? null : () => onChanged(shiftMonth(month, 1)),
+            icon: const Icon(Icons.chevron_right),
           ),
         ],
       ),

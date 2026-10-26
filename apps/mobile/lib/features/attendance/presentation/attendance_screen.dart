@@ -27,7 +27,7 @@ import '../../privacy/presentation/privacy_notice_screen.dart';
 import '../application/attendance_service.dart';
 import '../domain/attendance.dart';
 import 'attendance_widgets.dart';
-import 'recap_view.dart';
+import 'team_recap_view.dart';
 import 'team_view.dart';
 
 /// Tabs of the attendance hub (by role).
@@ -38,7 +38,8 @@ enum AttendanceTab { check, recap, team }
 /// Non-OnSite, cached for offline use); on open the GPS fix selects the location whose geofence contains it (nearest
 /// when several overlap → the user picks among them; none → manual picker as fallback) — works offline; GPS +
 /// front-camera selfie are captured on the phone and
-/// queued; the server decides. "Rekap": own month (US-09). "Tim": team today (US-13) with on-behalf
+/// queued; the server decides. "Rekap": own month (US-09); DRMS 26/10 #3: team month for the office roles / PM
+/// ([RecapHub]). "Tim": team today (US-13) with on-behalf
 /// (US-14) and corrections (US-15). Check-in / on-behalf follow `features.syncAttendance`; the recap and
 /// team views are online reads and work with the flag off.
 class AttendanceScreen extends ConsumerWidget {
@@ -62,7 +63,7 @@ class AttendanceScreen extends ConsumerWidget {
     };
     Widget body(AttendanceTab tab) => switch (tab) {
       AttendanceTab.check => const _CheckTab(),
-      AttendanceTab.recap => const RecapView(),
+      AttendanceTab.recap => const RecapHub(),
       AttendanceTab.team => const TeamTodayView(),
     };
     return DefaultTabController(

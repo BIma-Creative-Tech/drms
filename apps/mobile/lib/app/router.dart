@@ -234,7 +234,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: 'recap/:employeeId',
-            builder: (_, s) => MemberRecapScreen(employeeId: int.tryParse(s.pathParameters['employeeId'] ?? '') ?? 0),
+            builder: (_, s) {
+              final month = s.uri.queryParameters['month'];
+              return MemberRecapScreen(
+                employeeId: int.tryParse(s.pathParameters['employeeId'] ?? '') ?? 0,
+                initialMonth: month != null && RegExp(r'^\d{4}-(0[1-9]|1[0-2])$').hasMatch(month) ? month : null,
+              );
+            },
           ),
         ],
       ),

@@ -1791,6 +1791,23 @@ class AppLocalizationsId extends AppLocalizations {
   String get recapMemberTitle => 'Rekap absensi karyawan';
 
   @override
+  String get recapViewOwn => 'Saya';
+
+  @override
+  String get recapViewTeam => 'Tim';
+
+  @override
+  String get recapNoEmployee => 'Akun Anda belum terhubung ke data karyawan. Hubungi Admin.';
+
+  @override
+  String get teamRecapEmpty => 'Belum ada karyawan dalam rekap bulan ini.';
+
+  @override
+  String teamRecapCount(int count) {
+    return '$count karyawan';
+  }
+
+  @override
   String get teamStatusNotYet => 'Belum absen';
 
   @override

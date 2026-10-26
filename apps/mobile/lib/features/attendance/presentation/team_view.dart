@@ -433,17 +433,19 @@ class _CorrectionDialogState extends ConsumerState<CorrectionDialog> {
   }
 }
 
-/// Monthly recap of a team member (route /attendance/recap/:employeeId).
+/// Monthly recap of a team member (route /attendance/recap/:employeeId[?month=YYYY-MM] — DRMS 26/10 #3: the month of
+/// the team recap row).
 class MemberRecapScreen extends StatelessWidget {
-  const MemberRecapScreen({super.key, required this.employeeId});
+  const MemberRecapScreen({super.key, required this.employeeId, this.initialMonth});
   final int employeeId;
+  final String? initialMonth;
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(t.recapMemberTitle)),
-      body: RecapView(employeeId: employeeId),
+      body: RecapView(employeeId: employeeId, initialMonth: initialMonth),
     );
   }
 }

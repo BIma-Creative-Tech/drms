@@ -3247,6 +3247,36 @@ abstract class AppLocalizations {
   /// **'Rekap absensi karyawan'**
   String get recapMemberTitle;
 
+  /// No description provided for @recapViewOwn.
+  ///
+  /// In id, this message translates to:
+  /// **'Saya'**
+  String get recapViewOwn;
+
+  /// No description provided for @recapViewTeam.
+  ///
+  /// In id, this message translates to:
+  /// **'Tim'**
+  String get recapViewTeam;
+
+  /// No description provided for @recapNoEmployee.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun Anda belum terhubung ke data karyawan. Hubungi Admin.'**
+  String get recapNoEmployee;
+
+  /// No description provided for @teamRecapEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada karyawan dalam rekap bulan ini.'**
+  String get teamRecapEmpty;
+
+  /// No description provided for @teamRecapCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} karyawan'**
+  String teamRecapCount(int count);
+
   /// No description provided for @teamStatusNotYet.
   ///
   /// In id, this message translates to:
