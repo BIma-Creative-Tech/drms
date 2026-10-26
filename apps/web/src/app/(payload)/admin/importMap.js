@@ -54,6 +54,7 @@ import { SsoLoginButton as SsoLoginButton_e910a89f6cf03666cb4ab2594dae916d } fro
 import { LoadingProvider as LoadingProvider_102ab52fcb0bfaca8f09b2ac251085a9 } from '@/admin/loading/LoadingProvider'
 import { FeedbackHost as FeedbackHost_1a26d2215cbf7fb7955a47711cea01fe } from '@/admin/components/feedback/FeedbackHost'
 import { LightboxProvider as LightboxProvider_9e2cf7dbd1ec819b046a1110cd1942a3 } from '@/admin/components/lightbox/LightboxProvider'
+import { UploadSizeGuard as UploadSizeGuard_4936c73c3fbf00f630388b0ec71ae0a3 } from '@/admin/components/media/UploadSizeGuard'
 import { ApprovalInbox as ApprovalInbox_38358c8fa3c2f08f616ef2728997b5dc } from '@/admin/views/ApprovalInbox'
 import { TransferQueue as TransferQueue_8a6e0f53c8f086ccf31fb1d3d209ace9 } from '@/admin/views/TransferQueue'
 import { LpjVerification as LpjVerification_0e13d2751aafbaa3ddc692019a4025e1 } from '@/admin/views/LpjVerification'
@@ -175,6 +176,7 @@ export const importMap = {
   "@/admin/loading/LoadingProvider#LoadingProvider": LoadingProvider_102ab52fcb0bfaca8f09b2ac251085a9,
   "@/admin/components/feedback/FeedbackHost#FeedbackHost": FeedbackHost_1a26d2215cbf7fb7955a47711cea01fe,
   "@/admin/components/lightbox/LightboxProvider#LightboxProvider": LightboxProvider_9e2cf7dbd1ec819b046a1110cd1942a3,
+  "@/admin/components/media/UploadSizeGuard#UploadSizeGuard": UploadSizeGuard_4936c73c3fbf00f630388b0ec71ae0a3,
   "@/admin/views/ApprovalInbox#ApprovalInbox": ApprovalInbox_38358c8fa3c2f08f616ef2728997b5dc,
   "@/admin/views/TransferQueue#TransferQueue": TransferQueue_8a6e0f53c8f086ccf31fb1d3d209ace9,
   "@/admin/views/LpjVerification#LpjVerification": LpjVerification_0e13d2751aafbaa3ddc692019a4025e1,

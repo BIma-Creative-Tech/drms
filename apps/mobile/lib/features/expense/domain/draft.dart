@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../masters/domain/master_item.dart';
 import 'request_status.dart';
 
 part 'draft.freezed.dart';
@@ -187,6 +188,14 @@ const maxDraftAttachments = 20;
 
 /// `media-attachments` PDF limit (5 MB); photos are compressed on the phone like a receipt photo.
 const maxAttachmentPdfBytes = 5 * 1024 * 1024;
+
+/// Project statuses a new request may not use (server G10, domain/expense/drafts.ts).
+const requestRefusedProjectStatuses = {'arsip', 'dibatalkan', 'selesai'};
+
+/// D2610 (backlog 26/10): projects of the request picker — without the ones the server refuses (an older cached row
+/// without `status` stays); the draft's current project ([keep]) stays listed so its label still shows.
+List<MasterItem> requestableProjects(List<MasterItem> projects, {int? keep}) =>
+    projects.where((p) => p.id == keep || !requestRefusedProjectStatuses.contains(p.extra['status'])).toList();
 
 /// D2410 (point 6): type of a picked file by its name (JPG / PNG / PDF); null = not allowed.
 String? attachmentMimeOf(String fileName) => switch (fileName.split('.').last.toLowerCase()) {

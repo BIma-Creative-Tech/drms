@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-10-26
+
+**Upload size guard + request project picker (user 2026-10-26); APK 0.14.1.** No migrations, API contract unchanged
+(0.22.1, version only). APK 0.14.1 works with server 0.22.0+ (the `projects` master already carries `status`).
+
+### Fixed
+
+- **Admin upload of a file over its cap vanished silently (prod Reimburse #125, 26/10).** A 6–7 MB PDF in "Lampiran"
+  (attachment PDF cap 5 MB, unchanged — user decision) was refused with 413; Payload's bulk-upload drawer then re-sent
+  its form state WITH the file to the admin Server Action, CrowdSec CRS blocked that body (403, "rce" anomaly on the
+  PDF bytes), Payload swallowed the error and closed the drawer as if saved — no file, no message. Every file handed
+  to a Payload upload UI (file input, drop / paste on a dropzone) is now checked in the browser before anything is
+  sent (`UploadSizeGuard`, admin provider); an oversize file is stopped and the result popup names it with
+  "maks. X MB per file". The caps of every media collection live in one pure module
+  (`collections/media/limits.ts`) read by the server and the guard. The WAF rules are unchanged.
+- **Request project picker offered closed projects (backlog 26/10).** The web picker and the APK draft editor no
+  longer list projects with status `arsip`, `selesai` or `dibatalkan`, which the server refuses for a request (G10,
+  now `isRequestableProjectStatus`); a draft's current project stays shown.
+
+### Changed
+
+- "maks. 5 MB per file" note on "Lampiran", "File invoice / dokumen" and the Reimburse send hint.
+
 ## [0.22.0] - 2026-10-26
 
 **Client feedback 26/10 (DRMS 26/10, PR #144); APK 0.14.0.** Three streams on top of 0.21.1 / APK 0.13.1:

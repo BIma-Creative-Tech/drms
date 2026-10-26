@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:proyekkas/features/expense/domain/draft.dart';
 import 'package:proyekkas/features/expense/domain/draft_validation.dart';
 import 'package:proyekkas/features/expense/domain/request_status.dart';
+import 'package:proyekkas/features/masters/domain/master_item.dart';
 
 import '../support/seed.dart';
 
@@ -117,5 +118,13 @@ void main() {
       const DraftIssue('total', 'Total harus lebih dari 0.', lineNo: 2).toString(),
       'Baris 2: Total harus lebih dari 0.',
     );
+  });
+
+  test('D2610: request project picker without arsip / selesai / dibatalkan, current one kept', () {
+    MasterItem p(int id, String? status) => MasterItem(id, 'P$id', extra: {'id': id, 'status': ?status});
+    final all = [p(1, 'berjalan'), p(2, 'arsip'), p(3, 'selesai'), p(4, 'dibatalkan'), p(5, 'perencanaan')];
+    expect(requestableProjects(all).map((i) => i.id), [1, 5]);
+    expect(requestableProjects(all, keep: 3).map((i) => i.id), [1, 3, 5]);
+    expect(requestableProjects([p(6, 'ditunda'), p(7, null)]).map((i) => i.id), [6, 7]);
   });
 }
