@@ -1,6 +1,6 @@
 'use client'
 import { useConfig } from '@payloadcms/ui'
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect } from 'react'
 
 import type { MediaSlug } from '@/collections/media/limits'
 
@@ -18,8 +18,6 @@ import { entityOfPath, fieldNameOfId, oversizeFiles, oversizeMessage, slugByAcce
  */
 export function UploadSizeGuard({ children }: { children?: React.ReactNode }) {
   const { config, getEntityConfig } = useConfig()
-  const cfg = useRef({ config, getEntityConfig })
-  cfg.current = { config, getEntityConfig }
 
   useEffect(() => {
     /** Collection of the field around `el` (drop on an upload field's own dropzone: no file input there). */
@@ -29,10 +27,9 @@ export function UploadSizeGuard({ children }: { children?: React.ReactNode }) {
       if (byAccept) return byAccept
       const name = fieldNameOfId(el.closest('.field-type.upload[id^="field-"]')?.id)
       if (!name) return null
-      const { config: c, getEntityConfig: get } = cfg.current
-      const entity = entityOfPath(window.location.pathname, c.routes?.admin ?? '/admin')
-      const current = entity ? (get(entity) as { fields?: unknown } | null) : null
-      return slugOfField(name, current, [...(c.collections ?? []), ...(c.globals ?? [])] as Array<{ fields?: unknown }>)
+      const entity = entityOfPath(window.location.pathname, config.routes?.admin ?? '/admin')
+      const current = entity ? (getEntityConfig(entity) as { fields?: unknown } | null) : null
+      return slugOfField(name, current, [...(config.collections ?? []), ...(config.globals ?? [])] as Array<{ fields?: unknown }>)
     }
 
     /** True (and the popup shown) when one of `files` is too big. */
@@ -75,7 +72,7 @@ export function UploadSizeGuard({ children }: { children?: React.ReactNode }) {
       window.removeEventListener('drop', onDropOrPaste, true)
       window.removeEventListener('paste', onDropOrPaste, true)
     }
-  }, [])
+  }, [config, getEntityConfig])
 
   return <>{children}</>
 }
