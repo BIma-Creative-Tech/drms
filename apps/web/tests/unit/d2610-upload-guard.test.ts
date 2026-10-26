@@ -125,11 +125,10 @@ describe('wiring', () => {
   })
 
   it('the attachment fields say "maks. 5 MB per file"', () => {
-    const fields = ExpenseRequests.fields as Array<{ name?: string; admin?: { description?: unknown } }>
-    const flat = (fs: unknown): Array<{ name?: string; admin?: { description?: unknown } }> =>
-      Array.isArray(fs) ? fs.flatMap((f: { fields?: unknown; tabs?: Array<{ fields?: unknown }> }) => [f, ...flat(f.fields), ...(f.tabs ?? []).flatMap((t) => flat(t.fields))]) : []
+    type F = { name?: string; admin?: { description?: unknown }; fields?: unknown; tabs?: Array<{ fields?: unknown }> }
+    const flat = (fs: unknown): F[] => (Array.isArray(fs) ? (fs as F[]).flatMap((f) => [f, ...flat(f.fields), ...(f.tabs ?? []).flatMap((t) => flat(t.fields))]) : [])
     for (const name of ['attachments', 'invoiceFile']) {
-      const f = flat(fields).find((x) => x.name === name)
+      const f = flat(ExpenseRequests.fields).find((x) => x.name === name)
       expect(String(f?.admin?.description), name).toContain('maks. 5 MB per file')
     }
     expect(src('src/admin/components/RequesterActions.tsx')).toContain('lampiran (foto/PDF, maks. 5 MB per file)')
