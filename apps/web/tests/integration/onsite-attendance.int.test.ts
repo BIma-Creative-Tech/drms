@@ -169,7 +169,8 @@ describe('Non-OnSite: anywhere — inside a registered location recorded there, 
     expect(inn.status, JSON.stringify(inn.body)).toBe(201)
     expect(inn.body as Checked).toMatchObject({ location: { type: ref.kind, id: ref.id }, outsideArea: true, distanceM: ref.distanceM })
     const row = (await sqlAs('app', 'SELECT kind, project_id, cost_center_id, outside_area, distance_m, flags FROM attendances WHERE id = $1', [(inn.body as Checked).id])).rows[0]
-    expect(row).toMatchObject({ kind: 'check_in', outside_area: true, distance_m: ref.distanceM })
+    expect(row).toMatchObject({ kind: 'check_in', outside_area: true })
+    expect(Number(row.distance_m)).toBe(ref.distanceM)
     expect(ref.kind === 'project' ? row.project_id : row.cost_center_id).toBe(ref.id)
     // a check-out elsewhere outside every location closes that pair, again "Di luar area"
     const out = await check(roamer, FAR2, { cost_center_id: costCenter }, 'out')
