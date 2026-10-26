@@ -1656,8 +1656,7 @@ class AppLocalizationsId extends AppLocalizations {
       'Absen \"Di luar area\" belum bisa: site penempatan / kantor pusat PT belum ditetapkan Admin.';
 
   @override
-  String get attendanceNonOnsiteOutside =>
-      'Di luar lokasi terdaftar — absen dicatat \"Di luar area\"';
+  String get attendanceNonOnsiteOutside => 'Di luar lokasi terdaftar — absen dicatat \"Di luar area\"';
 
   @override
   String get distanceInside => 'Di dalam area absen';
