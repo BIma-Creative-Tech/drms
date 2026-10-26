@@ -30,8 +30,9 @@ Sebelum mulai: unggah **tanda tangan** sekali di web (**Profil & tanda tangan**)
 - **Di mana boleh absen?** Tergantung **tipe absensi** Anda (diatur Admin): **Karyawan OnSite** — di dalam salah satu
   lokasi terdaftar PT (kantor, site, project, pusat biaya), tanpa perlu ditugaskan; di luar radius ditolak.
   **Karyawan Non-OnSite** — di mana saja: di dalam lokasi terdaftar tercatat di lokasi itu, di luar semua lokasi
-  terdaftar pilihan **"Di luar area"** otomatis terpilih dan absen tetap tersimpan (tercatat "Di luar area" dengan
-  acuan site penempatan / kantor pusat). Daftar lokasi tersimpan di HP, jadi deteksi area tetap jalan tanpa sinyal.
+  terdaftar muncul catatan **"Di luar lokasi terdaftar — absen dicatat 'Di luar area'"** sebelum konfirmasi, dan absen
+  tetap tersimpan (tercatat "Di luar area" dengan acuan lokasi terdaftar terdekat). Daftar lokasi tersimpan di HP, jadi
+  deteksi area tetap jalan tanpa sinyal. Pengajuan tetap hanya untuk project tempat Anda ditugaskan.
 - **"Lokasi palsu (mock location) terdeteksi"**: matikan aplikasi pengubah lokasi. Absen ditolak.
 - **"Sudah absen masuk di … hari ini"**: absen masuk hanya sekali per hari per lokasi.
 - **"Titik lokasi … belum diisi Admin"**: lapor Admin. (Bila titik sudah ada tetapi radius kosong, dipakai radius
