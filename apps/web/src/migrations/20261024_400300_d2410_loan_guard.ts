@@ -114,7 +114,8 @@ const LOANS_GUARD_PREV = `
     END
     $fn$;`
 
-const LOANS_GUARD_NEW = `
+/** Exported for 20261026_100200_d2610_owner_loan_guard (built on it, restored by its down). */
+export const LOANS_GUARD_NEW = `
     CREATE OR REPLACE FUNCTION pk_project_loans_guard() RETURNS trigger LANGUAGE plpgsql AS $fn$
     DECLARE
       allowed text[];

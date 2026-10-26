@@ -21,37 +21,40 @@ export const fundLockKey = (companyId: number): string => `pk:fund:${companyId}`
 export type FundFigures = { companyId: number; balance: number; commitments: number; available: number }
 
 /**
- * ADR 0031 amendment (user 2026-10-22, "PB dulu, lalu PT"): a request of a project mapped to a Pusat Biaya (cash account)
- * is checked against that account first:
+ * ADR 0031 amendment (user 2026-10-22, "PB dulu, lalu PT") — narrowed by the amendment 2026-10-26 (DRMS 26/10 #1, user
+ * decision): a request of a project mapped to a Pusat Biaya (cash account) is checked against THAT account only:
  * - Dana bebas PB = balance of the account − commitments of the requests of the projects mapped to it (+ their unpaid LPJ
- *   shortfalls + approved, not yet disbursed cash-backed loans the account lends) — `pk_pb_balance` / `pk_pb_commitments`;
+ *   shortfalls + approved, not yet disbursed cash-backed loans the account lends + approved repayment orders it pays) —
+ *   `pk_pb_balance` / `pk_pb_commitments`;
  * - enough there → pass (Finance pays from the Pusat Biaya);
- * - else enough in the PT (ADR 0029 figure) → pass, Finance pays from another account of the PT (automatic loan);
- * - else short (inter-PT loan or reject). A request without a mapped project is checked per PT only.
- * The SQL `pk_request_fund_available(company, project)` is the same rule for the DB backstop.
+ * - else short — the 0.19.1 fallback "the PT covers it" is gone: the Owner (the final decider) instructs an inter-project
+ *   loan to that account ("Instruksi pinjam antar proyek", domain/loans/owner-instruct.ts) and approves once Finance has
+ *   executed its transfer; or rejects. A request without a mapped project is checked per PT only (ADR 0029, unchanged).
+ * The SQL `pk_request_fund_available(company, project)` is the same rule for the DB backstop (migration 20261026_100200).
+ * Finance paying an approved request from another account (automatic loan, ADR 0031 §3) is unchanged.
  */
 export type PbFigures = { accountId: number; name: string; balance: number; commitments: number; available: number }
 
+/**
+ * `other_account` = the 0.19.1 route "the PT covers it, Finance pays from another account" — no longer produced since
+ * 2026-10-26 (kept in the contract for older clients).
+ */
 export type FundRoute = 'pusat_biaya' | 'other_account' | 'pt' | 'short'
 
-/** The figure a request is compared with: the larger of the PT's and its Pusat Biaya's available funds. */
+/** The figure a request is compared with (2026-10-26): its Pusat Biaya's dana bebas when mapped, else the PT's. */
 export function effectiveAvailable(ptAvailable: number, pbAvailable: number | null): number {
-  return pbAvailable === null ? ptAvailable : Math.max(ptAvailable, pbAvailable)
+  return pbAvailable === null ? ptAvailable : pbAvailable
 }
 
 /** Where the money of a request comes from at its approval (or that it is short). */
 export function fundRoute(needed: number, ptAvailable: number, pbAvailable: number | null): FundRoute {
-  if (pbAvailable !== null && needed <= pbAvailable) return 'pusat_biaya'
-  if (needed <= ptAvailable) return pbAvailable === null ? 'pt' : 'other_account'
-  return 'short'
+  if (pbAvailable !== null) return needed <= pbAvailable ? 'pusat_biaya' : 'short'
+  return needed <= ptAvailable ? 'pt' : 'short'
 }
 
 /** One-line explanation of the route for the panel (web + APK). */
-export function fundRouteText(route: FundRoute, pbName: string | null, pbGap: number): string | null {
-  const pb = pbName ?? 'project'
-  if (route === 'pusat_biaya') return `Dana pusat biaya ${pb} cukup — Finance membayar dari akun ini.`
-  if (route === 'other_account')
-    return `Dana pusat biaya ${pb} kurang ${formatRupiah(pbGap)}, tetapi dana PT cukup — Finance membayar dari akun lain di PT ini (tercatat sebagai pinjaman antar project otomatis).`
+export function fundRouteText(route: FundRoute, pbName: string | null): string | null {
+  if (route === 'pusat_biaya') return `Dana pusat biaya ${pbName ?? 'project'} cukup — Finance membayar dari akun ini.`
   return null
 }
 
@@ -73,17 +76,28 @@ export function requestCommitment(r: { type: 'advance' | 'reimburse'; status: st
   return isCommitted(r.type, r.status) ? Math.max(0, (r.approvedAmount ?? 0) - (r.transferredTotal ?? 0)) : 0
 }
 
-/** Indonesian message of the refusal (409 FUND_INSUFFICIENT) with the three figures. */
+/**
+ * Indonesian message of the refusal (409 FUND_INSUFFICIENT) with the three figures. With a Pusat Biaya (2026-10-26): its
+ * dana bebas only, and the way out is the Owner's inter-project loan instruction.
+ */
 export function fundInsufficientMessage(code: string, f: { available: number; needed: number; pbName?: string | null }): string {
   const gap = fundGap(f.needed, f.available)
-  const who = f.pbName ? `Dana pusat biaya ${f.pbName} maupun dana PT ${code}` : `Dana PT ${code}`
-  return `${who} tidak cukup: tersedia ${formatRupiah(f.available)}, dibutuhkan ${formatRupiah(f.needed)}, kurang ${formatRupiah(gap)}. Tolak, atau minta Owner memerintahkan pinjaman antar-PT.`
+  if (f.pbName) return `Dana bebas akun kas ${f.pbName} tidak cukup: tersedia ${formatRupiah(f.available)}, dibutuhkan ${formatRupiah(f.needed)}, kurang ${formatRupiah(gap)}. ${PB_WAY_OUT}`
+  return `Dana PT ${code} tidak cukup: tersedia ${formatRupiah(f.available)}, dibutuhkan ${formatRupiah(f.needed)}, kurang ${formatRupiah(gap)}. Tolak, atau minta Owner memerintahkan pinjaman antar-PT.`
 }
+
+/** 2026-10-26: what the final decider can do while the project's cash account is short. */
+export const PB_WAY_OUT = 'Tolak, atau Owner menginstruksikan pinjaman antar proyek ke akun ini lalu menyetujui setelah Finance mentransfernya.'
 
 /** Text of the disabled "Setujui" (web panel, APK decision sheet). */
 export function blockedDecisionText(gap: number, pbName?: string | null): string {
-  const who = pbName ? `Dana pusat biaya ${pbName} maupun dana PT` : 'Dana PT'
-  return `${who} tidak cukup — kurang ${formatRupiah(gap)}. Tolak, atau perintahkan pinjaman antar-PT.`
+  if (pbName) return `Dana bebas akun kas ${pbName} tidak cukup — kurang ${formatRupiah(gap)}. ${PB_WAY_OUT}`
+  return `Dana PT tidak cukup — kurang ${formatRupiah(gap)}. Tolak, atau perintahkan pinjaman antar-PT.`
+}
+
+/** 2026-10-26: the disabled "Setujui" while the instructed inter-project loan waits for Finance's transfer. */
+export function awaitingLoanText(docNo: string | null, gap: number, pbName: string): string {
+  return `Dana bebas akun kas ${pbName} kurang ${formatRupiah(gap)}. Pinjaman ${docNo ?? 'antar proyek'} menunggu transfer Finance — setujui setelah transfer dieksekusi.`
 }
 
 /** Where a request stands for the fund check (detail panel `fundCheck.status`). */
@@ -113,7 +127,13 @@ export const FUND_SHORTFALL_DEFAULT = {
   title: 'Dana PT {company} tidak cukup: {docNo}',
   body: 'Dibutuhkan {needed}, tersedia {available}, kurang {gap}. Perintahkan pinjaman antar-PT atau tolak.',
 } as const
+/** 2026-10-26: the same moment for a request of a mapped project (its cash account short) — own event, own template. */
+export const FUND_SHORTFALL_PB_EVENT = 'expense.fund_shortfall_account'
+export const FUND_SHORTFALL_PB_DEFAULT = {
+  title: 'Dana akun kas {account} tidak cukup: {docNo}',
+  body: 'Dibutuhkan {needed}, dana bebas {available}, kurang {gap}. Instruksikan pinjaman antar proyek atau tolak.',
+} as const
 
 export function renderFundText(tpl: string, vars: Record<string, string>): string {
-  return tpl.replace(/\{(company|docNo|needed|available|gap|title)\}/g, (_, k: string) => vars[k] ?? '')
+  return tpl.replace(/\{(company|docNo|needed|available|gap|title|account)\}/g, (_, k: string) => vars[k] ?? '')
 }

@@ -10,8 +10,10 @@ import type { Detail } from './panel-data'
  * = Dana tersedia; Dibutuhkan = this request; Kurang (red) or "Cukup" (green); the other requests waiting at their final
  * decision; linked inter-PT loans; "Perintahkan pinjaman antar-PT" (Owner, short). Read-only before the final step
  * ("cek akhir di Owner"). The server is the authority: Setujui answers 409 FUND_INSUFFICIENT while short.
- * ADR 0031 amendment (user 2026-10-22): a mapped project shows its Pusat Biaya first (Saldo − Komitmen = Dana bebas);
- * the request passes when the Pusat Biaya OR the PT covers it, and `routeText` says which account Finance pays from.
+ * ADR 0031 amendment (user 2026-10-22): a mapped project shows its Pusat Biaya first (Saldo − Komitmen = Dana bebas).
+ * Amendment 2026-10-26 (DRMS 26/10 #1): such a request passes only when THAT account covers it (the PT figures stay as
+ * information); while short the final decider instructs an inter-project loan (action bar "Instruksi pinjam antar
+ * proyek") — the instructed loans of the request are listed here with their status ("menunggu transfer Finance").
  */
 const rp = formatRupiah
 const tone = (ok: boolean): React.CSSProperties => ({
@@ -64,6 +66,19 @@ export function FundPanel({ d }: { d: Pick<Detail, 'id' | 'fundCheck' | 'allowed
   const box: React.CSSProperties = { border: `1px solid ${short ? 'var(--pk-tone-bad)' : 'var(--theme-elevation-150)'}`, borderRadius: 4, padding: 12, marginBottom: 16, fontSize: 13 }
   const grid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '4px 16px', margin: '8px 0 0' }
   const pb = f.pusatBiaya
+  // 2026-10-26: the need is compared with the Pusat Biaya when there is one (the PT figures are information only)
+  const need = (
+    <>
+      <dt>Dibutuhkan</dt>
+      <dd style={{ margin: 0 }} data-pk-fund="needed">
+        {rp(f.needed)}
+      </dd>
+      <dt>{short ? 'Kurang' : 'Status'}</dt>
+      <dd style={{ margin: 0 }} data-pk-fund="gap">
+        <span style={tone(!short)}>{short ? `Kurang ${rp(f.gap)}` : 'Cukup'}</span>
+      </dd>
+    </>
+  )
   return (
     <section style={box} data-pk-section="fund-check" data-pk-fund-status={f.status} data-pk-fund-blocked={f.blocked ? 'yes' : 'no'}>
       <strong>Ketersediaan dana PT {code}</strong>{' '}
@@ -88,8 +103,9 @@ export function FundPanel({ d }: { d: Pick<Detail, 'id' | 'fundCheck' | 'allowed
           <dd style={{ margin: 0 }} data-pk-fund-pb="available">
             <b>{rp(pb.available)}</b>
           </dd>
+          {need}
           <dt style={{ gridColumn: '1 / -1', marginTop: 4 }}>
-            <b>Seluruh PT {code}</b>
+            <b>Seluruh PT {code}</b> <span style={{ fontSize: 12, color: 'var(--theme-elevation-600)' }}>(informasi — pengajuan dicek terhadap akun kas di atas)</span>
           </dt>
         </dl>
       ) : null}
@@ -109,14 +125,7 @@ export function FundPanel({ d }: { d: Pick<Detail, 'id' | 'fundCheck' | 'allowed
         <dd style={{ margin: 0 }} data-pk-fund="available">
           <b>{rp(f.available)}</b>
         </dd>
-        <dt>Dibutuhkan</dt>
-        <dd style={{ margin: 0 }} data-pk-fund="needed">
-          {rp(f.needed)}
-        </dd>
-        <dt>{short ? 'Kurang' : 'Status'}</dt>
-        <dd style={{ margin: 0 }} data-pk-fund="gap">
-          <span style={tone(!short)}>{short ? `Kurang ${rp(f.gap)}` : 'Cukup'}</span>
-        </dd>
+        {pb ? null : need}
       </dl>
       {f.routeText ? (
         <p style={{ margin: '8px 0 0' }} data-pk-fund-route={f.route}>
@@ -139,9 +148,24 @@ export function FundPanel({ d }: { d: Pick<Detail, 'id' | 'fundCheck' | 'allowed
           ))}
         </p>
       ) : null}
+      {f.projectLoans.length > 0 ? (
+        <p style={{ margin: '8px 0 0' }} data-pk-fund-project-loans>
+          Pinjaman antar proyek untuk pengajuan ini:{' '}
+          {f.projectLoans.map((l, i) => (
+            <span key={l.id} data-pk-fund-project-loan={l.awaitingTransfer ? 'pending' : l.status}>
+              {i > 0 ? ', ' : ''}
+              <a href={`/admin/pinjaman/detail/${l.id}`}>{l.docNo ?? `#${l.id}`}</a> (dari {l.lenderProject?.code ?? '—'}, akun kas {l.lenderAccount?.name ?? '—'}, {rp(l.amount)}) — {l.statusLabel}
+            </span>
+          ))}
+        </p>
+      ) : null}
       {f.blocked && f.blockedText ? (
         <p style={{ margin: '8px 0 0', color: 'var(--theme-error-500)' }} data-pk-fund-blocked-text>
-          {d.status === 'draft' ? `${pb ? `Dana pusat biaya ${pb.name} maupun dana PT` : 'Dana PT'} tidak cukup — kurang ${rp(f.gap)}. Pengajuan Anda tidak dapat dikirim sampai dana tersedia; perintahkan pinjaman antar-PT.` : f.blockedText}
+          {d.status === 'draft'
+            ? pb
+              ? `Dana bebas akun kas ${pb.name} tidak cukup — kurang ${rp(f.gap)}. Pengajuan Anda tidak dapat dikirim sampai dana akun kas ini mencukupi.`
+              : `Dana PT tidak cukup — kurang ${rp(f.gap)}. Pengajuan Anda tidak dapat dikirim sampai dana tersedia; perintahkan pinjaman antar-PT.`
+            : f.blockedText}
         </p>
       ) : null}
       {instruct ? (

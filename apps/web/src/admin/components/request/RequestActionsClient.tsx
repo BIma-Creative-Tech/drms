@@ -12,6 +12,7 @@ import { useDocSummary } from '../feedback/DocContext'
 import { confirmLabel, confirmTitle, successTitle } from '../feedback/feedback'
 import type { RequestActionsProps } from './action-bar'
 import { setRequestMode, useRequestMode } from './mode'
+import { ProjectLoanInstruct } from './ProjectLoanInstruct'
 
 // .pk-pbtn: the shared button box (custom.scss, DRMS 15/10 #5) — every control of this bar is 38 px, 13 px/600
 const BTN = 'btn btn--style-secondary btn--size-small pk-pbtn'
@@ -29,7 +30,7 @@ const idemKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ?
  * the form to the saved document and returns to read mode; a successful save (new `updatedAt`) returns to read mode
  * and refreshes the server-rendered panels.
  */
-export function RequestActionsClient({ id, decision, flowLinks, pdfs, canDuplicate, canCancel, historyHref }: RequestActionsProps) {
+export function RequestActionsClient({ id, decision, flowLinks, pdfs, canDuplicate, canCancel, historyHref, instructProjectLoan, docNo }: RequestActionsProps) {
   const router = useRouter()
   const ref = useRef<HTMLDivElement>(null)
   const { data, hasSavePermission } = useDocumentInfo()
@@ -98,6 +99,8 @@ export function RequestActionsClient({ id, decision, flowLinks, pdfs, canDuplica
               <span id={`pk-fund-blocked-${id}`} className="pk-er-actions__turn" role="note" data-pk-fund-blocked-reason>
                 {decision.blocked}
               </span>
+              {/* DRMS 26/10 #1: the project's cash account is short → the final decider instructs an inter-project loan */}
+              {instructProjectLoan ? <ProjectLoanInstruct requestId={id} docNo={docNo} /> : null}
             </>
           ) : decision.step ? (
             <ActionButton url={`/api/v1/expense-requests/${id}/${decision.step}`} label={decision.label} variant="primary" confirm={decision.confirm} testId={decision.step} />

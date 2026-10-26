@@ -17,6 +17,12 @@ export type RequestActionsProps = {
   canCancel: boolean
   /** UI feedback 17/10 #2: "Riwayat" (the request's history page, /riwayat) — a button here instead of a document tab. */
   historyHref: string
+  /**
+   * DRMS 26/10 #1: "Instruksi pinjam antar proyek" next to the disabled "Setujui" — the server lists
+   * `instruct_project_loan` (final decider, the project's cash account short, no instructed loan waiting).
+   */
+  instructProjectLoan?: boolean
+  docNo?: string | null
 }
 
 /**
@@ -35,5 +41,15 @@ export function actionBarProps(p: Pick<RequestPanel, 'd' | 'office' | 'canDuplic
   const pdfs = d.docNo
     ? [{ href: `/api/v1/expense-requests/${d.id}/pdf`, label: 'PDF Pengajuan Biaya' }, ...(p.office ? [{ href: `/api/v1/expense-requests/${d.id}/pdf?variant=internal`, label: 'PDF salinan internal (flag)' }] : [])]
     : []
-  return { id: d.id, decision: p.decision, flowLinks, pdfs, canDuplicate: p.canDuplicate, canCancel: d.allowedActions.includes('cancel'), historyHref: `/admin/collections/expense-requests/${d.id}/riwayat` }
+  return {
+    id: d.id,
+    decision: p.decision,
+    flowLinks,
+    pdfs,
+    canDuplicate: p.canDuplicate,
+    canCancel: d.allowedActions.includes('cancel'),
+    historyHref: `/admin/collections/expense-requests/${d.id}/riwayat`,
+    instructProjectLoan: (d.allowedActions as readonly string[]).includes('instruct_project_loan'),
+    docNo: d.docNo ?? null,
+  }
 }

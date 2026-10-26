@@ -86,6 +86,9 @@ export const ActionEnum = z
     'settle_reverse',
     // ADR 0029: the Owner orders an inter-PT loan for a short request (POST /intercompany-loans)
     'instruct_loan',
+    // 2026-10-26 (DRMS 26/10 #1): the final decider instructs an inter-project loan to the project's short cash account
+    // (GET /expense-requests/{id}/project-loan-lenders, POST /expense-requests/{id}/project-loan)
+    'instruct_project_loan',
     // D2410 "Hapus draft" (POST /expense-requests/{id}/delete-draft)
     'delete_draft',
   ])
@@ -317,16 +320,16 @@ export const FundCheck = z
     applies: z.boolean().meta({ description: 'The request\'s NEXT decision makes it "Disetujui" (the Owner level / a final level without Owner) or this is the Owner\'s own Draft (checked at submit).' }),
     status: z.enum(['ok', 'insufficient', 'not_applicable']),
     blocked: z.boolean().meta({ description: 'enabled ∧ applies ∧ insufficient.' }),
-    blockedText: z.string().nullable().meta({ description: '"Dana PT tidak cukup — kurang Rp X. Tolak, atau perintahkan pinjaman antar-PT."' }),
+    blockedText: z.string().nullable().meta({ description: '"Dana PT tidak cukup — kurang Rp X. Tolak, atau perintahkan pinjaman antar-PT."; with a Pusat Biaya (2026-10-26) "Dana bebas akun kas <name> tidak cukup — kurang Rp X. …", or, while an instructed loan waits, "… Pinjaman PJ/… menunggu transfer Finance …".' }),
     balance: signedRupiah.meta({ description: 'Saldo dana: Σ balance of the PT\'s active accounts (no site exclusion since DRMS 24/10).' }),
     commitments: signedRupiah.meta({ description: 'Komitmen: approved-not-transferred + unpaid LPJ shortfalls + loans instructed with this PT as lender.' }),
     available: signedRupiah.meta({ description: 'Dana tersedia = balance − commitments (may be negative).' }),
     needed: rupiah.meta({ description: 'Dibutuhkan: the request\'s grand total (not yet committed).' }),
-    gap: rupiah.meta({ description: 'Kurang = max(0, needed − max(available, pusatBiaya.available)) (ADR 0031 amendment: Pusat Biaya first, then PT).' }),
+    gap: rupiah.meta({ description: 'Kurang = max(0, needed − pusatBiaya.available) for a mapped project (ADR 0031 amendment 2026-10-26: that account only), else max(0, needed − available).' }),
     route: z.enum(['pusat_biaya', 'other_account', 'pt', 'short']).meta({
-      description: 'ADR 0031 amendment: pusat_biaya = the project\'s Pusat Biaya covers the need; other_account = it does not, the PT does (Finance pays from another account → automatic inter-project loan); pt = no Pusat Biaya, the PT covers it; short = neither.',
+      description: 'ADR 0031 amendment: pusat_biaya = the project\'s Pusat Biaya covers the need; pt = no Pusat Biaya, the PT covers it; short = not covered. other_account (the PT covering a short Pusat Biaya) is no longer produced since 2026-10-26.',
     }),
-    routeText: z.string().nullable().meta({ description: 'Indonesian one-liner of `route` (null when pt / short).' }),
+    routeText: z.string().nullable().meta({ description: 'Indonesian one-liner of `route` (null unless pusat_biaya).' }),
     pusatBiaya: z
       .object({
         accountId: id,
@@ -356,6 +359,21 @@ export const FundCheck = z
         }),
       )
       .meta({ description: 'Inter-PT loans instructed for this request (linked).' }),
+    projectLoans: z
+      .array(
+        z.object({
+          id,
+          docNo: z.string().nullable(),
+          status: z.string(),
+          statusLabel: z.string().meta({ description: 'Indonesian label (GET /project-loans), e.g. "Disetujui – menunggu transfer Finance".' }),
+          amount: rupiah,
+          awaitingTransfer: z.boolean().meta({ description: 'Approved, transfer order in Antrian Transfer not executed yet.' }),
+          lenderProject: z.object({ id, code: z.string().nullable(), name: z.string().nullable() }).nullable(),
+          lenderAccount: z.object({ id, name: z.string().nullable() }).nullable(),
+        }),
+      )
+      .meta({ description: '2026-10-26: inter-project loans instructed for this request ("Instruksi pinjam antar proyek", project_loans.expense_request_id), oldest first.' }),
+    projectLoanPending: z.boolean().meta({ description: '2026-10-26: one of `projectLoans` waits for Finance\'s transfer — "Setujui" stays disabled (blockedText says so), no second instruction.' }),
   })
   .meta({ id: 'FundCheck' })
 
@@ -1023,6 +1041,8 @@ export const ApprovalInbox = z
         decisionBy: z.enum(['pm', 'direktur', 'owner', 'finance', 'other']).meta({ description: 'ADR 0021: who decides this step (APK decision sheet texts): pm = PM project, direktur, owner (ADR 0026: the Owner level above the Direktur), finance, other (named user / legacy).' }),
         finalStep: z.boolean().meta({ description: 'ADR 0021: approving this step makes the request "Disetujui" (Finance then transfers / verifies receipts).' }),
         fundShort: rupiah.nullable().meta({ description: 'ADR 0029: "Dana kurang Rp X" — the gap of a final-step row of a PT with the fund check on (Kas roles of the PT); null when enough / not applicable. Approving it is refused (409 FUND_INSUFFICIENT).' }),
+        instructProjectLoan: z.boolean().meta({ description: '2026-10-26: fundShort is the gap of the project\'s cash account and no instructed loan waits — show "Instruksi pinjam antar proyek" (GET /expense-requests/{id}/project-loan-lenders).' }),
+        projectLoanPending: z.object({ id, docNo: z.string().nullable() }).nullable().meta({ description: '2026-10-26: the instructed inter-project loan waiting for Finance\'s transfer ("Pinjaman PJ/… menunggu transfer Finance"); null when none.' }),
         selfApproval: z.enum(['direktur_via_pm', 'direktur_via_pm_self']).nullable().meta({ description: 'ADR 0021 narrow G1 exception (a Direktur\'s request filed by the PM project; _self = the requester Direktur is the PT\'s only Direktur). Legacy since ADR 0024 (a request without approval never reaches the inbox).' }),
         budget: z.object({
           basis: z.enum(['project', 'none']),

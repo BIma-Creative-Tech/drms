@@ -10980,6 +10980,150 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'File ini bukan gambar (mis. PDF). Ketuk thumbnail-nya untuk membuka sebagai file.'**
   String get mediaNotImage;
+
+  /// DRMS 26/10 #1: button of the final decider while the project cash account is short.
+  ///
+  /// In id, this message translates to:
+  /// **'Instruksi pinjam antar proyek'**
+  String get pliAction;
+
+  /// No description provided for @pliTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Instruksi pinjam antar proyek — {doc}'**
+  String pliTitle(String doc);
+
+  /// No description provided for @pliBorrowerAccount.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun kas pengajuan'**
+  String get pliBorrowerAccount;
+
+  /// No description provided for @pliLenders.
+  ///
+  /// In id, this message translates to:
+  /// **'Project pemberi (PT yang sama)'**
+  String get pliLenders;
+
+  /// No description provided for @pliNoLenders.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada project lain yang aktif di PT ini.'**
+  String get pliNoLenders;
+
+  /// No description provided for @pliAccount.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun kas: {name}'**
+  String pliAccount(String name);
+
+  /// No description provided for @pliAmount.
+  ///
+  /// In id, this message translates to:
+  /// **'Nilai pinjaman'**
+  String get pliAmount;
+
+  /// No description provided for @pliAmountHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Minimal {min} (kekurangan), maksimal {max} (dana bebas pemberi).'**
+  String pliAmountHelp(String min, String max);
+
+  /// No description provided for @pliDueDate.
+  ///
+  /// In id, this message translates to:
+  /// **'Jatuh tempo'**
+  String get pliDueDate;
+
+  /// No description provided for @pliReason.
+  ///
+  /// In id, this message translates to:
+  /// **'Alasan / catatan'**
+  String get pliReason;
+
+  /// No description provided for @pliReasonHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Wajib, minimal 3 karakter. Tercatat di pinjaman dan audit log.'**
+  String get pliReasonHint;
+
+  /// No description provided for @pliReasonDefault.
+  ///
+  /// In id, this message translates to:
+  /// **'Menutup kekurangan dana akun kas {account} untuk pengajuan {doc}'**
+  String pliReasonDefault(String account, String doc);
+
+  /// No description provided for @pliChooseLender.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih project pemberi pinjaman.'**
+  String get pliChooseLender;
+
+  /// No description provided for @pliContinue.
+  ///
+  /// In id, this message translates to:
+  /// **'Lanjut'**
+  String get pliContinue;
+
+  /// No description provided for @pliConfirmNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman langsung disetujui dan masuk Antrian Transfer Finance. Pengajuan tetap menunggu keputusan Anda; setujui setelah Finance mentransfer pinjaman.'**
+  String get pliConfirmNote;
+
+  /// No description provided for @pliConfirmFrom.
+  ///
+  /// In id, this message translates to:
+  /// **'Pemberi: {project} — akun kas {account}'**
+  String pliConfirmFrom(String project, String account);
+
+  /// No description provided for @pliConfirmTo.
+  ///
+  /// In id, this message translates to:
+  /// **'Penerima: {project} — akun kas {account}'**
+  String pliConfirmTo(String project, String account);
+
+  /// No description provided for @pliConfirmAmount.
+  ///
+  /// In id, this message translates to:
+  /// **'Nilai pinjaman: {amount}'**
+  String pliConfirmAmount(String amount);
+
+  /// No description provided for @pliConfirmDue.
+  ///
+  /// In id, this message translates to:
+  /// **'Jatuh tempo: {date}'**
+  String pliConfirmDue(String date);
+
+  /// No description provided for @pliDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman {amount} dari {project} masuk Antrian Transfer Finance. Setujui pengajuan setelah transfer dieksekusi.'**
+  String pliDone(String amount, String project);
+
+  /// No description provided for @pliPending.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman {doc} ({amount}): {status}.'**
+  String pliPending(String doc, String amount, String status);
+
+  /// No description provided for @pliInboxBlocked.
+  ///
+  /// In id, this message translates to:
+  /// **'Dana bebas akun kas project kurang — instruksikan pinjaman antar proyek atau tolak.'**
+  String get pliInboxBlocked;
+
+  /// No description provided for @pliInboxPending.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman {doc} menunggu transfer Finance — setujui setelah transfer dieksekusi.'**
+  String pliInboxPending(String doc);
+
+  /// DRMS 26/10 #1: first step of an Owner-instructed inter-project loan.
+  ///
+  /// In id, this message translates to:
+  /// **'Instruksi Owner'**
+  String get loanStepInstructedOwner;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -55,8 +55,8 @@ Map<String, dynamic> fundCheckPbJson({String route = 'pusat_biaya'}) {
     ...fundCheckJson(blocked: short),
     'status': short ? 'insufficient' : 'ok',
     'blockedText': short
-        ? 'Dana pusat biaya CSR SEPASO/KUTIM maupun dana PT tidak cukup — kurang Rp 447.500. Tolak, atau perintahkan '
-              'pinjaman antar-PT.'
+        ? 'Dana bebas akun kas CSR SEPASO/KUTIM tidak cukup — kurang Rp 447.500. Tolak, atau Owner menginstruksikan '
+              'pinjaman antar proyek ke akun ini lalu menyetujui setelah Finance mentransfernya.'
         : null,
     'available': ptAvailable,
     'gap': short ? 447500 : 0,

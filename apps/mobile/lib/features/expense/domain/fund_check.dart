@@ -23,13 +23,14 @@ enum FundCheckStatus {
       FundCheckStatus.values.where((s) => s.code == c).firstOrNull ?? FundCheckStatus.notApplicable;
 }
 
-/// `fundCheck.route` (ADR 0031 amendment, user 2026-10-22 "PB dulu, lalu PT"): where Finance pays the request from at
-/// its approval, or that neither the Pusat Biaya nor the PT covers it. Null = an older server (no field).
+/// `fundCheck.route` (ADR 0031 amendment, user 2026-10-22 "PB dulu, lalu PT"; 2026-10-26: the Pusat Biaya only): where
+/// Finance pays the request from at its approval, or that it is not covered. Null = an older server (no field).
 enum FundCheckRoute {
   /// The project's Pusat Biaya covers the need: Finance pays from that account.
   pusatBiaya('pusat_biaya'),
 
   /// The Pusat Biaya does not, the PT does: Finance pays from another account of the PT (automatic inter-project loan).
+  /// No longer sent since 2026-10-26 (a short Pusat Biaya is `short`); kept for older servers.
   otherAccount('other_account'),
 
   /// No Pusat Biaya; the PT covers it.
@@ -176,18 +177,27 @@ abstract class FundCheck with _$FundCheck {
       : (blockedText?.trim().isNotEmpty == true ? blockedText : fundBlockedText(gap, pbName: pusatBiaya?.name));
 }
 
-/// Subject of the shortfall sentences: the Pusat Biaya and the PT, or the PT only (web `rules.ts` / `FundPanel.tsx`).
-String _fundWho(String? pbName) =>
-    pbName != null && pbName.isNotEmpty ? 'Dana pusat biaya $pbName maupun dana PT' : 'Dana PT';
+/// Subject of the shortfall sentences (web `rules.ts` / `FundPanel.tsx`): ADR 0031 amendment 2026-10-26 — a request of a
+/// mapped project is checked against its cash account only, so the sentence names that account; else the PT.
+String _fundWho(String? pbName) => pbName != null && pbName.isNotEmpty ? 'Dana bebas akun kas $pbName' : 'Dana PT';
+
+bool _hasPb(String? pbName) => pbName != null && pbName.isNotEmpty;
+
+/// 2026-10-26: the way out while the project's cash account is short (web `PB_WAY_OUT`).
+const fundPbWayOut =
+    'Tolak, atau Owner menginstruksikan pinjaman antar proyek ke akun ini lalu menyetujui setelah Finance mentransfernya.';
 
 /// Web `blockedDecisionText` (`domain/fundcheck/rules.ts`); [pbName] = the project's Pusat Biaya, if any.
-String fundBlockedText(int gap, {String? pbName}) =>
-    '${_fundWho(pbName)} tidak cukup — kurang ${formatRupiah(gap)}. Tolak, atau perintahkan pinjaman antar-PT.';
+String fundBlockedText(int gap, {String? pbName}) => _hasPb(pbName)
+    ? '${_fundWho(pbName)} tidak cukup — kurang ${formatRupiah(gap)}. $fundPbWayOut'
+    : 'Dana PT tidak cukup — kurang ${formatRupiah(gap)}. Tolak, atau perintahkan pinjaman antar-PT.';
 
 /// Draft variant of the web panel (the Owner's own request is checked at submit and stays Draft).
-String fundBlockedDraftText(int gap, {String? pbName}) =>
-    '${_fundWho(pbName)} tidak cukup — kurang ${formatRupiah(gap)}. Pengajuan Anda tidak dapat dikirim sampai dana '
-    'tersedia; perintahkan pinjaman antar-PT.';
+String fundBlockedDraftText(int gap, {String? pbName}) => _hasPb(pbName)
+    ? '${_fundWho(pbName)} tidak cukup — kurang ${formatRupiah(gap)}. Pengajuan Anda tidak dapat dikirim sampai dana '
+          'akun kas ini mencukupi.'
+    : 'Dana PT tidak cukup — kurang ${formatRupiah(gap)}. Pengajuan Anda tidak dapat dikirim sampai dana tersedia; '
+          'perintahkan pinjaman antar-PT.';
 
 /// Machine code of the refusal (openapi; `domain/fundcheck/rules.ts`).
 const fundInsufficientCode = 'FUND_INSUFFICIENT';
@@ -211,10 +221,12 @@ String? fundProblemMessage(ProblemException e, {bool draft = false}) {
   final b = e.body;
   final available = _num(b['available']);
   final needed = _num(b['needed']);
-  final tail = draft
-      ? 'Pengajuan tetap Draft — perintahkan pinjaman antar-PT, lalu kirim lagi.'
-      : 'Tolak, atau perintahkan pinjaman antar-PT.';
   final pbName = b['pusatBiayaName'] is String ? (b['pusatBiayaName'] as String).trim() : null;
+  final tail = _hasPb(pbName)
+      ? (draft ? 'Pengajuan tetap Draft — kirim lagi setelah dana akun kas ini mencukupi.' : fundPbWayOut)
+      : (draft
+            ? 'Pengajuan tetap Draft — perintahkan pinjaman antar-PT, lalu kirim lagi.'
+            : 'Tolak, atau perintahkan pinjaman antar-PT.');
   final who = _fundWho(pbName);
   if (available == null || needed == null) return '$who tidak cukup untuk langkah ini. $tail';
   final gap = _num(b['gap']) ?? (needed - available < 0 ? 0 : needed - available);

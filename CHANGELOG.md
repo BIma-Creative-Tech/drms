@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**Web (DRMS 26/10 #1, branch `feat/d2610-owner-loan`) + APK** — migrations `20261026_100000_d2610_owner_loan_enums`,
+`_100100_d2610_owner_loan_schema`, `_100200_d2610_owner_loan_guard`; API: `GET /expense-requests/{id}/project-loan-lenders`,
+`POST /expense-requests/{id}/project-loan`, new fields (`fundCheck.projectLoans` / `projectLoanPending`, inbox
+`instructProjectLoan` / `projectLoanPending`, loan `expenseRequest`, `submitterRole` `owner`, action
+`instruct_project_loan`). ADR 0031 "Amendment 2026-10-26".
+
+### Changed
+
+- **Fund check of a mapped project's request = its cash account only (DRMS 26/10 #1, user 2026-10-26).** At the
+  decision that makes a request "Disetujui" a request whose project has a Pusat Biaya is compared with that account's
+  dana bebas only — the 0.19.1 fallback "PB dulu, lalu PT" (the PT covering a short account) is removed (service + DB
+  backstop `pk_request_fund_available`). Requests without a mapped project keep the per-PT check; the fund switch is
+  unchanged; Finance paying an approved request from another account (automatic loan) is unchanged. Texts / the Owner
+  notification (`expense.fund_shortfall_account`) name the account.
+
+### Added
+
+- **"Instruksi pinjam antar proyek" (DRMS 26/10 #1).** While the project's cash account is short, "Setujui" stays
+  disabled with the reason (web request page + approval inbox; APK detail + Beranda / Persetujuan cards) and the final
+  decider (normally the Owner) gets a button: a dialog / sheet lists the open projects of the same PT with their own
+  cash account and its dana bebas (no account / same account / below the shortfall shown disabled with the reason),
+  amount (default = shortfall, max = dana bebas of the lender), due date, reason; confirmation before, result after. The
+  instruction creates an approved, cash-backed project loan PJ/… linked to the request (no Direktur / Owner level,
+  audited), a transfer order in Antrian Transfer (Finance notified, badge counts it). The request waits ("Pinjaman PJ/…
+  menunggu transfer Finance", no second instruction); Finance executes it with the existing flow (the lender's dana
+  bebas re-checked), the instructor is notified (`project_loan.request_ready`) and approves normally.
+
 **APK 0.13.1 (APK-only, works with server 0.21.0 and 0.21.1)** (branch `fix/d2510-apk-tap-lpj`, pubspec `0.13.1+1`, release notes
 `docs/release-notes/apk/0.13.1.md`): no server change, no migration, no API change; APK 0.13.0 keeps working. Folded
 into the next web release section.

@@ -920,7 +920,34 @@ class _LoanBody extends ConsumerWidget {
                     ].join(' · '),
                     last: true,
                   ),
-                if (!l.automatic) ...[
+                // DRMS 26/10 #1: an Owner-instructed loan has no Direktur / Owner level (instruction, then the transfer)
+                if (l.submitterRole == 'owner' && !l.automatic) ...[
+                  PkTimelineStep(
+                    key: const Key('loan-step-instructed'),
+                    state: step(done: submitted),
+                    title: t.loanStepInstructedOwner,
+                    subtitle: [
+                      if (l.createdBy?.name != null) l.createdBy!.name!,
+                      if (submitted) formatServerDateTime(l.submittedAt, zone: zone),
+                    ].join(' · '),
+                    last: !l.cashBacked,
+                  ),
+                  if (l.cashBacked)
+                    PkTimelineStep(
+                      key: const Key('loan-step-disburse'),
+                      state: step(done: l.disbursedAt != null, waiting: l.awaitingDisbursement),
+                      title: t.loanStepDisburse,
+                      subtitle: l.disbursedAt != null
+                          ? [
+                              t.loanStepDisbursed,
+                              if (l.disbursedBy?.name != null) l.disbursedBy!.name!,
+                              formatServerDateTime(l.disbursedAt, zone: zone),
+                            ].join(' · ')
+                          : (l.awaitingDisbursement ? t.loanStepWaiting : t.loanStepNotYet),
+                      last: true,
+                    ),
+                ],
+                if (!l.automatic && l.submitterRole != 'owner') ...[
                   PkTimelineStep(
                     key: const Key('loan-step-submit'),
                     state: step(done: submitted),

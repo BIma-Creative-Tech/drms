@@ -2060,6 +2060,7 @@ export interface ProjectLoan {
   borrowerCashAccount?: (number | null) | CashAccount;
   cashBacked?: boolean | null;
   transfer?: (number | null) | Transfer;
+  expenseRequest?: (number | null) | ExpenseRequest;
   disbursedAt?: string | null;
   disbursedBy?: (number | null) | User;
   kind: 'dana' | 'barang';
@@ -2079,7 +2080,7 @@ export interface ProjectLoan {
   cancelReason?: string | null;
   approvalCycle?: number | null;
   approvalLevel?: number | null;
-  submitterRole?: ('pm' | 'finance') | null;
+  submitterRole?: ('pm' | 'finance' | 'owner') | null;
   g1Exception?: string | null;
   source?: ('web' | 'apk') | null;
   uuid?: string | null;
@@ -4818,6 +4819,7 @@ export interface ProjectLoansSelect<T extends boolean = true> {
   borrowerCashAccount?: T;
   cashBacked?: T;
   transfer?: T;
+  expenseRequest?: T;
   disbursedAt?: T;
   disbursedBy?: T;
   kind?: T;

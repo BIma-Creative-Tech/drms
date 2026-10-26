@@ -107,9 +107,11 @@ beforeAll(async () => {
 
   const pm = await fixturePm(M)
   const cc = await sysCreate('cost-centers', { company: M, code: 'FC-CC', name: 'FC Operasional' })
-  pOwner = await sysCreate('projects', { company: M, code: 'FC-P1', name: 'FC Proyek Direktur lalu Owner', pm, budget: 0, status: 'berjalan', costCenter: cc })
-  pNoOwner = await sysCreate('projects', { company: M, code: 'FC-P2', name: 'FC Proyek tanpa Owner', pm, budget: 0, status: 'berjalan', costCenter: cc })
-  pOwn = await sysCreate('projects', { company: M, code: 'FC-P3', name: 'FC Proyek Owner', pm, budget: 0, status: 'berjalan', costCenter: cc })
+  // ADR 0029 per-PT semantics: projects WITHOUT a Pusat Biaya (ADR 0031 amendment 2026-10-26: a mapped project's request is
+  // checked against its cash account only — tests/integration/d2610-owner-loan.int.test.ts); no transfers here
+  pOwner = await sysCreate('projects', { company: M, code: 'FC-P1', name: 'FC Proyek Direktur lalu Owner', pm, budget: 0, status: 'berjalan', costCenter: cc, cashAccount: null })
+  pNoOwner = await sysCreate('projects', { company: M, code: 'FC-P2', name: 'FC Proyek tanpa Owner', pm, budget: 0, status: 'berjalan', costCenter: cc, cashAccount: null })
+  pOwn = await sysCreate('projects', { company: M, code: 'FC-P3', name: 'FC Proyek Owner', pm, budget: 0, status: 'berjalan', costCenter: cc, cashAccount: null })
   for (const project of [pOwner, pNoOwner, pOwn]) {
     await sysCreate('team-assignments', { company: M, employee: staffEmp, project, roleInProject: 'staff' })
     await sysCreate('team-assignments', { company: M, employee: ownerEmp, project, roleInProject: 'staff' })
