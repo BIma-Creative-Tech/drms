@@ -44,8 +44,9 @@ enum SiteKind {
 
 /// DRMS 13/10 A2: attendance type of the user's employee in a PT (`GET /attendance/locations` → `employees[]`).
 /// OnSite = inside the chosen registered location of the PT (no assignment; outside the radius refused); Non-OnSite
-/// (ADR 0032) = inside ANY registered location of the PT, picked automatically from the fix; outside all → refused (no
-/// "Di luar area" any more). The server applies the same rule (apps/web/src/domain/attendance/area.ts).
+/// (ADR 0032 amendment 2026-10-26, DRMS 26/10) = anywhere: inside a registered location of the PT → that one, picked
+/// automatically from the fix; outside all → recorded "Di luar area" at the nearest one. The server applies the same
+/// rule (apps/web/src/domain/attendance/area.ts).
 enum AttendanceType {
   onsite('onsite'),
   nonOnsite('non_onsite');
@@ -99,8 +100,8 @@ class ProjectSite {
   /// masters of a server before A2).
   final AttendanceType? attendanceType;
 
-  /// Non-OnSite (ADR 0032): not bound to the chosen location — the check-in / check-out goes to the registered location
-  /// of the PT that contains the fix (nearest when several); outside all → refused (client hint + server).
+  /// Non-OnSite: not bound to the chosen location — the check-in / check-out goes to the registered location of the PT
+  /// that contains the fix (nearest when several); outside all → "Di luar area" at the nearest one (DRMS 26/10).
   bool get unrestricted => attendanceType == AttendanceType.nonOnsite;
 
   bool get hasGeofence => lat != null && lng != null && radiusM != null;

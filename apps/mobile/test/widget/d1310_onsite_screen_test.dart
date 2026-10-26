@@ -13,8 +13,9 @@ import '../support/widget_harness.dart';
 
 /// DRMS 13/10 A2 + ADR 0032: the Absen tab recognises the area — the location whose geofence contains the GPS fix is
 /// selected on open (nearest when several overlap, chips to pick another; none → manual picker with the nearest as a
-/// hint); the attendance-type hint; Non-OnSite outside every registered location → refused (no "Di luar area"), inside
-/// any → recorded there. The service is a fake (no I/O in the widget zone). Fictional points.
+/// hint); the attendance-type hint; Non-OnSite (DRMS 26/10) outside every registered location → NOT blocked: the
+/// nearest one is used and the confirmation popup notes "Di luar area"; inside any → recorded there. The service is a
+/// fake (no I/O in the widget zone). Fictional points.
 const _office = ProjectSite(id: 2, label: 'P-02 — Proyek Kantor', lat: -1.2, lng: 116.8, radiusM: 100, companyId: 1);
 const _ops = ProjectSite(
   id: 1,
@@ -133,11 +134,11 @@ void main() {
       );
       await pump(tester, const [ops]);
       expect(find.byKey(const Key('attendance-type-hint')), findsOneWidget);
-      expect(find.textContaining('Karyawan Non-OnSite: absen masuk / pulang di dalam radius'), findsOneWidget);
+      expect(find.textContaining('Karyawan Non-OnSite: absen masuk / pulang di mana saja'), findsOneWidget);
       expect(find.textContaining('Pusat biaya · radius 150 m'), findsOneWidget);
     });
 
-    group('Non-OnSite (ADR 0032: any registered location, outside all refused)', () {
+    group('Non-OnSite (DRMS 26/10: anywhere — outside all "Di luar area" at the nearest location)', () {
       const ops = ProjectSite(
         id: 1,
         label: 'CC-1 — Ops Kantor Pusat',
@@ -158,16 +159,57 @@ void main() {
         attendanceType: AttendanceType.nonOnsite,
       );
 
-      testWidgets('outside every registered location: refused with the Non-OnSite message, nothing queued', (
-        tester,
-      ) async {
+      testWidgets(
+        'outside every registered location: not blocked — the nearest one, "Di luar area" note before the popup',
+        (tester) async {
+          location.fix = _at(-1.6, 116.85);
+          await pump(tester, const [office, ops], online: false);
+          expect(
+            find.textContaining('Di luar lokasi terdaftar — absen dicatat "Di luar area" (ref. CC-1'),
+            findsOneWidget,
+          );
+          expect(find.textContaining('hanya bisa absen'), findsNothing);
+          await tester.tap(find.byKey(const Key('attendance-checkIn')));
+          await tester.pumpAndSettle();
+          // the confirmation popup carries the note; nothing is queued before "Ya"
+          expect(find.byKey(const Key('confirm-action')), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byType(AlertDialog),
+              matching: find.textContaining('absen dicatat "Di luar area"'),
+            ),
+            findsOneWidget,
+          );
+          expect(service.calls, isEmpty);
+          await confirmPopup(tester);
+          // offline: queued at the nearest registered location (the server records it "Di luar area")
+          expect(service.calls.single, (AttendanceKind.checkIn, 'c1'));
+        },
+      );
+
+      testWidgets('check-out outside every location is not blocked either', (tester) async {
         location.fix = _at(-1.6, 116.85);
-        await pump(tester, const [ops, office], online: false);
-        expect(find.textContaining('Karyawan Non-OnSite hanya bisa absen di dalam area lokasi'), findsOneWidget);
+        await pump(tester, const [ops, office]);
+        await tester.tap(find.byKey(const Key('attendance-checkOut')));
+        await tester.pumpAndSettle();
+        await confirmPopup(tester);
+        expect(service.calls.single, (AttendanceKind.checkOut, 'c1'));
+      });
+
+      testWidgets('no registered location with a point at all: refused, nothing queued', (tester) async {
+        location.fix = _at(-1.6, 116.85);
+        const noPoint = ProjectSite(
+          id: 9,
+          label: 'P-09 — Tanpa titik',
+          companyId: 1,
+          attendanceType: AttendanceType.nonOnsite,
+        );
+        await pump(tester, const [noPoint]);
         await tester.tap(find.byKey(const Key('attendance-checkIn')));
         await tester.pumpAndSettle();
         expect(service.calls, isEmpty);
-        expect(find.textContaining('Anda di luar semua lokasi terdaftar PT'), findsOneWidget);
+        expect(find.byKey(const Key('confirm-action')), findsNothing);
+        expect(find.textContaining('Belum ada lokasi absen dengan titik koordinat'), findsOneWidget);
       });
 
       testWidgets('inside a registered location: recorded there, whatever was chosen', (tester) async {
