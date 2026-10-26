@@ -176,3 +176,64 @@ Because every project is mapped to a Pusat Biaya account, the PT figures behind 
 0029 §1) count every active account of the PT — accounts once flagged with a site included (migration
 `20261024_500000_d2410_site_accounts_fund` clears the flags, audited). The Pusat Biaya figures (`pk_pb_balance`) never
 excluded them; nothing changes there.
+
+## Amendment 2026-10-26 (DRMS 26/10 #1, user decisions) — the project's cash account only; "Instruksi pinjam antar proyek"
+
+User request (2026-10-26): *"Pada saat dana tidak cukup di akun kas maka Owner tidak dapat melakukan approval dan ada
+tombol instruksi pinjam antar proyek dimana owner diberikan pilihan proyek beserta informasi saldo akun kas tersedia."*
+
+- **Rule change (replaces §6 "PB dulu, lalu PT" at the approval).** The fund check of the decision that makes an expense
+  request `approved` (ADR 0029 §1: final approval level, a final "Diketahui", the Owner's own submit) compares a request
+  of a project mapped to a Pusat Biaya with **that account's dana bebas only** (`pk_pb_balance − pk_pb_commitments`).
+  The 0.19.1 fallback "the PT covers it, Finance pays from another account" is removed there: route `other_account` is no
+  longer produced (kept in the contract for older clients), `fundCheck.gap` / `blocked` / the 409 FUND_INSUFFICIENT
+  figures are the account's; the PT figures stay on the panel as information. A request without a project, or whose
+  project has no account, keeps the per-PT check (ADR 0029). `companies.fund_check_enabled` still switches the whole
+  check. Service `domain/fundcheck/service.ts` (`requestFunds`, `checkFundsForApproval`, `fundPanel`,
+  `inboxFundShort`) and the DB backstop (`pk_request_fund_available`, migration `20261026_100200_d2610_owner_loan_guard`;
+  `pk_expense_fund_guard` itself unchanged) say the same. Texts name the account: "Dana bebas akun kas X tidak cukup —
+  kurang Rp … Tolak, atau Owner menginstruksikan pinjaman antar proyek …"; the Owner notification at the final step
+  for such a request is the new event `expense.fund_shortfall_account` (own template). The Finance-side automatic loan
+  when Finance pays an **approved** request from another account (§3) is unchanged.
+- **"Setujui" disabled + "Instruksi pinjam antar proyek".** While the project's account is short (switch on) the final
+  decision is disabled with the explanation (web request page + approval inbox; APK detail + Beranda / Persetujuan
+  cards) and the caller who holds that final decision — normally the Owner (`pk-principal`), exactly whoever the
+  approval engine (ADR 0026, stored roles) lets take that step — gets the button (`allowedActions`
+  `instruct_project_loan`, inbox `instructProjectLoan`). The inter-PT loan instruction (`instruct_loan`, ADR 0029 §3.4)
+  is offered only for requests checked per PT (its money lands on the PT's receiving account, not on a project's).
+- **The dialog** (`GET /expense-requests/{id}/project-loan-lenders`, Kas roles of the PT): the borrower account (dana
+  bebas, Dibutuhkan, Kurang = shortfall) and every **open project of the same PT** except the borrower with its own
+  cash account and that account's dana bebas. Not selectable (shown with the reason): no account, an inactive account,
+  the borrower's own account (no money would move), dana bebas below the shortfall. Amount default = the shortfall,
+  min = shortfall, max = the chosen account's dana bebas; due date default loan date + 30 days; reason required (min.
+  3, like the project-loan form). Confirmation popup before, result popup after (DRMS 24/10).
+- **The instruction** (`POST /expense-requests/{id}/project-loan`, `domain/loans/owner-instruct.ts`): one transaction,
+  ADR 0029 §1 lock order (request row lock → PT fund lock); the shortfall and the lender's dana bebas are re-read under
+  the lock. It creates a project loan PJ/… (`kind` dana, cash-backed, lender = the chosen project + its account,
+  borrower = the request's project + its account) **born approved** — `submitter_role` = `owner`, no Direktur / Owner
+  decision rows (approval level 0), audited `approve` / field `ownerInstruction` (`ownerInstructed: true`, figures) —
+  and linked to the request by the new nullable FK `project_loans.expense_request_id` (immutable). It is a transfer
+  order in Finance's **Antrian Transfer** like every approved cash-backed loan (same queue, same badge count, note
+  "Instruksi Owner untuk pengajuan …"); Finance is notified (`project_loan.disburse_pending`), both PMs
+  (`project_loan.owner_instructed`). The loan's own lender commitment reserves the lender account's dana bebas from that
+  moment (`pk_pb_commitments`, unchanged).
+- **The request waits.** It stays at its final decision; the panel lists the instructed loans
+  (`fundCheck.projectLoans`, `projectLoanPending`) and the disabled "Setujui" says "Pinjaman PJ/… menunggu transfer
+  Finance". A second instruction is refused while one waits (service 409; DB: partial unique index
+  `project_loans_instruction_open_uq`). The existing cancel path of an approved, not transferred loan (Direktur / the
+  Owner's implied Direktur role, reason) frees the request for a new instruction.
+- **Execution.** Finance executes the order with the existing flow (`POST /project-loans/{id}/execute`, KK lender
+  account tagged with the lender project + KM borrower account tagged with the borrower project). For an instructed loan
+  the lender account's dana bebas **without this loan** is re-checked under the PT fund lock first — short → 409
+  FUND_INSUFFICIENT (audited `fund_insufficient`; cancel and instruct again). After the execution the instructor gets
+  `project_loan.request_ready` (opens the request); the borrower account is higher, the normal check passes and the
+  request is approved as usual.
+- **DB guards** (`20261026_100200`): `pk_project_loans_guard` (prelude kept) lets a row with `submitter_role` `owner` be
+  inserted approved only through `pk_project_loan_instruction_check` — manual, numbered, money, cash-backed between the
+  two projects' own different accounts, not transferred, level 0, decided by its creator; the request of the same PT /
+  project waits at its final decision and the creator holds that decision (the step's named approver or role, or a
+  stored Owner / Direktur of the PT); no other instructed loan of the request waits; the lender's dana bebas covers the
+  amount under the PT fund lock. Every other new row has no `expense_request_id`; `pk_same_company` checks it.
+- **Migrations:** `20261026_100000_d2610_owner_loan_enums` (`enum_project_loans_submitter_role` += owner),
+  `_100100_d2610_owner_loan_schema` (+ .json snapshot: `expense_request_id`, FK, index), `_100200_d2610_owner_loan_guard`.
+  No data change: existing requests are re-evaluated at their next decision under the new rule.

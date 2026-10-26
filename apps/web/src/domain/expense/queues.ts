@@ -13,7 +13,7 @@ import { budgetImpact, lastLevel, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
 import { ackStepLabel, approvalStepLabel, decisionByOf, requestStatusLabel } from './timeline'
 import { payeeOf, requestKindLabel, TRANSFER_QUEUE_WHERE } from './types'
-import { inboxFundShort, newFundCache } from '@/domain/fundcheck/service'
+import { inboxFundRow, newFundCache, projectLoansOfRequest } from '@/domain/fundcheck/service'
 
 export { TRANSFER_QUEUE_WHERE }
 
@@ -153,6 +153,10 @@ export async function approvalInbox(req: PayloadRequest, f?: QueueFilter) {
     const decisionFlow = isDecisionSnapshot(d.approvalSnapshot)
     const snap = (d.approvalSnapshot ?? null) as ApprovalSnapshot | null
     const finalStep = snap ? (step === 'acknowledge' ? lastLevel(snap) === 0 : (d.currentLevel ?? 1) >= lastLevel(snap)) : false
+    // ADR 0029: the gap of a row at its final decision (PT with the fund check on, Kas viewer) — "Dana kurang Rp X";
+    // 2026-10-26: a short project cash account → "Instruksi pinjam antar proyek" unless an instructed loan waits for Finance
+    const fund = await inboxFundRow(req, { company: (d as { company?: unknown }).company, project: d.project, grandTotal: d.grandTotal ?? 0, finalStep }, funds)
+    const pendingLoan = fund.short !== null && fund.accountMapped ? ((await projectLoansOfRequest(req, d.id)).find((l) => l.awaitingTransfer) ?? null) : null
     out.push({
       ...base(d, refs),
       step,
@@ -163,8 +167,9 @@ export async function approvalInbox(req: PayloadRequest, f?: QueueFilter) {
       decisionFlow,
       decisionBy: decisionByOf(snap, step, step === 'acknowledge' ? 0 : (d.currentLevel ?? 1)),
       finalStep,
-      // ADR 0029: the gap of a row at its final decision (PT with the fund check on, Kas viewer) — "Dana kurang Rp X"
-      fundShort: await inboxFundShort(req, { company: (d as { company?: unknown }).company, project: d.project, grandTotal: d.grandTotal ?? 0, finalStep }, funds),
+      fundShort: fund.short,
+      instructProjectLoan: fund.short !== null && fund.accountMapped && pendingLoan === null,
+      projectLoanPending: pendingLoan ? { id: pendingLoan.id, docNo: pendingLoan.docNo } : null,
       selfApproval: snap?.selfApproval ?? null,
       budget: { basis: p?.budget ? ('project' as const) : ('none' as const), pctBefore: b.before, pctAfter: b.after, overWarn: b.after !== null && b.after > itemWarn, warnPct: itemWarn },
       flags: await flagCounts(req, d.id),

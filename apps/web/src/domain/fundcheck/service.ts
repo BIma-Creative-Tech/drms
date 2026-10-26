@@ -9,14 +9,18 @@ import { isNoApproval, isNoApprovalRule } from '@/domain/expense/decision'
 import { lastLevel, type ApprovalSnapshot } from '@/domain/expense/rules'
 import { loadActiveRules } from '@/domain/expense/snapshot'
 import { icLoanStatusLabel } from '@/domain/intercompany/loan-rules'
+import { loanStatusLabel, type LoanStatus } from '@/domain/loans/rules'
 import { notificationTemplate, pushEnabled } from '@/domain/notifications'
 import { formatRupiah } from '@/lib/money'
 import { getRequestTx } from '@/lib/tx'
 
 import {
+  awaitingLoanText,
   FUND_INSUFFICIENT,
   FUND_SHORTFALL_DEFAULT,
   FUND_SHORTFALL_EVENT,
+  FUND_SHORTFALL_PB_DEFAULT,
+  FUND_SHORTFALL_PB_EVENT,
   finalStepWaiting,
   fundGap,
   fundInsufficientMessage,
@@ -85,7 +89,10 @@ export async function pbFigures(req: PayloadRequest, account: { id: number; name
 
 export type RequestFunds = { pt: FundFigures; pb: PbFigures | null; available: number }
 
-/** PT and Pusat Biaya figures of a request (ADR 0031 amendment): `available` = the larger of the two. */
+/**
+ * PT and Pusat Biaya figures of a request: `available` = the Pusat Biaya's dana bebas when the project is mapped (ADR 0031
+ * amendment 2026-10-26 — the PT no longer covers a short account), else the PT's "Dana tersedia" (ADR 0029).
+ */
 export async function requestFunds(req: PayloadRequest, companyId: number, projectId: number | undefined): Promise<RequestFunds> {
   const pt = await fundFigures(req, companyId)
   const acc = await projectPusatBiaya(req, projectId)
@@ -93,11 +100,10 @@ export async function requestFunds(req: PayloadRequest, companyId: number, proje
   return { pt, pb, available: effectiveAvailable(pt.available, pb?.available ?? null) }
 }
 
-/** The figures that decided a check (stored on the decision row): the Pusat Biaya's when it alone covers the need. */
-function decidingFigures(f: RequestFunds, needed: number): FundFigures {
+/** The figures that decided a check (stored on the decision row): the Pusat Biaya's when the project is mapped (2026-10-26). */
+function decidingFigures(f: RequestFunds): FundFigures {
   const pb = f.pb
-  if (pb && fundRoute(needed, f.pt.available, pb.available) === 'pusat_biaya') return { companyId: f.pt.companyId, balance: pb.balance, commitments: pb.commitments, available: pb.available }
-  return f.pt
+  return pb ? { companyId: f.pt.companyId, balance: pb.balance, commitments: pb.commitments, available: pb.available } : f.pt
 }
 
 /** `companies.fund_check_enabled` of a PT (read fresh, not from the settings cache: the switch may change any time). */
@@ -137,7 +143,7 @@ export async function auditFundInsufficient(
         gap: fundGap(figures.needed, effectiveAvailable(figures.available, pb?.available ?? null)),
         ...(pb ? { pusatBiaya: pb } : {}),
       },
-      reason: 'Dana tersedia PT tidak cukup (ADR 0029)',
+      reason: pb ? 'Dana bebas akun kas (pusat biaya) project tidak cukup (ADR 0031, 2026-10-26)' : 'Dana tersedia PT tidak cukup (ADR 0029)',
       companyId,
     },
   ])
@@ -161,9 +167,10 @@ export async function refuseFunds(req: PayloadRequest, doc: { docType: string; d
 /**
  * The hard block of ADR 0029 §1 at the decision that makes a request `approved` (final approval level, a final
  * "Diketahui", the Owner's own submit / receipt resubmit without approval). Only for a PT with the switch on; takes the
- * PT's fund lock, compares the request's grand total (not yet committed) with the larger of the Pusat Biaya's and the
- * PT's available funds (ADR 0031 amendment) and refuses with 409 FUND_INSUFFICIENT (audited `fund_insufficient`).
- * Returns the deciding figures for the decision row (null = no check).
+ * PT's fund lock, compares the request's grand total (not yet committed) with the dana bebas of the project's Pusat Biaya
+ * (ADR 0031 amendment 2026-10-26: that account only), or the PT's available funds for a request without a mapped
+ * project, and refuses with 409 FUND_INSUFFICIENT (audited `fund_insufficient`). Returns the deciding figures for the
+ * decision row (null = no check).
  */
 export async function checkFundsForApproval(req: PayloadRequest, doc: { id: number; docNo?: string | null; grandTotal?: number | null; company?: unknown; project?: unknown }, step: string): Promise<FundFigures | null> {
   const companyId = relId(doc.company)
@@ -172,7 +179,7 @@ export async function checkFundsForApproval(req: PayloadRequest, doc: { id: numb
   const f = await requestFunds(req, companyId, relId(doc.project))
   const needed = doc.grandTotal ?? 0
   if (needed > f.available) await refuseFunds(req, { docType: 'expense_request', docId: doc.id, docNo: doc.docNo }, step, f.pt, needed, f.pb)
-  return decidingFigures(f, needed)
+  return decidingFigures(f)
 }
 
 // ---------------------------------------------------------------- read side (panel, inbox, availability endpoint)
@@ -304,6 +311,47 @@ export type FundPanel = {
   commitmentItems: CommitmentItem[]
   /** `statusLabel` from `IC_LOAN_STATUS_LABELS` (the loan list / detail / queue use the same labels). */
   loans: Array<{ id: number; docNo: string; status: string; statusLabel: string; amount: number; lender: { id: number; shortCode: string } | null }>
+  /** 2026-10-26: inter-project loans the final decider instructed for this request ("Instruksi pinjam antar proyek"). */
+  projectLoans: ProjectLoanRef[]
+  /** 2026-10-26: one of them waits for Finance's transfer — "Setujui" stays disabled, no second instruction. */
+  projectLoanPending: boolean
+}
+
+export type ProjectLoanRef = {
+  id: number
+  docNo: string | null
+  status: string
+  statusLabel: string
+  amount: number
+  /** Approved, cash-backed, transfer order not executed yet (Antrian Transfer). */
+  awaitingTransfer: boolean
+  lenderProject: { id: number; code: string | null; name: string | null } | null
+  lenderAccount: { id: number; name: string | null } | null
+}
+
+/** 2026-10-26: the inter-project loans instructed for a request (`project_loans.expense_request_id`), oldest first. */
+export async function projectLoansOfRequest(req: PayloadRequest, requestId: number): Promise<ProjectLoanRef[]> {
+  const tx = await getRequestTx(req)
+  const r = (await tx.execute(sql`
+    SELECT l.id, l.doc_no, l.status::text AS status, l.amount::text AS amount, coalesce(l.cash_backed, false) AS cash, l.disbursed_at,
+           p.id AS pid, p.code AS pcode, p.name AS pname, a.id AS aid, a.name AS aname
+      FROM project_loans l LEFT JOIN projects p ON p.id = l.lender_project_id LEFT JOIN cash_accounts a ON a.id = l.lender_cash_account_id
+     WHERE l.expense_request_id = ${requestId} ORDER BY l.id`)) as unknown as {
+    rows: Array<{ id: number; doc_no: string | null; status: string; amount: string; cash: boolean; disbursed_at: string | null; pid: number | null; pcode: string | null; pname: string | null; aid: number | null; aname: string | null }>
+  }
+  return r.rows.map((x) => {
+    const awaiting = x.status === 'approved' && x.cash === true && x.disbursed_at === null
+    return {
+      id: Number(x.id),
+      docNo: x.doc_no,
+      status: x.status,
+      statusLabel: loanStatusLabel({ status: x.status as LoanStatus, awaitingDisbursement: awaiting }),
+      amount: n(x.amount),
+      awaitingTransfer: awaiting,
+      lenderProject: x.pid === null ? null : { id: Number(x.pid), code: x.pcode, name: x.pname },
+      lenderAccount: x.aid === null ? null : { id: Number(x.aid), name: x.aname },
+    }
+  })
 }
 
 /** Is a Draft the Owner's own request that will go straight to Finance (checked at submit)? */
@@ -335,9 +383,16 @@ async function loansOfRequest(req: PayloadRequest, requestId: number): Promise<F
 /**
  * `fundCheck` of the request detail (§6 API): for the Kas roles of the request's PT, while the request waits for a
  * decision (any step — the Direktur sees it read-only, "cek akhir di Owner") or is the Owner's own Draft. null for
- * everyone else / any other status. `instructLoan` = the caller may order a loan from here (Owner of the PT, short).
+ * everyone else / any other status. `instructLoan` = the caller may order an inter-PT loan from here (Owner of the PT,
+ * short, request without a mapped project). 2026-10-26: `instructProjectLoan` = the caller takes the final decision now
+ * (`decides`: approve / acknowledge in its allowed actions), the project's cash account is short (switch on) and no
+ * instructed inter-project loan waits for Finance — the "Instruksi pinjam antar proyek" button.
  */
-export async function fundPanel(req: PayloadRequest, doc: { id: number; status: string; grandTotal?: number | null; company?: unknown; project?: unknown; createdBy?: unknown; currentLevel?: number | null; approvalSnapshot?: ApprovalSnapshot | null }): Promise<{ panel: FundPanel; instructLoan: boolean } | null> {
+export async function fundPanel(
+  req: PayloadRequest,
+  doc: { id: number; status: string; grandTotal?: number | null; company?: unknown; project?: unknown; createdBy?: unknown; currentLevel?: number | null; approvalSnapshot?: ApprovalSnapshot | null },
+  opts: { decides?: boolean } = {},
+): Promise<{ panel: FundPanel; instructLoan: boolean; instructProjectLoan: boolean } | null> {
   const companyId = relId(doc.company)
   if (companyId === undefined || !hasRole(req, FUND_VIEW_ROLES, companyId)) return null
   const draftOwner = await ownerDraft(req, doc, companyId)
@@ -356,6 +411,8 @@ export async function fundPanel(req: PayloadRequest, doc: { id: number; status: 
   const blocked = enabled && applies && gap > 0
   const acc = await fundAccounts(req, companyId)
   const waiting = await waitingAtFinal(req, companyId, doc.id)
+  const projectLoans = await projectLoansOfRequest(req, doc.id)
+  const pendingLoan = projectLoans.find((l) => l.awaitingTransfer) ?? null
   return {
     panel: {
       companyId,
@@ -364,22 +421,26 @@ export async function fundPanel(req: PayloadRequest, doc: { id: number; status: 
       applies,
       status,
       blocked,
-      blockedText: blocked ? blockedDecisionText(gap, pb?.name) : null,
+      blockedText: !blocked ? null : pendingLoan && pb ? awaitingLoanText(pendingLoan.docNo, gap, pb.name) : blockedDecisionText(gap, pb?.name),
       balance: f.balance,
       commitments: f.commitments,
       available: f.available,
       needed,
       gap,
       route,
-      routeText: fundRouteText(route, pb?.name ?? null, pb ? fundGap(needed, pb.available) : 0),
+      routeText: fundRouteText(route, pb?.name ?? null),
       pusatBiaya: pb ? { ...pb, commitmentItems: await pbCommitmentItems(req, pb.accountId) } : null,
       accountCount: acc.accounts.length,
       excludedSiteAccounts: acc.excludedSiteAccounts,
       waitingAtOwner: { count: waiting.length, amount: waiting.reduce((s, w) => s + w.needed, 0) },
       commitmentItems: await commitmentItems(req, companyId),
       loans: await loansOfRequest(req, doc.id),
+      projectLoans,
+      projectLoanPending: pendingLoan !== null,
     },
-    instructLoan: gap > 0 && hasExactRole(req, 'pk-principal', companyId),
+    // ADR 0029 §3.4: an inter-PT loan lands on the PT's receiving account — it cannot cover a project's own account
+    instructLoan: gap > 0 && pb === null && hasExactRole(req, 'pk-principal', companyId),
+    instructProjectLoan: blocked && pb !== null && pendingLoan === null && opts.decides === true,
   }
 }
 
@@ -392,17 +453,23 @@ export type FundCache = { pt: Map<number, FundFigures | null>; pb: Map<number, P
 export const newFundCache = (): FundCache => ({ pt: new Map(), pb: new Map() })
 
 export async function inboxFundShort(req: PayloadRequest, row: { company?: unknown; project?: unknown; grandTotal?: number | null; finalStep: boolean }, cache: FundCache): Promise<number | null> {
+  return (await inboxFundRow(req, row, cache)).short
+}
+
+/** `inboxFundShort` + whether the row is checked against its project's cash account (2026-10-26: the loan instruction). */
+export async function inboxFundRow(req: PayloadRequest, row: { company?: unknown; project?: unknown; grandTotal?: number | null; finalStep: boolean }, cache: FundCache): Promise<{ short: number | null; accountMapped: boolean }> {
+  const none = { short: null, accountMapped: false }
   const companyId = relId(row.company)
-  if (companyId === undefined || !row.finalStep || !hasRole(req, FUND_VIEW_ROLES, companyId)) return null
+  if (companyId === undefined || !row.finalStep || !hasRole(req, FUND_VIEW_ROLES, companyId)) return none
   if (!cache.pt.has(companyId)) cache.pt.set(companyId, (await fundCheckEnabled(req, companyId)) ? await fundFigures(req, companyId) : null)
   const f = cache.pt.get(companyId)
-  if (!f) return null
-  // ADR 0031 amendment: the project's Pusat Biaya first (one figure per account per call)
+  if (!f) return none
+  // ADR 0031 amendment 2026-10-26: the project's Pusat Biaya only when mapped (one figure per account per call)
   const acc = await projectPusatBiaya(req, relId(row.project))
   if (acc && !cache.pb.has(acc.id)) cache.pb.set(acc.id, await pbFigures(req, acc))
   const pb = acc ? (cache.pb.get(acc.id) ?? null) : null
   const gap = fundGap(row.grandTotal ?? 0, effectiveAvailable(f.available, pb?.available ?? null))
-  return gap > 0 ? gap : null
+  return { short: gap > 0 ? gap : null, accountMapped: pb !== null }
 }
 
 // ---------------------------------------------------------------- notification
@@ -436,14 +503,16 @@ export async function notifyFundShortfall(req: PayloadRequest, prev: { status: s
   const actor = userId(req)
   const to = (await membersWithRole(req, 'pk-principal', companyId)).filter((u) => u !== actor).sort((a, b) => a - b)
   if (to.length === 0) return 0
-  const t = await notificationTemplate(req, FUND_SHORTFALL_EVENT, FUND_SHORTFALL_DEFAULT)
-  const vars = { company: await codeOf(req, companyId), docNo: doc.docNo ?? `#${doc.id}`, title: doc.title, needed: formatRupiah(needed), available: formatRupiah(f.available), gap: formatRupiah(gap) }
+  // 2026-10-26: a mapped project's request names its cash account (own event / template: the way out differs)
+  const event = f.pb ? FUND_SHORTFALL_PB_EVENT : FUND_SHORTFALL_EVENT
+  const t = await notificationTemplate(req, event, f.pb ? FUND_SHORTFALL_PB_DEFAULT : FUND_SHORTFALL_DEFAULT)
+  const vars = { company: await codeOf(req, companyId), docNo: doc.docNo ?? `#${doc.id}`, title: doc.title, needed: formatRupiah(needed), available: formatRupiah(f.available), gap: formatRupiah(gap), account: f.pb?.name ?? '' }
   for (const uid of to) {
     await req.payload.create({
       collection: 'notifications',
       data: {
         user: uid,
-        event: FUND_SHORTFALL_EVENT,
+        event,
         title: renderFundText(t.title, vars).slice(0, 160),
         body: renderFundText(t.body, vars).slice(0, 1000),
         docType: 'expense_request',

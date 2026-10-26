@@ -7,6 +7,8 @@ import { contextCompanyId, displayNames, membersWithRole } from '@/domain/compan
 import { signDecision, signerColumns, type DecisionSigner } from '@/domain/direktur-signature'
 import { today } from '@/domain/expense/common'
 import { claimMedia } from '@/domain/expense/receipts'
+import { auditFundInsufficient, lockFunds, pbFigures } from '@/domain/fundcheck/service'
+import { FUND_INSUFFICIENT } from '@/domain/fundcheck/rules'
 import { notificationTemplate, pushEnabled } from '@/domain/notifications'
 import { parseBusinessDate } from '@/domain/numbering'
 import { allocateDocNo } from '@/domain/numbering-db'
@@ -109,6 +111,8 @@ export type LoanDoc = {
   borrowerCashAccount?: unknown
   cashBacked?: boolean | null
   transfer?: unknown
+  /** 2026-10-26: the expense request an Owner-instructed loan (`submitterRole` owner) covers. */
+  expenseRequest?: unknown
   disbursedAt?: string | null
   disbursedBy?: unknown
   lenderProject?: unknown
@@ -429,6 +433,8 @@ export type LoanEvent =
   | 'project_loan.repayment_pending_owner'
   | 'project_loan.repayment_transfer_pending'
   | 'project_loan.repayment_rejected'
+  | 'project_loan.owner_instructed'
+  | 'project_loan.request_ready'
 
 export const LOAN_NOTIFICATION_DEFAULTS: Record<LoanEvent, { title: string; body: string }> = {
   'project_loan.pending': { title: 'Persetujuan Direktur: {docNo}', body: 'Pinjaman antar project {docNo}: {borrower} meminjam {amount} dari {lender}. Menunggu persetujuan Anda sebagai Direktur.' },
@@ -449,6 +455,9 @@ export const LOAN_NOTIFICATION_DEFAULTS: Record<LoanEvent, { title: string; body
   'project_loan.repayment_pending_owner': { title: 'Persetujuan Owner: pengembalian {docNo}', body: 'Pengembalian {payment} pinjaman {docNo} ({borrower} ke {lender}) disetujui Direktur, menunggu persetujuan Anda sebagai Owner.' },
   'project_loan.repayment_transfer_pending': { title: 'Transfer pengembalian: {docNo}', body: 'Pengembalian {payment} pinjaman {docNo} disetujui Owner dan masuk Antrian Transfer: transfer dari {borrowerAccount} ke {lenderAccount}.' },
   'project_loan.repayment_rejected': { title: 'Pengembalian ditolak: {docNo}', body: 'Pengajuan pengembalian {payment} pinjaman {docNo} ditolak. Lihat alasan di detail pinjaman.' },
+  // 2026-10-26 (DRMS 26/10 #1): "Instruksi pinjam antar proyek" — to the PMs; the instructor after Finance's transfer
+  'project_loan.owner_instructed': { title: 'Instruksi pinjaman: {docNo}', body: 'Owner menginstruksikan pinjaman antar project {docNo}: {borrower} meminjam {amount} dari {lender} untuk pengajuan {requestNo}. Menunggu transfer Finance.' },
+  'project_loan.request_ready': { title: 'Pengajuan siap disetujui: {requestNo}', body: 'Pinjaman {docNo} ({amount}) sudah ditransfer Finance ke {borrowerAccount}. Pengajuan {requestNo} dapat disetujui sekarang.' },
 }
 
 export function loanVars(doc: Pick<LoanDoc, 'id' | 'docNo' | 'amount' | 'dueDate' | 'repaidTotal'>, lender: ProjectRow | undefined, borrower: ProjectRow | undefined, extra: Record<string, string> = {}): Record<string, string> {
@@ -467,7 +476,8 @@ export function loanVars(doc: Pick<LoanDoc, 'id' | 'docNo' | 'amount' | 'dueDate
 
 export const renderLoanText = (s: string, vars: Record<string, string>) => s.replace(/\{([a-zA-Z]+)\}/g, (_, k: string) => vars[k] ?? '')
 
-async function notify(req: PayloadRequest, doc: LoanDoc, event: LoanEvent, to: Iterable<number>, vars: Record<string, string>): Promise<void> {
+/** In-app notification of a loan event (docType project_loan; `target` = another document, e.g. the request it covers). */
+async function notify(req: PayloadRequest, doc: LoanDoc, event: LoanEvent, to: Iterable<number>, vars: Record<string, string>, target?: { docType: 'expense_request'; docId: number; docNo: string | null }): Promise<void> {
   const actor = userId(req)
   const t = await notificationTemplate(req, event, LOAN_NOTIFICATION_DEFAULTS[event])
   for (const uid of new Set(to)) {
@@ -479,9 +489,9 @@ async function notify(req: PayloadRequest, doc: LoanDoc, event: LoanEvent, to: I
         event,
         title: renderLoanText(t.title, vars).slice(0, 160),
         body: renderLoanText(t.body, vars).slice(0, 1000),
-        docType: 'project_loan',
-        docId: String(doc.id),
-        docNo: doc.docNo ?? null,
+        docType: target?.docType ?? 'project_loan',
+        docId: String(target?.docId ?? doc.id),
+        docNo: target ? target.docNo : (doc.docNo ?? null),
         company: relId(doc.company) ?? null, // ADR 0016 §4
         pushStatus: pushEnabled() ? 'pending' : 'skipped',
       } as never,
@@ -491,6 +501,8 @@ async function notify(req: PayloadRequest, doc: LoanDoc, event: LoanEvent, to: I
     })
   }
 }
+
+export const notifyLoan = notify
 
 /** Active Direktur (pk-owner) of the loan's PT. */
 async function direkturOf(req: PayloadRequest, company: number): Promise<number[]> {
@@ -1010,6 +1022,9 @@ export async function executeLoan(req: PayloadRequest, id: number, input: Execut
   const doc = await loadVisibleLoan(req, id, { lock: true })
   await requireAction(req, doc, 'disburse')
   const fresh = await loadRawLoan(req, id)
+  const requestId = relId(fresh.expenseRequest)
+  // 2026-10-26: an Owner-instructed loan — the lender account's dana bebas is re-checked under the PT fund lock
+  if (requestId !== undefined) await recheckInstructedLender(req, fresh)
   const date = await executionDate(req, fresh, input.executeDate)
   const legs = await postLoanLegs(req, {
     loanId: id,
@@ -1039,8 +1054,42 @@ export async function executeLoan(req: PayloadRequest, id: number, input: Execut
   ])
   const lender = await lenderOf(req, fresh)
   const borrower = await loadProject(req, relId(fresh.borrowerProject)!, 'borrowerProjectId')
-  await notify(req, updated, 'project_loan.disbursed', [relId(fresh.createdBy)!, ...pmOf(borrower), ...(lender ? pmOf(lender) : [])], loanVars(updated, lender, borrower, await accountVars(req, updated)))
+  const vars = loanVars(updated, lender, borrower, await accountVars(req, updated))
+  if (requestId === undefined) {
+    await notify(req, updated, 'project_loan.disbursed', [relId(fresh.createdBy)!, ...pmOf(borrower), ...(lender ? pmOf(lender) : [])], vars)
+    return updated
+  }
+  // 2026-10-26: the instructor learns that the request can now be approved (opens the request); the PMs as before
+  const rq = await requestRef(req, requestId)
+  await notify(req, updated, 'project_loan.disbursed', [...pmOf(borrower), ...(lender ? pmOf(lender) : [])].filter((u) => u !== relId(fresh.createdBy)), vars)
+  await notify(req, updated, 'project_loan.request_ready', [relId(fresh.createdBy)!], { ...vars, requestNo: rq.docNo ?? `#${requestId}` }, { docType: 'expense_request', docId: requestId, docNo: rq.docNo })
   return updated
+}
+
+/** Number / title of the expense request an instructed loan covers (SYSTEM-READ: shown on a loan the caller may read). */
+export async function requestRef(req: PayloadRequest, id: number): Promise<{ id: number; docNo: string | null; title: string | null }> {
+  const tx = await getRequestTx(req)
+  const r = (await tx.execute(sql`SELECT doc_no, title FROM expense_requests WHERE id = ${id}`)) as unknown as { rows: Array<{ doc_no: string | null; title: string | null }> }
+  return { id, docNo: r.rows[0]?.doc_no ?? null, title: r.rows[0]?.title ?? null }
+}
+
+/**
+ * 2026-10-26 (ADR 0031 amendment): at Finance's execution of an Owner-instructed loan, the lender account must still cover
+ * it — its dana bebas without this loan (which it reserves while not transferred) ≥ the amount, under the PT fund lock
+ * (ADR 0029 §1 lock order: loan row → fund lock → the account lock of the postings). Else 409 FUND_INSUFFICIENT (audited);
+ * the loan can be cancelled (Direktur / Owner) and instructed again from the request.
+ */
+async function recheckInstructedLender(req: PayloadRequest, loan: LoanDoc): Promise<void> {
+  const company = relId(loan.company)!
+  await lockFunds(req, [company])
+  const lenderId = relId(loan.lenderCashAccount)!
+  const name = (await accountNames(req, [lenderId])).get(lenderId) ?? `#${lenderId}`
+  const f = await pbFigures(req, { id: lenderId, name })
+  const amount = amountOf(loan)
+  const free = f.available + amount
+  if (free >= amount) return
+  await auditFundInsufficient(req, { docType: 'project_loan', docId: loan.id, docNo: loan.docNo }, 'execute', { companyId: company, balance: f.balance, commitments: f.commitments - amount, available: free, needed: amount }, company, null)
+  fail(409, FUND_INSUFFICIENT, `Dana bebas akun kas ${name} tidak cukup lagi untuk pinjaman ${loan.docNo ?? `#${loan.id}`}: tersedia ${formatRupiah(free)}, dibutuhkan ${formatRupiah(amount)}. Batalkan pinjaman ini (Direktur / Owner) lalu instruksikan ulang dari pengajuan.`)
 }
 
 /** ADR 0031 "Cairkan" (POST /project-loans/:id/disburse, older APKs): the same execution as the transfer order. */
@@ -1223,10 +1272,10 @@ export async function cancelTransferLoan(req: PayloadRequest, transferId: number
 // ---------------------------------------------------------------- read models
 
 /** `representedDecider`: loan id → name of the PT's definitive Direktur when a representative decided it (ADR 0025). */
-type Names = { projects: Map<number, ProjectRow>; users: Map<number, string>; representedDecider: Map<number, string>; accounts: Map<number, string>; transfers: Map<number, string | null> }
+type Names = { projects: Map<number, ProjectRow>; users: Map<number, string>; representedDecider: Map<number, string>; accounts: Map<number, string>; transfers: Map<number, string | null>; requests: Map<number, string | null> }
 
 async function names(req: PayloadRequest, docs: readonly LoanDoc[], extraUsers: number[] = []): Promise<Names> {
-  const out: Names = { projects: new Map(), users: new Map(), representedDecider: new Map(), accounts: new Map(), transfers: new Map() }
+  const out: Names = { projects: new Map(), users: new Map(), representedDecider: new Map(), accounts: new Map(), transfers: new Map(), requests: new Map() }
   const decided = docs.filter((d) => relId(d.decidedBy) !== undefined).map((d) => d.id)
   if (decided.length) {
     // ADR 0025: "Diputuskan oleh" shows the definitive Direktur, never the representative (rows keep the real user)
@@ -1257,6 +1306,8 @@ async function names(req: PayloadRequest, docs: readonly LoanDoc[], extraUsers: 
     const r = await req.payload.find({ collection: 'transfers', where: { id: { in: tIds } }, depth: 0, pagination: false, select: { docNo: true }, overrideAccess: true /* SYSTEM-READ: transfer numbers of readable loans */, req })
     for (const t of r.docs as unknown as Array<{ id: number; docNo?: string | null }>) out.transfers.set(t.id, t.docNo ?? null)
   }
+  // 2026-10-26: numbers of the expense requests Owner-instructed loans cover
+  for (const rid of new Set(docs.map((d) => relId(d.expenseRequest)).filter((x): x is number => x !== undefined))) out.requests.set(rid, (await requestRef(req, rid)).docNo)
   const uids = [...new Set([...docs.flatMap((d) => [relId(d.createdBy), relId(d.decidedBy), relId(d.disbursedBy)]), ...[...out.projects.values()].map((p) => relId(p.pm)), ...extraUsers].filter((x): x is number => x !== undefined))]
   if (uids.length) for (const [k, v] of await displayNames(req, uids)) out.users.set(k, v)
   return out
@@ -1284,6 +1335,7 @@ function summary(d: LoanDoc, n: Names, todayStr: string) {
   const overdue = isOverdue(l, todayStr)
   const lenderId = relId(d.lenderProject)
   const transferId = relId(d.transfer)
+  const requestId = relId(d.expenseRequest)
   const awaiting = d.status === 'approved' && d.cashBacked === true && !d.disbursedAt
   return {
     id: d.id,
@@ -1313,6 +1365,8 @@ function summary(d: LoanDoc, n: Names, todayStr: string) {
     // #11: the loan's transfer order in "Antrian Transfer" (web anchor) while it waits for Finance
     transferQueueHref: awaiting ? transferOrderHref('loan', d.id) : null,
     transfer: transferId === undefined ? null : { id: transferId, docNo: n.transfers.get(transferId) ?? null },
+    // 2026-10-26: the expense request an Owner-instructed loan covers ("Instruksi pinjam antar proyek")
+    expenseRequest: requestId === undefined ? null : { id: requestId, docNo: n.requests.get(requestId) ?? null },
     amount,
     repaidTotal: rep,
     outstanding,
@@ -1637,7 +1691,8 @@ export async function loanTransferOrders(req: PayloadRequest, f: { companyIds?: 
       toAccount: accountRef(n, l.borrowerCashAccount),
       fromProject: project(relId(l.lenderProject)),
       toProject: project(relId(l.borrowerProject)),
-      note: null,
+      // 2026-10-26: an Owner-instructed loan says which request waits for it
+      note: relId(l.expenseRequest) === undefined ? null : `Instruksi Owner untuk pengajuan ${n.requests.get(relId(l.expenseRequest)!) ?? `#${relId(l.expenseRequest)}`} — pengajuan disetujui setelah transfer ini.`,
       reason: l.reason,
       submittedBy: { id: relId(l.createdBy) ?? null, name: n.users.get(relId(l.createdBy) ?? -1) ?? null },
       approvedAt: l.decidedAt ?? null,

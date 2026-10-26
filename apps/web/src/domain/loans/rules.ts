@@ -42,13 +42,19 @@ export const LOAN_ORIGINS = ['manual', 'transfer'] as const
 export type LoanOrigin = (typeof LOAN_ORIGINS)[number]
 export const LOAN_ORIGIN_LABELS: Record<LoanOrigin, string> = { manual: 'Diajukan PM / Finance', transfer: 'Otomatis dari transfer' }
 
-/** 2026-10-24 (#10): who filed a manual loan — the borrower project's PM or a Finance user of the PT (frozen at create). */
-export const LOAN_SUBMITTER_ROLES = ['pm', 'finance'] as const
+/**
+ * 2026-10-24 (#10): who filed a manual loan — the borrower project's PM or a Finance user of the PT (frozen at create).
+ * 2026-10-26 (DRMS 26/10 #1): `owner` = instructed by the final decider of an expense request whose project's cash account
+ * is short ("Instruksi pinjam antar proyek"): born approved, no Direktur / Owner level, linked to the request.
+ */
+export const LOAN_SUBMITTER_ROLES = ['pm', 'finance', 'owner'] as const
 export type LoanSubmitterRole = (typeof LOAN_SUBMITTER_ROLES)[number]
+export const LOAN_SUBMITTER_LABELS: Record<LoanSubmitterRole, string> = { pm: 'PM project peminjam', finance: 'Finance', owner: 'Instruksi Owner' }
 
 /** "Asal" of one loan: an automatic loan, else who submitted it (a legacy manual loan without role = the PM). */
 export function loanOriginLabel(origin: LoanOrigin | null | undefined, submitterRole: LoanSubmitterRole | null | undefined): string {
   if (origin === 'transfer') return LOAN_ORIGIN_LABELS.transfer
+  if (submitterRole === 'owner') return 'Instruksi Owner'
   return submitterRole === 'finance' ? 'Diajukan Finance' : 'Diajukan PM'
 }
 
@@ -398,3 +404,39 @@ export function executeDateError(date: unknown, c: { minDate: string; today: str
   if (date < c.minDate) return { path: 'executeDate', message: 'Tanggal transfer tidak boleh sebelum tanggal pinjaman.' }
   return null
 }
+
+// ---------------------------------------------------------------- 2026-10-26 (DRMS 26/10 #1): "Instruksi pinjam antar proyek"
+
+/**
+ * Lender candidate of an instruction: an open project of the request's PT (not the borrower) with its cash account and
+ * that account's dana bebas. Not eligible: no account, an inactive account, the borrower's own account (no money would
+ * move), or dana bebas below the minimum amount (= the shortfall).
+ */
+export type LenderCandidateReason = 'no_account' | 'inactive_account' | 'same_account' | 'insufficient'
+
+export const LENDER_REASON_TEXTS: Record<LenderCandidateReason, string> = {
+  no_account: 'Project ini belum punya akun kas (pusat biaya).',
+  inactive_account: 'Akun kas project ini tidak aktif.',
+  same_account: 'Akun kas sama dengan project peminjam — tidak ada dana yang berpindah.',
+  insufficient: 'Dana bebas akun kas kurang dari kekurangan pengajuan.',
+}
+
+export function lenderCandidateReason(c: { accountId: number | null; accountActive: boolean; borrowerAccountId: number; available: number; minAmount: number }): LenderCandidateReason | null {
+  if (c.accountId === null) return 'no_account'
+  if (!c.accountActive) return 'inactive_account'
+  if (c.accountId === c.borrowerAccountId) return 'same_account'
+  if (c.available < c.minAmount) return 'insufficient'
+  return null
+}
+
+/** Amount of an instruction: whole Rupiah, at least the shortfall (`min`), at most the lender account's dana bebas (`max`). */
+export function instructAmountError(amount: unknown, c: { min: number; max: number }): FieldError | null {
+  if (typeof amount !== 'number' || !Number.isSafeInteger(amount) || amount <= 0) return { path: 'amount', message: 'Nilai pinjaman wajib diisi (bilangan bulat Rupiah > 0).' }
+  if (amount < c.min) return { path: 'amount', message: `Nilai pinjaman minimal ${formatRupiah(c.min)} (kekurangan dana akun kas pengajuan).` }
+  if (amount > c.max) return { path: 'amount', message: `Nilai pinjaman melebihi dana bebas akun kas pemberi (${formatRupiah(c.max)}).` }
+  if (amount > MAX_LOAN_AMOUNT) return { path: 'amount', message: 'Nilai pinjaman terlalu besar.' }
+  return null
+}
+
+/** Reason stored on the loan: the instructor's note + the request it covers. */
+export const instructedLoanReason = (note: string, requestNo: string): string => `${note.trim()} (instruksi Owner untuk pengajuan ${requestNo})`.slice(0, REASON_MAX)

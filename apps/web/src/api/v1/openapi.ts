@@ -19,6 +19,7 @@ import { registerPartnerFormPaths } from './openapi-partners'
 import { registerUserOnboardingPaths } from './openapi-users'
 import { Device, DeviceRegister, DeviceRevoke, Health, Masters, MastersQuery, Me, Problem, Ready, TestEmailQueued } from './schemas'
 import * as F from './schemas-flow'
+import * as L from './schemas-loans'
 import { PrivacyAck, PrivacyAckBody, PrivacyNotice } from './schemas-privacy'
 import * as P from './schemas-progress'
 import * as R from './schemas-reports'
@@ -272,11 +273,29 @@ export function buildOpenApiDocument(version: string) {
   post('/expense-requests/{id}/acknowledge', '"Diketahui Oleh" = Direktur approval (US-42, ADR 0013); PM/Staff/Admin → 403 (audited). ADR 0029: a final "Diketahui" (no approval level) is fund-checked like the final approval (409 FUND_INSUFFICIENT)', F.SignBody, ['id'], detailOk())
   post(
     '/expense-requests/{id}/approve',
-    'Approve the current level (G1/G2, ADR 0013 / 0026; budget % before → after); PM/Staff/Admin → 403 (audited). ADR 0029: the decision that makes the request "Disetujui" (normally the Owner level; a rule without an Owner level: its last level) is refused for a PT with the fund check on when the request\'s grand total exceeds BOTH the dana bebas of its project\'s Pusat Biaya and the PT\'s "Dana tersedia" (ADR 0031 amendment: Pusat Biaya first, then PT; per PT only without a mapped project) → 409 code FUND_INSUFFICIENT (companyId, balance, commitments, available = the larger figure, needed, gap; with a Pusat Biaya also pusatBiayaAccountId / pusatBiayaName / pusatBiayaAvailable; audited fund_insufficient); the request stays at its step. Checked decisions store fundBalance / fundCommitments / fundAvailable',
+    'Approve the current level (G1/G2, ADR 0013 / 0026; budget % before → after); PM/Staff/Admin → 403 (audited). ADR 0029: the decision that makes the request "Disetujui" (normally the Owner level; a rule without an Owner level: its last level) is refused for a PT with the fund check on when the request\'s grand total exceeds the dana bebas of its project\'s Pusat Biaya (ADR 0031 amendment 2026-10-26: that account only — the PT no longer covers it; the final decider instructs an inter-project loan instead, POST /expense-requests/{id}/project-loan) or, without a mapped project, the PT\'s "Dana tersedia" → 409 code FUND_INSUFFICIENT (companyId, balance, commitments, available = the deciding figure, needed, gap; with a Pusat Biaya also pusatBiayaAccountId / pusatBiayaName / pusatBiayaAvailable; audited fund_insufficient); the request stays at its step. Checked decisions store fundBalance / fundCommitments / fundAvailable',
     F.SignBody,
     ['id'],
     detailOk(),
   )
+  registry.registerPath({
+    method: 'get',
+    path: '/expense-requests/{id}/project-loan-lenders',
+    summary:
+      'DRMS 26/10 #1 "Instruksi pinjam antar proyek" (ADR 0031 amendment 2026-10-26): the request\'s project cash account (dana bebas, shortfall = minAmount), the lender candidates (open projects of the same PT with their own account\'s dana bebas; no account / inactive / the borrower\'s account / below minAmount → eligible false + reason), the instructed loan waiting for Finance, `canInstruct` (the final decider while short, fund check on). Kas roles of the request\'s PT (Finance / Direktur / Owner) else 403; a request without a mapped project → 409',
+    security,
+    request: { headers: deviceHeader, params: idParams('id') },
+    responses: res(200, 'Instruction data', L.ProjectLoanInstructionInfo, [401, 403, 404, 409, 426]),
+  })
+  registry.registerPath({
+    method: 'post',
+    path: '/expense-requests/{id}/project-loan',
+    summary:
+      'DRMS 26/10 #1: the final decider of a request whose project cash account is short instructs an inter-project loan (lender project + its account → the request\'s project + account), born APPROVED (submitterRole owner, no Direktur / Owner level, audited approve/ownerInstruction), a transfer order in Antrian Transfer (Finance notified). Shortfall ≤ amount ≤ the lender account\'s dana bebas, both re-checked under the PT fund lock (409 FUND_INSUFFICIENT / 400). Not the final decider → 403 (audited access_denied); a loan already waits / not short / not at the final step → 409. The request stays waiting; it is approved normally after Finance executed the transfer (the instructor is notified, event project_loan.request_ready). 201 + the request detail',
+    security,
+    request: { headers: idem, params: idParams('id'), body: jsonBody(L.ProjectLoanInstruct) },
+    responses: res(201, 'Request after the instruction', F.ExpenseRequestDetail, [400, 401, 403, 404, 409, 422, 426, 429]),
+  })
   post('/expense-requests/{id}/reject', 'Reject (reason) at "Diketahui" (Direktur) or an approval level (Finance); PM/Staff/Admin → 403 (audited)', F.RejectBody, ['id'], detailOk())
   post('/expense-requests/{id}/complete', 'Reimburse: Ditransfer → Selesai', F.EmptyBody, ['id'], detailOk())
   post('/expense-requests/{id}/receipts', 'Add a receipt to a line (image from POST /media/receipts); receiptDate after today (PT timezone) → 400 "Tanggal nota tidak boleh di masa depan" (QA-07)', F.ReceiptCreate, ['id'], res(201, 'Request with receipts and flags', F.ExpenseRequestDetail, [400, 401, 403, 404, 409, 422, 426, 429]))

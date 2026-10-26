@@ -53,6 +53,8 @@ describe('fundCheck.loans[].statusLabel (gap 2)', () => {
       excludedSiteAccounts: { count: 1, balance: 5 },
       waitingAtOwner: { count: 0, amount: 0 },
       commitmentItems: [],
+      projectLoans: [],
+      projectLoanPending: false,
     }
     const loan = { id: 7, docNo: 'PJA/LAS/2610/0001', status: 'instructed', amount: 10, lender: { id: 3, shortCode: 'LAS' } }
     expect(FundCheck.safeParse({ ...panel, loans: [{ ...loan, statusLabel: 'Menunggu pencairan' }] }).success).toBe(true)

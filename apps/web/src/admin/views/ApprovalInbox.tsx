@@ -8,6 +8,7 @@ import { REQUEST_TYPE_LABELS, REQUEST_TYPES } from '@/domain/expense/types'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { ActionButton } from '../components/ActionButton'
+import { ProjectLoanInstruct } from '../components/request/ProjectLoanInstruct'
 import { Panel } from '../components/ui/nexus'
 import { ListToolbar, Pager } from '../components/list/ListToolbar'
 import { allowedValues, idValues, matchesQuery, paginate, parseListQuery } from '../list-query'
@@ -132,14 +133,31 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
                     {(() => {
                       // ADR 0013/0021 labels + confirmations, shared with the request detail (decision-texts.ts)
                       const t = decisionText({ step: r.step, docNo: r.docNo, grandTotal: r.grandTotal, decisionFlow: r.decisionFlow, decisionBy: r.decisionBy, finalStep: r.finalStep })
-                      // ADR 0029 §2: the PT's available funds are short (fund check on) → no "Setujui" here; the detail explains + offers the loan
+                      // ADR 0029 §2: the PT's available funds are short (fund check on) → "Setujui" disabled here; the detail explains + offers the loan
+                      // DRMS 26/10 #1: the project's cash account is short → "Instruksi pinjam antar proyek" in the row (same dialog as the detail)
                       if (r.fundShort) {
+                        const why = r.projectLoanPending
+                          ? `Pinjaman ${r.projectLoanPending.docNo ?? `#${r.projectLoanPending.id}`} menunggu transfer Finance — setujui setelah transfer dieksekusi.`
+                          : r.instructProjectLoan
+                            ? 'Dana bebas akun kas project kurang — instruksikan pinjaman antar proyek atau tolak.'
+                            : 'Dana tersedia kurang — lihat rincian, tolak atau perintahkan pinjaman antar-PT.'
                         return (
-                          <a href={`/admin/collections/expense-requests/${r.id}`} className="pk-nx-badge-link" data-pk-fund-short={r.id}>
-                            <Badge tone="bad" title="Dana tersedia PT kurang — lihat rincian, tolak atau perintahkan pinjaman antar-PT">
-                              Dana kurang {rp(r.fundShort)}
-                            </Badge>
-                          </a>
+                          <>
+                            <button type="button" className="btn btn--style-primary btn--size-small btn--disabled pk-pbtn" disabled title={why} data-pk-action={`${r.step}-blocked`}>
+                              {t.label}
+                            </button>
+                            <a href={`/admin/collections/expense-requests/${r.id}`} className="pk-nx-badge-link" data-pk-fund-short={r.id}>
+                              <Badge tone="bad" title={why}>
+                                Dana kurang {rp(r.fundShort)}
+                              </Badge>
+                            </a>
+                            {r.projectLoanPending ? (
+                              <span className="pk-nx-sub" data-pk-project-loan-pending={r.id}>
+                                {why}
+                              </span>
+                            ) : null}
+                            {r.instructProjectLoan ? <ProjectLoanInstruct requestId={r.id} docNo={r.docNo} buttonClassName="btn btn--style-secondary btn--size-small pk-pbtn" /> : null}
+                          </>
                         )
                       }
                       return <ActionButton url={`/api/v1/expense-requests/${r.id}/${r.step}`} label={t.label} variant="primary" confirm={t.confirm} {...inboxDoc(r)} />
