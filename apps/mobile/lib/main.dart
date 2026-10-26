@@ -15,6 +15,7 @@ import 'core/db/app_database.dart';
 import 'core/device/device_identity.dart';
 import 'core/logging/startup_trace.dart';
 import 'core/logging/log.dart';
+import 'core/network/provider_retry.dart';
 import 'core/storage/secure_store.dart';
 import 'features/sync/background/background_sync.dart';
 
@@ -47,6 +48,8 @@ Future<void> main() async {
   );
   runApp(
     ProviderScope(
+      // DRMS 26/10 #3: no automatic retry of a final API answer (4xx) — the message shows at once.
+      retry: providerRetry,
       overrides: [
         appEnvProvider.overrideWithValue(env),
         secureStoreProvider.overrideWithValue(store),
