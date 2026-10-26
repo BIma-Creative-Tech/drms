@@ -376,6 +376,9 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /expense-requests/:id/acknowledge': 'document',
   'POST /expense-requests/:id/approve': 'document',
   'POST /expense-requests/:id/reject': 'document',
+  // DRMS 26/10 #1: "Instruksi pinjam antar proyek" — the Kas roles / the final decider IN the request's PT
+  'GET /expense-requests/:id/project-loan-lenders': 'document',
+  'POST /expense-requests/:id/project-loan': 'document',
   'POST /expense-requests/:id/complete': 'document',
   'POST /expense-requests/:id/receipts': 'document',
   'PATCH /expense-requests/:id/receipts/:rid': 'document',

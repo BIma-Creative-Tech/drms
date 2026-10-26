@@ -156,7 +156,7 @@ void main() {
     expect(find.byKey(const Key('pli-sheet')), findsNothing);
   });
 
-  testWidgets('sheet: a 409 stays in the sheet and pops up; a waiting loan → no submit', (tester) async {
+  testWidgets('sheet: a 409 stays in the sheet and pops up', (tester) async {
     final api = _Api(
       refuse: ProblemException.fromJson(409, {
         'title': 'Dana bebas akun kas Kas Contoh B (Rp 1.000) tidak cukup untuk menutup kekurangan Rp 20.000.000. Pilih project lain.',
@@ -173,7 +173,9 @@ void main() {
     await tester.tap(find.byKey(const Key('result-ok')));
     await tester.pumpAndSettle();
     expect(tester.widget<Text>(find.byKey(const Key('pli-error'))).data, contains('Pilih project lain'));
+  });
 
+  testWidgets('sheet: a waiting loan → its status, the reason, no submit', (tester) async {
     final waiting = _Api(
       info: pliJson(
         canInstruct: false,
