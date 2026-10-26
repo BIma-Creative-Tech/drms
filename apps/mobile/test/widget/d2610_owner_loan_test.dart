@@ -15,7 +15,6 @@ import 'package:proyekkas/features/expense/presentation/widgets/receipt_thumb.da
 
 import '../support/d1310_c_fixtures.dart';
 import '../support/d2610_fixtures.dart';
-import '../support/fixtures.dart';
 import '../support/harness.dart';
 import '../support/widget_harness.dart';
 

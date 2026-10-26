@@ -146,7 +146,7 @@ class _ProjectLoanInstructSheetState extends ConsumerState<ProjectLoanInstructSh
     }
     final amount = parseDigits(_amount.text);
     final amountErr = pliAmountError(amount, min: info.minAmount, max: c.available, rupiah: formatRupiah);
-    if (amountErr != null) {
+    if (amountErr != null || amount == null) {
       setState(() => _error = amountErr);
       return;
     }
@@ -162,7 +162,7 @@ class _ProjectLoanInstructSheetState extends ConsumerState<ProjectLoanInstructSh
         info.docLabel,
         t.pliConfirmFrom(c.project.label, c.accountName ?? '-'),
         t.pliConfirmTo(info.borrowerProject.label, info.borrowerAccountName),
-        t.pliConfirmAmount(formatRupiah(amount!)),
+        t.pliConfirmAmount(formatRupiah(amount)),
         t.pliConfirmDue(formatDateOnly(_dueDate)),
       ],
       note: t.pliConfirmNote,

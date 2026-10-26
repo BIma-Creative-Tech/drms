@@ -6334,7 +6334,8 @@ class AppLocalizationsId extends AppLocalizations {
   String get pliContinue => 'Lanjut';
 
   @override
-  String get pliConfirmNote => 'Pinjaman langsung disetujui dan masuk Antrian Transfer Finance. Pengajuan tetap menunggu keputusan Anda; setujui setelah Finance mentransfer pinjaman.';
+  String get pliConfirmNote =>
+      'Pinjaman langsung disetujui dan masuk Antrian Transfer Finance. Pengajuan tetap menunggu keputusan Anda; setujui setelah Finance mentransfer pinjaman.';
 
   @override
   String pliConfirmFrom(String project, String account) {
