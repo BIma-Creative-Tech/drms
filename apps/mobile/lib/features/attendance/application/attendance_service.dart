@@ -179,10 +179,11 @@ final eligibleLocationsProvider = FutureProvider<EligibleLocations?>((ref) async
 });
 
 /// Own check-in locations with their geofence. DRMS 13/10 A2 / ADR 0032: the server's eligible list (every registered
-/// location of the PT with a point — projects, cost centers; OnSite inside the chosen one, Non-OnSite inside any) — no
-/// assignment needed. Without that list (server before A2 / never online) the
-/// assignment-based masters list ([_assignedLocationsProvider]). The first entry is the default of the picker; the
-/// screen then selects the location whose geofence contains the GPS fix (auto-detect).
+/// location of the PT with a point — projects, cost centers; OnSite inside the chosen one, Non-OnSite anywhere: the
+/// containing one, else "Di luar area" at the nearest one, DRMS 26/10) — no assignment needed. Without that list
+/// (server before A2 / never online) the assignment-based masters list ([_assignedLocationsProvider]). The first entry
+/// is the default of the picker; the screen then selects the location whose geofence contains the GPS fix
+/// (auto-detect).
 final attendanceSitesProvider = FutureProvider<List<ProjectSite>>((ref) async {
   final eligible = await ref.watch(eligibleLocationsProvider.future);
   if (eligible != null) return eligible.sites;

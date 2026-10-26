@@ -451,12 +451,14 @@ semua isian tab ini untuk kembali ke tanda tangan pribadi.
 - **Tipe absensi karyawan:** di **Karyawan** (atau **Pengguna → tab Data Karyawan**) isi **Tipe absensi**:
   - **Karyawan OnSite** (default semua karyawan): absen di lokasi terdaftar PT yang **dipilih** (project / pusat biaya
     yang punya titik) dan harus **di dalam radius** lokasi itu — **tanpa penugasan** (Team Assignment tidak perlu).
-  - **Karyawan Non-OnSite** (staf kantor): absen masuk **dan** pulang di dalam radius **lokasi terdaftar PT mana pun**
-    — tanpa penugasan; lokasi yang memuat posisi GPS dipilih otomatis (yang terdekat bila bertumpuk). **Di luar semua
-    lokasi terdaftar absen ditolak** (sejak 24 Okt 2026 tidak ada lagi "Di luar area"). Absen pulang menutup absen
-    masuk hari itu (bila pulang di lokasi lain, baris diberi tanda `CHECK_OUT_ELSEWHERE`). GPS wajib, lokasi palsu
-    ditolak.
-  - Catatan lama **"Di luar area"** (14–24 Okt 2026) tetap terlihat di Rekap, Laporan Absensi dan daftar **Absensi**.
+  - **Karyawan Non-OnSite** (staf kantor): absen masuk **dan** pulang **di mana saja** — tanpa penugasan. Di dalam
+    radius lokasi terdaftar PT, lokasi yang memuat posisi GPS dipilih otomatis (yang terdekat bila bertumpuk). **Di
+    luar semua lokasi terdaftar absen tetap tersimpan** dan dicatat **"Di luar area"** dengan acuan lokasi terdaftar
+    PT yang **terdekat** beserta jaraknya (sejak 26 Okt 2026, kembali seperti 14 Okt; 24–26 Okt sempat ditolak). Absen
+    pulang menutup absen masuk hari itu (bila pulang di lokasi lain, baris diberi tanda `CHECK_OUT_ELSEWHERE`; bila di
+    luar semua lokasi, "Di luar area"). Bila PT belum punya lokasi terdaftar dengan titik sama sekali, absen ditolak.
+    GPS dan selfie wajib, lokasi palsu ditolak. Pengajuan tetap hanya untuk project yang ditugaskan (tidak berubah).
+  - Catatan **"Di luar area"** terlihat di Rekap, Laporan Absensi dan daftar **Absensi** (filter "Di luar area").
   - Daftar Karyawan bisa difilter per **Tipe absensi**.
 - APK dan web **mengenali area otomatis**: lokasi yang geofence-nya memuat posisi GPS karyawan langsung terpilih;
   bila beberapa area bertumpuk, karyawan memilih salah satu; di luar semua area karyawan OnSite memilih manual (server

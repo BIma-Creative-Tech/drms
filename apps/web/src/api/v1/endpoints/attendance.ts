@@ -121,10 +121,10 @@ export const teamMonthEndpoint = v1({
  * DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13): the caller's eligible check-in locations, per own employee in the
  * selected PTs (`?company=` narrows; the APK asks with every membership PT and caches the list for offline use).
  * Both types get every registered location of the PT with a point (projects, cost centers — ADR 0032: no site): OnSite
- * must be inside the chosen one, Non-OnSite inside any of them (picked automatically; outside all → refused). Only id,
- * kind, code, name, point and radius — no money, no budgets. `homeSiteId` / `referenceSite` / `isHeadOffice` / `home`
- * stay in the answer for APK ≤ 0.11.1 and are always null / false. Read-only; the check-in re-validates everything
- * (domain/attendance/record.ts).
+ * must be inside the chosen one, Non-OnSite anywhere (the containing one, picked automatically; outside all → "Di luar
+ * area" at the nearest one, DRMS 26/10). Only id, kind, code, name, point and radius — no money, no budgets.
+ * `homeSiteId` / `referenceSite` / `isHeadOffice` / `home` stay in the answer for APK ≤ 0.11.1 and are always null /
+ * false. Read-only; the check-in re-validates everything (domain/attendance/record.ts).
  */
 export const attendanceLocationsEndpoint = v1({
   path: '/attendance/locations',

@@ -51,6 +51,25 @@ into the next web release section.
   kontrak (contract → contract unit, unit → vehicle record), Akses PT user header and Tutup buku history open their
   detail. `canOpenApkRoute` keeps a target the user cannot read unlinked.
 
+### Changed
+
+- **Absensi: Karyawan Non-OnSite may check in and out anywhere again (DRMS 26/10 #2, user 2026-10-26; ADR 0032
+  amendment 2026-10-26).** Reverses ADR 0032 D4 for Non-OnSite and restores the rule of 14/10: inside a registered
+  location of the own PT the record goes to the containing one (as before); outside every location it is no longer
+  refused (`OUTSIDE_GEOFENCE`) but recorded **"Di luar area"** (`attendances.outside_area`) referenced to the
+  **nearest** registered location of the PT (project / cost center with a point) with `distance_m` to it. A check-out
+  with an open check-in closes that pair (`CHECK_OUT_ELSEWHERE` inside another location, "Di luar area" outside all).
+  Same for the web self check-in, the APK sync (also offline items) and the PM / Admin Staff on-behalf. A PT without
+  any located registered location → `NO_GEOFENCE`. OnSite unchanged; mock location still refused; selfie + GPS still
+  required. Requests (pengajuan) unchanged: only for the assigned active projects (test added).
+- Web Absen / Absenkan karyawan: outside every location the nearest one (or the day's open check-in) is picked, the
+  note "Di luar lokasi terdaftar — absen dicatat "Di luar area"" is shown and repeated in the confirmation popup; the
+  result popup names the reference. Help texts (Data Karyawan, Pengguna form) and OpenAPI descriptions updated (text
+  only, no schema change).
+- APK: the client pre-check no longer blocks a Non-OnSite fix outside the registered locations (own check-in / out and
+  on-behalf): the nearest location is used and the confirmation popup carries the note; only "no located location at
+  all" and mock location are refused client-side. Type hint text updated.
+
 ## [0.21.1] - 2026-10-25
 
 **Web fix: image previews + popup for every image link, selfies only through audited endpoints (D2510, user

@@ -14,7 +14,8 @@ class EligibleLocations {
   final Map<int, AttendanceType> types;
 
   /// Registered locations (projects, then cost centers — server order). ADR 0032: no site and no "Di luar area"
-  /// entry any more (an old cache's `referenceSite` is ignored).
+  /// entry any more (an old cache's `referenceSite` is ignored; DRMS 26/10: a Non-OnSite fix outside every location is
+  /// recorded "Di luar area" at the nearest of these).
   final List<ProjectSite> sites;
 
   factory EligibleLocations.fromJson(Map<String, dynamic> j) {

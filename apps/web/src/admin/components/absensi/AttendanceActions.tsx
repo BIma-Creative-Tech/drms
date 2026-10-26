@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import React, { useEffect, useId, useRef, useState } from 'react'
 
-import { detectArea } from '@/domain/attendance/area'
+import { detectArea, NON_ONSITE_OUTSIDE, OUTSIDE_AREA_LABEL } from '@/domain/attendance/area'
 import { geofenceError } from '@/domain/attendance/calendar'
 import { errorLine } from '@/lib/field-labels'
 
@@ -493,7 +493,8 @@ export function GeofenceForm({ costCenterId, name, lat, lng, radiusM, defaultRad
 /**
  * DRMS 13/10 A2: the list is every registered location of the caller's PT with its point + effective radius (area
  * detection from the browser GPS) — ADR 0032: projects and cost centers (no site, no "Di luar area" entry);
- * `nonOnsite` = the employee there is Non-OnSite (any registered location, picked by the server).
+ * `nonOnsite` = the employee there is Non-OnSite (anywhere: the registered location containing the fix, else "Di luar
+ * area" at the nearest one — picked by the server, DRMS 26/10).
  */
 export type SelfCheckLocation = {
   type: 'project' | 'cost_center'
@@ -517,14 +518,16 @@ export function selfCheckPick(locations: readonly SelfCheckLocation[], key: stri
   return { loc, action: loc ? (!loc.checkIn ? 'check_in' : !loc.checkOut ? 'check_out' : null) : null }
 }
 
-type AreaNote = { text: string; tone: 'ok' | 'warn'; inside: string[] }
+/** `outside` (DRMS 26/10): a Non-OnSite fix outside every registered location — recorded "Di luar area". */
+type AreaNote = { text: string; tone: 'ok' | 'warn'; inside: string[]; outside?: boolean }
 
 /**
  * DRMS 13/10 A2: recognise the area from a GPS fix — one location whose geofence contains the fix → chosen; several
  * (overlapping) → the nearest is chosen and the user may pick another of them; none → manual choice (fallback) with
- * the nearest as a hint. ADR 0032: a Non-OnSite employee outside every location cannot check in (no "Di luar area"
- * any more) — the note says so. Pure (exported for the unit test); the server re-checks and decides where the record
- * belongs.
+ * the nearest as a hint. DRMS 26/10 (ADR 0032 amendment 2026-10-26): a Non-OnSite employee outside every location
+ * may still check in / out — recorded "Di luar area" at the nearest location (an open check-in of the day is closed
+ * there): that location is picked and the note says so. Pure (exported for the unit test); the server re-checks and
+ * decides where the record belongs.
  */
 export function areaNote(locations: readonly SelfCheckLocation[], fix: { lat: number; lng: number; accuracyM: number | null }): { pick: string | null; note: AreaNote } {
   const d = detectArea(locations, fix)
@@ -543,9 +546,11 @@ export function areaNote(locations: readonly SelfCheckLocation[], fix: { lat: nu
     }
   }
   if (d.nearest && locations.some((l) => l.nonOnsite)) {
+    // the server closes the open check-in of the day there; else it records at the nearest location
+    const open = locations.find((l) => l.checkIn && !l.checkOut)
     return {
-      pick: null,
-      note: { tone: 'warn', inside: [], text: `Posisi Anda di luar semua lokasi terdaftar. Karyawan Non-OnSite hanya bisa absen di dalam area lokasi project / pusat biaya PT. Terdekat: ${d.nearest.label} (${d.nearest.distanceM} m, radius ${d.nearest.radiusM} m).` },
+      pick: locKeyOf(open ?? d.nearest),
+      note: { tone: 'warn', inside: [], outside: true, text: `${NON_ONSITE_OUTSIDE} (ref. ${d.nearest.label}, ${d.nearest.distanceM} m dari titik).` },
     }
   }
   if (d.nearest) {
@@ -555,6 +560,18 @@ export function areaNote(locations: readonly SelfCheckLocation[], fix: { lat: nu
     }
   }
   return { pick: null, note: { tone: 'warn', inside: [], text: 'Belum ada lokasi absen dengan titik koordinat. Hubungi Admin.' } }
+}
+
+/**
+ * DRMS 26/10: result line of a check-in / check-out recorded "Di luar area" (POST result `outsideArea`; the reference
+ * = `location`); undefined for a normal one. Pure (exported for the unit test).
+ */
+export function outsideAreaLine(data: unknown, locations: readonly Pick<SelfCheckLocation, 'type' | 'id' | 'label'>[]): string | undefined {
+  const r = data as { outsideArea?: boolean; location?: { type?: string; id?: number }; distanceM?: number } | null
+  if (!r?.outsideArea) return undefined
+  const ref = locations.find((l) => l.type === r.location?.type && l.id === r.location?.id)
+  const dist = typeof r.distanceM === 'number' ? `, ${r.distanceM} m` : ''
+  return ref ? `Tercatat "${OUTSIDE_AREA_LABEL}" (ref. ${ref.label}${dist}).` : `Tercatat "${OUTSIDE_AREA_LABEL}".`
 }
 
 function getPosition(): Promise<GeolocationPosition> {
@@ -625,7 +642,8 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
     if (!photo) return setError('Ambil foto selfie dengan kamera dulu.')
     // DRMS 24/10: popup before (location) and after (result) the attendance
     const label = action === 'check_in' ? 'Absen masuk' : 'Absen pulang'
-    if (!(await confirmAction({ title: confirmTitle(label, `di ${loc.label}`), summary: [['Lokasi', loc.label], ['Masuk', loc.checkIn]], description: 'Lokasi GPS diambil saat Anda menekan Ya.', confirmLabel: confirmLabel(label) }))) return
+    const description = area?.outside ? `${NON_ONSITE_OUTSIDE}. Lokasi GPS diambil saat Anda menekan Ya.` : 'Lokasi GPS diambil saat Anda menekan Ya.'
+    if (!(await confirmAction({ title: confirmTitle(label, `di ${loc.label}`), summary: [['Lokasi', loc.label], ['Masuk', loc.checkIn]], description, confirmLabel: confirmLabel(label) }))) return
     const file = new File([photo], 'selfie.jpg', { type: 'image/jpeg' })
     setBusy(true)
     try {
@@ -643,7 +661,7 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
         showResult({ ok: false, title: failureTitle(label), message: r.error ?? 'Gagal mengirim absensi.' })
         return setError(r.error ?? 'Gagal mengirim absensi.')
       }
-      showResult({ ok: true, title: successTitle(label, loc.label) })
+      showResult({ ok: true, title: successTitle(label, loc.label), message: outsideAreaLine(r.data, locations) })
       setPhoto(null)
       setCamKey((k) => k + 1)
       router.refresh()
@@ -782,7 +800,8 @@ export function OnBehalfForm({ employees, locations, disabledCompanies, privacyB
       ['Lokasi', loc.label],
       ['Alasan', reason.trim()],
     ]
-    if (!(await confirmAction({ title: confirmTitle(label, who.label), summary, description: 'Lokasi GPS perangkat ini diambil saat Anda menekan Ya.', confirmLabel: confirmLabel(label), testId: 'on-behalf' }))) return
+    const description = area?.outside ? `${NON_ONSITE_OUTSIDE}. Lokasi GPS perangkat ini diambil saat Anda menekan Ya.` : 'Lokasi GPS perangkat ini diambil saat Anda menekan Ya.'
+    if (!(await confirmAction({ title: confirmTitle(label, who.label), summary, description, confirmLabel: confirmLabel(label), testId: 'on-behalf' }))) return
     const file = new File([photo], 'selfie.jpg', { type: 'image/jpeg' })
     setBusy(true)
     try {
@@ -802,7 +821,8 @@ export function OnBehalfForm({ employees, locations, disabledCompanies, privacyB
         showResult({ ok: false, title: failureTitle(label), message: r.error ?? 'Gagal mengirim absensi.', testId: 'on-behalf' })
         return setError(r.error ?? 'Gagal mengirim absensi.')
       }
-      showResult({ ok: true, title: successTitle(label, who.label), message: `${loc.label} · diabsenkan oleh Anda.`, testId: 'on-behalf' })
+      const outside = outsideAreaLine(r.data, mine)
+      showResult({ ok: true, title: successTitle(label, who.label), message: outside ? `${outside} Diabsenkan oleh Anda.` : `${loc.label} · diabsenkan oleh Anda.`, testId: 'on-behalf' })
       setDone(`${kind === 'check_in' ? 'Absen masuk' : 'Absen pulang'} ${who.label} tercatat (diabsenkan oleh Anda).`)
       setPhoto(null)
       setReason('')
@@ -849,7 +869,7 @@ export function OnBehalfForm({ employees, locations, disabledCompanies, privacyB
               </option>
             ))}
           </WrapSelect>
-          {who ? <span className="help">{who.nonOnsite ? 'Karyawan Non-OnSite: lokasi terdaftar yang memuat posisi GPS Anda dipakai otomatis.' : 'Karyawan OnSite: posisi GPS Anda harus di dalam radius lokasi yang dipilih.'}</span> : null}
+          {who ? <span className="help">{who.nonOnsite ? 'Karyawan Non-OnSite: lokasi terdaftar yang memuat posisi GPS Anda dipakai otomatis; di luar semua lokasi tercatat "Di luar area".' : 'Karyawan OnSite: posisi GPS Anda harus di dalam radius lokasi yang dipilih.'}</span> : null}
         </label>
         <label className="pk-fld">
           <span className="lbl">Jenis</span>

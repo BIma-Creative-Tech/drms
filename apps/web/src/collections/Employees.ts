@@ -129,8 +129,8 @@ export const Employees: CollectionConfig = withAudit(
       // ADR 0032: "Site penempatan" (ADR 0023) removed from the product — hidden legacy column, no longer used
       legacySiteField('homeSite', 'Site penempatan (lama)'),
       // DRMS 13/10 A2 / ADR 0032: where the employee may check in (no assignment needed) — OnSite: inside the CHOSEN
-      // registered location of the PT (project / cost center with a point); Non-OnSite: inside ANY registered location of
-      // the PT (picked automatically; outside all refused). Default OnSite. Rule: domain/attendance/area.ts.
+      // registered location of the PT (project / cost center with a point); Non-OnSite (DRMS 26/10): anywhere — the
+      // registered location containing the fix, else "Di luar area". Default OnSite. Rule: domain/attendance/area.ts.
       {
         name: 'attendanceType',
         type: 'select',
@@ -140,7 +140,7 @@ export const Employees: CollectionConfig = withAudit(
         options: ATTENDANCE_TYPES.map((value) => ({ value, label: ATTENDANCE_TYPE_LABEL[value] })),
         admin: {
           description:
-            'Karyawan OnSite: absen di lokasi terdaftar PT yang dipilih (project / pusat biaya yang punya titik) — harus di dalam radius lokasi itu, tanpa penugasan. Karyawan Non-OnSite (staf kantor): absen masuk dan pulang di dalam radius lokasi terdaftar PT mana pun; lokasi dipilih otomatis, di luar semua lokasi ditolak.',
+            'Karyawan OnSite: absen di lokasi terdaftar PT yang dipilih (project / pusat biaya yang punya titik) — harus di dalam radius lokasi itu, tanpa penugasan. Karyawan Non-OnSite (staf kantor): absen masuk dan pulang di mana saja — di dalam radius lokasi terdaftar PT tercatat di lokasi itu (dipilih otomatis), di luar semua lokasi tetap tercatat "Di luar area".',
         },
       },
       { name: 'faceRefPhoto', type: 'upload', relationTo: 'media-selfies', label: 'Foto wajah referensi' },

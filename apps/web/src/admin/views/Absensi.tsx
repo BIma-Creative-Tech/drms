@@ -655,8 +655,8 @@ function Stamp({ loc, kind, d, tz }: { loc: LocationDay; kind: 'checkIn' | 'chec
  * Owner decision 2026-10-09: web self check-in/out, every role. DRMS 13/10 A2: the location list is every registered
  * location of the caller's PT(s) with its point (`eligibleLocations`: projects, cost centers — ADR 0032: no site), so
  * the form can detect the area from the browser GPS. POST /attendance/check-in|check-out re-check everything (type
- * rule: OnSite inside the chosen location, Non-OnSite inside any — outside all refused —, company-settings
- * .syncAttendanceEnabled, ADR 0018 privacy ack).
+ * rule: OnSite inside the chosen location, Non-OnSite anywhere — outside all recorded "Di luar area" at the nearest
+ * location, DRMS 26/10 —, company-settings.syncAttendanceEnabled, ADR 0018 privacy ack).
  */
 export async function AbsensiAbsen(props: AdminViewServerProps) {
   const req = props.initPageResult.req

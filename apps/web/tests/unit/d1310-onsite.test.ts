@@ -12,6 +12,7 @@ import {
   geofenceRequired,
   haversineM,
   insideGeofence,
+  NON_ONSITE_NO_LOCATION,
   NON_ONSITE_OUTSIDE,
   OUTSIDE_AREA_FLAG,
   OUTSIDE_AREA_LABEL,
@@ -21,7 +22,7 @@ import * as legacy from '@/domain/sync/attendance'
 
 /**
  * DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13; Non-OnSite rule owner 2026-10-14): attendance type OnSite / Non-OnSite
- * — the geofence rule, the Non-OnSite resolution ("Di luar area"), the automatic area detection (pure, shared by
+ * — the geofence rule, the Non-OnSite resolution ("Di luar area", again since DRMS 26/10), the automatic area detection (pure, shared by
  * server and web client) and the recap stamp. Points are fictional.
  */
 const P = { lat: -2.21, lng: 113.91 }
@@ -36,12 +37,15 @@ describe('attendance type', () => {
     for (const v of ['onsite', null, undefined, '', 'x']) expect(attendanceTypeOf(v)).toBe('onsite')
   })
 
-  it('OnSite needs the fix inside the CHOSEN location; Non-OnSite inside any registered one (ADR 0032)', () => {
+  it('OnSite needs the fix inside the CHOSEN location; Non-OnSite anywhere ("Di luar area", DRMS 26/10)', () => {
     expect(geofenceRequired('onsite')).toBe(true)
     expect(geofenceRequired('non_onsite')).toBe(false)
-    // history label of the 14–24/10 rows; a new Non-OnSite attendance outside every location is refused
+    // DRMS 26/10: a Non-OnSite attendance outside every location is recorded "Di luar area" again (note, not a refusal)
     expect(OUTSIDE_AREA_LABEL).toBe('Di luar area')
-    expect(NON_ONSITE_OUTSIDE).toMatch(/Non-OnSite hanya bisa absen masuk \/ pulang di dalam area lokasi/)
+    expect(NON_ONSITE_OUTSIDE).toBe('Di luar lokasi terdaftar — absen dicatat "Di luar area"')
+    expect(NON_ONSITE_OUTSIDE).not.toMatch(/hanya bisa absen/)
+    // only a PT without any located registered location is refused
+    expect(NON_ONSITE_NO_LOCATION).toMatch(/belum punya lokasi terdaftar/)
     expect(CHECK_OUT_ELSEWHERE_FLAG).toBe('CHECK_OUT_ELSEWHERE')
   })
 })
@@ -58,9 +62,13 @@ describe('Non-OnSite resolution (pickContaining)', () => {
     expect(pickContaining('cost_center:9', cands, { lat: P.lat - 0.0003, lng: P.lng })!.key).toBe('project:7')
     expect(pickContaining(null, cands, { lat: P.lat - 0.0001, lng: P.lng })!.key).toBe('project:1')
   })
-  it('outside every registered location → null (ADR 0032: refused OUTSIDE_GEOFENCE)', () => {
-    expect(pickContaining('project:1', cands, { lat: P.lat + 0.05, lng: P.lng })).toBeNull()
+  it('outside every registered location → null ("Di luar area"; the reference is the nearest one, DRMS 26/10)', () => {
+    const far = { lat: P.lat + 0.05, lng: P.lng }
+    expect(pickContaining('project:1', cands, far)).toBeNull()
+    expect(detectArea(cands, far).nearest!.key).toBe('project:1')
     expect(pickContaining('project:1', [], { lat: P.lat, lng: P.lng })).toBeNull()
+    // no located location at all → nothing to reference (NON_ONSITE_NO_LOCATION)
+    expect(detectArea([], far).nearest).toBeNull()
   })
 })
 

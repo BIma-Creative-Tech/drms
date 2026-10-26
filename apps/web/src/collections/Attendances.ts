@@ -118,9 +118,10 @@ export const Attendances: CollectionConfig = withAudit(
       { name: 'lng', type: 'number', label: 'Longitude', required: true, admin: ro },
       { name: 'accuracyM', type: 'number', label: 'Akurasi GPS (m)', admin: ro },
       { name: 'distanceM', type: 'number', label: 'Jarak ke titik lokasi (m)', required: true, admin: ro },
-      // DRMS 13/10 A2 (owner 2026-10-14): Non-OnSite attendance outside every registered location of the PT — "Di luar
-      // area". The location above is then the reference (home site, else head office; a check-out: the open check-in's
-      // location) and `distanceM` the distance to its point.
+      // DRMS 13/10 A2 (owner 2026-10-14; again since DRMS 26/10): Non-OnSite attendance outside every registered location
+      // of the PT — "Di luar area". The location above is then the reference (14–24/10: home site, else head office;
+      // since 26/10: the nearest registered location; a check-out: the open check-in's location) and `distanceM` the
+      // distance to its point.
       { name: 'outsideArea', type: 'checkbox', label: 'Di luar area', defaultValue: false, admin: ro },
       { name: 'selfie', type: 'upload', relationTo: 'media-selfies', label: 'Selfie', required: true, admin: ro },
       { name: 'device', type: 'relationship', relationTo: 'devices', label: 'Perangkat', admin: ro },

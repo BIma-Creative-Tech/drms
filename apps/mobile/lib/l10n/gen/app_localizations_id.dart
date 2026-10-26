@@ -1637,7 +1637,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get attendanceTypeNonOnsite =>
-      'Karyawan Non-OnSite: absen masuk / pulang di dalam radius lokasi terdaftar PT mana pun; lokasi dipilih otomatis.';
+      'Karyawan Non-OnSite: absen masuk / pulang di mana saja — di dalam radius lokasi terdaftar PT tercatat di lokasi itu (dipilih otomatis), di luar semua lokasi dicatat \"Di luar area\".';
 
   @override
   String get attendanceOutsideArea => 'Di luar area';
@@ -1648,7 +1648,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String attendanceDetectOutsideArea(String name) {
-    return 'Posisi Anda di luar semua lokasi terdaftar: absen dicatat \"Di luar area\" (ref. $name).';
+    return 'Di luar lokasi terdaftar — absen dicatat \"Di luar area\" (ref. $name).';
   }
 
   @override
@@ -1656,8 +1656,7 @@ class AppLocalizationsId extends AppLocalizations {
       'Absen \"Di luar area\" belum bisa: site penempatan / kantor pusat PT belum ditetapkan Admin.';
 
   @override
-  String get attendanceNonOnsiteOutside =>
-      'Anda di luar semua lokasi terdaftar PT. Karyawan Non-OnSite hanya bisa absen di dalam area lokasi project / pusat biaya PT. Mendekatlah ke lokasi terdaftar.';
+  String get attendanceNonOnsiteOutside => 'Di luar lokasi terdaftar — absen dicatat \"Di luar area\"';
 
   @override
   String get distanceInside => 'Di dalam area absen';

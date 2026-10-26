@@ -7,9 +7,10 @@
  * ADR 0032 (DRMS 24/10, user decision; sites removed — registered locations = projects, plus cost centers with a point):
  * - OnSite: may check in at ANY registered location of the own PT that has a point; the fix must lie inside the CHOSEN
  *   location; no team assignment needed; outside the radius → refused.
- * - Non-OnSite: check-in AND check-out only inside the geofence of ANY active registered location of the own PT — no
- *   assignment needed, the location is picked automatically (the containing one, the nearest when several); outside
- *   every location → refused (no new "Di luar area" record; that label stays for the history rows of 14–24/10).
+ * - Non-OnSite (amendment 2026-10-26, DRMS 26/10, user decision — restores the rule of 14/10): check-in AND check-out
+ *   ANYWHERE, no assignment needed. Inside the geofence of an active registered location of the own PT → recorded
+ *   there (the containing one, the nearest when several); outside every location → NOT refused: recorded
+ *   "Di luar area" (`outside_area`) referenced to the NEAREST registered location of the PT with the distance to it.
  * Both: own PT only, GPS fix required and stored, mock location refused, selfie / privacy rules unchanged. The server
  * stays authoritative (record.ts).
  */
@@ -53,21 +54,30 @@ export function attendanceTypeOf(v: unknown): AttendanceType {
 }
 
 /**
- * Does the type require the fix inside the CHOSEN location's geofence? OnSite yes; Non-OnSite no — it must lie inside
- * ANY registered location of the PT, the server picks it (record.ts resolveNonOnsite, ADR 0032).
+ * Does the type require the fix inside the CHOSEN location's geofence? OnSite yes; Non-OnSite no — the server picks the
+ * registered location containing the fix, else records "Di luar area" (record.ts resolveNonOnsite, DRMS 26/10).
  */
 export function geofenceRequired(type: AttendanceType): boolean {
   return type === 'onsite'
 }
 
 /**
- * Label of a Non-OnSite attendance recorded outside every registered location (14–24/10, ADR 0023 revision 2026-10-14)
- * — history only since ADR 0032 (reports, recaps, APK history, web).
+ * Label of a Non-OnSite attendance recorded outside every registered location (ADR 0023 revision 2026-10-14; withdrawn
+ * 24–26/10 by ADR 0032, back since its amendment 2026-10-26) — reports, recaps, APK history, web.
  */
 export const OUTSIDE_AREA_LABEL = 'Di luar area'
 
-/** ADR 0032: refusal of a Non-OnSite check-in / check-out outside every registered location of the PT. */
-export const NON_ONSITE_OUTSIDE = 'Anda di luar semua lokasi terdaftar PT. Karyawan Non-OnSite hanya bisa absen masuk / pulang di dalam area lokasi project (atau pusat biaya) PT-nya. Mendekatlah ke lokasi terdaftar.'
+/**
+ * DRMS 26/10: note of a Non-OnSite check-in / check-out outside every registered location of the PT (web + APK show it
+ * before the confirmation popup; the server records the row "Di luar area"). Until 26/10 this was a refusal text.
+ */
+export const NON_ONSITE_OUTSIDE = 'Di luar lokasi terdaftar — absen dicatat "Di luar area"'
+
+/**
+ * DRMS 26/10: refusal of a Non-OnSite attendance when the PT has no registered location with a point at all (nothing
+ * to reference a "Di luar area" record to).
+ */
+export const NON_ONSITE_NO_LOCATION = 'Absen belum bisa dicatat: PT Anda belum punya lokasi terdaftar (project / pusat biaya) dengan titik koordinat. Hubungi Admin.'
 
 /**
  * ADR 0032: flag of a Non-OnSite check-out recorded at the day's open check-in while the fix lies inside ANOTHER
@@ -114,7 +124,8 @@ export function compareEligible(a: { kind: LocationKind; code: string }, b: { ki
 
 /**
  * Non-OnSite resolution (server and clients): the requested location when the fix lies inside it, else the nearest
- * registered location containing the fix, else null (= refused, ADR 0032). `key` identifies a candidate (`kind:id`).
+ * registered location containing the fix, else null (= "Di luar area", DRMS 26/10). `key` identifies a candidate
+ * (`kind:id`).
  */
 export function pickContaining<T extends AreaCandidate & { key: string }>(requestedKey: string | null, candidates: readonly T[], fix: { lat: number; lng: number; accuracyM?: number | null }): AreaMatch<T> | null {
   const d = detectArea(candidates, fix)
