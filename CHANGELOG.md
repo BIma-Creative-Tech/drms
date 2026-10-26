@@ -6,11 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-**Web (DRMS 26/10 #1, branch `feat/d2610-owner-loan`) + APK** — migrations `20261026_100000_d2610_owner_loan_enums`,
-`_100100_d2610_owner_loan_schema`, `_100200_d2610_owner_loan_guard`; API: `GET /expense-requests/{id}/project-loan-lenders`,
-`POST /expense-requests/{id}/project-loan`, new fields (`fundCheck.projectLoans` / `projectLoanPending`, inbox
-`instructProjectLoan` / `projectLoanPending`, loan `expenseRequest`, `submitterRole` `owner`, action
-`instruct_project_loan`). ADR 0031 "Amendment 2026-10-26".
+## [0.22.0] - 2026-10-26
+
+**Client feedback 26/10 (DRMS 26/10, PR #144); APK 0.14.0.** Three streams on top of 0.21.1 / APK 0.13.1:
+#1 "Instruksi pinjam antar proyek" (fund check per project cash account only), #2 Karyawan Non-OnSite "Di luar area"
+again, #3 APK Rekap bulanan tim. Three migrations (#1 only), run in timestamp order:
+`20261026_100000_d2610_owner_loan_enums`, `_100100_d2610_owner_loan_schema`, `_100200_d2610_owner_loan_guard`. API
+contract 0.22.0 (additive): `GET /expense-requests/{id}/project-loan-lenders`, `POST /expense-requests/{id}/project-loan`,
+`GET /attendance/team-month`, new fields (`fundCheck.projectLoans` / `projectLoanPending`, inbox `instructProjectLoan` /
+`projectLoanPending`, loan `expenseRequest`, `submitterRole` `owner`, action `instruct_project_loan`). ADR 0031 + ADR
+0032 "Amendment 2026-10-26". APK 0.14.0 needed for the instruction sheet, the team recap and Non-OnSite outside the
+registered locations (older APKs keep working; their client pre-check still blocks Non-OnSite outside every location).
+In-flight requests with a mapped project are judged by the new rule at their next decision.
 
 ### Changed
 
@@ -20,6 +27,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   backstop `pk_request_fund_available`). Requests without a mapped project keep the per-PT check; the fund switch is
   unchanged; Finance paying an approved request from another account (automatic loan) is unchanged. Texts / the Owner
   notification (`expense.fund_shortfall_account`) name the account.
+
+- **Absensi: Karyawan Non-OnSite may check in and out anywhere again (DRMS 26/10 #2, user 2026-10-26; ADR 0032
+  amendment 2026-10-26).** Reverses ADR 0032 D4 for Non-OnSite and restores the rule of 14/10: inside a registered
+  location of the own PT the record goes to the containing one (as before); outside every location it is no longer
+  refused (`OUTSIDE_GEOFENCE`) but recorded **"Di luar area"** (`attendances.outside_area`) referenced to the
+  **nearest** registered location of the PT (project / cost center with a point) with `distance_m` to it. A check-out
+  with an open check-in closes that pair (`CHECK_OUT_ELSEWHERE` inside another location, "Di luar area" outside all).
+  Same for the web self check-in, the APK sync (also offline items) and the PM / Admin Staff on-behalf. A PT without
+  any located registered location → `NO_GEOFENCE`. OnSite unchanged; mock location still refused; selfie + GPS still
+  required. Requests (pengajuan) unchanged: only for the assigned active projects (test added).
+- Web Absen / Absenkan karyawan: outside every location the nearest one (or the day's open check-in) is picked, the
+  note "Di luar lokasi terdaftar — absen dicatat "Di luar area"" is shown and repeated in the confirmation popup; the
+  result popup names the reference. Help texts (Data Karyawan, Pengguna form) and OpenAPI descriptions updated (text
+  only, no schema change).
+- APK: the client pre-check no longer blocks a Non-OnSite fix outside the registered locations (own check-in / out and
+  on-behalf): the nearest location is used and the confirmation popup carries the note; only "no located location at
+  all" and mock location are refused client-side. Type hint text updated.
 
 ### Added
 
@@ -32,18 +56,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   audited), a transfer order in Antrian Transfer (Finance notified, badge counts it). The request waits ("Pinjaman PJ/…
   menunggu transfer Finance", no second instruction); Finance executes it with the existing flow (the lender's dana
   bebas re-checked), the instructor is notified (`project_loan.request_ready`) and approves normally.
-
-**APK 0.13.1 (APK-only, works with server 0.21.0 and 0.21.1)** (branch `fix/d2510-apk-tap-lpj`, pubspec `0.13.1+1`, release notes
-`docs/release-notes/apk/0.13.1.md`): no server change, no migration, no API change; APK 0.13.0 keeps working. Folded
-into the next web release section.
-
-### Added
-
-- **APK: Finance LPJ actions (D2510, user 2026-10-25)** on the request detail, the web "Verifikasi LPJ" parity: per
-  receipt Valid / Tolak (reason ≥ 3), "Tandai flag diperiksa" (optional note), bottom bar "Minta revisi" (note ≥ 3) /
-  "Verifikasi LPJ" — shown only for the `allowedActions` the server lists (`receipt_verify`, `review_flag`,
-  `lpj_request_revision`, `lpj_verify`). Confirm before + result after (D2410); a 409 "Masih ada n nota yang belum
-  diputuskan" shows the server text. Detail and LPJ queue refresh after each call; "settle" stays web-only.
 
 ### Fixed
 
@@ -59,6 +71,20 @@ into the next web release section.
 - **APK: no automatic retry of final API answers (DRMS 26/10 #3).** The global `ProviderScope.retry` retries only
   network failures, 5xx, 408 and 429 (Riverpod backoff unchanged); 4xx / 401 / 426 show the server message at once.
   The offline sync queue keeps its own backoff (it never used provider retries).
+
+**APK 0.13.1 (APK-only, works with server 0.21.0 and 0.21.1)** (branch `fix/d2510-apk-tap-lpj`, pubspec `0.13.1+1`, release notes
+`docs/release-notes/apk/0.13.1.md`): no server change, no migration, no API change; APK 0.13.0 keeps working. Folded
+into this section (already released: tag `mobile-v0.13.1`).
+
+### Added
+
+- **APK: Finance LPJ actions (D2510, user 2026-10-25)** on the request detail, the web "Verifikasi LPJ" parity: per
+  receipt Valid / Tolak (reason ≥ 3), "Tandai flag diperiksa" (optional note), bottom bar "Minta revisi" (note ≥ 3) /
+  "Verifikasi LPJ" — shown only for the `allowedActions` the server lists (`receipt_verify`, `review_flag`,
+  `lpj_request_revision`, `lpj_verify`). Confirm before + result after (D2410); a 409 "Masih ada n nota yang belum
+  diputuskan" shows the server text. Detail and LPJ queue refresh after each call; "settle" stays web-only.
+
+### Fixed
 
 - **APK: photo previews (D2510, user 2026-10-25).** Attendance selfies had no preview: the only way to see one was
   a small photo button inside the recap day sheet; the team list and the attendance record showed none (the server
@@ -77,25 +103,6 @@ into the next web release section.
   account; dashboard "Kas terbaru" opens the request (else the cash entry); Aftersales "Hari ini" sent rows, Unit &
   kontrak (contract → contract unit, unit → vehicle record), Akses PT user header and Tutup buku history open their
   detail. `canOpenApkRoute` keeps a target the user cannot read unlinked.
-
-### Changed
-
-- **Absensi: Karyawan Non-OnSite may check in and out anywhere again (DRMS 26/10 #2, user 2026-10-26; ADR 0032
-  amendment 2026-10-26).** Reverses ADR 0032 D4 for Non-OnSite and restores the rule of 14/10: inside a registered
-  location of the own PT the record goes to the containing one (as before); outside every location it is no longer
-  refused (`OUTSIDE_GEOFENCE`) but recorded **"Di luar area"** (`attendances.outside_area`) referenced to the
-  **nearest** registered location of the PT (project / cost center with a point) with `distance_m` to it. A check-out
-  with an open check-in closes that pair (`CHECK_OUT_ELSEWHERE` inside another location, "Di luar area" outside all).
-  Same for the web self check-in, the APK sync (also offline items) and the PM / Admin Staff on-behalf. A PT without
-  any located registered location → `NO_GEOFENCE`. OnSite unchanged; mock location still refused; selfie + GPS still
-  required. Requests (pengajuan) unchanged: only for the assigned active projects (test added).
-- Web Absen / Absenkan karyawan: outside every location the nearest one (or the day's open check-in) is picked, the
-  note "Di luar lokasi terdaftar — absen dicatat "Di luar area"" is shown and repeated in the confirmation popup; the
-  result popup names the reference. Help texts (Data Karyawan, Pengguna form) and OpenAPI descriptions updated (text
-  only, no schema change).
-- APK: the client pre-check no longer blocks a Non-OnSite fix outside the registered locations (own check-in / out and
-  on-behalf): the nearest location is used and the confirmation popup carries the note; only "no located location at
-  all" and mock location are refused client-side. Type hint text updated.
 
 ## [0.21.1] - 2026-10-25
 
