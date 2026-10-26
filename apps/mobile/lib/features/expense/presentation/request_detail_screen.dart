@@ -19,11 +19,13 @@ import '../../approvals/presentation/decision_sheet.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/expense_providers.dart';
 import '../domain/expense_request.dart';
+import '../domain/project_loan_instruction.dart';
 import '../domain/turn_timeline.dart';
 import 'finance_lpj_actions.dart';
 import 'requester_actions.dart';
 import 'widgets/attachments.dart';
 import 'widgets/fund_check_panel.dart';
+import 'widgets/project_loan_instruct_sheet.dart';
 import 'widgets/rap_item_picker.dart';
 import 'widgets/request_stepper.dart';
 import 'widgets/request_ui.dart';
@@ -691,6 +693,12 @@ class _DecisionBar extends ConsumerWidget {
                 key: const Key('decision-blocked-text'),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.error),
               ),
+            ),
+          // DRMS 26/10 #1: the project's cash account is short → the final decider instructs an inter-project loan
+          if (detail.allowedActions.contains(instructProjectLoanAction))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: ProjectLoanInstructButton(requestId: detail.id, docNo: detail.docNo, filled: false),
             ),
           Row(
             children: [

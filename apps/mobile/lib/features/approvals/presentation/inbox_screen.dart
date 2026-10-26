@@ -12,6 +12,7 @@ import '../../../shared/widgets/pk_ui_keuangan.dart';
 import '../../expense/domain/expense_request.dart';
 import '../../expense/presentation/request_detail_screen.dart' show pct;
 import '../../expense/presentation/widgets/fund_check_panel.dart';
+import '../../expense/presentation/widgets/project_loan_instruct_sheet.dart';
 import '../../expense/presentation/widgets/receipt_mismatch_chip.dart';
 import '../../expense/presentation/widgets/request_ui.dart';
 import '../../addendum/presentation/addendum_providers.dart';
@@ -209,6 +210,21 @@ class InboxCard extends StatelessWidget {
                     ],
                   ],
                 ),
+                // DRMS 26/10 #1: the project's cash account is short — the waiting loan, or the final decider's instruction
+                if (it.fundShort != null && (it.projectLoanPendingDocNo != null || it.instructProjectLoan)) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    it.projectLoanPendingDocNo != null
+                        ? t.pliInboxPending(it.projectLoanPendingDocNo!)
+                        : t.pliInboxBlocked,
+                    key: Key('inbox-fund-reason-${it.id}'),
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                  ),
+                ],
+                if (it.fundShort != null && it.instructProjectLoan) ...[
+                  const SizedBox(height: 6),
+                  ProjectLoanInstructButton(requestId: it.id, docNo: it.docNo, filled: false),
+                ],
               ],
             ),
           ),
