@@ -135,7 +135,8 @@ export const absensiReport: ReportDef = {
               tanggal: d.date,
               karyawan: `${e.name} (${e.code})`,
               status: STATUS_LABEL[d.status] ?? d.status,
-              // DRMS 13/10 A2: "Di luar area" (Non-OnSite) — the location is the reference (home site / head office)
+              // DRMS 13/10 A2: "Di luar area" (Non-OnSite) — the location is the reference (14–24/10: home site / head office;
+              // since DRMS 26/10: the nearest registered location)
               lokasi: d.locations
                 .map((l) => (l.checkIn?.outsideArea || l.checkOut?.outsideArea ? `${OUTSIDE_AREA_LABEL} (ref. ${l.location.code} ${l.location.name})` : `${l.location.code} ${l.location.name}`))
                 .join('; '),

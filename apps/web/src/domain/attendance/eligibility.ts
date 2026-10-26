@@ -11,8 +11,9 @@ import { effectiveRadiusM } from './calendar'
 /**
  * DRMS 13/10 A2, ADR 0032 (DRMS 24/10): the registered check-in locations of an employee's PT, no assignment. Every
  * active location of the PT WITH a point — projects (not archived / cancelled / deleted) and cost centers (active); no
- * site any more — for both types: an OnSite employee must be inside the one chosen; a Non-OnSite employee inside any
- * of them (the containing one is picked; outside all → refused). Locations without a point never match a fix.
+ * site any more — for both types: an OnSite employee must be inside the one chosen; a Non-OnSite employee is recorded
+ * at the one containing the fix, else "Di luar area" referenced to the nearest one (DRMS 26/10). Locations without a
+ * point never match a fix.
  */
 
 export type EmployeeAttendance = { id: number; company: number; type: AttendanceType; active: boolean }

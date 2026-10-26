@@ -8459,7 +8459,7 @@ export const openapiDocument = {
           "site_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "ADR 0023 site — ADR 0032: no longer a check-in location (OnSite → VALIDATION; Non-OnSite: a hint only, recorded at the registered location containing the fix)."
+            "description": "ADR 0023 site — ADR 0032: no longer a check-in location (OnSite → VALIDATION; Non-OnSite: a hint only, recorded at the registered location containing the fix, else \"Di luar area\" at the nearest one)."
           },
           "lat": {
             "type": "number",
@@ -10572,7 +10572,7 @@ export const openapiDocument = {
                     "onsite",
                     "non_onsite"
                   ],
-                  "description": "onsite = inside the chosen registered location of the PT (outside the radius refused); non_onsite (ADR 0032) = inside ANY registered location of the PT (picked automatically; outside all → refused)."
+                  "description": "onsite = inside the chosen registered location of the PT (outside the radius refused); non_onsite (DRMS 26/10) = anywhere: inside a registered location of the PT → that one (picked automatically), outside all → recorded \"Di luar area\" at the nearest one."
                 },
                 "homeSiteId": {
                   "type": [
@@ -10618,7 +10618,7 @@ export const openapiDocument = {
                     "lat",
                     "lng"
                   ],
-                  "description": "ADR 0032: always null — no \"Di luar area\" check-in any more (kept for APK ≤ 0.11.1)."
+                  "description": "ADR 0032: always null (kept for APK ≤ 0.11.1). DRMS 26/10: a \"Di luar area\" check-in references the nearest registered location, picked by the server."
                 }
               },
               "required": [
@@ -10735,11 +10735,11 @@ export const openapiDocument = {
               "type",
               "id"
             ],
-            "description": "Where the record belongs (a Non-OnSite check-in: the registered location containing the fix; a check-out: the open check-in of the day). `site` = history only (ADR 0032)."
+            "description": "Where the record belongs (a Non-OnSite check-in: the registered location containing the fix, else — \"Di luar area\" — the nearest one; a check-out: the open check-in of the day). `site` = history only (ADR 0032)."
           },
           "outsideArea": {
             "type": "boolean",
-            "description": "DRMS 13/10 A2 \"Di luar area\" — ADR 0032: always false for a new record (Non-OnSite outside every location is refused)."
+            "description": "DRMS 13/10 A2 / 26/10 \"Di luar area\": true = a Non-OnSite attendance outside every registered location of the PT (`location` = the reference: the nearest location, a check-out: the open check-in of the day)."
           },
           "distanceM": {
             "type": "integer",
@@ -10760,7 +10760,7 @@ export const openapiDocument = {
           "project_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Project (exactly one of project_id / cost_center_id). OnSite: the fix must be inside it; Non-OnSite (ADR 0032): a hint — recorded at the registered location containing the fix (outside all → 409 OUTSIDE_GEOFENCE)."
+            "description": "Project (exactly one of project_id / cost_center_id). OnSite: the fix must be inside it; Non-OnSite: a hint — recorded at the registered location containing the fix (DRMS 26/10: outside all → recorded \"Di luar area\" at the nearest one)."
           },
           "cost_center_id": {
             "type": "integer",
@@ -10940,7 +10940,7 @@ export const openapiDocument = {
           "project_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Project (exactly one of project_id / cost_center_id; a Non-OnSite employee: a hint, the registered location containing the fix is used)."
+            "description": "Project (exactly one of project_id / cost_center_id; a Non-OnSite employee: a hint, the registered location containing the fix is used, else \"Di luar area\" at the nearest one)."
           },
           "cost_center_id": {
             "type": "integer",
@@ -41054,7 +41054,7 @@ export const openapiDocument = {
     },
     "/attendance/locations": {
       "get": {
-        "summary": "DRMS 13/10 A2: registered check-in locations of the caller (own employee per selected PT): every location of the PT with a point (projects, cost centers — ADR 0032: no site; no assignment needed). OnSite must check in inside the chosen one; Non-OnSite inside any of them (picked automatically; outside all → 409 OUTSIDE_GEOFENCE, no \"Di luar area\" any more). Coordinates and radius only (no money). The APK matches the GPS fix against this list (auto-detect) and caches it for offline check-ins; the server re-validates each check-in",
+        "summary": "DRMS 13/10 A2: registered check-in locations of the caller (own employee per selected PT): every location of the PT with a point (projects, cost centers — ADR 0032: no site; no assignment needed). OnSite must check in inside the chosen one; Non-OnSite anywhere (DRMS 26/10: the one containing the fix, picked automatically; outside all → recorded \"Di luar area\" at the nearest one). Coordinates and radius only (no money). The APK matches the GPS fix against this list (auto-detect) and caches it for offline check-ins; the server re-validates each check-in",
         "security": [
           {
             "bearer": []
@@ -41166,7 +41166,7 @@ export const openapiDocument = {
     },
     "/attendance/check-in": {
       "post": {
-        "summary": "Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED = location outside the PT of the employee, OUTSIDE_GEOFENCE (OnSite: outside the chosen location; Non-OnSite, ADR 0032: outside every registered location of the PT), MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)",
+        "summary": "Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED = location outside the PT of the employee, OUTSIDE_GEOFENCE (OnSite: outside the chosen location; DRMS 26/10: a Non-OnSite check-in outside every registered location is recorded \"Di luar area\", see the result), MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)",
         "security": [
           {
             "bearer": []
