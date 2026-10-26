@@ -20,6 +20,19 @@ into the next web release section.
 
 ### Fixed
 
+- **APK: Absensi → "Rekap bulanan" for office roles (DRMS 26/10 #3).** Owner / Direktur / Finance / Admin / Admin
+  Staff usually have no own employee: the menu opened the own recap (`GET /attendance/me` → 409), Riverpod retried
+  the 409 ten times (~30 s of loading) and then showed "Akun Anda belum terhubung ke data karyawan". Now the recap tab
+  shows, like the web `/admin/absensi/rekap`, the team month of the scope (PM team; office roles the PT): month
+  switcher, PT filter when several selected PTs have a team scope, name search, per employee hadir x/y, tidak hadir,
+  terlambat, belum absen pulang; tap → the employee's recap of that month. A user with an own employee AND a team
+  scope (e.g. PM) switches "Tim" / "Saya"; own employee only → own recap; neither → the message at once, no call.
+  New read-only endpoint `GET /api/v1/attendance/team-month?month=&company=&project_id=&cost_center_id=` (roles and
+  scope of `/attendance/team-today`; list and numbers of the web team grid; openapi `TeamMonth`).
+- **APK: no automatic retry of final API answers (DRMS 26/10 #3).** The global `ProviderScope.retry` retries only
+  network failures, 5xx, 408 and 429 (Riverpod backoff unchanged); 4xx / 401 / 426 show the server message at once.
+  The offline sync queue keeps its own backoff (it never used provider retries).
+
 - **APK: photo previews (D2510, user 2026-10-25).** Attendance selfies had no preview: the only way to see one was
   a small photo button inside the recap day sheet; the team list and the attendance record showed none (the server
   record detail names the file only). Now a shared `MediaThumb` (authorized bytes through the `ApiClient` —
