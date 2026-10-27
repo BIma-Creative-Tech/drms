@@ -46,4 +46,13 @@ export function registerUserOnboardingPaths(registry: OpenAPIRegistry, h: Helper
     request: { params, body: body(U.UserOnboardingUpdate) },
     responses: h.res(200, 'Saved', U.UserOnboardingResult, write),
   })
+  registry.registerPath({
+    method: 'post',
+    path: '/user-onboarding/{userId}/reset-password',
+    summary:
+      'DRMS 27/10: new temporary password of an existing account, returned ONCE (Keycloak UPDATE_PASSWORD at the next login; sessions untouched). Same rule as editing the identity (accounts only in the caller\'s Admin PTs, a group admin only by a group admin); never the own account (400) or an inactive one (409). Audited as a fact (field password, never the value) in the same transaction; Keycloak refusing / unreachable → 502 KEYCLOAK_FAILED and nothing changed',
+    security: h.security,
+    request: { params },
+    responses: h.res(200, 'Reset', U.UserPasswordResetResult, [400, 401, 403, 404, 409, 429, 502, 503]),
+  })
 }

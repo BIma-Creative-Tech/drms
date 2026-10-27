@@ -64,6 +64,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
   const [errors, setErrors] = useState<Map<string, string>>(new Map())
   const [msg, setMsg] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
   const [created, setCreated] = useState<{ id: number; password: string | null; linked: boolean } | null>(null)
+  const [resetPw, setResetPw] = useState<string | null>(null)
   const seq = useRef(0)
 
   const { body, order, changed, needsReason } = useMemo(() => buildBody(detail, draft, mode), [detail, draft, mode])
@@ -146,6 +147,40 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
       }
     } catch {
       setMsg({ tone: 'bad', text: 'Gagal menghubungi server. Periksa koneksi lalu coba lagi.' })
+      showResult({ ok: false, title: failureTitle(action), message: 'Gagal menghubungi server. Periksa koneksi lalu coba lagi.' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** DRMS 27/10: new temporary password of this (existing) account, shown once below the button. */
+  const resetPassword = async () => {
+    if (busy || !detail.user) return
+    const action = 'Reset kata sandi'
+    const who = detail.user.name || detail.user.email
+    const yes = await confirmAction({
+      title: confirmTitle(action, who),
+      summary: [
+        ['Nama', detail.user.name],
+        ['Email', detail.user.email],
+      ],
+      description: 'Kata sandi lama tidak berlaku lagi. Pengguna login dengan kata sandi sementara yang ditampilkan, lalu wajib membuat kata sandi baru.',
+      confirmLabel: confirmLabel('Reset kata sandi'),
+      danger: true,
+    })
+    if (!yes) return
+    setBusy(true)
+    setResetPw(null)
+    try {
+      const res = await fetch(`/api/v1/user-onboarding/${detail.user.id}/reset-password`, { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      const data = (await res.json().catch(() => null)) as { temporaryPassword?: string } | null
+      if (res.ok && data?.temporaryPassword) {
+        setResetPw(data.temporaryPassword)
+        showResult({ ok: true, title: successTitle(action, who), message: 'Catat kata sandi sementara yang ditampilkan di halaman.' })
+      } else {
+        showResult({ ok: false, title: failureTitle(action), message: `Kata sandi tidak diubah — ${problemText(data, res.status)}` })
+      }
+    } catch {
       showResult({ ok: false, title: failureTitle(action), message: 'Gagal menghubungi server. Periksa koneksi lalu coba lagi.' })
     } finally {
       setBusy(false)
@@ -277,6 +312,31 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
             </WrapSelect>,
             { help: mode === 'create' ? 'Akun baru mendapat kata sandi sementara yang wajib diganti saat login pertama.' : 'Nonaktif = login, sesi web dan HP langsung dicabut di semua PT (alasan wajib).' },
           )}
+          {mode === 'update' && !self && !identityLocked && detail.user?.active !== false ? (
+            <div className="pk-fgrid__row" data-pk-reset-password>
+              <span className="pk-fgrid__label">Kata sandi</span>
+              <div className="pk-fgrid__ctl pk-fld">
+                <div>
+                  <button type="button" className="pk-kbtn sm" disabled={busy} onClick={() => void resetPassword()}>
+                    Reset password
+                  </button>
+                </div>
+                {resetPw ? (
+                  <div className="pk-alert ok" role="status">
+                    <p>Kata sandi sementara (hanya ditampilkan sekali — berikan langsung ke pengguna; wajib diganti saat login berikutnya):</p>
+                    <p className="pk-uo__pw">
+                      <code data-pk-temp-password>{resetPw}</code>{' '}
+                      <button type="button" className="pk-kbtn sm" onClick={() => void navigator.clipboard?.writeText(resetPw)}>
+                        Salin
+                      </button>
+                    </p>
+                  </div>
+                ) : (
+                  <span className="help">Untuk pengguna yang lupa kata sandi: membuat kata sandi sementara baru yang wajib diganti saat login berikutnya.</span>
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
 

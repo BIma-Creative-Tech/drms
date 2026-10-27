@@ -361,3 +361,53 @@ describe('PATCH /api/v1/user-onboarding/{id} — edit flow', () => {
     expect((await api('GET', '/api/v1/user-onboarding/abc', adminA)).status).toBe(404)
   })
 })
+
+describe('POST /api/v1/user-onboarding/{id}/reset-password — DRMS 27/10', () => {
+  it('new TEMPORARY password in Keycloak, returned once, audited as a fact; old password replaced', async () => {
+    const u = await makeKcUser('reset')
+    const before = fake.users.get(u.keycloakSub)!.password!.value
+    const r = await api('POST', `/api/v1/user-onboarding/${u.id}/reset-password`, adminA)
+    expect(r.status, JSON.stringify(r.body)).toBe(200)
+    const b = r.body as Body
+    expect(b.userId).toBe(u.id)
+    expect(b.temporaryPassword).toMatch(/^[A-Za-z2-9!@#$%*?\-+=]{14}$/)
+    expect(b.temporaryPassword).not.toBe(before)
+    expect(r.headers.get('cache-control')).toBe('no-store')
+    expect(fake.users.get(u.keycloakSub)!.password).toEqual({ value: b.temporaryPassword, temporary: true })
+    const rows = (await auditRows('user', u.id)).filter((x) => x.field === 'password')
+    expect(rows).toHaveLength(2) // create + reset
+    expect(rows[1]).toMatchObject({ action: 'update', new_value: null, user_id: String(adminA.id) })
+    expect(rows[1]!.reason).toContain('direset')
+    expect(JSON.stringify(rows)).not.toContain(b.temporaryPassword)
+  })
+
+  it('refused: Staff 403, own account 400, foreign-PT account 403, inactive 409, unknown 404 — Keycloak untouched', async () => {
+    const u = await makeKcUser('reset-deny')
+    const n = fake.calls.filter((c) => c.op === 'resetPassword').length
+    expect((await api('POST', `/api/v1/user-onboarding/${u.id}/reset-password`, staffA)).status).toBe(403)
+    expect((await api('POST', `/api/v1/user-onboarding/${adminA.id}/reset-password`, adminA)).status).toBe(400)
+    expect((await api('POST', `/api/v1/user-onboarding/${u.id}/reset-password`, adminB)).status).toBe(404)
+    expect((await api('POST', '/api/v1/user-onboarding/999999999/reset-password', adminA)).status).toBe(404)
+    const cross = await makeKcUser('reset-cross')
+    await addMembership(cross.id, B, ['pk-staff'])
+    expect((await api('POST', `/api/v1/user-onboarding/${cross.id}/reset-password`, adminA)).status).toBe(403)
+    const off = await makeKcUser('reset-off')
+    expect((await api('PATCH', `/api/v1/user-onboarding/${off.id}`, adminA, { user: { active: false }, reason: 'keluar' })).status).toBe(200)
+    expect((await api('POST', `/api/v1/user-onboarding/${off.id}/reset-password`, adminA)).status).toBe(409)
+    expect(fake.calls.filter((c) => c.op === 'resetPassword').length).toBe(n + 2) // only the two makeKcUser creates
+  })
+
+  it('Keycloak refusing → 502 KEYCLOAK_FAILED, no audit row (rolled back)', async () => {
+    const u = await makeKcUser('reset-kc')
+    const real = getKeycloakAdmin()
+    setKeycloakAdmin({ ...real, resetPassword: async () => { throw new KeycloakPasswordPolicyError('invalidPasswordHistoryMessage', 20) } })
+    try {
+      const r = await api('POST', `/api/v1/user-onboarding/${u.id}/reset-password`, adminA)
+      expect(r.status).toBe(502)
+      expect((r.body as Body).code).toBe('KEYCLOAK_FAILED')
+    } finally {
+      setKeycloakAdmin(real)
+    }
+    expect((await auditRows('user', u.id)).filter((x) => x.field === 'password')).toHaveLength(1) // the create only
+  })
+})

@@ -2,7 +2,7 @@ import { APIError, type PayloadRequest } from 'payload'
 
 import { KeycloakAdminError, KeycloakPasswordPolicyError } from '@/auth/keycloak-admin'
 import { compensateKeycloak } from '@/domain/users-sync'
-import { loadUserOnboarding, mayOnboard, OnboardingError, saveUserOnboarding, type SaveResult } from '@/domain/user-onboarding/service'
+import { loadUserOnboarding, mayOnboard, OnboardingError, resetUserPassword, saveUserOnboarding, type SaveResult } from '@/domain/user-onboarding/service'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { HttpError, json, v1 } from '../http'
@@ -105,4 +105,17 @@ export const userOnboardingUpdateEndpoint = v1({
   },
 })
 
-export const USER_ONBOARDING_ENDPOINTS = [userOnboardingNewEndpoint, userOnboardingCreateEndpoint, userOnboardingGetEndpoint, userOnboardingUpdateEndpoint]
+/** DRMS 27/10: new temporary password of an existing account, shown once (nothing to compensate: Keycloak is the last write). */
+export const userOnboardingResetPasswordEndpoint = v1({
+  path: '/user-onboarding/:userId/reset-password',
+  method: 'post',
+  rateLimit: [10, 60_000],
+  handler: async ({ req, params }) => {
+    if (!mayOnboard(req)) throw notOnboarder()
+    const id = userIdParam(params)
+    const r = await withReqTransaction(req, () => resetUserPassword(req, id)).catch(toHttp)
+    return json(r)
+  },
+})
+
+export const USER_ONBOARDING_ENDPOINTS = [userOnboardingNewEndpoint, userOnboardingCreateEndpoint, userOnboardingGetEndpoint, userOnboardingUpdateEndpoint, userOnboardingResetPasswordEndpoint]
