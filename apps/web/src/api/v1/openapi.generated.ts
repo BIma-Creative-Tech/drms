@@ -24856,6 +24856,23 @@ export const openapiDocument = {
         },
         "additionalProperties": false
       },
+      "UserPasswordResetResult": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "temporaryPassword": {
+            "type": "string",
+            "description": "Shown ONCE: the new temporary password (Keycloak requires a new password at the next login, UPDATE_PASSWORD). Never stored or logged."
+          }
+        },
+        "required": [
+          "userId",
+          "temporaryPassword"
+        ]
+      },
       "ClientFormDetail": {
         "type": "object",
         "properties": {
@@ -56692,6 +56709,122 @@ export const openapiDocument = {
             }
           },
           "413": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user-onboarding/{userId}/reset-password": {
+      "post": {
+        "summary": "DRMS 27/10: new temporary password of an existing account, returned ONCE (Keycloak UPDATE_PASSWORD at the next login; sessions untouched). Same rule as editing the identity (accounts only in the caller's Admin PTs, a group admin only by a group admin); never the own account (400) or an inactive one (409). Audited as a fact (field password, never the value) in the same transaction; Keycloak refusing / unreachable → 502 KEYCLOAK_FAILED and nothing changed",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPasswordResetResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

@@ -523,6 +523,7 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'PATCH /user-onboarding/:userId': 'named-pt',
   'GET /user-onboarding': 'selection', // user 2026-10-19 (APK): the new-user form (caller's Admin PTs ∩ selection)
   'GET /user-onboarding/:userId': 'document',
+  'POST /user-onboarding/:userId/reset-password': 'document', // DRMS 27/10: the account's own PTs decide (Users update rule)
   // DRMS 16/10 Klien / Vendor pages: create = a PT of the caller's selection with the create role (named or the only
   // one); the record is read / written with the collections' own access (PT of the record)
   'GET /client-form': 'selection',

@@ -168,6 +168,13 @@ export const UserOnboardingResult = z
   })
   .meta({ id: 'UserOnboardingResult' })
 
+export const UserPasswordResetResult = z
+  .object({
+    userId: id,
+    temporaryPassword: z.string().meta({ description: 'Shown ONCE: the new temporary password (Keycloak requires a new password at the next login, UPDATE_PASSWORD). Never stored or logged.' }),
+  })
+  .meta({ id: 'UserPasswordResetResult' })
+
 export type UserOnboardingCreateBody = z.infer<typeof UserOnboardingCreate>
 export type UserOnboardingUpdateBody = z.infer<typeof UserOnboardingUpdate>
 export type UserOnboardingDetailBody = z.infer<typeof UserOnboardingDetail>
