@@ -282,6 +282,41 @@ describe('E7 daily reminders (fake clock)', () => {
     await setSettings({ reminderEmailEnabled: false, reminderLateProgressEnabled: true, reminderLpjOverdueEnabled: true, reminderRevisionEnabled: true, reminderLoanOverdueEnabled: true })
   })
 
+  it('D2710: with email on, ONE digest email per recipient per day over every rule; the next tick queues nothing', async () => {
+    const p = await getTestPayload()
+    const C = Number((await sqlAs('app', "SELECT id FROM companies WHERE short_code = 'DRMS'")).rows[0].id)
+    await setSettings({ reminderEmailEnabled: true })
+    const lastJob = Number((await sqlAs('app', 'SELECT coalesce(max(id), 0)::int AS n FROM payload_jobs')).rows[0].n)
+    const lastNotif = Number((await sqlAs('app', 'SELECT coalesce(max(id), 0)::int AS n FROM notifications')).rows[0].n)
+    const r = await runDailyReminders(p, { now: atWita(addDays(today, 9), '08:00') })
+    expect(r.status).toBe('run')
+    const jobs = (await sqlAs('app', "SELECT input FROM payload_jobs WHERE task_slug = 'sendEmail' AND id > $1 ORDER BY id", [lastJob])).rows.map((x) => x.input as { userId: number; subject: string; text: string })
+    const perUser = new Map<number, number>()
+    for (const j of jobs) perUser.set(j.userId, (perUser.get(j.userId) ?? 0) + 1)
+    expect([...perUser.values()].filter((n) => n !== 1)).toEqual([])
+    expect(r.emails).toBe(jobs.length)
+    // every reminder of this run (LPJ overdue, revision, late progress, …) is a line of the recipient's one email
+    const notes = (await sqlAs('app', "SELECT user_id FROM notifications WHERE id > $1 AND company_id = $2 AND (event LIKE 'reminder.%' OR event IN ('progress.late_report', 'project_loan.overdue'))", [lastNotif, C])).rows
+    const items = new Map<number, number>()
+    for (const n of notes) items.set(Number(n.user_id), (items.get(Number(n.user_id)) ?? 0) + 1)
+    expect(items.size).toBeGreaterThan(0)
+    for (const [uid, n] of items) {
+      const j = jobs.find((x) => x.userId === uid)
+      expect(j, `user ${uid}`).toBeDefined()
+      if (n > 1) {
+        expect(j!.subject).toMatch(/^RR Teams — Ringkasan pengingat /)
+        expect(j!.text.match(/^- /gm), `user ${uid}`).toHaveLength(n)
+      }
+      expect(JSON.stringify(j)).not.toMatch(/@/) // user id only, no address
+    }
+    // the digest is marked sent with the run: a later tick of the same day queues nothing
+    const again = await runDailyReminders(p, { now: atWita(addDays(today, 9), '10:00') })
+    expect(again.status).toBe('already_ran')
+    expect(again.emails).toBe(0)
+    expect((await sqlAs('app', "SELECT count(*)::int AS n FROM reminder_runs WHERE summary->'digest' IS NOT NULL")).rows[0].n).toBe(0)
+    await setSettings({ reminderEmailEnabled: false })
+  })
+
   it('reminder tables are append-only for the app role; settings are range-checked', async () => {
     expect(await sqlError('app', 'UPDATE reminder_deliveries SET period_key = period_key')).toMatchObject({ code: '42501' })
     expect(await sqlError('app', 'DELETE FROM reminder_deliveries')).toMatchObject({ code: '42501' })

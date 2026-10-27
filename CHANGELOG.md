@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.22.2] - 2026-10-27
+
+**Daily reminder digest (user 2026-10-27).** No migrations, API contract unchanged (version only), APK unchanged
+(0.14.1).
+
+### Fixed
+
+- **About half of the reminder emails were lost every day.** The daily reminders queued one email per subject per
+  recipient — on 27/10 ~150 emails at 06:02 WIB to ~12 people (up to 19 each, growing daily) — against the mailbox
+  budget of 5 + 24/h (`email/rate-guard.ts`, mail server limit 30/h). `sendEmail` gives up after 6 attempts (~2.6 h),
+  so 30–70 reminder emails failed for good each day (8 days: late progress 175, LPJ 169) and approval emails ("Menunggu
+  keputusan Anda") queued in such a burst lost the race too. Now every recipient gets **one digest email per day**
+  over every rule and PT: "Ringkasan pengingat <tanggal> (N pengingat)", grouped per rule, PT label when the items
+  span several PTs, capped below the email text limit ("… dan N pengingat lainnya"); a single reminder keeps its own
+  subject. The PT run stores the digest with its deliveries (`reminder_runs.summary.digest`, same transaction); one
+  flush after all PTs queues the emails and clears it (a failed flush is retried by the next hourly tick, never sent
+  twice). In-app notifications are unchanged (one per reminder).
+
 ## [0.22.1] - 2026-10-26
 
 **Upload size guard + request project picker (user 2026-10-26); APK 0.14.1.** No migrations, API contract unchanged
