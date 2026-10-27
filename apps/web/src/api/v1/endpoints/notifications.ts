@@ -1,6 +1,7 @@
 import type { PayloadRequest, Where } from 'payload'
 
 import { relId, userId } from '@/access/roles'
+import { selectedCompaniesWhere } from '@/domain/notifications'
 
 import { companyQuery } from '../company-query'
 
@@ -42,10 +43,16 @@ async function findOwn(req: PayloadRequest, key: string): Promise<Row> {
   return n
 }
 
+/** Own unread rows of the selected PTs (DRMS 23/10: `X-Company-Ids` / cookie narrows, like the web bell). */
+function ownUnread(req: PayloadRequest): Where {
+  const pt = selectedCompaniesWhere(req.user)
+  return { and: [{ user: { equals: userId(req)! } }, { readAt: { exists: false } }, ...(pt ? [pt] : [])] }
+}
+
 async function unreadCount(req: PayloadRequest): Promise<number> {
   const r = await req.payload.count({
     collection: 'notifications',
-    where: { and: [{ user: { equals: userId(req)! } }, { readAt: { exists: false } }] },
+    where: ownUnread(req),
     user: req.user,
     overrideAccess: false,
     req,
@@ -62,7 +69,9 @@ export const listNotificationsEndpoint = v1({
     const { unread, limit, cursor } = q.data
     const and: Where[] = [{ user: { equals: userId(req)! } }]
     if (unread === 'true') and.push({ readAt: { exists: false } })
-    // MC3: own rows are never filtered by the selection (a notification is the user's); ?company= narrows
+    // DRMS 23/10 (was MC3 "never filtered by the selection"): the selection narrows; ?company= narrows further
+    const pt = selectedCompaniesWhere(req.user)
+    if (pt) and.push(pt)
     const companies = await companyQuery(req)
     if (companies) and.push({ company: { in: companies } })
     if (cursor) {
@@ -112,7 +121,7 @@ export const readAllNotificationsEndpoint = v1({
   handler: async ({ req }) => {
     const res = await req.payload.update({
       collection: 'notifications',
-      where: { and: [{ user: { equals: userId(req)! } }, { readAt: { exists: false } }] },
+      where: ownUnread(req), // DRMS 23/10: only the rows of the selected PTs (what the list shows)
       data: { readAt: new Date().toISOString() } as never,
       depth: 0,
       overrideAccess: true, // SYSTEM-WRITE: the caller's own unread rows, readAt only

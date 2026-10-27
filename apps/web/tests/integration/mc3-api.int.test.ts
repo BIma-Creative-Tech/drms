@@ -310,8 +310,8 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /devices/register': 'own',
   'POST /admin/test-email': 'own',
   'POST /media/:kind': 'own',
-  'GET /notifications': 'own',
-  'POST /notifications/read-all': 'own',
+  'GET /notifications': 'selection', // DRMS 23/10: list + unreadCount follow the PT switcher
+  'POST /notifications/read-all': 'selection', // DRMS 23/10: marks the rows of the selected PTs only
   'GET /notifications/:id': 'own',
   'POST /notifications/:id/read': 'own',
   'GET /attendance/me': 'own',
@@ -605,6 +605,18 @@ describe('MC3 — route classes sampled across PTs', () => {
     expect((nc.items as Body[]).length).toBeGreaterThan(0)
     expect((nc.items as Body[]).every((i) => i.companyId === C)).toBe(true)
     expect((await http('GET', '/api/v1/health')).status).toBe(200)
+  })
+
+  it('DRMS 23/10: the PT selection narrows notifications and unreadCount (bell badge)', async () => {
+    const all = await ok(call('GET', '/api/v1/notifications?limit=100', ownerAC))
+    const onlyC = await ok(call('GET', '/api/v1/notifications?limit=100', ownerAC, undefined, H(C)))
+    const items = onlyC.items as Body[]
+    expect(items.length).toBeGreaterThan(0)
+    expect(items.every((i) => i.companyId === C || i.companyId === null)).toBe(true)
+    const unreadOf = (rows: Body[]) => rows.filter((i) => !i.readAt).length
+    expect(onlyC.unreadCount).toBe(unreadOf(items))
+    expect(onlyC.unreadCount as number).toBeLessThanOrEqual(all.unreadCount as number)
+    expect(all.unreadCount).toBe(unreadOf(all.items as Body[]))
   })
 })
 

@@ -1,7 +1,7 @@
 import type { AdminViewServerProps, Where } from 'payload'
 import React from 'react'
 
-import { notificationHref } from '@/domain/notifications'
+import { notificationHref, selectedCompaniesWhere } from '@/domain/notifications'
 import { DEFAULT_TZ } from '@/lib/time'
 
 import { ActionButton } from '../components/ActionButton'
@@ -25,7 +25,9 @@ export async function NotificationsView(props: AdminViewServerProps) {
   if (!user) return null
   // DRMS 10/10 D8: search (judul / isi / nomor) + read-state filter + pagination in the database
   const lq = parseListQuery(props.searchParams, ['status'])
-  const own = { user: { equals: user.id } }
+  // DRMS 23/10: list + count follow the PT switcher (same rule as the bell)
+  const pt = selectedCompaniesWhere(user)
+  const own: Where = pt ? { and: [{ user: { equals: user.id } }, pt] } : { user: { equals: user.id } }
   const and: Where[] = [own]
   // DRMS 13/10 Umum #4: multi-select — both ticked = every notification
   const status = allowedValues(lq, 'status', ['baru', 'dibaca'] as const)
