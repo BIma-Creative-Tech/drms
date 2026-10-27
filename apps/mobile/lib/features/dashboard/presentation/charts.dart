@@ -341,7 +341,9 @@ class HBarList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    if (items.isEmpty) return Text(empty, style: theme.textTheme.bodyMedium);
+    if (items.isEmpty) {
+      return Text(empty, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant));
+    }
     final maxV = items.fold<int>(1, (m, i) => math.max(m, i.value));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -349,20 +351,29 @@ class HBarList extends StatelessWidget {
         for (final (k, i) in items.indexed)
           Padding(
             key: Key('hbar-$k'),
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: Text(i.label, style: theme.textTheme.bodyMedium)),
+                    Expanded(
+                      child: Text(
+                        i.label,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: i.muted ? theme.colorScheme.onSurfaceVariant : null,
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: 8),
-                    Text(i.valueText, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                    Text(i.valueText, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
                   ],
                 ),
-                if (i.sub != null) Text(i.sub!, style: theme.textTheme.bodySmall),
-                const SizedBox(height: 4),
+                if (i.sub != null)
+                  Text(i.sub!, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                const SizedBox(height: 6),
                 ExcludeSemantics(
                   child: SizedBox(
                     height: 8,

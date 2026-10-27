@@ -137,12 +137,29 @@ export function addDays(d: string, n: number): string {
 /**
  * Report date of a field report against "today" in the company TZ: not in the future, not older than
  * BACKDATE_MAX_DAYS. Returns an error message or null.
+ * D2410 (user 2026-10-24, ADR 0020 amendment 2026-10-24): `unlimitedBackdate` — the timesheet of the project's PM
+ * (projects.pm) or the PT's Direktur may lie on ANY past date (the contract unit's period is checked by the caller /
+ * the DB trigger); never in the future.
  */
-export function reportDateError(date: string, today: string): string | null {
+export function reportDateError(date: string, today: string, opts: { unlimitedBackdate?: boolean } = {}): string | null {
   if (!BUSINESS_DATE_RE.test(date) || addDays(date, 0) !== date) return 'Tanggal harus YYYY-MM-DD.'
   if (date > today) return `Tanggal laporan tidak boleh di masa depan (hari ini ${today}).`
-  if (daysBetween(date, today) > BACKDATE_MAX_DAYS) return `Tanggal laporan paling lama ${BACKDATE_MAX_DAYS} hari ke belakang.`
+  if (!opts.unlimitedBackdate && daysBetween(date, today) > BACKDATE_MAX_DAYS) return `${BACKDATE_LIMIT_TEXT}.`
   return null
+}
+
+/** Why a reporter may not pick an older date (API error, web matrix title, form notice). */
+export const BACKDATE_LIMIT_TEXT = `Tanggal laporan paling lama ${BACKDATE_MAX_DAYS} hari ke belakang; tanggal yang lebih lama hanya dapat diisi PM project atau Direktur`
+
+/**
+ * D2410: earliest report date of a NEW timesheet for the caller on a project — today − BACKDATE_MAX_DAYS for a field
+ * reporter; for the PM of the project / the Direktur the earliest start of the project's contract units (each contract
+ * unit's own period still applies; `today` when there is none).
+ */
+export function timesheetMinDate(today: string, unlimitedBackdate: boolean, contractStarts: readonly string[] = []): string {
+  if (!unlimitedBackdate) return addDays(today, -BACKDATE_MAX_DAYS)
+  const first = [...contractStarts].sort()[0]
+  return first !== undefined && first < today ? first : today
 }
 
 // ---------------------------------------------------------------- hour meter
@@ -155,14 +172,15 @@ export function hmDecreased(reading: number, last: number | null | undefined): b
   return typeof last === 'number' && Number.isFinite(last) && reading < last - HM_EPS
 }
 
-/** HM_GAP: the timesheet's start HM differs from the previous day's end HM of the same unit. */
-export function hmGap(start: number, previousEnd: number | null | undefined): boolean {
-  return typeof previousEnd === 'number' && Number.isFinite(previousEnd) && Math.abs(start - previousEnd) > HM_EPS
+/** HM_GAP: the timesheet's start HM differs from the end HM of the unit's previous timesheet WITH HM (D2410: HM is weekly). */
+export function hmGap(start: number | null | undefined, previousEnd: number | null | undefined): boolean {
+  return typeof start === 'number' && typeof previousEnd === 'number' && Number.isFinite(previousEnd) && Math.abs(start - previousEnd) > HM_EPS
 }
 
 export type TimesheetHours = {
-  hmStart: number
-  hmEnd: number
+  /** D2410 (user 2026-10-24): HM is optional (operators read it about once a week) — both or none. */
+  hmStart?: number | null
+  hmEnd?: number | null
   workHours: number
   standbyHours?: number | null
   breakdownHours?: number | null
@@ -170,12 +188,26 @@ export type TimesheetHours = {
   fuelLiters?: number | null
 }
 
-/** Timesheet numbers (ADR 0020 §5): HM end ≥ start, hours ≥ 0 and Σ ≤ 24, breakdown needs a reason. */
+const given = (v: unknown): boolean => v !== undefined && v !== null
+
+/** Does a timesheet carry an HM reading (both values; the pair rule makes "one of them" an error)? */
+export const hasHm = (t: { hmStart?: unknown; hmEnd?: unknown }): boolean => given(t.hmStart) && given(t.hmEnd)
+
+export const HM_PHOTO_REQUIRED = 'Foto meter HM wajib bila HM diisi.'
+
+/**
+ * Timesheet numbers (ADR 0020 §5, amendment 2026-10-24): HM optional but both or none, HM end ≥ start (≥ 0, 2
+ * decimals); work hours required; hours ≥ 0 and Σ ≤ 24, breakdown needs a reason.
+ */
 export function timesheetErrors(t: TimesheetHours): FieldIssue[] {
   const out: FieldIssue[] = []
-  if (!isDec2(t.hmStart)) out.push({ path: 'hmStart', message: 'HM awal ≥ 0 dengan maks. 2 desimal.' })
-  if (!isDec2(t.hmEnd)) out.push({ path: 'hmEnd', message: 'HM akhir ≥ 0 dengan maks. 2 desimal.' })
-  else if (isDec2(t.hmStart) && t.hmEnd < t.hmStart) out.push({ path: 'hmEnd', message: 'HM akhir tidak boleh lebih kecil dari HM awal.' })
+  const s = given(t.hmStart)
+  const e = given(t.hmEnd)
+  if (s && !isDec2(t.hmStart)) out.push({ path: 'hmStart', message: 'HM awal ≥ 0 dengan maks. 2 desimal.' })
+  if (e && !isDec2(t.hmEnd)) out.push({ path: 'hmEnd', message: 'HM akhir ≥ 0 dengan maks. 2 desimal.' })
+  else if (e && isDec2(t.hmStart) && (t.hmEnd as number) < t.hmStart) out.push({ path: 'hmEnd', message: 'HM akhir tidak boleh lebih kecil dari HM awal.' })
+  if (s && !e) out.push({ path: 'hmEnd', message: 'HM akhir wajib bila HM awal diisi (HM boleh dikosongkan keduanya).' })
+  if (e && !s) out.push({ path: 'hmStart', message: 'HM awal wajib bila HM akhir diisi (HM boleh dikosongkan keduanya).' })
   const hours: Array<[keyof TimesheetHours, string]> = [
     ['workHours', 'Jam kerja'],
     ['standbyHours', 'Jam standby'],

@@ -11,6 +11,10 @@ import { postEntry, voidEntry, type CashEntryDoc } from '@/domain/cash/ledger'
  * Same PT on both sides → the PT's "Dana tersedia" (ADR 0029) is unchanged unless one side is a site account. Each
  * posting takes the PT fund lock and the overdraft check of its own account (ledger.postEntry). The DB re-checks the pair
  * at commit (`pk_project_loan_cash_check`, migration 20261021_100200). Voided only through the loan (`viaProjectLoan`).
+ * 2026-10-24 (DRMS 24/10 #11/#12): each leg is tagged with the project of ITS side — KK lender account / lender project
+ * + KM borrower account / borrower project (a repayment: KK borrower / borrower project + KM lender / lender project), so
+ * each project's cash book shows the loan; an automatic loan has no lender project (its lender leg stays untagged). Both
+ * projects on ONE account: the pair is posted on that account (KM first, so the account never dips below 0 for it).
  */
 
 export type LoanLegs = { kk: CashEntryDoc; km: CashEntryDoc }
@@ -27,6 +31,8 @@ export type LegInput = {
   description: string
   /** Borrower project — tagged on the borrower-side leg (KM of a disbursement, KK of a repayment: project cash flow). */
   borrowerProjectId?: number | null
+  /** 2026-10-24: lender project — tagged on the lender-side leg (KK of a disbursement, KM of a repayment); none for an automatic loan. */
+  lenderProjectId?: number | null
   /** QA-04: the KK may make the paying account negative (audited by postEntry). */
   confirmOverdraft?: boolean
   proofId?: number | null
@@ -44,10 +50,18 @@ export async function postLoanLegs(req: PayloadRequest, input: LegInput): Promis
     projectLoanRepaymentId: repayment,
     proofId: input.proofId ?? null,
   }
-  // the borrower project is tagged on ITS side only: KM of a disbursement, KK of a repayment
-  const kk = await postEntry(req, { ...base, direction: 'out', cashAccountId: input.fromAccountId, projectId: repayment !== null ? (input.borrowerProjectId ?? null) : null, confirmOverdraft: input.confirmOverdraft === true })
-  const km = await postEntry(req, { ...base, direction: 'in', cashAccountId: input.toAccountId, projectId: repayment === null ? (input.borrowerProjectId ?? null) : null })
-  return { kk, km }
+  // each project is tagged on ITS side: disbursement KK lender / KM borrower, repayment KK borrower / KM lender
+  const borrower = input.borrowerProjectId ?? null
+  const lender = input.lenderProjectId ?? null
+  const out = () => postEntry(req, { ...base, direction: 'out', cashAccountId: input.fromAccountId, projectId: repayment !== null ? borrower : lender, confirmOverdraft: input.confirmOverdraft === true })
+  const inn = () => postEntry(req, { ...base, direction: 'in', cashAccountId: input.toAccountId, projectId: repayment === null ? borrower : lender })
+  if (input.fromAccountId === input.toAccountId) {
+    // one shared account: the money arrives before it leaves (the pair nets to 0 on that account)
+    const km = await inn()
+    return { kk: await out(), km }
+  }
+  const kk = await out()
+  return { kk, km: await inn() }
 }
 
 /** Posted `project_loan` legs of a loan's disbursement (repaymentId null) or of one repayment. */

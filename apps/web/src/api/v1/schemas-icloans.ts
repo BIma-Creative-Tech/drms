@@ -43,7 +43,7 @@ export const IcLoanCreate = z
 export const IcLoanReason = z.object({ reason }).strict().meta({ id: 'IntercompanyLoanReason' })
 
 const movementBase = {
-  cashAccountId: id.meta({ description: 'Source account of the PAYING PT: active, WITHOUT a site (the pool of the fund check).' }),
+  cashAccountId: id.meta({ description: 'Source account of the PAYING PT: active (the pool of the fund check; no site exclusion since DRMS 24/10).' }),
   bankRef: z.string().trim().min(1).max(64),
   proofMediaId: id.meta({ description: 'media-transfer-proofs id (POST /media/transfer-proofs), an unclaimed upload of the caller.' }),
   transferAt,
@@ -228,7 +228,7 @@ export const FundAvailability = z
     balance: rupiah,
     commitments: rupiah,
     available: rupiah,
-    accounts: z.array(z.object({ id, name: z.string(), balance: rupiah })).meta({ description: 'The accounts behind "Saldo dana" (active, without a site).' }),
+    accounts: z.array(z.object({ id, name: z.string(), balance: rupiah })).meta({ description: 'The accounts behind "Saldo dana" (every active account).' }),
     excludedSiteAccounts: z.object({ count: z.number().int(), balance: rupiah }),
     commitmentItems: z.array(z.object({ kind: z.enum(['request', 'shortfall', 'loan']), id, docNo: z.string().nullable(), amount: rupiah, status: z.string() })),
   })

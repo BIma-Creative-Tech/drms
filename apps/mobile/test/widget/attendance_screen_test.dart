@@ -89,6 +89,7 @@ void main() {
     expect(find.text('P-01 — Gudang Contoh'), findsOneWidget);
     await tester.tap(find.byKey(const Key('attendance-checkIn')));
     await tester.pumpAndSettle();
+    await confirmPopup(tester);
     expect(selfies, 1);
     expect(service.calls.single.$1, AttendanceKind.checkIn);
     expect(service.calls.single.$2, 7);
@@ -101,6 +102,7 @@ void main() {
     await pump(tester, online: true);
     await tester.tap(find.byKey(const Key('attendance-checkOut')));
     await tester.pumpAndSettle();
+    await confirmPopup(tester);
     expect(service.calls.single.$1, AttendanceKind.checkOut);
     expect(service.calls.single.$4, isTrue);
     expect(find.text('Absen tersimpan dan sedang dikirim.'), findsOneWidget);
@@ -166,10 +168,10 @@ void main() {
     expect(find.textContaining('Di luar radius project (140 m dari titik, radius 100 m).'), findsOneWidget);
   });
 
-  testWidgets('ADR 0023: home site first with the "Penempatan" badge; check-in at the site; history by site', (
+  testWidgets('ADR 0032: no home-site badge any more; a legacy site location / queued site item still shows', (
     tester,
   ) async {
-    const home = ProjectSite(
+    const legacy = ProjectSite(
       id: 2,
       label: 'BPN — Cabang Balikpapan',
       lat: -2.21,
@@ -180,14 +182,11 @@ void main() {
     );
     await pump(
       tester,
-      sites: const [home, _site],
+      sites: const [legacy, _site],
       history: [_row('pending').copyWith(payloadJson: '{"site_id":2}', siteId: const Value(2))],
     );
-    expect(find.byKey(const Key('home-site-badge')), findsOneWidget);
-    expect(find.text('Site penempatan · radius 100 m'), findsOneWidget);
+    expect(find.byKey(const Key('home-site-badge')), findsNothing);
+    expect(find.text('Site · radius 100 m'), findsOneWidget);
     expect(find.textContaining('Absen masuk · BPN — Cabang Balikpapan'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('attendance-checkIn')));
-    await tester.pumpAndSettle();
-    expect(service.calls.single.$2, 2, reason: 'the default location is the home site');
   });
 }

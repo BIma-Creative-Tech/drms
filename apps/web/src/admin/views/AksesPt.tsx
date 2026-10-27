@@ -6,7 +6,7 @@ import { companyContextOf, isRole, relId, type Role } from '@/access/roles'
 
 import { RoleMatrix } from '../components/access/RoleMatrix'
 import { canUseMatrix, matrixColumns, type MatrixCell, type MatrixCompany, type MatrixEmployee, type MatrixUser, type Viewer } from '../components/access/role-matrix'
-import { Frame } from './frame'
+import { Frame, PageHead } from './frame'
 import { NoAccess } from './NoAccess'
 
 /**
@@ -21,8 +21,6 @@ import { NoAccess } from './NoAccess'
 const PAGE_SIZE = 40
 
 const STYLE = `
-.pk-rm h1 { font-family: var(--pk-font-heading); margin: 24px 0 4px; }
-.pk-rm .pk-rm__lead { color: var(--pk-muted-fg); margin: 0 0 16px; max-width: 880px; }
 /* the checkbox row itself = the shared filter rule (F3_STYLE) + the native checkbox normalisation (custom.scss) */
 .pk-f3 form.pk-filter label.pk-rm__check { min-height: 34px; }
 .pk-f3 .pk-rm .pk-btn:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -112,13 +110,18 @@ export async function AksesPtView(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="akses-pt">
       <style>{STYLE}</style>
+      <PageHead
+        props={props}
+        title="Pengguna & akses PT"
+        note={
+          <>
+            Satu sel = peran satu pengguna di satu PT, plus data karyawannya di PT itu. Anda dapat mengubah kolom PT tempat Anda Admin
+            {viewer.groupAdmin ? ' (Admin grup: semua PT)' : ''}. Mengosongkan semua peran menonaktifkan keanggotaan (riwayat tetap). Setiap perubahan tercatat di audit log
+            dengan alasan.
+          </>
+        }
+      />
       <div className="pk-rm">
-        <h1>Pengguna &amp; akses PT</h1>
-        <p className="pk-rm__lead">
-          Satu sel = peran satu pengguna di satu PT, plus data karyawannya di PT itu. Anda dapat mengubah kolom PT tempat Anda Admin
-          {viewer.groupAdmin ? ' (Admin grup: semua PT)' : ''}. Mengosongkan semua peran menonaktifkan keanggotaan (riwayat tetap). Setiap perubahan tercatat di audit log
-          dengan alasan.
-        </p>
         <form className="pk-filter" method="get" action="/admin/akses-pt" role="search" aria-label="Cari pengguna">
           <label>
             Cari nama / email

@@ -302,7 +302,7 @@ describe('POST /api/v1/sync/batch — expense request drafts (ADR 0010)', () => 
     expect(r2.body.results[1]).toMatchObject({ status: 'rejected', errors: [expect.objectContaining({ code: 'DEPENDENCY_FAILED' })] })
   })
 
-  it('draft_delete = soft delete (cancelled); again → ALREADY_CANCELLED; a submitted request → NOT_EDITABLE with server copy', async () => {
+  it('draft_delete = soft delete (cancelled); again → ALREADY_CANCELLED; a submitted request → NOT_EDITABLE with server copy; a withdrawn one → deleted', async () => {
     const created = await sync(staffA, [item('expense_request.draft_upsert', { kind: 'advance', title: 'Hapus saya', project_id: w.project })])
     const uuid = created.body.results[0].client_uuid as string
     const del = await sync(staffA, [item('expense_request.draft_delete', { draft_client_uuid: uuid })])
@@ -321,6 +321,14 @@ describe('POST /api/v1/sync/batch — expense request drafts (ADR 0010)', () => 
     expect(edit.body.results[0].server_copy.status).toMatch(/^pending_/)
     const del2 = await sync(staffA, [item('expense_request.draft_delete', { request_id: d.body.id })])
     expect(del2.body.results[0].errors[0].code).toBe('NOT_EDITABLE')
+    // D2410 "Hapus draft": a withdrawn (numbered) draft nobody decided on is soft-deleted (not cancelled), number kept
+    expect((await api('POST', `${E}/${d.body.id}/withdraw`, w.users.staffA, { reason: 'perlu revisi' })).status).toBe(200)
+    const del3 = await sync(staffA, [item('expense_request.draft_delete', { request_id: d.body.id })])
+    expect(del3.body.results[0]).toMatchObject({ status: 'applied' })
+    expect(del3.body.results[0].flags).toContain('DELETED')
+    const row = (await sqlAs('app', 'SELECT status::text AS s, is_deleted AS del, doc_no, delete_reason FROM expense_requests WHERE id = $1', [d.body.id])).rows[0]
+    expect(row).toMatchObject({ s: 'draft', del: true, doc_no: d.body.docNo ?? row.doc_no, delete_reason: 'Draft dihapus dari aplikasi' })
+    expect(row.doc_no).toBeTruthy()
   })
 
   it('progress items are processed (E4); on-behalf (E6) and feature flags off → FEATURE_DISABLED', async () => {

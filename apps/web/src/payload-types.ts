@@ -395,7 +395,7 @@ export interface Company {
    */
   fieldReportsEnabled?: boolean | null;
   /**
-   * Aktif = persetujuan terakhir (Owner) dan pengajuan Owner sendiri ditolak bila dana tersedia PT (saldo semua akun kas/bank tanpa akun site − pengajuan disetujui belum ditransfer − kekurangan LPJ belum dibayar − perintah pinjaman antar-PT belum dicairkan) kurang. Nyalakan hanya setelah saldo buku kas cocok dengan rekening koran. Hanya Admin grup; alasan wajib.
+   * Aktif = persetujuan terakhir (Owner) dan pengajuan Owner sendiri ditolak bila dana tersedia PT (saldo semua akun kas/bank aktif − pengajuan disetujui belum ditransfer − kekurangan LPJ belum dibayar − perintah pinjaman antar-PT belum dicairkan) kurang. Nyalakan hanya setelah saldo buku kas cocok dengan rekening koran. Hanya Admin grup; alasan wajib.
    */
   fundCheckEnabled?: boolean | null;
   /**
@@ -416,7 +416,7 @@ export interface Company {
   remindersEnabled?: boolean | null;
   reminderHour: number;
   /**
-   * Selain notifikasi in-app. Batas SMTP 30 email/jam per mailbox — aktifkan setelah alamat email pengguna benar.
+   * Selain notifikasi in-app: satu email ringkasan per pengguna per hari (semua pengingat dan PT). Batas SMTP 30 email/jam per mailbox — aktifkan setelah alamat email pengguna benar.
    */
   reminderEmailEnabled?: boolean | null;
   /**
@@ -562,7 +562,7 @@ export interface CompanyMembership {
   user: number | User;
   company: number | Company;
   employee?: (number | null) | Employee;
-  roles?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator')[] | null;
+  roles?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator' | 'pk-admin-staff')[] | null;
   active?: boolean | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -1300,7 +1300,7 @@ export interface ApprovalRule {
   acknowledge: 'required' | 'optional' | 'none';
   acknowledgeBy: 'scope_manager' | 'role' | 'user';
   acknowledgeRole?:
-    ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator') | null;
+    ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator' | 'pk-admin-staff') | null;
   acknowledgeUser?: (number | null) | User;
   signDiajukan: 'required' | 'optional' | 'none';
   signDibuat: 'required' | 'optional' | 'none';
@@ -1311,7 +1311,7 @@ export interface ApprovalRule {
     | {
         level: number;
         approverRole?:
-          ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator') | null;
+          ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator' | 'pk-admin-staff') | null;
         approverUser?: (number | null) | User;
         id?: string | null;
       }[]
@@ -1546,7 +1546,7 @@ export interface ExpenseRequest {
   invoiceDate?: string | null;
   invoiceDueDate?: string | null;
   /**
-   * Wajib sebelum dikirim. Invoice vendor / tagihan atau memo PT penerima = bukti pembayaran (tanpa LPJ).
+   * Wajib sebelum dikirim, maks. 5 MB per file. Invoice vendor / tagihan atau memo PT penerima = bukti pembayaran (tanpa LPJ).
    */
   invoiceFile?: (number | null) | MediaAttachment;
   bankSnapshot?: {
@@ -1731,11 +1731,12 @@ export interface Approval {
    * Mengikuti dokumen induk.
    */
   company?: (number | null) | Company;
-  docType: 'expense_request' | 'budget_addendum' | 'expense_shortfall' | 'project_loan';
+  docType: 'expense_request' | 'budget_addendum' | 'expense_shortfall' | 'project_loan' | 'project_loan_repayment';
   request?: (number | null) | ExpenseRequest;
   addendum?: (number | null) | BudgetAddendum;
   settlement?: (number | null) | Settlement;
   loan?: (number | null) | ProjectLoan;
+  loanRepayment?: (number | null) | ProjectLoanRepayment;
   cycle: number;
   position: 'diajukan' | 'dibuat' | 'diketahui' | 'approval';
   level: number;
@@ -2059,6 +2060,7 @@ export interface ProjectLoan {
   borrowerCashAccount?: (number | null) | CashAccount;
   cashBacked?: boolean | null;
   transfer?: (number | null) | Transfer;
+  expenseRequest?: (number | null) | ExpenseRequest;
   disbursedAt?: string | null;
   disbursedBy?: (number | null) | User;
   kind: 'dana' | 'barang';
@@ -2077,6 +2079,8 @@ export interface ProjectLoan {
   rejectReason?: string | null;
   cancelReason?: string | null;
   approvalCycle?: number | null;
+  approvalLevel?: number | null;
+  submitterRole?: ('pm' | 'finance' | 'owner') | null;
   g1Exception?: string | null;
   source?: ('web' | 'apk') | null;
   uuid?: string | null;
@@ -2103,11 +2107,20 @@ export interface ProjectLoanRepayment {
   repayDate: string;
   amount: number;
   note?: string | null;
-  status: 'posted' | 'void';
+  status: 'pending_approval' | 'approved' | 'posted' | 'void' | 'rejected' | 'cancelled';
   voidReason?: string | null;
   recordedBy: number | User;
   voidedBy?: (number | null) | User;
   voidedAt?: string | null;
+  plannedDate?: string | null;
+  approvalLevel?: number | null;
+  submittedAt?: string | null;
+  decidedAt?: string | null;
+  decidedBy?: (number | null) | User;
+  rejectReason?: string | null;
+  cancelReason?: string | null;
+  executedAt?: string | null;
+  executedBy?: (number | null) | User;
   source?: ('web' | 'apk') | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -2375,8 +2388,8 @@ export interface UnitTimesheet {
   contractUnit: number | ContractUnit;
   reportDate: string;
   reporter: number | User;
-  hmStart: number;
-  hmEnd: number;
+  hmStart?: number | null;
+  hmEnd?: number | null;
   workHours: number;
   standbyHours?: number | null;
   breakdownHours?: number | null;
@@ -2659,7 +2672,7 @@ export interface Attendance {
   project?: (number | null) | Project;
   costCenter?: (number | null) | CostCenter;
   site?: (number | null) | Site;
-  source: 'self' | 'pm';
+  source: 'self' | 'pm' | 'admin';
   recordedBy?: (number | null) | User;
   onBehalfReason?: string | null;
   localDate: string;
@@ -2917,7 +2930,8 @@ export interface AuditLog {
     | 'soft_delete'
     | 'restore'
     | 'disburse'
-    | 'auto_create';
+    | 'auto_create'
+    | 'self_processed';
   field?: string | null;
   lineNo?: number | null;
   oldValue?:
@@ -4169,6 +4183,7 @@ export interface ApprovalsSelect<T extends boolean = true> {
   addendum?: T;
   settlement?: T;
   loan?: T;
+  loanRepayment?: T;
   cycle?: T;
   position?: T;
   level?: T;
@@ -4804,6 +4819,7 @@ export interface ProjectLoansSelect<T extends boolean = true> {
   borrowerCashAccount?: T;
   cashBacked?: T;
   transfer?: T;
+  expenseRequest?: T;
   disbursedAt?: T;
   disbursedBy?: T;
   kind?: T;
@@ -4822,6 +4838,8 @@ export interface ProjectLoansSelect<T extends boolean = true> {
   rejectReason?: T;
   cancelReason?: T;
   approvalCycle?: T;
+  approvalLevel?: T;
+  submitterRole?: T;
   g1Exception?: T;
   source?: T;
   uuid?: T;
@@ -4844,6 +4862,15 @@ export interface ProjectLoanRepaymentsSelect<T extends boolean = true> {
   recordedBy?: T;
   voidedBy?: T;
   voidedAt?: T;
+  plannedDate?: T;
+  approvalLevel?: T;
+  submittedAt?: T;
+  decidedAt?: T;
+  decidedBy?: T;
+  rejectReason?: T;
+  cancelReason?: T;
+  executedAt?: T;
+  executedBy?: T;
   source?: T;
   changeReason?: T;
   updatedAt?: T;

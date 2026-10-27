@@ -7,8 +7,11 @@ import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_proyek.dart';
 import '../../../shared/widgets/reason_dialog.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../companies/presentation/company_chip.dart';
@@ -70,7 +73,7 @@ class _VoidableTransfersViewState extends ConsumerState<VoidableTransfersView> {
     try {
       final key = _keys.putIfAbsent(x.transferId, () => const Uuid().v4());
       await ref.read(cashApiProvider).voidTransfer(x.requestId, x.transferId, reason, idempotencyKey: key);
-      if (mounted) showSnack(context, t.voidTransferDone(x.transferNo));
+      if (!mounted) return;
       setState(() {
         _more.clear();
         _page = 1;
@@ -80,8 +83,9 @@ class _VoidableTransfersViewState extends ConsumerState<VoidableTransfersView> {
       ref.invalidate(requestDetailProvider(x.requestId));
       ref.invalidate(inboxProvider);
       ref.invalidate(cashBookProvider);
+      await showActionResult(context, message: t.voidTransferDone(x.transferNo), action: t.voidTransfer);
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: t.voidTransfer);
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -95,7 +99,7 @@ class _VoidableTransfersViewState extends ConsumerState<VoidableTransfersView> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: ListSearchField(
             key: const Key('void-transfer-search'),
             hint: t.voidTransferSearchHint,
@@ -123,70 +127,83 @@ class _VoidableTransfersViewState extends ConsumerState<VoidableTransfersView> {
                 final more = _page < first.totalPages;
                 return ListView(
                   key: const Key('void-transfer-list'),
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                   children: [
-                    Text(t.voidTransferLead(first.total), style: theme.textTheme.titleSmall),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4, bottom: 8),
-                      child: Text(t.voidTransferNote, style: theme.textTheme.bodySmall),
+                    PkListTitle(
+                      t.voidTransferLead(first.total),
+                      sub: t.voidTransferNote,
+                      padding: const EdgeInsets.only(top: 4, bottom: 12),
                     ),
                     if (items.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Center(child: Text(t.voidTransferEmpty, key: const Key('void-transfer-empty'))),
+                      PkEmptyState(
+                        key: const Key('void-transfer-empty'),
+                        icon: Icons.task_alt,
+                        message: t.voidTransferEmpty,
                       ),
                     for (final x in items)
-                      Card(
+                      PkCard(
                         key: Key('void-transfer-${x.transferId}'),
-                        margin: const EdgeInsets.only(bottom: 8),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          onTap: () => context.push('/requests/${x.requestId}'),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(14),
+                        onTap: () => context.push('/requests/${x.requestId}'),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    CompanyChipLead(companyId: x.companyId),
-                                    Expanded(
-                                      child: Text(formatDateOnly(x.transferDate), style: theme.textTheme.labelMedium),
-                                    ),
-                                    Text(
-                                      formatRupiah(x.amount),
-                                      style: theme.textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        fontFeatures: const [FontFeature.tabularFigures()],
+                                const PkIconChip(icon: Icons.account_balance, size: 38),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          CompanyChipLead(companyId: x.companyId),
+                                          Expanded(
+                                            child: Text(formatDateOnly(x.transferDate), style: pkMetaStyle(context)),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  ],
+                                      Text(
+                                        x.transferNo,
+                                        style: theme.textTheme.labelLarge?.copyWith(
+                                          color: theme.colorScheme.primary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                Text(
-                                  x.transferNo,
-                                  style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary),
-                                ),
-                                Text(
-                                  '${x.requestNo ?? '#${x.requestId}'} · ${x.requestTitle}',
-                                  style: theme.textTheme.bodyMedium,
-                                ),
-                                Text(
-                                  (x.advance ? RequestType.advance : RequestType.reimburse).label,
-                                  style: theme.textTheme.bodySmall,
-                                ),
-                                const SizedBox(height: 8),
-                                if (x.canVoid)
-                                  OutlinedButton.icon(
-                                    key: Key('void-transfer-${x.transferId}-action'),
-                                    onPressed: _busy == null ? () => _void(x) : null,
-                                    icon: const Icon(Icons.block),
-                                    label: Text(_busy == x.transferId ? t.processing : t.voidTransfer),
-                                  )
-                                else
-                                  Text(t.voidTransferFinanceOnly, style: theme.textTheme.bodySmall),
+                                const SizedBox(width: 8),
+                                Text(formatRupiah(x.amount), style: pkAmountStyle(context)),
                               ],
                             ),
-                          ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${x.requestNo ?? '#${x.requestId}'} · ${x.requestTitle}',
+                              style: pkTitleStyle(context),
+                            ),
+                            const SizedBox(height: 6),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: PkPill(
+                                label: (x.advance ? RequestType.advance : RequestType.reimburse).label,
+                                tone: PkTone.info,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            if (x.canVoid)
+                              OutlinedButton.icon(
+                                key: Key('void-transfer-${x.transferId}-action'),
+                                onPressed: _busy == null ? () => _void(x) : null,
+                                icon: const Icon(Icons.block),
+                                label: Text(_busy == x.transferId ? t.processing : t.voidTransfer),
+                              )
+                            else
+                              Text(t.voidTransferFinanceOnly, style: pkMetaStyle(context)),
+                          ],
                         ),
                       ),
                     if (more)

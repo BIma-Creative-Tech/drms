@@ -292,6 +292,8 @@ describe('ADR 0029 §6 API contract', () => {
         waitingAtOwner: { count: 0, amount: 0 },
         commitmentItems: [{ kind: 'loan', id: 1, docNo: 'PJA/LAS/2610/0001', amount: 10, status: 'instructed' }],
         loans: [],
+        projectLoans: [],
+        projectLoanPending: false,
       }).success,
     ).toBe(true)
     const item = (ApprovalInbox.shape.items.element as unknown as { shape: Record<string, unknown> }).shape

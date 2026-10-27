@@ -1,6 +1,6 @@
 import type { CollectionConfig, GlobalConfig } from 'payload'
 
-import { isOperatorOnly, isStaffOnly } from './roles'
+import { isAdminStaffOnly, isOperatorOnly, isStaffOnly } from './roles'
 
 /**
  * F2c: admin-panel visibility for restricted panels (staff-only, and operator-only since owner
@@ -26,9 +26,17 @@ export const STAFF_VISIBLE_COLLECTIONS: readonly string[] = ['projects', 'expens
  */
 export const OPERATOR_VISIBLE_COLLECTIONS: readonly string[] = ['users']
 
+/**
+ * ADR 0032: Admin Staff-only users (attendance administration of their PT) see the attendance records, the
+ * corrections, the employees (Data Karyawan, read) and the schedule masters (read) besides their own profile and
+ * notifications; the board / recap / on-behalf pages are custom views (`/absensi…`).
+ */
+export const ADMIN_STAFF_VISIBLE_COLLECTIONS: readonly string[] = ['users', 'notifications', 'attendances', 'attendance-corrections', 'employees', 'work-schedules', 'holidays']
+
 const RESTRICTED_PANELS: ReadonlyArray<{ isOnly: (user: unknown) => boolean; visible: readonly string[] }> = [
   { isOnly: isStaffOnly, visible: STAFF_VISIBLE_COLLECTIONS },
   { isOnly: isOperatorOnly, visible: OPERATOR_VISIBLE_COLLECTIONS },
+  { isOnly: isAdminStaffOnly, visible: ADMIN_STAFF_VISIBLE_COLLECTIONS },
 ]
 
 type HiddenFn = (args: { user: unknown }) => boolean

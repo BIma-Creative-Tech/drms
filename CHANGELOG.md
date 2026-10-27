@@ -12,6 +12,468 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   selected PTs' rows plus rows without a PT. "Tandai semua dibaca" marks only those rows. APK follows via
   `X-Company-Ids` (no app change).
 
+## [0.22.2] - 2026-10-27
+
+**Daily reminder digest (user 2026-10-27).** No migrations, API contract unchanged (version only), APK unchanged
+(0.14.1).
+
+### Fixed
+
+- **About half of the reminder emails were lost every day.** The daily reminders queued one email per subject per
+  recipient — on 27/10 ~150 emails at 06:02 WIB to ~12 people (up to 19 each, growing daily) — against the mailbox
+  budget of 5 + 24/h (`email/rate-guard.ts`, mail server limit 30/h). `sendEmail` gives up after 6 attempts (~2.6 h),
+  so 30–70 reminder emails failed for good each day (8 days: late progress 175, LPJ 169) and approval emails ("Menunggu
+  keputusan Anda") queued in such a burst lost the race too. Now every recipient gets **one digest email per day**
+  over every rule and PT: "Ringkasan pengingat <tanggal> (N pengingat)", grouped per rule, PT label when the items
+  span several PTs, capped below the email text limit ("… dan N pengingat lainnya"); a single reminder keeps its own
+  subject. The PT run stores the digest with its deliveries (`reminder_runs.summary.digest`, same transaction); one
+  flush after all PTs queues the emails and clears it (a failed flush is retried by the next hourly tick, never sent
+  twice). In-app notifications are unchanged (one per reminder).
+
+## [0.22.1] - 2026-10-26
+
+**Upload size guard + request project picker (user 2026-10-26); APK 0.14.1.** No migrations, API contract unchanged
+(0.22.1, version only). APK 0.14.1 works with server 0.22.0+ (the `projects` master already carries `status`).
+
+### Fixed
+
+- **Admin upload of a file over its cap vanished silently (prod Reimburse #125, 26/10).** A 6–7 MB PDF in "Lampiran"
+  (attachment PDF cap 5 MB, unchanged — user decision) was refused with 413; Payload's bulk-upload drawer then re-sent
+  its form state WITH the file to the admin Server Action, CrowdSec CRS blocked that body (403, "rce" anomaly on the
+  PDF bytes), Payload swallowed the error and closed the drawer as if saved — no file, no message. Every file handed
+  to a Payload upload UI (file input, drop / paste on a dropzone) is now checked in the browser before anything is
+  sent (`UploadSizeGuard`, admin provider); an oversize file is stopped and the result popup names it with
+  "maks. X MB per file". The caps of every media collection live in one pure module
+  (`collections/media/limits.ts`) read by the server and the guard. The WAF rules are unchanged.
+- **Request project picker offered closed projects (backlog 26/10).** The web picker and the APK draft editor no
+  longer list projects with status `arsip`, `selesai` or `dibatalkan`, which the server refuses for a request (G10,
+  now `isRequestableProjectStatus`); a draft's current project stays shown.
+
+### Changed
+
+- "maks. 5 MB per file" note on "Lampiran", "File invoice / dokumen" and the Reimburse send hint.
+
+## [0.22.0] - 2026-10-26
+
+**Client feedback 26/10 (DRMS 26/10, PR #144); APK 0.14.0.** Three streams on top of 0.21.1 / APK 0.13.1:
+#1 "Instruksi pinjam antar proyek" (fund check per project cash account only), #2 Karyawan Non-OnSite "Di luar area"
+again, #3 APK Rekap bulanan tim. Three migrations (#1 only), run in timestamp order:
+`20261026_100000_d2610_owner_loan_enums`, `_100100_d2610_owner_loan_schema`, `_100200_d2610_owner_loan_guard`. API
+contract 0.22.0 (additive): `GET /expense-requests/{id}/project-loan-lenders`, `POST /expense-requests/{id}/project-loan`,
+`GET /attendance/team-month`, new fields (`fundCheck.projectLoans` / `projectLoanPending`, inbox `instructProjectLoan` /
+`projectLoanPending`, loan `expenseRequest`, `submitterRole` `owner`, action `instruct_project_loan`). ADR 0031 + ADR
+0032 "Amendment 2026-10-26". APK 0.14.0 needed for the instruction sheet, the team recap and Non-OnSite outside the
+registered locations (older APKs keep working; their client pre-check still blocks Non-OnSite outside every location).
+In-flight requests with a mapped project are judged by the new rule at their next decision.
+
+### Changed
+
+- **Fund check of a mapped project's request = its cash account only (DRMS 26/10 #1, user 2026-10-26).** At the
+  decision that makes a request "Disetujui" a request whose project has a Pusat Biaya is compared with that account's
+  dana bebas only — the 0.19.1 fallback "PB dulu, lalu PT" (the PT covering a short account) is removed (service + DB
+  backstop `pk_request_fund_available`). Requests without a mapped project keep the per-PT check; the fund switch is
+  unchanged; Finance paying an approved request from another account (automatic loan) is unchanged. Texts / the Owner
+  notification (`expense.fund_shortfall_account`) name the account.
+
+- **Absensi: Karyawan Non-OnSite may check in and out anywhere again (DRMS 26/10 #2, user 2026-10-26; ADR 0032
+  amendment 2026-10-26).** Reverses ADR 0032 D4 for Non-OnSite and restores the rule of 14/10: inside a registered
+  location of the own PT the record goes to the containing one (as before); outside every location it is no longer
+  refused (`OUTSIDE_GEOFENCE`) but recorded **"Di luar area"** (`attendances.outside_area`) referenced to the
+  **nearest** registered location of the PT (project / cost center with a point) with `distance_m` to it. A check-out
+  with an open check-in closes that pair (`CHECK_OUT_ELSEWHERE` inside another location, "Di luar area" outside all).
+  Same for the web self check-in, the APK sync (also offline items) and the PM / Admin Staff on-behalf. A PT without
+  any located registered location → `NO_GEOFENCE`. OnSite unchanged; mock location still refused; selfie + GPS still
+  required. Requests (pengajuan) unchanged: only for the assigned active projects (test added).
+- Web Absen / Absenkan karyawan: outside every location the nearest one (or the day's open check-in) is picked, the
+  note "Di luar lokasi terdaftar — absen dicatat "Di luar area"" is shown and repeated in the confirmation popup; the
+  result popup names the reference. Help texts (Data Karyawan, Pengguna form) and OpenAPI descriptions updated (text
+  only, no schema change).
+- APK: the client pre-check no longer blocks a Non-OnSite fix outside the registered locations (own check-in / out and
+  on-behalf): the nearest location is used and the confirmation popup carries the note; only "no located location at
+  all" and mock location are refused client-side. Type hint text updated.
+
+### Added
+
+- **"Instruksi pinjam antar proyek" (DRMS 26/10 #1).** While the project's cash account is short, "Setujui" stays
+  disabled with the reason (web request page + approval inbox; APK detail + Beranda / Persetujuan cards) and the final
+  decider (normally the Owner) gets a button: a dialog / sheet lists the open projects of the same PT with their own
+  cash account and its dana bebas (no account / same account / below the shortfall shown disabled with the reason),
+  amount (default = shortfall, max = dana bebas of the lender), due date, reason; confirmation before, result after. The
+  instruction creates an approved, cash-backed project loan PJ/… linked to the request (no Direktur / Owner level,
+  audited), a transfer order in Antrian Transfer (Finance notified, badge counts it). The request waits ("Pinjaman PJ/…
+  menunggu transfer Finance", no second instruction); Finance executes it with the existing flow (the lender's dana
+  bebas re-checked), the instructor is notified (`project_loan.request_ready`) and approves normally.
+
+### Fixed
+
+- **APK: Absensi → "Rekap bulanan" for office roles (DRMS 26/10 #3).** Owner / Direktur / Finance / Admin / Admin
+  Staff usually have no own employee: the menu opened the own recap (`GET /attendance/me` → 409), Riverpod retried
+  the 409 ten times (~30 s of loading) and then showed "Akun Anda belum terhubung ke data karyawan". Now the recap tab
+  shows, like the web `/admin/absensi/rekap`, the team month of the scope (PM team; office roles the PT): month
+  switcher, PT filter when several selected PTs have a team scope, name search, per employee hadir x/y, tidak hadir,
+  terlambat, belum absen pulang; tap → the employee's recap of that month. A user with an own employee AND a team
+  scope (e.g. PM) switches "Tim" / "Saya"; own employee only → own recap; neither → the message at once, no call.
+  New read-only endpoint `GET /api/v1/attendance/team-month?month=&company=&project_id=&cost_center_id=` (roles and
+  scope of `/attendance/team-today`; list and numbers of the web team grid; openapi `TeamMonth`).
+- **APK: no automatic retry of final API answers (DRMS 26/10 #3).** The global `ProviderScope.retry` retries only
+  network failures, 5xx, 408 and 429 (Riverpod backoff unchanged); 4xx / 401 / 426 show the server message at once.
+  The offline sync queue keeps its own backoff (it never used provider retries).
+
+**APK 0.13.1 (APK-only, works with server 0.21.0 and 0.21.1)** (branch `fix/d2510-apk-tap-lpj`, pubspec `0.13.1+1`, release notes
+`docs/release-notes/apk/0.13.1.md`): no server change, no migration, no API change; APK 0.13.0 keeps working. Folded
+into this section (already released: tag `mobile-v0.13.1`).
+
+### Added
+
+- **APK: Finance LPJ actions (D2510, user 2026-10-25)** on the request detail, the web "Verifikasi LPJ" parity: per
+  receipt Valid / Tolak (reason ≥ 3), "Tandai flag diperiksa" (optional note), bottom bar "Minta revisi" (note ≥ 3) /
+  "Verifikasi LPJ" — shown only for the `allowedActions` the server lists (`receipt_verify`, `review_flag`,
+  `lpj_request_revision`, `lpj_verify`). Confirm before + result after (D2410); a 409 "Masih ada n nota yang belum
+  diputuskan" shows the server text. Detail and LPJ queue refresh after each call; "settle" stays web-only.
+
+### Fixed
+
+- **APK: photo previews (D2510, user 2026-10-25).** Attendance selfies had no preview: the only way to see one was
+  a small photo button inside the recap day sheet; the team list and the attendance record showed none (the server
+  record detail names the file only). Now a shared `MediaThumb` (authorized bytes through the `ApiClient` —
+  `/media/<kind>/<id>/file?variant=thumb`, `/attendance/<id>/selfie`; never `Image.network`, which carries no auth
+  header) opens the shared fullscreen viewer (pinch zoom, swipe within the record, close, caption): selfies on the
+  recap day sheet, "Tim hari ini" and the `/data/attendances` record; field-report photos in the record sheet;
+  transfer proofs on the request detail (`transfers[].proofId` now parsed); photo attachments of a request. A PDF (no
+  thumbnail variant → 404 → the file) stays a file link.
+- **APK: rows that could not be tapped (D2510).** Laporan: `apkRouteForReportLink` maps the history tab, the
+  field-report detail pages, every web collection document whose APK list is `/data/<slug>`, report → report links
+  with their filters (`ReportScreen.initialParams` from the route query), an employee's attendance recap and the menu
+  pages with an APK screen; a row opens the first link that maps (row, title cell, any cell — audit-log "dokumen").
+  Notifications: `project_loan`, `cash_entry` and the field-report doc types; `project` without progress access opens
+  the project. Progress / Beranda project cards open the project; Beranda cash accounts open the cash book of that
+  account; dashboard "Kas terbaru" opens the request (else the cash entry); Aftersales "Hari ini" sent rows, Unit &
+  kontrak (contract → contract unit, unit → vehicle record), Akses PT user header and Tutup buku history open their
+  detail. `canOpenApkRoute` keeps a target the user cannot read unlinked.
+
+## [0.21.1] - 2026-10-25
+
+**Web fix: image previews + popup for every image link, selfies only through audited endpoints (D2510, user
+2026-10-25).** Web only: no migration, no API change, no CSP change, no token change; one access tightening (selfies,
+see Security); APK unchanged (APK 0.13.1 — Finance LPJ, tappable rows, photo
+previews — is a separate APK-only release, branch `fix/d2510-apk-tap-lpj`). Rollback = image 0.21.0.
+
+### Fixed
+
+- **Attendance photos had no preview on the web.** The selfie of a check-in / check-out was only reachable through a
+  "Selfie" text button in the Aksi column of the per-employee rekap (a dialog); "Tim hari ini" and "Rekap saya"
+  showed none, and the Payload Absensi record previewed through the generic `/api/media-selfies` route, whose media
+  read rule never lets a PM see his team's selfie (Q-33 visibility runs through the attendance). Now the selfies are
+  lazy thumbnails on the "Tim hari ini" member cards and in the rekap (per karyawan and "Rekap saya"), each opening
+  the shared lightbox (caption: masuk / pulang, time, location, date; ← → between the selfies of the day / member).
+  Same audited endpoint `GET /api/v1/attendance/{id}/selfie` (attendance read access; someone else's selfie still
+  audited `view_sensitive`); a selfie removed by retention keeps the "Selfie dihapus" chip.
+- **Every image link of the web admin is a preview that opens in a popup:** one shared thumbnail
+  (`src/admin/components/media/ImageThumb.tsx`: fixed size, `object-fit: cover`, lazy, alt text, keyboard link
+  opening the lightbox — Esc closes and returns the focus, ← → within the record, caption, "Buka di tab baru"; no JS /
+  Ctrl-click = new tab; thumbnail → full file → file link fallback) for receipts and LPJ photos (Verifikasi LPJ,
+  Verifikasi nota Reimburse, request detail lines, own receipts), transfer proofs (request detail — was a "bukti"
+  text link —, Pinjaman antar-PT movements), cash proofs (Buku kas list — was a "Bukti" button —, KK / KM edit form),
+  the request's invoice / PT document file and its Lampiran (images previewed, PDFs stay file links with their
+  name), field-report / progress galleries and the photo cells of the Progress and Laporan servis lists. Lightbox
+  title and caption wrap instead of an ellipsis.
+- **Payload views:** every upload field to a media collection shows thumbnails in the collection list (was the file
+  name); read-only ones (attendance selfie, transfer / cash proof, approval signature) show the authorized preview in
+  the edit form; editable upload fields keep Payload's own field.
+
+### Security
+
+- **No unaudited path to attendance selfies any more (user decision 2026-10-25).** The Payload side of
+  `media-selfies` (REST `/api/media-selfies` list and by id, the static file route `/api/media-selfies/file/<name>`,
+  the Media → Selfie absensi library, Payload upload previews, populated `selfie` relations) answers only the
+  uploader's own rows: Admin, Direktur, Finance and Admin Staff (and the PM, already before) no longer see other
+  people's selfies there without an audit row. Every legitimate viewer goes through the audited
+  `GET /api/v1/attendance/{id}/selfie` or `GET /api/v1/media/selfies/{id}/file` (+ signed URL): visibility = read
+  access of the referencing attendance (Q-33), someone else's selfie audited `view_sensitive` (throttled). The
+  library is hidden from the admin menu and routes and from `/me/modules` (APK). Uploads (web + APK), check-in /
+  on-behalf and the uploader's own capture are unchanged. ADR 0004 (revision 2026-10-25) and ADR 0018 amended.
+  Note: a face reference photo (`employees.faceRefPhoto`, unused — 0 rows) is only previewable by its uploader.
+
+## [0.21.0] - 2026-10-25
+
+**Web admin in the Nexus layout (D2510, ADR 0033) + APK 0.13.0 restyle (tag `mobile-v0.13.0`, PR #140, already
+published).** Presentation only: no migration, no API change, no token change; APK 0.12.0 / 0.13.0 keep working.
+Rollback = image 0.20.0.
+
+### Changed
+
+- **Web admin: Nexus-style shell (D2510, user 2026-10-25, ADR 0033)** after the Nexus daisyUI CRM / Corporate Finance
+  dashboards, web palette kept (no token change). Left sidebar with every visible module (collapsible groups, section
+  labels, badges; compact icon mode remembered per browser; drawer ≤ 1024px), slim top bar with menu search (Ctrl+K /
+  ⌘K), "+ Buat", PT switcher, bell and avatar menu; soft grey page under white cards. `/admin` opens the role
+  dashboard (first menu item) instead of the module launcher; module landing pages show their menus as cards.
+  Breadcrumb home outside a module = "Beranda".
+  - Dashboard per role (PR-2): Nexus cards / stat tiles (icon chip, muted "Rp", delta soft badge), soft status
+    badges, roomy card tables, metric rows; Finance in the Corporate Finance style (hero "Saldo kas total" with a mini
+    card per cash account, project budget progress, quick actions); role / range tabs as a segmented control. Same
+    data, links and `data-pk-*` hooks.
+  - List & form chrome (PR-3): every collection list is one card (module glyph, title, total badge, "Kolom" /
+    "+ Buat baru" in the head, filter bar row, Nexus table with soft status badges and ghost row actions, pager and
+    page size in the foot; long text still wraps); edit / create views show their fields in white cards under a
+    sticky white toolbar, tabs and collapsibles tidied.
+  - Custom pages (PR-4): every custom view (Kas, Absensi, Persetujuan, Antrian Transfer, Verifikasi LPJ, Laporan,
+    laporan lapangan, Pinjaman, RAP, Progress, Addendum, Pengguna, Notifikasi, Keamanan akun, Riwayat) opens with the
+    shared page header (module chip, muted line, actions right) over Nexus cards; queue / inbox lists in cards with
+    the new table style, soft status badges and item cards; filters as the card's toolbar row; soft alerts, tab boxes.
+    Same data, texts, buttons and popups; long texts wrap (progress bars, holiday names, location chips no longer cut).
+- **APK restyle after the Banani reference "Project Monitoring Hub" (D2510, user 2026-10-25), web palette kept** (ADR
+  0015 tokens unchanged; layout and components only). Presentation-only: same providers, routes, keys, texts and popups.
+  - Kit `lib/shared/widgets/pk_ui.dart` (hero band, cards, icon chips, soft status pills, KPI tiles, section headers,
+    progress bars, quick actions, avatar, info rows, section cards, empty state) + `PkColors` hero / soft-status colours
+    and `PkRadius`; group helpers in `pk_ui_{keuangan,lapangan,proyek,akun}.dart`.
+  - **Beranda** (supersedes the launcher-only home of 2026-10-18): hero (PT, bell, avatar, greeting, role), role summary
+    with its two main actions, quick actions, KPI tiles, projects needing attention, cash accounts, the first two
+    approvals with inline Setujui / Tolak (same decision sheet, signature, fund check and popups as the detail), then a
+    3-column module grid. Bottom bar: waiting counts on Persetujuan / Antrian Transfer.
+  - Splash and login with the brand hero; every other screen restyled one by one: pengajuan (list, detail, draft / line
+    editor, LPJ, history), Persetujuan + decision sheet, Antrian Transfer + transfer form, addendum; absensi (today hero
+    card, 60 dp check-in / check-out, recap calendar, team, on-behalf, schedule), laporan lapangan, progress; proyek
+    (list, detail tabs, RAP), buku kas, tutup buku, pinjaman antar project / antar PT; Profil (hero + grouped rows),
+    Keamanan, Antrean sinkron, notifications, PT switcher, module landing pages (menu rows), master data, users, access
+    matrix, klien / vendor, laporan, dashboard cards.
+  - CI: workflow `mobile-preview` (pushes to `feat/d2510-apk-ui-**`, or by hand) runs `flutter analyze` and the
+    `test_preview/` screenshot tests (light + dark) and uploads them as artifact `mobile-preview-shots`; the broken
+    loans / sites previews are fixed and new previews cover every group.
+
+## [0.20.0] - 2026-10-24
+
+**Client feedback 24/10 (D2410, PR #138); APK 0.12.0.** Five streams on top of 0.19.3 (0.19.2/0.19.3 = security
+releases). Twelve migrations: ten stream migrations (+ two follow-ups below), run in timestamp order:
+`20261024_100000_d2410_timesheet_hm_optional`, `_200000_d2410_site_assignments`, `_210000_d2410_admin_staff_enums`,
+`_210100_d2410_admin_staff_guard`, `_300000_d2410_self_processed_enum`, `_300100_d2410_finance_self_lpj`,
+`_400000_d2410_loan_enums`, `_400100_d2410_loan_schema`, `_400200_d2410_loan_data`, `_400300_d2410_loan_guard`. The
+latest snapshot (`20261024_400100_d2410_loan_schema.json`) carries every schema change of the five streams. API contract
+0.20.0 (additive / relaxed changes only). APK 0.12.0: drift schema 12; new APK needed for
+Lampiran, HM optional, Admin Staff on-behalf, loan transfer orders and the popups (older APKs keep working, see each
+stream).
+
+### Follow-up decisions (user, 2026-10-24)
+
+Two more migrations: `20261024_500000_d2410_site_accounts_fund` (data + functions) and
+`20261024_510000_d2410_delete_draft_invoice` (indexes); no schema snapshot change.
+
+- **Funds without the site exclusion** (every project is mapped to a cash account): `pk_fund_balance` and the inter-PT
+  loan transfer guard count / accept every active account of the PT; the migration clears every legacy
+  `cash_accounts.site_id` (one audit row per account, source `system`, NOTICE; `down()` restores them). Service,
+  inter-PT loan source lists (web + APK) and the fund panel ("akun kas cabang (site lama) … tidak dihitung" removed, web
+  and APK) follow; `excludedSiteAccounts` stays in the API, always 0. ADR 0029 / 0031 amendments, ADR 0032 §4 decided.
+- **"Hapus draft"**: the creator / requester soft-deletes (ADR 0030) a Draft nobody ever decided on — never submitted or
+  withdrawn before any decision — with `POST /expense-requests/{id}/delete-draft` (reason optional, audited
+  `soft_delete`, action `delete_draft`); the number is never reused; the draft leaves every list and no longer blocks
+  its vendor / PT grup invoice number (duplicate checks + partial unique indexes skip deleted rows). Web button in the
+  requester panel (confirm popup, danger), APK button on a server draft; sync `draft_delete` of a numbered draft
+  soft-deletes it (flag `DELETED`) instead of `NOT_EDITABLE`. ADR 0030 amendment.
+- **Web "Absensi → Absenkan karyawan" for the PM**, team-scoped like the APK PM on-behalf: options = employees assigned
+  today to the PM's team projects / cost centers and those team locations; `POST /attendance/on-behalf` records source
+  `pm` and refuses a non-member (403); the Admin Staff stays PT-wide. ADR 0032 open question 3 decided.
+- `npm run check:openapi` prints the first differing line on drift.
+
+### Timesheet unit
+
+**Timesheet unit: backdate for PM / Direktur, HM weekly (client feedback 24/10, ADR 0020 amendment 2026-10-24).** One
+migration (`20261024_100000_d2410_timesheet_hm_optional`: `unit_timesheets.hm_start` / `hm_end` nullable + CHECK
+`unit_timesheets_hm_pair`; additive for the 0.19 image). API contract: additive / relaxed (nullable HM, new
+`timesheetMinDate`). Old APKs (always HM + photo) keep working; the APK changes ship with the next APK.
+
+#### Added
+- `GET /projects/{id}/contract-units` returns the caller's `timesheetMinDate` (APK date picker).
+- Weekly HM per unit (weeks Monday–Sunday overlapping the month): HM awal, HM akhir, total HM, days with HM — web
+  contract tab **Rekap** (card "HM mingguan") and report `rekap-timesheet-kontrak` (sheet "HM mingguan per unit").
+- `PATCH /unit-timesheets/{id}`, `POST …/corrections` and the sync edit accept the HM photo (`hmPhotoId` /
+  `hm_photo_media_id`) for a timesheet that has none; a stored photo is never replaced (REST 400 `PHOTO_LIMIT`, sync
+  ignores it).
+
+#### Changed
+- The PM of the project (`projects.pm`) and the Direktur may file a timesheet for any past date inside the contract
+  unit's period (REST + sync); field reporters keep 14 days. Web matrix: "+" only on days the caller may fill, older
+  missing days show "!" with the reason; the timesheet form keeps `?tanggal=` (visible notice when not allowed, no
+  silent switch to today) and preselects `?unit=` when active on that date.
+- HM awal / HM akhir and the HM photo are optional on the daily timesheet (HM read about once a week): both or none,
+  HM akhir ≥ HM awal, photo only with HM; work hours stay required. An edit / correction may clear the HM (null).
+- HM_GAP compares with the previous timesheet **with HM**; the unit's last HM and the service-report HM reference skip
+  timesheets without HM; HM awal prefill = last recorded HM akhir (web lookup 60 days, else the unit's last HM).
+- Monthly "HM awal → akhir" = first / last recorded reading; report **Total HM** is empty (not 0) without readings;
+  the daily detail shows empty HM cells for days without HM.
+- `UnitTimesheet.hmStart/hmEnd/hmUsed` and sync copy `hm_start/hm_end` are nullable.
+- APK: date picker window from `timesheetMinDate`; HM optional (both or none, photo only with HM, untouched prefill not
+  sent); edit may add the missing HM photo; drift schema 12 (`field_recent_timesheets` HM nullable, cache rebuilt);
+  l10n `fieldHmOptional`, `fieldTimesheetBackdateWide`.
+
+### Absensi and Admin Staff
+
+**Absensi: site dihapus, Non-OnSite hanya di lokasi terdaftar, role Admin Staff (ADR 0032, user 2026-10-24).** Four
+migrations (`20261024_200000_d2410_site_assignments` data, `_210000_d2410_admin_staff_enums` + snapshot,
+`_210100_d2410_admin_staff_guard`). No table or column is dropped. API: `/api/v1/sites` and masters `sites` stay for
+APK ≤ 0.11.1 (empty / tombstones).
+
+#### Removed
+- Sites (ADR 0023) from the product: Site master menu / form / create, "Buat site dari pusat biaya", "Site penempatan"
+  on Data Karyawan, Site on Project / Akun kas / Penugasan tim (form, list column, filter), the Site filter on Tim hari
+  ini, rekap, reports and Kas, the dashboard Site filter and the cards "Saldo kas per site" / "Ringkasan per site",
+  `/me` `employee.homeSite`, `ProjectListItem.site`, `?site=` on reports, dashboards, `/projects`,
+  `/cash-accounts/balances` and Kas, `lookups.sites`. APK: site in profile, project detail, onboarding, masters.
+- The "Di luar area" check-in of Karyawan Non-OnSite (new records only; the label stays for existing rows).
+
+#### Changed
+- Attendance locations are projects (and cost centers with a point); a site check-in from an old APK is refused for
+  OnSite ("Site tidak lagi dipakai sebagai lokasi absen"). Work-schedule fallback employee → PT; the PM team scope has
+  no team sites.
+- Karyawan Non-OnSite checks in and out only inside the geofence of any registered location of the own PT (picked
+  automatically, nearest when several); outside every location → 409 `OUTSIDE_GEOFENCE` with an Indonesian message. A
+  check-out closes the day's open check-in (flag `CHECK_OUT_ELSEWHERE` when the fix is inside another location).
+  `GET /attendance/locations` returns `homeSiteId` / `referenceSite` null and `isHeadOffice` / `home` false.
+- Data migration: every team assignment to a site becomes an assignment to each active project of that site (first
+  project on the row, one new row per further project, same employee / role / dates); without such a project a running
+  site assignment is ended. Each change is audited (`audit_logs` source `system`) and logged.
+- Help texts of "Tipe absensi" (Data Karyawan, Pengguna form, APK) describe the new rule.
+- On-behalf labels: "Diabsenkan" (PM or Admin Staff, with the recorder's name) in recap, report and selfie stamp.
+
+#### Added
+- Role `pk-admin-staff` "Admin Staff" (per PT): reads every attendance (selfies audited) and correction of the PT,
+  records check-in / check-out on behalf of any employee of the PT (also without an account), corrects attendance
+  (never own, reason required), reads Data Karyawan (no bank accounts), Tim hari ini, Rekap, Jadwal (read), Laporan
+  Absensi. No finance / request access. Restricted panel, dashboard layout "Admin Staff", role pickers / matrix (AdmS),
+  APK `Role.adminStaff` (Operator bottom bar + team tab).
+- Web **Absensi → Absenkan karyawan** (`/admin/absensi/absenkan`): camera selfie + GPS of the Admin Staff, reason;
+  `GET /api/v1/attendance/on-behalf/options`, `POST /api/v1/attendance/on-behalf`. Attendance source `admin`
+  ("Diabsenkan oleh Admin Staff"). APK on-behalf screen lists the Admin Staff candidates (cached offline).
+- `/me` capabilities `attendanceOnBehalf`, `attendanceAdminStaff`.
+
+#### Open questions
+- Cash accounts already flagged with a site stay outside the fund pool (ADR 0029) until the owner decides (ADR 0032 §4).
+- The go-live import workbook still carries the Site sheet / `kode_site` columns (CLI writes the hidden legacy columns).
+
+### Pengajuan biaya
+
+**Pengajuan biaya — client feedback 24/10 (D2410, user decisions 2026-10-24).** Two migrations
+(`20261024_300000_d2410_self_processed_enum`: audit action `self_processed`; `20261024_300100_d2410_finance_self_lpj`:
+drops the F2e triggers `receipts_self_verify_guard` / `receipt_flags_self_review_guard`). No data change. API contract:
+additive (`ExpenseRequestDetail.attachments`, `SyncDraftUpsertPayload.attachment_ids`), plus the behaviour changes
+below. **APK:** a new APK with "Lampiran" needs this server (the old sync schema refuses `attachment_ids`); older APKs
+keep working but cannot add a Lampiran, so their Reimburse submit gets the 400 below — raise `minAppVersion` once the
+APK is released.
+
+#### Changed
+- **Batalkan pengajuan only at the Finance stage, absolute** (point 13): `cancel` only from Pengajuan Baru / vendor /
+  PT grup "Disetujui" and Reimburse "Disetujui" / "Nota Terverifikasi" / "Revisi Nota", only by Finance / Direktur of
+  the PT (also on their own request), reason required. No cancel on Draft or while waiting for approval (requester:
+  "Tarik kembali ke Draft"; others 403, office roles 409). Web: one "Batalkan pengajuan" button in the action bar (the
+  requester panel has none); row action "Batalkan" for the office roles at the Finance stage only. APK: driven by
+  `allowedActions` (no change). APK "hapus draft" (sync `draft_delete`): a never-submitted draft is still cancelled; a
+  numbered (withdrawn) draft → `NOT_EDITABLE` with the server copy. "Batalkan proyek" still cancels the project's
+  drafts / pending requests (system cascade, ADR 0030).
+- **Finance may process its own request's receipts and LPJ** (user decision): verify / reject receipts, review flags,
+  verify all receipts, LPJ revision / verification, settle and settlement reversal are allowed when the Finance user is
+  the requester or creator; each is recorded as audit `self_processed` ("diproses oleh pemohon sendiri",
+  `newValue.selfProcessed = true`) in "Log perubahan" / "Riwayat". Approvals (G1) and the transfer rule are unchanged.
+- **Reimburse needs at least one Lampiran to be sent** (point 6): submit without a general attachment → 400
+  `errors[attachmentIds]` "Lampiran wajib untuk Reimburse: unggah minimal 1 lampiran (foto/PDF)." (besides a receipt on
+  every line). Optional for Pengajuan Baru; the vendor / PT grup invoice file is unchanged. Web form: hint on the
+  Lampiran field, "Kirim pengajuan" disabled with the reason.
+- **List filters: "Semua" = every option ticked** (point 7): without a filter every option shows ticked; a tri-state
+  "Semua" box ticks (or clears) all; every option ticked — or none — applies as no filter. Form mode unchanged.
+- **Status filter "Menunggu persetujuan Owner"** (point 8) in Keuangan › Pengajuan Biaya and Laporan › Rekap Pengajuan
+  (virtual value `pending_owner`: waiting rows whose current level is the Owner's); "Menunggu persetujuan Direktur" now
+  means the other waiting rows. Dashboard "menunggu" links tick both.
+
+#### Added
+- APK: "Lampiran" (photo / PDF, max. 20) in the draft editor — required for Reimburse, optional for Pengajuan Baru; sent
+  with the sync / Ajukan; the request detail lists the attachments and opens them.
+- API: `SyncDraftUpsertPayload.attachment_ids` (replaces the list; omitted = unchanged) and
+  `ExpenseRequestDetail.attachments[] {id, fileName, mimeType}`.
+
+### Pinjaman antar project
+
+**Pinjaman antar project: PM / Finance file, Direktur → Owner, transfer orders, repayment requests (DRMS 24/10
+#10–#12; ADR 0022 + ADR 0031 amendments 2026-10-24).** Four migrations (`20261024_400000_d2410_loan_enums`,
+`_400100_d2410_loan_schema`, `_400200_d2410_loan_data`, `_400300_d2410_loan_guard`). API contract: additive (new
+fields, endpoints, statuses); `POST /project-loans/:id/disburse` kept. APK: see below.
+
+#### Changed
+- A manual inter-project loan is filed by the borrower project's PM **or Finance** of the PT (`submitterRole`; Finance
+  picks both projects). Approval is **Direktur (level 1) → Owner (level 2)**, reject with reason at either level; status
+  "Menunggu persetujuan Direktur / Owner". G1: the creator never decides (`direktur_self` stays, level 1 only). A PT
+  without an active Owner refuses the submit (409 `NO_OWNER`).
+- After the Owner's approval a cash-backed loan is a **transfer order in Antrian Transfer** (new section "Transfer
+  pinjaman antar project"): Finance executes it (date, optional proof) → KK on the lender account tagged with the lender
+  project + KM on the borrower account tagged with the borrower project, one transaction. The loan page links to the
+  queue instead of "Cairkan". The Finance user who filed it may execute it (audited `selfExecuted`).
+- Money between two projects of the **same** Pusat Biaya is cash-backed too: the pair is posted on that account, tagged
+  with each project. Goods stay a claim.
+- A repayment of a cash-backed loan is a **request** (PM / Finance, planned date, ≤ the part not yet requested) →
+  Direktur → Owner → transfer order → executed by Finance (KK borrower / KM lender, tagged). Statuses `pending_approval`,
+  `approved`, `posted` (= executed, every existing row), `rejected`, `cancelled`. Claims are recorded as before.
+- Persetujuan: loans and repayment requests at the caller's level (the Owner gets the loan section); nav badge and
+  dashboard "menunggu saya" count both.
+- Fund check: an approved repayment order is a commitment of the borrower account; a same-account loan is no
+  commitment.
+
+#### Added
+- API: `GET /project-loans/transfer-orders`, `POST /project-loans/:id/execute`,
+  `POST /project-loans/:id/repayments/:rid/{approve,reject,cancel,execute}`; loan fields `approvalLevel`,
+  `submitterRole`, `transferQueueHref`, `repaymentNeedsApproval`, `repayableAmount`, decision `level` / `levelLabel`,
+  repayment `status` / `approvalLevel` / `plannedDate` / `allowedActions` / `decisions` / execution fields; inbox
+  `repayments`.
+- DB guards: two-level order and stored roles on loan / repayment decision rows; repayment lifecycle; Finance executes.
+- APK: Finance files a loan; Direktur and Owner decide loans and repayment requests (Persetujuan); repayment request +
+  row actions on the loan; "Buka Antrian Transfer" replaces "Cairkan"; transfer orders executed in the APK Antrian
+  Transfer (without proof upload — optional on the server).
+- **"Antrian Transfer" badge counts loan transfer orders** (pinjaman open item): for Finance the nav badge (web
+  launcher and `GET /me/modules`, i.e. the APK menu) adds the approved loan disbursements and approved repayment orders
+  of its PTs (`loanTransferOrderCount`), next to the expense transfer queue.
+
+#### Data (in-flight)
+- Loans pending at the Direktur get `approval_level = 1` and now also need the Owner (audited). Approved loans keep
+  their approval; an approved cash-backed loan not yet disbursed appears as a transfer order. No other data change.
+
+### Confirm and result popups
+
+#### Added
+- **Popup before and after every data-changing action, web and APK (user decision 2026-10-24).**
+  - Before: a modal "Yakin ingin <aksi> …?" with a short summary of what is affected (document number, amount,
+    person, unit, date) and **[Ya, <aksi>] / [Batal]**. Tolak, Batalkan, Hapus, Nonaktifkan and Void use the danger
+    style. A reason dialog is the confirmation itself (no second dialog); it now shows the same summary.
+  - After: a result modal "Berhasil: <aksi> <dokumen>", or the server's error, with an **OK** button. Navigation or
+    refresh happens behind it as before. On the APK, an action saved to the offline queue says "Tersimpan di antrian,
+    akan dikirim saat online".
+  - Web: one shared host (`src/admin/components/feedback`: `confirmAction`, `showResult`, `DocSummaryProvider`),
+    mounted on every admin page. `ActionButton`, `ActionDialog`, `ReasonAction`, `ConfirmAction`, `MoneyForm` and
+    `RowRecordAction` use it, so new buttons built from them get both popups. Payload's document **Simpan** asks
+    first and shows the result on every collection and global, the relationship "+" drawer included
+    (`withConfirmSave`).
+  - APK: one helper (`lib/shared/widgets/action_feedback.dart`: `confirmAction`, `showActionResult`) used by every
+    action screen.
+- The new actions of the other streams use the popups too: web **Absensi → Absenkan karyawan**, loan transfer order
+  execution in Antrian Transfer (`LoanExecuteForm`), "Ajukan pengembalian", repayment approve / reject / cancel; APK
+  Antrian Transfer "Catat transfer", Admin Staff on-behalf, repayment decisions.
+- No migration. No API change.
+
+## [0.19.3] - 2026-10-24
+
+**Security release: Node.js runtime bump only.** No code change, no migration, APK unchanged (0.11.1).
+
+### Security
+- Node.js 24.21.0 → 24.22.1 (2026-10-20 security release: 5 High — tls ×3, dns, brotli; 2 Medium — http, crypto;
+  1 Low — permission). Base image `node:24.22.1-alpine` pinned by index digest (Alpine 3.24.3); CI `NODE_VERSION`
+  and the integration test env follow (PR #136). Trivy: 0 HIGH/CRITICAL.
+
+## [0.19.2] - 2026-10-24
+
+**Security release: dependency bumps only.** No code change, no migration, APK unchanged (0.11.1).
+
+### Security
+- Dependency bumps for CRITICAL/HIGH advisories found by `npm audit` / trivy on 2026-10-24 (no code change):
+  - `next` + `eslint-config-next` 16.3.8 → 16.4.2 (GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr unauthenticated RCE;
+    GHSA-p3m5-59mp-jv5r DoS).
+  - `dompurify` 3.4.8 → 3.4.17 via `overrides` (transitive through monaco-editor; GHSA-cg2g-xh64-v4q7 and others).
+  - `undici` override 7.29.1 → 7.30.1; `zod` 4.6.5 → 4.6.7.
+  - Remaining `npm audit` findings are moderate only (esbuild via drizzle-kit, fast-uri, nodemailer).
+
 ## [0.19.1] - 2026-10-22
 
 **Fund check per Pusat Biaya first, then PT (ADR 0031 §6, user 2026-10-22).** One migration

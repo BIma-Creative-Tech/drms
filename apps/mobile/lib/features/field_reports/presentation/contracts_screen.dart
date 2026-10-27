@@ -9,6 +9,7 @@ import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
+import '../../../shared/widgets/pk_ui.dart';
 import '../../companies/presentation/company_chip.dart';
 
 // User 2026-10-19 (APK ↔ web parity, phase 5b): the web "Unit & kontrak" page (/admin/unit-kontrak) —
@@ -82,22 +83,32 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
                 onRetry: () => ref.invalidate(fieldContractsProvider(_q)),
                 data: (p) => ListView(
                   key: const Key('contracts-list'),
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   children: [
-                    if (p.items.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(t.contractsEmpty, textAlign: TextAlign.center),
-                      ),
+                    if (p.items.isEmpty) PkEmptyState(icon: Icons.assignment_outlined, message: t.contractsEmpty),
                     for (final r in p.items)
-                      Card(
+                      PkCard(
                         key: Key('contract-project-${r.projectId}'),
-                        margin: const EdgeInsets.only(bottom: 8),
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: EdgeInsets.zero,
                         child: ExpansionTile(
+                          shape: const Border(),
+                          collapsedShape: const Border(),
+                          tilePadding: const EdgeInsets.fromLTRB(14, 6, 12, 6),
+                          leading: PkIconChip(
+                            icon: Icons.precision_manufacturing_outlined,
+                            tone: r.filled < r.active ? PkTone.warn : PkTone.ok,
+                            size: 40,
+                          ),
                           title: Row(
                             children: [
                               CompanyChipLead(companyId: r.companyId),
-                              Expanded(child: Text(r.title)),
+                              Expanded(
+                                child: Text(
+                                  r.title,
+                                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                              ),
                             ],
                           ),
                           subtitle: Text(
@@ -116,7 +127,13 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
                           children: [
                             for (final c in r.contracts)
                               ListTile(
+                                key: Key('contract-unit-${c['id']}'),
                                 dense: true,
+                                // D2510: the contract opens its record (period, unit, status; rates stay hidden)
+                                onTap: c['id'] is num ? () => context.push('/data/contract-units/${c['id']}') : null,
+                                trailing: c['id'] is num
+                                    ? Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.outline)
+                                    : null,
                                 leading: Icon(
                                   c['filledToday'] == true ? Icons.check_circle : Icons.radio_button_unchecked,
                                   color: c['filledToday'] == true ? context.pk.okText : theme.colorScheme.outline,
@@ -147,22 +164,29 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
                         ),
                       ),
                     if (p.units.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Text(t.contractsUnits, style: theme.textTheme.titleMedium),
+                      PkSectionHeader(title: t.contractsUnits, padding: const EdgeInsets.only(top: 14, bottom: 10)),
                       for (final u in p.units)
-                        ListTile(
+                        PkCard(
                           key: Key('unit-${u['id']}'),
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.precision_manufacturing_outlined),
-                          title: Text('${u['label'] ?? ''}'),
-                          subtitle: Text(
-                            [
-                              ?(u['type'] as String?),
-                              ?(u['brandModel'] as String?),
-                              ?(u['clientName'] as String?),
-                              if (u['lastHourMeter'] is num)
-                                'HM ${formatDecimal(u['lastHourMeter'] as num, digits: 1)}',
-                            ].join(' · '),
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: ListTile(
+                            // D2510: the unit opens its record (the web "Kendaraan & unit" document)
+                            onTap: u['id'] is num ? () => context.push('/data/vehicles/${u['id']}') : null,
+                            trailing: u['id'] is num
+                                ? Icon(Icons.chevron_right, color: theme.colorScheme.outline)
+                                : null,
+                            leading: const PkIconChip(icon: Icons.agriculture, tone: PkTone.warn),
+                            title: Text('${u['label'] ?? ''}'),
+                            subtitle: Text(
+                              [
+                                ?(u['type'] as String?),
+                                ?(u['brandModel'] as String?),
+                                ?(u['clientName'] as String?),
+                                if (u['lastHourMeter'] is num)
+                                  'HM ${formatDecimal(u['lastHourMeter'] as num, digits: 1)}',
+                              ].join(' · '),
+                            ),
                           ),
                         ),
                     ],

@@ -4,6 +4,8 @@ import type { PayloadRequest } from 'payload'
 import { BUDGET_COMMITTED, type RequestStatus, type RequestType } from '@/domain/expense/types'
 import { settings, today } from '@/domain/expense/common'
 import { flagVisibleSql } from '@/domain/expense/flag-visibility'
+import { splitStatusFilter, type PENDING_OWNER } from '@/domain/expense/status-filter'
+import { ownerStepSql } from '@/domain/expense/status-filter-sql'
 import { counterpartsOf, type EntryCounterpart } from '@/domain/intercompany/service'
 import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
@@ -648,7 +650,8 @@ export type RequestFilter = {
   from: string
   to: string
   type?: RequestType
-  statuses?: RequestStatus[]
+  /** D2410: may hold the virtual `pending_owner` (status-filter.ts; `pending_approval` then = the non-Owner half). */
+  statuses?: Array<RequestStatus | typeof PENDING_OWNER>
   projectId?: number
   /** ADR 0031: Pusat Biaya = a cash account (`?pusat=`). */
   pusatBiayaId?: number
@@ -665,10 +668,20 @@ export function requestPusatBiayaSql(accountId: number): SQL {
               OR EXISTS (SELECT 1 FROM transfers tpb WHERE tpb.request_id = er.id AND tpb.status = 'posted' AND tpb.cash_account_id = ${accountId}))`
 }
 
+/** D2410: status filter with the virtual Owner half (status-filter.ts) — plain statuses OR'ed with the two waiting halves. */
+export function requestStatusesSql(values: readonly string[]): SQL {
+  const f = splitStatusFilter(values)
+  const parts: SQL[] = []
+  if (f.plain.length) parts.push(sql`er.status::text IN (${textList(f.plain)})`)
+  if (f.direktur) parts.push(sql`(er.status = 'pending_approval' AND NOT ${ownerStepSql('er')})`)
+  if (f.owner) parts.push(ownerStepSql('er'))
+  return sql`(${sql.join(parts, sql` OR `)})`
+}
+
 export function requestFilterSql(f: RequestFilter): SQL {
   const w: SQL[] = [sql`er.status <> 'draft'`, sql`er.request_date BETWEEN ${f.from} AND ${f.to}`]
   if (f.type) w.push(sql`er.type = ${f.type}`)
-  if (f.statuses?.length) w.push(sql`er.status::text IN (${textList(f.statuses)})`)
+  if (f.statuses?.length) w.push(requestStatusesSql(f.statuses))
   if (f.projectId) w.push(sql`er.project_id = ${f.projectId}`)
   if (f.pusatBiayaId) w.push(requestPusatBiayaSql(f.pusatBiayaId))
   if (f.categoryId) w.push(sql`EXISTS (SELECT 1 FROM expense_requests_lines l2 WHERE l2._parent_id = er.id AND l2.category_id = ${f.categoryId})`)

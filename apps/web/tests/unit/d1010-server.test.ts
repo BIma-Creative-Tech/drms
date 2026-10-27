@@ -163,9 +163,10 @@ describe('D7 selfie stamp (server-side band)', () => {
     expect(lines[2]).toBe('Project PRJ-01 Gedung Kantor Balikpapan')
     expect(lines[3]).toBe('-1.26543, 116.83123 - akurasi 12 m')
     expect(right).toBe(BRAND)
+    // onBehalfBy carries the recorder's role (ADR 0032: "PM <nama>" / "Admin Staff <nama>")
     expect(stampLines({ ...info, kind: 'check_out', onBehalfBy: 'PM Uji', timeTrust: 'estimated', accuracyM: null }).lines).toEqual([
       '11/10/2026 08:15:32 WITA (perkiraan server)',
-      'Pulang - Budi Santoso (diabsenkan PM PM Uji)',
+      'Pulang - Budi Santoso (diabsenkan PM Uji)',
       'Project PRJ-01 Gedung Kantor Balikpapan',
       '-1.26543, 116.83123',
     ])

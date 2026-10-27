@@ -129,10 +129,10 @@ void main() {
       await tester.tap(find.byKey(const Key('account-signature-remove')));
       await tester.pumpAndSettle();
       expect(api.calls, isEmpty, reason: 'nothing before the confirmation');
-      await tester.tap(find.byKey(const Key('account-signature-remove-confirm')));
-      await tester.pumpAndSettle();
+      await confirmPopup(tester, key: const Key('account-signature-remove-confirm'));
       expect(api.calls, ['set:null']);
       expect(find.text('Tanda tangan dihapus.'), findsOneWidget);
+      await dismissResult(tester);
       expect(find.byKey(const Key('account-signature-none')), findsOneWidget);
     });
 

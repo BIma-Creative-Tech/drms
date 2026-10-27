@@ -5,6 +5,7 @@ import React from 'react'
 import { hasRoleAny, relId } from '@/access/roles'
 import { AddendumForm } from '@/admin/components/addendum/AddendumForm'
 import { ConfirmAction } from '@/admin/components/addendum/ConfirmAction'
+import { DocSummaryProvider } from '@/admin/components/feedback/DocContext'
 import { ReasonAction } from '@/admin/components/kas/ReasonAction'
 import { ADDENDUM_STATUSES, ADDENDUM_STATUS_LABELS, type AddendumStatus } from '@/domain/addendum/rules'
 import { addendumDetail, addendumInbox, addendumProjectOptions, listAddenda, loadVisibleAddendum, type AddendumSummary } from '@/domain/addendum/service'
@@ -14,14 +15,15 @@ import { withReqTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
 
 import { KAS_STYLE } from '@/admin/components/kas/style'
+import { Panel } from '@/admin/components/ui/nexus'
 import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseListQuery } from '@/admin/list-query'
 
 import { F3Root } from './f3-ui'
-import { Frame } from './frame'
+import { Frame, PageHead } from './frame'
 import { Alert, dateTimeId } from './progress-ui'
 import { PtChip, ptOptionsOf, ptView } from './pt'
-import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText, rp, StatusPill, VIZ_STYLE, type Col } from './viz'
+import { Bento, Card, DataTable, EmptyState, KpiRow, KpiTile, pctText, rp, StatusPill, VIZ_STYLE, type Col } from './viz'
 import { NoAccess } from './NoAccess'
 
 /**
@@ -33,6 +35,11 @@ import { NoAccess } from './NoAccess'
 const READERS = ['pk-owner', 'pk-finance', 'pk-pm'] as const
 export const addendumHref = (id: number) => `/admin/addendum/detail/${id}`
 const addendumEditHref = (id: number) => `/admin/addendum/${id}/ubah`
+/** DRMS 24/10: the addendum as named in the popups (submit, approve, reject, cancel). */
+const addendumDoc = (a: Pick<AddendumSummary, 'id' | 'docNo' | 'project' | 'addition' | 'reason' | 'createdBy'>) => {
+  const docNo = a.docNo ?? `Draft addendum #${a.id}`
+  return { object: docNo, summary: [['Addendum RAB', docNo], ['Project', `${a.project.code} ${a.project.name}`], ['Tambahan', `+${rp(a.addition)}`], ['Diajukan', a.createdBy.name], ['Alasan', a.reason]] as const }
+}
 
 export const ADDENDUM_TONE: Record<AddendumStatus, PillTone> = { draft: 'none', pending_ack: 'wait', pending_approval: 'progress', approved: 'ok', rejected: 'bad', cancelled: 'none' }
 
@@ -108,7 +115,7 @@ export async function AddendumList(props: AdminViewServerProps) {
   }
   return (
     <Frame props={props} name="addendum">
-      <DashHead title="Addendum RAB" note="Diajukan PM project · disetujui Direktur lalu Finance · RAB project bertambah otomatis setelah disetujui">
+      <PageHead props={props} title="Addendum RAB" note="Diajukan PM project · disetujui Direktur lalu Finance · RAB project bertambah otomatis setelah disetujui">
         <div className="pk-kact">
           {d.canCreate ? (
             <Link className="pk-kbtn primary" href={`/admin/addendum/baru${project ? `?project=${project}` : ''}`} data-pk-link="addendum-baru">
@@ -121,7 +128,7 @@ export async function AddendumList(props: AdminViewServerProps) {
             </Link>
           ) : null}
         </div>
-      </DashHead>
+      </PageHead>
       <Bento label="Ringkasan addendum">
         <KpiRow cols={3}>
           <KpiTile id="add-pending" icon="clock" label="Menunggu persetujuan" value={String(pending.length)} kpi="addendum-pending" href={keep({ status: 'pending_ack' })} more="Menunggu Direktur" i={0}>
@@ -242,11 +249,11 @@ export async function AddendumNew(props: AdminViewServerProps) {
   if (projects.length === 0) {
     return (
       <Frame props={props} name="addendum-baru">
-        <DashHead title="Ajukan addendum RAB">
+        <PageHead props={props} title="Ajukan addendum RAB">
           <Link className="pk-kbtn" href="/admin/addendum">
             ← Addendum RAB
           </Link>
-        </DashHead>
+        </PageHead>
         <Alert tone="bad" attr="denied">
           <p>Addendum RAB diajukan oleh PM project (project tim Anda). Anda belum menjadi PM project yang aktif.</p>
         </Alert>
@@ -257,11 +264,11 @@ export async function AddendumNew(props: AdminViewServerProps) {
   const initial = sp.project && /^\d{1,10}$/.test(sp.project) ? Number(sp.project) : undefined
   return (
     <Frame props={props} name="addendum-baru">
-      <DashHead title="Ajukan addendum RAB" note="Nomor ADD/YYMM/#### diberikan saat diajukan. Direktur menyetujui, lalu Finance.">
+      <PageHead props={props} title="Ajukan addendum RAB" note="Nomor ADD/YYMM/#### diberikan saat diajukan. Direktur menyetujui, lalu Finance.">
         <Link className="pk-kbtn" href="/admin/addendum">
           ← Addendum RAB
         </Link>
-      </DashHead>
+      </PageHead>
       <Bento>
         <Card id="addendum-form" title="Addendum baru" span={8}>
           <AddendumForm projects={projects} initialProject={projects.some((p) => p.id === initial) ? initial : undefined} />
@@ -303,7 +310,7 @@ export async function AddendumDetail(props: AdminViewServerProps) {
   if (!d) {
     return (
       <Frame props={props} name="addendum-detail">
-        <DashHead title="Addendum tidak ditemukan">{back}</DashHead>
+        <PageHead props={props} title="Addendum tidak ditemukan">{back}</PageHead>
       </Frame>
     )
   }
@@ -318,9 +325,9 @@ export async function AddendumDetail(props: AdminViewServerProps) {
     ...(a.approvalRule?.skipped.some((s) => s.position === 'diketahui') ? [] : [{ key: 'ack', label: 'Direktur (Diketahui)', ...decided(a, 'diketahui') }]),
     ...Array.from({ length: a.approvalRule?.levels ?? 1 }, (_, i) => ({ key: `ap${i + 1}`, label: (a.approvalRule?.levels ?? 1) > 1 ? `Finance level ${i + 1}` : 'Finance', ...decided(a, 'approval', i + 1) })),
   ]
-  return (
+  const page = (
     <Frame props={props} name="addendum-detail">
-      <DashHead title={title} note={`${a.project.code} ${a.project.name} · diajukan ${a.createdBy.name ?? '—'}`}>
+      <PageHead props={props} title={title} note={`${a.project.code} ${a.project.name} · diajukan ${a.createdBy.name ?? '—'}`}>
         <div className="pk-kact">
           {back}
           <Link className="pk-kbtn" href={`/admin/progress/project/${a.project.id}`}>
@@ -333,7 +340,7 @@ export async function AddendumDetail(props: AdminViewServerProps) {
             </Link>
           ) : null}
         </div>
-      </DashHead>
+      </PageHead>
       {sp.diajukan ? (
         <Alert tone="ok" attr="submitted">
           <p>
@@ -454,6 +461,8 @@ export async function AddendumDetail(props: AdminViewServerProps) {
       </Bento>
     </Frame>
   )
+  // DRMS 24/10: every action of the page names the addendum in its popups
+  return <DocSummaryProvider {...addendumDoc(a)}>{page}</DocSummaryProvider>
 }
 
 type Detail = Awaited<ReturnType<typeof addendumDetail>>
@@ -477,8 +486,7 @@ export async function AddendumInboxSection({ req }: { req: PayloadRequest }) {
     <F3Root name="addendum-inbox">
     <style>{VIZ_STYLE}</style>
     <style>{KAS_STYLE}</style>
-    <section id="addendum" style={{ marginTop: 32 }} data-pk-inbox="addendum">
-      <h2 style={{ margin: '0 0 8px' }}>Addendum RAB</h2>
+    <Panel id="addendum" icon="tNoteAdd" title="Addendum RAB" data-pk-inbox="addendum">
       {items.length === 0 ? (
         <EmptyState text="Tidak ada addendum RAB yang menunggu keputusan Anda." />
       ) : (
@@ -526,9 +534,10 @@ export async function AddendumInboxSection({ req }: { req: PayloadRequest }) {
                     title={`Setujui ${r.docNo}?`}
                     description={r.step === 'approve' ? <>RAB {r.project.code} bertambah {rp(r.addition)} (sekarang {rp(r.budget.current)}).</> : <>Tambahan {rp(r.addition)} untuk {r.project.code}; berikutnya approval Finance.</>}
                     confirmLabel="Setujui"
+                    summary={addendumDoc(r).summary}
                     testId={`addendum-inbox-${r.step}-${r.id}`}
                   />
-                  <ReasonAction url={`/api/v1/budget-addenda/${r.id}/reject`} label="Tolak" title={`Tolak ${r.docNo}?`} description={<>Alasan dikirim ke PM pengaju.</>} confirmLabel="Tolak addendum" testId={`addendum-inbox-reject-${r.id}`} />
+                  <ReasonAction url={`/api/v1/budget-addenda/${r.id}/reject`} label="Tolak" title={`Tolak ${r.docNo}?`} description={<>Alasan dikirim ke PM pengaju.</>} confirmLabel="Tolak addendum" summary={addendumDoc(r).summary} testId={`addendum-inbox-reject-${r.id}`} />
                 </div>
               ),
             },
@@ -536,7 +545,7 @@ export async function AddendumInboxSection({ req }: { req: PayloadRequest }) {
           empty={null}
         />
       )}
-    </section>
+    </Panel>
     </F3Root>
   )
 }
@@ -562,11 +571,11 @@ export async function AddendumEdit(props: AdminViewServerProps) {
   if (!d) {
     return (
       <Frame props={props} name="addendum-ubah">
-        <DashHead title="Addendum tidak ditemukan">
+        <PageHead props={props} title="Addendum tidak ditemukan">
           <Link className="pk-kbtn" href="/admin/addendum">
             ← Addendum RAB
           </Link>
-        </DashHead>
+        </PageHead>
       </Frame>
     )
   }
@@ -579,7 +588,7 @@ export async function AddendumEdit(props: AdminViewServerProps) {
   if (!a.allowedActions.includes('edit')) {
     return (
       <Frame props={props} name="addendum-ubah">
-        <DashHead title={`Ubah ${a.docNo ?? `draft addendum #${a.id}`}`}>{back}</DashHead>
+        <PageHead props={props} title={`Ubah ${a.docNo ?? `draft addendum #${a.id}`}`}>{back}</PageHead>
         <Alert tone="bad" attr="not-editable">
           <p>Hanya draft milik PM pengaju yang dapat diubah. Addendum yang sudah diajukan tidak dapat diubah lagi.</p>
         </Alert>
@@ -590,9 +599,9 @@ export async function AddendumEdit(props: AdminViewServerProps) {
   const projects = d.projects.some((p) => p.id === a.project.id) ? d.projects : [{ id: a.project.id, code: a.project.code ?? '', name: a.project.name ?? '', budget: a.project.budget }, ...d.projects]
   return (
     <Frame props={props} name="addendum-ubah">
-      <DashHead title={`Ubah draft addendum #${a.id}`} note="Nomor ADD/YYMM/#### diberikan saat diajukan. Direktur menyetujui, lalu Finance.">
+      <PageHead props={props} title={`Ubah draft addendum #${a.id}`} note="Nomor ADD/YYMM/#### diberikan saat diajukan. Direktur menyetujui, lalu Finance.">
         {back}
-      </DashHead>
+      </PageHead>
       <Bento>
         <Card id="addendum-form" title="Ubah draft" span={8}>
           <AddendumForm projects={projects} edit={{ id: a.id, projectId: a.project.id, addition: a.addition, reason: a.reason }} />

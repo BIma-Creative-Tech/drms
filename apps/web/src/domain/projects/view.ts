@@ -1,10 +1,7 @@
 import type { PayloadRequest, Where } from 'payload'
 
 import { relId } from '@/access/roles'
-import { effectiveRadiusM } from '@/domain/attendance/calendar'
-import { companyById, displayNames } from '@/domain/companies'
-import { today } from '@/domain/expense/common'
-import { siteFlagsFor, type SiteFlags } from '@/domain/sites'
+import { displayNames } from '@/domain/companies'
 import { projectRapSummaries, type ProjectRapSummary } from '@/domain/rap/budget'
 import { rapRequiredFor } from '@/domain/rap/rules'
 import { rapRoles } from '@/domain/rap/service'
@@ -17,7 +14,7 @@ import { PROJECT_STATUSES } from '@/collections/Projects'
  * Direktur / Finance / Admin: every project of the selected PTs). RAP money (planned / realised) only for the price
  * roles of the project (Direktur, Admin, Finance, the project's PM; owner 2026-10-10: no prices for Staff).
  */
-export type ProjectListQuery = { q?: string; status?: string; page: number; limit: number; companies?: number[]; site?: number }
+export type ProjectListQuery = { q?: string; status?: string; page: number; limit: number; companies?: number[] }
 
 type ProjectDoc = {
   id: number
@@ -31,7 +28,6 @@ type ProjectDoc = {
   progressPct?: number | null
   costCenter?: unknown
   cashAccount?: unknown
-  site?: unknown
   client?: unknown
   address?: string | null
   startDate?: string | null
@@ -49,11 +45,11 @@ export function rapSummaryDto(s: ProjectRapSummary | undefined, prices: boolean)
 
 type Ref = { id: number; code: string; name: string }
 
-/** {id, code, name} of the referenced cost centers / sites of the visible projects (names only, no other data). */
-async function refsOf(req: PayloadRequest, collection: 'cost-centers' | 'sites', ids: Array<number | undefined>): Promise<Map<number, Ref>> {
+/** {id, code, name} of the referenced cost centers of the visible projects (names only, no other data). */
+async function refsOf(req: PayloadRequest, collection: 'cost-centers', ids: Array<number | undefined>): Promise<Map<number, Ref>> {
   const list = [...new Set(ids.filter((x): x is number => x !== undefined))]
   if (list.length === 0) return new Map()
-  const res = await req.payload.find({ collection, where: { id: { in: list } }, depth: 0, pagination: false, select: { code: true, name: true }, overrideAccess: true /* SYSTEM-READ: names of the visible projects' cost centers / sites */, req })
+  const res = await req.payload.find({ collection, where: { id: { in: list } }, depth: 0, pagination: false, select: { code: true, name: true }, overrideAccess: true /* SYSTEM-READ: names of the visible projects' cost centers */, req })
   return new Map(res.docs.map((c) => [c.id as number, { id: c.id as number, code: String((c as { code?: string }).code ?? ''), name: String((c as { name?: string }).name ?? '') }]))
 }
 
@@ -74,11 +70,10 @@ async function budgetsOf(req: PayloadRequest, docs: ProjectDoc[]): Promise<Map<n
 
 async function items(req: PayloadRequest, docs: ProjectDoc[]) {
   const pmIds = docs.map((d) => relId(d.pm)).filter((x): x is number => x !== undefined)
-  const [names, ccs, pbs, sites, rap, budgets] = [
+  const [names, ccs, pbs, rap, budgets] = [
     await displayNames(req, pmIds),
     await refsOf(req, 'cost-centers', docs.map((d) => relId(d.costCenter))),
     await accountNamesOf(req, docs.map((d) => relId(d.cashAccount))),
-    await refsOf(req, 'sites', docs.map((d) => relId(d.site))),
     await projectRapSummaries(req, docs.map((d) => d.id)),
     await budgetsOf(req, docs),
   ]
@@ -103,8 +98,6 @@ async function items(req: PayloadRequest, docs: ProjectDoc[]) {
       costCenter: ccs.get(relId(d.costCenter) ?? -1) ?? null,
       // ADR 0031: the project's Pusat Biaya (cash account), name only
       pusatBiaya: pbs.get(relId(d.cashAccount) ?? -1) ?? null,
-      // ADR 0023: the branch office (kantor cabang) that handles the project
-      site: sites.get(relId(d.site) ?? -1) ?? null,
       rapPlanned: prices ? (s?.planned ?? null) : null,
       rapRealised: prices ? (s?.realised ?? null) : null,
       rapPercent: prices ? (s?.percent ?? null) : null,
@@ -126,7 +119,6 @@ export async function listProjects(req: PayloadRequest, q: ProjectListQuery) {
   const text = searchWhere(['code', 'name'], q.q)
   if (text) and.push(text)
   if (q.companies?.length) and.push({ company: { in: q.companies } })
-  if (q.site) and.push({ site: { equals: q.site } }) // ADR 0023: only narrows the read scope
   try {
     const res = await req.payload.find({ collection: 'projects', where: { and }, sort: 'code', page: q.page, limit: q.limit, depth: 0, user: req.user, overrideAccess: false /* caller's project read scope */, req })
     return { docs: await items(req, res.docs as unknown as ProjectDoc[]), totalDocs: res.totalDocs, page: res.page ?? q.page, totalPages: Math.max(1, res.totalPages), limit: res.limit }
@@ -181,55 +173,9 @@ export async function listCostCenters(req: PayloadRequest, q: { q?: string; comp
 }
 
 /**
- * ADR 0023 §6: GET /sites — the sites (kantor cabang) of the selected PTs (every member of a PT reads them) with
- * the caller's flags: `home` (own home site), `assigned` (active site assignment today), `team` (may record PM
- * on-behalf there). Effective radius = own or the PT default (like projects in /masters).
+ * ADR 0023 §6 GET /sites — ADR 0032: sites are removed from the product. The endpoint stays (an APK ≤ 0.11.1 calls
+ * it) and always answers an empty list.
  */
-export async function listSites(req: PayloadRequest, q: { q?: string; companies?: number[]; includeInactive?: boolean }) {
-  const and: Where[] = []
-  if (!q.includeInactive) and.push({ active: { not_equals: false } })
-  const text = searchWhere(['code', 'name'], q.q)
-  if (text) and.push(text)
-  if (q.companies?.length) and.push({ company: { in: q.companies } })
-  type SiteDoc = { id: number; code?: string; name?: string; company?: unknown; address?: string | null; lat?: number | null; lng?: number | null; radiusM?: number | null; costCenter?: unknown; defaultWorkSchedule?: unknown; active?: boolean | null }
-  let docs: SiteDoc[] = []
-  try {
-    const res = await req.payload.find({ collection: 'sites', where: and.length ? { and } : undefined, sort: 'code', limit: 500, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req })
-    docs = res.docs as unknown as SiteDoc[]
-  } catch (err) {
-    if ((err as { status?: number }).status === 403) return { docs: [], totalDocs: 0 }
-    throw err
-  }
-  const ccs = await refsOf(req, 'cost-centers', docs.map((d) => relId(d.costCenter)))
-  const wsIds = [...new Set(docs.map((d) => relId(d.defaultWorkSchedule)).filter((x): x is number => x !== undefined))]
-  const ws = wsIds.length
-    ? new Map(
-        (await req.payload.find({ collection: 'work-schedules', where: { id: { in: wsIds } }, depth: 0, pagination: false, select: { name: true }, overrideAccess: true /* SYSTEM-READ: schedule names of the visible sites */, req })).docs.map((w) => [w.id as number, { id: w.id as number, name: String((w as { name?: string }).name ?? '') }]),
-      )
-    : new Map<number, { id: number; name: string }>()
-  const flags = new Map<number, SiteFlags>()
-  const out = []
-  for (const d of docs) {
-    const company = relId(d.company) ?? -1
-    if (!flags.has(company)) flags.set(company, await siteFlagsFor(req, company, await today(req, company)))
-    const f = flags.get(company)!
-    const radius = typeof d.lat === 'number' && typeof d.lng === 'number' && typeof d.radiusM !== 'number' ? effectiveRadiusM(null, (await companyById(req, company)).defaultGeofenceRadiusM) : (d.radiusM ?? null)
-    out.push({
-      id: d.id,
-      code: d.code ?? '',
-      name: d.name ?? '',
-      companyId: company,
-      address: d.address ?? null,
-      lat: typeof d.lat === 'number' ? d.lat : null,
-      lng: typeof d.lng === 'number' ? d.lng : null,
-      radiusM: radius,
-      costCenter: ccs.get(relId(d.costCenter) ?? -1) ?? null,
-      defaultWorkSchedule: ws.get(relId(d.defaultWorkSchedule) ?? -1) ?? null,
-      active: d.active !== false,
-      home: f.home === d.id,
-      assigned: f.assigned.has(d.id),
-      team: f.team.has(d.id),
-    })
-  }
-  return { docs: out, totalDocs: out.length }
+export async function listSites(_req: PayloadRequest, _q: { q?: string; companies?: number[]; includeInactive?: boolean }) {
+  return { docs: [] as never[], totalDocs: 0 }
 }

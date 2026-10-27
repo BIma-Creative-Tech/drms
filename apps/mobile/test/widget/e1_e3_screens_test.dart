@@ -55,6 +55,12 @@ class FakeExpenseApi extends ExpenseApi {
   }
 
   @override
+  Future<ExpenseDetail> deleteDraft(int requestId, {String? reason, required String idempotencyKey}) async {
+    calls.add('delete-draft:$requestId');
+    return detailFromJson(detailJson(status: 'draft', allowed: const []));
+  }
+
+  @override
   Future<List<HistoryEntry>> history(int requestId) async => [
     for (final i in historyJson()['items'] as List) historyFromJson(i as Map<String, dynamic>),
   ];
@@ -318,7 +324,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(api.decisions, 1);
-      expect(find.textContaining('Hanya PM project pengajuan ini, Direktur dan Finance'), findsOneWidget);
+      // D2410: inline in the sheet and in the "Gagal" popup
+      expect(find.textContaining('Hanya PM project pengajuan ini, Direktur dan Finance'), findsNWidgets(2));
+      expect(find.byKey(const Key('result-failed')), findsOneWidget);
     });
   });
 
@@ -435,6 +443,51 @@ void main() {
       );
       expect(find.byKey(const Key('action-edit-on-phone')), findsOneWidget);
       expect(find.byKey(const Key('action-resubmit')), findsNothing);
+    });
+
+    testWidgets('D2410 "Hapus draft": an undecided server draft is deleted through the confirm + result popups', (
+      tester,
+    ) async {
+      final api = FakeExpenseApi();
+      await pumpScreen(
+        tester,
+        const RequestDetailScreen(id: 42),
+        overrides: [
+          expenseApiProvider.overrideWithValue(api),
+          requestDetailProvider(42).overrideWith(
+            (ref) async =>
+                detailFromJson(detailJson(status: 'draft', allowed: const ['edit', 'submit', 'delete_draft'])),
+          ),
+          receiptThumbProvider(901).overrideWith((ref) => Future.error(const NetworkException())),
+        ],
+      );
+      await tester.ensureVisible(find.byKey(const Key('action-delete-draft')));
+      await tester.tap(find.byKey(const Key('action-delete-draft')));
+      await tester.pumpAndSettle();
+      expect(find.text('Yakin ingin hapus draft?'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('confirm-cancel')));
+      await tester.pumpAndSettle();
+      expect(api.calls, isNot(contains('delete-draft:42')));
+      await tester.tap(find.byKey(const Key('action-delete-draft')));
+      await tester.pumpAndSettle();
+      await confirmPopup(tester, key: const Key('delete-draft-confirm'));
+      expect(api.calls, contains('delete-draft:42'));
+      expect(find.text('Draft dihapus.'), findsOneWidget);
+      await dismissResult(tester);
+    });
+
+    testWidgets('a draft without "delete_draft" (decided before / not own) shows no "Hapus draft"', (tester) async {
+      await pumpScreen(
+        tester,
+        const RequestDetailScreen(id: 42),
+        overrides: [
+          requestDetailProvider(
+            42,
+          ).overrideWith((ref) async => detailFromJson(detailJson(status: 'draft', allowed: const ['edit', 'submit']))),
+          receiptThumbProvider(901).overrideWith((ref) => Future.error(const NetworkException())),
+        ],
+      );
+      expect(find.byKey(const Key('action-delete-draft')), findsNothing);
     });
 
     testWidgets('rejected request offers "Ajukan ulang"', (tester) async {

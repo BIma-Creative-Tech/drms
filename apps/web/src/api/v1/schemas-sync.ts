@@ -112,6 +112,7 @@ export const SyncDraftUpsertPayload = z
     invoice_date: businessDate.nullable().optional(),
     invoice_due_date: businessDate.nullable().optional(),
     invoice_file_id: id.nullable().optional().meta({ description: 'ADR 0027: media-attachments id of the invoice (POST /media/attachments).' }),
+    attachment_ids: z.array(id).max(20).optional().meta({ description: 'D2410: general attachments ("Lampiran", media-attachments ids — POST /media/attachments; photo / PDF). Replaces the list; omitted = unchanged. A Reimburse needs at least one to be submitted.' }),
     client_grand_total: rupiah.nullable().optional().meta({ description: 'Advisory; mismatch with the server total → flag CLIENT_TOTAL_MISMATCH.' }),
     lines: z.array(SyncLineInput).max(200).optional().meta({ description: 'Replaces ALL lines when present.' }),
   })
@@ -126,16 +127,18 @@ export const SyncDraftDeletePayload = z
     reason: z.string().trim().min(3).max(1000).optional().meta({ description: 'Default "Draft dihapus dari aplikasi".' }),
   })
   .strict()
-  .meta({ id: 'SyncDraftDeletePayload', description: 'Soft delete = the draft is cancelled (no hard delete).' })
+  .meta({ id: 'SyncDraftDeletePayload', description: 'A never-submitted draft is cancelled (no hard delete). D2410 "Hapus draft": a draft submitted before (withdrawn, numbered) and never decided is soft-deleted (ADR 0030, flag DELETED; number never reused); a decided one → rejected.' })
 export type SyncDraftDelete = z.infer<typeof SyncDraftDeletePayload>
 
-/** Exactly one of project_id / cost_center_id / site_id (E6, Q-40: cost-center geofence; ADR 0023: site). */
+/** Exactly one of project_id / cost_center_id / site_id (E6, Q-40: cost-center geofence; ADR 0023 site — ADR 0032: refused, kept so an APK ≤ 0.11.1 gets the reason). */
 const oneLocation = (v: { project_id?: number | null; cost_center_id?: number | null; site_id?: number | null }) => [v.project_id, v.cost_center_id, v.site_id].filter((x) => x !== undefined).length === 1
 const oneLocationError = { message: 'Isi salah satu: project_id, cost_center_id, ATAU site_id.', path: ['project_id'] }
 
 /**
  * `attendance.check_in` / `attendance.check_out` (US-01/US-02, ADR 0010 decisions 7/8): own
- * attendance at an ASSIGNED project OR cost center (E6, Q-40) with a geofence. The selfie is uploaded
+ * attendance at a registered project OR cost center of the own PT (E6, Q-40; DRMS 13/10 A2: no assignment) with a
+ * geofence — OnSite inside the given one, Non-OnSite anywhere (inside one → that one; outside all → "Di luar area" at the
+ * nearest one, DRMS 26/10). The selfie is uploaded
  * first with POST /api/v1/media/selfies. Enabled by company-settings.syncAttendanceEnabled (else
  * `rejected FEATURE_DISABLED`). Corrections (US-15) are POST /api/v1/attendance/{id}/correct.
  */
@@ -143,7 +146,7 @@ export const SyncAttendancePayload = z
   .object({
     project_id: id.optional().meta({ description: 'Project (exactly one of project_id / cost_center_id / site_id).' }),
     cost_center_id: id.optional().meta({ description: 'Cost center / operational location (E6, Q-40).' }),
-    site_id: id.optional().meta({ description: 'ADR 0023: site (kantor cabang) — allowed at the home site or with an active site assignment.' }),
+    site_id: id.optional().meta({ description: 'ADR 0023 site — ADR 0032: no longer a check-in location (OnSite → VALIDATION; Non-OnSite: a hint only, recorded at the registered location containing the fix, else "Di luar area" at the nearest one).' }),
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
     accuracy_m: z.number().min(0).max(10_000).nullable().optional().meta({ description: 'GPS accuracy radius (m); up to 50 m is added to the geofence radius.' }),
@@ -282,7 +285,10 @@ export const SyncServiceReportPayload = z
   .meta({ id: 'SyncServiceReportPayload' })
 export type SyncServiceReport = z.infer<typeof SyncServiceReportPayload>
 
-/** `unit_timesheet.upsert` (FR1): one timesheet per unit and date; the HM photo is required on create. */
+/**
+ * `unit_timesheet.upsert` (FR1): one timesheet per unit and date. D2410 (user 2026-10-24): HM optional — hm_start +
+ * hm_end both or none, the HM photo required only with HM (older APKs always send all three: unchanged behaviour).
+ */
 export const SyncUnitTimesheetPayload = z
   .object({
     timesheet_id: id.optional(),
@@ -290,9 +296,9 @@ export const SyncUnitTimesheetPayload = z
     project_id: id.optional().meta({ description: 'Required for a new timesheet (kind kontrak_unit).' }),
     unit_id: id.optional().meta({ description: 'Required for a new timesheet (active contract unit on report_date).' }),
     report_date: businessDate.optional().meta({ description: 'Required for a new timesheet.' }),
-    hm_start: dec2(10_000_000).optional(),
-    hm_end: dec2(10_000_000).optional(),
-    work_hours: dec2(24).optional(),
+    hm_start: dec2(10_000_000).nullable().optional().meta({ description: 'Optional (D2410), both hm_start and hm_end or none. On an edit: omitted = unchanged, null = cleared.' }),
+    hm_end: dec2(10_000_000).nullable().optional(),
+    work_hours: dec2(24).optional().meta({ description: 'Required for a new timesheet.' }),
     standby_hours: dec2(24).optional(),
     breakdown_hours: dec2(24).optional(),
     breakdown_reason: optStr(500),
@@ -300,7 +306,10 @@ export const SyncUnitTimesheetPayload = z
     operator_name: optStr(128),
     location: optStr(200),
     notes: optStr(2000),
-    hm_photo_media_id: id.optional().meta({ description: 'Required for a new timesheet (photo of the HM meter). Cannot change afterwards.' }),
+    hm_photo_media_id: id
+      .nullable()
+      .optional()
+      .meta({ description: 'Photo of the HM meter — required when the timesheet has HM (D2410). Never replaced: on an edit it is only added to a timesheet without one (ignored otherwise).' }),
     reason: z.string().trim().min(3).max(1000).optional(),
   })
   .strict()
@@ -546,8 +555,8 @@ export const SyncUnitTimesheetCopy = z
     project_id: id,
     unit_id: id,
     report_date: z.string(),
-    hm_start: z.number(),
-    hm_end: z.number(),
+    hm_start: z.number().nullable().meta({ description: 'null = no HM reading (D2410).' }),
+    hm_end: z.number().nullable(),
     work_hours: z.number(),
     standby_hours: z.number(),
     breakdown_hours: z.number(),

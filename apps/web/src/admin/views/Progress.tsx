@@ -22,13 +22,14 @@ import { timelineTypesFor } from '@/domain/field/views'
 import { enabledCompanies, type ProjectOpt } from '@/domain/field/web'
 import { kindOf } from '@/domain/field/rules'
 
+import { ImageThumb } from '../components/media/ImageThumb'
 import { ChartHover } from './ChartHover'
 import { FIELD_STYLE, Tabs } from './field-ui'
 import { ProjectTimeline } from './field-timeline'
-import { Frame } from './frame'
+import { Frame, PageHead } from './frame'
 import { ptOptionsOf, ptView } from './pt'
 import { Alert, dateId, dateTimeId, ProgressLegend, ProgressTable, ProgressTonePill, ProgressVsBudgetRows } from './progress-ui'
-import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText, rp, StatusPill, TableView, type Col } from './viz'
+import { Bento, Card, DataTable, EmptyState, KpiRow, KpiTile, pctText, rp, StatusPill, TableView, type Col } from './viz'
 import { NoAccess } from './NoAccess'
 import { DateInput } from '../components/DateInput'
 
@@ -83,7 +84,7 @@ export async function ProgressOverview(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="progress">
       <ChartHover>
-        <DashHead title="Progress project" note={`Per ${dateId(d.asOf)} (WITA) · progress fisik (Σ bobot × % tahapan) dibandingkan % anggaran terpakai (komitmen terhadap RAB)${isPm ? ' · project tim Anda' : ''}`}>
+        <PageHead props={props} title="Progress project" note={`Per ${dateId(d.asOf)} (WITA) · progress fisik (Σ bobot × % tahapan) dibandingkan % anggaran terpakai (komitmen terhadap RAB)${isPm ? ' · project tim Anda' : ''}`}>
           <div className="pk-kact">
             <Link className="pk-kbtn" href="/admin/progress/laporan" data-pk-link="laporan-progress">
               Laporan progress
@@ -92,7 +93,7 @@ export async function ProgressOverview(props: AdminViewServerProps) {
               {archived ? 'Sembunyikan arsip' : 'Tampilkan arsip'}
             </Link>
           </div>
-        </DashHead>
+        </PageHead>
         <Bento label="Ringkasan progress">
           <KpiRow cols={4}>
             <KpiTile id="progress-avg" icon="target" label="Rata-rata progress fisik" value={pctText(avg)} kpi="progress-avg" i={0}>
@@ -174,11 +175,11 @@ export async function ProjectProgressView(props: AdminViewServerProps) {
   if (!d) {
     return (
       <Frame props={props} name="progress-project">
-        <DashHead title="Project tidak ditemukan">
+        <PageHead props={props} title="Project tidak ditemukan">
           <Link className="pk-kbtn" href="/admin/progress">
             ← Progress project
           </Link>
-        </DashHead>
+        </PageHead>
       </Frame>
     )
   }
@@ -209,7 +210,7 @@ export async function ProjectProgressView(props: AdminViewServerProps) {
   return (
     <Frame props={props} name="progress-project">
       <ChartHover>
-        <DashHead title={`${project.code} ${project.name}`} note={`Progress fisik ${pctText(set.progressPct, 2)} · total bobot ${pctText(set.weightSum, 2)}${set.complete ? '' : ' (belum 100%: laporan progress ditolak sampai lengkap)'}`}>
+        <PageHead props={props} title={`${project.code} ${project.name}`} note={`Progress fisik ${pctText(set.progressPct, 2)} · total bobot ${pctText(set.weightSum, 2)}${set.complete ? '' : ' (belum 100%: laporan progress ditolak sampai lengkap)'}`}>
           <div className="pk-kact">
             <Link className="pk-kbtn" href="/admin/progress">
               ← Progress project
@@ -227,7 +228,7 @@ export async function ProjectProgressView(props: AdminViewServerProps) {
               </Link>
             ) : null}
           </div>
-        </DashHead>
+        </PageHead>
         {tabs.length ? (
           <>
             <style>{FIELD_STYLE}</style>
@@ -435,10 +436,18 @@ export async function ProgressReportList(props: AdminViewServerProps) {
         r.photos.length === 0 ? (
           '—'
         ) : (
-          <span className="pk-thumbs">
-            {r.photos.slice(0, 3).map((p) => (
-              // eslint-disable-next-line @next/next/no-img-element -- authenticated API thumbnail, not a static asset
-              <img key={p.id} src={p.thumbUrl} alt="" loading="lazy" width={36} height={28} />
+          // D2510 (web 0.21.1): the first three photos as real previews (lightbox; the row link stays on the rest of the row)
+          <span className="pk-thumbs" data-pk-report-thumbs={r.id}>
+            {r.photos.slice(0, 3).map((p, i) => (
+              <ImageThumb
+                key={p.id}
+                src={{ href: p.url, thumb: p.thumbUrl, fallback: 'full' }}
+                size={36}
+                group={`progress-list-${r.id}`}
+                title={`Foto ${i + 1} laporan ${r.docNo ?? r.id}`}
+                caption={`${r.reportDate}${r.stage.name ? ` · ${r.stage.name}` : ''}`}
+                data-pk-photo={p.id}
+              />
             ))}
             {r.photos.length > 3 ? <small>+{r.photos.length - 3}</small> : null}
           </span>
@@ -458,13 +467,13 @@ export async function ProgressReportList(props: AdminViewServerProps) {
   ]
   return (
     <Frame props={props} name="laporan-progress">
-      <DashHead title="Laporan progress" note="Terbaru di atas · PM melihat project timnya, Direktur/Finance semua project · laporan dibuat dari aplikasi Android">
+      <PageHead props={props} title="Laporan progress" note="Terbaru di atas · PM melihat project timnya, Direktur/Finance semua project · laporan dibuat dari aplikasi Android">
         <div className="pk-kact">
           <Link className="pk-kbtn" href="/admin/progress">
             Progress project
           </Link>
         </div>
-      </DashHead>
+      </PageHead>
       <form className="pk-filter" method="get" action="/admin/progress/laporan" role="search" aria-label="Filter laporan progress" data-pk-filter="laporan-progress">
         <label className="pk-filter__search">
           Cari
@@ -570,7 +579,7 @@ export async function ProgressReportDetail(props: AdminViewServerProps) {
   if (!d) {
     return (
       <Frame props={props} name="laporan-progress-detail">
-        <DashHead title="Laporan tidak ditemukan">{back}</DashHead>
+        <PageHead props={props} title="Laporan tidak ditemukan">{back}</PageHead>
       </Frame>
     )
   }
@@ -578,14 +587,14 @@ export async function ProgressReportDetail(props: AdminViewServerProps) {
   const trust: Record<string, string> = { server: 'jam server (online)', estimated: 'perkiraan server (offline)', device_only: 'jam HP saja (offline)' }
   return (
     <Frame props={props} name="laporan-progress-detail">
-      <DashHead title={r.docNo ?? `Laporan #${r.id}`} note={`${dateId(r.reportDate)} · ${r.project.code} ${r.project.name} · ${r.stage.name}`}>
+      <PageHead props={props} title={r.docNo ?? `Laporan #${r.id}`} note={`${dateId(r.reportDate)} · ${r.project.code} ${r.project.name} · ${r.stage.name}`}>
         <div className="pk-kact">
           {back}
           <Link className="pk-kbtn" href={projectHref(r.project.id)}>
             Project
           </Link>
         </div>
-      </DashHead>
+      </PageHead>
       {r.flags.length > 0 || r.timeTrust === 'device_only' ? (
         <Alert tone="info" attr="flags">
           <p>
@@ -640,10 +649,15 @@ export async function ProgressReportDetail(props: AdminViewServerProps) {
             <ul className="pk-gallery" data-pk-gallery={r.id}>
               {r.photos.map((p, i) => (
                 <li key={p.id}>
-                  <a href={p.url} target="_blank" rel="noopener noreferrer" aria-label={`Foto ${i + 1} dari ${r.photos.length}, buka ukuran penuh`} data-pk-lightbox={`progress-${r.id}`} data-pk-lightbox-title={`Foto ${i + 1} laporan ${r.docNo ?? r.id}`}>
-                    {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API thumbnail */}
-                    <img src={p.thumbUrl} alt={`Foto ${i + 1} laporan ${r.docNo ?? r.id}`} loading="lazy" width={p.width ?? undefined} height={p.height ?? undefined} />
-                  </a>
+                  <ImageThumb
+                    src={{ href: p.url, thumb: p.thumbUrl, fallback: 'full' }}
+                    size="fill"
+                    group={`progress-${r.id}`}
+                    title={`Foto ${i + 1} laporan ${r.docNo ?? r.id}`}
+                    caption={`${r.reportDate}${r.stage.name ? ` · ${r.stage.name}` : ''}`}
+                    label={`Foto ${i + 1} dari ${r.photos.length}, buka ukuran penuh`}
+                    data-pk-photo={p.id}
+                  />
                 </li>
               ))}
             </ul>

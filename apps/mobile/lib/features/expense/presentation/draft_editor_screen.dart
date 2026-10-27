@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,11 +11,15 @@ import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/platform/report_files.dart';
 import '../../auth/domain/user_profile.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/online_only_button.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_keuangan.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../masters/domain/master_item.dart';
 import '../../projects/application/projects_providers.dart';
@@ -27,6 +34,7 @@ import '../domain/request_status.dart';
 import 'line_editor_screen.dart';
 import 'receipt_capture.dart';
 import 'requests_screen.dart' show syncStateLabel;
+import 'widgets/attachments.dart';
 import 'widgets/master_picker.dart';
 import 'widgets/rap_item_picker.dart';
 import 'widgets/receipt_mismatch_chip.dart';
@@ -253,6 +261,79 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     }
   }
 
+  /// D2410 (point 6): a general attachment ("Lampiran") — a camera / gallery photo (compressed like a receipt photo) or
+  /// a JPG / PNG / PDF file from the phone (system picker; a PDF stays as it is, ≤ 5 MB). Stored as media blob
+  /// `attachment` and uploaded to `POST /media/attachments` by the sync / at "Ajukan".
+  Future<void> _addAttachment(AttachmentSource source) async {
+    final t = AppLocalizations.of(context);
+    final sub = ref.read(currentSubProvider);
+    if (sub == null) return;
+    if (_d.attachments.length >= maxDraftAttachments) {
+      showSnack(context, t.attachmentsLimit(maxDraftAttachments));
+      return;
+    }
+    Uint8List? raw;
+    var name = 'foto-lampiran-${_d.attachments.length + 1}.jpg';
+    String? mime = 'image/jpeg';
+    if (source == AttachmentSource.file) {
+      const maxRaw = 15 * 1024 * 1024; // photos are compressed after picking (PDF: ≤ 5 MB, checked below)
+      final picked = await ref.read(filePickerProvider).pick(mimeTypes: attachmentMimeTypes, maxBytes: maxRaw);
+      if (picked == null || !mounted) return;
+      if (picked.tooLarge || picked.bytes == null) {
+        showSnack(context, t.attachmentTooLarge);
+        return;
+      }
+      raw = picked.bytes;
+      name = picked.name;
+      mime = attachmentMimeOf(picked.name);
+    } else {
+      raw = await pickReceiptImage(context, fromCamera: source == AttachmentSource.camera);
+    }
+    if (raw == null || !mounted) return;
+    if (mime == null) {
+      showSnack(context, t.attachmentTypeInvalid);
+      return;
+    }
+    final pdf = mime == 'application/pdf';
+    if (pdf && raw.length > maxAttachmentPdfBytes) {
+      showSnack(context, t.attachmentPdfTooLarge);
+      return;
+    }
+    if (pdf && !isPdfFile(raw)) {
+      showSnack(context, t.attachmentPdfInvalid);
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      var bytes = raw;
+      final String sha;
+      if (pdf) {
+        sha = sha256.convert(raw).toString();
+      } else {
+        // a photo is re-encoded as JPEG (EXIF dropped); a PDF is stored as picked
+        final target = receiptTargetFor(ref.read(currentProfileProvider));
+        final photo = await ref.read(photoCompressorProvider).compress(raw, target);
+        bytes = photo.bytes;
+        sha = photo.sha256Hex;
+      }
+      final type = pdf ? mime : 'image/jpeg';
+      final uuid = ref.read(draftServiceProvider).newId();
+      final repo = ref.read(draftRepositoryProvider);
+      await repo.addMedia(sub, uuid: uuid, kind: 'attachment', bytes: bytes, sha256: sha, mime: type);
+      final added = DraftAttachment(fileName: name, mimeType: type, mediaUuid: uuid);
+      if (mounted) setState(() => _d = _d.copyWith(attachments: [..._d.attachments, added]));
+    } on Object catch (e) {
+      if (mounted) showSnack(context, errorText(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// D2410: the file of a removed local attachment is deleted when the draft is saved (DraftRepository.save).
+  void _removeAttachment(DraftAttachment a) {
+    setState(() => _d = _d.copyWith(attachments: [..._d.attachments]..remove(a)));
+  }
+
   /// D4: RAP items belong to the project — a new project clears the RAP item of every line (after a confirm).
   Future<void> _setProject(int? id) async {
     if (id == _d.projectId) return;
@@ -297,6 +378,17 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     });
   }
 
+  /// D2410: "Simpan draft" asks first and reports after; the submit path saves quietly (its own popups).
+  Future<void> _saveDraft() async {
+    final t = AppLocalizations.of(context);
+    final draft = _collect();
+    setState(() => _issues = validateForSave(draft));
+    if (_issues.isNotEmpty) return;
+    final summary = [draft.title, formatRupiah(draft.previewGrandTotal)];
+    if (!await confirmAction(context, action: t.saveDraft, summary: summary) || !mounted) return;
+    await _save();
+  }
+
   Future<bool> _save({bool quiet = false}) async {
     final t = AppLocalizations.of(context);
     final sub = ref.read(currentSubProvider);
@@ -318,13 +410,19 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
           );
       _d = saved;
       ref.read(syncCoordinatorProvider.notifier).requestSync();
-      if (mounted && !quiet) showSnack(context, online ? t.draftSaved : t.draftSavedQueued);
+      if (mounted && !quiet) {
+        if (online) {
+          await showActionResult(context, message: t.draftSaved, action: t.saveDraft);
+        } else {
+          await showActionQueued(context, action: t.saveDraft, message: t.draftSavedQueued);
+        }
+      }
       return true;
     } on DraftValidationException catch (e) {
       setState(() => _issues = e.issues);
       return false;
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: quiet ? t.submit : t.saveDraft);
       return false;
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -355,31 +453,24 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     final issues = validateForSubmit(draft, selfOnlyEmployee: _selfOnlyEmployee(), rap: _rapCheck());
     setState(() => _issues = issues);
     if (issues.isNotEmpty) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        content: Text(t.submitConfirm),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
-          FilledButton(
-            key: const Key('submit-confirm'),
-            onPressed: () => Navigator.pop(c, true),
-            child: Text(t.submit),
-          ),
-        ],
-      ),
+    final ok = await confirmAction(
+      context,
+      action: t.submit,
+      summary: [draft.title, formatRupiah(draft.previewGrandTotal)],
+      note: t.submitConfirm,
+      confirmKey: const Key('submit-confirm'),
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     if (!await _save(quiet: true)) return;
     final sub = ref.read(currentSubProvider);
     if (sub == null) return;
     setState(() => _busy = true);
     try {
       final detail = await ref.read(draftServiceProvider).submit(sub, _d, rap: _rapCheck());
-      if (!mounted) return;
-      showSnack(context, t.submitted);
       ref.invalidate(requestListProvider('mine'));
-      context.pushReplacement('/requests/${detail.id}');
+      if (!mounted) return;
+      await showActionResult(context, message: '${detail.docNo ?? ''} ${t.submitted}'.trim(), action: t.submit);
+      if (mounted) context.pushReplacement('/requests/${detail.id}');
     } on DraftValidationException catch (e) {
       setState(() => _issues = e.issues);
     } on ProblemException catch (e) {
@@ -394,12 +485,13 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
       // message offers "Perintahkan pinjaman antar-PT" to the Owner of the PT
       final fund = fundProblemMessage(e, draft: true);
       if (mounted && fund != null) {
-        _showFundShortSnack(fund, e);
+        await showActionFailure(context, fund, action: t.submit);
+        if (mounted) _showFundShortSnack(fund, e);
       } else if (mounted) {
-        showSnack(context, intercompanyAwareError(e, errorText));
+        await showActionFailure(context, intercompanyAwareError(e, errorText), action: t.submit);
       }
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: t.submit);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -440,25 +532,25 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     'invoiceDate' || 'invoice_date' => 'invoiceDate',
     'invoiceFileId' || 'invoice_file_id' => 'invoiceFile',
     'payeeCompanyId' || 'payee_company_id' => 'payeeCompanyId',
+    // D2410 (point 6): "Lampiran wajib untuk Reimburse" (server rule at submit)
+    'attachmentIds' || 'attachment_ids' => 'attachments',
     _ => null,
   };
 
   Future<void> _delete() async {
     final t = AppLocalizations.of(context);
     final sub = ref.read(currentSubProvider);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        content: Text(t.deleteDraftConfirm),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(t.delete)),
-        ],
-      ),
+    final ok = await confirmAction(
+      context,
+      action: t.fieldDiscardAction,
+      summary: [_d.title],
+      note: t.deleteDraftConfirm,
     );
-    if (ok != true || sub == null) return;
+    if (!ok || sub == null) return;
     await ref.read(draftServiceProvider).delete(sub, _d, online: ref.read(connectivityProvider));
     ref.read(syncCoordinatorProvider.notifier).requestSync();
+    if (!mounted) return;
+    await showActionResult(context, message: t.fieldDiscarded, action: t.fieldDiscardAction);
     if (mounted) context.pop();
   }
 
@@ -578,13 +670,13 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             if (m.isEmpty)
-              Card(
-                child: Padding(padding: const EdgeInsets.all(12), child: Text(t.mastersMissing)),
-              ),
+              PkNoticeCard(tone: PkTone.warn, icon: Icons.cloud_off_outlined, title: Text(t.mastersMissing)),
             if (!widget.isNew)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text('${syncStateLabel(t, _d.syncState)}${_d.lastError != null ? '\n${_d.lastError}' : ''}'),
+              PkNoticeCard(
+                dense: true,
+                tone: _d.lastError != null ? PkTone.bad : PkTone.neutral,
+                icon: _d.syncState == DraftSyncState.synced ? Icons.cloud_done_outlined : Icons.phone_android,
+                title: Text('${syncStateLabel(t, _d.syncState)}${_d.lastError != null ? '\n${_d.lastError}' : ''}'),
               ),
             // MC3: the PT of this draft (fixed; the pickers below list that PT's data only). Persetujuan #8: a badge
             // (code + name), no "PT:" label.
@@ -605,475 +697,506 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                 ),
               ),
             if (direkturNoApproval)
-              Card(
+              PkNoticeCard(
                 key: const Key('draft-direktur-no-approval'),
-                color: Theme.of(context).colorScheme.secondaryContainer,
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  leading: const Icon(Icons.info_outline),
-                  title: Text(t.draftDirekturNoApprovalInfo),
-                  subtitle: Text(t.draftDirekturNoApprovalHint),
-                ),
+                icon: Icons.info_outline,
+                title: Text(t.draftDirekturNoApprovalInfo),
+                body: Text(t.draftDirekturNoApprovalHint),
               ),
             // DRMS 13/10 Umum #2 / D4: label left of the field, two columns on wide screens.
             if (_d.isVendor)
-              Card(
+              PkNoticeCard(
                 key: const Key('draft-vendor-hint'),
-                color: Theme.of(context).colorScheme.secondaryContainer,
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(leading: const Icon(Icons.storefront), title: Text(t.vendorPaymentHint)),
+                dense: true,
+                icon: Icons.storefront,
+                title: Text(t.vendorPaymentHint),
               ),
             if (_d.isPtGrup)
-              Card(
+              PkNoticeCard(
                 key: const Key('draft-intercompany-hint'),
-                color: Theme.of(context).colorScheme.secondaryContainer,
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(leading: const Icon(Icons.business), title: Text(t.intercompanyPaymentHint)),
+                dense: true,
+                icon: Icons.business,
+                title: Text(t.intercompanyPaymentHint),
               ),
-            FormGrid(
-              children: [
-                // ADR 0027 "Jenis penerima": only Staff / Finance / PM see "Vendor", ADR 0028: Finance / PM / Direktur
-                // see "PT grup"; fixed once the server knows the draft
-                if (mayVendor || mayIntercompany || _d.isDirectPayment)
-                  FormGridCell(
-                    label: t.fieldPayeeType,
-                    stackedLabel: true,
-                    child: SegmentedButton<PayeeType>(
-                      key: const Key('draft-payee-type'),
-                      segments: [
-                        ButtonSegment(value: PayeeType.karyawan, label: Text(t.payeeKaryawan)),
-                        if (mayVendor || _d.isVendor)
-                          ButtonSegment(value: PayeeType.vendor, label: Text(t.payeeVendor)),
-                        if (mayIntercompany || _d.isPtGrup)
-                          ButtonSegment(
-                            value: PayeeType.ptGrup,
-                            label: Text(t.payeePtGrup, key: const Key('draft-payee-pt-grup')),
-                          ),
-                      ],
-                      selected: {_d.payeeType},
-                      onSelectionChanged: editableType && (mayVendor || mayIntercompany) ? _setPayee : null,
-                    ),
-                  ),
-                // a vendor / PT grup payment is always Pengajuan Baru (no "Jenis" choice)
-                if (!_d.isDirectPayment)
-                  FormGridCell(
-                    label: t.fieldType,
-                    stackedLabel: true,
-                    child: SegmentedButton<RequestType>(
-                      segments: [for (final ty in RequestType.values) ButtonSegment(value: ty, label: Text(ty.label))],
-                      selected: {_d.type},
-                      onSelectionChanged: editableType ? _setType : null,
-                    ),
-                  ),
-                FormGridCell(
-                  label: t.fieldTitle,
-                  builder: (label) => TextField(
-                    key: const Key('draft-title'),
-                    controller: _title,
-                    maxLength: 200,
-                    decoration: InputDecoration(labelText: label, errorText: issueFor('title')),
-                  ),
-                ),
-                // D2 (DRMS 10/10) / ADR 0031: project required, no cost center choice (Pusat Biaya = the project's cash
-                // account).
-                FormGridCell(
-                  label: t.fieldProject,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      MasterPickerField(
-                        key: const Key('draft-project'),
-                        label: t.fieldProject,
-                        items: m[MasterTypes.projects] ?? const [],
-                        value: _d.projectId,
-                        // ADR 0027 / 0028 / 0031: a vendor / PT grup payment may go without a project (no Pusat Biaya;
-                        // Finance picks the paying account)
-                        allowNone: _d.isDirectPayment,
-                        errorText: issueFor('projectId'),
-                        onChanged: _setProject,
+            // D2510: the request fields in one titled card.
+            PkSectionCard(
+              title: t.sectionRequestDetails,
+              icon: Icons.description_outlined,
+              child: FormGrid(
+                children: [
+                  // ADR 0027 "Jenis penerima": only Staff / Finance / PM see "Vendor", ADR 0028: Finance / PM / Direktur
+                  // see "PT grup"; fixed once the server knows the draft
+                  if (mayVendor || mayIntercompany || _d.isDirectPayment)
+                    FormGridCell(
+                      label: t.fieldPayeeType,
+                      stackedLabel: true,
+                      child: SegmentedButton<PayeeType>(
+                        key: const Key('draft-payee-type'),
+                        segments: [
+                          ButtonSegment(value: PayeeType.karyawan, label: Text(t.payeeKaryawan)),
+                          if (mayVendor || _d.isVendor)
+                            ButtonSegment(value: PayeeType.vendor, label: Text(t.payeeVendor)),
+                          if (mayIntercompany || _d.isPtGrup)
+                            ButtonSegment(
+                              value: PayeeType.ptGrup,
+                              label: Text(t.payeePtGrup, key: const Key('draft-payee-pt-grup')),
+                            ),
+                        ],
+                        selected: {_d.payeeType},
+                        onSelectionChanged: editableType && (mayVendor || mayIntercompany) ? _setPayee : null,
                       ),
-                      if (_d.isDirectPayment && _d.projectId == null)
-                        Padding(
-                          key: const Key('draft-no-project-hint'),
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(t.directPaymentNoProjectHint, style: Theme.of(context).textTheme.bodySmall),
-                        ),
-                      // D4 (owner 2026-10-11): project with a RAB but no RAP → submit refused; same text as the web
-                      if (rap != null && rap.missing) const _RapMissingCard(),
-                      // ADR 0031: a legacy draft's old cost center, read-only (never sent; dropped with a project)
-                      if (_d.projectId == null && legacyCc != null)
-                        Padding(
-                          key: const Key('draft-cost-center-legacy'),
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            '${t.costCenterLegacyValue(legacyCcName)}\n${t.draftCostCenterLegacy}',
-                            style: TextStyle(color: context.pk.warnText),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                FormGridCell(
-                  label: t.fieldNeededDate,
-                  builder: (label) => InkWell(
-                    key: const Key('draft-needed-date'),
-                    onTap: _pickNeededDate,
-                    child: InputDecorator(
-                      decoration: InputDecoration(labelText: label, suffixIcon: const Icon(Icons.calendar_today)),
-                      child: Text(formatDateOnly(_d.neededDate)),
+                    ),
+                  // a vendor / PT grup payment is always Pengajuan Baru (no "Jenis" choice)
+                  if (!_d.isDirectPayment)
+                    FormGridCell(
+                      label: t.fieldType,
+                      stackedLabel: true,
+                      child: SegmentedButton<RequestType>(
+                        segments: [
+                          for (final ty in RequestType.values) ButtonSegment(value: ty, label: Text(ty.label)),
+                        ],
+                        selected: {_d.type},
+                        onSelectionChanged: editableType ? _setType : null,
+                      ),
+                    ),
+                  FormGridCell(
+                    label: t.fieldTitle,
+                    builder: (label) => TextField(
+                      key: const Key('draft-title'),
+                      controller: _title,
+                      maxLength: 200,
+                      decoration: InputDecoration(labelText: label, errorText: issueFor('title')),
                     ),
                   ),
-                ),
-                // Owner decision 2026-10-09: "Tingkat urgensi" (per-PT master, lowest rank first)
-                FormGridCell(
-                  label: t.fieldUrgency,
-                  child: MasterPickerField(
-                    key: const Key('draft-urgency'),
-                    label: t.fieldUrgency,
-                    items: urgencies,
-                    value: _d.urgencyLevelId,
-                    errorText: issueFor('urgencyLevelId'),
-                    onChanged: (v) => setState(() => _d = _d.copyWith(urgencyLevelId: v)),
-                  ),
-                ),
-                if (!_d.isDirectPayment)
+                  // D2 (DRMS 10/10) / ADR 0031: project required, no cost center choice (Pusat Biaya = the project's cash
+                  // account).
                   FormGridCell(
-                    label: t.fieldRequesters,
-                    stackedLabel: true,
+                    label: t.fieldProject,
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Wrap(
-                          spacing: 6,
-                          children: [
-                            for (final id in _d.requesterIds)
-                              InputChip(
-                                label: Text(allEmployees.where((e) => e.id == id).firstOrNull?.label ?? '#$id'),
-                                onDeleted: _d.requesterIds.length > 1 ? () => _removeRequester(id) : null,
-                              ),
-                            // QA-15: a Staff-only user can add only themselves (no other requesters)
-                            if (selfOnly == null || (selfOnly > 0 && !_d.requesterIds.contains(selfOnly)))
-                              ActionChip(
-                                avatar: const Icon(Icons.person_add, size: 18),
-                                label: Text(t.choose),
-                                onPressed: () => _addRequester(employees),
-                              ),
-                          ],
+                        MasterPickerField(
+                          key: const Key('draft-project'),
+                          label: t.fieldProject,
+                          // D2610: no arsip / selesai / dibatalkan project (server G10 refuses them)
+                          items: requestableProjects(m[MasterTypes.projects] ?? const [], keep: _d.projectId),
+                          value: _d.projectId,
+                          // ADR 0027 / 0028 / 0031: a vendor / PT grup payment may go without a project (no Pusat Biaya;
+                          // Finance picks the paying account)
+                          allowNone: _d.isDirectPayment,
+                          errorText: issueFor('projectId'),
+                          onChanged: _setProject,
                         ),
-                        if (issueFor('requesterIds') != null)
+                        if (_d.isDirectPayment && _d.projectId == null)
                           Padding(
-                            key: const Key('requesters-issue'),
+                            key: const Key('draft-no-project-hint'),
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(t.directPaymentNoProjectHint, style: Theme.of(context).textTheme.bodySmall),
+                          ),
+                        // D4 (owner 2026-10-11): project with a RAB but no RAP → submit refused; same text as the web
+                        if (rap != null && rap.missing) const _RapMissingCard(),
+                        // ADR 0031: a legacy draft's old cost center, read-only (never sent; dropped with a project)
+                        if (_d.projectId == null && legacyCc != null)
+                          Padding(
+                            key: const Key('draft-cost-center-legacy'),
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
-                              issueFor('requesterIds')!,
-                              style: TextStyle(color: Theme.of(context).colorScheme.error),
+                              '${t.costCenterLegacyValue(legacyCcName)}\n${t.draftCostCenterLegacy}',
+                              style: TextStyle(color: context.pk.warnText),
                             ),
                           ),
                       ],
                     ),
                   ),
-                if (!_d.isDirectPayment)
                   FormGridCell(
-                    label: t.fieldBankAccount,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        MasterPickerField(
-                          label: t.fieldBankAccount,
-                          items: accounts,
-                          value: _d.bankAccountId,
-                          errorText: issueFor('bankAccountId'),
-                          onChanged: (v) => setState(() => _d = _d.copyWith(bankAccountId: v)),
-                        ),
-                        if (accounts.where((a) => a.id == _d.bankAccountId).firstOrNull case final acc?)
-                          BankAccountPreview(
-                            key: ValueKey('bank-preview-${acc.id}'),
-                            account: acc,
-                            banks: m[MasterTypes.banks] ?? const [],
-                          ),
-                      ],
+                    label: t.fieldNeededDate,
+                    builder: (label) => InkWell(
+                      key: const Key('draft-needed-date'),
+                      onTap: _pickNeededDate,
+                      child: InputDecorator(
+                        decoration: InputDecoration(labelText: label, suffixIcon: const Icon(Icons.calendar_today)),
+                        child: Text(formatDateOnly(_d.neededDate)),
+                      ),
                     ),
                   ),
-                // ADR 0027: vendor → its account (then the invoice fields below)
-                if (_d.isVendor) ...[
+                  // Owner decision 2026-10-09: "Tingkat urgensi" (per-PT master, lowest rank first)
                   FormGridCell(
-                    label: t.fieldVendor,
+                    label: t.fieldUrgency,
                     child: MasterPickerField(
-                      key: const Key('draft-vendor'),
-                      label: t.fieldVendor,
-                      items: m[MasterTypes.vendors] ?? const [],
-                      value: _d.vendorId,
-                      allowNone: false,
-                      errorText: issueFor('vendorId'),
-                      onChanged: (v) => setState(() {
-                        if (v == _d.vendorId) return;
-                        final accs = vendorAccountsOf(m, v);
-                        // the vendor's default (else only) active account is preselected
-                        final def =
-                            accs.where((a) => a.extra['isDefault'] == true).firstOrNull ??
-                            (accs.length == 1 ? accs.single : null);
-                        _d = _d.copyWith(vendorId: v, vendorBankAccountId: def?.id);
-                      }),
+                      key: const Key('draft-urgency'),
+                      label: t.fieldUrgency,
+                      items: urgencies,
+                      value: _d.urgencyLevelId,
+                      errorText: issueFor('urgencyLevelId'),
+                      onChanged: (v) => setState(() => _d = _d.copyWith(urgencyLevelId: v)),
                     ),
                   ),
-                  FormGridCell(
-                    label: t.fieldVendorBankAccount,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        MasterPickerField(
-                          key: const Key('draft-vendor-account'),
-                          label: t.fieldVendorBankAccount,
-                          items: vendorAccounts,
-                          value: _d.vendorBankAccountId,
-                          allowNone: false,
-                          errorText: issueFor('vendorBankAccountId'),
-                          onChanged: (v) => setState(() => _d = _d.copyWith(vendorBankAccountId: v)),
+                  if (!_d.isDirectPayment)
+                    FormGridCell(
+                      label: t.fieldRequesters,
+                      stackedLabel: true,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 6,
+                            children: [
+                              for (final id in _d.requesterIds)
+                                InputChip(
+                                  label: Text(allEmployees.where((e) => e.id == id).firstOrNull?.label ?? '#$id'),
+                                  onDeleted: _d.requesterIds.length > 1 ? () => _removeRequester(id) : null,
+                                ),
+                              // QA-15: a Staff-only user can add only themselves (no other requesters)
+                              if (selfOnly == null || (selfOnly > 0 && !_d.requesterIds.contains(selfOnly)))
+                                ActionChip(
+                                  avatar: const Icon(Icons.person_add, size: 18),
+                                  label: Text(t.choose),
+                                  onPressed: () => _addRequester(employees),
+                                ),
+                            ],
+                          ),
+                          if (issueFor('requesterIds') != null)
+                            Padding(
+                              key: const Key('requesters-issue'),
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                issueFor('requesterIds')!,
+                                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  if (!_d.isDirectPayment)
+                    FormGridCell(
+                      label: t.fieldBankAccount,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          MasterPickerField(
+                            label: t.fieldBankAccount,
+                            items: accounts,
+                            value: _d.bankAccountId,
+                            errorText: issueFor('bankAccountId'),
+                            onChanged: (v) => setState(() => _d = _d.copyWith(bankAccountId: v)),
+                          ),
+                          if (accounts.where((a) => a.id == _d.bankAccountId).firstOrNull case final acc?)
+                            BankAccountPreview(
+                              key: ValueKey('bank-preview-${acc.id}'),
+                              account: acc,
+                              banks: m[MasterTypes.banks] ?? const [],
+                            ),
+                        ],
+                      ),
+                    ),
+                  // ADR 0027: vendor → its account (then the invoice fields below)
+                  if (_d.isVendor) ...[
+                    FormGridCell(
+                      label: t.fieldVendor,
+                      child: MasterPickerField(
+                        key: const Key('draft-vendor'),
+                        label: t.fieldVendor,
+                        items: m[MasterTypes.vendors] ?? const [],
+                        value: _d.vendorId,
+                        allowNone: false,
+                        errorText: issueFor('vendorId'),
+                        onChanged: (v) => setState(() {
+                          if (v == _d.vendorId) return;
+                          final accs = vendorAccountsOf(m, v);
+                          // the vendor's default (else only) active account is preselected
+                          final def =
+                              accs.where((a) => a.extra['isDefault'] == true).firstOrNull ??
+                              (accs.length == 1 ? accs.single : null);
+                          _d = _d.copyWith(vendorId: v, vendorBankAccountId: def?.id);
+                        }),
+                      ),
+                    ),
+                    FormGridCell(
+                      label: t.fieldVendorBankAccount,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          MasterPickerField(
+                            key: const Key('draft-vendor-account'),
+                            label: t.fieldVendorBankAccount,
+                            items: vendorAccounts,
+                            value: _d.vendorBankAccountId,
+                            allowNone: false,
+                            errorText: issueFor('vendorBankAccountId'),
+                            onChanged: (v) => setState(() => _d = _d.copyWith(vendorBankAccountId: v)),
+                          ),
+                          if (_d.vendorId != null && vendorAccounts.isEmpty)
+                            Padding(
+                              key: const Key('draft-vendor-no-account'),
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(t.vendorAccountsNone, style: TextStyle(color: context.pk.warnText)),
+                            ),
+                          if (vendorAccounts.where((a) => a.id == _d.vendorBankAccountId).firstOrNull case final acc?)
+                            BankAccountPreview(
+                              key: ValueKey('vendor-bank-preview-${acc.id}'),
+                              account: acc,
+                              banks: m[MasterTypes.banks] ?? const [],
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  // ADR 0028: the receiving PT (payee directory) → its designated receiving account (masked)
+                  if (_d.isPtGrup)
+                    FormGridCell(
+                      label: t.fieldPayeeCompany,
+                      child: PayeeCompanyField(
+                        companyId: _d.companyId,
+                        value: _d.payeeCompanyId,
+                        errorText: issueFor('payeeCompanyId'),
+                        onChanged: (v) => setState(() => _d = _d.copyWith(payeeCompanyId: v)),
+                      ),
+                    ),
+                  // ADR 0027 / 0028: invoice of the vendor / document of the receiving PT — number / date / due date / photo
+                  if (_d.isDirectPayment) ...[
+                    FormGridCell(
+                      label: doc.no,
+                      builder: (label) => TextField(
+                        key: const Key('draft-invoice-no'),
+                        controller: _invoiceNo,
+                        maxLength: 64,
+                        decoration: InputDecoration(
+                          labelText: label,
+                          errorText: issueFor('invoiceNo'),
+                          helperText: _d.isPtGrup ? t.documentNoHelp : null,
                         ),
-                        if (_d.vendorId != null && vendorAccounts.isEmpty)
-                          Padding(
-                            key: const Key('draft-vendor-no-account'),
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(t.vendorAccountsNone, style: TextStyle(color: context.pk.warnText)),
+                      ),
+                    ),
+                    FormGridCell(
+                      label: doc.date,
+                      builder: (label) => InkWell(
+                        key: const Key('draft-invoice-date'),
+                        onTap: () => _pickInvoiceDate(due: false),
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: label,
+                            errorText: issueFor('invoiceDate'),
+                            suffixIcon: const Icon(Icons.calendar_today),
                           ),
-                        if (vendorAccounts.where((a) => a.id == _d.vendorBankAccountId).firstOrNull case final acc?)
-                          BankAccountPreview(
-                            key: ValueKey('vendor-bank-preview-${acc.id}'),
-                            account: acc,
-                            banks: m[MasterTypes.banks] ?? const [],
+                          child: Text(formatDateOnly(_d.invoiceDate)),
+                        ),
+                      ),
+                    ),
+                    FormGridCell(
+                      label: t.fieldInvoiceDueDate,
+                      builder: (label) => InkWell(
+                        key: const Key('draft-invoice-due-date'),
+                        onTap: () => _pickInvoiceDate(due: true),
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: label,
+                            errorText: issueFor('invoiceDueDate'),
+                            suffixIcon: const Icon(Icons.event),
                           ),
-                      ],
+                          child: Text(formatDateOnly(_d.invoiceDueDate)),
+                        ),
+                      ),
+                    ),
+                    FormGridCell(
+                      label: doc.file,
+                      stackedLabel: true,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _d.invoiceMediaUuid != null
+                                ? doc.attached
+                                : _d.invoiceFileId != null
+                                ? doc.onServer
+                                : doc.missing,
+                            key: const Key('draft-invoice-state'),
+                            style: issueFor('invoiceFile') == null
+                                ? null
+                                : TextStyle(color: Theme.of(context).colorScheme.error),
+                          ),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              OutlinedButton.icon(
+                                key: const Key('draft-invoice-camera'),
+                                onPressed: _busy ? null : () => _addInvoicePhoto(fromCamera: true),
+                                icon: const Icon(Icons.photo_camera),
+                                label: Text(t.invoiceCamera),
+                              ),
+                              OutlinedButton.icon(
+                                key: const Key('draft-invoice-gallery'),
+                                onPressed: _busy ? null : () => _addInvoicePhoto(fromCamera: false),
+                                icon: const Icon(Icons.photo_library),
+                                label: Text(t.invoiceGallery),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  FormGridCell(
+                    label: t.fieldNotes,
+                    full: true,
+                    builder: (label) => TextField(
+                      controller: _notes,
+                      maxLength: 2000,
+                      maxLines: 3,
+                      minLines: 1,
+                      decoration: InputDecoration(labelText: label),
                     ),
                   ),
                 ],
-                // ADR 0028: the receiving PT (payee directory) → its designated receiving account (masked)
-                if (_d.isPtGrup)
-                  FormGridCell(
-                    label: t.fieldPayeeCompany,
-                    child: PayeeCompanyField(
-                      companyId: _d.companyId,
-                      value: _d.payeeCompanyId,
-                      errorText: issueFor('payeeCompanyId'),
-                      onChanged: (v) => setState(() => _d = _d.copyWith(payeeCompanyId: v)),
+              ),
+            ),
+            // D2410 (point 6): general attachments — required for a Reimburse, optional for Pengajuan Baru
+            DraftAttachmentsSection(
+              attachments: _d.attachments,
+              mandatory: _d.type == RequestType.reimburse && !_d.isDirectPayment,
+              enabled: !_busy,
+              onAdd: _addAttachment,
+              onRemove: _removeAttachment,
+              error: issueFor('attachments'),
+            ),
+            // D2510: the lines in one titled card ("+ Tambah item" in its header), the preview total as its footer.
+            PkSectionCard(
+              title: t.linesTitle,
+              icon: Icons.receipt_long_outlined,
+              trailing: TextButton.icon(
+                key: const Key('add-line'),
+                onPressed: () => _editLine(ref.read(draftServiceProvider).newLine(_d.lines.length + 1), isNew: true),
+                icon: const Icon(Icons.add),
+                label: Text(t.addLine),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (linesWithoutRap > 0)
+                    PkNoticeCard(
+                      key: const Key('draft-lines-need-rap'),
+                      dense: true,
+                      tone: PkTone.warn,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      icon: Icons.info_outline,
+                      title: Text(t.draftLinesNeedRap(linesWithoutRap)),
                     ),
-                  ),
-                // ADR 0027 / 0028: invoice of the vendor / document of the receiving PT — number / date / due date / photo
-                if (_d.isDirectPayment) ...[
-                  FormGridCell(
-                    label: doc.no,
-                    builder: (label) => TextField(
-                      key: const Key('draft-invoice-no'),
-                      controller: _invoiceNo,
-                      maxLength: 64,
-                      decoration: InputDecoration(
-                        labelText: label,
-                        errorText: issueFor('invoiceNo'),
-                        helperText: _d.isPtGrup ? t.documentNoHelp : null,
-                      ),
-                    ),
-                  ),
-                  FormGridCell(
-                    label: doc.date,
-                    builder: (label) => InkWell(
-                      key: const Key('draft-invoice-date'),
-                      onTap: () => _pickInvoiceDate(due: false),
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: label,
-                          errorText: issueFor('invoiceDate'),
-                          suffixIcon: const Icon(Icons.calendar_today),
+                  if (issueFor('lines') != null)
+                    Text(issueFor('lines')!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  for (final l in _d.lines)
+                    PkCard(
+                      key: Key('line-${l.no}'),
+                      padding: EdgeInsets.zero,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+                        title: Text(
+                          '${l.no}. ${l.description.isEmpty ? '-' : l.description}',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                         ),
-                        child: Text(formatDateOnly(_d.invoiceDate)),
-                      ),
-                    ),
-                  ),
-                  FormGridCell(
-                    label: t.fieldInvoiceDueDate,
-                    builder: (label) => InkWell(
-                      key: const Key('draft-invoice-due-date'),
-                      onTap: () => _pickInvoiceDate(due: true),
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: label,
-                          errorText: issueFor('invoiceDueDate'),
-                          suffixIcon: const Icon(Icons.event),
-                        ),
-                        child: Text(formatDateOnly(_d.invoiceDueDate)),
-                      ),
-                    ),
-                  ),
-                  FormGridCell(
-                    label: doc.file,
-                    stackedLabel: true,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _d.invoiceMediaUuid != null
-                              ? doc.attached
-                              : _d.invoiceFileId != null
-                              ? doc.onServer
-                              : doc.missing,
-                          key: const Key('draft-invoice-state'),
-                          style: issueFor('invoiceFile') == null
-                              ? null
-                              : TextStyle(color: Theme.of(context).colorScheme.error),
-                        ),
-                        Wrap(
-                          spacing: 8,
+                        // D3: same columns as the web lines table — Kategori · Qty Satuan × Harga satuan = Total.
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            OutlinedButton.icon(
-                              key: const Key('draft-invoice-camera'),
-                              onPressed: _busy ? null : () => _addInvoicePhoto(fromCamera: true),
-                              icon: const Icon(Icons.photo_camera),
-                              label: Text(t.invoiceCamera),
+                            Text(
+                              [
+                                ?lineQtyPriceText(l, m),
+                                ?m[MasterTypes.categories]?.where((c) => c.id == l.categoryId).firstOrNull?.label,
+                                '${l.receipts.length} nota',
+                              ].join(' · '),
                             ),
-                            OutlinedButton.icon(
-                              key: const Key('draft-invoice-gallery'),
-                              onPressed: _busy ? null : () => _addInvoicePhoto(fromCamera: false),
-                              icon: const Icon(Icons.photo_library),
-                              label: Text(t.invoiceGallery),
+                            // D4: RAP item of the line ("Pilih item RAP" until chosen).
+                            if (l.rapItemId != null)
+                              Text(
+                                '${t.fieldRapItem}: ${rap?.byId(l.rapItemId)?.label ?? '#${l.rapItemId}'}',
+                                key: Key('line-${l.no}-rap'),
+                              )
+                            else if (rapPickable)
+                              Text(
+                                t.lineNeedsRapItemShort,
+                                key: Key('line-${l.no}-needs-rap'),
+                                style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
+                              ),
+                            if (l.needsUnitPrice && l.total != null)
+                              Text(
+                                t.lineNeedsUnitPriceShort,
+                                key: Key('line-${l.no}-needs-unit-price'),
+                                style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
+                              ),
+                            if (rap?.byId(l.rapItemId)?.exceeds(l.computedTotal) ?? false)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: RapOverBudgetChip(key: Key('line-${l.no}-rap-over')),
+                              ),
+                            for (final i in _issues.where((i) => i.lineNo == l.no))
+                              Text(i.message, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                            if (l.receiptMismatch)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: ReceiptMismatchChip(
+                                  key: Key('line-${l.no}-receipt-mismatch'),
+                                  receiptAmount: l.receiptAmount,
+                                  total: l.computedTotal ?? l.total,
+                                ),
+                              ),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              (l.computedTotal ?? l.total) == null ? '-' : formatRupiah(l.computedTotal ?? l.total!),
+                              key: Key('line-${l.no}-total'),
+                              style: pkMoneyStyle(context),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () => setState(
+                                () => _d = _d.copyWith(
+                                  lines: renumber([
+                                    for (final x in _d.lines)
+                                      if (x.clientUuid != l.clientUuid) x,
+                                  ]),
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                      ],
+                        onTap: () => _editLine(l),
+                      ),
+                    ),
+                  PkTile(
+                    margin: const EdgeInsets.only(top: 4),
+                    color: context.pk.infoBg,
+                    borderColor: Colors.transparent,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                      title: Text(
+                        t.totalPreview,
+                        style: TextStyle(color: context.pk.infoOn, fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(t.previewNote, style: TextStyle(color: context.pk.infoOn)),
+                      trailing: Text(
+                        formatRupiah(_collect().previewGrandTotal),
+                        key: const Key('preview-total'),
+                        style: Theme.of(context).textTheme.titleLarge
+                            ?.copyWith(color: context.pk.infoOn, fontWeight: FontWeight.w700),
+                      ),
                     ),
                   ),
                 ],
-                FormGridCell(
-                  label: t.fieldNotes,
-                  full: true,
-                  builder: (label) => TextField(
-                    controller: _notes,
-                    maxLength: 2000,
-                    maxLines: 3,
-                    minLines: 1,
-                    decoration: InputDecoration(labelText: label),
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 24),
-            Row(
-              children: [
-                Expanded(child: Text(t.linesTitle, style: Theme.of(context).textTheme.titleMedium)),
-                TextButton.icon(
-                  key: const Key('add-line'),
-                  onPressed: () => _editLine(ref.read(draftServiceProvider).newLine(_d.lines.length + 1), isNew: true),
-                  icon: const Icon(Icons.add),
-                  label: Text(t.addLine),
-                ),
-              ],
-            ),
-            if (linesWithoutRap > 0)
-              Card(
-                key: const Key('draft-lines-need-rap'),
-                color: Theme.of(context).colorScheme.tertiaryContainer,
-                child: ListTile(
-                  leading: const Icon(Icons.info_outline),
-                  title: Text(t.draftLinesNeedRap(linesWithoutRap)),
-                ),
-              ),
-            if (issueFor('lines') != null)
-              Text(issueFor('lines')!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            for (final l in _d.lines)
-              Card(
-                key: Key('line-${l.no}'),
-                child: ListTile(
-                  title: Text('${l.no}. ${l.description.isEmpty ? '-' : l.description}'),
-                  // D3: same columns as the web lines table — Kategori · Qty Satuan × Harga satuan = Total.
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        [
-                          ?lineQtyPriceText(l, m),
-                          ?m[MasterTypes.categories]?.where((c) => c.id == l.categoryId).firstOrNull?.label,
-                          '${l.receipts.length} nota',
-                        ].join(' · '),
-                      ),
-                      // D4: RAP item of the line ("Pilih item RAP" until chosen).
-                      if (l.rapItemId != null)
-                        Text(
-                          '${t.fieldRapItem}: ${rap?.byId(l.rapItemId)?.label ?? '#${l.rapItemId}'}',
-                          key: Key('line-${l.no}-rap'),
-                        )
-                      else if (rapPickable)
-                        Text(
-                          t.lineNeedsRapItemShort,
-                          key: Key('line-${l.no}-needs-rap'),
-                          style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
-                        ),
-                      if (l.needsUnitPrice && l.total != null)
-                        Text(
-                          t.lineNeedsUnitPriceShort,
-                          key: Key('line-${l.no}-needs-unit-price'),
-                          style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
-                        ),
-                      if (rap?.byId(l.rapItemId)?.exceeds(l.computedTotal) ?? false)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: RapOverBudgetChip(key: Key('line-${l.no}-rap-over')),
-                        ),
-                      for (final i in _issues.where((i) => i.lineNo == l.no))
-                        Text(i.message, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                      if (l.receiptMismatch)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: ReceiptMismatchChip(
-                            key: Key('line-${l.no}-receipt-mismatch'),
-                            receiptAmount: l.receiptAmount,
-                            total: l.computedTotal ?? l.total,
-                          ),
-                        ),
-                    ],
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        (l.computedTotal ?? l.total) == null ? '-' : formatRupiah(l.computedTotal ?? l.total!),
-                        key: Key('line-${l.no}-total'),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => setState(
-                          () => _d = _d.copyWith(
-                            lines: renumber([
-                              for (final x in _d.lines)
-                                if (x.clientUuid != l.clientUuid) x,
-                            ]),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  onTap: () => _editLine(l),
-                ),
-              ),
-            const SizedBox(height: 8),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(t.totalPreview),
-              subtitle: Text(t.previewNote),
-              trailing: Text(
-                formatRupiah(_collect().previewGrandTotal),
-                key: const Key('preview-total'),
-                style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
             if (_issues.isNotEmpty)
-              Card(
-                color: Theme.of(context).colorScheme.errorContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text(_issues.map((e) => '• $e').join('\n'), key: const Key('draft-issues')),
-                ),
+              PkNoticeCard(
+                dense: true,
+                tone: PkTone.bad,
+                icon: Icons.error_outline,
+                title: Text(_issues.map((e) => '• $e').join('\n'), key: const Key('draft-issues')),
               ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 4),
             OutlinedButton.icon(
               key: const Key('save-draft'),
-              onPressed: _busy ? null : _save,
+              onPressed: _busy ? null : _saveDraft,
               icon: const Icon(Icons.save),
               label: Text(t.saveDraft),
             ),
@@ -1120,19 +1243,13 @@ class _RapMissingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
-    return Card(
+    return PkNoticeCard(
       key: const Key('draft-rap-missing'),
-      margin: const EdgeInsets.only(top: 4),
-      color: scheme.errorContainer,
-      child: ListTile(
-        leading: Icon(Icons.block, color: scheme.onErrorContainer),
-        title: Text(
-          t.rapMissingBlock,
-          style: TextStyle(fontWeight: FontWeight.w600, color: scheme.onErrorContainer),
-        ),
-        subtitle: Text(t.rapMissingBlockDetail, style: TextStyle(color: scheme.onErrorContainer)),
-      ),
+      tone: PkTone.bad,
+      margin: const EdgeInsets.only(top: 8),
+      icon: Icons.block,
+      title: Text(t.rapMissingBlock),
+      body: Text(t.rapMissingBlockDetail),
     );
   }
 }
@@ -1173,12 +1290,11 @@ class _BankAccountPreviewState extends State<BankAccountPreview> {
     final bankName = bank == null ? '' : '${bank.extra['name'] ?? bank.label}';
     final holder = '${x['accountHolder'] ?? ''}';
     final title = [bankName, holder].where((e) => e.isNotEmpty).join(' · ');
-    return Card(
+    return PkTile(
       key: const Key('bank-preview'),
       margin: const EdgeInsets.only(top: 8),
-      color: theme.colorScheme.surfaceContainerLow,
       child: ListTile(
-        leading: const Icon(Icons.account_balance),
+        leading: const PkIconChip(icon: Icons.account_balance, size: 36),
         // Masters cached before the bank fields were read: the picker label.
         title: Text(title.isEmpty ? widget.account.label : title, key: const Key('bank-preview-title')),
         subtitle: Text(
@@ -1265,12 +1381,11 @@ class IntercompanyAccountPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    return Card(
+    return PkTile(
       key: const Key('ic-account-preview'),
       margin: const EdgeInsets.only(top: 8),
-      color: theme.colorScheme.surfaceContainerLow,
       child: ListTile(
-        leading: const Icon(Icons.account_balance),
+        leading: const PkIconChip(icon: Icons.account_balance, size: 36),
         title: Text(payee.accountTitle.isEmpty ? payee.label : payee.accountTitle, key: const Key('ic-account-title')),
         subtitle: Text(
           [if (payee.accountNoMasked.isNotEmpty) payee.accountNoMasked, t.intercompanyReceivingAccount].join(' · '),

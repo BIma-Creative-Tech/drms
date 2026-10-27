@@ -214,7 +214,7 @@ void main() {
           loanDetailProvider.overrideWith((ref, id) async => Loan.fromJson(loanApprovedJson())),
         ],
         child: const LoanDetailScreen(id: 42),
-        act: (t) => _scrollTo(t, const Key('loan-repay-web-hint')),
+        act: (t) => _scrollTo(t, const Key('loan-repayments')),
       );
       await _shot(
         tester,
@@ -225,10 +225,12 @@ void main() {
           ..._common(),
           inboxProvider.overrideWith((ref) async => const InboxPage([], 85)),
           loanInboxProvider.overrideWith(
-            (ref) async => [
-              Loan.fromJson(loanJson()),
-              Loan.fromJson(loanJson(id: 44, docNo: 'PJ/DRMS/2610/0002', amount: 45000000)),
-            ],
+            (ref) async => LoanInbox(
+              loans: [
+                Loan.fromJson(loanJson()),
+                Loan.fromJson(loanJson(id: 44, docNo: 'PJ/DRMS/2610/0002', amount: 45000000)),
+              ],
+            ),
           ),
         ],
         child: const InboxScreen(),

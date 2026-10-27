@@ -3,11 +3,11 @@ import type { Role } from '@/access/roles'
 import type { IconName } from './icons'
 
 /**
- * Odoo-style module registry — the single source of truth of the admin navigation (launcher tiles
- * at /admin + the landing-page tiles of each module; DRMS 13/10 #9: no module menu in the top bar).
- * Payload's `admin.group` values stay untouched; this file only decides where an entity appears in
- * the new navigation. Pure data + pure functions (no React, no Payload runtime): used by the server
- * components (ModuleNav, Launcher, ModuleLanding), the client bar (active-module resolution) and the
+ * Module registry — the single source of truth of the admin navigation (D2510 / ADR 0033: the sidebar groups +
+ * the landing-page tiles of each module, the menu search, the APK /me/modules menu). Payload's `admin.group` values
+ * stay untouched; this file only decides where an entity appears in the navigation. Pure data + pure functions (no
+ * React, no Payload runtime): used by the server components (ModuleNav, Launcher = /admin redirect, ModuleLanding),
+ * the client shell (sidebar, active module/item) and the
  * unit tests (tests/unit/admin-modules.test.ts guards that every collection/global of
  * payload.config.ts maps to exactly one module).
  *
@@ -245,9 +245,11 @@ export const MODULES: readonly ModuleDef[] = [
         items: [
           // Owner decision 2026-10-09: web self check-in/out for every role (incl. Operator/Anggota)
           { view: '/absensi/absen', label: 'Absen', navKey: 'absensi-absen' },
-          { view: '/absensi', label: 'Tim hari ini', roles: OFFICE_PM_ADMIN, navKey: 'absensi' },
+          // ADR 0032: Admin Staff = attendance administration of the PT (board, on-behalf, recap, schedules read)
+          { view: '/absensi', label: 'Tim hari ini', roles: [...OFFICE_PM_ADMIN, 'pk-admin-staff'], navKey: 'absensi' },
+          { view: '/absensi/absenkan', label: 'Absenkan karyawan', roles: ['pk-admin-staff', 'pk-pm'], navKey: 'absensi-absenkan' },
           { view: '/absensi/rekap', label: 'Rekap bulanan', staffLabel: 'Rekap absensi saya', navKey: 'absensi-saya' },
-          { view: '/absensi/jadwal', label: 'Jadwal & hari libur', roles: OFFICE_PM_ADMIN, navKey: 'absensi-jadwal' },
+          { view: '/absensi/jadwal', label: 'Jadwal & hari libur', roles: [...OFFICE_PM_ADMIN, 'pk-admin-staff'], navKey: 'absensi-jadwal' },
           { collection: 'attendances' },
           { collection: 'attendance-corrections' },
         ],
@@ -261,7 +263,8 @@ export const MODULES: readonly ModuleDef[] = [
     icon: 'report',
     hint: 'Laporan & ekspor',
     // S3e (S-23): Admin gets the attendance report (only report besides the audit log).
-    sections: [{ items: [{ view: '/laporan', label: 'Semua laporan', roles: OFFICE_PM_ADMIN, navKey: 'laporan' }] }],
+    // ADR 0032: Admin Staff reaches the attendance report (the list shows only the reports of its roles)
+    sections: [{ items: [{ view: '/laporan', label: 'Semua laporan', roles: [...OFFICE_PM_ADMIN, 'pk-admin-staff'], navKey: 'laporan' }] }],
   },
   {
     id: 'pengguna',
@@ -303,7 +306,6 @@ export const MODULES: readonly ModuleDef[] = [
           // DRMS 16/10: "+ Vendor baru" = the tabbed Vendor page (detail + rekening + kontak PIC; /vendor/<id> = edit)
           { view: '/vendor/baru', label: '+ Vendor baru', roles: ['pk-admin', 'pk-finance'], navKey: 'vendor-baru', prefix: '/vendor', needsCollection: 'vendors' },
           { collection: 'vendor-bank-accounts' },
-          { collection: 'sites' },
         ],
       },
     ],
@@ -607,6 +609,7 @@ export const ITEM_ICONS: Readonly<Record<string, IconName>> = {
   '/collections/project-loan-repayments': 'tMoneyRecive',
   // Absensi
   '/absensi/absen': 'tCamera',
+  '/absensi/absenkan': 'tSecurityUser',
   '/absensi': 'tPeople',
   '/absensi/rekap': 'tCalendar2',
   '/absensi/jadwal': 'tCalendar1',
@@ -632,7 +635,6 @@ export const ITEM_ICONS: Readonly<Record<string, IconName>> = {
   '/collections/vehicles': 'tCar',
   '/collections/vendors': 'tShop',
   '/collections/vendor-bank-accounts': 'tCardTick',
-  '/collections/sites': 'tBuilding',
   // Media
   '/collections/media-receipts': 'tReceipt2',
   '/collections/media-transfer-proofs': 'tCardReceive',

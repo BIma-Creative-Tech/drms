@@ -245,9 +245,10 @@ describe('contracts', () => {
 
   it('OpenAPI documents the attendance endpoints and the on-behalf payload', () => {
     const doc = buildOpenApiDocument('0.0.0') as { paths: Record<string, unknown>; components: { schemas: Record<string, unknown> } }
-    for (const p of ['/attendance/me', '/attendance/recap', '/attendance/team-today', '/attendance/{id}/correct', '/attendance/{id}/selfie']) expect(doc.paths[p], p).toBeDefined()
+    for (const p of ['/attendance/me', '/attendance/recap', '/attendance/team-today', '/attendance/team-month', '/attendance/{id}/correct', '/attendance/{id}/selfie']) expect(doc.paths[p], p).toBeDefined()
     expect(doc.components.schemas.SyncOnBehalfPayload).toBeDefined()
     expect(doc.components.schemas.AttendanceRecap).toBeDefined()
+    expect(doc.components.schemas.TeamMonth).toBeDefined()
   })
 
   it('report scope: PM filters intersect the team scope (other ids → empty)', () => {

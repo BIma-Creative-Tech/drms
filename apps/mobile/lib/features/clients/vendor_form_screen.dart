@@ -7,8 +7,12 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/network/api_exception.dart';
 import '../../l10n/gen/app_localizations.dart';
+import '../../shared/widgets/action_feedback.dart';
 import '../../shared/widgets/async_body.dart';
+import '../../shared/icons/iconsax.dart';
 import '../../shared/widgets/online_only_button.dart';
+import '../../shared/widgets/pk_ui.dart';
+import '../../shared/widgets/pk_ui_akun.dart';
 import '../records/data/records_providers.dart';
 import '../users/onboarding.dart';
 import '../users/onboarding_screen.dart';
@@ -138,6 +142,8 @@ class _VendorFormState extends ConsumerState<_VendorForm> {
         ],
       if (_reason.text.trim().isNotEmpty) 'reason': _reason.text.trim(),
     };
+    final summary = [_name.text.trim(), _address.text.trim()];
+    if (!await confirmAction(context, action: t.save, summary: summary) || !mounted) return;
     setState(() => _busy = true);
     try {
       final key = _keys.putIfAbsent(jsonEncode(body), () => const Uuid().v4());
@@ -146,17 +152,19 @@ class _VendorFormState extends ConsumerState<_VendorForm> {
       ref.invalidate(recordPageProvider);
       ref.invalidate(recordDetailProvider);
       if (!mounted) return;
-      showSnack(context, t.recordSaved(_name.text.trim()));
-      context.pop('$id');
+      await showActionResult(context, message: t.recordSaved(_name.text.trim()), action: t.save);
+      if (mounted) context.pop('$id');
     } on ProblemException catch (e) {
-      if (mounted) {
-        setState(() {
-          _errors = {for (final x in e.errors) x.path: x.message};
-          _summary = e.message;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _errors = {for (final x in e.errors) x.path: x.message};
+        _summary = e.message;
+      });
+      await showActionError(context, e, action: t.save);
     } on Object catch (e) {
-      if (mounted) setState(() => _summary = errorText(e));
+      if (!mounted) return;
+      setState(() => _summary = errorText(e));
+      await showActionError(context, e, action: t.save);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -176,116 +184,133 @@ class _VendorFormState extends ConsumerState<_VendorForm> {
           key: const Key('vendor-form'),
           padding: const EdgeInsets.all(16),
           children: [
-            if (readOnly) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(t.recordNoRight)),
-            if (_summary != null)
-              Card(
-                color: theme.colorScheme.errorContainer,
-                margin: const EdgeInsets.only(bottom: 12),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text([_summary!, ..._errors.values.map((e) => '• $e')].join('\n')),
-                ),
-              ),
-            if (!_edit && d.companies.length > 1)
-              DropdownButtonFormField<int>(
-                key: const Key('vendor-company'),
-                initialValue: _company,
-                isExpanded: true,
-                decoration: InputDecoration(labelText: '${t.cashPt} *', errorText: _errors['vendor.company']),
-                items: [for (final c in d.companies) DropdownMenuItem(value: c.id, child: Text(c.label))],
-                onChanged: (v) => setState(() => _company = v),
-              ),
-            TextField(
-              key: const Key('vendor-name'),
-              controller: _name,
-              maxLength: 160,
-              decoration: InputDecoration(labelText: '${t.clientName} *', errorText: _errors['vendor.name']),
-            ),
-            TextField(
-              controller: _address,
-              maxLength: 500,
-              minLines: 1,
-              maxLines: 4,
-              decoration: InputDecoration(labelText: t.clientAddress),
-            ),
-            TextField(
-              key: const Key('vendor-npwp'),
-              controller: _npwp,
-              maxLength: 32,
-              decoration: const InputDecoration(labelText: 'NPWP'),
-            ),
-            if (_edit)
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(t.rapActive),
-                value: _active,
-                onChanged: (v) => setState(() => _active = v),
-              ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(child: Text(t.clientContacts, style: theme.textTheme.titleMedium)),
-                TextButton.icon(
-                  onPressed: () => _contact(),
-                  icon: const Icon(Icons.person_add_alt),
-                  label: Text(t.recordAdd),
-                ),
-              ],
-            ),
-            if (_contacts.isEmpty) Text(t.clientNoContacts, style: theme.textTheme.bodySmall),
-            for (final (i, c) in _contacts.indexed)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(c.isPrimary ? '${c.name} · ${t.clientPrimary}' : c.name),
-                subtitle: Text([?c.position, ?c.phone, ?c.email].join(' · ')),
-                onTap: () => _contact(i),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () => setState(() => _contacts.removeAt(i)),
-                ),
-              ),
-            if (_canBanks) ...[
-              const SizedBox(height: 8),
-              Row(
+            if (readOnly) PartnerReadOnlyNote(text: t.recordNoRight),
+            if (_summary != null) FormErrorCard(text: [_summary!, ..._errors.values.map((e) => '• $e')].join('\n')),
+            PkCard(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(child: Text(t.onbBankAccounts, style: theme.textTheme.titleMedium)),
-                  TextButton.icon(
-                    key: const Key('vendor-bank-add'),
-                    onPressed: _bank,
-                    icon: const Icon(Icons.add),
-                    label: Text(t.onbAddBank),
+                  if (!_edit && d.companies.length > 1) ...[
+                    DropdownButtonFormField<int>(
+                      key: const Key('vendor-company'),
+                      initialValue: _company,
+                      isExpanded: true,
+                      decoration: InputDecoration(labelText: '${t.cashPt} *', errorText: _errors['vendor.company']),
+                      items: [for (final c in d.companies) DropdownMenuItem(value: c.id, child: Text(c.label))],
+                      onChanged: (v) => setState(() => _company = v),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  TextField(
+                    key: const Key('vendor-name'),
+                    controller: _name,
+                    maxLength: 160,
+                    decoration: InputDecoration(labelText: '${t.clientName} *', errorText: _errors['vendor.name']),
                   ),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: _address,
+                    maxLength: 500,
+                    minLines: 1,
+                    maxLines: 4,
+                    decoration: InputDecoration(labelText: t.clientAddress),
+                  ),
+                  const SizedBox(height: 4),
+                  TextField(
+                    key: const Key('vendor-npwp'),
+                    controller: _npwp,
+                    maxLength: 32,
+                    decoration: const InputDecoration(labelText: 'NPWP'),
+                  ),
+                  if (_edit)
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(t.rapActive),
+                      value: _active,
+                      onChanged: (v) => setState(() => _active = v),
+                    ),
                 ],
               ),
-              for (final b in _banks)
-                SwitchListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text('${b.bankName ?? ''} ${b.accountNo} · ${b.accountHolder}'.trim()),
-                  subtitle: Text(
-                    [if (b.isDefault) t.onbDefault, if (b.verified) t.onbVerified else t.bankUnverified].join(' · '),
-                  ),
-                  value: b.active,
-                  onChanged: b.id == null
-                      ? null
-                      : (v) => setState(() {
-                          b.active = v;
-                          b.dirty = true;
-                        }),
-                ),
-            ],
-            TextField(
-              key: const Key('vendor-reason'),
-              controller: _reason,
-              maxLength: 1000,
-              decoration: InputDecoration(
-                labelText: t.cashReason,
-                helperText: t.vendorReasonHint,
-                helperMaxLines: 2,
-                errorText: _errors['reason'],
+            ),
+            PkSectionCard(
+              title: t.clientContacts,
+              icon: PkIcons.users,
+              trailing: TextButton.icon(
+                onPressed: () => _contact(),
+                icon: const Icon(Icons.person_add_alt),
+                label: Text(t.recordAdd),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_contacts.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Text(
+                        t.clientNoContacts,
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                    ),
+                  for (final (i, c) in _contacts.indexed) ...[
+                    if (i > 0) const PkRowDivider(indent: 52),
+                    PartnerContactRow(
+                      contact: c,
+                      onTap: () => _contact(i),
+                      onDelete: () => setState(() => _contacts.removeAt(i)),
+                    ),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 12),
+            if (_canBanks)
+              PkSectionCard(
+                title: t.onbBankAccounts,
+                icon: PkIcons.finance,
+                trailing: TextButton.icon(
+                  key: const Key('vendor-bank-add'),
+                  onPressed: _bank,
+                  icon: const Icon(Icons.add),
+                  label: Text(t.onbAddBank),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final b in _banks)
+                      BankAccountRow(
+                        account: (
+                          bankName: b.bankName,
+                          accountNo: b.accountNo,
+                          accountHolder: b.accountHolder,
+                          isDefault: b.isDefault,
+                          verified: b.verified,
+                          active: b.active,
+                        ),
+                        onActive: b.id == null
+                            ? null
+                            : (v) => setState(() {
+                                b.active = v;
+                                b.dirty = true;
+                              }),
+                      ),
+                  ],
+                ),
+              ),
+            PkCard(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: TextField(
+                key: const Key('vendor-reason'),
+                controller: _reason,
+                maxLength: 1000,
+                decoration: InputDecoration(
+                  labelText: t.cashReason,
+                  helperText: t.vendorReasonHint,
+                  helperMaxLines: 2,
+                  errorText: _errors['reason'],
+                ),
+              ),
+            ),
             if (!readOnly)
               OnlineOnlyButton(
                 key: const Key('vendor-save'),

@@ -6,12 +6,14 @@ import type { Detail } from './panel-data'
 
 /**
  * ADR 0029 §2 "Ketersediaan dana PT <code>" on the request page (Finance / Direktur / Owner of the PT, while the request
- * waits for a decision or is the Owner's own Draft): Saldo dana (n akun, tanpa akun site) − Komitmen (expandable list)
+ * waits for a decision or is the Owner's own Draft): Saldo dana (n akun; DRMS 24/10: every active account, no site exclusion) − Komitmen (expandable list)
  * = Dana tersedia; Dibutuhkan = this request; Kurang (red) or "Cukup" (green); the other requests waiting at their final
  * decision; linked inter-PT loans; "Perintahkan pinjaman antar-PT" (Owner, short). Read-only before the final step
  * ("cek akhir di Owner"). The server is the authority: Setujui answers 409 FUND_INSUFFICIENT while short.
- * ADR 0031 amendment (user 2026-10-22): a mapped project shows its Pusat Biaya first (Saldo − Komitmen = Dana bebas);
- * the request passes when the Pusat Biaya OR the PT covers it, and `routeText` says which account Finance pays from.
+ * ADR 0031 amendment (user 2026-10-22): a mapped project shows its Pusat Biaya first (Saldo − Komitmen = Dana bebas).
+ * Amendment 2026-10-26 (DRMS 26/10 #1): such a request passes only when THAT account covers it (the PT figures stay as
+ * information); while short the final decider instructs an inter-project loan (action bar "Instruksi pinjam antar
+ * proyek") — the instructed loans of the request are listed here with their status ("menunggu transfer Finance").
  */
 const rp = formatRupiah
 const tone = (ok: boolean): React.CSSProperties => ({
@@ -28,10 +30,12 @@ const KIND: Record<'request' | 'shortfall' | 'loan' | 'project_loan', string> = 
   request: 'Pengajuan disetujui, belum ditransfer',
   shortfall: 'Kekurangan LPJ belum dibayar',
   loan: 'Perintah pinjaman (PT ini pemberi), belum dicairkan',
-  project_loan: 'Pinjaman antar project disetujui, belum dicairkan',
+  project_loan: 'Pinjaman antar project disetujui, belum ditransfer',
 }
+/** 2026-10-24 (#12): an approved repayment order of an inter-project loan (kind `project_loan`, id = the loan). */
+const REPAYMENT_ORDER = 'Pengembalian pinjaman antar project disetujui, belum ditransfer'
 
-type Item = { kind: keyof typeof KIND; id: number; docNo: string | null; amount: number }
+type Item = { kind: keyof typeof KIND; id: number; docNo: string | null; amount: number; status?: string }
 
 const itemHref = (c: Item): string =>
   c.kind === 'loan' ? `/admin/pinjaman-antar-pt/detail/${c.id}` : c.kind === 'project_loan' ? `/admin/pinjaman/detail/${c.id}` : `/admin/collections/expense-requests/${c.id}`
@@ -44,7 +48,7 @@ function Items({ items }: { items: Item[] }) {
       <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
         {items.map((c) => (
           <li key={`${c.kind}-${c.id}`} data-pk-commitment={c.kind}>
-            <a href={itemHref(c)}>{c.docNo ?? `#${c.id}`}</a> · {rp(c.amount)} · {KIND[c.kind]}
+            <a href={itemHref(c)}>{c.docNo ?? `#${c.id}`}</a> · {rp(c.amount)} · {c.kind === 'project_loan' && c.status === 'repayment_approved' ? REPAYMENT_ORDER : KIND[c.kind]}
           </li>
         ))}
       </ul>
@@ -62,6 +66,19 @@ export function FundPanel({ d }: { d: Pick<Detail, 'id' | 'fundCheck' | 'allowed
   const box: React.CSSProperties = { border: `1px solid ${short ? 'var(--pk-tone-bad)' : 'var(--theme-elevation-150)'}`, borderRadius: 4, padding: 12, marginBottom: 16, fontSize: 13 }
   const grid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '4px 16px', margin: '8px 0 0' }
   const pb = f.pusatBiaya
+  // 2026-10-26: the need is compared with the Pusat Biaya when there is one (the PT figures are information only)
+  const need = (
+    <>
+      <dt>Dibutuhkan</dt>
+      <dd style={{ margin: 0 }} data-pk-fund="needed">
+        {rp(f.needed)}
+      </dd>
+      <dt>{short ? 'Kurang' : 'Status'}</dt>
+      <dd style={{ margin: 0 }} data-pk-fund="gap">
+        <span style={tone(!short)}>{short ? `Kurang ${rp(f.gap)}` : 'Cukup'}</span>
+      </dd>
+    </>
+  )
   return (
     <section style={box} data-pk-section="fund-check" data-pk-fund-status={f.status} data-pk-fund-blocked={f.blocked ? 'yes' : 'no'}>
       <strong>Ketersediaan dana PT {code}</strong>{' '}
@@ -86,15 +103,16 @@ export function FundPanel({ d }: { d: Pick<Detail, 'id' | 'fundCheck' | 'allowed
           <dd style={{ margin: 0 }} data-pk-fund-pb="available">
             <b>{rp(pb.available)}</b>
           </dd>
+          {need}
           <dt style={{ gridColumn: '1 / -1', marginTop: 4 }}>
-            <b>Seluruh PT {code}</b>
+            <b>Seluruh PT {code}</b> <span style={{ fontSize: 12, color: 'var(--theme-elevation-600)' }}>(informasi — pengajuan dicek terhadap akun kas di atas)</span>
           </dt>
         </dl>
       ) : null}
       <dl style={{ ...grid, margin: pb ? '4px 0 0' : grid.margin }}>
         <dt>Saldo dana</dt>
         <dd style={{ margin: 0 }} data-pk-fund="balance">
-          {rp(f.balance)} <span style={{ color: 'var(--theme-elevation-600)' }}>({f.accountCount} akun, tanpa akun site{f.excludedSiteAccounts.count ? ` — ${f.excludedSiteAccounts.count} akun site ${rp(f.excludedSiteAccounts.balance)} tidak dihitung` : ''})</span>
+          {rp(f.balance)} <span style={{ color: 'var(--theme-elevation-600)' }}>({f.accountCount} akun)</span>
         </dd>
         <dt>Komitmen</dt>
         <dd style={{ margin: 0 }} data-pk-fund="commitments">
@@ -107,14 +125,7 @@ export function FundPanel({ d }: { d: Pick<Detail, 'id' | 'fundCheck' | 'allowed
         <dd style={{ margin: 0 }} data-pk-fund="available">
           <b>{rp(f.available)}</b>
         </dd>
-        <dt>Dibutuhkan</dt>
-        <dd style={{ margin: 0 }} data-pk-fund="needed">
-          {rp(f.needed)}
-        </dd>
-        <dt>{short ? 'Kurang' : 'Status'}</dt>
-        <dd style={{ margin: 0 }} data-pk-fund="gap">
-          <span style={tone(!short)}>{short ? `Kurang ${rp(f.gap)}` : 'Cukup'}</span>
-        </dd>
+        {pb ? null : need}
       </dl>
       {f.routeText ? (
         <p style={{ margin: '8px 0 0' }} data-pk-fund-route={f.route}>
@@ -137,9 +148,24 @@ export function FundPanel({ d }: { d: Pick<Detail, 'id' | 'fundCheck' | 'allowed
           ))}
         </p>
       ) : null}
+      {f.projectLoans.length > 0 ? (
+        <p style={{ margin: '8px 0 0' }} data-pk-fund-project-loans>
+          Pinjaman antar proyek untuk pengajuan ini:{' '}
+          {f.projectLoans.map((l, i) => (
+            <span key={l.id} data-pk-fund-project-loan={l.awaitingTransfer ? 'pending' : l.status}>
+              {i > 0 ? ', ' : ''}
+              <a href={`/admin/pinjaman/detail/${l.id}`}>{l.docNo ?? `#${l.id}`}</a> (dari {l.lenderProject?.code ?? '—'}, akun kas {l.lenderAccount?.name ?? '—'}, {rp(l.amount)}) — {l.statusLabel}
+            </span>
+          ))}
+        </p>
+      ) : null}
       {f.blocked && f.blockedText ? (
         <p style={{ margin: '8px 0 0', color: 'var(--theme-error-500)' }} data-pk-fund-blocked-text>
-          {d.status === 'draft' ? `${pb ? `Dana pusat biaya ${pb.name} maupun dana PT` : 'Dana PT'} tidak cukup — kurang ${rp(f.gap)}. Pengajuan Anda tidak dapat dikirim sampai dana tersedia; perintahkan pinjaman antar-PT.` : f.blockedText}
+          {d.status === 'draft'
+            ? pb
+              ? `Dana bebas akun kas ${pb.name} tidak cukup — kurang ${rp(f.gap)}. Pengajuan Anda tidak dapat dikirim sampai dana akun kas ini mencukupi.`
+              : `Dana PT tidak cukup — kurang ${rp(f.gap)}. Pengajuan Anda tidak dapat dikirim sampai dana tersedia; perintahkan pinjaman antar-PT.`
+            : f.blockedText}
         </p>
       ) : null}
       {instruct ? (

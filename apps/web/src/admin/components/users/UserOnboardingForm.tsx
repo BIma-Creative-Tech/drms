@@ -8,6 +8,7 @@ import { ROLE_LABELS, type Role } from '@/access/roles'
 import type { OnboardingDetail } from '@/domain/user-onboarding/service'
 
 import { problemText } from '../ActionButton'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle } from '../feedback/feedback'
 import { lockOwner, roleOptionsFor } from '../access/role-matrix'
 import { MultiSelect } from '../list/MultiSelect'
 import {
@@ -17,6 +18,7 @@ import {
   draftFromDetail,
   ensureEmployee,
   hasEmployee,
+  LOCATION_KIND_LABEL,
   LOCATION_KINDS,
   mapErrors,
   newAssignment,
@@ -62,6 +64,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
   const [errors, setErrors] = useState<Map<string, string>>(new Map())
   const [msg, setMsg] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
   const [created, setCreated] = useState<{ id: number; password: string | null; linked: boolean } | null>(null)
+  const [resetPw, setResetPw] = useState<string | null>(null)
   const seq = useRef(0)
 
   const { body, order, changed, needsReason } = useMemo(() => buildBody(detail, draft, mode), [detail, draft, mode])
@@ -98,6 +101,24 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
       setMsg({ tone: 'bad', text: 'Tidak ada yang disimpan — isi alasan perubahan.' })
       return
     }
+    // DRMS 24/10: popup before (account, PT, status, reason) and after
+    const action = mode === 'create' ? 'Buat pengguna' : 'Simpan perubahan pengguna'
+    const who = draft.user.name.trim() || draft.user.email.trim() || null
+    const deactivating = mode === 'update' && detail.user?.active !== false && !draft.user.active
+    const yes = await confirmAction({
+      title: confirmTitle(deactivating ? 'Nonaktifkan pengguna' : action, who),
+      summary: [
+        ['Nama', draft.user.name.trim() || null],
+        ['Email', draft.user.email.trim() || null],
+        ['PT', activeCompanies(detail, draft).map((c) => c.shortCode).join(', ') || null],
+        ['Status akun', draft.user.active ? 'Aktif' : 'Nonaktif'],
+        ['Alasan', draft.reason.trim() || null],
+      ],
+      description: deactivating ? 'Login, sesi web dan HP langsung dicabut di semua PT.' : undefined,
+      confirmLabel: confirmLabel(deactivating ? 'Nonaktifkan' : mode === 'create' ? 'Buat pengguna' : 'Simpan'),
+      danger: deactivating,
+    })
+    if (!yes) return
     setBusy(true)
     setMsg(null)
     setErrors(new Map())
@@ -108,21 +129,59 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
       const data = (await res.json().catch(() => null)) as { userId?: number; temporaryPassword?: string | null; linkedExistingAccount?: boolean; detail?: OnboardingDetail } | null
       if (res.ok && data?.detail) {
         if (mode === 'create') {
+          showResult({ ok: true, title: successTitle(action, who), message: data.temporaryPassword ? 'Catat kata sandi sementara yang ditampilkan di halaman.' : null })
           setCreated({ id: data.userId!, password: data.temporaryPassword ?? null, linked: data.linkedExistingAccount === true })
           return
         }
         setDetail(data.detail)
         setDraft(draftFromDetail(data.detail))
         setMsg({ tone: 'ok', text: 'Perubahan tersimpan.' })
+        showResult({ ok: true, title: successTitle(deactivating ? 'Nonaktifkan pengguna' : action, who) })
         router.refresh()
       } else {
         const { byKey, tab: errTab } = mapErrors(data, sentOrder)
         setErrors(byKey)
         if (errTab) setTab(errTab)
         setMsg({ tone: 'bad', text: `Tidak ada yang disimpan — ${problemText(data, res.status)}` })
+        showResult({ ok: false, title: failureTitle(action), message: `Tidak ada yang disimpan — ${problemText(data, res.status)}` })
       }
     } catch {
       setMsg({ tone: 'bad', text: 'Gagal menghubungi server. Periksa koneksi lalu coba lagi.' })
+      showResult({ ok: false, title: failureTitle(action), message: 'Gagal menghubungi server. Periksa koneksi lalu coba lagi.' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** DRMS 27/10: new temporary password of this (existing) account, shown once below the button. */
+  const resetPassword = async () => {
+    if (busy || !detail.user) return
+    const action = 'Reset kata sandi'
+    const who = detail.user.name || detail.user.email
+    const yes = await confirmAction({
+      title: confirmTitle(action, who),
+      summary: [
+        ['Nama', detail.user.name],
+        ['Email', detail.user.email],
+      ],
+      description: 'Kata sandi lama tidak berlaku lagi. Pengguna login dengan kata sandi sementara yang ditampilkan, lalu wajib membuat kata sandi baru.',
+      confirmLabel: confirmLabel('Reset kata sandi'),
+      danger: true,
+    })
+    if (!yes) return
+    setBusy(true)
+    setResetPw(null)
+    try {
+      const res = await fetch(`/api/v1/user-onboarding/${detail.user.id}/reset-password`, { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      const data = (await res.json().catch(() => null)) as { temporaryPassword?: string } | null
+      if (res.ok && data?.temporaryPassword) {
+        setResetPw(data.temporaryPassword)
+        showResult({ ok: true, title: successTitle(action, who), message: 'Catat kata sandi sementara yang ditampilkan di halaman.' })
+      } else {
+        showResult({ ok: false, title: failureTitle(action), message: `Kata sandi tidak diubah — ${problemText(data, res.status)}` })
+      }
+    } catch {
+      showResult({ ok: false, title: failureTitle(action), message: 'Gagal menghubungi server. Periksa koneksi lalu coba lagi.' })
     } finally {
       setBusy(false)
     }
@@ -253,6 +312,31 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
             </WrapSelect>,
             { help: mode === 'create' ? 'Akun baru mendapat kata sandi sementara yang wajib diganti saat login pertama.' : 'Nonaktif = login, sesi web dan HP langsung dicabut di semua PT (alasan wajib).' },
           )}
+          {mode === 'update' && !self && !identityLocked && detail.user?.active !== false ? (
+            <div className="pk-fgrid__row" data-pk-reset-password>
+              <span className="pk-fgrid__label">Kata sandi</span>
+              <div className="pk-fgrid__ctl pk-fld">
+                <div>
+                  <button type="button" className="pk-kbtn sm" disabled={busy} onClick={() => void resetPassword()}>
+                    Reset password
+                  </button>
+                </div>
+                {resetPw ? (
+                  <div className="pk-alert ok" role="status">
+                    <p>Kata sandi sementara (hanya ditampilkan sekali — berikan langsung ke pengguna; wajib diganti saat login berikutnya):</p>
+                    <p className="pk-uo__pw">
+                      <code data-pk-temp-password>{resetPw}</code>{' '}
+                      <button type="button" className="pk-kbtn sm" onClick={() => void navigator.clipboard?.writeText(resetPw)}>
+                        Salin
+                      </button>
+                    </p>
+                  </div>
+                ) : (
+                  <span className="help">Untuk pengguna yang lupa kata sandi: membuat kata sandi sementara baru yang wajib diganti saat login berikutnya.</span>
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -391,7 +475,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                         <option value="onsite">Karyawan OnSite</option>
                         <option value="non_onsite">Karyawan Non-OnSite</option>
                       </WrapSelect>,
-                      { help: 'OnSite: absen di semua lokasi terdaftar PT (site, kantor pusat, project, pusat biaya) tanpa penugasan. Non-OnSite (staf kantor): hanya kantor pusat dan kantor cabang.' },
+                      { help: 'OnSite: absen di lokasi terdaftar PT yang dipilih (project / pusat biaya), di dalam radiusnya. Non-OnSite (staf kantor): di mana saja — di dalam radius lokasi terdaftar PT tercatat di lokasi itu (otomatis), di luar semua lokasi tercatat "Di luar area".' },
                     )}
                     {field(
                       `${k}.active`,
@@ -411,7 +495,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
               ) : null}
               {c.employee ? (
                 <p className="pk-uo__more">
-                  <Link prefetch={false} href={`/admin/collections/employees/${c.employee.id}`}>Buka data karyawan lengkap ↗</Link> (jadwal kerja, site penempatan, foto wajah)
+                  <Link prefetch={false} href={`/admin/collections/employees/${c.employee.id}`}>Buka data karyawan lengkap ↗</Link> (jadwal kerja, foto wajah)
                 </p>
               ) : null}
             </fieldset>
@@ -528,8 +612,8 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
       {/* ---- Penugasan Proyek (DRMS 15/10: editable, same save) ---- */}
       <section id="uo-panel-penugasan" role="tabpanel" aria-labelledby="uo-tab-penugasan" hidden={tab !== 'penugasan'} className="pk-uo__panel">
         <p className="pk-uo__lead">
-          Penugasan tim data karyawan per PT: project, pusat biaya, atau site. Penugasan yang tersimpan tidak dihapus — ubah peran atau isi tanggal selesai
-          untuk mengakhirinya (wajib dengan alasan).
+          Penugasan tim data karyawan per PT: project atau pusat biaya. Penugasan yang tersimpan tidak dihapus — ubah peran atau isi tanggal selesai untuk
+          mengakhirinya (wajib dengan alasan).
         </p>
         {noCompanies}
         {detail.companies.map((c) => {
@@ -559,7 +643,7 @@ export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: 
                     <p className="pk-uo__bank-title">
                       {a.id !== undefined ? (
                         <>
-                          {kind.label}: {a.label}
+                          {LOCATION_KIND_LABEL[a.kind]}: {a.label}
                           {a.startDate ? <span className="pk-uo__hint">mulai {a.startDate}</span> : null}
                           <Link prefetch={false} href={`/admin/collections/team-assignments/${a.id}`} className="pk-uo__hint">
                             Buka ↗

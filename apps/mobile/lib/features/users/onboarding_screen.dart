@@ -6,11 +6,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../app/theme.dart';
 import '../../core/format/dates.dart';
 import '../../core/network/api_exception.dart';
 import '../../l10n/gen/app_localizations.dart';
+import '../../shared/widgets/action_feedback.dart';
 import '../../shared/widgets/async_body.dart';
+import '../../shared/icons/iconsax.dart';
 import '../../shared/widgets/online_only_button.dart';
+import '../../shared/widgets/pk_ui.dart';
+import '../../shared/widgets/pk_ui_akun.dart';
 import '../expense/presentation/widgets/master_picker.dart';
 import '../masters/domain/master_item.dart';
 import '../records/data/records_providers.dart';
@@ -130,6 +135,8 @@ class _OnboardingFormState extends ConsumerState<_OnboardingForm> {
       setState(() => _summary = t.recordNoChanges);
       return;
     }
+    final summary = [_name.text.trim(), _email.text.trim()];
+    if (!await confirmAction(context, action: t.save, summary: summary) || !mounted) return;
     setState(() => _busy = true);
     try {
       final key = _keys.putIfAbsent(jsonEncode(body), () => const Uuid().v4());
@@ -161,21 +168,22 @@ class _OnboardingFormState extends ConsumerState<_OnboardingForm> {
             ],
           ),
         );
-      } else if (r.linked && !_edit) {
-        showSnack(context, t.onbLinked);
       } else {
-        showSnack(context, t.recordSaved(_name.text.trim()));
+        final done = r.linked && !_edit ? t.onbLinked : t.recordSaved(_name.text.trim());
+        await showActionResult(context, message: done, action: t.save);
       }
       if (mounted) context.pop('${r.id}');
     } on ProblemException catch (e) {
-      if (mounted) {
-        setState(() {
-          _errors = {for (final x in e.errors) x.path: x.message};
-          _summary = e.message;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _errors = {for (final x in e.errors) x.path: x.message};
+        _summary = e.message;
+      });
+      await showActionError(context, e, action: t.save);
     } on Object catch (e) {
-      if (mounted) setState(() => _summary = errorText(e));
+      if (!mounted) return;
+      setState(() => _summary = errorText(e));
+      await showActionError(context, e, action: t.save);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -186,79 +194,123 @@ class _OnboardingFormState extends ConsumerState<_OnboardingForm> {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final identity = widget.detail.identityEditable;
+    final pk = context.pk;
     return Scaffold(
       appBar: AppBar(title: Text(_edit ? (_u?['name'] as String? ?? t.onbTitle) : t.onbNewTitle)),
       body: AbsorbPointer(
         absorbing: _busy,
         child: ListView(
           key: const Key('onb-form'),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           children: [
-            Text(_edit ? '${_u?['email'] ?? ''}' : t.onbLead, style: theme.textTheme.bodySmall),
-            if (_summary != null)
-              Card(
-                key: const Key('onb-error'),
-                color: theme.colorScheme.errorContainer,
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text([_summary!, ..._errors.entries.map((e) => '• ${e.value}')].join('\n')),
+            // header: who (edit) or what this form does (new)
+            if (_edit)
+              PkCard(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    PkAvatar(name: '${_u?['name'] ?? _u?['email'] ?? ''}', size: 44),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '${_u?['email'] ?? ''}',
+                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    PkPill(
+                      label: _u?['active'] != false ? t.rapActive : t.rapInactive,
+                      tone: _u?['active'] != false ? PkTone.ok : PkTone.bad,
+                    ),
+                  ],
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+                child: Text(
+                  t.onbLead,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
               ),
-            const SizedBox(height: 8),
-            Text(t.onbAccount, style: theme.textTheme.titleMedium),
-            TextField(
-              key: const Key('onb-email'),
-              controller: _email,
-              enabled: identity,
-              keyboardType: TextInputType.emailAddress,
-              onChanged: (_) => _identityDirty = true,
-              decoration: InputDecoration(labelText: '${t.accountEmail} *', errorText: _errors['user.email']),
-            ),
-            TextField(
-              key: const Key('onb-name'),
-              controller: _name,
-              enabled: identity,
-              maxLength: 128,
-              onChanged: (_) => _identityDirty = true,
-              decoration: InputDecoration(labelText: '${t.clientName} *', errorText: _errors['user.name']),
-            ),
-            TextField(
-              key: const Key('onb-phone'),
-              controller: _phone,
-              enabled: identity,
-              maxLength: 32,
-              keyboardType: TextInputType.phone,
-              onChanged: (_) => _identityDirty = true,
-              decoration: InputDecoration(labelText: t.accountPhone),
-            ),
-            if (!identity) Text(t.onbIdentityReadOnly, style: theme.textTheme.bodySmall),
-            if (_edit)
-              SwitchListTile(
-                key: const Key('onb-active'),
-                contentPadding: EdgeInsets.zero,
-                title: Text(t.rapActive),
-                subtitle: Text(t.onbActiveHint),
-                value: _active,
-                onChanged: (v) => setState(() => _active = v),
+            if (_summary != null)
+              FormErrorCard(
+                key: const Key('onb-error'),
+                text: [_summary!, ..._errors.entries.map((e) => '• ${e.value}')].join('\n'),
               ),
-            const SizedBox(height: 12),
-            Text(t.onbAccess, style: theme.textTheme.titleMedium),
+            PkSectionCard(
+              title: t.onbAccount,
+              icon: PkIcons.profile,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 4),
+                  TextField(
+                    key: const Key('onb-email'),
+                    controller: _email,
+                    enabled: identity,
+                    keyboardType: TextInputType.emailAddress,
+                    onChanged: (_) => _identityDirty = true,
+                    decoration: InputDecoration(labelText: '${t.accountEmail} *', errorText: _errors['user.email']),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    key: const Key('onb-name'),
+                    controller: _name,
+                    enabled: identity,
+                    maxLength: 128,
+                    onChanged: (_) => _identityDirty = true,
+                    decoration: InputDecoration(labelText: '${t.clientName} *', errorText: _errors['user.name']),
+                  ),
+                  const SizedBox(height: 4),
+                  TextField(
+                    key: const Key('onb-phone'),
+                    controller: _phone,
+                    enabled: identity,
+                    maxLength: 32,
+                    keyboardType: TextInputType.phone,
+                    onChanged: (_) => _identityDirty = true,
+                    decoration: InputDecoration(labelText: t.accountPhone),
+                  ),
+                  if (!identity)
+                    Text(
+                      t.onbIdentityReadOnly,
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  if (_edit)
+                    SwitchListTile(
+                      key: const Key('onb-active'),
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(t.rapActive),
+                      subtitle: Text(t.onbActiveHint),
+                      value: _active,
+                      onChanged: (v) => setState(() => _active = v),
+                    ),
+                ],
+              ),
+            ),
+            PkSectionHeader(title: t.onbAccess, padding: const EdgeInsets.only(top: 8, bottom: 10)),
             if (_errors['companies'] != null)
-              Text(_errors['companies']!, style: TextStyle(color: theme.colorScheme.error)),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(_errors['companies']!, style: TextStyle(color: pk.badText)),
+              ),
             for (final c in widget.detail.companies) _CompanyCard(company: c, onChanged: () => setState(() {})),
-            TextField(
-              key: const Key('onb-reason'),
-              controller: _reason,
-              maxLength: 1000,
-              decoration: InputDecoration(
-                labelText: t.cashReason,
-                helperText: t.onbReasonHint,
-                helperMaxLines: 3,
-                errorText: _errors['reason'],
+            PkCard(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: TextField(
+                key: const Key('onb-reason'),
+                controller: _reason,
+                maxLength: 1000,
+                decoration: InputDecoration(
+                  labelText: t.cashReason,
+                  helperText: t.onbReasonHint,
+                  helperMaxLines: 3,
+                  errorText: _errors['reason'],
+                ),
               ),
             ),
-            const SizedBox(height: 12),
             OnlineOnlyButton(
               key: const Key('onb-save'),
               label: _busy ? t.cashSaving : t.save,
@@ -269,6 +321,64 @@ class _OnboardingFormState extends ConsumerState<_OnboardingForm> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Error summary above a form (server / validation messages), soft red card.
+class FormErrorCard extends StatelessWidget {
+  const FormErrorCard({super.key, required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final pk = context.pk;
+    return PkCard(
+      color: pk.badBg,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline, color: pk.badOn, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text, style: TextStyle(color: pk.badOn)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bank account row (onboarding, vendor): icon chip, "Bank No · Atas nama", Utama / Terverifikasi, active switch.
+class BankAccountRow extends StatelessWidget {
+  const BankAccountRow({super.key, required this.account, required this.onActive});
+  final ({String? bankName, String accountNo, String accountHolder, bool isDefault, bool verified, bool active})
+  account;
+
+  /// null = not switchable (a new, unsaved account).
+  final ValueChanged<bool>? onActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final b = account;
+    return SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      secondary: PkIconChip(
+        icon: PkIcons.finance,
+        tone: !b.active ? PkTone.neutral : (b.verified ? PkTone.ok : PkTone.warn),
+        size: 36,
+      ),
+      title: Text(
+        '${b.bankName ?? ''} ${b.accountNo} · ${b.accountHolder}'.trim(),
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text([if (b.isDefault) t.onbDefault, if (b.verified) t.onbVerified else t.bankUnverified].join(' · ')),
+      value: b.active,
+      onChanged: onActive,
     );
   }
 }
@@ -329,45 +439,54 @@ class _CompanyCard extends ConsumerWidget {
     final theme = Theme.of(context);
     final c = company;
     final e = c.employee;
-    return Card(
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    return PkSectionCard(
       key: Key('onb-pt-${c.id}'),
-      margin: const EdgeInsets.only(top: 8, bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(c.label, style: theme.textTheme.titleSmall),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final (code, label) in onboardingRoles)
-                  FilterChip(
-                    key: Key('onb-role-${c.id}-$code'),
-                    label: Text(label),
-                    selected: c.roles.contains(code),
-                    onSelected: (on) {
-                      on ? c.roles.add(code) : c.roles.remove(code);
-                      c.dirty = true;
-                      onChanged();
-                    },
-                  ),
-              ],
+      title: c.label,
+      icon: Icons.business_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final (code, label) in onboardingRoles)
+                FilterChip(
+                  key: Key('onb-role-${c.id}-$code'),
+                  label: Text(label),
+                  selected: c.roles.contains(code),
+                  onSelected: (on) {
+                    on ? c.roles.add(code) : c.roles.remove(code);
+                    c.dirty = true;
+                    onChanged();
+                  },
+                ),
+            ],
+          ),
+          if (c.hasMembership && c.roles.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                t.onbMembershipInactive,
+                style: theme.textTheme.bodySmall?.copyWith(color: context.pk.badText),
+              ),
             ),
-            if (c.hasMembership && c.roles.isEmpty)
-              Text(t.onbMembershipInactive, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error)),
-            if (c.canManageEmployees) ...[
-              const Divider(height: 20),
-              Row(
+          if (c.canManageEmployees) ...[
+            const PkRowDivider(indent: 0),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
                 children: [
+                  PkIconChip(icon: PkIcons.profile, tone: e == null ? PkTone.neutral : PkTone.info, size: 36),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       e == null
                           ? t.onbNoEmployee
                           : '${t.onbEmployee}: ${e.code} ${e.name}${e.active ? '' : ' (${t.rapInactive})'}',
-                      style: theme.textTheme.bodyMedium,
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: e == null ? null : FontWeight.w600),
                     ),
                   ),
                   TextButton(
@@ -377,59 +496,85 @@ class _CompanyCard extends ConsumerWidget {
                   ),
                 ],
               ),
-              Text(t.onbBankAccounts, style: theme.textTheme.labelLarge),
-              for (final b in c.bankAccounts)
-                SwitchListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text('${b.bankName ?? ''} ${b.accountNo} · ${b.accountHolder}'.trim()),
-                  subtitle: Text(
-                    [if (b.isDefault) t.onbDefault, if (b.verified) t.onbVerified else t.bankUnverified].join(' · '),
-                  ),
-                  value: b.active,
-                  onChanged: b.id == null
-                      ? null
-                      : (v) {
-                          b.active = v;
-                          c.dirty = true;
-                          onChanged();
-                        },
+            ),
+            const PkRowDivider(indent: 0),
+            _SubTitle(t.onbBankAccounts),
+            for (final b in c.bankAccounts)
+              BankAccountRow(
+                account: (
+                  bankName: b.bankName,
+                  accountNo: b.accountNo,
+                  accountHolder: b.accountHolder,
+                  isDefault: b.isDefault,
+                  verified: b.verified,
+                  active: b.active,
                 ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  key: Key('onb-bank-add-${c.id}'),
-                  onPressed: () => _bank(context),
-                  icon: const Icon(Icons.add),
-                  label: Text(t.onbAddBank),
-                ),
+                onActive: b.id == null
+                    ? null
+                    : (v) {
+                        b.active = v;
+                        c.dirty = true;
+                        onChanged();
+                      },
               ),
-            ],
-            if (c.canManageAssignments && (e?.id != null || c.employeeDirty)) ...[
-              const Divider(height: 20),
-              Text(t.onbAssignments, style: theme.textTheme.labelLarge),
-              for (final a in c.assignments)
-                Text(
-                  '• ${a.label} · ${a.role}${a.endDate == null ? '' : ' · s/d ${formatDateOnly(a.endDate)}'}',
-                  style: theme.textTheme.bodySmall,
-                ),
-              for (final a in c.newAssignments)
-                Text('+ ${a['_label']} · ${a['roleInProject']}', style: theme.textTheme.bodySmall),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  key: Key('onb-assignment-add-${c.id}'),
-                  onPressed: () => _assignment(context),
-                  icon: const Icon(Icons.add),
-                  label: Text(t.onbAddAssignment),
-                ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: Key('onb-bank-add-${c.id}'),
+                onPressed: () => _bank(context),
+                icon: const Icon(Icons.add),
+                label: Text(t.onbAddBank),
               ),
-            ],
+            ),
           ],
-        ),
+          if (c.canManageAssignments && (e?.id != null || c.employeeDirty)) ...[
+            const PkRowDivider(indent: 0),
+            _SubTitle(t.onbAssignments),
+            for (final a in c.assignments)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '• ${a.label} · ${a.role}${a.endDate == null ? '' : ' · s/d ${formatDateOnly(a.endDate)}'}',
+                  style: muted,
+                ),
+              ),
+            for (final a in c.newAssignments)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '+ ${a['_label']} · ${a['roleInProject']}',
+                  style: theme.textTheme.bodySmall?.copyWith(color: context.pk.okText, fontWeight: FontWeight.w600),
+                ),
+              ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: Key('onb-assignment-add-${c.id}'),
+                onPressed: () => _assignment(context),
+                icon: const Icon(Icons.add),
+                label: Text(t.onbAddAssignment),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
+}
+
+/// Sub-heading inside a PT card ("Rekening", "Penugasan tim").
+class _SubTitle extends StatelessWidget {
+  const _SubTitle(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 10, bottom: 4),
+    child: Text(
+      text,
+      style: Theme.of(context).textTheme.labelLarge?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+    ),
+  );
 }
 
 /// Link an existing employee of the PT (not linked to another account) or create a new one; edit the linked one.
@@ -655,7 +800,6 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
     final c = widget.company;
     final options = switch (_kind) {
       'costCenter' => c.costCenters(),
-      'site' => c.sites(),
       _ => c.projects(),
     };
     return Padding(
@@ -668,8 +812,8 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
           SegmentedButton<String>(
             segments: [
               ButtonSegment(value: 'project', label: Text(t.cashProject)),
+              // ADR 0032: no site option any more (sites removed from the product)
               ButtonSegment(value: 'costCenter', label: Text(t.cashCostCenter)),
-              ButtonSegment(value: 'site', label: Text(t.onbSite)),
             ],
             selected: {_kind},
             onSelectionChanged: (s) => setState(() {

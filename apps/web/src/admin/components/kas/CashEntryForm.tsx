@@ -6,10 +6,13 @@ import React, { useId, useMemo, useRef, useState } from 'react'
 import { formatRupiah } from '@/lib/money'
 import { CASH_MINUS_MESSAGE } from '@/lib/rupiah-input'
 
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle } from '../feedback/feedback'
 import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson, uploadAttachment } from './client'
 import { OverrideDialog, overridePromptOf, type OverridePrompt } from './OverrideDialog'
 import { DateInput } from '../DateInput'
+import { ImageThumb } from '../media/ImageThumb'
+import { mediaThumbSource } from '../media/media-url'
 import { WrapSelect } from '../WrapSelect'
 
 /**
@@ -25,6 +28,8 @@ import { WrapSelect } from '../WrapSelect'
  * UI feedback 17/10 #5 ("edit = add"): edit mode renders the create form field for field — Tanggal, Akun kas and
  * Nominal keep their date picker / account select / Rupiah field, disabled (never swapped for text inputs) — and adds
  * only "Alasan perubahan" at the end; the page puts it next to the same "Aturan" card.
+ * DRMS 24/10: "Yakin ingin simpan kas masuk/keluar?" (tanggal, akun, nominal, keterangan) before sending, the
+ * result popup after (the overdraft / unverified-account dialog stays between them when the server asks).
  */
 export type Opt = { id: number; label: string; requiresVehicle?: boolean; openingDate?: string | null }
 
@@ -78,6 +83,8 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
   const key = useRef<string | undefined>(undefined)
   const proof = useRef<{ file: File; id: number } | null>(null)
   const summaryRef = useRef<HTMLDivElement>(null)
+  // DRMS 24/10: the action named in the popups (= the submit button's text)
+  const action = edit ? 'Simpan perubahan' : direction === 'in' ? 'Simpan kas masuk' : 'Simpan kas keluar'
   const needsVehicle = useMemo(() => options.categories.find((c) => String(c.id) === categoryId)?.requiresVehicle === true, [categoryId, options.categories])
 
   const id = (n: string) => `${uid}-${n}`
@@ -154,6 +161,23 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
       return
     }
     setSummary(null)
+    // DRMS 24/10: confirmation popup with what is booked / changed
+    const label = (k: string, opts: Opt[]) => opts.find((o) => o.id === n(k))?.label ?? null
+    const yes = await confirmAction({
+      title: confirmTitle(action, edit ? entry.entryNo : null),
+      summary: [
+        ['Transaksi', edit ? entry.entryNo : direction === 'in' ? 'Kas masuk baru' : 'Kas keluar baru'],
+        ['Tanggal', edit ? dmy(entry.entryDate) : s('entryDate') ? dmy(s('entryDate')) : null],
+        ['Akun kas', edit ? entry.account : label('cashAccountId', options.accounts)],
+        ['Nominal', edit ? formatRupiah(entry.amount) : amount.parsed.value !== null ? formatRupiah(amount.parsed.value) : null],
+        ['Proyek', projectId ? label('projectId', options.projects) : null],
+        ['Pusat biaya', costCenterId ? label('costCenterId', options.costCenters) : null],
+        ['Keterangan', description],
+        ['Alasan perubahan', edit ? s('reason') : null],
+      ],
+      confirmLabel: confirmLabel(action),
+    })
+    if (!yes) return
     setBusy(true)
     try {
       if (hasFile) {
@@ -162,7 +186,9 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
       }
       await send(body)
     } catch (x) {
-      setSummary((x as Error).message || 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+      const msg = (x as Error).message || 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.'
+      setSummary(msg)
+      showResult({ ok: false, title: failureTitle(action), message: msg })
       requestAnimationFrame(() => summaryRef.current?.focus())
     } finally {
       setBusy(false)
@@ -184,11 +210,13 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
       const fe = fieldErrors(r.data)
       setErrors(fe)
       setSummary(r.error)
+      showResult({ ok: false, title: failureTitle(action), message: r.error })
       requestAnimationFrame(() => summaryRef.current?.focus())
       return
     }
     setPrompt(null)
-    const saved = r.data as { id: number }
+    const saved = r.data as { id: number; entryNo?: string | null }
+    showResult({ ok: true, title: successTitle(action, saved.entryNo ?? (edit ? entry.entryNo : null)), message: edit ? 'Perubahan transaksi kas tersimpan.' : 'Transaksi kas tercatat di buku kas.' })
     router.push(edit ? `/admin/kas?diubah=${saved.id}#ce-${saved.id}` : `/admin/kas?baru=${saved.id}#ce-${saved.id}`)
     router.refresh()
   }
@@ -202,7 +230,9 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
       await send(body)
     } catch (x) {
       setPrompt(null)
-      setSummary((x as Error).message || 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+      const msg = (x as Error).message || 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.'
+      setSummary(msg)
+      showResult({ ok: false, title: failureTitle(action), message: msg })
       requestAnimationFrame(() => summaryRef.current?.focus())
     } finally {
       setBusy(false)
@@ -379,10 +409,9 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
           <label htmlFor={id('proof')}>{edit && entry.proofId ? 'Ganti bukti (opsional)' : 'Bukti (opsional)'}</label>
           {edit && entry.proofId ? (
             <p className="help" data-pk-proof-current>
-              <a href={`/api/v1/media/attachments/${entry.proofId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox="kas-proof-current" data-pk-lightbox-title="Bukti saat ini">
-                Lihat bukti saat ini
-              </a>{' '}
-              — pilih file baru untuk menggantinya.
+              {/* D2510 (web 0.21.1): preview of the stored proof (lightbox; a PDF → file link) */}
+              <ImageThumb src={mediaThumbSource('attachments', entry.proofId)} group="kas-proof-current" title={`Bukti saat ini ${entry.entryNo}`} size={72} fileLabel="Lihat bukti saat ini" />{' '}
+              Bukti saat ini — pilih file baru untuk menggantinya.
             </p>
           ) : null}
           <input id={id('proof')} type="file" name="proof" accept="application/pdf,image/jpeg,image/png" aria-describedby={id('proof-h')} data-pk-field="proof" />

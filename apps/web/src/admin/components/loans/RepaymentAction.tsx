@@ -5,6 +5,8 @@ import React, { useId, useRef, useState } from 'react'
 import { formatRupiah } from '@/lib/money'
 
 import { DateInput } from '../DateInput'
+import { useDocSummary } from '../feedback/DocContext'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle } from '../feedback/feedback'
 import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 
@@ -13,8 +15,12 @@ import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
  * ≤ sisa pinjaman), tanggal (default today, between the loan date and today) and an optional note. POST
  * /api/v1/project-loans/:id/repayments with one Idempotency-Key per opened dialog / content version. No Direktur
  * approval (Q-L7); the server re-checks role (borrower PM / Finance), status and amount. Styles: KAS_STYLE.
+ * DRMS 24/10 #12 (`request`): a cash-backed loan — "Ajukan pengembalian": nominal ≤ the part not yet requested,
+ * RENCANA tanggal (≥ loan date, may be in the future); then Direktur → Owner → Antrian Transfer Finance.
+ * DRMS 24/10: "Yakin ingin catat / ajukan pengembalian …?" (nominal, tanggal, sisa) on top of the dialog, result popup
+ * after.
  */
-export function RepaymentAction({ loanId, outstanding, loanDate, today }: { loanId: number; outstanding: number; loanDate: string; today: string }) {
+export function RepaymentAction({ loanId, outstanding, loanDate, today, request = false }: { loanId: number; outstanding: number; loanDate: string; today: string; request?: boolean }) {
   const router = useRouter()
   const ref = useRef<HTMLDialogElement>(null)
   const key = useRef<string | undefined>(undefined)
@@ -25,6 +31,7 @@ export function RepaymentAction({ loanId, outstanding, loanDate, today }: { loan
   const [errs, setErrs] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const doc = useDocSummary()
   const touch = () => {
     key.current = newIdemKey()
   }
@@ -43,25 +50,47 @@ export function RepaymentAction({ loanId, outstanding, loanDate, today }: { loan
     const v = amount.parsed.value ?? 0
     if (amount.parsed.error) e.amount = amount.parsed.error
     else if (!(v > 0)) e.amount = 'Nominal pengembalian wajib diisi (> 0).'
-    else if (v > outstanding) e.amount = `Nominal melebihi sisa pinjaman (${formatRupiah(outstanding)}).`
-    if (!date) e.repayDate = 'Tanggal pengembalian wajib diisi.'
-    else if (date < loanDate) e.repayDate = 'Tanggal pengembalian tidak boleh sebelum tanggal pinjaman.'
-    else if (date > today) e.repayDate = 'Tanggal pengembalian tidak boleh di masa depan.'
+    else if (v > outstanding) e.amount = request ? `Nominal melebihi sisa pinjaman yang belum diajukan (${formatRupiah(outstanding)}).` : `Nominal melebihi sisa pinjaman (${formatRupiah(outstanding)}).`
+    if (!date) e.repayDate = request ? 'Rencana tanggal pengembalian wajib diisi.' : 'Tanggal pengembalian wajib diisi.'
+    else if (date < loanDate) e.repayDate = request ? 'Rencana tanggal pengembalian tidak boleh sebelum tanggal pinjaman.' : 'Tanggal pengembalian tidak boleh sebelum tanggal pinjaman.'
+    else if (!request && date > today) e.repayDate = 'Tanggal pengembalian tidak boleh di masa depan.'
     setErrs(e)
     setError(null)
     if (Object.keys(e).length > 0) return
+    const action = request ? 'Ajukan pengembalian' : 'Catat pengembalian'
+    const yes = await confirmAction({
+      title: confirmTitle(action, doc.object),
+      summary: [
+        ...(doc.summary ?? []),
+        ['Nominal pengembalian', formatRupiah(v)],
+        [request ? 'Rencana tanggal' : 'Tanggal', date],
+        [request ? 'Sisa yang belum diajukan setelah ini' : 'Sisa setelah ini', formatRupiah(outstanding - v)],
+        ['Catatan', note.trim() || null],
+      ],
+      description: request ? 'Disetujui Direktur lalu Owner, kemudian ditransfer Finance lewat Antrian Transfer.' : undefined,
+      confirmLabel: confirmLabel(action),
+    })
+    if (!yes) return
     setBusy(true)
     try {
       const r = await sendJson('POST', `/api/v1/project-loans/${loanId}/repayments`, { amount: v, repayDate: date, note: note.trim() || null }, key.current)
       if (!r.ok) {
         setError(r.error)
         setErrs(fieldErrors(r.data))
+        showResult({ ok: false, title: failureTitle(action), message: r.error })
         return
       }
       ref.current?.close()
+      showResult({
+        ok: true,
+        title: successTitle(action, doc.object),
+        message: request ? `Pengembalian ${formatRupiah(v)} diajukan ke Direktur.` : `Pengembalian ${formatRupiah(v)} tercatat; Direktur dan PM pemberi diberi tahu.`,
+      })
       router.refresh()
     } catch {
-      setError('Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+      const msg = 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.'
+      setError(msg)
+      showResult({ ok: false, title: failureTitle(action), message: msg })
     } finally {
       setBusy(false)
     }
@@ -69,12 +98,16 @@ export function RepaymentAction({ loanId, outstanding, loanDate, today }: { loan
   return (
     <>
       <button type="button" className="pk-kbtn primary" onClick={open} data-pk-action="loan-repay">
-        Catat pengembalian
+        {request ? 'Ajukan pengembalian' : 'Catat pengembalian'}
       </button>
       <dialog ref={ref} className="pk-dlg" aria-labelledby={`${uid}-t`} onCancel={(e) => busy && e.preventDefault()}>
         <div role="form" aria-labelledby={`${uid}-t`}>
-          <h2 id={`${uid}-t`}>Catat pengembalian</h2>
-          <div className="desc">Sisa pinjaman {formatRupiah(outstanding)}. Tanpa persetujuan Direktur; Direktur dan PM pemberi diberi tahu. Salah catat dibatalkan (void) dengan alasan.</div>
+          <h2 id={`${uid}-t`}>{request ? 'Ajukan pengembalian' : 'Catat pengembalian'}</h2>
+          <div className="desc">
+            {request
+              ? `Maksimal ${formatRupiah(outstanding)} (sisa pinjaman yang belum diajukan). Disetujui Direktur lalu Owner, kemudian ditransfer Finance lewat Antrian Transfer (kas keluar dari pusat biaya peminjam, kas masuk ke pemberi).`
+              : `Sisa pinjaman ${formatRupiah(outstanding)}. Tanpa persetujuan Direktur; Direktur dan PM pemberi diberi tahu. Salah catat dibatalkan (void) dengan alasan.`}
+          </div>
           <div className="pk-fld">
             <label htmlFor={`${uid}-a`}>
               Nominal
@@ -103,7 +136,7 @@ export function RepaymentAction({ loanId, outstanding, loanDate, today }: { loan
           </div>
           <div className="pk-fld">
             <label htmlFor={`${uid}-d`}>
-              Tanggal pengembalian
+              {request ? 'Rencana tanggal pengembalian' : 'Tanggal pengembalian'}
               <span className="req" aria-hidden>
                 *
               </span>
@@ -112,7 +145,7 @@ export function RepaymentAction({ loanId, outstanding, loanDate, today }: { loan
               id={`${uid}-d`}
               value={date}
               min={loanDate}
-              max={today}
+              max={request ? undefined : today}
               onChange={(e) => {
                 setDate(e.target.value)
                 touch()
@@ -145,7 +178,7 @@ export function RepaymentAction({ loanId, outstanding, loanDate, today }: { loan
               Batal
             </button>
             <button type="button" className="pk-kbtn primary" onClick={() => void submit()} disabled={busy} data-pk-confirm="loan-repay">
-              {busy ? 'Menyimpan…' : 'Simpan pengembalian'}
+              {busy ? 'Menyimpan…' : request ? 'Ajukan pengembalian' : 'Simpan pengembalian'}
             </button>
           </div>
         </div>

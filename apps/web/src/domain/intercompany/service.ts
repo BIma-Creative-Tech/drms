@@ -162,14 +162,15 @@ export function duplicateDocumentMessage(invoiceNo: string, other: { id: number;
 
 /**
  * ADR 0028 duplicate rule: same receiving PT + same normalized document number on a `pt_grup` request that is not
- * cancelled / rejected (Draft included) → 409 with a field error on `invoiceNo`. DB: expense_requests_ic_invoice_uq.
+ * cancelled / rejected (Draft included; D2410: not a soft-deleted draft) → 409 with a field error on `invoiceNo`. DB:
+ * expense_requests_ic_invoice_uq (migration 20261024_510000 ignores deleted rows).
  */
 export async function assertDocumentUnused(req: PayloadRequest, payeeCompanyId: number, invoiceNo: string, requestId?: number): Promise<void> {
   const key = normalizeInvoiceNo(invoiceNo)
   const tx = await getRequestTx(req)
   const r = (await tx.execute(sql`
     SELECT id, doc_no, status::text AS status FROM expense_requests
-     WHERE payee_type = 'pt_grup' AND payee_company_id = ${payeeCompanyId} AND id <> ${requestId ?? -1}
+     WHERE payee_type = 'pt_grup' AND payee_company_id = ${payeeCompanyId} AND id <> ${requestId ?? -1} AND is_deleted IS NOT TRUE
        AND status::text NOT IN (${sql.join(
          INACTIVE_FOR_DUPLICATES.map((s) => sql`${s}`),
          sql`, `,

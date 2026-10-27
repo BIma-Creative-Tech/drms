@@ -13,10 +13,13 @@ import '../../../core/format/rupiah.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/online_only_button.dart';
 import '../../../shared/widgets/photo_viewer.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_keuangan.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/application/expense_providers.dart';
@@ -161,6 +164,11 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
       _error = null;
     });
     if (_issues().isNotEmpty) return;
+    final it = widget.item;
+    if (!confirmOverdraft && !confirmUnverified) {
+      final summary = [it.docNo, it.title, formatRupiah(it.amount), it.bankText, _bankRef.text.trim()];
+      if (!await confirmAction(context, action: t.transferRecord, summary: summary) || !mounted) return;
+    }
     setState(() => _busy = true);
     final api = ref.read(financeApiProvider);
     try {
@@ -187,27 +195,27 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
       final km = detail.intercompany;
       // ADR 0031: paid from another account → the automatic inter-project loan (its number)
       final loanNo = out.loanNo;
-      showSnack(
-        context,
-        km != null && !km.voided
-            ? t.transferRecordedIntercompany(
-                trf ?? '-',
-                km.targetEntryNo,
-                km.companyCode ?? widget.item.payeeCompanyCode ?? '-',
-              )
-            : loanNo != null
-            ? t.transferRecordedLoan(trf ?? '-', loanNo)
-            : trf == null
-            ? t.transferRecorded
-            : t.transferRecordedNo(trf),
-      );
-      context.pop(true);
+      final done = km != null && !km.voided
+          ? t.transferRecordedIntercompany(
+              trf ?? '-',
+              km.targetEntryNo,
+              km.companyCode ?? widget.item.payeeCompanyCode ?? '-',
+            )
+          : loanNo != null
+          ? t.transferRecordedLoan(trf ?? '-', loanNo)
+          : trf == null
+          ? t.transferRecorded
+          : t.transferRecordedNo(trf);
+      await showActionResult(context, message: done, action: t.transferRecord);
+      if (mounted) context.pop(true);
     } on ProblemException catch (e) {
       final prompt = transferOverridePrompt(t, e);
       if (!mounted) return;
       if (prompt == null) {
         // ADR 0028: the receiving PT's closed period / changed account / no account in Indonesian
-        setState(() => _error = intercompanyProblemMessage(e) ?? e.message);
+        final message = intercompanyProblemMessage(e) ?? e.message;
+        setState(() => _error = message);
+        await showActionFailure(context, message, action: t.transferRecord);
         return;
       }
       setState(() => _busy = false);
@@ -236,7 +244,9 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
         confirmUnverified: confirmUnverified || prompt.flag == 'confirmUnverifiedAccount',
       );
     } on Object catch (e) {
-      if (mounted) setState(() => _error = errorText(e));
+      if (!mounted) return;
+      setState(() => _error = errorText(e));
+      await showActionError(context, e, action: t.transferRecord);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -272,155 +282,178 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Card(
+            // D2510: summary card — icon chip + amount, the request, the destination account on a soft tile, pills.
+            PkCard(
               key: const Key('transfer-amount-card'),
-              color: theme.colorScheme.primaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      t.transferAmountText(formatRupiah(it.amount)),
-                      key: const Key('transfer-amount'),
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                    Text(t.transferAmountHelp, style: theme.textTheme.bodySmall),
-                    const Divider(height: 20),
-                    Text('${it.docNo ?? '#${it.id}'} · ${it.title}', style: theme.textTheme.bodyMedium),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${t.bankDestination}: ${it.bankText.isEmpty ? '-' : it.bankText}',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    // ADR 0028: Antar PT — the transfer also records the Kas Masuk in the receiving PT
-                    if (it.payeeCompanyCode case final code?)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          t.transferIntercompanyNote(code),
-                          key: const Key('transfer-intercompany-note'),
-                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+              radius: PkRadius.lg,
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const PkIconChip(icon: Icons.account_balance, size: 44),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              t.transferAmountText(formatRupiah(it.amount)),
+                              key: const Key('transfer-amount'),
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                            Text(
+                              t.transferAmountHelp,
+                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                            ),
+                          ],
                         ),
                       ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        SlaBadge(sla: it.sla),
-                        if (!it.bankVerified)
-                          Text(
-                            t.bankUnverified,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: context.pk.warnText,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        if (it.receiptMismatch > 0) ReceiptMismatchChip(count: it.receiptMismatch),
-                      ],
+                    ],
+                  ),
+                  Divider(height: 24, color: context.pk.border),
+                  Text(
+                    '${it.docNo ?? '#${it.id}'} · ${it.title}',
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerLow,
+                      border: Border.all(color: context.pk.border),
+                      borderRadius: BorderRadius.circular(PkRadius.sm),
                     ),
-                  ],
-                ),
+                    child: Text(
+                      '${t.bankDestination}: ${it.bankText.isEmpty ? '-' : it.bankText}',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                  // ADR 0028: Antar PT — the transfer also records the Kas Masuk in the receiving PT
+                  if (it.payeeCompanyCode case final code?)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        t.transferIntercompanyNote(code),
+                        key: const Key('transfer-intercompany-note'),
+                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      SlaBadge(sla: it.sla),
+                      if (!it.bankVerified) PkPill(label: t.bankUnverified, tone: PkTone.warn),
+                      if (it.receiptMismatch > 0) ReceiptMismatchChip(count: it.receiptMismatch),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
             // DRMS 13/10 Umum #2 / D4: label left of the field, two columns on wide screens (web field order).
-            FormGrid(
-              children: [
-                // 1. Dibayar dari akun (ADR 0031: default = the project's Pusat Biaya)
-                FormGridCell(
-                  label: t.paidFromAccountLabel,
-                  child: switch (accounts) {
-                    AsyncError(:final error) => loadError(error),
-                    _ => MasterPickerField(
-                      key: const Key('transfer-cash-account'),
-                      label: t.paidFromAccountLabel,
-                      items: accountItems,
-                      value: _cashAccountId,
-                      allowNone: false,
-                      errorText: issues['cashAccountId'] ?? issues['pusatBiaya'],
-                      helperText: it.pusatBiayaMissing
-                          ? t.transferPusatBiayaMissingHelp
-                          : (pb == null ? null : t.transferPusatBiayaHelp(pb.label)),
-                      onChanged: (v) => setState(() => _cashAccountId = v),
-                    ),
-                  },
-                ),
-                // ADR 0031 #4–#5: paid from another account → the automatic inter-project loan (KK on that account,
-                // KM on the project's Pusat Biaya) — reason required, due date optional (server default +30 days)
-                if (loan)
+            // D2510: the form fields in one card.
+            PkCard(
+              child: FormGrid(
+                children: [
+                  // 1. Dibayar dari akun (ADR 0031: default = the project's Pusat Biaya)
                   FormGridCell(
-                    full: true,
-                    child: _LoanPanel(
-                      pusatBiaya: pb?.label ?? '-',
-                      reason: _loanReason,
-                      reasonError: issues['loanReason'],
-                      due: _loanDue,
-                      dueError: issues['loanDueDate'],
-                      onPickDue: _pickLoanDue,
-                      onClearDue: () => setState(() => _loanDue = null),
-                      onChanged: () => _tried ? setState(() {}) : null,
+                    label: t.paidFromAccountLabel,
+                    child: switch (accounts) {
+                      AsyncError(:final error) => loadError(error),
+                      _ => MasterPickerField(
+                        key: const Key('transfer-cash-account'),
+                        label: t.paidFromAccountLabel,
+                        items: accountItems,
+                        value: _cashAccountId,
+                        allowNone: false,
+                        errorText: issues['cashAccountId'] ?? issues['pusatBiaya'],
+                        helperText: it.pusatBiayaMissing
+                            ? t.transferPusatBiayaMissingHelp
+                            : (pb == null ? null : t.transferPusatBiayaHelp(pb.label)),
+                        onChanged: (v) => setState(() => _cashAccountId = v),
+                      ),
+                    },
+                  ),
+                  // ADR 0031 #4–#5: paid from another account → the automatic inter-project loan (KK on that account,
+                  // KM on the project's Pusat Biaya) — reason required, due date optional (server default +30 days)
+                  if (loan)
+                    FormGridCell(
+                      full: true,
+                      child: _LoanPanel(
+                        pusatBiaya: pb?.label ?? '-',
+                        reason: _loanReason,
+                        reasonError: issues['loanReason'],
+                        due: _loanDue,
+                        dueError: issues['loanDueDate'],
+                        onPickDue: _pickLoanDue,
+                        onClearDue: () => setState(() => _loanDue = null),
+                        onChanged: () => _tried ? setState(() {}) : null,
+                      ),
+                    ),
+                  // 2. Tanggal & jam transfer (item 11 / D11)
+                  FormGridCell(
+                    label: t.transferAtLabel,
+                    builder: (label) => InkWell(
+                      key: const Key('transfer-at'),
+                      onTap: _pickAt,
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: label,
+                          helperText: t.transferAtHelp,
+                          errorText: issues['transferAt'],
+                          suffixIcon: const Icon(Icons.event),
+                        ),
+                        child: Text(
+                          _at == null ? t.transferAtHint : transferAtText(_at!, zone),
+                          key: const Key('transfer-at-value'),
+                          style: _at == null ? theme.textTheme.bodyLarge?.copyWith(color: theme.hintColor) : null,
+                        ),
+                      ),
                     ),
                   ),
-                // 2. Tanggal & jam transfer (item 11 / D11)
-                FormGridCell(
-                  label: t.transferAtLabel,
-                  builder: (label) => InkWell(
-                    key: const Key('transfer-at'),
-                    onTap: _pickAt,
-                    child: InputDecorator(
+                  // 3. No. referensi bank
+                  FormGridCell(
+                    label: t.bankRefLabel,
+                    builder: (label) => TextField(
+                      key: const Key('transfer-bank-ref'),
+                      controller: _bankRef,
+                      maxLength: 64,
                       decoration: InputDecoration(
                         labelText: label,
-                        helperText: t.transferAtHelp,
-                        errorText: issues['transferAt'],
-                        suffixIcon: const Icon(Icons.event),
+                        hintText: t.bankRefHint,
+                        errorText: issues['bankRef'],
                       ),
-                      child: Text(
-                        _at == null ? t.transferAtHint : transferAtText(_at!, zone),
-                        key: const Key('transfer-at-value'),
-                        style: _at == null ? theme.textTheme.bodyLarge?.copyWith(color: theme.hintColor) : null,
-                      ),
+                      onChanged: (_) => _tried ? setState(() {}) : null,
                     ),
                   ),
-                ),
-                // 3. No. referensi bank
-                FormGridCell(
-                  label: t.bankRefLabel,
-                  builder: (label) => TextField(
-                    key: const Key('transfer-bank-ref'),
-                    controller: _bankRef,
-                    maxLength: 64,
-                    decoration: InputDecoration(
-                      labelText: label,
-                      hintText: t.bankRefHint,
-                      errorText: issues['bankRef'],
+                  // 4. Bukti
+                  FormGridCell(
+                    label: t.transferProofLabel,
+                    full: true,
+                    stackedLabel: true,
+                    child: TransferProofPicker(
+                      proof: _proof,
+                      error: issues['proof'],
+                      onAdd: (fromCamera) => _addProof(fromCamera: fromCamera),
                     ),
-                    onChanged: (_) => _tried ? setState(() {}) : null,
                   ),
-                ),
-                // 4. Bukti
-                FormGridCell(
-                  label: t.transferProofLabel,
-                  full: true,
-                  stackedLabel: true,
-                  child: TransferProofPicker(
-                    proof: _proof,
-                    error: issues['proof'],
-                    onAdd: (fromCamera) => _addProof(fromCamera: fromCamera),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
             if (_error != null)
-              Card(
+              PkNoticeCard(
                 key: const Key('transfer-error'),
-                color: theme.colorScheme.errorContainer,
+                tone: PkTone.bad,
                 margin: const EdgeInsets.only(top: 16),
-                child: Padding(padding: const EdgeInsets.all(12), child: Text(_error!)),
+                icon: Icons.error_outline,
+                title: Text(_error!),
               ),
             const SizedBox(height: 20),
             OnlineOnlyButton(
@@ -464,11 +497,14 @@ class _LoanPanel extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final warn = context.pk.warnText;
+    // D2510: a soft warn tile (the automatic loan needs a reason).
     return Container(
       key: const Key('transfer-loan-panel'),
-      padding: const EdgeInsets.only(left: 10),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
       decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: warn, width: 3)),
+        color: context.pk.warnBg.withValues(alpha: 0.5),
+        border: Border.all(color: warn.withValues(alpha: 0.4)),
+        borderRadius: BorderRadius.circular(PkRadius.sm),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -568,7 +604,7 @@ class TransferProofPicker extends StatelessWidget {
             child: SizedBox.square(
               dimension: 96,
               child: Material(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(PkRadius.sm),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
                   key: const Key('transfer-proof-thumb'),

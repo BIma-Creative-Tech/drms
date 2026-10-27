@@ -1,6 +1,6 @@
-// ADR 0023 (DRMS 10/10 Phase D) visual preview WITHOUT a device: sites (kantor cabang) on the APK — the attendance
-// location picker (home site first with the "Penempatan" badge, picker opened), "Diabsenkan PM" at a site, the project
-// detail with its site and the profile with "Site penempatan". 390×844 logical px, light and dark, bundled fonts.
+// ADR 0023 (DRMS 10/10 Phase D) visual preview WITHOUT a device. Since ADR 0032 / D2410 (sites deleted 2026-10-24) the
+// attendance picker and "Diabsenkan PM" use project / cost-center locations; the project detail with its (legacy) site
+// and the profile with "Site penempatan" stay. 390×844 logical px, light and dark, bundled fonts.
 //
 // Not part of CI (outside test/). Run by hand:
 //   flutter test test_preview/d1010_d_sites_preview_test.dart --dart-define=PK_SHOTS_DIR=/some/dir
@@ -135,26 +135,6 @@ Future<void> _shot(
   await db.close();
 }
 
-const _home = ProjectSite(
-  id: 2,
-  label: 'BPN — Cabang Balikpapan',
-  lat: -1.2654,
-  lng: 116.8312,
-  radiusM: 120,
-  kind: SiteKind.site,
-  companyId: 1,
-  home: true,
-);
-const _assigned = ProjectSite(
-  id: 5,
-  label: 'KDI — Cabang Kendari',
-  lat: -3.99,
-  lng: 122.51,
-  radiusM: 100,
-  kind: SiteKind.site,
-  companyId: 1,
-  assigned: true,
-);
 const _project = ProjectSite(
   id: 9,
   label: 'PRJ-09 — Jalan Tambang Blok B',
@@ -179,7 +159,7 @@ OutboxData _item(String status, Map<String, Object> payload, {int? siteId}) => O
   siteId: siteId,
   type: 'attendance.check_in',
   targetUuid: 'op-$status',
-  payloadJson: '{"site_id":${siteId ?? 0}}',
+  payloadJson: siteId == null ? '{"project_id":9}' : '{"site_id":$siteId}',
   dependsOnJson: '[]',
   deviceTime: '2026-10-11T07:52:10+08:00',
   elapsedMs: 1,
@@ -202,19 +182,27 @@ void main() {
   setUpAll(_loadFonts);
 
   for (final b in Brightness.values) {
-    testWidgets('attendance picker with sites (${b.name})', (tester) async {
+    // ADR 0032 / D2410 (sites deleted 2026-10-24): attendance locations are the registered projects and cost
+    // centers; a legacy site item still shows in the phone's history.
+    testWidgets('attendance picker with project locations (${b.name})', (tester) async {
       final over = <Override>[
-        attendanceSitesProvider.overrideWith((ref) async => const [_home, _assigned, _project, _cc]),
-        attendanceItemsProvider.overrideWith((ref) => Stream.value([_item('applied', const {}, siteId: 2)])),
+        attendanceSitesProvider.overrideWith((ref) async => const [_project, _cc]),
+        attendanceItemsProvider.overrideWith((ref) => Stream.value([_item('applied', const {})])),
       ];
-      await _shot(tester, name: 'd-attendance-sites', brightness: b, child: const AttendanceScreen(), overrides: over);
       await _shot(
         tester,
-        name: 'd-attendance-sites-open',
+        name: 'd-attendance-locations',
         brightness: b,
         child: const AttendanceScreen(),
         overrides: over,
-        act: (t) => t.tap(find.byKey(const Key('attendance-project'))),
+      );
+      await _shot(
+        tester,
+        name: 'd-attendance-locations-open',
+        brightness: b,
+        child: const AttendanceScreen(),
+        overrides: over,
+        act: (t) => t.tap(find.byType(DropdownButtonFormField<String>)),
       );
     });
 
@@ -228,7 +216,7 @@ void main() {
         overrides: [
           onBehalfCandidatesProvider.overrideWith(
             (ref) async => const [
-              OnBehalfCandidate(employeeId: 44, name: 'Budi Contoh', sites: [_home, _project]),
+              OnBehalfCandidate(employeeId: 44, name: 'Budi Contoh', sites: [_project, _cc]),
             ],
           ),
         ],

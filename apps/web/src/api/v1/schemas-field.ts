@@ -227,8 +227,11 @@ export const ServiceTypeList = z.object({ items: z.array(ServiceTypeItem) }).met
 
 const hours = dec2(24)
 const timesheetContent = {
-  hmStart: dec2(10_000_000).meta({ description: 'HM awal; ≠ the previous timesheet\'s HM akhir → flag HM_GAP (not rejected).' }),
-  hmEnd: dec2(10_000_000).meta({ description: 'HM akhir ≥ HM awal.' }),
+  hmStart: dec2(10_000_000)
+    .nullable()
+    .optional()
+    .meta({ description: 'HM awal — optional since D2410 (HM is read about once a week): both hmStart and hmEnd or none. ≠ the HM akhir of the unit\'s previous timesheet WITH HM → flag HM_GAP (not rejected).' }),
+  hmEnd: dec2(10_000_000).nullable().optional().meta({ description: 'HM akhir ≥ HM awal; optional, both or none.' }),
   workHours: hours,
   standbyHours: hours.optional(),
   breakdownHours: hours.optional(),
@@ -244,17 +247,18 @@ export const UnitTimesheetCreate = z
     company: createCompanyField,
     projectId: id.meta({ description: 'Project of kind kontrak_unit.' }),
     unitId: id.meta({ description: 'Unit in an ACTIVE contract unit of the project on reportDate (else 409 NOT_IN_CONTRACT). One timesheet per unit and date (409 DUPLICATE_DATE).' }),
-    reportDate: businessDate,
+    reportDate: businessDate.meta({ description: 'Not in the future; at most 14 days back — the PM of the project and the Direktur may use any date inside the contract unit\'s period (D2410).' }),
     ...timesheetContent,
-    hmPhotoId: id.meta({ description: 'Photo of the HM meter (media-progress-photos, uploaded by the caller) — required, exactly one.' }),
+    hmPhotoId: id.nullable().optional().meta({ description: 'Photo of the HM meter (media-progress-photos, uploaded by the caller) — required when hmStart/hmEnd are given (D2410), at most one.' }),
     clientUuid,
   })
   .strict()
   .meta({ id: 'UnitTimesheetCreate', description: 'Σ work + standby + breakdown ≤ 24.' })
 
 const timesheetPatch = {
-  hmStart: timesheetContent.hmStart.optional(),
-  hmEnd: timesheetContent.hmEnd.optional(),
+  hmStart: timesheetContent.hmStart.meta({ description: 'Omitted = unchanged; null (with hmEnd null) clears the HM reading.' }),
+  hmEnd: timesheetContent.hmEnd,
+  hmPhotoId: id.optional().meta({ description: 'D2410: adds the HM photo of a timesheet that has none (required when HM is added to it); a stored photo is never replaced (400 PHOTO_LIMIT).' }),
   workHours: hours.optional(),
   standbyHours: hours.optional(),
   breakdownHours: hours.optional(),
@@ -289,9 +293,9 @@ export const UnitTimesheet = z
     contractUnitId: id.nullable(),
     reportDate: z.string(),
     reporter: Ref,
-    hmStart: z.number(),
-    hmEnd: z.number(),
-    hmUsed: z.number().meta({ description: 'hmEnd − hmStart.' }),
+    hmStart: z.number().nullable().meta({ description: 'null = no HM reading on this day (D2410).' }),
+    hmEnd: z.number().nullable(),
+    hmUsed: z.number().nullable().meta({ description: 'hmEnd − hmStart (null without HM).' }),
     workHours: z.number(),
     standbyHours: z.number(),
     breakdownHours: z.number(),
@@ -462,7 +466,16 @@ export const ContractUnit = z
   })
   .meta({ id: 'ContractUnit' })
 
-export const ContractUnitList = z.object({ projectId: id, items: z.array(ContractUnit) }).meta({ id: 'ContractUnitList' })
+export const ContractUnitList = z
+  .object({
+    projectId: id,
+    items: z.array(ContractUnit),
+    timesheetMinDate: z.string().meta({
+      description:
+        'D2410: earliest report date the CALLER may use for a new timesheet on this project — today − 14 days for field reporters; for the PM of the project and the Direktur the earliest contract-unit start (any date inside a unit\'s contract period). Never a future date; each contract unit\'s own period still applies.',
+    }),
+  })
+  .meta({ id: 'ContractUnitList' })
 
 /** User 2026-10-19 (APK, phase 5b): GET /field/contracts — the web "Unit & kontrak" page (no rates). */
 export const FieldContracts = z

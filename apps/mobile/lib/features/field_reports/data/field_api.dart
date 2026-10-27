@@ -64,11 +64,17 @@ class FieldApi {
       );
 
   /// `GET /projects/{id}/contract-units` — rates are dropped while parsing (never kept on the phone).
-  Future<List<FieldContractUnit>> contractUnits(int projectId) => client.run(
+  /// `timesheetMinDate` (user 2026-10-24) = the caller's earliest date of a new timesheet on the project (PM project /
+  /// Direktur: the whole contract period; else today − 14); null from a server before it.
+  Future<({List<FieldContractUnit> items, String? timesheetMinDate})> contractUnits(int projectId) => client.run(
     (d) => d.get<dynamic>('/projects/$projectId/contract-units', options: ApiClient.allCompanies()),
-    (data) => [
-      for (final c in fList((data as Json)['items'])) FieldContractUnit.fromJson(fMap(c), projectId: projectId),
-    ],
+    (data) {
+      final j = data as Json;
+      return (
+        items: [for (final c in fList(j['items'])) FieldContractUnit.fromJson(fMap(c), projectId: projectId)],
+        timesheetMinDate: fStrN(j['timesheetMinDate']),
+      );
+    },
   );
 
   /// P3 `GET /projects/{id}/rap` — RAP items (prices dropped while parsing) + the PT's resource types.

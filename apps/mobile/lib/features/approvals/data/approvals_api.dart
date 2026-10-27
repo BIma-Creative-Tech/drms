@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import '../../expense/data/expense_mappers.dart';
 import '../../expense/domain/expense_request.dart';
+import '../../expense/domain/project_loan_instruction.dart';
 
 enum Decision { acknowledge, approve, reject }
 
@@ -85,4 +86,28 @@ class ApprovalsApi {
       (data) => detailFromJson(data as Map<String, dynamic>),
     );
   }
+
+  /// DRMS 26/10 #1 "Instruksi pinjam antar proyek": the request project's cash account, the lender candidates of the PT
+  /// with their dana bebas, the waiting loan (Kas roles of the request's PT).
+  Future<ProjectLoanInstruction> projectLoanLenders(int requestId) => client.run(
+    (d) => d.get<dynamic>('/expense-requests/$requestId/project-loan-lenders', options: ApiClient.allCompanies()),
+    (data) => ProjectLoanInstruction.fromJson(data as Map<String, dynamic>),
+  );
+
+  /// The final decider instructs the loan (born approved → Antrian Transfer); the request detail comes back.
+  Future<ExpenseDetail> instructProjectLoan(
+    int requestId, {
+    required int lenderProjectId,
+    required int amount,
+    required String reason,
+    String? dueDate,
+    required String idempotencyKey,
+  }) => client.run(
+    (d) => d.post<dynamic>(
+      '/expense-requests/$requestId/project-loan',
+      data: {'lenderProjectId': lenderProjectId, 'amount': amount, 'reason': reason, 'dueDate': ?dueDate},
+      options: ApiClient.allCompanies(Options(headers: {'Idempotency-Key': idempotencyKey})),
+    ),
+    (data) => detailFromJson(data as Map<String, dynamic>),
+  );
 }

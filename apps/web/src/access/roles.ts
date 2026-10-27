@@ -8,8 +8,13 @@ import type { Access, PayloadRequest } from 'payload'
  * `access/panel-visibility.ts` and `admin/modules/registry.ts` for the enforced narrowing. It is
  * intentionally absent from `anyMember` (access/policies.ts) and from every per-collection role map
  * that exposes business data — new code must not add it there without a specific reason.
+ * ADR 0032 (DRMS 24/10): `pk-admin-staff` ("Admin Staff") is attendance administration of a PT — reads every
+ * attendance (selfies included, audited) and correction of the PT, records check-in / check-out ON BEHALF of any
+ * employee of the PT (also without an account), corrects attendance (never own, reason required) and reads the
+ * employees of the PT (no bank accounts). Like `pk-operator` it is absent from `anyMember` and from every money /
+ * request rule: no finance or request access unless another role is held.
  */
-export const ROLES = ['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator'] as const
+export const ROLES = ['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator', 'pk-admin-staff'] as const
 export type Role = (typeof ROLES)[number]
 
 /**
@@ -51,6 +56,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   'pk-principal': 'Owner',
   'pk-admin': 'Admin',
   'pk-operator': 'Operator/Anggota',
+  'pk-admin-staff': 'Admin Staff',
 }
 
 /**
@@ -60,7 +66,7 @@ export const ROLE_LABELS: Record<Role, string> = {
  * an even narrower panel (attendance only). What a restricted role SEES is narrowed by
  * `src/access/panel-visibility.ts`; what it may READ/WRITE is still decided by access functions.
  */
-export const PANEL_ROLES: readonly Role[] = ['pk-admin', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-pm', 'pk-staff', 'pk-operator']
+export const PANEL_ROLES: readonly Role[] = ['pk-admin', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-pm', 'pk-staff', 'pk-operator', 'pk-admin-staff']
 
 // ---- company context (ADR 0016 §5) --------------------------------------------------------------
 
@@ -169,6 +175,15 @@ export function isStaffOnly(user: unknown): boolean {
 /** Operator/Anggota without any other panel role (the restricted attendance-only panel). */
 export function isOperatorOnly(user: unknown): boolean {
   return isRoleOnly(user, 'pk-operator')
+}
+
+/**
+ * ADR 0032: Admin Staff without a role beyond the attendance ones (`pk-admin-staff`, optionally `pk-operator`) in the
+ * selected PTs — the restricted attendance-administration panel (access/panel-visibility.ts).
+ */
+export function isAdminStaffOnly(user: unknown): boolean {
+  const roles = rolesOf(user)
+  return roles.includes('pk-admin-staff') && roles.every((r) => r === 'pk-admin-staff' || r === 'pk-operator')
 }
 
 /**

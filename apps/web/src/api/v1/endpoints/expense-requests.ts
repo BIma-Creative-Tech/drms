@@ -13,12 +13,13 @@ import { detail, listItem } from '@/domain/expense/dto'
 import { addReceipt, editReceipt, rejectReceipt, removeReceipt, resubmitReceipts, reviewFlag, verifyAllReceipts, verifyReceipt } from '@/domain/expense/receipts'
 import { allowedActions } from '@/domain/expense/state'
 import { recordTransfer, voidTransfer } from '@/domain/expense/transfers'
-import { acknowledge, approve, cancel, complete, reject, submit, withdraw } from '@/domain/expense/workflow'
+import { acknowledge, approve, cancel, complete, DELETE_DRAFT_DEFAULT_REASON, deleteDraft, reject, submit, withdraw } from '@/domain/expense/workflow'
 import { receiptsComplete, requestLpjRevision, reverseSettlement, setLpjPhotos, settle, submitLpj, verifyLpj } from '@/domain/expense/lpj'
 import { requestHistory } from '@/domain/history'
 import { approvalInbox, lpjQueue, officeQueueWhere, transferQueue } from '@/domain/expense/queues'
 import { searchWhere } from '@/lib/text-search'
 import { settlePrecheck } from '@/domain/expense/settle-precheck'
+import { instructionInfo, instructProjectLoan } from '@/domain/loans/owner-instruct'
 
 import { companyQuery } from '../company-query'
 
@@ -37,12 +38,14 @@ import {
   RevisionBody,
   SettleBody,
   ReasonBody,
+  OptionalReasonBody,
   ReceiptCreate,
   ReceiptUpdate,
   RejectBody,
   SignBody,
   TransferCreate,
 } from '../schemas-flow'
+import { ProjectLoanInstruct } from '../schemas-loans'
 
 /** Architecture §6.5: submit/approve 30/min per user. */
 const ACTION_LIMIT: [number, number] = [30, 60_000]
@@ -351,6 +354,12 @@ export const cancelEndpoint = action('cancel', ReasonBody, (req, id, b) => {
   req.context.auditReason = b.reason
   return cancel(req, id, b.reason)
 })
+/** D2410 "Hapus draft": soft delete of an own Draft nobody ever decided on (reason optional, audited `soft_delete`). */
+export const deleteDraftEndpoint = action('delete-draft', OptionalReasonBody, (req, id, b) => {
+  const reason = b.reason?.trim() || DELETE_DRAFT_DEFAULT_REASON
+  req.context.auditReason = reason
+  return deleteDraft(req, id, reason)
+})
 export const resubmitEndpoint = action('resubmit', EmptyBody, (req, id) => resubmitAsDraft(req, id), { status: 201, returnsNewId: true })
 /**
  * POST /expense-requests/{id}/duplicate — DRMS 13/10 Persetujuan #12 "Duplikat": a clean NEW Draft from a request the
@@ -626,6 +635,38 @@ export const bankPreviewEndpoint = v1({
   },
 })
 
+/**
+ * DRMS 26/10 #1 (ADR 0031 amendment 2026-10-26) "Instruksi pinjam antar proyek": the dialog data — the request's project
+ * account (dana bebas, shortfall), the lender candidates of the PT with their account's dana bebas, the instructed loan
+ * waiting for Finance; `canInstruct` for the final decider. Kas roles of the request's PT (else 403), readers only.
+ */
+export const projectLoanLendersEndpoint = v1({
+  path: '/expense-requests/:id/project-loan-lenders',
+  method: 'get',
+  rateLimit: [60, 60_000],
+  transactional: true,
+  handler: async ({ req, params }) => json(await instructionInfo(req, idParam(params))),
+})
+
+/**
+ * POST /expense-requests/{id}/project-loan — the final decider instructs the loan (born approved, transfer order in
+ * Antrian Transfer); 201 + the request detail (`fundCheck.projectLoans` / `projectLoanPending`). The request stays at its
+ * final decision until Finance executed the transfer.
+ */
+export const instructProjectLoanEndpoint = v1({
+  path: '/expense-requests/:id/project-loan',
+  method: 'post',
+  body: ProjectLoanInstruct,
+  rateLimit: ACTION_LIMIT,
+  transactional: true,
+  idempotent: true,
+  handler: async ({ req, body, params }) => {
+    const id = idParam(params)
+    await instructProjectLoan(req, id, { lenderProjectId: body.lenderProjectId, amount: body.amount, reason: body.reason, dueDate: body.dueDate })
+    return ok(req, id, 201)
+  },
+})
+
 export const EXPENSE_ENDPOINTS = [
   listRequestsEndpoint,
   createRequestEndpoint,
@@ -638,6 +679,7 @@ export const EXPENSE_ENDPOINTS = [
   submitEndpoint,
   withdrawEndpoint,
   cancelEndpoint,
+  deleteDraftEndpoint,
   resubmitEndpoint,
   duplicateEndpoint,
   acknowledgeEndpoint,
@@ -664,5 +706,7 @@ export const EXPENSE_ENDPOINTS = [
   settleReverseEndpoint,
   pdfEndpoint,
   bankPreviewEndpoint,
+  projectLoanLendersEndpoint,
+  instructProjectLoanEndpoint,
 ]
 

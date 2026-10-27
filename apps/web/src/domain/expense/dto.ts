@@ -180,8 +180,11 @@ export async function detail(req: PayloadRequest, id: number) {
   const baseAllowed = allowedActions(ctx).filter((a) => a !== 'settle_reverse' || (lpj?.status === 'settled' && (lpj.settlementType === 'refund' || lpj.settlementType === 'shortfall')))
   // ADR 0029 §2 / §6: the PT's available funds (Kas roles of the PT, waiting request or the Owner's own Draft) and the
   // Owner's "Perintahkan pinjaman antar-PT" (`instruct_loan`) while short. `approve` stays listed (old clients get the 409).
-  const fund = await fundPanel(req, { id, status: doc.status, grandTotal: doc.grandTotal ?? 0, company: doc.company, project: doc.project, createdBy: doc.createdBy, currentLevel: doc.currentLevel ?? null, approvalSnapshot: snap })
-  const allowed: Array<(typeof baseAllowed)[number] | 'instruct_loan'> = fund?.instructLoan ? [...baseAllowed, 'instruct_loan'] : baseAllowed
+  // 2026-10-26 (DRMS 26/10 #1): the final decider's "Instruksi pinjam antar proyek" (`instruct_project_loan`) while the
+  // project's cash account is short and no instructed loan waits for Finance's transfer.
+  const decides = baseAllowed.includes('approve') || baseAllowed.includes('acknowledge')
+  const fund = await fundPanel(req, { id, status: doc.status, grandTotal: doc.grandTotal ?? 0, company: doc.company, project: doc.project, createdBy: doc.createdBy, currentLevel: doc.currentLevel ?? null, approvalSnapshot: snap }, { decides })
+  const allowed: Array<(typeof baseAllowed)[number] | 'instruct_loan' | 'instruct_project_loan'> = [...baseAllowed, ...(fund?.instructLoan ? (['instruct_loan'] as const) : []), ...(fund?.instructProjectLoan ? (['instruct_project_loan'] as const) : [])]
   const kasViewer = hasRole(req, FUND_VIEW_ROLES, company)
   // ADR 0025: the caller's next decision is signed as the PT's definitive Direktur (representative on a Direktur step)
   const direkturSignature = await direkturSignatureHint(req, { companyId: company, callerId: userId(req) ?? -1, snapshot: snap, status: doc.status, currentLevel: doc.currentLevel ?? null, allowed: baseAllowed })
@@ -215,6 +218,13 @@ export async function detail(req: PayloadRequest, id: number) {
           mimeType: doc.invoiceFile && typeof doc.invoiceFile === 'object' ? String((doc.invoiceFile as { mimeType?: string }).mimeType ?? '') || null : null,
         }
       : null,
+    // D2410 (point 6): general attachments ("Lampiran", photo / PDF) — the APK lists and opens them like the web summary
+    attachments: (doc.attachments ?? []).flatMap((a) => {
+      const fileId = relId(a)
+      if (fileId === undefined) return []
+      const m = (a && typeof a === 'object' ? a : {}) as { filename?: string | null; mimeType?: string | null }
+      return [{ id: fileId, fileName: m.filename || null, mimeType: m.mimeType || null }]
+    }),
     bank: doc.bankSnapshot?.accountNo
       ? { bankName: doc.bankSnapshot.bankName ?? null, accountNo: maskAccountNo(doc.bankSnapshot.accountNo, fullBank), accountHolder: doc.bankSnapshot.accountHolder ?? null }
       : null,

@@ -2,6 +2,7 @@ import { APIError, ValidationError, type CollectionSlug, type PayloadRequest, ty
 
 import { companyContextOf, hasRole, isGroupAdmin, isRole, relId, userId as callerId, type Role } from '@/access/roles'
 import { canUseMatrix, employeeChoices, matrixColumns, viewerOf, type MatrixCompany, type Viewer } from '@/admin/components/access/role-matrix'
+import { getKeycloakAdmin } from '@/auth/keycloak-admin'
 import { writeAudit } from '@/audit/writer'
 import { attendanceTypeOf, type AttendanceType } from '@/domain/attendance/area'
 import { membershipOf, membershipOfEmployee } from '@/domain/employee-user-link'
@@ -65,10 +66,11 @@ export type OnboardingCompany = {
   employeeChoices: Array<{ id: number; code: string; name: string; active: boolean }>
   canManageAssignments: boolean
   assignments: Array<{ id: number; kind: LocationKind | null; label: string; roleInProject: string; startDate: string | null; endDate: string | null }>
-  /** Locations of a NEW assignment: active records of this PT the caller can read. */
+  /** Locations of a NEW assignment: active records of this PT the caller can read. ADR 0032: `sites` always empty (kept for APK ≤ 0.11.1). */
   assignmentChoices: Record<'projects' | 'costCenters' | 'sites', LocationChoice[]>
 }
 
+/** `site` = a legacy ADR 0023 assignment (ADR 0032: shown, never created). */
 export type LocationKind = 'project' | 'costCenter' | 'site'
 export type LocationChoice = { id: number; code: string; name: string }
 
@@ -81,7 +83,7 @@ export type OnboardingDetail = {
 /** Project statuses that take no new assignment (the picker and the save agree). */
 const CLOSED_PROJECT = ['selesai', 'arsip', 'dibatalkan'] as const
 
-/** The three locations of a team assignment (exactly one per row — TeamAssignments guard + DB CHECK). */
+/** The locations of a team assignment (exactly one per row — TeamAssignments guard + DB CHECK; `site` = legacy rows only). */
 const LOCATIONS = [
   { key: 'project', collection: 'projects', label: 'Project' },
   { key: 'costCenter', collection: 'cost-centers', label: 'Pusat biaya' },
@@ -179,13 +181,12 @@ export async function loadUserOnboarding(req: PayloadRequest, userId: number | n
 
   const mine = cells.filter((c) => userId !== null && c.user === userId)
   const linked = mine.map((c) => c.employee).filter((e): e is number => e !== null)
-  const [accountsRes, assignRes, projectsRes, costCentersRes, sitesRes] = await Promise.all([
+  const [accountsRes, assignRes, projectsRes, costCentersRes] = await Promise.all([
     linked.length ? req.payload.find({ collection: 'employee-bank-accounts', where: { employee: { in: linked } }, sort: 'id', pagination: false, select: { employee: true, bank: true, accountNo: true, accountHolder: true, isDefault: true, verificationStatus: true, active: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
     linked.length ? req.payload.find({ collection: 'team-assignments', where: { employee: { in: linked } }, sort: '-startDate', pagination: false, ...asCaller, overrideAccess: false, depth: 1 }) : { docs: [] },
     // DRMS 15/10: locations of a new assignment — the caller's own read access (a PM reads its team's only)
     colIds.length ? req.payload.find({ collection: 'projects', where: { and: [{ company: { in: colIds } }, { status: { not_in: [...CLOSED_PROJECT] } }] }, sort: 'code', pagination: false, select: { code: true, name: true, company: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
     colIds.length ? req.payload.find({ collection: 'cost-centers', where: { and: [{ company: { in: colIds } }, { active: { not_equals: false } }] }, sort: 'code', pagination: false, select: { code: true, name: true, company: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
-    colIds.length ? req.payload.find({ collection: 'sites', where: { and: [{ company: { in: colIds } }, { active: { not_equals: false } }] }, sort: 'code', pagination: false, select: { code: true, name: true, company: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
   ])
   const choicesOf = (docs: unknown[], company: number): LocationChoice[] =>
     (docs as Row[]).filter((d) => relId(d.company) === company).map((d) => ({ id: d.id as number, code: str(d.code), name: str(d.name) }))
@@ -233,7 +234,7 @@ export async function loadUserOnboarding(req: PayloadRequest, userId: number | n
               }))
           : [],
         assignmentChoices: canManageAssignments
-          ? { projects: choicesOf(projectsRes.docs, c.id), costCenters: choicesOf(costCentersRes.docs, c.id), sites: choicesOf(sitesRes.docs, c.id) }
+          ? { projects: choicesOf(projectsRes.docs, c.id), costCenters: choicesOf(costCentersRes.docs, c.id), sites: [] }
           : { projects: [], costCenters: [], sites: [] },
       }
     }),
@@ -368,6 +369,33 @@ export async function saveUserOnboarding(req: PayloadRequest, input: OnboardingI
   for (const [i, c] of companies.entries()) await savePt(req, uid, c, i, stored.get(c.company) ?? { membership: null, employee: null }, storedAssignments)
 
   return { userId: uid, created: userId === null, temporaryPassword, linkedExistingAccount }
+}
+
+/**
+ * DRMS 27/10: an Admin resets the password of an EXISTING account — a new temporary password (Keycloak
+ * `temporary: true` → UPDATE_PASSWORD at the next login), returned once. Same rule as editing the identity
+ * (`canUpdateUser`: accounts only in the caller's Admin PTs, a group admin only by a group admin); never the own
+ * account, never an inactive one. MUST run inside one DB transaction on `req`: the audit row (the fact, never the
+ * value) is written first and Keycloak last, so a refused / unreachable Keycloak rolls the audit back. Sessions are
+ * left alone (the account is not suspected compromised — deactivation ends them).
+ */
+export async function resetUserPassword(req: PayloadRequest, userId: number): Promise<{ userId: number; temporaryPassword: string }> {
+  if (!req.transactionID) throw new Error('resetUserPassword needs a transaction on req')
+  if (!mayOnboard(req)) throw new OnboardingError(403, 'Hanya Admin PT (atau Admin grup) yang dapat mengelola pengguna.')
+  if (userId === callerId(req)) throw new OnboardingError(400, 'Kata sandi akun Anda sendiri tidak dapat direset di sini — minta Admin lain.')
+  const u = (await req.payload.findByID({ collection: 'users', id: userId, depth: 0, user: req.user, req, overrideAccess: false, disableErrors: true })) as Row | null
+  if (!u) throw new OnboardingError(404, 'Pengguna tidak ditemukan atau bukan pengguna PT Anda.')
+  if (!(await canUpdateUser(req, userId))) {
+    throw new OnboardingError(403, 'Akun ini juga terdaftar di PT yang bukan wewenang Anda (atau Admin grup) — kata sandinya hanya dapat direset oleh Admin PT tersebut / Admin grup.')
+  }
+  if (u.active === false) throw new OnboardingError(409, 'Akun nonaktif — aktifkan dulu sebelum mereset kata sandi.')
+  const sub = str(u.keycloakSub)
+  if (!sub) throw new OnboardingError(409, 'Akun belum tertaut ke sistem login (Keycloak).')
+  const kc = getKeycloakAdmin()
+  const temporaryPassword = generateTemporaryPassword()
+  await writeAudit(req, [{ action: 'update', docType: 'user', docId: String(userId), field: 'password', reason: 'Kata sandi sementara direset oleh Admin (wajib diganti saat login berikutnya).' }])
+  await kc.resetPassword(sub, temporaryPassword, true)
+  return { userId, temporaryPassword }
 }
 
 async function loadStoredAssignments(req: PayloadRequest, companies: readonly CompanyInput[]): Promise<Map<number, StoredAssignment>> {

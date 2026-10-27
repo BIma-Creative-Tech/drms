@@ -1,8 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { denyAll } from '@/access/roles'
-import { anyOf, byRole, ownEmployee, teamCostCenters, teamProjects, type Rule } from '@/access/policies'
-import { inIds } from '@/access/scope'
+import { anyOf, byRole, ownEmployee, teamCostCenters, teamProjects } from '@/access/policies'
 import { withAudit } from '@/audit/hooks'
 
 import { ro } from './fields-f2'
@@ -10,9 +9,6 @@ import { companyField, companyHook } from '@/fields/company'
 import { USER_NAME_VIEW } from '@/fields/users'
 
 const dt = { ...ro, date: { pickerAppearance: 'dayAndTime' as const } }
-
-/** ADR 0023: corrections of site check-ins (no project / cost center) at the PM's team sites (through the attendance). */
-const teamSiteCorrections: Rule = async ({ scope }) => ({ and: [inIds('attendance.site', (await scope()).teamSites), { project: { exists: false } }, { costCenter: { exists: false } }] })
 
 /**
  * T10 Koreksi absensi (US-15, requirements v1.1 §7 T10 / §8 "Jam lama → baru, project; alasan
@@ -37,10 +33,12 @@ export const AttendanceCorrections: CollectionConfig = withAudit(
         'pk-admin': true,
         'pk-owner': true,
         'pk-finance': true,
-        'pk-pm': anyOf(teamProjects('project'), teamCostCenters('costCenter'), teamSiteCorrections, ownEmployee('employee')),
+        'pk-pm': anyOf(teamProjects('project'), teamCostCenters('costCenter'), ownEmployee('employee')),
         'pk-staff': ownEmployee('employee'),
         // Operator/Anggota (owner decision 2026-10-09): own corrections only, same as Staff.
         'pk-operator': ownEmployee('employee'),
+        // ADR 0032: Admin Staff reads (and makes, never own) the corrections of its PT
+        'pk-admin-staff': true,
       }),
       create: denyAll,
       update: denyAll,

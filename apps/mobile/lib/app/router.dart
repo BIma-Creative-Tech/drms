@@ -234,7 +234,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: 'recap/:employeeId',
-            builder: (_, s) => MemberRecapScreen(employeeId: int.tryParse(s.pathParameters['employeeId'] ?? '') ?? 0),
+            builder: (_, s) {
+              final month = s.uri.queryParameters['month'];
+              return MemberRecapScreen(
+                employeeId: int.tryParse(s.pathParameters['employeeId'] ?? '') ?? 0,
+                initialMonth: month != null && RegExp(r'^\d{4}-(0[1-9]|1[0-2])$').hasMatch(month) ? month : null,
+              );
+            },
           ),
         ],
       ),
@@ -318,7 +324,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: ':code',
-            builder: (_, s) => ReportScreen(code: s.pathParameters['code'] ?? ''),
+            builder: (_, s) =>
+                ReportScreen(code: s.pathParameters['code'] ?? '', initialParams: s.uri.queryParametersAll),
           ),
         ],
       ),

@@ -4,6 +4,7 @@ import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { fmtNum, parseDecimalId } from '@/domain/field/views'
 
 import { uploadFieldPhoto } from './client'
+import { ImageThumb } from '../media/ImageThumb'
 import { WrapText } from '../WrapText'
 
 /**
@@ -105,10 +106,7 @@ export function PhotoPicker({ photos, label, help, required, error, name, existi
       <ul className="pk-photos" aria-labelledby={`${uid}-l`}>
         {existing.map((p, i) => (
           <li key={`s${p.id}`} data-pk-photo-stored={p.id}>
-            <a href={p.url} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`stored-${uid}`} data-pk-lightbox-title={`Foto tersimpan ${i + 1}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API thumbnail */}
-              <img src={p.thumbUrl} alt={`Foto tersimpan ${i + 1}`} loading="lazy" />
-            </a>
+            <ImageThumb src={{ href: p.url, thumb: p.thumbUrl, fallback: 'full' }} size={96} group={`stored-${uid}`} title={`Foto tersimpan ${i + 1}`} />
             <small className="pk-photo-tag">tersimpan</small>
           </li>
         ))}

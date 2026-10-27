@@ -5,12 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../app/theme.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
+import '../../../shared/icons/iconsax.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/online_only_button.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_keuangan.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/user_profile.dart';
@@ -35,10 +40,13 @@ class AddendumInboxSection extends ConsumerWidget {
       key: const Key('addendum-inbox'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(t.addendumInboxTitle(items.length), style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
+        Text(
+          t.addendumInboxTitle(items.length),
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 10),
         for (final a in items) AddendumCard(a: a),
-        const Divider(height: 24),
+        const SizedBox(height: 12),
       ],
     );
   }
@@ -71,7 +79,7 @@ class AddendumListScreen extends ConsumerWidget {
           data: (page) => ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
             children: [
-              if (page.items.isEmpty) Padding(padding: const EdgeInsets.all(24), child: Text(t.addendumEmpty)),
+              if (page.items.isEmpty) PkEmptyState(icon: PkIcons.addendum, message: t.addendumEmpty),
               for (final a in page.items) AddendumCard(a: a),
             ],
           ),
@@ -164,21 +172,26 @@ class _AddendumCreateScreenState extends ConsumerState<AddendumCreateScreen> {
       _error = null;
     });
     if (errors.isNotEmpty) return;
-    if (_editing) return _saveEdit(addition: addition!, submit: submit);
+    final label = _label(t, submit: submit);
+    final amountRab = addition!;
+    final summary = [widget.initial?.docNo, formatRupiah(amountRab), _reason.text.trim()];
+    if (!await confirmAction(context, action: label, summary: summary) || !mounted) return;
+    if (_editing) return _saveEdit(addition: amountRab, submit: submit);
     setState(() => _busy = true);
     try {
       final a = await ref
           .read(addendumApiProvider)
           .create(
             projectId: _projectId!,
-            addition: addition!,
+            addition: amountRab,
             reason: _reason.text,
             submit: submit,
             idempotencyKey: _key,
           );
       ref.invalidate(addendumListProvider);
       if (!mounted) return;
-      showSnack(context, submit ? t.addendumSubmitted : t.addendumSavedDraft);
+      await showActionResult(context, message: submit ? t.addendumSubmitted : t.addendumSavedDraft, action: label);
+      if (!mounted) return;
       final router = GoRouter.maybeOf(context);
       if (router != null) {
         unawaited(router.pushReplacement('/addenda/${a.id}'));
@@ -186,10 +199,17 @@ class _AddendumCreateScreenState extends ConsumerState<AddendumCreateScreen> {
         await Navigator.of(context).maybePop();
       }
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (!mounted) return;
+      setState(() => _error = e.message);
+      await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  String _label(AppLocalizations t, {required bool submit}) {
+    if (submit) return _editing ? t.addendumSaveAndSubmit : t.addendumSubmit;
+    return _editing ? t.addendumSaveChanges : t.addendumSaveDraft;
   }
 
   Future<void> _saveEdit({required int addition, required bool submit}) async {
@@ -205,7 +225,9 @@ class _AddendumCreateScreenState extends ConsumerState<AddendumCreateScreen> {
       ref.invalidate(addendumDetailProvider(a.id));
       ref.invalidate(addendumListProvider);
       if (!mounted) return;
-      showSnack(context, submit ? t.addendumSubmitted : t.addendumEdited);
+      final label = _label(t, submit: submit);
+      await showActionResult(context, message: submit ? t.addendumSubmitted : t.addendumEdited, action: label);
+      if (!mounted) return;
       final router = GoRouter.maybeOf(context);
       if (router != null && router.canPop()) {
         router.pop();
@@ -213,7 +235,9 @@ class _AddendumCreateScreenState extends ConsumerState<AddendumCreateScreen> {
         await Navigator.of(context).maybePop();
       }
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (!mounted) return;
+      setState(() => _error = e.message);
+      await showActionError(context, e, action: _label(t, submit: submit));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -231,61 +255,68 @@ class _AddendumCreateScreenState extends ConsumerState<AddendumCreateScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (initial != null)
-            InputDecorator(
-              key: const Key('addendum-project-fixed'),
-              decoration: InputDecoration(labelText: t.progressProject, prefixIcon: const Icon(Icons.apartment)),
-              child: Text(initial.projectLabel.isEmpty ? '#${initial.projectId}' : initial.projectLabel),
-            )
-          else
-            AsyncBody<List<MasterItem>>(
-              value: projects,
-              data: (list) => DropdownButtonFormField<int>(
-                hint: Text(pickHintFor(t, t.progressProject)),
-                key: const Key('addendum-project'),
-                initialValue: _projectId,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: t.progressProject,
-                  prefixIcon: const Icon(Icons.apartment),
-                  errorText: _errors['project'],
-                ),
-                items: [
-                  for (final p in list)
-                    DropdownMenuItem(
-                      value: p.id,
-                      child: Text(p.label, overflow: TextOverflow.ellipsis),
+          // D2510: the fields in one card.
+          PkCard(
+            radius: PkRadius.lg,
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (initial != null)
+                  InputDecorator(
+                    key: const Key('addendum-project-fixed'),
+                    decoration: InputDecoration(labelText: t.progressProject, prefixIcon: const Icon(Icons.apartment)),
+                    child: Text(initial.projectLabel.isEmpty ? '#${initial.projectId}' : initial.projectLabel),
+                  )
+                else
+                  AsyncBody<List<MasterItem>>(
+                    value: projects,
+                    data: (list) => DropdownButtonFormField<int>(
+                      hint: Text(pickHintFor(t, t.progressProject)),
+                      key: const Key('addendum-project'),
+                      initialValue: _projectId,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: t.progressProject,
+                        prefixIcon: const Icon(Icons.apartment),
+                        errorText: _errors['project'],
+                      ),
+                      items: [
+                        for (final p in list)
+                          DropdownMenuItem(
+                            value: p.id,
+                            child: Text(p.label, overflow: TextOverflow.ellipsis),
+                          ),
+                      ],
+                      onChanged: _busy ? null : (v) => setState(() => _projectId = v),
                     ),
-                ],
-                onChanged: _busy ? null : (v) => setState(() => _projectId = v),
-              ),
+                  ),
+                const SizedBox(height: 16),
+                TextField(
+                  key: const Key('addendum-amount'),
+                  controller: _amount,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: const [RupiahInputFormatter()],
+                  decoration: InputDecoration(
+                    labelText: t.addendumAddition,
+                    prefixText: 'Rp ',
+                    errorText: _errors['addition'],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  key: const Key('addendum-reason'),
+                  controller: _reason,
+                  minLines: 2,
+                  maxLines: 5,
+                  maxLength: 1000,
+                  decoration: InputDecoration(labelText: t.addendumReason, errorText: _errors['reason']),
+                ),
+              ],
             ),
-          const SizedBox(height: 16),
-          TextField(
-            key: const Key('addendum-amount'),
-            controller: _amount,
-            keyboardType: TextInputType.number,
-            inputFormatters: const [RupiahInputFormatter()],
-            decoration: InputDecoration(
-              labelText: t.addendumAddition,
-              prefixText: 'Rp ',
-              errorText: _errors['addition'],
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            key: const Key('addendum-reason'),
-            controller: _reason,
-            minLines: 2,
-            maxLines: 5,
-            maxLength: 1000,
-            decoration: InputDecoration(labelText: t.addendumReason, errorText: _errors['reason']),
           ),
           if (_error != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            ),
+            PkNoticeCard(tone: PkTone.bad, dense: true, icon: Icons.error_outline, title: Text(_error!)),
           if (canSubmit) ...[
             OnlineOnlyButton(
               key: const Key('addendum-submit'),
@@ -331,29 +362,31 @@ class _AddendumDetailScreenState extends ConsumerState<AddendumDetailScreen> {
       return;
     }
     String? reason;
+    final label = switch (action) {
+      AddendumAction.acknowledge => t.addendumAcknowledge,
+      AddendumAction.approve => t.addendumApprove,
+      AddendumAction.reject => t.addendumReject,
+      AddendumAction.cancel => t.addendumCancel,
+      _ => t.addendumSubmit,
+    };
+    final a = ref.read(addendumDetailProvider(widget.id)).value;
+    final summary = [a?.docNo, a?.projectLabel, a == null ? null : formatRupiah(a.addition)];
     if (action == AddendumAction.reject || action == AddendumAction.cancel) {
       reason = await showDialog<String>(
         context: context,
-        builder: (_) => _ReasonDialog(title: action == AddendumAction.reject ? t.addendumReject : t.addendumCancel),
+        builder: (_) =>
+            _ReasonDialog(title: t.confirmActionTitle(actionPhrase(label)), summary: summary, confirm: label),
       );
       if (reason == null) return;
-    } else if (action != AddendumAction.submit) {
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(action == AddendumAction.acknowledge ? t.addendumAcknowledge : t.addendumApprove),
-          content: Text(t.addendumConfirmBody),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-            FilledButton(
-              key: const Key('addendum-confirm'),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(t.yes),
-            ),
-          ],
-        ),
+    } else {
+      final ok = await confirmAction(
+        context,
+        action: label,
+        summary: summary,
+        note: action == AddendumAction.submit ? null : t.addendumConfirmBody,
+        confirmKey: const Key('addendum-confirm'),
       );
-      if (ok != true) return;
+      if (!ok) return;
     }
     final key = _keys.putIfAbsent(action, () => const Uuid().v7());
     final api = ref.read(addendumApiProvider);
@@ -371,9 +404,10 @@ class _AddendumDetailScreenState extends ConsumerState<AddendumDetailScreen> {
       ref.invalidate(addendumInboxProvider);
       ref.invalidate(addendumListProvider);
       ref.invalidate(inboxProvider);
-      if (mounted) showSnack(context, t.addendumDone);
+      final done = '${a?.docNo ?? ''} ${t.addendumDone}'.trim();
+      if (mounted) await showActionResult(context, message: done, action: label);
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -400,52 +434,102 @@ class _AddendumDetailScreenState extends ConsumerState<AddendumDetailScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Row(
-                children: [
-                  Expanded(child: Text(a.projectLabel, style: theme.textTheme.titleMedium)),
-                  AddendumStatusChip(a: a),
-                ],
-              ),
-              if (a.stepLabel != null && a.status.isOpen) Text(t.addendumWaiting(a.stepLabel!)),
-              const SizedBox(height: 12),
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.surfaceContainerLow,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: AddendumImpact(a: a),
+              // D2510: header card (addendum chip, project, status pill, waiting step) with the RAB impact.
+              PkCard(
+                radius: PkRadius.lg,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const PkIconChip(icon: PkIcons.addendum, size: 44),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                a.projectLabel,
+                                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 6),
+                              AddendumStatusChip(a: a),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    Divider(height: 24, color: context.pk.border),
+                    AddendumImpact(a: a),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-              Text(t.addendumReason, style: theme.textTheme.titleSmall),
-              Text(a.reason),
-              if (a.rejectReason != null) Text(t.addendumRejectedBecause(a.rejectReason!)),
-              if (a.cancelReason != null) Text(t.addendumCancelledBecause(a.cancelReason!)),
-              const SizedBox(height: 8),
-              Text(
-                [
-                  if (a.createdByName != null) t.addendumBy(a.createdByName!),
-                  if (a.submittedAt != null) t.addendumSubmittedAt(formatServerDateTime(a.submittedAt, zone: zone)),
-                ].join(' · '),
-                style: theme.textTheme.bodySmall,
-              ),
-              if (a.decisions.isNotEmpty) ...[
-                const Divider(height: 24),
-                Text(t.addendumTimeline, style: theme.textTheme.titleSmall),
-                for (final d in a.decisions)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(d.decision == 'rejected' ? Icons.cancel : Icons.check_circle),
-                    title: Text('${decisionLabel(d)} · ${d.actorName ?? '-'}'),
-                    subtitle: Text(
+              if (a.stepLabel != null && a.status.isOpen)
+                PkNoticeCard(icon: Icons.hourglass_top, dense: true, title: Text(t.addendumWaiting(a.stepLabel!))),
+              PkSectionCard(
+                title: t.addendumReason,
+                icon: Icons.notes,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(a.reason),
+                    if (a.rejectReason != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          t.addendumRejectedBecause(a.rejectReason!),
+                          style: TextStyle(color: context.pk.badText),
+                        ),
+                      ),
+                    if (a.cancelReason != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(t.addendumCancelledBecause(a.cancelReason!)),
+                      ),
+                    const SizedBox(height: 8),
+                    Text(
                       [
-                        formatServerDateTime(d.decidedAt, zone: zone),
-                        if ((d.reason ?? '').isNotEmpty) d.reason!,
-                      ].join('\n'),
+                        if (a.createdByName != null) t.addendumBy(a.createdByName!),
+                        if (a.submittedAt != null)
+                          t.addendumSubmittedAt(formatServerDateTime(a.submittedAt, zone: zone)),
+                      ].join(' · '),
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     ),
+                  ],
+                ),
+              ),
+              if (a.decisions.isNotEmpty)
+                PkSectionCard(
+                  title: t.addendumTimeline,
+                  icon: Icons.timeline,
+                  child: Column(
+                    children: [
+                      for (final d in a.decisions)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: PkIconChip(
+                            icon: d.decision == 'rejected' ? Icons.cancel : Icons.check_circle,
+                            tone: d.decision == 'rejected' ? PkTone.bad : PkTone.ok,
+                            round: true,
+                            size: 34,
+                          ),
+                          title: Text(
+                            '${decisionLabel(d)} · ${d.actorName ?? '-'}',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(
+                            [
+                              formatServerDateTime(d.decidedAt, zone: zone),
+                              if ((d.reason ?? '').isNotEmpty) d.reason!,
+                            ].join('\n'),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
-              const SizedBox(height: 16),
+                ),
+              const SizedBox(height: 4),
               if (acts.contains(AddendumAction.acknowledge))
                 _action(AddendumAction.acknowledge, t.addendumAcknowledge, Icons.verified),
               if (acts.contains(AddendumAction.approve))
@@ -479,8 +563,10 @@ class _AddendumDetailScreenState extends ConsumerState<AddendumDetailScreen> {
 }
 
 class _ReasonDialog extends StatefulWidget {
-  const _ReasonDialog({required this.title});
+  const _ReasonDialog({required this.title, required this.summary, required this.confirm});
   final String title;
+  final List<String?> summary;
+  final String confirm;
   @override
   State<_ReasonDialog> createState() => _ReasonDialogState();
 }
@@ -498,19 +584,38 @@ class _ReasonDialogState extends State<_ReasonDialog> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final style = isDestructiveAction(widget.confirm)
+        ? FilledButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError)
+        : null;
+    final lines = [
+      for (final s in widget.summary)
+        if (s != null && s.isNotEmpty) s,
+    ];
     return AlertDialog(
       title: Text(widget.title),
-      content: TextField(
-        key: const Key('addendum-reason-field'),
-        controller: _c,
-        autofocus: true,
-        maxLength: 1000,
-        decoration: InputDecoration(labelText: t.addendumReason, errorText: _error),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final l in lines) Text(l, style: const TextStyle(fontWeight: FontWeight.w600)),
+            if (lines.isNotEmpty) const SizedBox(height: 8),
+            TextField(
+              key: const Key('addendum-reason-field'),
+              controller: _c,
+              autofocus: true,
+              maxLength: 1000,
+              decoration: InputDecoration(labelText: t.addendumReason, errorText: _error),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
         FilledButton(
           key: const Key('addendum-reason-ok'),
+          style: style,
           onPressed: () {
             final v = _c.text.trim();
             if (v.length < 3) {
@@ -519,7 +624,7 @@ class _ReasonDialogState extends State<_ReasonDialog> {
             }
             Navigator.pop(context, v);
           },
-          child: Text(t.next),
+          child: Text(t.confirmActionYes(actionPhrase(widget.confirm))),
         ),
       ],
     );

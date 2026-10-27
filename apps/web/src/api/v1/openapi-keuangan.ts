@@ -30,7 +30,6 @@ export function registerKeuanganPaths(registry: OpenAPIRegistry, h: Helpers): vo
         status: z.string().optional().meta({ description: 'posted,void' }),
         sumber: z.string().optional().meta({ description: 'transfer,settlement_refund,manual,reversal,opening,intercompany' }),
         pt: z.string().regex(/^\d+$/).optional().meta({ description: 'One Kas PT (a PT without Kas rights is ignored).' }),
-        site: z.string().regex(/^\d+$/).optional(),
         q: z.string().max(100).optional(),
         per: z.enum(['20', '50', '100']).optional(),
         hal: z.string().regex(/^\d+$/).optional(),

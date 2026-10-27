@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../masters/domain/master_item.dart';
 import 'request_status.dart';
 
 part 'draft.freezed.dart';
@@ -141,6 +142,9 @@ abstract class DraftRequest with _$DraftRequest {
 
     /// Server media id of the invoice (`media-attachments`): imported from the server or uploaded by the sync.
     int? invoiceFileId,
+    // D2410 (point 6): general attachments ("Lampiran", photo / PDF) — optional for Pengajuan Baru, at least one for a
+    // Reimburse ([maxDraftAttachments] at most). Stored in `local_drafts.vendor_json` (no drift schema change).
+    @Default([]) List<DraftAttachment> attachments,
     @Default([]) List<DraftLine> lines,
     int? serverId,
     int? serverRev,
@@ -172,5 +176,86 @@ abstract class DraftRequest with _$DraftRequest {
   Iterable<String> get mediaUuids => [
     ...lines.expand((l) => l.receipts).where((r) => !r.isServerReceipt).map((r) => r.mediaUuid),
     if (isDirectPayment && invoiceFileId == null && invoiceMediaUuid != null) invoiceMediaUuid!,
+    ...attachments.where((a) => a.isLocal).map((a) => a.mediaUuid!),
   ];
+}
+
+/// D2410 (point 6): file types of a general attachment (`media-attachments`: JPG / PNG photo or PDF).
+const attachmentMimeTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+
+/// Server `DraftInput.attachmentIds` maximum.
+const maxDraftAttachments = 20;
+
+/// `media-attachments` PDF limit (5 MB); photos are compressed on the phone like a receipt photo.
+const maxAttachmentPdfBytes = 5 * 1024 * 1024;
+
+/// Project statuses a new request may not use (server G10, domain/expense/drafts.ts).
+const requestRefusedProjectStatuses = {'arsip', 'dibatalkan', 'selesai'};
+
+/// D2610 (backlog 26/10): projects of the request picker — without the ones the server refuses (an older cached row
+/// without `status` stays); the draft's current project ([keep]) stays listed so its label still shows.
+List<MasterItem> requestableProjects(List<MasterItem> projects, {int? keep}) =>
+    projects.where((p) => p.id == keep || !requestRefusedProjectStatuses.contains(p.extra['status'])).toList();
+
+/// D2410 (point 6): type of a picked file by its name (JPG / PNG / PDF); null = not allowed.
+String? attachmentMimeOf(String fileName) => switch (fileName.split('.').last.toLowerCase()) {
+  'jpg' || 'jpeg' => 'image/jpeg',
+  'png' => 'image/png',
+  'pdf' => 'application/pdf',
+  _ => null,
+};
+
+/// A PDF starts with `%PDF-` (the server refuses anything else).
+bool isPdfFile(List<int> bytes) => bytes.length >= 5 && String.fromCharCodes(bytes.take(5)) == '%PDF-';
+
+/// D2410 (point 6): one general attachment ("Lampiran") of a draft — a photo / PDF picked on the phone ([mediaUuid]:
+/// `media_blobs` kind `attachment`, uploaded to `POST /media/attachments` by the sync or at "Ajukan") or a file already
+/// on the server ([serverFileId]: uploaded, or imported from a server draft).
+class DraftAttachment {
+  const DraftAttachment({required this.fileName, required this.mimeType, this.mediaUuid, this.serverFileId});
+
+  final String fileName;
+  final String mimeType;
+  final String? mediaUuid;
+  final int? serverFileId;
+
+  /// Still only on the phone (the upload replaces it by [serverFileId]).
+  bool get isLocal => serverFileId == null && mediaUuid != null;
+
+  bool get isPdf => mimeType == 'application/pdf';
+
+  DraftAttachment uploaded(int id) =>
+      DraftAttachment(fileName: fileName, mimeType: mimeType, mediaUuid: mediaUuid, serverFileId: id);
+
+  Map<String, Object?> toJson() => {
+    'fileName': fileName,
+    'mimeType': mimeType,
+    'mediaUuid': mediaUuid,
+    'serverFileId': serverFileId,
+  };
+
+  /// null = unreadable entry (skipped).
+  static DraftAttachment? fromJson(Object? j) {
+    if (j is! Map<String, dynamic>) return null;
+    final media = j['mediaUuid'];
+    final server = j['serverFileId'];
+    if (media is! String && server is! num) return null;
+    return DraftAttachment(
+      fileName: j['fileName'] is String ? j['fileName'] as String : 'lampiran',
+      mimeType: j['mimeType'] is String ? j['mimeType'] as String : 'image/jpeg',
+      mediaUuid: media is String ? media : null,
+      serverFileId: server is num ? server.toInt() : null,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is DraftAttachment &&
+      other.fileName == fileName &&
+      other.mimeType == mimeType &&
+      other.mediaUuid == mediaUuid &&
+      other.serverFileId == serverFileId;
+
+  @override
+  int get hashCode => Object.hash(fileName, mimeType, mediaUuid, serverFileId);
 }

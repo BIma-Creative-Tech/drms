@@ -202,3 +202,33 @@ fall back to the server label. To do in the APK later:
 Staging first. Deploy as usual (migrate → web + worker); nothing is deleted by the migration. Rollback before any
 project is cancelled: `payload migrate:down` (newest first) — the deletion flags are lost (the audit log keeps them);
 after a project cancel → restore the dump and the 0.12.0 image.
+
+## Amendment 2026-10-24 — "Batalkan" only at the Finance stage (D2410)
+
+User decision 2026-10-24 (point 13): the expense-request `cancel` transition exists only at the Finance stage
+(advance / vendor / PT grup `approved`; Reimburse `approved`, `receipts_verified`, `receipt_revision`) and only for
+Finance / Direktur of the PT. The row action **Batalkan** of a submitted request follows it (`requestCancellable` +
+`mayCancelRequest`); a submitted / withdrawn request otherwise has no row action. **Batalkan proyek** keeps cancelling
+the project's drafts and pending requests as before — a system cascade (`state.ts` `PROJECT_CASCADE_CANCEL_FROM`,
+`cascadeCancellable`), never offered to a user.
+
+## Amendment 2026-10-24 (DRMS 24/10, user decision) — "Hapus draft"
+
+Since D2410 "Batalkan" exists only at the Finance stage (ADR 0013 / state.ts), the requester side needs a way to drop a
+draft: the creator / a requester may **soft-delete a Draft nobody ever decided on** — never submitted, **or submitted
+and withdrawn before any approval decision** (§3 row "Pengajuan" widened; "decided" = an approval row other than a
+signature in any cycle).
+
+- Action `delete_draft` (allowedActions: own + Draft + no decision) and `POST /api/v1/expense-requests/{id}/delete-draft`
+  `{ reason? }` (default reason "Draft dihapus oleh pemohon"; 403 / 404 / 409 as the other workflow actions). It is the
+  §1 soft delete (same service, audit `soft_delete`, Pulihkan by an Admin); the row action "Hapus" of the lists and
+  `POST /records/expense-requests/{id}/delete` follow the same rule.
+- The number of a withdrawn draft stays on the deleted row and is **never reused** (ADR 0007).
+- A deleted draft no longer blocks its vendor (ADR 0027) / PT grup (ADR 0028) invoice number: the duplicate checks and the
+  partial unique indexes `expense_requests_vendor_invoice_uq` / `expense_requests_ic_invoice_uq` skip
+  `is_deleted = true` (migration `20261024_510000_d2410_delete_draft_invoice`). Restoring such a draft while another
+  request uses the number is refused by the index.
+- Web: "Hapus draft" in the requester panel (confirm popup, danger, optional reason, back to the list). APK: "Hapus draft"
+  on a server draft (confirm + result popups); sync `expense_request.draft_delete` of a numbered draft now soft-deletes
+  it by the same rule (flag `DELETED`) instead of `NOT_EDITABLE`; a never-submitted draft is still closed as Dibatalkan.
+

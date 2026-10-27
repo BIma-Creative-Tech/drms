@@ -11,6 +11,7 @@ import { reportPhotoWhere } from '@/domain/progress/access'
 import { assertSelfieUploadAllowed } from '@/legal/privacy-enforcement'
 
 import { mediaCollection } from './factory'
+import { MEDIA_LIMITS } from './limits'
 
 /**
  * Upload collections split by resize policy (ADR 0004 §2). Server re-encodes every raster image
@@ -172,13 +173,20 @@ const officeSignatures = officeRule(async (req, ids) => {
   return or.length === 0 ? false : or.length === 1 ? or[0]! : { or }
 })
 
-const ownOrOffice: Access = byRoleAny({
-  'pk-admin': officeOwned,
-  'pk-owner': officeOwned,
-  'pk-finance': officeOwned,
-  'pk-pm': ownUser('uploadedBy'),
-  'pk-staff': ownUser('uploadedBy'),
-})
+/**
+ * D2510 (web 0.21.1, user 2026-10-25): the Payload side of `media-selfies` — REST find / findByID
+ * (`/api/media-selfies[/<id>]`), the static file route `/api/media-selfies/file/<name>` and every admin view on it —
+ * answers ONLY the uploader's own rows. Office roles, Admin Staff and PMs used to read the selfies of their PTs / team
+ * here WITHOUT an audit row (the Media → Selfie absensi library, upload previews); they now go through the audited
+ * endpoints only: GET /api/v1/attendance/{id}/selfie and GET /api/v1/media/selfies/{id}/file (+ signed URL), whose
+ * visibility = read access of the referencing attendance (Q-33) and which audit someone else's selfie
+ * `view_sensitive`. The uploader keeps its own capture (web / APK check-in, on-behalf photo): upload response, own
+ * unlinked upload through the v1 file endpoint. The collection is hidden from the admin nav / routes (`hidden` below).
+ */
+const selfieRead: Access = ({ req }) => {
+  const uid = (req.user as { id?: number } | null)?.id
+  return uid === undefined ? false : { uploadedBy: { equals: uid } }
+}
 
 const signatureRead: Access = byRoleAny({
   'pk-admin': officeSignatures,
@@ -282,7 +290,7 @@ const thumbJpeg = { ...thumb, formatOptions: { format: 'jpeg' as const, options:
 export const MediaReceipts = mediaCollection({
   slug: 'media-receipts',
   labels: { singular: 'Foto nota', plural: 'Foto nota' },
-  mimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+  ...MEDIA_LIMITS['media-receipts'],
   // S3e (US-57, requirements §9, S-24): stored receipt photo ≤ 1600 px (was 2000). The input stays
   // tolerant (≤ 8 MiB, ≤ MAX_INPUT_PIXELS) so older APK builds and camera uploads from the web keep
   // working; the ≤ 400 KB target is met by the device compression + this re-encode (q82 mozjpeg).
@@ -296,11 +304,10 @@ export const MediaReceipts = mediaCollection({
 export const MediaTransferProofs = mediaCollection({
   slug: 'media-transfer-proofs',
   labels: { singular: 'Bukti transfer', plural: 'Bukti transfer' },
-  mimeTypes: ['image/jpeg', 'image/png', 'application/pdf'],
+  ...MEDIA_LIMITS['media-transfer-proofs'],
   resizeOptions: { width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true },
   formatOptions: { format: 'jpeg', options: { quality: 80, mozjpeg: true } },
   imageSizes: [thumbJpeg],
-  maxBytesByMime: { 'application/pdf': 2 * 1024 * 1024 },
   disposition: 'attachment',
   ownerCompany: true,
   access: { read: focused('media-transfer-proofs', ownerLinked, true), create: rolesAllowedAny('pk-finance') },
@@ -309,7 +316,7 @@ export const MediaTransferProofs = mediaCollection({
 export const MediaSelfies = mediaCollection({
   slug: 'media-selfies',
   labels: { singular: 'Selfie absensi', plural: 'Selfie absensi' },
-  mimeTypes: ['image/jpeg'],
+  ...MEDIA_LIMITS['media-selfies'],
   resizeOptions: { width: 720, height: 720, fit: 'inside', withoutEnlargement: true },
   // F4b: was WebP, which Payload validates against mimeTypes ['image/jpeg'] → every selfie upload
   // failed ("Invalid file type: 'image/webp'", same cause as the F2a thumbnail finding). JPEG also
@@ -318,10 +325,12 @@ export const MediaSelfies = mediaCollection({
   ownerCompany: true,
   // Owner decision 2026-10-09: web self check-in/out is every role, so every role may upload a selfie
   // (previously staff/pm/admin only, from when only the APK captured attendance).
-  access: { read: focused('media-selfies', ownOrOffice, false), create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-admin', 'pk-owner', 'pk-finance', 'pk-operator') },
+  access: { read: selfieRead, create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-admin', 'pk-owner', 'pk-finance', 'pk-operator', 'pk-admin-staff') },
   // ADR 0018 (owner 2026-10-05): no selfie of an uploader without the current privacy acknowledgement while
   // "Versi APK minimum" ≥ 0.3.3 (403 PRIVACY_ACK_REQUIRED, audited access_denied).
   createGuard: assertSelfieUploadAllowed,
+  // D2510 (0.21.1): the library would only list the caller's own uploads (selfieRead) — no menu, no admin route
+  hidden: true,
   // E6 S2 (Q-33): set by the selfieRetention job when the file was deleted from the volume. The row
   // stays as a tombstone (attendances.selfie_id is NOT NULL and append-only), without the image.
   // D7 (DRMS 10/10, ADR 0010 addendum 2026-10-12): set once by the worker job `stampSelfie` when the timestamp
@@ -335,7 +344,7 @@ export const MediaSelfies = mediaCollection({
 export const MediaProgressPhotos = mediaCollection({
   slug: 'media-progress-photos',
   labels: { singular: 'Foto progress', plural: 'Foto progress' },
-  mimeTypes: ['image/jpeg'],
+  ...MEDIA_LIMITS['media-progress-photos'],
   resizeOptions: { width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true },
   // JPEG so PDF reports can embed it (@react-pdf/image: JPEG/PNG/SVG only, ADR 0004 §Context).
   formatOptions: { format: 'jpeg', options: { quality: 78, mozjpeg: true } },
@@ -349,9 +358,8 @@ export const MediaProgressPhotos = mediaCollection({
 export const MediaSignatures = mediaCollection({
   slug: 'media-signatures',
   labels: { singular: 'Tanda tangan', plural: 'Tanda tangan' },
-  mimeTypes: ['image/png'],
+  ...MEDIA_LIMITS['media-signatures'],
   resizeOptions: { width: 800, height: 300, fit: 'inside', withoutEnlargement: true },
-  maxBytesByMime: { 'image/png': 2 * 1024 * 1024 }, // S3e: a drawn/scanned signature never needs more
   formatOptions: { format: 'png', options: { palette: true, compressionLevel: 9 } },
   access: { read: signatureRead, create: anyRole },
 })
@@ -359,10 +367,9 @@ export const MediaSignatures = mediaCollection({
 export const MediaCompany = mediaCollection({
   slug: 'media-company',
   labels: { singular: 'Logo perusahaan', plural: 'Logo perusahaan' },
-  mimeTypes: ['image/png', 'image/jpeg'],
+  ...MEDIA_LIMITS['media-company'],
   // S3e (US-57, S-24): logo ≤ 1024 px (was 600), input ≤ 2 MB.
   resizeOptions: { width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true },
-  maxBytesByMime: { 'image/png': 2 * 1024 * 1024, 'image/jpeg': 2 * 1024 * 1024 },
   formatOptions: { format: 'png', options: { compressionLevel: 9 } },
   access: { read: companyLogoRead, create: rolesAllowedAny('pk-admin', 'pk-owner') },
 })
@@ -370,11 +377,10 @@ export const MediaCompany = mediaCollection({
 export const MediaAttachments = mediaCollection({
   slug: 'media-attachments',
   labels: { singular: 'Lampiran', plural: 'Lampiran' },
-  mimeTypes: ['application/pdf', 'image/jpeg', 'image/png'],
+  ...MEDIA_LIMITS['media-attachments'],
   resizeOptions: { width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true },
   formatOptions: { format: 'jpeg', options: { quality: 82, mozjpeg: true } },
   imageSizes: [thumbJpeg],
-  maxBytesByMime: { 'application/pdf': 5 * 1024 * 1024 },
   disposition: 'attachment',
   ownerCompany: true,
   access: { read: focused('media-attachments', ownerLinked, true), create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-finance', 'pk-admin', 'pk-owner') /* ADR 0024: Direktur's own requests */ },

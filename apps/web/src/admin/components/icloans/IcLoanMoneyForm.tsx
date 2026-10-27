@@ -6,6 +6,8 @@ import { formatRupiah } from '@/lib/money'
 
 import { problemText } from '../ActionButton'
 import { DateInput } from '../DateInput'
+import { useDocSummary } from '../feedback/DocContext'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle } from '../feedback/feedback'
 import { OverrideDialog, overridePromptOf, type OverridePrompt } from '../kas/OverrideDialog'
 import { KAS_STYLE } from '../kas/style'
 import { newIdemKey, sendJson } from '../kas/client'
@@ -15,10 +17,12 @@ import { WrapSelect } from '../WrapSelect'
 /**
  * ADR 0029 §3.5 / §3.6: the money form of an inter-PT loan movement — "Cairkan pinjaman" (Finance of the LENDER, amount =
  * the loan amount, fixed) and "Catat pengembalian" (Finance of the BORROWER, amount ≤ outstanding, editable). Source
- * account (the paying PT's accounts WITHOUT a site), date + time of the bank proof, bank reference and the proof upload
+ * account (the paying PT's active accounts; DRMS 24/10: no site exclusion), date + time of the bank proof, bank reference and the proof upload
  * (media-transfer-proofs first, then the action with its id). A 409 CASH_OVERDRAFT_CONFIRM_REQUIRED opens the app
  * dialog; "Tetap simpan" re-sends the same body + `confirmOverdraft` (one Idempotency-Key per body). The server
  * re-checks role, G1, the fund check and both PTs' lock dates.
+ * DRMS 24/10: confirmation popup (the loan of the surrounding DocSummaryProvider + akun, nominal, waktu, referensi)
+ * before the upload, result popup after (the overdraft dialog stays in between when the server asks).
  */
 export type IcLoanMoneyFormProps = {
   url: string
@@ -47,11 +51,13 @@ export function IcLoanMoneyForm({ url, submitLabel, accounts, amountText, amount
   const [error, setError] = useState<string | null>(null)
   const [prompt, setPrompt] = useState<OverridePrompt | null>(null)
   const pending = useRef<{ body: Record<string, unknown>; key?: string } | null>(null)
+  const doc = useDocSummary()
 
   const send = async (body: Record<string, unknown>, key?: string) => {
     const r = await sendJson('POST', url, body, key)
     if (r.ok) {
       setPrompt(null)
+      showResult({ ok: true, title: successTitle(submitLabel, doc.object), message: 'Kas keluar / masuk kedua PT tercatat.' })
       router.refresh()
       return
     }
@@ -63,6 +69,7 @@ export function IcLoanMoneyForm({ url, submitLabel, accounts, amountText, amount
     }
     setPrompt(null)
     setError(r.error)
+    showResult({ ok: false, title: failureTitle(submitLabel), message: r.error })
   }
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -84,12 +91,26 @@ export function IcLoanMoneyForm({ url, submitLabel, accounts, amountText, amount
     }
     const file = f.get('proof')
     if (!(file instanceof File) || file.size === 0) return setError('Bukti transfer wajib diunggah.')
+    const yes = await confirmAction({
+      title: confirmTitle(submitLabel, doc.object),
+      summary: [
+        ...(doc.summary ?? []),
+        ['Akun kas sumber', accounts.find((a) => a.id === body.cashAccountId)?.name ?? null],
+        ['Nominal', amount ? formatRupiah(Number(body.amount)) : amountText],
+        ['Tanggal & jam transfer', at.replace('T', ' ')],
+        ['No. referensi bank', bankRef],
+      ],
+      confirmLabel: confirmLabel(submitLabel),
+    })
+    if (!yes) return
     setBusy(true)
     try {
       body.proofMediaId = await uploadProof(file)
       await send(body, newIdemKey())
     } catch (err) {
-      setError((err as Error).message || 'Gagal.')
+      const msg = (err as Error).message || 'Gagal.'
+      setError(msg)
+      showResult({ ok: false, title: failureTitle(submitLabel), message: msg })
     } finally {
       setBusy(false)
     }
@@ -102,7 +123,9 @@ export function IcLoanMoneyForm({ url, submitLabel, accounts, amountText, amount
       await send({ ...pending.current.body, [prompt.flag]: true }, newIdemKey())
     } catch (err) {
       setPrompt(null)
-      setError((err as Error).message || 'Gagal.')
+      const msg = (err as Error).message || 'Gagal.'
+      setError(msg)
+      showResult({ ok: false, title: failureTitle(submitLabel), message: msg })
     } finally {
       setBusy(false)
     }
@@ -127,7 +150,6 @@ export function IcLoanMoneyForm({ url, submitLabel, accounts, amountText, amount
                 </option>
               ))}
             </WrapSelect>
-            <p className="help">Tanpa akun site (kas kecil / rekening cabang).</p>
           </div>
           {amount ? (
             <div className="pk-fld">
@@ -163,7 +185,7 @@ export function IcLoanMoneyForm({ url, submitLabel, accounts, amountText, amount
           <button type="submit" className="pk-kbtn primary" disabled={busy || accounts.length === 0} data-pk-action={testId}>
             {busy ? 'Memproses…' : submitLabel}
           </button>
-          {accounts.length === 0 ? <span className="pk-kerr">Belum ada akun kas aktif tanpa site di PT ini.</span> : null}
+          {accounts.length === 0 ? <span className="pk-kerr">Belum ada akun kas aktif yang dapat dipakai di PT ini.</span> : null}
           {error ? (
             <span className="pk-kerr" role="alert">
               {error}

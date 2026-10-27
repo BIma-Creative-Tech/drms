@@ -151,15 +151,14 @@ describe('F2c requester actions (panel request shapes)', () => {
     expect(again.headers.get('idempotent-replayed')).toBe('true')
   })
 
-  it('Batalkan: after "Diketahui" the requester can no longer cancel (403); on Draft with reason OK', async () => {
+  it('Batalkan (D2410): never by the requester — not on Draft, not while waiting, not after "Diketahui" (403)', async () => {
     const a = await draft()
+    expect((await api('POST', `${E}/${a.id}/cancel`, w.users.staffA, { reason: 'Tidak jadi' }, key())).status).toBe(403)
     await api('POST', `${E}/${a.id}/submit`, w.users.staffA, {}, key())
+    expect((await api('POST', `${E}/${a.id}/cancel`, w.users.staffA, { reason: 'Tidak jadi' }, key())).status).toBe(403)
     expect((await api('POST', `${E}/${a.id}/acknowledge`, w.users.owner, {}, key())).status).toBe(200)
     expect((await api('POST', `${E}/${a.id}/cancel`, w.users.staffA, { reason: 'Tidak jadi' }, key())).status).toBe(403)
-    const b = await draft()
-    const c = await api('POST', `${E}/${b.id}/cancel`, w.users.staffA, { reason: 'Tidak jadi' }, key())
-    expect(c.status, JSON.stringify(c.body)).toBe(200)
-    expect(c.body).toMatchObject({ status: 'cancelled', cancelReason: 'Tidak jadi' })
+    expect((await api('GET', `${E}/${a.id}`, w.users.staffA)).body.status).toBe('pending_approval')
   })
 
   it('Ajukan ulang: only from Ditolak (409 on Draft); creates a new Draft linked to the old one', async () => {
@@ -244,7 +243,7 @@ describe('F2c workflow panel (server-rendered in the edit view)', () => {
     expect((await bar(w.users.owner, a.id))?.decision).not.toBeNull()
     const own = await panelHtml(w.users.staffA, a.id)
     expect(own).toContain('data-pk-action="withdraw"')
-    expect(own).toContain('data-pk-action="cancel"')
+    expect(own).not.toContain('data-pk-action="cancel"') // D2410: no requester cancel
     expect(own).not.toContain('data-pk-action="submit"')
   })
 })

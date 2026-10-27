@@ -54,6 +54,7 @@ class MarkdownView extends StatelessWidget {
           for (final row in rows) {
             children.add(
               Card(
+                color: theme.colorScheme.surfaceContainer,
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Padding(
                   padding: const EdgeInsets.all(12),

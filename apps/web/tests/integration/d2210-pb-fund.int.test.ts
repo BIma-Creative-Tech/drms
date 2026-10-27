@@ -8,15 +8,15 @@ import { fixturePm, getTestPayload, sqlAs, sqlError } from './helpers'
 import { api, makeFlowUser, makeWorld, sysCreate, type FlowUser } from './flow-world'
 
 /**
- * ADR 0031 amendment (user 2026-10-22, "PB dulu, lalu PT"): the fund check of the final approval compares a request with
- * the larger of its project's Pusat Biaya dana bebas and the PT's "Dana tersedia". The production case: PT LAS short
- * overall, CSR SEPASO free 51 jt, a 17 jt request of a CSR SEPASO project was blocked.
+ * ADR 0031 amendment (user 2026-10-22, "PB dulu, lalu PT"), narrowed by the amendment 2026-10-26 (DRMS 26/10 #1): the
+ * fund check of the final approval compares a request of a mapped project with ITS Pusat Biaya's dana bebas only (the
+ * PT no longer covers a short account — the Owner instructs an inter-project loan instead, d2610-owner-loan.int.test.ts).
  * A fresh fictional PT P (fund check ON) with three bank accounts — A Rp 51 jt, B Rp 179 jt, C Rp 0 — and one project
  * mapped to each (Direktur = the final level):
- *  1. C has nothing, the PT has 230 → approved (route other_account), twice → the PT has 5 jt left
- *  2. a 17 jt request of A's project: the PT is short, A covers it → panel route pusat_biaya, approved
- *  3. a request of C's project: C and the PT are short → 409 naming the Pusat Biaya; panel lists C's commitments
- *  4. the DB backstop uses the same rule (23514 for C, accepted for A)
+ *  1. C has nothing, the PT has 230 → 2026-10-26: refused (route short, the PT figure is information only)
+ *  2. a 17 jt request of A's project: A covers it → panel route pusat_biaya, approved
+ *  3. a request of C's project: C short → 409 naming the account; the inbox badge
+ *  4. the DB backstop uses the same rule (23514 for C although the PT has plenty, accepted for A)
  * P is deactivated in afterAll.
  */
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {}, push: () => {} }) }))
@@ -110,45 +110,46 @@ let c1 = 0
 let c3 = 0
 let a2 = 0
 
-describe('d2210: fund check Pusat Biaya first, then PT', () => {
-  it('1. C empty, PT covers it → approved, route other_account (Finance will pay from another account)', async () => {
+describe('d2210 / d2610: fund check of a mapped project = its Pusat Biaya only', () => {
+  it('1. C empty, the PT would cover it → 2026-10-26: blocked (route short), 409 naming the account', async () => {
     c1 = await request(pC, 140 * JT)
     const d = await ok(api('GET', `${E}/${c1}`, direktur))
-    expect(d.fundCheck).toMatchObject({ enabled: true, applies: true, status: 'ok', blocked: false, gap: 0, route: 'other_account', available: 230 * JT })
+    expect(d.fundCheck).toMatchObject({ enabled: true, applies: true, status: 'insufficient', blocked: true, gap: 140 * JT, route: 'short', routeText: null, available: 230 * JT })
     expect(d.fundCheck.pusatBiaya).toMatchObject({ accountId: accC, name: 'CSR Contoh C', balance: 0, commitments: 0, available: 0 })
-    expect(d.fundCheck.routeText).toContain('Finance membayar dari akun lain')
-    expect((await ok(approve(c1))).status).toBe('approved')
-    expect((await ok(approve(await request(pC, 85 * JT)))).status).toBe('approved')
-    expect(await ptAvailable()).toBe(5 * JT)
-    expect(await pbAvailable(accC)).toBe(-225 * JT)
+    expect(d.fundCheck.blockedText).toContain('Dana bebas akun kas CSR Contoh C tidak cukup')
+    expect(d.fundCheck.blockedText).not.toContain('dana PT')
+    const r = await approve(c1)
+    expect(r.status).toBe(409)
+    expect(r.body).toMatchObject({ code: 'FUND_INSUFFICIENT', available: 0, needed: 140 * JT, gap: 140 * JT, pusatBiayaAccountId: accC, pusatBiayaAvailable: 0 })
+    expect(await ptAvailable()).toBe(230 * JT)
   })
 
-  it('2. the production case: PT short, its Pusat Biaya free → route pusat_biaya, approved', async () => {
+  it('2. its Pusat Biaya covers it → route pusat_biaya, approved', async () => {
     a2 = await request(pA, 17 * JT)
     const d = await ok(api('GET', `${E}/${a2}`, direktur))
-    expect(d.fundCheck).toMatchObject({ status: 'ok', blocked: false, gap: 0, route: 'pusat_biaya', available: 5 * JT, needed: 17 * JT })
+    expect(d.fundCheck).toMatchObject({ status: 'ok', blocked: false, gap: 0, route: 'pusat_biaya', available: 230 * JT, needed: 17 * JT })
     expect(d.fundCheck.pusatBiaya).toMatchObject({ accountId: accA, balance: 51 * JT, commitments: 0, available: 51 * JT })
     expect(d.fundCheck.routeText).toBe('Dana pusat biaya CSR Contoh A cukup — Finance membayar dari akun ini.')
     const inbox = await ok(api('GET', '/api/v1/approvals/inbox', direktur))
-    expect(inbox.items.find((i: { id: number }) => i.id === a2)).toMatchObject({ finalStep: true, fundShort: null })
+    expect(inbox.items.find((i: { id: number }) => i.id === a2)).toMatchObject({ finalStep: true, fundShort: null, instructProjectLoan: false, projectLoanPending: null })
     expect((await ok(approve(a2))).status).toBe('approved')
     expect(await pbAvailable(accA)).toBe(34 * JT)
-    expect(await ptAvailable()).toBe(-12 * JT)
+    expect(await ptAvailable()).toBe(213 * JT)
   })
 
-  it('3. both short → 409 naming the Pusat Biaya; the panel lists its commitments', async () => {
+  it('3. C short → 409 naming the account; the inbox badge + the loan instruction for the final decider', async () => {
     c3 = await request(pC, 1 * JT)
     const d = await ok(api('GET', `${E}/${c3}`, direktur))
-    expect(d.fundCheck).toMatchObject({ status: 'insufficient', blocked: true, route: 'short', routeText: null, gap: 13 * JT })
-    expect(d.fundCheck.blockedText).toBe('Dana pusat biaya CSR Contoh C maupun dana PT tidak cukup — kurang Rp 13.000.000. Tolak, atau perintahkan pinjaman antar-PT.')
-    expect(d.fundCheck.pusatBiaya.commitmentItems.map((x: { id: number; kind: string }) => [x.kind, x.id])).toEqual(expect.arrayContaining([['request', c1]]))
-    expect(d.fundCheck.pusatBiaya.commitments).toBe(225 * JT)
+    expect(d.fundCheck).toMatchObject({ status: 'insufficient', blocked: true, route: 'short', routeText: null, gap: 1 * JT, projectLoans: [], projectLoanPending: false })
+    expect(d.fundCheck.blockedText).toBe('Dana bebas akun kas CSR Contoh C tidak cukup — kurang Rp 1.000.000. Tolak, atau Owner menginstruksikan pinjaman antar proyek ke akun ini lalu menyetujui setelah Finance mentransfernya.')
+    expect(d.allowedActions).toContain('instruct_project_loan')
+    expect(d.allowedActions).not.toContain('instruct_loan')
     const inbox = await ok(api('GET', '/api/v1/approvals/inbox', direktur))
-    expect(inbox.items.find((i: { id: number }) => i.id === c3)).toMatchObject({ fundShort: 13 * JT })
+    expect(inbox.items.find((i: { id: number }) => i.id === c3)).toMatchObject({ fundShort: 1 * JT, instructProjectLoan: true, projectLoanPending: null })
     const r = await approve(c3)
     expect(r.status).toBe(409)
-    expect(r.body).toMatchObject({ code: 'FUND_INSUFFICIENT', companyId: P, available: -12 * JT, needed: 1 * JT, gap: 13 * JT, pusatBiayaAccountId: accC, pusatBiayaName: 'CSR Contoh C', pusatBiayaAvailable: -225 * JT })
-    expect(r.body.title).toContain('Dana pusat biaya CSR Contoh C maupun dana PT')
+    expect(r.body).toMatchObject({ code: 'FUND_INSUFFICIENT', companyId: P, available: 0, needed: 1 * JT, gap: 1 * JT, pusatBiayaAccountId: accC, pusatBiayaName: 'CSR Contoh C', pusatBiayaAvailable: 0 })
+    expect(r.body.title).toContain('Dana bebas akun kas CSR Contoh C tidak cukup')
   })
 
   it('4. DB backstop: same rule (C refused 23514, A accepted)', async () => {
@@ -166,6 +167,9 @@ describe('d2210: fund check Pusat Biaya first, then PT', () => {
     expect(errC?.message).toContain('fund check')
     expect(errA).toBeNull()
     expect(Number((await sqlAs('app', 'SELECT pk_request_fund_available($1, $2)::bigint AS a', [P, pA])).rows[0].a)).toBe(32 * JT)
+    // 2026-10-26: C's request is compared with C only although the PT has plenty
+    expect(Number((await sqlAs('app', 'SELECT pk_request_fund_available($1, $2)::bigint AS a', [P, pC])).rows[0].a)).toBe(0)
+    expect(await ptAvailable()).toBeGreaterThan(200 * JT)
     expect(Number((await sqlAs('app', 'SELECT pk_request_fund_available($1, NULL)::bigint AS a', [P])).rows[0].a)).toBe(await ptAvailable())
   })
 })

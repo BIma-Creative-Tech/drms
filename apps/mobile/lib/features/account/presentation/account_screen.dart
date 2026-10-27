@@ -6,8 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:signature/signature.dart';
 
+import '../../../app/theme.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/pk_ui.dart';
 import '../application/account_providers.dart';
 import '../domain/account.dart';
 
@@ -22,6 +25,7 @@ class AccountScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final account = ref.watch(meAccountProvider);
     return Scaffold(
       appBar: AppBar(title: Text(t.accountTitle)),
@@ -31,39 +35,26 @@ class AccountScreen extends ConsumerWidget {
         data: (a) => RefreshIndicator(
           onRefresh: () => ref.refresh(meAccountProvider.future),
           child: ListView(
-            padding: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             children: [
-              ListTile(
-                key: const Key('account-name'),
-                leading: const Icon(Icons.person_outline),
-                title: Text(t.accountName),
-                subtitle: Text(a.name ?? '-'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.badge_outlined),
-                title: Text(t.accountDisplayName),
-                subtitle: Text(a.displayName),
-              ),
-              ListTile(
-                key: const Key('account-email'),
-                leading: const Icon(Icons.alternate_email),
-                title: Text(t.accountEmail),
-                subtitle: Text(a.email),
-              ),
-              ListTile(
-                leading: const Icon(Icons.phone_outlined),
-                title: Text(t.accountPhone),
-                subtitle: Text(a.phone ?? '-'),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Text(
-                  t.accountAdminManaged,
-                  style: Theme.of(context).textTheme.bodySmall
-                      ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              PkSectionCard(
+                title: t.akunGroupAccount,
+                icon: Icons.person_outline,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    PkInfoRow(key: const Key('account-name'), label: t.accountName, value: Text(a.name ?? '-')),
+                    PkInfoRow(label: t.accountDisplayName, value: Text(a.displayName)),
+                    PkInfoRow(key: const Key('account-email'), label: t.accountEmail, value: Text(a.email)),
+                    PkInfoRow(label: t.accountPhone, value: Text(a.phone ?? '-')),
+                    const SizedBox(height: 6),
+                    Text(
+                      t.accountAdminManaged,
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ],
                 ),
               ),
-              const Divider(),
               _SignatureSection(account: a),
             ],
           ),
@@ -84,24 +75,25 @@ class _SignatureSection extends ConsumerStatefulWidget {
 class _SignatureSectionState extends ConsumerState<_SignatureSection> {
   bool _busy = false;
 
-  Future<void> _run(Future<MeAccount> Function() action, String done) async {
+  Future<void> _run(Future<MeAccount> Function() action, String done, String label) async {
     setState(() => _busy = true);
-    final messenger = ScaffoldMessenger.of(context);
     try {
       await action();
       ref.invalidate(meAccountProvider);
-      messenger.showSnackBar(SnackBar(content: Text(done)));
+      if (mounted) await showActionResult(context, message: done, action: label);
     } on Object catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(errorText(e))));
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _save(Uint8List png) {
+  Future<void> _save(Uint8List png) async {
     final t = AppLocalizations.of(context);
     final api = ref.read(accountApiProvider);
-    return _run(() async => api.setSignature(await api.uploadSignature(png)), t.accountSignatureSaved);
+    final label = t.accountSignatureSaveAction;
+    if (!await confirmAction(context, action: label) || !mounted) return;
+    await _run(() async => api.setSignature(await api.uploadSignature(png)), t.accountSignatureSaved, label);
   }
 
   Future<void> _draw() async {
@@ -135,22 +127,15 @@ class _SignatureSectionState extends ConsumerState<_SignatureSection> {
 
   Future<void> _remove() async {
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        content: Text(t.accountSignatureRemoveConfirm),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
-          FilledButton(
-            key: const Key('account-signature-remove-confirm'),
-            onPressed: () => Navigator.pop(c, true),
-            child: Text(t.accountSignatureRemove),
-          ),
-        ],
-      ),
+    final label = t.accountSignatureRemoveAction;
+    final ok = await confirmAction(
+      context,
+      action: label,
+      note: t.accountSignatureRemoveConfirm,
+      confirmKey: const Key('account-signature-remove-confirm'),
     );
-    if (ok != true || !mounted) return;
-    await _run(() => ref.read(accountApiProvider).setSignature(null), t.accountSignatureRemoved);
+    if (!ok || !mounted) return;
+    await _run(() => ref.read(accountApiProvider).setSignature(null), t.accountSignatureRemoved, label);
   }
 
   @override
@@ -158,13 +143,12 @@ class _SignatureSectionState extends ConsumerState<_SignatureSection> {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final id = widget.account.signatureId;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+    return PkSectionCard(
+      title: t.accountSignature,
+      icon: Icons.draw_outlined,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(t.accountSignature, style: theme.textTheme.titleMedium),
-          const SizedBox(height: 4),
           Text(
             t.accountSignatureHint,
             style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -177,8 +161,8 @@ class _SignatureSectionState extends ConsumerState<_SignatureSection> {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border.all(color: theme.colorScheme.outlineVariant),
-              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: context.pk.border),
+              borderRadius: BorderRadius.circular(PkRadius.md),
             ),
             child: id == null
                 ? Text(

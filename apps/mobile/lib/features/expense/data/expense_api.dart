@@ -21,6 +21,10 @@ enum RequesterAction {
   final String path;
 }
 
+/// D2510: Finance actions on an LPJ / its receipts / flags (`allowedActions` `lpj_verify`, `lpj_request_revision`,
+/// `receipt_verify` (+ reject), `review_flag`). "settle" stays on the web.
+enum FinanceLpjAction { verify, requestRevision, receiptVerify, receiptReject, flagReview }
+
 class ExpensePage {
   const ExpensePage(this.items, this.nextCursor);
   final List<ExpenseSummary> items;
@@ -143,11 +147,48 @@ class ExpenseApi {
   Future<ExpenseDetail> cancel(int requestId, String reason, {required String idempotencyKey}) =>
       _reasonAction(requestId, 'cancel', reason, idempotencyKey);
 
+  /// D2410 "Hapus draft": `POST …/delete-draft` — soft delete of an own server Draft nobody ever decided on (reason
+  /// optional; the number of a withdrawn draft is never reused). Returns the (deleted) request.
+  Future<ExpenseDetail> deleteDraft(int requestId, {String? reason, required String idempotencyKey}) => client.run(
+    (d) => d.post<dynamic>(
+      '/expense-requests/$requestId/delete-draft',
+      data: {if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim()},
+      options: _idem(idempotencyKey),
+    ),
+    (data) => detailFromJson(data as Map<String, dynamic>),
+  );
+
   Future<ExpenseDetail> _reasonAction(int requestId, String path, String reason, String idempotencyKey) => client.run(
     (d) =>
         d.post<dynamic>('/expense-requests/$requestId/$path', data: {'reason': reason}, options: _idem(idempotencyKey)),
     (data) => detailFromJson(data as Map<String, dynamic>),
   );
+
+  /// D2510: Finance LPJ review (web Verifikasi LPJ, `apps/web/src/admin/views/LpjVerification.tsx`) — every call returns
+  /// the updated detail. [FinanceLpjAction.verify] answers 409 "Masih ada n nota yang belum diputuskan" while a receipt
+  /// is pending; the revision note / receipt reject reason is ≥ 3 characters, the flag review note optional.
+  Future<ExpenseDetail> financeLpjAction(
+    int requestId,
+    FinanceLpjAction action, {
+    required String idempotencyKey,
+    int? targetId,
+    String? text,
+  }) {
+    final (path, body) = switch (action) {
+      FinanceLpjAction.verify => ('lpj/verify', const <String, dynamic>{}),
+      FinanceLpjAction.requestRevision => ('lpj/request-revision', {'note': text ?? ''}),
+      FinanceLpjAction.receiptVerify => ('receipts/$targetId/verify', const <String, dynamic>{}),
+      FinanceLpjAction.receiptReject => ('receipts/$targetId/reject', {'reason': text ?? ''}),
+      FinanceLpjAction.flagReview => (
+        'flags/$targetId/review',
+        {if (text != null && text.trim().isNotEmpty) 'note': text.trim()},
+      ),
+    };
+    return client.run(
+      (d) => d.post<dynamic>('/expense-requests/$requestId/$path', data: body, options: _idem(idempotencyKey)),
+      (data) => detailFromJson(data as Map<String, dynamic>),
+    );
+  }
 
   /// `POST …/resubmit` (US-06): clones a rejected request into a NEW Draft (201) — returns the new draft.
   Future<ExpenseDetail> resubmit(int requestId, {required String idempotencyKey}) => client.run(
@@ -181,6 +222,15 @@ class ExpenseApi {
       for (final i in ((data as Map<String, dynamic>)['items'] as List<dynamic>? ?? const []))
         if (i is Map<String, dynamic>) ?IntercompanyPayee.fromApiJson(i),
     ],
+  );
+
+  /// D2410 (point 6): a general attachment of a request (photo / PDF) via the authorized file endpoint.
+  Future<Uint8List> attachmentFile(int id) => client.run(
+    (d) => d.get<dynamic>(
+      '/media/attachments/$id/file',
+      options: ApiClient.allCompanies(Options(responseType: ResponseType.bytes)),
+    ),
+    (data) => Uint8List.fromList(data as List<int>),
   );
 
   /// Receipt image (thumbnail variant) via the authorized file endpoint (ADR 0004 §4a).

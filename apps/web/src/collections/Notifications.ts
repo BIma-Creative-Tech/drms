@@ -23,7 +23,7 @@ export const Notifications: CollectionConfig = {
     // Own rows only; scope rule 2026-10-02 (QA-MC4-14): rows about a PT the user is no longer mapped
     // to (membership ended / PT deactivated) are not readable any more; rows without a PT stay.
     read: async (args) => {
-      const own = await byRoleAny({ 'pk-staff': ownUser('user'), 'pk-pm': ownUser('user'), 'pk-finance': ownUser('user'), 'pk-owner': ownUser('user'), 'pk-admin': ownUser('user'), 'pk-operator': ownUser('user') })(args)
+      const own = await byRoleAny({ 'pk-staff': ownUser('user'), 'pk-pm': ownUser('user'), 'pk-finance': ownUser('user'), 'pk-owner': ownUser('user'), 'pk-admin': ownUser('user'), 'pk-operator': ownUser('user'), 'pk-admin-staff': ownUser('user') })(args)
       if (own === false) return false
       const mapped = mappedCompanies(args.req) ?? []
       const pt: Where = { or: [{ company: { exists: false } }, ...(mapped.length ? [{ company: { in: mapped } }] : [])] }

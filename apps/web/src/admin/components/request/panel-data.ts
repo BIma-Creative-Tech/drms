@@ -61,7 +61,7 @@ export type RequestPanel = {
   pt: { shortCode: string; name: string | null } | null
   /** Chosen account of a Draft for the read-only summary (submitted: the DTO's snapshot). */
   draftBank: DraftBank | null
-  attachments: Array<{ id: number; name: string }>
+  attachments: Array<{ id: number; name: string; mimeType?: string | null }>
   stepper: RequestStepper
   /** Readable G1 exception note (ADR 0021 / 0024) and, for Finance / Admin, the approval rule's name. */
   stepperNote: string | null
@@ -86,12 +86,13 @@ async function load(payload: Payload, user: NonNullable<PayloadRequest['user']>,
     const company = relId((doc as { company?: unknown }).company)
     const pt = company !== undefined ? await companyById(r, company) : null
     const tz = pt?.timezone ?? 'Asia/Makassar'
-    // B-2 item 3: "Lampiran" of the read-only summary (file names; the files open through the authorized media endpoint)
+    // B-2 item 3: "Lampiran" of the read-only summary (file names; the files open through the authorized media endpoint).
+    // D2510 (web 0.21.1): + the MIME type — images are previewed (lightbox), PDFs stay file links
     const attIds = ids((doc as { attachments?: unknown[] | null }).attachments ?? null)
     const attachments = attIds.length
       ? (
-          await r.payload.find({ collection: 'media-attachments', where: { id: { in: attIds } }, depth: 0, pagination: false, select: { filename: true }, overrideAccess: true /* SYSTEM-READ: names of a visible request's attachments */, req: r })
-        ).docs.map((m) => ({ id: m.id as number, name: String((m as { filename?: string }).filename ?? `Lampiran #${String(m.id)}`) }))
+          await r.payload.find({ collection: 'media-attachments', where: { id: { in: attIds } }, depth: 0, pagination: false, select: { filename: true, mimeType: true }, overrideAccess: true /* SYSTEM-READ: names of a visible request's attachments */, req: r })
+        ).docs.map((m) => ({ id: m.id as number, name: String((m as { filename?: string }).filename ?? `Lampiran #${String(m.id)}`), mimeType: (m as { mimeType?: string | null }).mimeType ?? null }))
       : []
     // KK (cash entries) are readable by Finance/Direktur/Admin of the PT only → link them only for those
     const office = hasRole(r, ['pk-finance', 'pk-owner', 'pk-admin'], company)

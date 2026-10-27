@@ -6,7 +6,9 @@ import '../domain/loan.dart';
 /// `/api/v1/project-loans` (ADR 0022). Online only; every write carries an Idempotency-Key (one per opened form /
 /// action). Phase 3 (user 2026-10-19): repayments and their void too. ADR 0031: Finance "Cairkan" of a cash-backed
 /// loan; a cash move that takes the paying account below 0 answers 409 `CASH_OVERDRAFT_CONFIRM_REQUIRED` (re-sent with
-/// `confirmOverdraft`).
+/// `confirmOverdraft`). User decision 2026-10-24: Direktur → Owner approve loans AND cash-backed repayment requests;
+/// the approved cash moves are transfer orders Finance executes from the "Antrian Transfer" (`transferOrders`,
+/// `execute`, `executeRepayment`) — without a proof upload on the APK (optional; attached on the web).
 class LoansApi {
   LoansApi(this.client);
   final ApiClient client;
@@ -41,9 +43,16 @@ class LoansApi {
     (data) => LoanPage.fromJson(data as Map<String, dynamic>),
   );
 
-  Future<List<Loan>> inbox() => client.run(
+  /// Loans and repayment requests waiting for the caller (Direktur level 1, Owner level 2).
+  Future<LoanInbox> inbox() => client.run(
     (d) => d.get<dynamic>('/project-loans/inbox'),
-    (data) => LoanPage.fromJson(data as Map<String, dynamic>).items,
+    (data) => LoanInbox.fromJson(data as Map<String, dynamic>),
+  );
+
+  /// Approved cash-backed loans / repayments waiting in the "Antrian Transfer" (PT switcher selection).
+  Future<LoanTransferOrders> transferOrders() => client.run(
+    (d) => d.get<dynamic>('/project-loans/transfer-orders'),
+    (data) => LoanTransferOrders.fromJson(data as Map<String, dynamic>),
   );
 
   Future<LoanOptions> options() => client.run(
@@ -117,7 +126,7 @@ class LoansApi {
     _one,
   );
 
-  /// Direktur "Setujui" (one level). The profile signature is used by the server.
+  /// "Setujui" of the caller's level (Direktur level 1, Owner level 2). The profile signature is used by the server.
   Future<Loan> approve(int id, {required String idempotencyKey}) => client.run(
     (d) => d.post<dynamic>('/project-loans/$id/approve', data: <String, dynamic>{}, options: _idem(idempotencyKey)),
     _one,
@@ -172,6 +181,73 @@ class LoansApi {
     ),
     _one,
   );
+
+  /// Finance executes the loan's transfer order: KK on the lender's Pusat Biaya (lender project) + KM on the
+  /// borrower's (borrower project), dated [executeDate] (default today in the PT zone), once.
+  Future<Loan> execute(
+    int id, {
+    String? executeDate,
+    String? note,
+    bool confirmOverdraft = false,
+    required String idempotencyKey,
+  }) => client.run(
+    (d) => d.post<dynamic>(
+      '/project-loans/$id/execute',
+      data: _executeBody(executeDate, note, confirmOverdraft),
+      options: _idem(idempotencyKey),
+    ),
+    _one,
+  );
+
+  /// Finance executes an approved repayment's transfer order: KK on the borrower's Pusat Biaya + KM on the lender's.
+  Future<Loan> executeRepayment(
+    int id,
+    int repaymentId, {
+    String? executeDate,
+    String? note,
+    bool confirmOverdraft = false,
+    required String idempotencyKey,
+  }) => client.run(
+    (d) => d.post<dynamic>(
+      '/project-loans/$id/repayments/$repaymentId/execute',
+      data: _executeBody(executeDate, note, confirmOverdraft),
+      options: _idem(idempotencyKey),
+    ),
+    _one,
+  );
+
+  Map<String, dynamic> _executeBody(String? executeDate, String? note, bool confirmOverdraft) => {
+    'executeDate': ?executeDate,
+    if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    if (confirmOverdraft) 'confirmOverdraft': true,
+  };
+
+  /// "Setujui" of a repayment request at the caller's level (Direktur, then Owner).
+  Future<Loan> approveRepayment(int id, int repaymentId, {required String idempotencyKey}) => client.run(
+    (d) => d.post<dynamic>(
+      '/project-loans/$id/repayments/$repaymentId/approve',
+      data: <String, dynamic>{},
+      options: _idem(idempotencyKey),
+    ),
+    _one,
+  );
+
+  Future<Loan> rejectRepayment(int id, int repaymentId, {required String reason, required String idempotencyKey}) =>
+      _repaymentReason(id, repaymentId, 'reject', reason, idempotencyKey);
+
+  /// The submitter cancels a pending request (Finance also an approved one not yet executed).
+  Future<Loan> cancelRepayment(int id, int repaymentId, {required String reason, required String idempotencyKey}) =>
+      _repaymentReason(id, repaymentId, 'cancel', reason, idempotencyKey);
+
+  Future<Loan> _repaymentReason(int id, int repaymentId, String action, String reason, String idempotencyKey) =>
+      client.run(
+        (d) => d.post<dynamic>(
+          '/project-loans/$id/repayments/$repaymentId/$action',
+          data: {'reason': reason.trim()},
+          options: _idem(idempotencyKey),
+        ),
+        _one,
+      );
 
   /// `POST /project-loans/{id}/repayments/{rid}/void` {reason} — Direktur / Finance.
   Future<Loan> voidRepayment(int id, int repaymentId, {required String reason, required String idempotencyKey}) =>

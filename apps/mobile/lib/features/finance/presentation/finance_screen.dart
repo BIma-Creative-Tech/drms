@@ -8,6 +8,8 @@ import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_keuangan.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../cash/presentation/voidable_transfers_view.dart';
 import '../../auth/application/auth_controller.dart';
@@ -16,8 +18,11 @@ import '../../companies/presentation/company_chip.dart';
 import '../../expense/domain/expense_request.dart';
 import '../../expense/domain/request_status.dart';
 import '../../expense/presentation/widgets/receipt_mismatch_chip.dart';
+import '../../expense/presentation/widgets/request_ui.dart';
 import '../../loans/presentation/intercompany_loan_providers.dart';
 import '../../loans/presentation/intercompany_loan_screens.dart';
+import '../../loans/presentation/loan_providers.dart';
+import '../../loans/presentation/loan_transfer_orders.dart';
 import '../application/finance_providers.dart';
 import '../domain/transfer_queue.dart';
 
@@ -70,14 +75,24 @@ class SlaBadge extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     if (sla.ageHours == null) return Text(t.slaAgeUnknown, style: theme.textTheme.bodySmall);
-    final color = sla.over ? context.pk.badText : context.pk.okText;
+    // D2510: soft pill (tone fill + readable text).
+    final c = pkToneColors(context, sla.over ? PkTone.bad : PkTone.ok);
     final hours = sla.slaHours == sla.slaHours.roundToDouble() ? '${sla.slaHours.toInt()}' : '${sla.slaHours}';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999)),
-      child: Text(
-        '${t.slaAge(formatSlaHours(sla.ageHours))}${sla.over ? ' · ${t.slaOver(hours)}' : ''}',
-        style: theme.textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w700),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: c.bg, borderRadius: BorderRadius.circular(999)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.schedule, size: 13, color: c.fg),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              '${t.slaAge(formatSlaHours(sla.ageHours))}${sla.over ? ' · ${t.slaOver(hours)}' : ''}',
+              style: theme.textTheme.labelSmall?.copyWith(color: c.fg, fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -148,8 +163,10 @@ class _TransferQueueViewState extends ConsumerState<TransferQueueView> {
         Expanded(
           child: RefreshIndicator(
             onRefresh: () {
-              // ADR 0029: the "Pencairan pinjaman antar-PT" section above the queue reloads with it
+              // ADR 0029: the "Pencairan pinjaman antar-PT" section above the queue reloads with it; user decision
+              // 2026-10-24: so do the inter-project loan transfer orders
               ref.invalidate(icLoanQueueProvider);
+              ref.invalidate(loanTransferOrdersProvider);
               return ref.refresh(transferQueueProvider.future);
             },
             child: AsyncBody(
@@ -167,18 +184,13 @@ class _TransferQueueViewState extends ConsumerState<TransferQueueView> {
                     .toList();
                 if (items.isEmpty) {
                   return ListView(
-                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                     children: [
                       const IcLoanQueueSection(),
-                      Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          children: [
-                            Icon(Icons.task_alt, size: 48, color: Theme.of(context).colorScheme.primary),
-                            const SizedBox(height: 12),
-                            Text(all.isEmpty ? t.transferQueueEmpty : t.projectsNoMatch, textAlign: TextAlign.center),
-                          ],
-                        ),
+                      const LoanTransferOrderSection(),
+                      PkEmptyState(
+                        icon: Icons.task_alt,
+                        message: all.isEmpty ? t.transferQueueEmpty : t.projectsNoMatch,
                       ),
                     ],
                   );
@@ -187,11 +199,13 @@ class _TransferQueueViewState extends ConsumerState<TransferQueueView> {
                 final more = shown.length < items.length;
                 return ListView.builder(
                   key: const Key('transfer-queue'),
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   // ADR 0029: index 0 = "Pencairan pinjaman antar-PT" (Finance of a lender PT; hidden when empty)
+                  // and the inter-project loan transfer orders (user decision 2026-10-24; hidden when empty)
                   itemCount: shown.length + 2,
-                  itemBuilder: (_, j) =>
-                      j == 0 ? const IcLoanQueueSection() : _queueRow(j - 1, shown, items.length, more),
+                  itemBuilder: (_, j) => j == 0
+                      ? const Column(children: [IcLoanQueueSection(), LoanTransferOrderSection()])
+                      : _queueRow(j - 1, shown, items.length, more),
                 );
               },
             ),
@@ -237,134 +251,146 @@ class TransferQueueCard extends ConsumerWidget {
     final flags = it.warningFlags + it.infoFlags;
     // ADR 0031: the project's Pusat Biaya (cash account) — the default paying account of the transfer
     final pb = it.pusatBiaya?.label ?? (it.pusatBiayaMissing ? t.pusatBiayaQueueMissing : t.costCenterByFinance);
-    return Card(
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.35);
+    // D2510: a bordered card — type chip, number + title, bold amount; SLA pill; muted meta; the destination account
+    // on a soft tile; pills; "Catat transfer".
+    return PkCard(
       key: Key('tq-${it.id}'),
       margin: const EdgeInsets.only(bottom: 10),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.push('/requests/${it.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
+      padding: const EdgeInsets.all(14),
+      onTap: () => context.push('/requests/${it.id}'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  CompanyChipLead(companyId: it.companyId),
-                  Expanded(
-                    child: Text(
-                      '${t.neededDate}: ${formatDateOnly(it.neededDate)}',
-                      style: theme.textTheme.labelMedium,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              SlaBadge(key: Key('tq-${it.id}-sla'), sla: it.sla),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              requestTypeChip(it.type),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Text(
-                          it.docNo ?? '#${it.id}',
-                          style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary),
+                        CompanyChipLead(companyId: it.companyId),
+                        Flexible(
+                          child: Text(
+                            it.docNo ?? '#${it.id}',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
-                        Text(it.title, style: theme.textTheme.titleMedium),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    formatRupiah(it.amount),
-                    key: Key('tq-${it.id}-amount'),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontFeatures: const [FontFeature.tabularFigures()],
+                    const SizedBox(height: 2),
+                    Text(
+                      it.title,
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, height: 1.3),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              if (it.project != null)
-                Text([?it.project!.code, ?it.project!.name].join(' '), style: theme.textTheme.bodySmall),
+              const SizedBox(width: 10),
               Text(
-                '${t.fieldCostCenter}: $pb',
-                key: Key('tq-${it.id}-cc'),
-                style: theme.textTheme.bodySmall?.copyWith(color: it.pusatBiayaMissing ? context.pk.warnText : null),
+                formatRupiah(it.amount),
+                key: Key('tq-${it.id}-amount'),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
-              Text(it.statusLabel, style: theme.textTheme.bodySmall),
-              const SizedBox(height: 6),
-              Text(it.bankText.isEmpty ? '-' : it.bankText, style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  _Pill(
-                    text: it.bankVerified ? t.bankVerified : t.bankUnverified,
-                    color: it.bankVerified ? context.pk.okText : context.pk.warnText,
-                  ),
-                  if (flags > 0)
-                    _Pill(
-                      key: Key('tq-${it.id}-flags'),
-                      text: t.openFlags(flags),
-                      color: it.warningFlags > 0 ? context.pk.warnText : theme.colorScheme.outline,
-                    ),
-                  if (it.receiptMismatch > 0)
-                    ReceiptMismatchChip(key: Key('tq-${it.id}-mismatch'), count: it.receiptMismatch),
-                  // ADR 0024: reached the queue without approval (web badge "Tanpa persetujuan (Direktur)")
-                  if (it.noApproval)
-                    _Pill(key: Key('tq-${it.id}-no-approval'), text: t.noApprovalBadge, color: context.pk.warnText),
-                  // ADR 0028: a PT grup payment (web badge "Antar PT: <PT>") — the transfer also posts its Kas Masuk
-                  if (it.payeeCompanyCode case final code?)
-                    _Pill(
-                      key: Key('tq-${it.id}-intercompany'),
-                      text: t.intercompanyBadge(code),
-                      color: theme.colorScheme.primary,
-                    ),
-                ],
-              ),
-              if (canTransfer) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    key: Key('tq-${it.id}-transfer'),
-                    onPressed: () => context.push('/finance/transfer/${it.id}'),
-                    icon: const Icon(Icons.account_balance),
-                    label: Text(t.transferRecord),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SlaBadge(key: Key('tq-${it.id}-sla'), sla: it.sla),
+              Text('${t.neededDate}: ${formatDateOnly(it.neededDate)}', style: muted),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (it.project != null) Text([?it.project!.code, ?it.project!.name].join(' '), style: muted),
+          Text(
+            '${t.fieldCostCenter}: $pb',
+            key: Key('tq-${it.id}-cc'),
+            style: muted?.copyWith(color: it.pusatBiayaMissing ? context.pk.warnText : null),
+          ),
+          Text(it.statusLabel, style: muted),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerLow,
+              border: Border.all(color: context.pk.border),
+              borderRadius: BorderRadius.circular(PkRadius.sm),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.account_balance_outlined, size: 18, color: theme.colorScheme.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    it.bankText.isEmpty ? '-' : it.bankText,
+                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              PkPill(
+                label: it.bankVerified ? t.bankVerified : t.bankUnverified,
+                tone: it.bankVerified ? PkTone.ok : PkTone.warn,
+              ),
+              if (flags > 0)
+                PkPill(
+                  key: Key('tq-${it.id}-flags'),
+                  label: t.openFlags(flags),
+                  tone: it.warningFlags > 0 ? PkTone.warn : PkTone.neutral,
+                  icon: Icons.flag,
+                ),
+              if (it.receiptMismatch > 0)
+                ReceiptMismatchChip(key: Key('tq-${it.id}-mismatch'), count: it.receiptMismatch),
+              // ADR 0024: reached the queue without approval (web badge "Tanpa persetujuan (Direktur)")
+              if (it.noApproval)
+                PkPill(key: Key('tq-${it.id}-no-approval'), label: t.noApprovalBadge, tone: PkTone.warn),
+              // ADR 0028: a PT grup payment (web badge "Antar PT: <PT>") — the transfer also posts its Kas Masuk
+              if (it.payeeCompanyCode case final code?)
+                PkPill(key: Key('tq-${it.id}-intercompany'), label: t.intercompanyBadge(code), tone: PkTone.info),
             ],
           ),
-        ),
+          if (canTransfer) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: Key('tq-${it.id}-transfer'),
+                onPressed: () => context.push('/finance/transfer/${it.id}'),
+                icon: const Icon(Icons.account_balance),
+                label: Text(t.transferRecord),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill({super.key, required this.text, required this.color});
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-    decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999)),
-    child: Text(
-      text,
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w600),
-    ),
-  );
-}
-
-/// "Verifikasi LPJ" (`GET /lpj-queue`): read-only list; the request detail shows the LPJ.
+/// "Verifikasi LPJ" (`GET /lpj-queue`): the LPJ waiting for Finance; a tap opens the request detail, where Finance
+/// decides each receipt (Valid / Tolak), marks flags reviewed and requests a revision or verifies the LPJ (D2510).
 class _LpjQueueView extends ConsumerStatefulWidget {
   const _LpjQueueView();
 
@@ -401,26 +427,22 @@ class _LpjQueueViewState extends ConsumerState<_LpjQueueView> {
                     .toList();
                 if (items.isEmpty) {
                   return ListView(
-                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                     children: [
                       const IcLoanQueueSection(),
-                      Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Center(child: Text(all.isEmpty ? t.lpjQueueEmpty : t.projectsNoMatch)),
+                      PkEmptyState(
+                        icon: Icons.assignment_turned_in_outlined,
+                        message: all.isEmpty ? t.lpjQueueEmpty : t.projectsNoMatch,
                       ),
                     ],
                   );
                 }
-                return ListView.separated(
+                return ListView.builder(
                   key: const Key('lpj-queue-list'),
-                  padding: const EdgeInsets.only(bottom: 24),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   itemCount: items.length + 1,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (_, i) => i == 0
-                      ? Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                          child: Text(t.lpjReadOnlyHint, style: Theme.of(context).textTheme.bodySmall),
-                        )
+                      ? PkNoticeCard(dense: true, icon: Icons.fact_check_outlined, title: Text(t.lpjReadOnlyHint))
                       : _LpjTile(r: items[i - 1]),
                 );
               },
@@ -437,8 +459,9 @@ class _LpjTile extends StatelessWidget {
   final ExpenseSummary r;
 
   @override
-  Widget build(BuildContext context) => ListTile(
+  Widget build(BuildContext context) => PkListCard(
     key: Key('lpj-${r.id}'),
+    leading: PkIconChip(icon: Icons.assignment_turned_in_outlined, tone: requestStatusTone(r.status), size: 40),
     title: Row(
       children: [
         CompanyChipLead(companyId: r.companyId),
@@ -446,7 +469,7 @@ class _LpjTile extends StatelessWidget {
       ],
     ),
     subtitle: Text('${r.docNo ?? '-'} · ${r.statusLabel}'),
-    trailing: Text(formatRupiah(r.approvedAmount ?? r.grandTotal)),
+    amount: formatRupiah(r.approvedAmount ?? r.grandTotal),
     onTap: () => context.push('/requests/${r.id}'),
   );
 }

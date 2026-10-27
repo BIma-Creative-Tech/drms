@@ -1,13 +1,19 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/icons/iconsax.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_akun.dart';
+import '../../auth/application/auth_controller.dart';
 import '../../expense/domain/request_status.dart';
+import '../../home/domain/route_access.dart';
 import '../domain/dashboard.dart';
 import 'charts.dart';
 
@@ -34,8 +40,15 @@ class DashSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(title, style: theme.textTheme.titleMedium),
-            if (subtitle != null) Text(subtitle!, style: theme.textTheme.bodySmall),
+            Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            if (subtitle != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  subtitle!,
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ),
             const SizedBox(height: 12),
             child,
           ],
@@ -46,11 +59,14 @@ class DashSection extends StatelessWidget {
 }
 
 Widget _line(BuildContext context, String text, {Color? color, Key? key}) => Padding(
-  padding: const EdgeInsets.only(top: 4),
+  padding: const EdgeInsets.only(top: 3),
   child: Text(
     key: key,
     text,
-    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color),
+    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+      color: color ?? Theme.of(context).colorScheme.onSurfaceVariant,
+      fontWeight: color == null ? null : FontWeight.w600,
+    ),
   ),
 );
 
@@ -60,31 +76,63 @@ Widget _big(BuildContext context, String text, {Key? key}) => Text(
   style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
 );
 
-Widget _empty(BuildContext context, String text) => Text(text, style: Theme.of(context).textTheme.bodyMedium);
+Widget _empty(BuildContext context, String text) => Text(
+  text,
+  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+);
 
-/// List row of a card: title, supporting lines, trailing figure; tappable when it leads somewhere.
+/// D2510: rows of a card separated by hairlines (inset past the icon chip).
+Widget _rows(List<Widget> rows) => Column(
+  crossAxisAlignment: CrossAxisAlignment.stretch,
+  children: [
+    for (final (i, r) in rows.indexed) ...[if (i > 0) const PkRowDivider(indent: 46), r],
+  ],
+);
+
+/// Bold right-aligned figure of a row (amount, percentage).
+Widget _figure(BuildContext context, String text, {Color? color, TextDecoration? decoration}) => Text(
+  text,
+  style: Theme.of(context).textTheme.bodyMedium
+      ?.copyWith(fontWeight: FontWeight.w700, color: color, decoration: decoration),
+);
+
+/// List row of a card: tonal icon chip, bold title, muted supporting lines, trailing figure; tappable when it leads
+/// somewhere.
 class _Row extends StatelessWidget {
-  const _Row({super.key, required this.title, this.lines = const [], this.trailing, this.onTap});
+  const _Row({
+    super.key,
+    required this.title,
+    this.lines = const [],
+    this.trailing,
+    this.onTap,
+    this.icon = Icons.folder_outlined,
+    this.tone = PkTone.info,
+  });
   final String title;
   final List<Widget> lines;
   final Widget? trailing;
   final VoidCallback? onTap;
+  final Object icon;
+  final PkTone tone;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(PkRadius.sm),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            PkIconChip(icon: icon, tone: tone, size: 34),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  Text(title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
                   ...lines,
                 ],
               ),
@@ -223,36 +271,40 @@ class RapMonitorCard extends StatelessWidget {
           : t.kpiRapMonitorSubtitle(data.projects, data.overProjects),
       child: data.rows.isEmpty
           ? _empty(context, t.kpiRapMonitorEmpty)
-          : Column(
-              children: [
-                for (final r in data.rows)
-                  _Row(
-                    key: Key('dash-rap-monitor-${r.projectId}'),
-                    title: _project(r.code, r.name),
-                    onTap: () => context.push('/projects/${r.projectId}?tab=rap'),
-                    trailing: Text(r.percent == null ? '—' : formatPercent(r.percent!)),
-                    lines: [
-                      _line(
-                        context,
-                        t.kpiRapRealised(formatRupiah(r.realised), r.planned == null ? '—' : formatRupiah(r.planned!)),
-                      ),
-                      const SizedBox(height: 4),
-                      Meter(
-                        value: r.realised,
-                        max: math.max(1, r.planned ?? 0),
-                        color: r.overBudget
-                            ? pk.bad
-                            : (r.percent ?? 0) >= 85
-                            ? pk.warn
-                            : pk.ok,
-                      ),
-                      r.overBudgetItems > 0
-                          ? _line(context, t.kpiRapOverItems(r.overBudgetItems), color: pk.warnText)
-                          : _line(context, t.kpiRapSafe, color: pk.okText),
-                    ],
-                  ),
-              ],
-            ),
+          : _rows([
+              for (final r in data.rows)
+                _Row(
+                  key: Key('dash-rap-monitor-${r.projectId}'),
+                  title: _project(r.code, r.name),
+                  icon: PkIcons.project,
+                  tone: r.overBudget
+                      ? PkTone.bad
+                      : (r.percent ?? 0) >= 85
+                      ? PkTone.warn
+                      : PkTone.ok,
+                  onTap: () => context.push('/projects/${r.projectId}?tab=rap'),
+                  trailing: _figure(context, r.percent == null ? '—' : formatPercent(r.percent!)),
+                  lines: [
+                    _line(
+                      context,
+                      t.kpiRapRealised(formatRupiah(r.realised), r.planned == null ? '—' : formatRupiah(r.planned!)),
+                    ),
+                    const SizedBox(height: 4),
+                    Meter(
+                      value: r.realised,
+                      max: math.max(1, r.planned ?? 0),
+                      color: r.overBudget
+                          ? pk.bad
+                          : (r.percent ?? 0) >= 85
+                          ? pk.warn
+                          : pk.ok,
+                    ),
+                    r.overBudgetItems > 0
+                        ? _line(context, t.kpiRapOverItems(r.overBudgetItems), color: pk.warnText)
+                        : _line(context, t.kpiRapSafe, color: pk.okText),
+                  ],
+                ),
+            ]),
     );
   }
 }
@@ -288,22 +340,26 @@ class LoanCard extends StatelessWidget {
           if (data.projects.isEmpty)
             _empty(context, t.kpiLoansEmpty)
           else
-            for (final p in data.projects)
-              _Row(
-                key: Key('dash-loan-${p.projectId}'),
-                title: _project(p.code, p.name),
-                onTap: () => context.push('/projects/${p.projectId}?tab=loans'),
-                lines: [
-                  _line(context, t.kpiLoanRow(formatRupiah(p.outstandingBorrowed), formatRupiah(p.outstandingLent))),
-                  p.overdueCount > 0
-                      ? _line(
-                          context,
-                          t.kpiLoanOverdue(p.overdueCount, formatRupiah(p.overdueBorrowed)),
-                          color: pk.badText,
-                        )
-                      : _line(context, t.kpiLoanOnTime, color: pk.okText),
-                ],
-              ),
+            _rows([
+              for (final p in data.projects)
+                _Row(
+                  key: Key('dash-loan-${p.projectId}'),
+                  title: _project(p.code, p.name),
+                  icon: Icons.swap_horiz,
+                  tone: p.overdueCount > 0 ? PkTone.bad : PkTone.info,
+                  onTap: () => context.push('/projects/${p.projectId}?tab=loans'),
+                  lines: [
+                    _line(context, t.kpiLoanRow(formatRupiah(p.outstandingBorrowed), formatRupiah(p.outstandingLent))),
+                    p.overdueCount > 0
+                        ? _line(
+                            context,
+                            t.kpiLoanOverdue(p.overdueCount, formatRupiah(p.overdueBorrowed)),
+                            color: pk.badText,
+                          )
+                        : _line(context, t.kpiLoanOnTime, color: pk.okText),
+                  ],
+                ),
+            ]),
         ],
       ),
     );
@@ -319,31 +375,27 @@ class RapMissingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     if (data.total == 0) return const SizedBox.shrink();
     final t = AppLocalizations.of(context);
-    final pk = context.pk;
     return DashSection(
       key: const Key('dash-rap-missing'),
       title: data.team ? t.kpiRapMissingTeamTitle : t.kpiRapMissingTitle,
       subtitle: data.team ? t.kpiRapMissingTeamSubtitle(data.total) : t.kpiRapMissingSubtitle(data.total),
-      child: Column(
-        children: [
-          for (final r in data.rows)
-            _Row(
-              key: Key('dash-rap-missing-${r.id}'),
-              title: _project(r.code, r.name),
-              onTap: () => context.push('/projects/${r.id}?tab=rap'),
-              trailing: Text(
-                t.kpiRapFill,
-                style: TextStyle(color: pk.warnText, fontWeight: FontWeight.w600),
+      child: _rows([
+        for (final r in data.rows)
+          _Row(
+            key: Key('dash-rap-missing-${r.id}'),
+            title: _project(r.code, r.name),
+            icon: PkIcons.project,
+            tone: PkTone.warn,
+            onTap: () => context.push('/projects/${r.id}?tab=rap'),
+            trailing: PkPill(label: t.kpiRapFill, tone: PkTone.warn),
+            lines: [
+              _line(
+                context,
+                r.budget == null ? r.kindLabel : t.kpiRapMissingBudget(r.kindLabel, formatRupiah(r.budget!)),
               ),
-              lines: [
-                _line(
-                  context,
-                  r.budget == null ? r.kindLabel : t.kpiRapMissingBudget(r.kindLabel, formatRupiah(r.budget!)),
-                ),
-              ],
-            ),
-        ],
-      ),
+            ],
+          ),
+      ]),
     );
   }
 }
@@ -383,36 +435,32 @@ class MyRequestsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     return DashSection(
       key: const Key('dash-my-requests'),
       title: t.kpiMyLatestTitle,
       subtitle: t.kpiMyLatestSubtitle,
       child: rows.isEmpty
           ? _empty(context, t.kpiMyLatestEmpty)
-          : Column(
-              children: [
-                for (final r in rows)
-                  _Row(
-                    key: Key('dash-my-request-${r.id}'),
-                    title: r.docNo ?? t.kpiMyDraftTitle(r.title),
-                    lines: [
-                      _line(
-                        context,
-                        [
-                          if (r.docNo != null) r.title,
-                          statusLabelFallback(RequestType.fromCode(r.type), RequestStatus.fromCode(r.status)),
-                        ].where((x) => x.isNotEmpty).join(' · '),
-                      ),
-                    ],
-                    trailing: Text(
-                      formatRupiah(r.grandTotal),
-                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          : _rows([
+              for (final r in rows)
+                _Row(
+                  key: Key('dash-my-request-${r.id}'),
+                  title: r.docNo ?? t.kpiMyDraftTitle(r.title),
+                  icon: PkIcons.requests,
+                  tone: _statusTone(r.status),
+                  lines: [
+                    _line(
+                      context,
+                      [
+                        if (r.docNo != null) r.title,
+                        statusLabelFallback(RequestType.fromCode(r.type), RequestStatus.fromCode(r.status)),
+                      ].where((x) => x.isNotEmpty).join(' · '),
                     ),
-                    onTap: () => context.push('/requests/${r.id}'),
-                  ),
-              ],
-            ),
+                  ],
+                  trailing: _figure(context, formatRupiah(r.grandTotal)),
+                  onTap: () => context.push('/requests/${r.id}'),
+                ),
+            ]),
     );
   }
 }
@@ -480,53 +528,56 @@ class CompletenessCard extends StatelessWidget {
   }
 }
 
-/// "Transaksi kas terbaru" (cash book incl. void & reversal).
-class RecentCashCard extends StatelessWidget {
+/// "Transaksi kas terbaru" (cash book incl. void & reversal). D2510: a row opens its request (else the cash entry).
+class RecentCashCard extends ConsumerWidget {
   const RecentCashCard({super.key, required this.rows});
   final List<RecentCashEntry> rows;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     final pk = context.pk;
+    final profile = ref.watch(currentProfileProvider);
     return DashSection(
       key: const Key('dash-recent-cash'),
       title: t.kpiRecentCashTitle,
       subtitle: t.kpiRecentCashSubtitle,
       child: rows.isEmpty
           ? _empty(context, t.kpiRecentCashEmpty)
-          : Column(
-              children: [
-                for (final r in rows)
-                  _Row(
-                    key: Key('dash-cash-${r.id}'),
-                    title: r.entryNo ?? '#${r.id}',
-                    lines: [
+          : _rows([
+              for (final r in rows)
+                _Row(
+                  key: Key('dash-cash-${r.id}'),
+                  title: r.entryNo ?? '#${r.id}',
+                  onTap: canOpenApkRoute(r.route, profile) ? () => context.push(r.route) : null,
+                  icon: r.incoming ? Icons.south_west : Icons.north_east,
+                  tone: r.voided
+                      ? PkTone.neutral
+                      : r.incoming
+                      ? PkTone.ok
+                      : PkTone.info,
+                  lines: [
+                    _line(
+                      context,
+                      [formatDateOnly(r.entryDate), r.label, r.account].where((x) => x.isNotEmpty).join(' · '),
+                    ),
+                    // ADR 0028: "Antar PT" (+ the other leg "Dari PT … · KK/…" / "Ke PT … · KM/…" when sent)
+                    if (r.isIntercompany)
                       _line(
                         context,
-                        [formatDateOnly(r.entryDate), r.label, r.account].where((x) => x.isNotEmpty).join(' · '),
+                        [cashSourceLabels['intercompany']!, ?r.counterpart?.text].join(' · '),
+                        key: Key('dash-cash-${r.id}-ic'),
                       ),
-                      // ADR 0028: "Antar PT" (+ the other leg "Dari PT … · KK/…" / "Ke PT … · KM/…" when sent)
-                      if (r.isIntercompany)
-                        _line(
-                          context,
-                          [cashSourceLabels['intercompany']!, ?r.counterpart?.text].join(' · '),
-                          key: Key('dash-cash-${r.id}-ic'),
-                        ),
-                      if (r.voided) _line(context, t.kpiVoid, color: pk.badText),
-                    ],
-                    trailing: Text(
-                      '${r.incoming ? '+' : '−'}${formatRupiah(r.amount)}',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: r.incoming ? pk.okText : null,
-                        decoration: r.voided ? TextDecoration.lineThrough : null,
-                      ),
-                    ),
+                    if (r.voided) _line(context, t.kpiVoid, color: pk.badText),
+                  ],
+                  trailing: _figure(
+                    context,
+                    '${r.incoming ? '+' : '−'}${formatRupiah(r.amount)}',
+                    color: r.incoming ? pk.okText : null,
+                    decoration: r.voided ? TextDecoration.lineThrough : null,
                   ),
-              ],
-            ),
+                ),
+            ]),
     );
   }
 }
@@ -574,24 +625,24 @@ class AdvancesWithoutLpjCard extends StatelessWidget {
       subtitle: t.kpiAdvancesSubtitle(dueDays),
       child: rows.isEmpty
           ? _empty(context, t.kpiAdvancesEmpty)
-          : Column(
-              children: [
-                for (final r in rows)
-                  _Row(
-                    key: Key('dash-advance-${r.id}'),
-                    title: r.docNo ?? '#${r.id}',
-                    onTap: () => context.push('/requests/${r.id}'),
-                    trailing: Text(formatRupiah(r.amount)),
-                    lines: [
-                      if (r.requesters.isNotEmpty) _line(context, r.requesters),
-                      if (r.ageDays != null)
-                        r.overdue
-                            ? _line(context, t.kpiAdvanceLate(r.ageDays!), color: pk.badText)
-                            : _line(context, t.kpiAdvanceAge(r.ageDays!)),
-                    ],
-                  ),
-              ],
-            ),
+          : _rows([
+              for (final r in rows)
+                _Row(
+                  key: Key('dash-advance-${r.id}'),
+                  title: r.docNo ?? '#${r.id}',
+                  icon: PkIcons.advance,
+                  tone: r.overdue ? PkTone.bad : PkTone.warn,
+                  onTap: () => context.push('/requests/${r.id}'),
+                  trailing: _figure(context, formatRupiah(r.amount)),
+                  lines: [
+                    if (r.requesters.isNotEmpty) _line(context, r.requesters),
+                    if (r.ageDays != null)
+                      r.overdue
+                          ? _line(context, t.kpiAdvanceLate(r.ageDays!), color: pk.badText)
+                          : _line(context, t.kpiAdvanceAge(r.ageDays!)),
+                  ],
+                ),
+            ]),
     );
   }
 }
@@ -621,3 +672,12 @@ class PeriodCloseCard extends StatelessWidget {
     );
   }
 }
+
+/// Tone of a request status in "Pengajuan saya" (draft neutral, waiting info, transferred / done ok, rejected bad).
+PkTone _statusTone(String code) => switch (code) {
+  'draft' => PkTone.neutral,
+  'approved' || 'transferred' || 'receipts_complete' || 'lpj_verified' || 'completed' => PkTone.ok,
+  'rejected' || 'cancelled' => PkTone.bad,
+  'receipt_revision' || 'lpj_revision' => PkTone.warn,
+  _ => PkTone.info,
+};

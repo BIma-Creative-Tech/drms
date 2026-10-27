@@ -24,7 +24,7 @@ export const PROGRESS_STYLE = `
 .pk-f3 .pk-pvb-row { display: grid; grid-template-columns: minmax(0, 28%) minmax(0, 1fr) 310px; align-items: center; gap: 4px 14px; padding: 4px; margin: 0 -4px; border-radius: 6px; color: inherit; text-decoration: none; }
 .pk-f3 a.pk-pvb-row:hover, .pk-f3 .pk-pvb-row:focus-visible { background: color-mix(in oklab, var(--pk-primary) 6%, transparent); }
 .pk-f3 .pk-pvb-row .l { min-width: 0; font-size: 13px; }
-.pk-f3 .pk-pvb-row .l span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-f3 .pk-pvb-row .l span { display: block; overflow-wrap: anywhere; } /* DRMS 16/10: project names wrap, never an ellipsis */
 .pk-f3 .pk-pvb-row .l span.pk-pt-chip { display: inline-block; margin-right: 6px; vertical-align: 1px; }
 .pk-f3 .pk-pvb-row .l small { display: block; color: var(--pk-muted-fg); font-size: 11px; }
 .pk-f3 .pk-pvb-row .t { display: grid; gap: 2px; position: relative; }
@@ -62,14 +62,13 @@ export const PROGRESS_STYLE = `
 .pk-f3 .pk-gallery img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .2s ease; }
 .pk-f3 .pk-gallery a:hover img { transform: scale(1.03); }
 @media (prefers-reduced-motion: reduce) { .pk-f3 .pk-gallery img { transition: none; } }
-.pk-f3 .pk-thumbs { display: flex; gap: 4px; }
-.pk-f3 .pk-thumbs img { width: 36px; height: 28px; object-fit: cover; border-radius: 4px; border: 1px solid var(--pk-border); background: var(--viz-track); }
+.pk-f3 .pk-thumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; } /* D2510 0.21.1: ImageThumb (36 px) previews in list cells */
 .pk-f3 .pk-dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; margin: 0; font-size: 13px; }
 .pk-f3 .pk-dl dt { color: var(--pk-muted-fg); } .pk-f3 .pk-dl dd { margin: 0; overflow-wrap: anywhere; }
 .pk-f3 .pk-pre { white-space: pre-wrap; margin: 0; font-size: 13px; line-height: 1.55; }
 .pk-f3 .pk-t tr:target td { background: color-mix(in oklab, var(--pk-primary) 12%, transparent); }
 .pk-f3 form.pk-filter .pk-kbtn { align-self: flex-end; }
-@media (max-width: 559px) { .pk-f3 .pk-dash-head .pk-kact { width: 100%; } .pk-f3 .pk-dash-head .pk-kact > * { flex: 1 1 auto; } }
+@media (max-width: 559px) { .pk-f3 .pk-nx-head .pk-kact { width: 100%; } .pk-f3 .pk-nx-head .pk-kact > * { flex: 1 1 auto; } }
 `
 
 export function Alert({ tone, children, attr }: { tone: 'ok' | 'bad' | 'info'; children: React.ReactNode; attr?: string }) {

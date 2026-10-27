@@ -16,7 +16,11 @@ enum Role {
   admin('pk-admin'),
 
   /// Owner decision 2026-10-09: attendance only ("Operator/Anggota").
-  operator('pk-operator');
+  operator('pk-operator'),
+
+  /// ADR 0032 (DRMS 24/10): "Admin Staff" — attendance administration of the PT (team attendance, on-behalf for any
+  /// employee of the PT incl. those without an account, corrections); no finance / requests.
+  adminStaff('pk-admin-staff');
 
   const Role(this.code);
   final String code;
@@ -30,6 +34,7 @@ enum Role {
     principal => 'Owner',
     admin => 'Admin',
     operator => 'Operator/Anggota',
+    adminStaff => 'Admin Staff',
   };
 
   static Role? fromCode(String code) {
@@ -55,7 +60,8 @@ enum Role {
 enum HomeKind { direktur, finance, pm, staff }
 
 /// Bottom bar variant (user 2026-10-18), from the roles of the selected PTs — the highest wins: Owner (`pk-principal`,
-/// whose roles also carry `pk-owner`), Direktur, Finance, PM, Admin, Staff, Operator.
+/// whose roles also carry `pk-owner`), Direktur, Finance, PM, Admin, Staff, Operator. ADR 0032: an Admin Staff without
+/// a higher role gets the Operator bar (Beranda, Absensi — with the team tab —, Profil).
 enum NavKind { owner, direktur, finance, pm, admin, staff, operator }
 
 /// `GET /api/v1/me` `capabilities` (E1, ADR 0013): UI hints only — the server guards stay authoritative.
@@ -388,17 +394,25 @@ abstract class UserProfile with _$UserProfile {
   /// still requires an employee with a team assignment at a geofenced location).
   bool get hasOwnAttendance => roles.isNotEmpty;
 
+  /// DRMS 26/10 #3: an own employee in the scope (PT switcher) — the own monthly recap (`GET /attendance/me`) exists;
+  /// without one the server answers 409 "belum terhubung ke data karyawan" (usual for Owner / Direktur / Finance).
+  bool get hasOwnEmployee => employee != null || scopedCompanies.any((c) => c.employee != null);
+
   /// Owner decision 2026-10-09: "Operator/Anggota" only — attendance, nothing else on the home screen.
   bool get isOperatorOnly => roles.isNotEmpty && roles.every((r) => r == Role.operator);
 
-  /// E6: "Tim hari ini" (PM team; Admin/Direktur/Finance all).
-  bool get canSeeTeamAttendance => has(Role.pm) || has(Role.owner) || has(Role.finance) || has(Role.admin);
+  /// ADR 0032: only attendance roles (Operator and / or Admin Staff) — no finance / request menus.
+  bool get isAttendanceOnly => roles.isNotEmpty && roles.every((r) => r == Role.operator || r == Role.adminStaff);
 
-  /// E6 US-14: record attendance on behalf of a team member (PM only).
-  bool get canAttendOnBehalf => has(Role.pm);
+  /// E6: "Tim hari ini" (PM team; Admin/Direktur/Finance all; ADR 0032: Admin Staff all of its PT).
+  bool get canSeeTeamAttendance =>
+      has(Role.pm) || has(Role.owner) || has(Role.finance) || has(Role.admin) || has(Role.adminStaff);
 
-  /// E6 US-15 (T10): correct a team member's attendance time (PM of the location or Admin).
-  bool get canCorrectAttendance => has(Role.pm) || has(Role.admin);
+  /// E6 US-14: record attendance on behalf of a team member (PM: team; ADR 0032: Admin Staff: any employee of the PT).
+  bool get canAttendOnBehalf => has(Role.pm) || has(Role.adminStaff);
+
+  /// E6 US-15 (T10): correct a team member's attendance time (PM of the location, Admin, Admin Staff).
+  bool get canCorrectAttendance => has(Role.pm) || has(Role.admin) || has(Role.adminStaff);
 }
 
 /// Union of an optional capability over several PTs: true when any PT says true, false when every PT that sends it

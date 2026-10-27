@@ -290,14 +290,16 @@ describe('QA-MC4-04: one media file is authorised against its own owner document
     expect(loads).toEqual([])
   })
 
-  it('media LIST of an office user in a subset of PTs: same per-PT answer, id lists not loaded through Payload documents', async () => {
+  // D2510 (web 0.21.1): the Payload selfie LIST answers the caller's own uploads only — an office user reads the
+  // selfies of its PTs through the audited /api/v1 endpoints (test above), never through /api/media-selfies
+  it('media LIST of an office user in a subset of PTs: own uploads only (no selfie of A or B), id lists not loaded through Payload documents', async () => {
     let ids: number[] = []
     const loads = await ptWideLoads(async () => {
       const r = await call('GET', '/api/media-selfies?limit=500&depth=0', finA)
       expect(r.status).toBe(200)
       ids = (r.body.docs as Array<{ id: number }>).map((d) => d.id)
     })
-    expect(ids).toContain(X.selfieA)
+    expect(ids).not.toContain(X.selfieA)
     expect(ids).not.toContain(X.selfieB)
     expect(loads).toEqual([]) // 1 year × 3 PTs: 31 200 attendance documents = 1.7–2.5 s, ~300 MiB heap per list request
   })

@@ -13,7 +13,9 @@ import { DateInput } from '../DateInput'
  * component; values come from the parsed ListQuery. `keep` = params of the view that the toolbar does
  * not own (e.g. a tab) and must survive a search.
  * DRMS 13/10 Umum #4 / Persetujuan #2: a filter with `multi` is a checklist dropdown (MultiSelect, `?key=a,b`);
- * the view reads it with filterValues(). `extra` = more controls at the end of the bar (PkListView: "Kolom ▾").
+ * the view reads it with filterValues(). `extra` = more controls at the end of the bar.
+ * D2510 (ADR 0033): `flush` = the bar is a row of a Nexus card (PkListView) — no box of its own; `formId` names the
+ * form so a control outside it can belong to it (`form=` attribute: the page size in the card foot, Pager `perPage`).
  */
 export type ToolbarFilter = { key: string; label: string; options: ReadonlyArray<{ value: string; label: string; title?: string }>; all?: string; multi?: boolean }
 export type ToolbarDates = { from: string; to: string; fromLabel?: string; toLabel?: string }
@@ -33,15 +35,19 @@ type Props = {
   resetHref?: string
   /** Force the Reset link (e.g. a filter the toolbar does not render is active). */
   filteredHint?: boolean
+  /** D2510: a row inside a card (no border / background of its own). */
+  flush?: boolean
+  /** D2510: id of the <form> (controls outside it join via `form=`). */
+  formId?: string
 }
 
-export function ListToolbar({ id, action, query, label, search, filters, dates, keep, pageSize = true, extra, resetHref, filteredHint }: Props) {
+export function ListToolbar({ id, action, query, label, search, filters, dates, keep, pageSize = true, extra, resetHref, filteredHint, flush, formId }: Props) {
   // a multi filter with a value from the URL stays visible even if its option list came back empty
   const fs = (filters ?? []).filter((f): f is ToolbarFilter => !!f && (f.options.length > 0 || (!!f.multi && filterValues(query, f.key).length > 0)))
   const ranges: ReadonlyArray<ToolbarDates> = dates ? ('from' in dates ? [dates as ToolbarDates] : (dates as ReadonlyArray<ToolbarDates>)) : []
   const filtered = !!filteredHint || isFiltered(query) || ranges.some((d) => !!(query.filters[d.from] || query.filters[d.to]))
   return (
-    <form className="pk-ltb" method="get" action={action} role="search" aria-label={label} data-pk-toolbar={id}>
+    <form id={formId} className={flush ? 'pk-ltb pk-ltb--flush' : 'pk-ltb'} method="get" action={action} role="search" aria-label={label} data-pk-toolbar={id}>
       {Object.entries(keep ?? {}).map(([k, v]) => (v ? <input key={k} type="hidden" name={k} value={v} /> : null))}
       {search ? (
         <label className="pk-ltb__field pk-ltb__search">
@@ -112,14 +118,28 @@ export function ListToolbar({ id, action, query, label, search, filters, dates, 
 /**
  * Page indicator + previous/next links ("1–20 dari 57 · Halaman 1 dari 3"). Plain links (URL state),
  * rendered also for a single page so the count is always visible.
+ * D2510: `perPage` = the toolbar's page size, shown here (card foot) and bound to the toolbar form by `form=`
+ * (AutoSubmit applies it on change like any toolbar control; without JS the toolbar's "Terapkan" sends it).
  */
-export function Pager({ id, path, sp, page, pageKey = 'hal', unit = 'data' }: { id: string; path: string; sp: Record<string, string | string[] | undefined> | undefined; page: PageOf<unknown>; pageKey?: string; unit?: string }) {
+export function Pager({ id, path, sp, page, pageKey = 'hal', unit = 'data', perPage }: { id: string; path: string; sp: Record<string, string | string[] | undefined> | undefined; page: PageOf<unknown>; pageKey?: string; unit?: string; perPage?: { form: string; value: number } }) {
   const href = (p: number) => listHref(path, sp, { [pageKey]: p > 1 ? p : null }, { pageKey })
   return (
     <nav className="pk-pager" aria-label={`Halaman ${unit}`} data-pk-pager={id}>
       <span className="pk-pager__count" aria-live="polite">
         {page.total === 0 ? `0 ${unit}` : `${page.from}–${page.to} dari ${page.total} ${unit}`}
       </span>
+      {perPage ? (
+        <label className="pk-pager__per">
+          <span>Per halaman</span>
+          <select name="per" form={perPage.form} defaultValue={String(perPage.value)} data-pk-page-size={id}>
+            {PAGE_SIZES.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       {page.totalPages > 1 ? (
         <span className="pk-pager__nav">
           {page.page > 1 ? (

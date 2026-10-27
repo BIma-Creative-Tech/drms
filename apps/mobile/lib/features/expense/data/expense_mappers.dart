@@ -61,6 +61,14 @@ RequestIntercompany? requestIntercompanyFromJson(Object? v) {
   );
 }
 
+/// D2410 (point 6) `attachments[] {id, fileName, mimeType}` — a general attachment of the request (null = unreadable).
+RequestAttachment? requestAttachmentFromJson(Object? v) {
+  final m = _map(v);
+  final id = _intN(m?['id']);
+  if (m == null || id == null) return null;
+  return RequestAttachment(id: id, fileName: _strN(m['fileName']), mimeType: _strN(m['mimeType']));
+}
+
 BudgetImpact budgetFromJson(Object? v) {
   final m = _map(v);
   if (m == null) return const BudgetImpact(basis: 'none');
@@ -406,6 +414,7 @@ ExpenseDetail detailFromJson(Json j) {
             cashAccount: accountRefFromJson(m['cashAccount']),
             paidFromCashAccount: accountRefFromJson(m['paidFromCashAccount']),
             projectLoan: transferLoanFromJson(m['projectLoan']),
+            proofId: _intN(m['proofId']),
           ),
     ],
     transferredTotal: _int(j['transferredTotal']),
@@ -436,6 +445,8 @@ ExpenseDetail detailFromJson(Json j) {
     // ADR 0028 (absent on servers before Phase B)
     payeeCompany: companyRefFromJson(j['payeeCompany']),
     intercompany: requestIntercompanyFromJson(j['intercompany']),
+    // D2410 (point 6): general attachments (absent on servers before 0.20)
+    attachments: [for (final a in _list(j['attachments'])) ?requestAttachmentFromJson(a)],
   );
 }
 
@@ -516,6 +527,12 @@ InboxItem inboxItemFromJson(Json j) {
       final g? when g > 0 => g,
       _ => null,
     },
+    // DRMS 26/10 #1
+    instructProjectLoan: j['instructProjectLoan'] == true,
+    projectLoanPendingDocNo: switch (_map(j['projectLoanPending'])) {
+      final p? when _intN(p['id']) != null => _strN(p['docNo']) ?? '#${p['id']}',
+      _ => null,
+    },
   );
 }
 
@@ -558,6 +575,8 @@ Json draftToCreateBody(DraftRequest d) => {
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),
   if (d.requesterIds.isNotEmpty) 'requesterIds': d.requesterIds,
   'bankAccountId': d.isDirectPayment ? null : d.bankAccountId,
+  // D2410 (point 6): the general attachments (DraftService uploads the local ones first)
+  if (d.attachments.isNotEmpty) 'attachmentIds': [for (final a in d.attachments) ?a.serverFileId],
   ..._vendorCreateFields(d),
   'lines': [for (final l in d.lines) lineToInput(l)],
   'clientUuid': d.clientUuid,
@@ -596,6 +615,14 @@ Json draftToSyncPayload(DraftRequest d, {bool includeDraftId = false}) => {
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),
   'requester_ids': d.requesterIds,
   'bank_account_id': d.isDirectPayment ? null : d.bankAccountId,
+  // D2410 (point 6): the general attachments replace the server list (ids already on the server; local photos / PDFs
+  // are uploaded by the sync engine — POST /media/attachments — and appended to `attachment_ids`)
+  'attachment_ids': [for (final a in d.attachments) ?a.serverFileId],
+  if (d.attachments.any((a) => a.isLocal))
+    attachmentsPlaceholderKey: [
+      for (final a in d.attachments)
+        if (a.isLocal) a.mediaUuid!,
+    ],
   // ADR 0027 / 0028: vendor / PT grup payment only (an employee draft stays byte-compatible with servers before Wave 4;
   // the payee type of a draft the server knows is fixed in the editor)
   if (d.isDirectPayment) ...{
@@ -676,6 +703,11 @@ DraftRequest draftFromServer(
   invoiceDate: d.invoiceDate,
   invoiceDueDate: d.invoiceDueDate,
   invoiceFileId: d.invoiceFileId,
+  // D2410 (point 6): the general attachments stay on the server (their media ids)
+  attachments: [
+    for (final a in d.attachments)
+      DraftAttachment(fileName: a.label, mimeType: a.mimeType ?? 'image/jpeg', serverFileId: a.id),
+  ],
   serverId: d.id,
   serverRev: d.rev,
   syncState: DraftSyncState.synced,
@@ -731,9 +763,26 @@ const hmPhotoPlaceholderKey = 'pk_hm_photo_uuid';
 /// `invoice_file_id`.
 const invoicePlaceholderKey = 'pk_invoice_uuid';
 
+/// D2410 (point 6): local-only key of a draft item: the local general attachments (photo / PDF), appended to
+/// `attachment_ids` once uploaded.
+const attachmentsPlaceholderKey = 'pk_attachment_uuids';
+
 /// Replaces [mediaPlaceholderKey] by `media_id` using [mediaIds] (local uuid → server id).
 /// Returns null when a photo has no server id yet.
 Json? resolveMediaIds(Json payload, Map<String, int> mediaIds) {
+  // D2410 (point 6): the local general attachments of a draft (then the invoice / receipts as usual).
+  if (payload.containsKey(attachmentsPlaceholderKey)) {
+    final out = Map<String, dynamic>.of(payload);
+    final locals = (out.remove(attachmentsPlaceholderKey) as List<dynamic>? ?? const []).map((e) => '$e');
+    final ids = <int>[for (final e in (out['attachment_ids'] as List<dynamic>? ?? const [])) (e as num).toInt()];
+    for (final l in locals) {
+      final id = mediaIds[l];
+      if (id == null) return null;
+      ids.add(id);
+    }
+    out['attachment_ids'] = ids;
+    return resolveMediaIds(out, mediaIds);
+  }
   // ADR 0027: the invoice photo of a vendor-payment draft (then the draft's receipts as usual).
   if (payload.containsKey(invoicePlaceholderKey)) {
     final out = Map<String, dynamic>.of(payload);

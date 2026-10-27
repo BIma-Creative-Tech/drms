@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme.dart';
 import '../../../../core/format/rupiah.dart';
 import '../../../../l10n/gen/app_localizations.dart';
+import '../../../../shared/widgets/pk_ui.dart';
+import '../../../../shared/widgets/pk_ui_keuangan.dart';
 import '../../domain/expense_request.dart';
 import '../../domain/fund_check.dart';
 import '../../domain/request_status.dart';
@@ -21,7 +23,7 @@ String icLoanInstructPath(ExpenseDetail d) {
   ).toString();
 }
 
-/// ADR 0029 §2 "Ketersediaan dana PT <code>" (web `FundPanel.tsx`): Saldo dana (n akun, tanpa akun site) − Komitmen
+/// ADR 0029 §2 "Ketersediaan dana PT <code>" (web `FundPanel.tsx`): Saldo dana (n akun, every active account) − Komitmen
 /// (expandable list) = Dana tersedia; Dibutuhkan; Kurang (red) or "Cukup" (green); other requests waiting at the final
 /// step; linked inter-PT loans; the blocked text; "Perintahkan pinjaman antar-PT" ([onInstructLoan], Owner, short).
 /// Read-only before the final step ("cek akhir di persetujuan Owner"). Shown on the request detail and in the decision
@@ -44,7 +46,6 @@ class FundCheckPanel extends StatelessWidget {
     final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
     final money = theme.textTheme.bodyMedium?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
     final bold = money?.copyWith(fontWeight: FontWeight.w700);
-    final toneColor = short ? context.pk.badText : context.pk.okText;
     Widget row(String label, Widget value, {Key? key, bool strong = false}) => Padding(
       key: key,
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -62,9 +63,6 @@ class FundCheckPanel extends StatelessWidget {
         ],
       ),
     );
-    final site = f.excludedSiteCount > 0
-        ? ' — ${t.fundSiteExcluded(f.excludedSiteCount, formatRupiah(f.excludedSiteBalance))}'
-        : '';
     Widget commitmentList(List<FundCommitmentItem> items, String keyPrefix) => Theme(
       data: theme.copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
@@ -101,27 +99,27 @@ class FundCheckPanel extends StatelessWidget {
     final routeText = f.routeText?.trim() ?? '';
     final blocked = f.blockedReason;
     final draft = detail.status == RequestStatus.draft;
-    return Card(
+    // D2510: a bordered card like the other sections (red border while the PT is short).
+    return PkTile(
       key: const Key('fund-check'),
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: short ? context.pk.badText : theme.colorScheme.outlineVariant),
-      ),
+      margin: compact ? const EdgeInsets.symmetric(vertical: 8) : const EdgeInsets.only(bottom: 12),
+      color: context.pk.card,
+      radius: PkRadius.md,
+      borderColor: short ? context.pk.badText.withValues(alpha: 0.6) : context.pk.border,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                Icon(Icons.account_balance_wallet_outlined, size: 20, color: toneColor),
-                const SizedBox(width: 6),
+                PkIconChip(icon: Icons.account_balance_wallet_outlined, tone: short ? PkTone.bad : PkTone.ok, size: 30),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     t.fundPanelTitle(f.code),
                     key: const Key('fund-title'),
-                    style: theme.textTheme.titleSmall,
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ),
               ],
@@ -150,7 +148,7 @@ class FundCheckPanel extends StatelessWidget {
             row(
               t.fundBalance,
               Text(
-                '${formatRupiah(f.balance)} (${t.fundAccounts(f.accountCount)}$site)',
+                '${formatRupiah(f.balance)} (${t.fundAccounts(f.accountCount)})',
                 key: const Key('fund-balance'),
                 style: money,
               ),
@@ -171,15 +169,18 @@ class FundCheckPanel extends StatelessWidget {
               Align(
                 alignment: Alignment.centerLeft,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: toneColor.withValues(alpha: 0.12),
+                    color: short ? context.pk.badBg : context.pk.okBg,
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     short ? t.fundGap(formatRupiah(f.gap)) : t.fundEnough,
                     key: const Key('fund-gap'),
-                    style: theme.textTheme.labelMedium?.copyWith(color: toneColor, fontWeight: FontWeight.w700),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: short ? context.pk.badOn : context.pk.okOn,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -242,10 +243,10 @@ class FundShortBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final color = context.pk.badText;
+    final color = context.pk.badOn;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: context.pk.badBg, borderRadius: BorderRadius.circular(999)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

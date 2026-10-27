@@ -7,6 +7,7 @@ import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
@@ -14,6 +15,7 @@ import '../../sync/application/sync_coordinator.dart';
 import '../application/field_providers.dart';
 import '../domain/field_models.dart';
 import '../domain/field_rules.dart';
+import 'field_hub_screen.dart' show FieldRecordSheet;
 import 'service_report_screen.dart' show confirmDiscard;
 import 'widgets/field_widgets.dart';
 import '../../../shared/widgets/pick_hint.dart';
@@ -207,6 +209,8 @@ class _AftersalesScreenState extends ConsumerState<AftersalesScreen> {
       showSnack(context, t.fieldFixErrors);
       return;
     }
+    final label = _isEdit ? t.fieldSaveEdit : t.fieldActivitySubmit;
+    if (!await confirmFieldSubmit(context, label, project: _projectLabel, date: _date) || !mounted) return;
     final online = ref.read(connectivityProvider);
     setState(() => _busy = true);
     _autosave?.cancel();
@@ -214,7 +218,8 @@ class _AftersalesScreenState extends ConsumerState<AftersalesScreen> {
       await ref.read(fieldServiceProvider).submit(sub, d, online: online);
       ref.read(syncCoordinatorProvider.notifier).requestSync(delay: Duration.zero);
       if (!mounted) return;
-      showSnack(context, online ? t.fieldQueuedOnline : t.fieldQueuedOffline);
+      await showFieldSubmitted(context, label, online: online);
+      if (!mounted) return;
       if (_single) {
         Navigator.of(context).maybePop();
         return;
@@ -237,7 +242,7 @@ class _AftersalesScreenState extends ConsumerState<AftersalesScreen> {
       });
       _autosave?.saved.value = false;
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -335,7 +340,7 @@ class _AftersalesScreenState extends ConsumerState<AftersalesScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           if (_base?.lastError != null) FieldNote(text: _base!.lastError!, error: true),
           if (_isEdit && _base?.editableUntil != null)
@@ -606,7 +611,7 @@ class _AftersalesScreenState extends ConsumerState<AftersalesScreen> {
               const SizedBox(height: 8),
               FilledButton(
                 key: const Key('activity-submit'),
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                 onPressed: _busy || _projectId == null ? null : _submit,
                 child: _busy
                     ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
@@ -646,32 +651,55 @@ class _AftersalesScreenState extends ConsumerState<AftersalesScreen> {
                       if (r.followUpDate != null) t.fieldFollowUpShort(fieldDateLabel(r.followUpDate!)),
                       if (r.value != null) formatRupiah(r.value!),
                     ].where((e) => e.isNotEmpty).join(' · '),
+                    // D2510: a sent activity opens its detail (the same sheet as the field hub history)
+                    onTap: () => showModalBottomSheet<void>(
+                      context: context,
+                      showDragHandle: true,
+                      isScrollControlled: true,
+                      builder: (_) => FieldRecordSheet(record: r, zone: profile?.timezone),
+                    ),
                   ),
               ],
             ),
             Card(
               key: const Key('activity-follow-ups'),
               elevation: 0,
-              color: context.pk.warnText.withValues(alpha: 0.10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: context.pk.warnText.withValues(alpha: 0.4)),
-              ),
+              margin: EdgeInsets.zero,
+              color: context.pk.warnBg,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(PkRadius.md)),
               child: Padding(
                 padding: const EdgeInsets.all(14),
-                child: Column(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      t.fieldNeedsFollowUp,
-                      style: theme.textTheme.titleMedium?.copyWith(color: context.pk.warnText),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(color: context.pk.card, borderRadius: BorderRadius.circular(12)),
+                      child: Icon(Icons.notifications_active_outlined, color: context.pk.warnOn, size: 20),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      [
-                        t.fieldOpenPosCount(allPos.length),
-                        if (day?.value != null) t.fieldFollowUpsToday(day!.value!.followUpsDue),
-                      ].join(' · '),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            t.fieldNeedsFollowUp,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: context.pk.warnOn,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            [
+                              t.fieldOpenPosCount(allPos.length),
+                              if (day?.value != null) t.fieldFollowUpsToday(day!.value!.followUpsDue),
+                            ].join(' · '),
+                            style: TextStyle(color: context.pk.warnOn),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -707,17 +735,19 @@ class _ActivityRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(6),
+              constraints: const BoxConstraints(minWidth: 36),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: context.pk.infoBg, borderRadius: BorderRadius.circular(PkRadius.sm)),
+              child: Text(
+                tag,
+                style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700, color: context.pk.infoOn),
               ),
-              child: Text(tag, style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700)),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -731,7 +761,11 @@ class _ActivityRow extends StatelessWidget {
                 ],
               ),
             ),
-            if (state != null) FieldStateChip(state: state!),
+            if (state != null) ...[const SizedBox(width: 8), FieldStateChip(state: state!)],
+            if (onTap != null) ...[
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.outline),
+            ],
           ],
         ),
       ),

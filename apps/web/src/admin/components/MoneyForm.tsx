@@ -3,6 +3,8 @@ import { useRouter } from 'next/navigation'
 import React, { useId, useRef, useState } from 'react'
 
 import { postJson, problemText } from './ActionButton'
+import { useDocSummary } from './feedback/DocContext'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle, type Summary } from './feedback/feedback'
 import { OverrideDialog, overridePromptOf, type OverridePrompt } from './kas/OverrideDialog'
 import { DateInput } from './DateInput'
 import { KAS_STYLE } from './kas/style'
@@ -14,6 +16,8 @@ import { WrapSelect } from './WrapSelect'
  * action with the returned id). Amounts are never entered: the server copies/computes them (G3).
  * QA 2026-10-08: a 409 asking for confirmation (unverified destination account QA-17, balance below 0
  * QA-04) opens the app dialog; "Tetap simpan" re-sends the same body + flag (the proof is not re-uploaded).
+ * DRMS 24/10: after the client checks, "Yakin ingin <submitLabel> <dokumen>?" with the document (DocSummaryProvider),
+ * account, date, reference and amount; the result popup follows the save (or the server's error).
  */
 export type MoneyFormProps = {
   url: string
@@ -66,10 +70,16 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
   const defaultAccount = isTransfer && pusatBiaya && cashAccounts.some((a) => a.id === pusatBiaya.id) ? pusatBiaya.id : cashAccounts[0]?.id
   const [account, setAccount] = useState<number | undefined>(defaultAccount)
   const loan = isTransfer && pusatBiaya != null && account !== undefined && account !== pusatBiaya.id
+  const doc = useDocSummary()
+  const fail = (msg: string) => {
+    setError(msg)
+    showResult({ ok: false, title: failureTitle(submitLabel), message: msg, testId: 'money-submit' })
+  }
   const send = async (body: Record<string, unknown>) => {
     const r = await postJson(url, body)
     if (r.ok) {
       setPrompt(null)
+      showResult({ ok: true, title: successTitle(submitLabel, doc.object), message: amountText, testId: 'money-submit' })
       router.refresh()
       return
     }
@@ -80,7 +90,7 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
       return
     }
     setPrompt(null)
-    setError(problemText(r.data, r.status))
+    fail(problemText(r.data, r.status))
   }
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -106,18 +116,27 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
       if (date) body.date = date
     }
     if (bankRef === 'required') body.bankRef = String(f.get('bankRef') ?? '').trim()
+    const file = f.get('proof')
+    const summary: Summary = [
+      ...(doc.summary ?? []),
+      [isTransfer ? 'Dibayar dari akun' : 'Akun kas', cashAccounts.find((a) => a.id === body.cashAccountId)?.name ?? null],
+      [isTransfer ? 'Tanggal & jam transfer' : 'Tanggal', String(body.transferAt ?? body.date ?? '').replace('T', ' ') || (isTransfer ? null : 'hari ini')],
+      ['No. referensi bank', (body.bankRef as string | undefined) || null],
+      ['Bukti', file instanceof File && file.size > 0 ? file.name : null],
+      ['Pinjaman antar project', loan ? 'ya — dibayar dari akun lain' : null],
+    ]
+    if (!(await confirmAction({ title: confirmTitle(submitLabel, doc.object), summary, description: amountText, confirmLabel: confirmLabel(submitLabel), testId: 'money-submit' }))) return
     setBusy(true)
     try {
       if (precheckUrl) {
         const pre = await fetch(precheckUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
         if (!pre.ok) throw new Error(problemText(await pre.json().catch(() => null), pre.status))
       }
-      const file = f.get('proof')
       if (proof && file instanceof File && file.size > 0) body.proofMediaId = await uploadProof(proof.kind, file)
       else if (proof?.required) throw new Error('Bukti wajib diunggah.')
       await send(body)
     } catch (err) {
-      setError((err as Error).message || 'Gagal.')
+      fail((err as Error).message || 'Gagal.')
     } finally {
       setBusy(false)
     }
@@ -129,7 +148,7 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
       await send({ ...pending.current, [prompt.flag]: true })
     } catch (err) {
       setPrompt(null)
-      setError((err as Error).message || 'Gagal.')
+      fail((err as Error).message || 'Gagal.')
     } finally {
       setBusy(false)
     }

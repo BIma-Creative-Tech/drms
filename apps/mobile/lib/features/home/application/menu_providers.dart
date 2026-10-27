@@ -66,7 +66,7 @@ List<WebModule> fallbackMenu(UserProfile p) {
         ],
         if (p.hasFieldReports) item('/laporan-servis', 'Laporan servis'),
       ]),
-    if (!p.isOperatorOnly)
+    if (!p.isAttendanceOnly)
       mod('keuangan', 'Keuangan', [
         item('/collections/expense-requests', 'Pengajuan biaya'),
         if (p.canCreateRequests || p.has(Role.finance))
@@ -75,6 +75,7 @@ List<WebModule> fallbackMenu(UserProfile p) {
     mod('absensi', 'Absensi', [
       item('/absensi/absen', 'Absen'),
       if (p.canSeeTeamAttendance) item('/absensi', 'Tim hari ini'),
+      if (p.has(Role.adminStaff)) item('/absensi/absenkan', 'Absenkan karyawan'),
       item(
         '/absensi/rekap',
         p.roles.every((r) => r == Role.staff || r == Role.operator) ? 'Rekap absensi saya' : 'Rekap bulanan',

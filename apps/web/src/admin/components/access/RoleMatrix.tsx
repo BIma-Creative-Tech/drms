@@ -6,6 +6,7 @@ import React, { useMemo, useRef, useState } from 'react'
 import { ROLE_LABELS, type Role } from '@/access/roles'
 
 import { problemText } from '../ActionButton'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle } from '../feedback/feedback'
 import { MultiSelect } from '../list/MultiSelect'
 import { newIdemKey } from '../kas/client'
 import {
@@ -94,6 +95,19 @@ export function RoleMatrix({ companies, users, cells, employees, activeUserIds, 
       setMsg({ tone: 'bad', text: 'Ada perubahan di PT yang bukan hak Anda — tidak ada yang disimpan.' })
       return
     }
+    // DRMS 24/10: popup before (changes, PTs, reason) and after
+    const ptCodes = [...new Set(ops.map((o) => companies.find((c) => c.id === o.company)?.shortCode).filter(Boolean))].join(', ')
+    const yes = await confirmAction({
+      title: confirmTitle('simpan perubahan akses', `(${ops.length} perubahan)`),
+      summary: [
+        ['Akses baru', ops.filter((o) => o.kind === 'create').length || null],
+        ['Akses diubah / dicabut', ops.filter((o) => o.kind === 'update').length || null],
+        ['PT', ptCodes || null],
+        ['Alasan', reason.trim()],
+      ],
+      confirmLabel: confirmLabel('simpan'),
+    })
+    if (!yes) return
     setBusy(true)
     setMsg(null)
     setErrors(new Map())
@@ -108,6 +122,7 @@ export function RoleMatrix({ companies, users, cells, employees, activeUserIds, 
         setDrafts(new Map())
         setReason('')
         setMsg({ tone: 'ok', text: `${ops.length} perubahan tersimpan.` })
+        showResult({ ok: true, title: successTitle('simpan perubahan akses'), message: `${ops.length} perubahan tersimpan.` })
         router.refresh()
       } else {
         // all-or-nothing: nothing saved, every draft stays; a changed body next time needs a new key
@@ -116,10 +131,12 @@ export function RoleMatrix({ companies, users, cells, employees, activeUserIds, 
         setErrors(cells)
         const head = res.status === 403 ? 'Anda tidak berhak mengubah akses di salah satu PT.' : cells.size > 0 ? 'Periksa sel bertanda merah.' : problemText(data, res.status)
         setMsg({ tone: 'bad', text: `Tidak ada yang disimpan — ${head}${general.length ? ` ${general.join('; ')}` : ''}` })
+        showResult({ ok: false, title: failureTitle('simpan perubahan akses'), message: `Tidak ada yang disimpan — ${head}${general.length ? ` ${general.join('; ')}` : ''}` })
       }
     } catch {
       // network: same key on retry (the server replays a stored success, never saves twice)
       setMsg({ tone: 'bad', text: 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.' })
+      showResult({ ok: false, title: failureTitle('simpan perubahan akses'), message: 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.' })
     } finally {
       setBusy(false)
     }

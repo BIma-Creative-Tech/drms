@@ -1633,11 +1633,11 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get attendanceTypeOnsite =>
-      'Karyawan OnSite: boleh absen di semua lokasi terdaftar PT (site, kantor pusat, project, pusat biaya).';
+      'Karyawan OnSite: absen di dalam radius lokasi yang dipilih (project / pusat biaya terdaftar PT).';
 
   @override
   String get attendanceTypeNonOnsite =>
-      'Karyawan Non-OnSite: boleh absen di mana saja; di luar lokasi terdaftar dicatat \"Di luar area\".';
+      'Karyawan Non-OnSite: absen masuk / pulang di mana saja — di dalam radius lokasi terdaftar PT tercatat di lokasi itu (dipilih otomatis), di luar semua lokasi dicatat \"Di luar area\".';
 
   @override
   String get attendanceOutsideArea => 'Di luar area';
@@ -1648,12 +1648,15 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String attendanceDetectOutsideArea(String name) {
-    return 'Posisi Anda di luar semua lokasi terdaftar: absen dicatat \"Di luar area\" (ref. $name).';
+    return 'Di luar lokasi terdaftar — absen dicatat \"Di luar area\" (ref. $name).';
   }
 
   @override
   String get attendanceNoReference =>
       'Absen \"Di luar area\" belum bisa: site penempatan / kantor pusat PT belum ditetapkan Admin.';
+
+  @override
+  String get attendanceNonOnsiteOutside => 'Di luar lokasi terdaftar — absen dicatat \"Di luar area\"';
 
   @override
   String get distanceInside => 'Di dalam area absen';
@@ -1787,6 +1790,23 @@ class AppLocalizationsId extends AppLocalizations {
   String get recapMemberTitle => 'Rekap absensi karyawan';
 
   @override
+  String get recapViewOwn => 'Saya';
+
+  @override
+  String get recapViewTeam => 'Tim';
+
+  @override
+  String get recapNoEmployee => 'Akun Anda belum terhubung ke data karyawan. Hubungi Admin.';
+
+  @override
+  String get teamRecapEmpty => 'Belum ada karyawan dalam rekap bulan ini.';
+
+  @override
+  String teamRecapCount(int count) {
+    return '$count karyawan';
+  }
+
+  @override
   String get teamStatusNotYet => 'Belum absen';
 
   @override
@@ -1823,11 +1843,11 @@ class AppLocalizationsId extends AppLocalizations {
       'Absen atas nama belum bisa: absensi dari aplikasi belum diaktifkan Admin (Setting perusahaan).';
 
   @override
-  String get onBehalfTitle => 'Diabsenkan PM';
+  String get onBehalfTitle => 'Absenkan karyawan';
 
   @override
   String get onBehalfIntro =>
-      'Untuk anggota tim yang tidak bisa absen sendiri. Lokasi diambil dari HP Anda, foto karyawan diambil dengan kamera HP Anda. Nama Anda dan alasannya tercatat.';
+      'Untuk karyawan yang tidak bisa absen sendiri (PM: anggota tim; Admin Staff: semua karyawan PT, juga tanpa akun). Lokasi diambil dari HP Anda, foto karyawan diambil dengan kamera HP Anda. Nama Anda dan alasannya tercatat.';
 
   @override
   String get onBehalfNoTeam =>
@@ -1835,6 +1855,9 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get onBehalfEmployee => 'Karyawan';
+
+  @override
+  String get onBehalfNoAccount => 'tanpa akun';
 
   @override
   String get onBehalfReason => 'Alasan (wajib)';
@@ -2835,7 +2858,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String fieldHmPrefilled(String date, String hm) {
-    return 'HM awal diisi otomatis dari HM akhir $date ($hm).';
+    return 'HM awal otomatis dari HM akhir terakhir yang tercatat: $date ($hm).';
   }
 
   @override
@@ -2852,10 +2875,19 @@ class AppLocalizationsId extends AppLocalizations {
   String get fieldHmPhoto => 'Foto meter HM';
 
   @override
-  String get fieldHmPhotoRequired => 'Foto meter HM akhir (wajib)';
+  String get fieldHmPhotoRequired => 'Foto meter HM akhir (wajib bila HM diisi)';
 
   @override
   String get fieldHmPhotoFixed => 'Foto meter HM sudah di server (tidak bisa diganti).';
+
+  @override
+  String get fieldHmOptional =>
+      'HM opsional — isi saat pencatatan HM mingguan. Bila diisi, HM awal dan HM akhir wajib keduanya, plus foto meter HM. HM awal otomatis tidak dikirim selama HM akhir kosong.';
+
+  @override
+  String fieldTimesheetBackdateWide(String date) {
+    return 'Sebagai PM project / Direktur Anda dapat mengisi timesheet sejak $date (selama periode kontrak unit).';
+  }
 
   @override
   String get fieldOperatingHours => 'Jam operasi';
@@ -3540,8 +3572,7 @@ class AppLocalizationsId extends AppLocalizations {
   String get lpjQueueEmpty => 'Tidak ada LPJ yang menunggu verifikasi.';
 
   @override
-  String get lpjReadOnlyHint =>
-      'Hanya lihat: buka pengajuan untuk melihat LPJ-nya. Verifikasi LPJ dilakukan di web (Verifikasi LPJ).';
+  String get lpjReadOnlyHint => 'Buka pengajuan untuk memeriksa nota dan memverifikasi LPJ.';
 
   @override
   String get transferNotInQueue => 'Pengajuan ini tidak lagi ada di antrian transfer (mungkin sudah ditransfer).';
@@ -3670,7 +3701,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get loanNoBorrower =>
-      'Pinjaman antar project diajukan oleh PM project peminjam. Anda belum menjadi PM project yang aktif.';
+      'Pinjaman antar project diajukan oleh PM project peminjam atau Finance. Anda belum menjadi PM project yang aktif.';
 
   @override
   String get loanBorrower => 'Project peminjam';
@@ -3752,7 +3783,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String loanApproveBody(String borrower, String amount, String lender) {
-    return '$borrower meminjam $amount dari $lender. Bila pusat biaya kedua project berbeda (dana), Finance mencairkan dana: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat biaya peminjam.';
+    return '$borrower meminjam $amount dari $lender. Persetujuan Direktur lalu Owner; untuk dana, Finance kemudian mentransfer lewat Antrian Transfer: kas keluar dari pusat biaya pemberi dan kas masuk ke pusat biaya peminjam.';
   }
 
   @override
@@ -3994,12 +4025,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String fundAccounts(int count) {
-    return '$count akun, tanpa akun site';
-  }
-
-  @override
-  String fundSiteExcluded(int count, String amount) {
-    return '$count akun site $amount tidak dihitung';
+    return '$count akun';
   }
 
   @override
@@ -5919,24 +5945,24 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
-  String get loanCashWaiting => 'Menunggu pencairan Finance';
+  String get loanCashWaiting => 'Menunggu transfer Finance (Antrian Transfer)';
 
   @override
   String get loanCashCancelled => 'Dibatalkan (jurnal balik)';
 
   @override
-  String get loanCashTbd => 'Ditentukan saat disetujui (dana antar pusat biaya berbeda → dicairkan Finance)';
+  String get loanCashTbd => 'Ditentukan saat disetujui (dana → ditransfer Finance lewat Antrian Transfer)';
 
   @override
-  String get loanCashNone => 'Tanpa transaksi kas (barang, atau pusat biaya sama)';
+  String get loanCashNone => 'Tanpa transaksi kas (barang, atau pinjaman lama dengan pusat biaya sama)';
 
   @override
   String loanAwaitingDisbursement(String lender, String borrower) {
-    return 'Disetujui — menunggu Finance mencairkan dana dari $lender ke $borrower.';
+    return 'Disetujui — menunggu Finance mentransfer dana dari $lender ke $borrower lewat Antrian Transfer.';
   }
 
   @override
-  String get loanStepDisburse => 'Pencairan Finance';
+  String get loanStepDisburse => 'Transfer Finance';
 
   @override
   String get loanStepDisbursed => 'Dicairkan';
@@ -5962,4 +5988,409 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get kpiCostCentersTeamEmpty => 'Project Anda belum dipetakan ke pusat biaya (akun kas).';
+
+  @override
+  String get sectionAttachments => 'Lampiran';
+
+  @override
+  String get attachmentsOptional => 'Lampiran (opsional)';
+
+  @override
+  String get attachmentsRequired => 'Lampiran (wajib untuk Reimburse)';
+
+  @override
+  String get attachmentsHint => 'Foto atau file JPG / PNG / PDF (PDF maks. 5 MB), maks. 20 lampiran.';
+
+  @override
+  String get attachmentFile => 'File';
+
+  @override
+  String get attachmentLocal => 'Di HP — terkirim saat sinkron / Ajukan';
+
+  @override
+  String get attachmentOnServer => 'Tersimpan di server';
+
+  @override
+  String get attachmentRemove => 'Hapus lampiran';
+
+  @override
+  String attachmentsLimit(int count) {
+    return 'Maksimal $count lampiran.';
+  }
+
+  @override
+  String get attachmentTypeInvalid => 'Pilih file JPG, PNG atau PDF.';
+
+  @override
+  String get attachmentPdfTooLarge => 'File PDF lebih dari 5 MB. Perkecil file-nya atau lampirkan sebagai foto.';
+
+  @override
+  String get attachmentPdfInvalid => 'File PDF tidak valid.';
+
+  @override
+  String get attachmentTooLarge => 'File terlalu besar (maks. 15 MB).';
+
+  @override
+  String get loanStepOwner => 'Persetujuan Owner';
+
+  @override
+  String get loanStepSubmittedFinance => 'Diajukan Finance';
+
+  @override
+  String get loanOpenTransferQueue => 'Buka Antrian Transfer';
+
+  @override
+  String get loanRepayRequest => 'Ajukan pengembalian';
+
+  @override
+  String loanRepayRequestTitle(String title) {
+    return 'Ajukan pengembalian $title';
+  }
+
+  @override
+  String get loanRepayRequestHint =>
+      'Disetujui Direktur lalu Owner, kemudian ditransfer Finance lewat Antrian Transfer (kas keluar dari pusat biaya peminjam, kas masuk ke pusat biaya pemberi).';
+
+  @override
+  String loanRepayable(String amount) {
+    return 'Dapat diajukan $amount';
+  }
+
+  @override
+  String get loanRepayPlannedDate => 'Rencana tanggal pengembalian';
+
+  @override
+  String loanRepayRequested(String amount) {
+    return 'Pengembalian $amount diajukan ke Direktur.';
+  }
+
+  @override
+  String loanRepayPlannedOn(String date) {
+    return 'rencana $date';
+  }
+
+  @override
+  String loanSubmittedBy(String name) {
+    return 'diajukan $name';
+  }
+
+  @override
+  String loanRepaymentExecutedBy(String name) {
+    return 'ditransfer $name';
+  }
+
+  @override
+  String loanRepaymentRejected(String reason) {
+    return 'Ditolak: $reason';
+  }
+
+  @override
+  String loanRepaymentCancelled(String reason) {
+    return 'Dibatalkan: $reason';
+  }
+
+  @override
+  String loanRepaymentApproveTitle(String amount) {
+    return 'Setujui pengembalian $amount?';
+  }
+
+  @override
+  String get loanRepaymentApproveBody =>
+      'Setelah persetujuan Owner, Finance mentransfer dari pusat biaya peminjam ke pusat biaya pemberi lewat Antrian Transfer.';
+
+  @override
+  String loanRepaymentRejectTitle(String amount) {
+    return 'Tolak pengembalian $amount?';
+  }
+
+  @override
+  String loanRepaymentCancelTitle(String amount) {
+    return 'Batalkan pengembalian $amount?';
+  }
+
+  @override
+  String get loanRepaymentCancelBody => 'Pengajuan pengembalian dibatalkan (tidak dihapus). Alasan wajib.';
+
+  @override
+  String loanRepaymentInboxTitle(String no) {
+    return 'Pengembalian pinjaman $no';
+  }
+
+  @override
+  String loanTransferOrdersTitle(int count) {
+    return 'Transfer pinjaman antar project ($count)';
+  }
+
+  @override
+  String get loanTransferOrderSelf => 'Anda yang mengajukan; boleh dieksekusi sendiri (tercatat di audit).';
+
+  @override
+  String get loanTransferOrderExecute => 'Catat transfer';
+
+  @override
+  String loanTransferOrderExecuteTitle(String no) {
+    return 'Catat transfer $no';
+  }
+
+  @override
+  String loanTransferOrderExecuteBody(String amount, String from, String to) {
+    return 'Kas keluar $amount dari $from dan kas masuk ke $to, masing-masing ditandai project-nya. Bukti transfer dapat dilampirkan di web.';
+  }
+
+  @override
+  String get loanTransferOrderDate => 'Tanggal transfer';
+
+  @override
+  String loanTransferOrderDone(String no) {
+    return 'Transfer $no tercatat.';
+  }
+
+  @override
+  String confirmActionTitle(String action) {
+    return 'Yakin ingin $action?';
+  }
+
+  @override
+  String confirmActionYes(String action) {
+    return 'Ya, $action';
+  }
+
+  @override
+  String get resultOk => 'OK';
+
+  @override
+  String get resultSuccessTitle => 'Berhasil';
+
+  @override
+  String resultSuccessAction(String action) {
+    return 'Berhasil: $action';
+  }
+
+  @override
+  String get resultFailedTitle => 'Gagal';
+
+  @override
+  String resultFailedAction(String action) {
+    return 'Gagal: $action';
+  }
+
+  @override
+  String get resultQueuedTitle => 'Tersimpan di antrian';
+
+  @override
+  String get resultQueuedBody => 'Tersimpan di antrian, akan dikirim saat online.';
+
+  @override
+  String get actionReceiptsCompleteVerb => 'Tandai nota lengkap';
+
+  @override
+  String get receiptSaveAction => 'Simpan nota';
+
+  @override
+  String get correctionSaveAction => 'Simpan koreksi';
+
+  @override
+  String get scheduleAssignAction => 'Ubah jadwal karyawan';
+
+  @override
+  String get fieldDiscardAction => 'Hapus draft';
+
+  @override
+  String get progressDiscardAction => 'Hapus laporan';
+
+  @override
+  String get progressResendAction => 'Kirim versi HP';
+
+  @override
+  String get accountSignatureSaveAction => 'Simpan tanda tangan';
+
+  @override
+  String get accountSignatureRemoveAction => 'Hapus tanda tangan';
+
+  @override
+  String get actionDeleteDraft => 'Hapus draft';
+
+  @override
+  String get deleteDraftServerConfirm =>
+      'Draft dihapus dari daftar dan tidak dapat dikirim lagi; nomor yang sudah terbit tidak dipakai ulang.';
+
+  @override
+  String get deleteDraftDone => 'Draft dihapus.';
+
+  @override
+  String get homeAccountsTitle => 'Kas & bank';
+
+  @override
+  String homeAccountsCount(int count) {
+    return '$count rekening';
+  }
+
+  @override
+  String homeTransferWaiting(int count) {
+    return '$count menunggu transfer';
+  }
+
+  @override
+  String get akunGroupAccount => 'Akun';
+
+  @override
+  String get akunGroupApp => 'Aplikasi';
+
+  @override
+  String get lpjActionRevision => 'Minta revisi';
+
+  @override
+  String get lpjVerifyNote =>
+      'Total terverifikasi = jumlah nota valid. Nota yang masih menunggu harus diputuskan dulu (valid / tolak).';
+
+  @override
+  String get lpjRevisionNoteLabel => 'Catatan revisi untuk pemohon';
+
+  @override
+  String get lpjRevisionNoteHint => 'Wajib, minimal 3 karakter.';
+
+  @override
+  String get lpjVerifiedDone => 'LPJ terverifikasi.';
+
+  @override
+  String get lpjRevisionDone => 'LPJ dikembalikan ke pemohon untuk direvisi.';
+
+  @override
+  String lpjPendingReceipts(int count) {
+    return '$count nota belum diputuskan (valid / tolak).';
+  }
+
+  @override
+  String get receiptActionVerify => 'Validasi nota';
+
+  @override
+  String get receiptActionReject => 'Tolak nota';
+
+  @override
+  String get receiptValidButton => 'Valid';
+
+  @override
+  String get receiptRejectReasonLabel => 'Alasan nota ditolak';
+
+  @override
+  String get receiptVerifiedDone => 'Nota ditandai valid.';
+
+  @override
+  String get receiptRejectedDone => 'Nota ditolak.';
+
+  @override
+  String get flagReviewAction => 'Tandai flag diperiksa';
+
+  @override
+  String get flagReviewNoteLabel => 'Catatan pemeriksaan (opsional)';
+
+  @override
+  String get flagReviewedDone => 'Flag ditandai sudah diperiksa.';
+
+  @override
+  String get flagReviewedLabel => 'Sudah diperiksa';
+
+  @override
+  String get mediaOpenPhoto => 'Buka foto';
+
+  @override
+  String get mediaOpenFile => 'Buka file';
+
+  @override
+  String get mediaNotImage => 'File ini bukan gambar (mis. PDF). Ketuk thumbnail-nya untuk membuka sebagai file.';
+
+  @override
+  String get pliAction => 'Instruksi pinjam antar proyek';
+
+  @override
+  String pliTitle(String doc) {
+    return 'Instruksi pinjam antar proyek — $doc';
+  }
+
+  @override
+  String get pliBorrowerAccount => 'Akun kas pengajuan';
+
+  @override
+  String get pliLenders => 'Project pemberi (PT yang sama)';
+
+  @override
+  String get pliNoLenders => 'Tidak ada project lain yang aktif di PT ini.';
+
+  @override
+  String pliAccount(String name) {
+    return 'Akun kas: $name';
+  }
+
+  @override
+  String get pliAmount => 'Nilai pinjaman';
+
+  @override
+  String pliAmountHelp(String min, String max) {
+    return 'Minimal $min (kekurangan), maksimal $max (dana bebas pemberi).';
+  }
+
+  @override
+  String get pliDueDate => 'Jatuh tempo';
+
+  @override
+  String get pliReason => 'Alasan / catatan';
+
+  @override
+  String get pliReasonHint => 'Wajib, minimal 3 karakter. Tercatat di pinjaman dan audit log.';
+
+  @override
+  String pliReasonDefault(String account, String doc) {
+    return 'Menutup kekurangan dana akun kas $account untuk pengajuan $doc';
+  }
+
+  @override
+  String get pliChooseLender => 'Pilih project pemberi pinjaman.';
+
+  @override
+  String get pliContinue => 'Lanjut';
+
+  @override
+  String get pliConfirmNote =>
+      'Pinjaman langsung disetujui dan masuk Antrian Transfer Finance. Pengajuan tetap menunggu keputusan Anda; setujui setelah Finance mentransfer pinjaman.';
+
+  @override
+  String pliConfirmFrom(String project, String account) {
+    return 'Pemberi: $project — akun kas $account';
+  }
+
+  @override
+  String pliConfirmTo(String project, String account) {
+    return 'Penerima: $project — akun kas $account';
+  }
+
+  @override
+  String pliConfirmAmount(String amount) {
+    return 'Nilai pinjaman: $amount';
+  }
+
+  @override
+  String pliConfirmDue(String date) {
+    return 'Jatuh tempo: $date';
+  }
+
+  @override
+  String pliDone(String amount, String project) {
+    return 'Pinjaman $amount dari $project masuk Antrian Transfer Finance. Setujui pengajuan setelah transfer dieksekusi.';
+  }
+
+  @override
+  String pliPending(String doc, String amount, String status) {
+    return 'Pinjaman $doc ($amount): $status.';
+  }
+
+  @override
+  String get pliInboxBlocked => 'Dana bebas akun kas project kurang — instruksikan pinjaman antar proyek atau tolak.';
+
+  @override
+  String pliInboxPending(String doc) {
+    return 'Pinjaman $doc menunggu transfer Finance — setujui setelah transfer dieksekusi.';
+  }
+
+  @override
+  String get loanStepInstructedOwner => 'Instruksi Owner';
 }

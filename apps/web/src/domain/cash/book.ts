@@ -81,8 +81,6 @@ export const BookQuery = z.object({
   arah: optEnums(['masuk', 'keluar']),
   /** MC2: PT filter of the Kas list (a PT without Kas access simply yields no rows). */
   pt: optId,
-  /** ADR 0023 (Q-S7): rows of the cash accounts flagged with this site (petty cash of a branch). */
-  site: optId,
   status: optEnums(['posted', 'void']),
   /** ADR 0028: "Sumber" — source types (e.g. `intercompany` = Antar PT). */
   sumber: optEnums(['transfer', 'settlement_refund', 'manual', 'reversal', 'opening', 'intercompany', 'project_loan']),
@@ -119,7 +117,6 @@ export function bookWhere(q: BookQuery): Where | undefined {
   if (q.status?.length) and.push({ status: { in: q.status } })
   if (q.sumber?.length) and.push({ sourceType: { in: q.sumber } })
   if (q.pt) and.push({ company: { equals: q.pt } })
-  if (q.site) and.push({ 'cashAccount.site': { equals: q.site } })
   if (q.q) for (const t of q.q.split(/\s+/).filter(Boolean).slice(0, 5)) and.push({ or: [{ entryNo: { like: t } }, { description: { like: t } }] })
   return and.length ? { and } : undefined
 }
@@ -204,13 +201,11 @@ export function parseRupiahInput(v: string): number | null {
 
 // ---------------------------------------------------------------- DB reads
 
-/** `siteId` (accounts only, ADR 0023 Q-S7): the account's site flag. */
+/** `siteId` (accounts only, ADR 0023 Q-S7): the account's legacy site flag — ADR 0032: still keeps the account out of the PT fund pool (ADR 0029). */
 /** ADR 0028 `intercompanyReceiving` (accounts only): the PT's designated "Rekening penerimaan antar-PT". */
 export type Option = { id: number; label: string; active: boolean; companyId: number | null; openingDate?: string | null; siteId?: number | null; intercompanyReceiving?: boolean }
 export type Lookups = {
   accounts: Option[]
-  /** ADR 0023: sites of the readable PTs (Kas "Site" filter). */
-  sites: Option[]
   projects: Option[]
   costCenters: Option[]
   categories: Array<Option & { requiresVehicle: boolean }>
@@ -218,7 +213,7 @@ export type Lookups = {
   vehicles: Option[]
 }
 
-async function all(req: PayloadRequest, collection: 'cash-accounts' | 'projects' | 'cost-centers' | 'expense-categories' | 'cash-in-sources' | 'vehicles' | 'sites', sort: string) {
+async function all(req: PayloadRequest, collection: 'cash-accounts' | 'projects' | 'cost-centers' | 'expense-categories' | 'cash-in-sources' | 'vehicles', sort: string) {
   const r = await req.payload.find({ collection, depth: 0, pagination: false, sort, user: req.user, overrideAccess: false, req })
   return r.docs as unknown as Array<Record<string, unknown>>
 }
@@ -228,9 +223,8 @@ const cid = (d: Record<string, unknown>) => relId(d.company) ?? null
 
 /** Masters for filters, labels and the forms (Finance/Owner may read all of them). */
 export async function cashLookups(req: PayloadRequest): Promise<Lookups> {
-  const [accounts, sites, projects, costCenters, categories, sources, vehicles] = await Promise.all([
+  const [accounts, projects, costCenters, categories, sources, vehicles] = await Promise.all([
     all(req, 'cash-accounts', 'name'),
-    all(req, 'sites', 'code'),
     all(req, 'projects', 'code'),
     all(req, 'cost-centers', 'code'),
     all(req, 'expense-categories', 'name'),
@@ -240,7 +234,6 @@ export async function cashLookups(req: PayloadRequest): Promise<Lookups> {
   return {
     // QA-05: the form's date `min` follows the picked account's opening-balance (go-live) date
     accounts: accounts.map((d) => ({ id: d.id as number, companyId: cid(d), label: String(d.name ?? ''), active: d.active !== false, openingDate: (d.openingBalanceDate as string | null | undefined) ?? null, siteId: relId(d.site) ?? null, intercompanyReceiving: d.intercompanyReceiving === true })),
-    sites: sites.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false })),
     projects: projects.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.status !== 'selesai' && d.status !== 'arsip' && d.status !== 'dibatalkan' })),
     costCenters: costCenters.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false })),
     categories: categories.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false, requiresVehicle: d.requiresVehicle === true })),

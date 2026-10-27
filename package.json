@@ -1,6 +1,6 @@
 {
   "name": "proyekkas",
-  "version": "0.19.1",
+  "version": "0.22.2",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -20,8 +20,9 @@
     "check:privacy-notice": "npm run check:privacy-notice -w apps/web"
   },
   "overrides": {
+    "dompurify": "3.4.17",
     "nodemailer": "10.0.10",
     "sass": "1.105.0",
-    "undici": "7.29.1"
+    "undici": "7.30.1"
   }
 }

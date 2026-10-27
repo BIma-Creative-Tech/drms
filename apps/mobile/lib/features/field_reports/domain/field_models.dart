@@ -467,7 +467,7 @@ class TimesheetContent extends FieldContent {
   final String location;
   final String notes;
 
-  /// Local id of the HM meter photo (exactly one, required on create).
+  /// Local id of the HM meter photo (at most one; required only when HM is filled — user 2026-10-24).
   final String? hmPhoto;
 
   /// HM akhir of the previous timesheet of the unit (prefill source; HM_GAP when HM awal differs).
@@ -478,6 +478,9 @@ class TimesheetContent extends FieldContent {
   List<String> get photoUuids => [?hmPhoto];
 
   double get totalHours => (workHours ?? 0) + (standbyHours ?? 0) + (breakdownHours ?? 0);
+
+  /// HM awal or HM akhir filled (then both are required, and the HM photo too).
+  bool get hasHm => hmStart != null || hmEnd != null;
 
   @override
   Json toJson() => {
@@ -1179,13 +1182,14 @@ class FieldClient {
   final String name;
 }
 
-/// A timesheet known on the phone (server cache or local) — HM prefill and the unit tabs.
+/// A timesheet known on the phone (server cache or local) — HM prefill and the unit tabs. HM is optional (user
+/// 2026-10-24, recorded about once a week): a mark without HM still fills its unit tab, but is never an HM source.
 class TimesheetMark {
   const TimesheetMark({
     required this.unitId,
     required this.reportDate,
-    required this.hmStart,
-    required this.hmEnd,
+    this.hmStart,
+    this.hmEnd,
     this.operatorName,
     this.location,
     this.fuelLiters,
@@ -1193,8 +1197,8 @@ class TimesheetMark {
   });
   final int unitId;
   final String reportDate;
-  final double hmStart;
-  final double hmEnd;
+  final double? hmStart;
+  final double? hmEnd;
   final String? operatorName;
   final String? location;
   final double? fuelLiters;
@@ -1300,7 +1304,8 @@ class FieldRecord {
       fStr(raw['action']),
     ].where((e) => e.isNotEmpty).join(' · '),
     FieldReportType.unitTimesheet => [
-      'HM ${fmtNum(fDblN(raw['hmStart']) ?? 0)} → ${fmtNum(fDblN(raw['hmEnd']) ?? 0)}',
+      if ((fDblN(raw['hmStart']), fDblN(raw['hmEnd'])) case (final double s, final double e))
+        'HM ${fmtNum(s)} → ${fmtNum(e)}',
       'kerja ${fmtNum(fDblN(raw['workHours']) ?? 0)} j',
       if ((fDblN(raw['standbyHours']) ?? 0) > 0) 'standby ${fmtNum(fDblN(raw['standbyHours'])!)} j',
       if ((fDblN(raw['breakdownHours']) ?? 0) > 0) 'breakdown ${fmtNum(fDblN(raw['breakdownHours'])!)} j',

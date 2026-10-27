@@ -14,10 +14,13 @@ import '../../../core/format/rupiah.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/doc_no_chip.dart';
 import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/online_only_button.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_proyek.dart';
 import '../../../shared/widgets/reason_dialog.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../auth/application/auth_controller.dart';
@@ -34,7 +37,7 @@ import 'intercompany_loan_providers.dart';
 
 /// ADR 0029 "Pinjaman antar-PT" on the APK (online only): the Owner's instruction form (opened from the fund panel of
 /// a short request), the loan detail (notifications `icloan.*` deep-link here) and Finance's disbursement form (reusing
-/// the transfer form: source account without site, date + time of the bank proof, bank reference, proof photo, overdraft
+/// the transfer form: source account (any active one), date + time of the bank proof, bank reference, proof photo, overdraft
 /// confirmation). Phase 3 (user 2026-10-19): the repayment by Finance of the borrower (same form + amount) and the voids
 /// of a disbursement / repayment; only "Batalkan perintah" stays on the web.
 
@@ -50,18 +53,13 @@ class IcLoanStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (IconData icon, Color? color) = switch (loan.status) {
-      IcLoanStatus.instructed => (Icons.hourglass_top, context.pk.warnText),
-      IcLoanStatus.disbursed || IcLoanStatus.partiallyRepaid => (Icons.check_circle_outline, context.pk.okText),
-      IcLoanStatus.repaid => (Icons.check_circle, context.pk.okText),
-      IcLoanStatus.cancelled => (Icons.block, null),
+    final (IconData icon, PkTone tone) = switch (loan.status) {
+      IcLoanStatus.instructed => (Icons.hourglass_top, PkTone.warn),
+      IcLoanStatus.disbursed || IcLoanStatus.partiallyRepaid => (Icons.check_circle_outline, PkTone.ok),
+      IcLoanStatus.repaid => (Icons.check_circle, PkTone.ok),
+      IcLoanStatus.cancelled => (Icons.block, PkTone.bad),
     };
-    return Chip(
-      key: Key('icloan-status-${loan.id}'),
-      avatar: Icon(icon, size: 18, color: color),
-      label: Text(loan.label, overflow: TextOverflow.ellipsis),
-      visualDensity: VisualDensity.compact,
-    );
+    return PkPill(key: Key('icloan-status-${loan.id}'), icon: icon, tone: tone, label: loan.label);
   }
 }
 
@@ -162,22 +160,14 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
     });
     if (errors.isNotEmpty || lender == null || amount == null) return;
     final borrowerCode = o.borrower.company?.shortCode ?? '#${widget.borrowerId}';
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t.icLoanConfirmTitle),
-        content: Text(t.icLoanConfirmBody(lender.company.shortCode, formatRupiah(amount), borrowerCode)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-          FilledButton(
-            key: const Key('icloan-confirm'),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(t.icLoanSubmit),
-          ),
-        ],
-      ),
+    final ok = await confirmAction(
+      context,
+      action: t.icLoanSubmit,
+      summary: ['${lender.company.shortCode} → $borrowerCode', formatRupiah(amount), formatDateOnly(_dueDate)],
+      note: t.icLoanConfirmBody(lender.company.shortCode, formatRupiah(amount), borrowerCode),
+      confirmKey: const Key('icloan-confirm'),
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     final body = icLoanCreateBody(
       borrowerCompanyId: widget.borrowerId,
       lenderCompanyId: lender.company.id,
@@ -201,7 +191,8 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
       }
       ref.invalidate(inboxProvider);
       if (!mounted) return;
-      showSnack(context, t.icLoanInstructed(loan.docNo));
+      await showActionResult(context, message: t.icLoanInstructed(loan.docNo), action: t.icLoanSubmit);
+      if (!mounted) return;
       final router = GoRouter.maybeOf(context);
       if (router != null) {
         unawaited(router.pushReplacement(icLoanPath(loan.id)));
@@ -220,8 +211,12 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
       });
       // the lender's availability may have changed meanwhile (409 LOAN_LENDER_INSUFFICIENT)
       if (e.code == loanLenderInsufficientCode) ref.invalidate(icLenderOptionsProvider(_query));
+      final message = icLoanAwareError(e, errorText);
+      await showActionFailure(context, message, action: t.icLoanSubmit);
     } on Object catch (e) {
-      if (mounted) setState(() => _error = errorText(e));
+      if (!mounted) return;
+      setState(() => _error = errorText(e));
+      await showActionError(context, e, action: t.icLoanSubmit);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -266,16 +261,28 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
       key: const Key('icloan-form'),
       padding: const EdgeInsets.all(16),
       children: [
-        Text(t.icLoanInstructNote, style: theme.textTheme.bodySmall),
+        Text(t.icLoanInstructNote, style: pkMetaStyle(context)),
         const SizedBox(height: 12),
         // PT peminjam: its availability (same §1 definition) and the receiving account check
-        Card(
+        PkCard(
           key: const Key('icloan-borrower'),
-          margin: EdgeInsets.zero,
-          child: ListTile(
-            leading: const Icon(Icons.call_received),
-            title: Text('${t.icLoanBorrower}: ${b.company?.label ?? borrowerCode}'),
-            subtitle: Text(t.icLoanAvailable(formatRupiah(b.available)), style: money),
+          radius: PkRadius.lg,
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              const PkIconChip(icon: Icons.call_received, tone: PkTone.primary, size: 40),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${t.icLoanBorrower}: ${b.company?.label ?? borrowerCode}', style: pkTitleStyle(context)),
+                    const SizedBox(height: 2),
+                    Text(t.icLoanAvailable(formatRupiah(b.available)), style: money),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
         if (!b.hasReceivingAccount || _errors['borrower'] != null)
@@ -287,9 +294,7 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
               style: TextStyle(color: theme.colorScheme.error),
             ),
           ),
-        const SizedBox(height: 16),
-        Text(t.icLoanLender, style: theme.textTheme.titleSmall),
-        const SizedBox(height: 4),
+        PkListTitle(t.icLoanLender),
         if (o.lenders.isEmpty)
           Text(t.icLoanNoLenders, key: const Key('icloan-no-lenders'))
         else
@@ -304,60 +309,64 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
             ),
           ),
         const SizedBox(height: 16),
-        FormGrid(
-          rowGap: 16,
-          children: [
-            FormGridCell(
-              label: t.icLoanAmount,
-              builder: (label) => TextField(
-                key: const Key('icloan-amount'),
-                controller: _amount,
-                keyboardType: TextInputType.number,
-                inputFormatters: const [RupiahInputFormatter()],
-                decoration: InputDecoration(
-                  labelText: label,
-                  prefixText: 'Rp ',
-                  errorText: _errors['amount'],
-                  helperText: _amountHint(t, amount, widget.amount ?? selectedGap),
-                  helperMaxLines: 3,
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-            ),
-            FormGridCell(
-              label: t.icLoanDueDate,
-              builder: (label) => InkWell(
-                key: const Key('icloan-due-date'),
-                onTap: _busy ? null : _pickDue,
-                child: InputDecorator(
+        PkCard(
+          radius: PkRadius.lg,
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+          child: FormGrid(
+            rowGap: 16,
+            children: [
+              FormGridCell(
+                label: t.icLoanAmount,
+                builder: (label) => TextField(
+                  key: const Key('icloan-amount'),
+                  controller: _amount,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: const [RupiahInputFormatter()],
                   decoration: InputDecoration(
                     labelText: label,
-                    helperText: t.icLoanDueHelp,
-                    errorText: _errors['dueDate'],
-                    suffixIcon: const Icon(Icons.calendar_today),
+                    prefixText: 'Rp ',
+                    errorText: _errors['amount'],
+                    helperText: _amountHint(t, amount, widget.amount ?? selectedGap),
+                    helperMaxLines: 3,
                   ),
-                  child: Text(formatDateOnly(_dueDate), key: const Key('icloan-due-value')),
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
-            ),
-            FormGridCell(
-              label: t.icLoanReason,
-              full: true,
-              builder: (label) => TextField(
-                key: const Key('icloan-reason'),
-                controller: _reason,
-                minLines: 2,
-                maxLines: 5,
-                maxLength: 1000,
-                decoration: InputDecoration(labelText: label, errorText: _errors['reason']),
+              FormGridCell(
+                label: t.icLoanDueDate,
+                builder: (label) => InkWell(
+                  key: const Key('icloan-due-date'),
+                  onTap: _busy ? null : _pickDue,
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: label,
+                      helperText: t.icLoanDueHelp,
+                      errorText: _errors['dueDate'],
+                      suffixIcon: const Icon(Icons.calendar_today),
+                    ),
+                    child: Text(formatDateOnly(_dueDate), key: const Key('icloan-due-value')),
+                  ),
+                ),
               ),
-            ),
-          ],
+              FormGridCell(
+                label: t.icLoanReason,
+                full: true,
+                builder: (label) => TextField(
+                  key: const Key('icloan-reason'),
+                  controller: _reason,
+                  minLines: 2,
+                  maxLines: 5,
+                  maxLength: 1000,
+                  decoration: InputDecoration(labelText: label, errorText: _errors['reason']),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(child: Text(t.icLoanRequests, style: theme.textTheme.titleSmall)),
+            Expanded(child: PkListTitle(t.icLoanRequests)),
             if (b.waiting.length > 1 && b.gapAll > 0)
               TextButton(
                 key: const Key('icloan-calc-all'),
@@ -367,7 +376,7 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
           ],
         ),
         if (b.waiting.isEmpty)
-          Text(t.icLoanRequestsNone, style: theme.textTheme.bodySmall)
+          Text(t.icLoanRequestsNone, style: pkMetaStyle(context))
         else
           for (final w in b.waiting)
             CheckboxListTile(
@@ -383,11 +392,12 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
             ),
         if (_errors['requests'] != null) Text(_errors['requests']!, style: TextStyle(color: theme.colorScheme.error)),
         if (_error != null)
-          Card(
+          PkCard(
             key: const Key('icloan-error'),
-            color: theme.colorScheme.errorContainer,
+            color: context.pk.badBg,
             margin: const EdgeInsets.only(top: 16),
-            child: Padding(padding: const EdgeInsets.all(12), child: Text(_error!)),
+            padding: const EdgeInsets.all(12),
+            child: Text(_error!, style: TextStyle(color: context.pk.badOn)),
           ),
         const SizedBox(height: 20),
         OnlineOnlyButton(
@@ -417,9 +427,11 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
     return Card(
       key: Key('icloan-lender-${l.company.id}'),
       margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      color: context.pk.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: selected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(PkRadius.md),
+        side: BorderSide(color: selected ? theme.colorScheme.primary : context.pk.border, width: selected ? 2 : 1),
       ),
       child: ListTile(
         enabled: enough,
@@ -525,148 +537,177 @@ class _IcLoanBody extends ConsumerWidget {
     final theme = Theme.of(context);
     final zone = ref.watch(currentProfileProvider)?.timezone;
     final l = loan;
-    Widget row(String k, String v, {Key? key, TextStyle? style}) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(width: 140, child: Text(k, style: theme.textTheme.bodySmall)),
-          Expanded(
-            child: Text(v, key: key, style: style),
-          ),
-        ],
-      ),
-    );
-    Widget section(String title) => Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 4),
-      child: Text(title, style: theme.textTheme.titleMedium),
-    );
-    Widget note(String text, {Key? key, Color? color}) => Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Row(
-        key: key,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.info_outline, size: 18, color: color ?? theme.colorScheme.primary),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(text, style: theme.textTheme.bodySmall?.copyWith(color: color)),
-          ),
-        ],
-      ),
-    );
-    final money = theme.textTheme.bodyMedium?.copyWith(
-      fontWeight: FontWeight.w600,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
+    Widget row(String k, String v, {Key? key, TextStyle? style}) => PkKeyRow(k, v, valueKey: key, style: style);
+    Widget note(String text, {Key? key, PkTone tone = PkTone.info}) => PkNote(text, key: key, tone: tone);
+    final money = pkAmountStyle(context, base: theme.textTheme.bodyMedium);
     final destination = icLoanDestinationOf(l, queued: queued);
     final side = switch (l.side) {
       'lender' => t.icLoanSideLender,
       'borrower' => t.icLoanSideBorrower,
       _ => null,
     };
+    final notes = <Widget>[
+      if (l.ownRequestNote != null) note(l.ownRequestNote!, key: const Key('icloan-own-request')),
+      if (l.droppedRequestNote != null)
+        note(l.droppedRequestNote!, key: const Key('icloan-dropped-request'), tone: PkTone.warn),
+      if (l.disburseBlockedByG1) note(t.icLoanG1Blocked, key: const Key('icloan-g1'), tone: PkTone.warn),
+      if (destination.destination == null && destination.known && l.readsDestination)
+        note(t.icLoanDestinationNone, key: const Key('icloan-destination-none'), tone: PkTone.bad),
+      if (!l.lenderHasReceivingAccount && l.status.active)
+        note(t.icLoanNoLenderAccount(l.lenderCode), key: const Key('icloan-lender-no-account'), tone: PkTone.warn),
+      if (l.cancelReason != null)
+        note(t.icLoanCancelledBecause(l.cancelReason!), key: const Key('icloan-cancelled'), tone: PkTone.bad),
+    ];
     return ListView(
       key: const Key('icloan-detail'),
       padding: const EdgeInsets.all(16),
       children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            DocNoChip(docNo: l.docNo),
-            IcLoanStatusChip(loan: l),
-            if (l.overdue)
-              Chip(
-                key: Key('icloan-overdue-${l.id}'),
-                avatar: Icon(Icons.warning_amber, size: 18, color: context.pk.warnText),
-                label: Text(t.loanOverdueDays(l.daysOverdue), style: TextStyle(color: context.pk.warnText)),
-                visualDensity: VisualDensity.compact,
+        // headline card: number + status, lender → borrower, the amount
+        PkCard(
+          radius: PkRadius.lg,
+          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  DocNoChip(docNo: l.docNo),
+                  IcLoanStatusChip(loan: l),
+                  if (l.overdue)
+                    PkPill(
+                      key: Key('icloan-overdue-${l.id}'),
+                      icon: Icons.warning_amber_rounded,
+                      tone: PkTone.bad,
+                      label: t.loanOverdueDays(l.daysOverdue),
+                    ),
+                  if (side != null) PkPill(label: side, tone: PkTone.primary),
+                ],
               ),
-            if (side != null) Chip(label: Text(side), visualDensity: VisualDensity.compact),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          t.icLoanFlow(l.lenderCode, l.borrowerCode),
-          key: const Key('icloan-flow'),
-          style: theme.textTheme.titleMedium,
-        ),
-        const SizedBox(height: 8),
-        row(t.icLoanLender, l.lender?.label ?? '-', key: const Key('icloan-lender-value')),
-        row(t.icLoanBorrower, l.borrower?.label ?? '-', key: const Key('icloan-borrower-value')),
-        if (destination.destination != null)
-          row(t.bankDestination, destination.destination!.text, key: const Key('icloan-destination-value')),
-        row(t.icLoanAmount, formatRupiah(l.amount), key: const Key('icloan-amount-value'), style: money),
-        if (l.status.active) ...[
-          row(t.icLoanRepaid, formatRupiah(l.repaidTotal), key: const Key('icloan-repaid-value'), style: money),
-          row(
-            t.icLoanOutstanding,
-            formatRupiah(l.outstanding),
-            key: const Key('icloan-outstanding-value'),
-            style: money?.copyWith(color: l.overdue ? context.pk.warnText : null),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const PkIconChip(icon: Icons.business, tone: PkTone.primary, size: 40),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          t.icLoanFlow(l.lenderCode, l.borrowerCode),
+                          key: const Key('icloan-flow'),
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          formatRupiah(l.amount),
+                          key: const Key('icloan-amount-value'),
+                          style: pkAmountStyle(context, base: theme.textTheme.headlineSmall, fontSize: 24),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (l.status.active) ...[
+                const SizedBox(height: 12),
+                PkProgressBar(value: l.amount <= 0 ? 0 : l.repaidTotal / l.amount, color: context.pk.okText),
+              ],
+            ],
           ),
-        ],
-        row(t.icLoanInstructionDate, formatDateOnly(l.instructionDate)),
-        row(
-          t.icLoanDueDate,
-          '${formatDateOnly(l.dueDate)} · ${t.icLoanNoInterest}',
-          key: const Key('icloan-due-value'),
         ),
-        if (l.createdByName != null) row(t.icLoanCreatedBy, l.createdByName!),
-        section(t.icLoanReason),
-        Text(l.reason, key: const Key('icloan-reason-value')),
-        if (l.ownRequestNote != null) note(l.ownRequestNote!, key: const Key('icloan-own-request')),
-        if (l.droppedRequestNote != null)
-          note(l.droppedRequestNote!, key: const Key('icloan-dropped-request'), color: context.pk.warnText),
-        if (l.disburseBlockedByG1) note(t.icLoanG1Blocked, key: const Key('icloan-g1'), color: context.pk.warnText),
-        if (destination.destination == null && destination.known && l.readsDestination)
-          note(t.icLoanDestinationNone, key: const Key('icloan-destination-none'), color: theme.colorScheme.error),
-        if (!l.lenderHasReceivingAccount && l.status.active)
-          note(
-            t.icLoanNoLenderAccount(l.lenderCode),
-            key: const Key('icloan-lender-no-account'),
-            color: context.pk.warnText,
+        PkCard(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              row(t.icLoanLender, l.lender?.label ?? '-', key: const Key('icloan-lender-value')),
+              row(t.icLoanBorrower, l.borrower?.label ?? '-', key: const Key('icloan-borrower-value')),
+              if (destination.destination != null)
+                row(t.bankDestination, destination.destination!.text, key: const Key('icloan-destination-value')),
+              if (l.status.active) ...[
+                row(t.icLoanRepaid, formatRupiah(l.repaidTotal), key: const Key('icloan-repaid-value'), style: money),
+                row(
+                  t.icLoanOutstanding,
+                  formatRupiah(l.outstanding),
+                  key: const Key('icloan-outstanding-value'),
+                  style: money?.copyWith(color: l.overdue ? context.pk.badText : null),
+                ),
+              ],
+              row(t.icLoanInstructionDate, formatDateOnly(l.instructionDate)),
+              row(
+                t.icLoanDueDate,
+                '${formatDateOnly(l.dueDate)} · ${t.icLoanNoInterest}',
+                key: const Key('icloan-due-value'),
+              ),
+              if (l.createdByName != null) row(t.icLoanCreatedBy, l.createdByName!),
+            ],
           ),
-        if (l.cancelReason != null)
-          note(
-            t.icLoanCancelledBecause(l.cancelReason!),
-            key: const Key('icloan-cancelled'),
-            color: context.pk.badText,
+        ),
+        PkSectionCard(
+          title: t.icLoanReason,
+          icon: Icons.notes,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(l.reason, key: const Key('icloan-reason-value')),
+              ...notes,
+            ],
           ),
-        if (l.requests.isNotEmpty) ...[
-          section(t.icLoanRequests),
-          for (final r in l.requests)
-            ListTile(
-              key: Key('icloan-request-${r.id}'),
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              leading: const Icon(Icons.receipt_long_outlined),
-              title: Text([r.label, ?r.title].join(' · '), overflow: TextOverflow.ellipsis),
-              subtitle: r.statusLabel == null && r.grandTotal == null
-                  ? null
-                  : Text([?r.statusLabel, if (r.grandTotal != null) formatRupiah(r.grandTotal!)].join(' · ')),
-              // only the borrower's people get the title: they may open the request
-              trailing: r.title == null ? null : const Icon(Icons.chevron_right),
-              onTap: r.title == null ? null : () => GoRouter.maybeOf(context)?.push('/requests/${r.id}'),
+        ),
+        if (l.requests.isNotEmpty)
+          PkSectionCard(
+            title: t.icLoanRequests,
+            icon: Icons.receipt_long_outlined,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final r in l.requests)
+                  ListTile(
+                    key: Key('icloan-request-${r.id}'),
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    leading: const PkIconChip(icon: Icons.receipt_long_outlined, size: 32),
+                    title: Text([r.label, ?r.title].join(' · '), overflow: TextOverflow.ellipsis),
+                    subtitle: r.statusLabel == null && r.grandTotal == null
+                        ? null
+                        : Text([?r.statusLabel, if (r.grandTotal != null) formatRupiah(r.grandTotal!)].join(' · ')),
+                    // only the borrower's people get the title: they may open the request
+                    trailing: r.title == null ? null : const Icon(Icons.chevron_right),
+                    onTap: r.title == null ? null : () => GoRouter.maybeOf(context)?.push('/requests/${r.id}'),
+                  ),
+              ],
             ),
-        ],
-        section(t.icLoanMovements),
-        if (l.movements.isEmpty)
-          Text(t.icLoanMovementsEmpty, key: const Key('icloan-movements-empty'), style: theme.textTheme.bodySmall)
-        else
-          for (final m in l.movements)
-            _MovementTile(
-              m: m,
-              zone: zone,
-              onVoid: !m.posted
-                  ? null
-                  : m.isDisbursement && l.allowedActions.contains(IcLoanAction.voidDisbursement)
-                  ? () => _voidMovement(context, ref, l, m)
-                  : !m.isDisbursement && l.allowedActions.contains(IcLoanAction.voidRepayment)
-                  ? () => _voidMovement(context, ref, l, m)
-                  : null,
-            ),
+          ),
+        PkSectionCard(
+          title: t.icLoanMovements,
+          icon: Icons.swap_vert,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (l.movements.isEmpty)
+                Text(t.icLoanMovementsEmpty, key: const Key('icloan-movements-empty'), style: pkMetaStyle(context))
+              else
+                for (final m in l.movements)
+                  _MovementTile(
+                    m: m,
+                    zone: zone,
+                    onVoid: !m.posted
+                        ? null
+                        : m.isDisbursement && l.allowedActions.contains(IcLoanAction.voidDisbursement)
+                        ? () => _voidMovement(context, ref, l, m)
+                        : !m.isDisbursement && l.allowedActions.contains(IcLoanAction.voidRepayment)
+                        ? () => _voidMovement(context, ref, l, m)
+                        : null,
+                  ),
+            ],
+          ),
+        ),
         if (l.allowedActions.contains(IcLoanAction.cancel))
           note(t.icLoanCancelWebHint, key: const Key('icloan-web-hint')),
         const SizedBox(height: 80),
@@ -679,6 +720,7 @@ class _IcLoanBody extends ConsumerWidget {
 /// tersedia" below 0 asks for the confirmation of the 409 `LOAN_VOID_BORROWER_SHORTFALL_CONFIRM_REQUIRED`).
 Future<void> _voidMovement(BuildContext context, WidgetRef ref, IcLoan l, IcLoanMovement m) async {
   final t = AppLocalizations.of(context);
+  final label = m.isDisbursement ? t.icLoanVoidDisbursement : t.loanRepaymentVoidConfirm;
   final reason = await showReasonDialog(
     context,
     title: m.isDisbursement
@@ -687,7 +729,7 @@ Future<void> _voidMovement(BuildContext context, WidgetRef ref, IcLoan l, IcLoan
     description: m.isDisbursement
         ? t.icLoanVoidDisbursementBody(l.lenderCode, l.borrowerCode)
         : t.icLoanVoidRepaymentBody(l.borrowerCode, l.lenderCode),
-    confirm: m.isDisbursement ? t.icLoanVoidDisbursement : t.loanRepaymentVoidConfirm,
+    confirm: label,
     keyPrefix: 'icloan-void',
   );
   if (reason == null || !context.mounted) return;
@@ -724,9 +766,11 @@ Future<void> _voidMovement(BuildContext context, WidgetRef ref, IcLoan l, IcLoan
       if (ok != true) return;
       await send(confirm: true);
     }
-    if (context.mounted) showSnack(context, m.isDisbursement ? t.icLoanVoidedDisbursement : t.loanRepaymentVoided);
+    final done = m.isDisbursement ? t.icLoanVoidedDisbursement : t.loanRepaymentVoided;
+    if (context.mounted) await showActionResult(context, message: done, action: label);
   } on ApiException catch (e) {
-    if (context.mounted) showSnack(context, icLoanAwareError(e, errorText));
+    final message = icLoanAwareError(e, errorText);
+    if (context.mounted) await showActionFailure(context, message, action: label);
   } finally {
     ref.invalidate(icLoanDetailProvider(l.id));
     ref.invalidate(icLoanQueueProvider);
@@ -749,58 +793,59 @@ class _MovementTile extends StatelessWidget {
     final strike = m.posted ? null : const TextStyle(decoration: TextDecoration.lineThrough);
     final when = m.transferAt != null ? formatServerDateTime(m.transferAt, zone: zone) : formatDateOnly(m.transferDate);
     final entries = [if (m.kkNo != null) 'KK ${m.kkNo}', if (m.kmNo != null) 'KM ${m.kmNo}'].join(' · ');
-    return Card(
+    return Container(
       key: Key('icloan-movement-${m.id}'),
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(child: Text(m.label, style: theme.textTheme.labelLarge)),
-                Text(
-                  formatRupiah(m.amount),
-                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700).merge(strike),
-                ),
-              ],
+      margin: const EdgeInsets.only(top: 4, bottom: 6),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: m.posted ? null : theme.colorScheme.surfaceContainerHighest,
+        border: Border.all(color: context.pk.border),
+        borderRadius: BorderRadius.circular(PkRadius.sm + 2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(m.label, style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+              ),
+              Text(
+                formatRupiah(m.amount),
+                style: pkAmountStyle(context, base: theme.textTheme.bodyMedium)?.merge(strike),
+              ),
+            ],
+          ),
+          Text([when, ?m.executedByName].join(' · '), style: theme.textTheme.bodySmall?.merge(strike)),
+          if (entries.isNotEmpty)
+            Text(entries, key: Key('icloan-movement-${m.id}-entries'), style: theme.textTheme.bodySmall?.merge(strike)),
+          if (m.fromAccountName != null || m.toAccountNoMasked != null)
+            Text(
+              [
+                ?m.fromAccountName,
+                if (m.toAccountNoMasked != null) '→ ${m.toAccountName ?? ''} ${m.toAccountNoMasked}'.trim(),
+              ].join(' '),
+              style: theme.textTheme.bodySmall?.merge(strike),
             ),
-            Text([when, ?m.executedByName].join(' · '), style: theme.textTheme.bodySmall?.merge(strike)),
-            if (entries.isNotEmpty)
-              Text(
-                entries,
-                key: Key('icloan-movement-${m.id}-entries'),
-                style: theme.textTheme.bodySmall?.merge(strike),
+          if (m.bankRef != null)
+            Text('${t.bankRefLabel}: ${m.bankRef}', style: theme.textTheme.bodySmall?.merge(strike)),
+          if (!m.posted)
+            Text(
+              m.voidReason == null ? t.icLoanMovementVoid : t.icLoanMovementVoidReason(m.voidReason!),
+              key: Key('icloan-movement-void-${m.id}'),
+              style: theme.textTheme.bodySmall?.copyWith(color: context.pk.badText),
+            ),
+          if (onVoid != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                key: Key('icloan-movement-${m.id}-void'),
+                onPressed: onVoid,
+                icon: const Icon(Icons.block, size: 18),
+                label: Text(m.isDisbursement ? t.icLoanVoidDisbursement : t.cashVoid),
               ),
-            if (m.fromAccountName != null || m.toAccountNoMasked != null)
-              Text(
-                [
-                  ?m.fromAccountName,
-                  if (m.toAccountNoMasked != null) '→ ${m.toAccountName ?? ''} ${m.toAccountNoMasked}'.trim(),
-                ].join(' '),
-                style: theme.textTheme.bodySmall?.merge(strike),
-              ),
-            if (m.bankRef != null)
-              Text('${t.bankRefLabel}: ${m.bankRef}', style: theme.textTheme.bodySmall?.merge(strike)),
-            if (!m.posted)
-              Text(
-                m.voidReason == null ? t.icLoanMovementVoid : t.icLoanMovementVoidReason(m.voidReason!),
-                key: Key('icloan-movement-void-${m.id}'),
-                style: theme.textTheme.bodySmall?.copyWith(color: context.pk.badText),
-              ),
-            if (onVoid != null)
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  key: Key('icloan-movement-${m.id}-void'),
-                  onPressed: onVoid,
-                  icon: const Icon(Icons.block, size: 18),
-                  label: Text(m.isDisbursement ? t.icLoanVoidDisbursement : t.cashVoid),
-                ),
-              ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -876,7 +921,7 @@ class IcLoanRepayRoute extends ConsumerWidget {
 
 /// "Catat pencairan" (Finance of the LENDER) or, with [repay], "Catat pengembalian" (Finance of the BORROWER, amount
 /// ≤ sisa, destination = the lender's receiving account): the transfer form without a cost center — source account of the lender
-/// WITHOUT a site (the fund pool), date + time of the bank proof (lender zone), bank reference, proof photo; a
+/// (any active account, the fund pool), date + time of the bank proof (lender zone), bank reference, proof photo; a
 /// confirmable 409 (overdraft, QA-04) asks "Tetap simpan". The amount is the loan amount (server-set).
 class IcLoanDisburseScreen extends ConsumerStatefulWidget {
   const IcLoanDisburseScreen({
@@ -973,8 +1018,19 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
       _error = null;
     });
     if (_issues().isNotEmpty) return;
-    setState(() => _busy = true);
     final loan = widget.loan;
+    final label = widget.repay ? t.loanRepaySave : t.icLoanDisburse;
+    if (!confirmOverdraft) {
+      final amount = widget.repay ? parseRupiah(_amount.text) : loan.amount;
+      final summary = [
+        loan.docNo,
+        '${loan.lenderCode} → ${loan.borrowerCode}',
+        amount == null ? null : formatRupiah(amount),
+        _bankRef.text.trim(),
+      ];
+      if (!await confirmAction(context, action: label, summary: summary) || !mounted) return;
+    }
+    setState(() => _busy = true);
     try {
       _proofMediaId ??= await ref
           .read(financeApiProvider)
@@ -1006,14 +1062,13 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
       if (!mounted) return;
       final kk = out.disbursement?.kkNo;
       final km = out.disbursement?.kmNo;
-      showSnack(
-        context,
-        widget.repay
-            ? t.icLoanRepayDone(out.docNo, formatRupiah(parseRupiah(_amount.text) ?? 0))
-            : kk != null && km != null
-            ? t.icLoanDisbursed(out.docNo, kk, km)
-            : t.icLoanDisbursedShort(out.docNo),
-      );
+      final done = widget.repay
+          ? t.icLoanRepayDone(out.docNo, formatRupiah(parseRupiah(_amount.text) ?? 0))
+          : kk != null && km != null
+          ? t.icLoanDisbursed(out.docNo, kk, km)
+          : t.icLoanDisbursedShort(out.docNo);
+      await showActionResult(context, message: done, action: label);
+      if (!mounted) return;
       final router = GoRouter.maybeOf(context);
       if (router != null && router.canPop()) {
         router.pop(true);
@@ -1024,8 +1079,10 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
       final prompt = transferOverridePrompt(t, e);
       if (!mounted) return;
       if (prompt == null || prompt.flag != 'confirmOverdraft') {
-        setState(() => _error = icLoanAwareError(e, errorText));
+        final message = icLoanAwareError(e, errorText);
+        setState(() => _error = message);
         if (e.code == loanLenderInsufficientCode) ref.invalidate(icLoanQueueProvider);
+        await showActionFailure(context, message, action: label);
         return;
       }
       setState(() => _busy = false);
@@ -1064,8 +1121,8 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
     final loan = widget.loan;
     final issues = _tried ? _issues() : const <String, String>{};
     final accounts = ref.watch(cashAccountsProvider(_payerId));
-    // ADR 0029 §3.5: only active accounts WITHOUT a site (the PT's fund pool) pay an inter-PT loan
-    final pool = (accounts.value ?? const <CashAccountOption>[]).where((a) => a.active && a.siteId == null).toList();
+    // ADR 0029 §3.5: active accounts (the PT's fund pool; DRMS 24/10: no site exclusion any more) pay an inter-PT loan
+    final pool = (accounts.value ?? const <CashAccountOption>[]).where((a) => a.active).toList();
     if (_cashAccountId == null && pool.isNotEmpty) _cashAccountId = pool.first.id;
     final zone = zoneAbbrev(ref.watch(accountProfileProvider)?.forCompany(_payerId).timezone);
     final destination = widget.destination;
@@ -1076,152 +1133,156 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Card(
+            PkCard(
               key: const Key('icloan-disburse-amount-card'),
-              color: theme.colorScheme.primaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.repay
-                          ? t.icLoanRepayAmount(formatRupiah(loan.outstanding), loan.borrowerCode, loan.lenderCode)
-                          : t.icLoanDisburseAmount(formatRupiah(loan.amount), loan.lenderCode, loan.borrowerCode),
-                      key: const Key('icloan-disburse-amount'),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
+              radius: PkRadius.lg,
+              color: context.pk.infoBg,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.repay
+                        ? t.icLoanRepayAmount(formatRupiah(loan.outstanding), loan.borrowerCode, loan.lenderCode)
+                        : t.icLoanDisburseAmount(formatRupiah(loan.amount), loan.lenderCode, loan.borrowerCode),
+                    key: const Key('icloan-disburse-amount'),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
-                    Text(widget.repay ? t.icLoanRepayHelp : t.icLoanDisburseHelp, style: theme.textTheme.bodySmall),
-                    const Divider(height: 20),
+                  ),
+                  Text(widget.repay ? t.icLoanRepayHelp : t.icLoanDisburseHelp, style: theme.textTheme.bodySmall),
+                  const Divider(height: 20),
+                  Text(
+                    '${loan.docNo} · ${t.loanDueOn(formatDateOnly(loan.dueDate))}',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  if (destination != null)
                     Text(
-                      '${loan.docNo} · ${t.loanDueOn(formatDateOnly(loan.dueDate))}',
-                      style: theme.textTheme.bodyMedium,
+                      '${t.bankDestination}: ${destination.text}',
+                      key: const Key('icloan-destination'),
+                      style: theme.textTheme.bodySmall,
+                    )
+                  else if (widget.repay && !loan.lenderHasReceivingAccount)
+                    Text(
+                      t.icLoanNoLenderAccount(loan.lenderCode),
+                      key: const Key('icloan-lender-no-account'),
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                    )
+                  else if (widget.destinationKnown)
+                    Text(
+                      t.icLoanDestinationNone,
+                      key: const Key('icloan-destination-none'),
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
                     ),
-                    if (destination != null)
-                      Text(
-                        '${t.bankDestination}: ${destination.text}',
-                        key: const Key('icloan-destination'),
-                        style: theme.textTheme.bodySmall,
-                      )
-                    else if (widget.repay && !loan.lenderHasReceivingAccount)
-                      Text(
-                        t.icLoanNoLenderAccount(loan.lenderCode),
-                        key: const Key('icloan-lender-no-account'),
-                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
-                      )
-                    else if (widget.destinationKnown)
-                      Text(
-                        t.icLoanDestinationNone,
-                        key: const Key('icloan-destination-none'),
-                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
-                      ),
-                  ],
-                ),
+                ],
               ),
             ),
             const SizedBox(height: 16),
-            FormGrid(
-              children: [
-                if (widget.repay)
+            PkCard(
+              radius: PkRadius.lg,
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+              child: FormGrid(
+                children: [
+                  if (widget.repay)
+                    FormGridCell(
+                      label: t.cashAmount,
+                      builder: (label) => TextField(
+                        key: const Key('icloan-repay-amount'),
+                        controller: _amount,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: const [RupiahInputFormatter()],
+                        decoration: InputDecoration(
+                          labelText: label,
+                          prefixText: 'Rp ',
+                          errorText: issues['amount'],
+                          helperText: t.loanRepayOutstanding(formatRupiah(loan.outstanding)),
+                        ),
+                      ),
+                    ),
                   FormGridCell(
-                    label: t.cashAmount,
-                    builder: (label) => TextField(
-                      key: const Key('icloan-repay-amount'),
-                      controller: _amount,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: const [RupiahInputFormatter()],
-                      decoration: InputDecoration(
-                        labelText: label,
-                        prefixText: 'Rp ',
-                        errorText: issues['amount'],
-                        helperText: t.loanRepayOutstanding(formatRupiah(loan.outstanding)),
+                    label: t.cashAccountLabel,
+                    child: switch (accounts) {
+                      AsyncError(:final error) => Text(
+                        errorText(error),
+                        style: TextStyle(color: theme.colorScheme.error),
                       ),
-                    ),
-                  ),
-                FormGridCell(
-                  label: t.cashAccountLabel,
-                  child: switch (accounts) {
-                    AsyncError(:final error) => Text(
-                      errorText(error),
-                      style: TextStyle(color: theme.colorScheme.error),
-                    ),
-                    AsyncData() when pool.isEmpty => Text(
-                      t.icLoanNoAccounts,
-                      key: const Key('icloan-no-accounts'),
-                      style: TextStyle(color: theme.colorScheme.error),
-                    ),
-                    _ => MasterPickerField(
-                      key: const Key('icloan-cash-account'),
-                      label: t.cashAccountLabel,
-                      items: [
-                        for (final a in pool)
-                          MasterItem(a.id, a.balance == null ? a.name : '${a.name} · ${formatRupiah(a.balance!)}'),
-                      ],
-                      value: _cashAccountId,
-                      allowNone: false,
-                      errorText: issues['cashAccountId'],
-                      helperText: t.icLoanAccountHelp,
-                      onChanged: (v) => setState(() => _cashAccountId = v),
-                    ),
-                  },
-                ),
-                FormGridCell(
-                  label: t.transferAtLabel,
-                  builder: (label) => InkWell(
-                    key: const Key('transfer-at'),
-                    onTap: () async {
-                      final at = await pickTransferAt(context, zoneOffset: _zoneOffset, current: _at);
-                      if (at != null && mounted) setState(() => _at = at);
+                      AsyncData() when pool.isEmpty => Text(
+                        t.icLoanNoAccounts,
+                        key: const Key('icloan-no-accounts'),
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                      _ => MasterPickerField(
+                        key: const Key('icloan-cash-account'),
+                        label: t.cashAccountLabel,
+                        items: [
+                          for (final a in pool)
+                            MasterItem(a.id, a.balance == null ? a.name : '${a.name} · ${formatRupiah(a.balance!)}'),
+                        ],
+                        value: _cashAccountId,
+                        allowNone: false,
+                        errorText: issues['cashAccountId'],
+                        helperText: t.icLoanAccountHelp,
+                        onChanged: (v) => setState(() => _cashAccountId = v),
+                      ),
                     },
-                    child: InputDecorator(
+                  ),
+                  FormGridCell(
+                    label: t.transferAtLabel,
+                    builder: (label) => InkWell(
+                      key: const Key('transfer-at'),
+                      onTap: () async {
+                        final at = await pickTransferAt(context, zoneOffset: _zoneOffset, current: _at);
+                        if (at != null && mounted) setState(() => _at = at);
+                      },
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: label,
+                          helperText: t.transferAtHelp,
+                          errorText: issues['transferAt'],
+                          suffixIcon: const Icon(Icons.event),
+                        ),
+                        child: Text(
+                          _at == null ? t.transferAtHint : transferAtText(_at!, zone),
+                          style: _at == null ? theme.textTheme.bodyLarge?.copyWith(color: theme.hintColor) : null,
+                        ),
+                      ),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.bankRefLabel,
+                    builder: (label) => TextField(
+                      key: const Key('transfer-bank-ref'),
+                      controller: _bankRef,
+                      maxLength: 64,
                       decoration: InputDecoration(
                         labelText: label,
-                        helperText: t.transferAtHelp,
-                        errorText: issues['transferAt'],
-                        suffixIcon: const Icon(Icons.event),
+                        hintText: t.bankRefHint,
+                        errorText: issues['bankRef'],
                       ),
-                      child: Text(
-                        _at == null ? t.transferAtHint : transferAtText(_at!, zone),
-                        style: _at == null ? theme.textTheme.bodyLarge?.copyWith(color: theme.hintColor) : null,
-                      ),
+                      onChanged: (_) => _tried ? setState(() {}) : null,
                     ),
                   ),
-                ),
-                FormGridCell(
-                  label: t.bankRefLabel,
-                  builder: (label) => TextField(
-                    key: const Key('transfer-bank-ref'),
-                    controller: _bankRef,
-                    maxLength: 64,
-                    decoration: InputDecoration(
-                      labelText: label,
-                      hintText: t.bankRefHint,
-                      errorText: issues['bankRef'],
+                  FormGridCell(
+                    label: t.transferProofLabel,
+                    full: true,
+                    stackedLabel: true,
+                    child: TransferProofPicker(
+                      proof: _proof,
+                      error: issues['proof'],
+                      onAdd: (fromCamera) => _addProof(fromCamera: fromCamera),
                     ),
-                    onChanged: (_) => _tried ? setState(() {}) : null,
                   ),
-                ),
-                FormGridCell(
-                  label: t.transferProofLabel,
-                  full: true,
-                  stackedLabel: true,
-                  child: TransferProofPicker(
-                    proof: _proof,
-                    error: issues['proof'],
-                    onAdd: (fromCamera) => _addProof(fromCamera: fromCamera),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
             if (_error != null)
-              Card(
+              PkCard(
                 key: const Key('icloan-disburse-error'),
-                color: theme.colorScheme.errorContainer,
+                color: context.pk.badBg,
                 margin: const EdgeInsets.only(top: 16),
-                child: Padding(padding: const EdgeInsets.all(12), child: Text(_error!)),
+                padding: const EdgeInsets.all(12),
+                child: Text(_error!, style: TextStyle(color: context.pk.badOn)),
               ),
             const SizedBox(height: 20),
             OnlineOnlyButton(
@@ -1260,12 +1321,8 @@ class IcLoanQueueSection extends ConsumerWidget {
         key: const Key('icloan-queue'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-            child: Text(t.icLoanQueueTitle(items.length), style: Theme.of(context).textTheme.titleMedium),
-          ),
+          PkListTitle(t.icLoanQueueTitle(items.length), padding: const EdgeInsets.only(bottom: 10)),
           for (final l in items) IcLoanQueueCard(loan: l),
-          const Divider(height: 16),
         ],
       ),
     );
@@ -1285,77 +1342,77 @@ class IcLoanQueueCard extends ConsumerWidget {
     // Finance IN the lender PT (the server re-checks; G1: never the instruction's creator)
     final finance = ref.watch(accountProfileProvider)?.forCompany(l.lender?.id).has(Role.finance) ?? false;
     final can = finance && l.canDisburse != false;
-    return Card(
+    return PkCard(
       key: Key('icloan-q-${l.id}'),
       margin: const EdgeInsets.only(bottom: 10),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.push(icLoanPath(l.id)),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
+      padding: const EdgeInsets.all(14),
+      onTap: () => context.push(icLoanPath(l.id)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(l.docNo, style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
-                        Text(t.icLoanFlow(l.lenderCode, l.borrowerCode), style: theme.textTheme.titleMedium),
-                      ],
+              const PkIconChip(icon: Icons.business, size: 38),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l.docNo,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    formatRupiah(l.amount),
-                    key: Key('icloan-q-${l.id}-amount'),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
+                    Text(t.icLoanFlow(l.lenderCode, l.borrowerCode), style: pkTitleStyle(context)),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Text(
-                '${formatDateOnly(l.instructionDate)} · ${t.loanDueOn(formatDateOnly(l.dueDate))}',
-                style: theme.textTheme.bodySmall,
+                formatRupiah(l.amount),
+                key: Key('icloan-q-${l.id}-amount'),
+                style: pkAmountStyle(context, base: theme.textTheme.titleMedium),
               ),
-              if (l.reason.isNotEmpty) Text(l.reason, maxLines: 2, overflow: TextOverflow.ellipsis),
-              const SizedBox(height: 4),
-              Text(
-                l.destination == null ? t.icLoanDestinationNone : '${t.bankDestination}: ${l.destination!.text}',
-                key: Key('icloan-q-${l.id}-destination'),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: l.destination == null ? theme.colorScheme.error : null,
-                ),
-              ),
-              if (l.g1Note != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    l.g1Note!,
-                    key: Key('icloan-q-${l.id}-g1'),
-                    style: theme.textTheme.bodySmall?.copyWith(color: context.pk.warnText, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              if (can) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    key: Key('icloan-q-${l.id}-disburse'),
-                    onPressed: () => context.push('${icLoanPath(l.id)}/disburse'),
-                    icon: const Icon(Icons.account_balance),
-                    label: Text(t.icLoanDisburse),
-                  ),
-                ),
-              ],
             ],
           ),
-        ),
+          const SizedBox(height: 8),
+          Text(
+            '${formatDateOnly(l.instructionDate)} · ${t.loanDueOn(formatDateOnly(l.dueDate))}',
+            style: pkMetaStyle(context),
+          ),
+          if (l.reason.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(l.reason, maxLines: 2, overflow: TextOverflow.ellipsis),
+            ),
+          const SizedBox(height: 4),
+          Text(
+            l.destination == null ? t.icLoanDestinationNone : '${t.bankDestination}: ${l.destination!.text}',
+            key: Key('icloan-q-${l.id}-destination'),
+            style: theme.textTheme.bodySmall?.copyWith(color: l.destination == null ? theme.colorScheme.error : null),
+          ),
+          if (l.g1Note != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                l.g1Note!,
+                key: Key('icloan-q-${l.id}-g1'),
+                style: theme.textTheme.bodySmall?.copyWith(color: context.pk.warnText, fontWeight: FontWeight.w600),
+              ),
+            ),
+          if (can) ...[
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              key: Key('icloan-q-${l.id}-disburse'),
+              onPressed: () => context.push('${icLoanPath(l.id)}/disburse'),
+              icon: const Icon(Icons.account_balance),
+              label: Text(t.icLoanDisburse),
+            ),
+          ],
+        ],
       ),
     );
   }

@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:proyekkas/features/attendance/application/attendance_providers.dart';
 import 'package:proyekkas/features/attendance/domain/attendance.dart';
 import 'package:proyekkas/features/attendance/domain/attendance_recap.dart';
 import 'package:proyekkas/features/attendance/presentation/recap_view.dart';
@@ -16,6 +15,7 @@ import 'package:proyekkas/features/expense/presentation/request_detail_screen.da
 import 'package:proyekkas/features/expense/presentation/widgets/receipt_thumb.dart';
 import 'package:proyekkas/features/field_reports/presentation/widgets/field_widgets.dart';
 import 'package:proyekkas/features/masters/domain/master_item.dart';
+import 'package:proyekkas/shared/widgets/media_thumb.dart';
 
 import '../support/fixtures.dart';
 import '../support/seed.dart';
@@ -149,10 +149,16 @@ void main() {
           body: DayDetailSheet(day: day, zone: 'Asia/Makassar'),
         ),
         overrides: [
-          for (final id in [301, 302]) attendanceSelfieProvider(id).overrideWith((ref) async => _png),
+          for (final id in [301, 302])
+            mediaImageProvider(('/attendance/$id/selfie', false)).overrideWith((ref) async => _png),
         ],
       );
-      await tester.tap(find.byKey(const Key('selfie-project-7')));
+      // D2510: both selfies are thumbnails on the location card; the first opens the viewer at 1 / 2
+      expect(
+        find.descendant(of: find.byKey(const Key('selfie-project-7')), matching: find.byType(MediaThumb)),
+        findsNWidgets(2),
+      );
+      await tester.tap(find.byKey(const Key('media-thumb-/attendance/301/selfie')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('photo-viewer')), findsOneWidget);
       expect(tester.widget<Text>(find.byKey(const Key('photo-viewer-counter'))).data, '1 / 2');

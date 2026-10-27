@@ -86,9 +86,16 @@ void main() {
   });
 
   group('tap routing (doc types the server emits)', () {
-    String? route(String? docType, String? docId, {String event = 'x', bool progress = true, bool own = true}) =>
+    String? route(
+      String? docType,
+      String? docId, {
+      String event = 'x',
+      bool progress = true,
+      bool own = true,
+      bool projects = true,
+    }) =>
         AppNotification.fromJson({..._n(5), 'event': event, 'docType': docType, 'docId': docId})
-            .route(canReadProgress: progress, ownAttendance: own);
+            .route(canReadProgress: progress, ownAttendance: own, canSeeProjects: projects);
 
     test('expense request (expense.*, reminder.lpj_overdue / revision_pending) → request detail', () {
       expect(route('expense_request', '42', event: 'expense.approved'), '/requests/42');
@@ -103,7 +110,9 @@ void main() {
     test('project: late progress report → that project\'s reports; budget threshold → progress vs budget', () {
       expect(route('project', '7', event: 'progress.late_report'), '/progress?project=7');
       expect(route('project', '7', event: 'reminder.budget_threshold'), '/progress?tab=projects');
-      expect(route('project', '7', event: 'progress.late_report', progress: false), isNull);
+      // D2510: without progress access the project itself (when the user may see projects)
+      expect(route('project', '7', event: 'progress.late_report', progress: false), '/projects/7');
+      expect(route('project', '7', event: 'progress.late_report', progress: false, projects: false), isNull);
     });
 
     test('progress report → report detail', () {

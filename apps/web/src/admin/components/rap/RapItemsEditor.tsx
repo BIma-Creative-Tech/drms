@@ -6,6 +6,7 @@ import { formatNumber, formatRupiah, rupiahOrDash } from '@/lib/money'
 import { groupRupiah, isImmediateRupiahError, parseRupiah } from '@/lib/rupiah-input'
 
 import { problemText } from '../ActionButton'
+import { confirmAction, confirmLabel, confirmTitle, failureTitle, showResult, successTitle } from '../feedback/feedback'
 import { FORM_GRID_STYLE } from '../form-grid'
 import { RupiahInput, type RupiahField } from '../RupiahInput'
 import {
@@ -290,6 +291,17 @@ function RapItemDialog(props: { projectId: number; item: RapItemView | null; sta
     const body = item ? patchBody(item, r.values, d.reason) : createBody(r.values, d.reason)
     if (!body) return close() // nothing changed
     if (!props.prices) delete body.unitPrice
+    // DRMS 24/10: popup before (item, volume, amount, reason) and after
+    const action = item ? 'Simpan item RAP' : 'Tambah item RAP'
+    const summary: Array<[string, string | null]> = [
+      ['Kode', r.values.code],
+      ['Uraian', r.values.description || null],
+      ['Volume', qty(r.values.volume)],
+      ['Jumlah', props.prices && amount !== null ? formatRupiah(amount) : null],
+      ['Status', r.values.active ? null : 'Nonaktif'],
+      ['Alasan', d.reason.trim() || null],
+    ]
+    if (!(await confirmAction({ title: confirmTitle(action, r.values.code), summary, confirmLabel: confirmLabel(action) }))) return
     setBusy(true)
     setServerError(null)
     try {
@@ -309,12 +321,15 @@ function RapItemDialog(props: { projectId: number; item: RapItemView | null; sta
         }
         setErrors(fieldErrs)
         setServerError(problemText(data, res.status))
+        showResult({ ok: false, title: failureTitle(action), message: problemText(data, res.status) })
         return
       }
       ref.current?.close()
+      showResult({ ok: true, title: successTitle(action, r.values.code) })
       props.onSaved(item ? `Item ${r.values.code} tersimpan.` : `Item ${r.values.code} ditambahkan ke RAP.`)
     } catch {
       setServerError('Gagal menghubungi server. Periksa koneksi lalu coba lagi.')
+      showResult({ ok: false, title: failureTitle(action), message: 'Gagal menghubungi server. Periksa koneksi lalu coba lagi.' })
     } finally {
       setBusy(false)
     }

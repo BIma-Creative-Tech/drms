@@ -1,6 +1,7 @@
 'use client'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
+import { THUMB_STYLE } from '../media/thumb-style'
 import { collect, keyAction, LIGHTBOX_ATTR, step, swipeAction, type LightboxItem, type ZoomMode } from './gallery'
 
 const STYLE = `
@@ -8,7 +9,9 @@ const STYLE = `
 .pk-lb::backdrop { background: rgb(2 6 23 / .7); }
 .pk-lb__wrap { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; }
 .pk-lb__bar { display: flex; align-items: center; gap: 8px; padding: 8px max(12px, env(safe-area-inset-left)); min-height: 52px; }
-.pk-lb__title { flex: 1 1 auto; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-lb__head { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+.pk-lb__title { font-size: 14px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.pk-lb__cap { font-size: 12px; line-height: 1.35; opacity: .85; overflow-wrap: anywhere; }
 .pk-lb__count { font-size: 13px; font-variant-numeric: tabular-nums; opacity: .85; white-space: nowrap; }
 .pk-lb__btn { flex: none; display: inline-grid; place-items: center; min-width: 44px; height: 44px; padding: 0 10px; border-radius: 999px; border: 1px solid rgb(248 250 252 / .35); background: rgb(15 23 42 / .6); color: #F8FAFC; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; }
 .pk-lb__btn:hover { background: rgb(51 65 85 / .9); }
@@ -32,6 +35,8 @@ const STYLE = `
  * group (arrow keys, buttons, swipe), a counter and "Buka di tab baru". Ctrl/⌘/middle click keeps the
  * browser's new tab. Images that fail to load (e.g. a PDF proof) offer the new-tab link instead.
  * The image URLs are the existing authorized /api/v1 endpoints — nothing new is exposed.
+ * D2510 (web 0.21.1): the shared thumbnails (media/ImageThumb.tsx) add a caption line (`data-pk-lightbox-caption`:
+ * date / time / location); the title and caption wrap instead of an ellipsis; THUMB_STYLE is rendered here once.
  */
 export function LightboxProvider({ children }: { children?: React.ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null)
@@ -60,7 +65,7 @@ export function LightboxProvider({ children }: { children?: React.ReactNode }) {
       // only the rendered copies: the desktop table and the ≤ 640 px cards carry the same thumbnails (one is display:none)
       const members = [...document.querySelectorAll<HTMLAnchorElement>(`a[${LIGHTBOX_ATTR}]`)].filter((x) => x.getAttribute(LIGHTBOX_ATTR) === group && (x === a || x.getClientRects().length > 0))
       const titleOf = (x: HTMLAnchorElement) => x.dataset.pkLightboxTitle || x.querySelector('img')?.alt || x.getAttribute('aria-label') || x.textContent?.trim() || 'Gambar'
-      const g = collect(members.map((x) => ({ href: x.href, title: titleOf(x) })), a.href, members.indexOf(a))
+      const g = collect(members.map((x) => ({ href: x.href, title: titleOf(x), caption: x.dataset.pkLightboxCaption })), a.href, members.indexOf(a))
       e.preventDefault()
       opener.current = a
       setItems(g.items)
@@ -85,11 +90,11 @@ export function LightboxProvider({ children }: { children?: React.ReactNode }) {
   return (
     <>
       {children}
-      <style>{STYLE}</style>
+      <style>{STYLE + THUMB_STYLE}</style>
       <dialog
         ref={ref}
         className="pk-lb"
-        aria-label={cur ? `Pratinjau gambar: ${cur.title}` : 'Pratinjau gambar'}
+        aria-label={cur ? `Pratinjau gambar: ${cur.title}${cur.caption ? ` · ${cur.caption}` : ''}` : 'Pratinjau gambar'}
         data-pk-lightbox-dialog
         onClose={() => {
           setItems([])
@@ -106,8 +111,15 @@ export function LightboxProvider({ children }: { children?: React.ReactNode }) {
         {cur ? (
           <div className="pk-lb__wrap">
             <div className="pk-lb__bar">
-              <span className="pk-lb__title" title={cur.title}>
-                {cur.title}
+              <span className="pk-lb__head">
+                <span className="pk-lb__title" data-pk-lightbox-heading>
+                  {cur.title}
+                </span>
+                {cur.caption ? (
+                  <span className="pk-lb__cap" data-pk-lightbox-cap>
+                    {cur.caption}
+                  </span>
+                ) : null}
               </span>
               {many ? (
                 <span className="pk-lb__count" aria-live="polite" data-pk-lightbox-count>

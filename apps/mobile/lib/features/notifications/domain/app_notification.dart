@@ -44,11 +44,25 @@ class AppNotification {
   /// - `budget_addendum` (addendum.*) → addendum detail
   /// - `progress_report` → report detail
   /// - `project`: `progress.late_report` → reports of that project; other project events
-  ///   (reminder.budget_threshold) → "Progress fisik vs anggaran" tab
+  ///   (reminder.budget_threshold) → "Progress fisik vs anggaran" tab; D2510: without progress access → the project
   /// - `attendance` → attendance screen (no id needed; team tab for users without own attendance)
   /// - `intercompany_loan` (icloan.*, ADR 0029) → inter-PT loan detail
-  /// [canReadProgress] = the caller may open the progress screens (PM / Direktur / Finance).
-  String? route({bool canReadProgress = true, bool ownAttendance = true}) {
+  /// - D2510: `project_loan` → loan detail, `cash_entry` (ADR 0028 Kas Masuk) → the cash entry record, the field
+  ///   reports (`service_report`, `daily_report`, `aftersales_activity`, `unit_timesheet`) → their record detail
+  /// [canReadProgress] = the caller may open the progress screens (PM / Direktur / Finance); [canSeeProjects] = the
+  /// project screens; [canOpen] = the caller may open a target route at all (`canOpenApkRoute`; a target the caller
+  /// cannot read is not linked).
+  String? route({
+    bool canReadProgress = true,
+    bool ownAttendance = true,
+    bool canSeeProjects = true,
+    bool Function(String route)? canOpen,
+  }) {
+    final r = _route(canReadProgress: canReadProgress, ownAttendance: ownAttendance, canSeeProjects: canSeeProjects);
+    return r == null || (canOpen?.call(r) ?? true) ? r : null;
+  }
+
+  String? _route({required bool canReadProgress, required bool ownAttendance, required bool canSeeProjects}) {
     final id = _numericId;
     switch (docType) {
       case 'expense_request':
@@ -58,12 +72,25 @@ class AppNotification {
       case 'progress_report':
         return id == null || !canReadProgress ? null : '/progress/report/$id';
       case 'project':
-        if (id == null || !canReadProgress) return null;
+        if (id == null) return null;
+        if (!canReadProgress) return canSeeProjects ? '/projects/$id' : null;
         return event == 'progress.late_report' ? '/progress?project=$id' : '/progress?tab=projects';
       case 'attendance':
         return ownAttendance ? '/attendance' : '/attendance?tab=team';
       case 'intercompany_loan':
         return id == null ? null : '/intercompany-loans/$id';
+      case 'project_loan':
+        return id == null ? null : '/loans/$id';
+      case 'cash_entry':
+        return id == null ? null : '/data/cash-entries/$id';
+      case 'service_report':
+        return id == null ? null : '/data/service-reports/$id';
+      case 'daily_report':
+        return id == null ? null : '/data/daily-reports/$id';
+      case 'aftersales_activity':
+        return id == null ? null : '/data/aftersales-activities/$id';
+      case 'unit_timesheet':
+        return id == null ? null : '/data/unit-timesheets/$id';
       default:
         return null;
     }

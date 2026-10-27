@@ -303,7 +303,8 @@ void main() {
       await tester.tap(find.text('Depan'));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('on-behalf-submit')));
-      await tester.pumpAndSettle();
+      await pumpFrames(tester); // the GPS fix runs with the busy spinner, then the confirmation
+      await confirmPopup(tester);
       expect(lenses, [CameraLens.front]);
       final c = service.calls.single;
       expect(c.employee, 44);

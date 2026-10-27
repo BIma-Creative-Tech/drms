@@ -7,6 +7,7 @@ import '../../../app/theme.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/pk_ui.dart';
 import '../data/dashboard_api.dart';
 import '../domain/dashboard.dart';
 import 'charts.dart';
@@ -53,33 +54,31 @@ class KpiCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Card(
-      elevation: 0,
-      color: emphasis ? scheme.primaryContainer : scheme.surfaceContainerLow,
-      clipBehavior: Clip.antiAlias,
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    // D2510 (Banani "KpiGrid"): icon chip (solid primary for the headline card), muted label, big value.
+    return PkCard(
+      onTap: onTap,
+      radius: emphasis ? PkRadius.lg : PkRadius.md,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Icon(icon, size: 20, color: emphasis ? scheme.onPrimaryContainer : scheme.primary),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(label, style: theme.textTheme.labelLarge)),
-                  if (onTap != null) Icon(Icons.chevron_right, size: 20, color: scheme.outline),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(value, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-              for (final l in lines) Padding(padding: const EdgeInsets.only(top: 4), child: l),
-              if (footer != null) Padding(padding: const EdgeInsets.only(top: 8), child: footer),
+              PkIconChip(icon: icon, tone: emphasis ? PkTone.primary : PkTone.info, size: 34),
+              const Spacer(),
+              if (onTap != null) Icon(Icons.chevron_right, size: 20, color: scheme.outline),
             ],
           ),
-        ),
+          const SizedBox(height: 10),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 2),
+          Text(value, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700, fontSize: 22)),
+          for (final l in lines) Padding(padding: const EdgeInsets.only(top: 4), child: l),
+          if (footer != null) Padding(padding: const EdgeInsets.only(top: 8), child: footer),
+        ],
       ),
     );
   }

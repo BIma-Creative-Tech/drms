@@ -9,8 +9,11 @@ import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/platform/report_files.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/list_search.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_proyek.dart';
 import '../../../shared/widgets/reason_dialog.dart';
 import '../../expense/presentation/widgets/master_picker.dart';
 import '../../masters/domain/master_item.dart';
@@ -42,14 +45,14 @@ class _RapManageScreenState extends ConsumerState<RapManageScreen> {
     ref.invalidate(projectDetailProvider(widget.projectId));
   }
 
-  Future<void> _run(Future<void> Function() action, String done) async {
+  Future<void> _run(Future<void> Function() action, String done, String label) async {
     setState(() => _busy = true);
     try {
       await action();
-      if (mounted) showSnack(context, done);
       _refresh();
+      if (mounted) await showActionResult(context, message: done, action: label);
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -95,6 +98,7 @@ class _RapManageScreenState extends ConsumerState<RapManageScreen> {
     await _run(
       () => api.commit(widget.projectId, bytes, picked.name, fileHash: p.fileHash, reason: reason),
       t.rapImported,
+      t.rapImportCommit,
     );
   }
 
@@ -145,8 +149,14 @@ class _RapManageScreenState extends ConsumerState<RapManageScreen> {
         ),
       ),
     );
-    if (id == null) return;
-    await _run(() => api.applyTemplate(widget.projectId, id, idempotencyKey: const Uuid().v4()), t.rapTemplateApplied);
+    if (id == null || !mounted) return;
+    final name = list.where((e) => e.$1 == id).firstOrNull?.$2;
+    if (!await confirmAction(context, action: t.rapApplyTemplate, summary: [name]) || !mounted) return;
+    await _run(
+      () => api.applyTemplate(widget.projectId, id, idempotencyKey: const Uuid().v4()),
+      t.rapTemplateApplied,
+      t.rapApplyTemplate,
+    );
   }
 
   Future<void> _saveTemplate() async {
@@ -155,7 +165,7 @@ class _RapManageScreenState extends ConsumerState<RapManageScreen> {
       context,
       title: t.rapSaveTemplate,
       description: t.rapSaveTemplateHint,
-      confirm: t.save,
+      confirm: t.rapSaveTemplate,
       fieldLabel: t.rapTemplateName,
       keyPrefix: 'rap-template-name',
     );
@@ -163,6 +173,7 @@ class _RapManageScreenState extends ConsumerState<RapManageScreen> {
     await _run(
       () => ref.read(rapApiProvider).saveTemplate(widget.projectId, name, idempotencyKey: const Uuid().v4()),
       t.rapTemplateSaved(name),
+      t.rapSaveTemplate,
     );
   }
 
@@ -221,73 +232,107 @@ class _RapManageScreenState extends ConsumerState<RapManageScreen> {
                 .toList();
             return ListView(
               key: const Key('rap-manage'),
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
               children: [
-                if (_busy) const LinearProgressIndicator(),
+                if (_busy) const Padding(padding: EdgeInsets.only(bottom: 8), child: LinearProgressIndicator()),
                 if (rap.locked)
-                  Card(
+                  PkNote(
+                    rap.canEdit ? t.rapLockedDirektur : t.rapLockedPm,
                     key: const Key('rap-locked'),
-                    color: theme.colorScheme.secondaryContainer,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Text(rap.canEdit ? t.rapLockedDirektur : t.rapLockedPm),
-                    ),
+                    icon: Icons.lock_outline,
+                    tone: PkTone.warn,
+                    margin: const EdgeInsets.only(bottom: 12),
                   )
                 else if (!rap.canEdit)
-                  Card(
-                    child: Padding(padding: const EdgeInsets.all(12), child: Text(t.rapReadOnly)),
-                  ),
+                  PkNote(t.rapReadOnly, icon: Icons.visibility_outlined, margin: const EdgeInsets.only(bottom: 12)),
                 if (rap.prices && rap.rapValue != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text(
-                      rap.budget == null
-                          ? t.rapValueLine(formatRupiah(rap.rapValue!))
-                          : t.rapValueVsBudget(formatRupiah(rap.rapValue!), formatRupiah(rap.budget!)),
-                      key: const Key('rap-value'),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: rap.budget != null && rap.rapValue! > rap.budget! ? context.pk.badText : null,
-                      ),
+                  PkCard(
+                    radius: PkRadius.lg,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        PkIconChip(
+                          icon: Icons.pie_chart_outline,
+                          tone: rap.budget != null && rap.rapValue! > rap.budget! ? PkTone.bad : PkTone.primary,
+                          size: 38,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            rap.budget == null
+                                ? t.rapValueLine(formatRupiah(rap.rapValue!))
+                                : t.rapValueVsBudget(formatRupiah(rap.rapValue!), formatRupiah(rap.budget!)),
+                            key: const Key('rap-value'),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: rap.budget != null && rap.rapValue! > rap.budget! ? context.pk.badText : null,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ListSearchField(key: const Key('rap-manage-search'), onChanged: (v) => setState(() => _q = v)),
-                const SizedBox(height: 8),
-                if (rap.items.isEmpty) Padding(padding: const EdgeInsets.all(24), child: Text(t.rapNoItemsProject)),
+                const SizedBox(height: 12),
+                if (rap.items.isEmpty) PkEmptyState(icon: Icons.table_rows_outlined, message: t.rapNoItemsProject),
                 for (final i in items)
-                  Card(
+                  PkCard(
                     key: Key('rap-item-${i.id}'),
-                    margin: const EdgeInsets.only(bottom: 8),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(14),
                     color: i.active ? null : theme.colorScheme.surfaceContainerHighest,
-                    child: InkWell(
-                      onTap: rap.canEdit && !_busy ? () => _edit(rap, i) : null,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text('${i.code} · ${i.description}', style: theme.textTheme.titleSmall),
-                                ),
-                                if (!i.active) Text(t.rapInactive, style: theme.textTheme.labelSmall),
-                              ],
-                            ),
-                            Text(
-                              [
-                                i.kind == 'material' ? t.rapKindMaterial : t.rapKindWork,
-                                ?i.stageName,
-                                '${formatDecimal(i.volume, digits: 2)} ${i.uomCode}',
-                                if (i.unitPrice != null) '@ ${formatRupiah(i.unitPrice!)}',
-                                if (i.weightPct != null) t.rapWeight(formatDecimal(i.weightPct!, digits: 2)),
-                              ].join(' · '),
-                              style: theme.textTheme.bodySmall,
-                            ),
-                            if (i.inUse)
-                              Text(t.rapInUse, style: theme.textTheme.labelSmall?.copyWith(color: context.pk.warnText)),
-                          ],
+                    onTap: rap.canEdit && !_busy ? () => _edit(rap, i) : null,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        PkIconChip(
+                          icon: i.kind == 'material' ? Icons.inventory_2_outlined : Icons.construction,
+                          tone: i.active ? PkTone.info : PkTone.neutral,
+                          size: 36,
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(child: Text('${i.code} · ${i.description}', style: pkTitleStyle(context))),
+                                  if (!i.active) ...[const SizedBox(width: 6), PkPill(label: t.rapInactive)],
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                [
+                                  i.kind == 'material' ? t.rapKindMaterial : t.rapKindWork,
+                                  ?i.stageName,
+                                  '${formatDecimal(i.volume, digits: 2)} ${i.uomCode}',
+                                  if (i.unitPrice != null) '@ ${formatRupiah(i.unitPrice!)}',
+                                  if (i.weightPct != null) t.rapWeight(formatDecimal(i.weightPct!, digits: 2)),
+                                ].join(' · '),
+                                style: pkMetaStyle(context),
+                              ),
+                              if (i.inUse)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Text(
+                                    t.rapInUse,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: context.pk.warnText,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        if (rap.canEdit) ...[
+                          const SizedBox(width: 4),
+                          Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.outline),
+                        ],
+                      ],
                     ),
                   ),
               ],
@@ -378,6 +423,9 @@ class _ItemSheetState extends ConsumerState<_ItemSheet> {
       if (_i != null && _active != _i.active) 'active': _active,
       if (_reason.text.trim().isNotEmpty) 'reason': _reason.text.trim(),
     };
+    final label = _i == null ? t.rapAddItem : t.rapEditItem(_code.text.trim());
+    final summary = [_code.text.trim(), _desc.text.trim(), _volume.text.trim()];
+    if (!await confirmAction(context, action: label, summary: summary) || !mounted) return;
     setState(() => _busy = true);
     final api = ref.read(rapApiProvider);
     try {
@@ -388,17 +436,19 @@ class _ItemSheetState extends ConsumerState<_ItemSheet> {
         await api.updateItem(_i.id, body, idempotencyKey: key);
       }
       if (!mounted) return;
-      showSnack(context, t.rapItemSaved(_code.text.trim()));
-      Navigator.pop(context, true);
+      await showActionResult(context, message: t.rapItemSaved(_code.text.trim()), action: label);
+      if (mounted) Navigator.pop(context, true);
     } on ProblemException catch (e) {
-      if (mounted) {
-        setState(() {
-          _errors = {for (final x in e.errors) x.path: x.message};
-          _summary = e.message;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _errors = {for (final x in e.errors) x.path: x.message};
+        _summary = e.message;
+      });
+      await showActionError(context, e, action: label);
     } on Object catch (e) {
-      if (mounted) setState(() => _summary = errorText(e));
+      if (!mounted) return;
+      setState(() => _summary = errorText(e));
+      await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -416,7 +466,10 @@ class _ItemSheetState extends ConsumerState<_ItemSheet> {
         child: ListView(
           shrinkWrap: true,
           children: [
-            Text(_i == null ? t.rapAddItem : t.rapEditItem(_i.code), style: theme.textTheme.titleMedium),
+            Text(
+              _i == null ? t.rapAddItem : t.rapEditItem(_i.code),
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
             if (_summary != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),

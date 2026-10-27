@@ -105,8 +105,8 @@ void main() {
       expect(short.short, isTrue);
       expect(
         short.blockedReason,
-        'Dana pusat biaya CSR SEPASO/KUTIM maupun dana PT tidak cukup — kurang Rp 447.500. Tolak, atau perintahkan '
-        'pinjaman antar-PT.',
+        'Dana bebas akun kas CSR SEPASO/KUTIM tidak cukup — kurang Rp 447.500. Tolak, atau Owner menginstruksikan '
+        'pinjaman antar proyek ke akun ini lalu menyetujui setelah Finance mentransfernya.',
       );
       final local = fundCheckFromJson({...fundCheckPbJson(route: 'short'), 'blockedText': null})!;
       expect(local.blockedReason, short.blockedReason);
@@ -114,8 +114,8 @@ void main() {
       expect(fundBlockedText(447500, pbName: ''), fundBlockedText(447500));
       expect(
         fundBlockedDraftText(447500, pbName: 'CSR SEPASO/KUTIM'),
-        'Dana pusat biaya CSR SEPASO/KUTIM maupun dana PT tidak cukup — kurang Rp 447.500. Pengajuan Anda tidak dapat '
-        'dikirim sampai dana tersedia; perintahkan pinjaman antar-PT.',
+        'Dana bebas akun kas CSR SEPASO/KUTIM tidak cukup — kurang Rp 447.500. Pengajuan Anda tidak dapat dikirim '
+        'sampai dana akun kas ini mencukupi.',
       );
       expect(fundBlockedDraftText(447500), startsWith('Dana PT tidak cukup — kurang Rp 447.500. Pengajuan Anda'));
     });
@@ -216,8 +216,9 @@ void main() {
       });
       expect(
         fundProblemMessage(e),
-        'Dana pusat biaya CSR SEPASO/KUTIM maupun dana PT tidak cukup: tersedia Rp 1.000.000, dibutuhkan '
-        'Rp 1.447.500, kurang Rp 447.500. Tolak, atau perintahkan pinjaman antar-PT.',
+        'Dana bebas akun kas CSR SEPASO/KUTIM tidak cukup: tersedia Rp 1.000.000, dibutuhkan Rp 1.447.500, kurang '
+        'Rp 447.500. Tolak, atau Owner menginstruksikan pinjaman antar proyek ke akun ini lalu menyetujui setelah '
+        'Finance mentransfernya.',
       );
     });
 

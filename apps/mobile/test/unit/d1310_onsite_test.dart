@@ -18,29 +18,19 @@ import '../support/harness.dart';
 import '../support/mock_server.dart';
 import '../support/widget_harness.dart';
 
-/// DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13): attendance type OnSite / Non-OnSite on the APK — the eligible
-/// locations of `GET /attendance/locations` (cached for offline use) and the automatic area detection (the location
-/// whose geofence contains the fix; nearest when several overlap; manual fallback). Screen:
-/// test/widget/d1310_onsite_screen_test.dart. Points and names are fictional.
-const _home = ProjectSite(
-  id: 2,
-  label: 'CAB — Kantor Cabang Contoh',
-  lat: -1.2,
-  lng: 116.8,
-  radiusM: 100,
-  kind: SiteKind.site,
-  companyId: 1,
-  home: true,
-);
-const _head = ProjectSite(
+/// DRMS 13/10 A2 + ADR 0032: attendance type OnSite / Non-OnSite on the APK — the eligible locations of
+/// `GET /attendance/locations` (projects and cost centers; cached for offline use; no site, no "Di luar area") and the
+/// automatic area detection (the location whose geofence contains the fix; nearest when several overlap; manual
+/// fallback). Screen: test/widget/d1310_onsite_screen_test.dart. Points and names are fictional.
+const _office = ProjectSite(id: 2, label: 'P-02 — Proyek Kantor', lat: -1.2, lng: 116.8, radiusM: 100, companyId: 1);
+const _ops = ProjectSite(
   id: 1,
-  label: 'HO — Kantor Pusat Contoh',
+  label: 'CC-1 — Ops Kantor Pusat',
   lat: -1.25,
   lng: 116.85,
   radiusM: 150,
-  kind: SiteKind.site,
+  kind: SiteKind.costCenter,
   companyId: 1,
-  isHeadOffice: true,
 );
 const _project = ProjectSite(id: 7, label: 'P-07 — Proyek Contoh', lat: -2.21, lng: 113.91, radiusM: 100, companyId: 1);
 const _overlap = ProjectSite(
@@ -57,77 +47,53 @@ const _noPoint = ProjectSite(id: 9, label: 'P-09 — Tanpa titik', companyId: 1)
 LocationFix _at(double lat, double lng, {double acc = 5, bool mocked = false}) =>
     LocationFix(lat: lat, lng: lng, accuracyM: acc, isMocked: mocked);
 
+Map<String, dynamic> _item(String kind, int id, int company, int employee, String code, String name, double lat) => {
+  'kind': kind,
+  'id': id,
+  'company': company,
+  'employeeId': employee,
+  'code': code,
+  'name': name,
+  'lat': lat,
+  'lng': 114.0,
+  'radiusM': 100,
+  'isHeadOffice': false,
+  'home': false,
+};
+
 Map<String, dynamic> _locationsJson() => {
   'employees': [
-    {'id': 12, 'company': 1, 'attendanceType': 'onsite', 'homeSiteId': 2},
+    {'id': 12, 'company': 1, 'attendanceType': 'onsite', 'homeSiteId': null, 'referenceSite': null},
+    {'id': 31, 'company': 4, 'attendanceType': 'non_onsite', 'homeSiteId': null, 'referenceSite': null},
+  ],
+  'items': [
+    _item('project', 7, 1, 12, 'P-07', 'Proyek Contoh', -2.21),
+    _item('cost_center', 3, 1, 12, 'CC-3', 'Ops Contoh', -2.2104),
+    _item('project', 40, 4, 31, 'P-40', 'Proyek PT Dua', -3.0),
+  ],
+};
+
+/// The cache of an APK ≤ 0.11.1 (server before ADR 0032): sites and the "Di luar area" reference.
+Map<String, dynamic> _oldCacheJson() => {
+  'employees': [
     {
       'id': 31,
       'company': 4,
       'attendanceType': 'non_onsite',
-      'homeSiteId': null,
-      'referenceSite': {'id': 40, 'code': 'HO2', 'name': 'Kantor Pusat PT Dua', 'lat': -3.0, 'lng': 114.0},
+      'homeSiteId': 41,
+      'referenceSite': {'id': 41, 'code': 'HO2', 'name': 'Kantor Pusat PT Dua', 'lat': -3.0, 'lng': 114.0},
     },
   ],
   'items': [
-    {
-      'kind': 'site',
-      'id': 2,
-      'company': 1,
-      'employeeId': 12,
-      'code': 'CAB',
-      'name': 'Kantor Cabang Contoh',
-      'lat': -1.2,
-      'lng': 116.8,
-      'radiusM': 100,
-      'isHeadOffice': false,
-      'home': true,
-    },
-    {
-      'kind': 'site',
-      'id': 1,
-      'company': 1,
-      'employeeId': 12,
-      'code': 'HO',
-      'name': 'Kantor Pusat Contoh',
-      'lat': -1.25,
-      'lng': 116.85,
-      'radiusM': 150,
-      'isHeadOffice': true,
-      'home': false,
-    },
-    {
-      'kind': 'project',
-      'id': 7,
-      'company': 1,
-      'employeeId': 12,
-      'code': 'P-07',
-      'name': 'Proyek Contoh',
-      'lat': -2.21,
-      'lng': 113.91,
-      'radiusM': 100,
-      'isHeadOffice': false,
-      'home': false,
-    },
-    {
-      'kind': 'site',
-      'id': 40,
-      'company': 4,
-      'employeeId': 31,
-      'code': 'HO2',
-      'name': 'Kantor Pusat PT Dua',
-      'lat': -3.0,
-      'lng': 114.0,
-      'radiusM': 100,
-      'isHeadOffice': true,
-      'home': false,
-    },
+    _item('site', 41, 4, 31, 'HO2', 'Kantor Pusat PT Dua', -3.0),
+    _item('project', 40, 4, 31, 'P-40', 'Proyek PT Dua', -3.1),
   ],
 };
 
 void main() {
   group('detectArea (auto-detect)', () {
     test('one geofence contains the fix → that location', () {
-      final d = detectArea(const [_home, _head, _project], _at(-2.2102, 113.91));
+      final d = detectArea(const [_office, _ops, _project], _at(-2.2102, 113.91));
       expect(d.single, isTrue);
       expect(d.inside.single.site.key, 'p7');
       expect(d.inside.single.distanceM, 22);
@@ -140,16 +106,16 @@ void main() {
       expect(d.inside.map((m) => m.site.key), ['c3', 'p7'], reason: 'cost center 11 m, project 33 m');
     });
 
-    test('equal distance keeps the list order (home site first)', () {
+    test('equal distance keeps the list order', () {
       const twin = ProjectSite(id: 8, label: 'P-08', lat: -1.2, lng: 116.8, radiusM: 100, companyId: 1);
-      final d = detectArea(const [_home, twin], _at(-1.2, 116.8));
-      expect(d.inside.map((m) => m.site.key), ['s2', 'p8']);
-      final reversed = detectArea(const [twin, _home], _at(-1.2, 116.8));
-      expect(reversed.inside.map((m) => m.site.key), ['p8', 's2']);
+      final d = detectArea(const [_office, twin], _at(-1.2, 116.8));
+      expect(d.inside.map((m) => m.site.key), ['p2', 'p8']);
+      final reversed = detectArea(const [twin, _office], _at(-1.2, 116.8));
+      expect(reversed.inside.map((m) => m.site.key), ['p8', 'p2']);
     });
 
     test('outside every geofence → nothing inside, the nearest as a hint; no point → ignored', () {
-      final d = detectArea(const [_noPoint, _home, _project], _at(-2.2112, 113.91));
+      final d = detectArea(const [_noPoint, _office, _project], _at(-2.2112, 113.91));
       expect(d.inside, isEmpty);
       expect(d.nearest!.site.key, 'p7');
       expect(d.nearest!.distanceM, 133);
@@ -166,29 +132,27 @@ void main() {
   });
 
   group('eligible locations (GET /attendance/locations)', () {
-    test('parse: label, kind, head office / home flags, PT, type per PT; scoped to the selected PTs', () {
+    test('parse: label, kind, PT, type per PT; scoped to the selected PTs; Non-OnSite is not bound to the choice', () {
       final e = EligibleLocations.fromJson(_locationsJson());
-      expect(e.sites.map((s) => s.key), ['s2', 's1', 'p7', 's40', 'o40'], reason: 'o40 = Di luar area');
-      final head = e.sites[1];
-      expect(head.label, 'HO — Kantor Pusat Contoh');
-      expect(head.isHeadOffice, isTrue);
-      expect(head.home, isFalse);
-      expect(head.hasGeofence, isTrue);
-      expect(head.companyId, 1);
-      expect(e.sites.first.home, isTrue);
+      expect(e.sites.map((s) => s.key), ['p7', 'c3', 'p40']);
+      final ops = e.sites[1];
+      expect(ops.label, 'CC-3 — Ops Contoh');
+      expect(ops.kind, SiteKind.costCenter);
+      expect(ops.hasGeofence, isTrue);
+      expect(ops.companyId, 1);
       expect(e.types, {1: AttendanceType.onsite, 4: AttendanceType.nonOnsite});
       expect(e.sites.last.attendanceType, AttendanceType.nonOnsite);
-      expect(e.sites.first.attendanceType, AttendanceType.onsite);
-      final scoped = e.scoped(const [4]);
-      expect(scoped.sites.map((s) => s.key), ['s40', 'o40']);
-      final outside = e.sites.last;
-      expect(outside.outsideArea, isTrue);
-      expect(outside.unrestricted, isTrue);
-      expect(outside.hasGeofence, isFalse, reason: 'any position; the server decides');
-      expect(outside.label, 'HO2 — Kantor Pusat PT Dua');
+      expect(e.sites.last.unrestricted, isTrue);
       expect(e.sites.first.unrestricted, isFalse, reason: 'OnSite PT');
+      final scoped = e.scoped(const [4]);
+      expect(scoped.sites.map((s) => s.key), ['p40']);
       expect(scoped.types.keys, [4]);
       expect(AttendanceType.fromCode(null), AttendanceType.onsite, reason: 'default OnSite');
+    });
+
+    test('ADR 0032: an old cache with sites / a "Di luar area" reference → only projects / cost centers', () {
+      final e = EligibleLocations.fromJson(_oldCacheJson());
+      expect(e.sites.map((s) => s.key), ['p40']);
     });
 
     test('repository: fetched for every PT (no X-Company-Ids), cached; offline / old server keep the cache', () async {
@@ -201,17 +165,17 @@ void main() {
       expect(await repo.cached('sub-1'), isNull);
       expect(await repo.refresh('sub-1'), isTrue);
       expect(server.calls.single.$3.containsKey('x-company-ids'), isFalse, reason: 'all membership PTs');
-      expect((await repo.cached('sub-1'))!.sites, hasLength(5));
+      expect((await repo.cached('sub-1'))!.sites, hasLength(3));
 
       // server before A2: 404 → false, the cache stays
       server.routes.clear();
       expect(await repo.refresh('sub-1'), isFalse);
-      expect((await repo.cached('sub-1'))!.sites, hasLength(5));
+      expect((await repo.cached('sub-1'))!.sites, hasLength(3));
       // offline: false, the cache stays (area detection keeps working without signal)
       final offlineApi = AttendanceApi(testClient('http://127.0.0.1:9', StaticTokens()));
       final offline = AttendanceLocationsRepository(offlineApi, db);
       expect(await offline.refresh('sub-1'), isFalse);
-      expect((await offline.cached('sub-1'))!.sites.map((s) => s.key), ['s2', 's1', 'p7', 's40', 'o40']);
+      expect((await offline.cached('sub-1'))!.sites.map((s) => s.key), ['p7', 'c3', 'p40']);
     });
   });
 
@@ -255,27 +219,17 @@ void main() {
       await db.kvPut(AttendanceLocationsRepository.key('st-sub'), jsonEncode(_locationsJson()));
       c.invalidate(eligibleLocationsProvider);
       final list = await c.read(attendanceSitesProvider.future);
-      expect(list.map((s) => s.key), ['s2', 's1', 'p7', 's40', 'o40'], reason: 'no assignment needed');
-      expect(list.first.home, isTrue, reason: 'home site first');
+      expect(list.map((s) => s.key), ['p7', 'c3', 'p40'], reason: 'no assignment needed');
     });
   });
 
-  test('"Di luar area" item: local-only hint for the history, stripped before sending', () {
-    const outside = ProjectSite(
-      id: 40,
-      label: 'HO2 — Kantor Pusat PT Dua',
-      kind: SiteKind.site,
-      companyId: 4,
-      attendanceType: AttendanceType.nonOnsite,
-      outsideArea: true,
-    );
-    final p = attendancePayload(site: outside, fix: _at(-3.5, 114.0), selfieUuid: 'sel-9');
-    expect(p['site_id'], 40);
-    expect(p[outsideAreaHintKey], isTrue);
-    final sent = resolveMediaIds(p, {'sel-9': 77})!;
+  test('ADR 0032: no "Di luar area" hint on a new item; a legacy queued hint is stripped before sending', () {
+    final p = attendancePayload(site: _ops, fix: _at(-1.25, 116.85), selfieUuid: 'sel-9');
+    expect(p['cost_center_id'], 1);
+    expect(p.containsKey(outsideAreaHintKey), isFalse);
+    final legacy = {...p, outsideAreaHintKey: true};
+    final sent = resolveMediaIds(legacy, {'sel-9': 77})!;
     expect(sent.containsKey(outsideAreaHintKey), isFalse);
     expect(sent['selfie_media_id'], 77);
-    final inside = attendancePayload(site: _head, fix: _at(-1.25, 116.85), selfieUuid: 's');
-    expect(inside.containsKey(outsideAreaHintKey), isFalse);
   });
 }

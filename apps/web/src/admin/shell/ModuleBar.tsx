@@ -9,45 +9,44 @@ import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 
 
 import { Icon } from '@/admin/modules/Icon'
 import { moduleForPath, profileHref, type ResolvedModule } from '@/admin/modules/registry'
-import { BRAND_NAME } from '@/theme/graphics'
 
+import { AppSidebar } from './AppSidebar'
+import { CommandPalette } from './CommandPalette'
 import type { SwitcherState } from './company-switcher'
 import { CompanySwitcher } from './CompanySwitcher'
 import { deriveCrumbs, type Crumb } from './crumbs'
 import type { NavUser } from './modules-server'
+import { isPaletteShortcut, navEntries, sidebarCookie, type SidebarMode } from './nav-search'
 import { isQuickCreateShortcut, type QuickCreateGroup } from './quick-create'
 
 /**
- * Odoo-style top bar (client). Left: launcher button (⊞ → /admin) + current module (link to the module
- * landing page, D9). Right: PT switcher (MC2-4, ./CompanySwitcher.tsx), bell (server node) + avatar
- * menu (profile & signature, account security / 2FA, light/dark theme, logout = the existing
- * LogoutButton form).
- * DRMS 13/10 #9 (owner decision D2): the module menu (links/▾ dropdowns + the ☰ sheet on mobile) is
- * gone from the bar; every former menu entry is a tile of the module landing page (registry
- * landingSections = the same resolved items), reachable via the module name and the breadcrumb home.
- * Compact mode (≤ 768px): shorter PT label. Keyboard: ↓/Enter/Space opens a menu, ↑/↓ inside, Esc
- * closes and returns focus, visible focus rings (custom.scss). Reduced motion: MotionConfig
- * reducedMotion="user". Below the bar: the breadcrumb line (PageCrumbs) — only on pages that have crumbs.
- * DRMS 16/10 (owner, "konsep no. 1"): "+ Buat" menu left of the PT switcher — create pages of what the caller may
- * create (items resolved on the server, ./quick-create.ts), grouped; Alt+N opens it; icon-only "+" under 640px.
+ * Admin shell (client), D2510 Nexus layout (user 2026-10-25, ADR 0033 — supersedes the Odoo top bar of ADR 0014):
+ * the left sidebar (./AppSidebar.tsx, every visible module and menu item) + a slim top bar. Top bar left: sidebar
+ * toggle (desktop: full ↔ compact, remembered in the `pk-side` cookie; ≤ 1024px: opens the drawer) and the menu
+ * search (./CommandPalette.tsx, Ctrl+K / ⌘K). Right: "+ Buat" (DRMS 16/10, Alt+N, icon-only under 640px), PT
+ * switcher (MC2-4, ./CompanySwitcher.tsx; short label ≤ 768px), bell (server node) and the avatar menu (profile &
+ * signature, account security / 2FA, light/dark theme, logout = the existing LogoutButton form).
+ * Keyboard: ↓/Enter/Space opens a menu, ↑/↓ inside, Esc closes and returns focus, visible focus rings (custom.scss).
+ * Reduced motion: MotionConfig reducedMotion="user". Below the bar: the breadcrumb line (PageCrumbs) — only on
+ * pages that have crumbs.
  */
 
-type Props = { modules: ResolvedModule[]; user: NavUser; companies?: SwitcherState; quickCreate?: QuickCreateGroup[]; bell: React.ReactNode; logout: React.ReactNode }
+type Props = {
+  modules: ResolvedModule[]
+  user: NavUser
+  companies?: SwitcherState
+  quickCreate?: QuickCreateGroup[]
+  bell: React.ReactNode
+  logout: React.ReactNode
+  /** D2510: desktop sidebar width from the `pk-side` cookie (server), so the first paint has the right column. */
+  sidebarMode?: SidebarMode
+}
 
 const EASE = [0.22, 1, 0.36, 1] as const
 const MENU_ANIM = {
   initial: { opacity: 0, y: -6, scale: 0.98 },
   animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.16, ease: EASE } },
   exit: { opacity: 0, y: -4, scale: 0.98, transition: { duration: 0.1 } },
-}
-
-function Badge({ n, label }: { n?: number; label?: string }) {
-  if (!n) return null
-  return (
-    <span className="pk-bar__count" aria-label={label ?? `${n} menunggu`}>
-      {n > 99 ? '99+' : n}
-    </span>
-  )
 }
 
 function focusables(root: HTMLElement | null): HTMLElement[] {
@@ -302,21 +301,38 @@ function CrumbInner({ c }: { c: Crumb }) {
 
 // ------------------------------------------------------------------------------ bar
 
-export function ModuleBar({ modules, user, companies, quickCreate, bell, logout }: Props) {
+export function ModuleBar({ modules, user, companies, quickCreate, bell, logout, sidebarMode = 'full' }: Props) {
   const pathname = usePathname() ?? '/admin'
   const modId = moduleForPath(pathname)
   const mod = useMemo(() => modules.find((m) => m.id === modId) ?? null, [modules, modId])
+  const entries = useMemo(() => navEntries(modules), [modules])
 
   // Menus remember the path they were opened on → navigating closes them (no effect needed).
   const [openState, setOpenState] = useState<{ path: string; key: string } | null>(null)
   const openKey = openState?.path === pathname ? openState.key : null
   const setOpenKey = useCallback((key: string | null) => setOpenState(key ? { path: pathname, key } : null), [pathname])
-  // ≤ 768px: the PT switcher shows its short label (the bar no longer measures a menu, DRMS 13/10 #9)
+  // ≤ 768px: the PT switcher shows its short label
   const [compact, setCompact] = useState(false)
+  // D2510: ≤ 1024px the sidebar is an off-canvas drawer (openKey 'side'); wider it is full or compact (cookie)
+  const [narrow, setNarrow] = useState(false)
+  const [sideCompact, setSideCompact] = useState(sidebarMode === 'compact')
+  const [palette, setPalette] = useState(false)
+  const drawer = narrow && openKey === 'side'
+
+  const toggleSide = () => {
+    if (narrow) return setOpenKey(drawer ? null : 'side')
+    const next = !sideCompact
+    setSideCompact(next)
+    try {
+      document.cookie = sidebarCookie(next ? 'compact' : 'full')
+    } catch {
+      // cookies blocked: the mode lasts until the next reload
+    }
+  }
 
   // outside click / Esc (menus handle their own Esc for focus return)
   useEffect(() => {
-    if (!openKey) return
+    if (!openKey || openKey === 'side') return
     const onDown = (e: PointerEvent) => {
       if (!(e.target as Element | null)?.closest?.('.pk-bar__dd[data-open]')) setOpenKey(null)
     }
@@ -329,36 +345,72 @@ export function ModuleBar({ modules, user, companies, quickCreate, bell, logout 
     }
   }, [openKey, setOpenKey])
 
+  // Ctrl+K / ⌘K anywhere opens the menu search
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!isPaletteShortcut(e)) return
+      e.preventDefault()
+      setOpenKey(null)
+      setPalette(true)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [setOpenKey])
+
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
-    const on = () => setCompact(mq.matches)
+    const side = window.matchMedia('(max-width: 1024px)')
+    const on = () => {
+      setCompact(mq.matches)
+      setNarrow(side.matches)
+    }
     on()
     mq.addEventListener('change', on)
-    return () => mq.removeEventListener('change', on)
+    side.addEventListener('change', on)
+    return () => {
+      mq.removeEventListener('change', on)
+      side.removeEventListener('change', on)
+    }
+  }, [])
+
+  const searchBtn = useRef<HTMLButtonElement>(null)
+  const closePalette = useCallback(() => {
+    setPalette(false)
+    requestAnimationFrame(() => searchBtn.current?.focus())
   }, [])
 
   return (
     <MotionConfig reducedMotion="user">
-      <header className="pk-bar" data-pk-nav="bar" data-compact={compact || undefined} data-module={mod?.id ?? 'launcher'}>
+      <AppSidebar
+        modules={modules}
+        user={user}
+        pathname={pathname}
+        compact={sideCompact}
+        open={drawer}
+        onClose={() => drawer && setOpenKey(null)}
+        onToggleCompact={toggleSide}
+      />
+      <header className="pk-bar" data-pk-nav="bar" data-compact={compact || undefined} data-module={mod?.id ?? 'home'}>
         <div className="pk-bar__start">
-          <Link href="/admin" className="pk-bar__icon-btn pk-bar__launcher" aria-label="Semua modul" title="Semua modul" data-pk-nav-link="launcher" aria-current={pathname.replace(/\/+$/, '') === '/admin' ? 'page' : undefined}>
-            <Icon name="grid" size={22} />
-          </Link>
-          {mod ? (
-            // DRMS 13/10 #9: no module menu in the bar any more — the module name opens the module
-            // landing page (D9 tiles = exactly the old menu items, with their badges).
-            <Link href={mod.href} className="pk-bar__module" data-mod={mod.id} data-pk-nav-link="module-home" title={mod.landing ? `Menu ${mod.label}` : mod.label}>
-              <span className="pk-bar__chip" aria-hidden="true">
-                <Icon name={mod.icon} size={18} />
-              </span>
-              <span className="pk-bar__module-name">{mod.label}</span>
-              <Badge n={mod.badge} />
-            </Link>
-          ) : (
-            <span className="pk-bar__module pk-bar__brand">
-              {BRAND_NAME}
-            </span>
-          )}
+          <button
+            type="button"
+            className="pk-bar__icon-btn pk-bar__side-toggle"
+            aria-controls="pk-side"
+            aria-expanded={narrow ? drawer : !sideCompact}
+            aria-label={narrow ? 'Buka menu' : sideCompact ? 'Lebarkan menu' : 'Ringkas menu'}
+            title="Menu"
+            onClick={toggleSide}
+            data-pk-nav-link="sidebar-toggle"
+          >
+            <Icon name="menu" size={22} />
+          </button>
+          <button ref={searchBtn} type="button" className="pk-bar__search" onClick={() => setPalette(true)} aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K" data-pk-nav-link="search">
+            <Icon name="search" size={18} />
+            <span className="pk-bar__search-text">Cari menu…</span>
+            <kbd className="pk-bar__kbd" aria-hidden="true">
+              Ctrl K
+            </kbd>
+          </button>
         </div>
 
         <div className="pk-bar__end">
@@ -369,6 +421,7 @@ export function ModuleBar({ modules, user, companies, quickCreate, bell, logout 
         </div>
       </header>
       <PageCrumbs pathname={pathname} mod={mod} />
+      {palette ? <CommandPalette entries={entries} onClose={closePalette} /> : null}
     </MotionConfig>
   )
 }

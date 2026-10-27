@@ -7,9 +7,10 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { ActionButton } from '../components/ActionButton'
 import { ListToolbar, Pager } from '../components/list/ListToolbar'
 import { NotificationOpen } from '../components/NotificationOpen'
+import { Panel } from '../components/ui/nexus'
 import { allowedValues, isFiltered, pageOfFind, parseListQuery, searchWhere } from '../list-query'
 import { dateTimeId } from './progress-ui'
-import { Empty, Shell, TableScroll, badge, table, td, th } from './shared'
+import { Badge, Empty, NX_TABLE, Shell, TableScroll } from './shared'
 
 /**
  * S3e (US-05, S-04): the caller's own in-app notifications (bell in the nav → here). Newest first,
@@ -38,11 +39,13 @@ export async function NotificationsView(props: AdminViewServerProps) {
   const unread = (await req.payload.count({ collection: 'notifications', where: { and: [own, { readAt: { exists: false } }] }, user, overrideAccess: false, req })).totalDocs
   const tz = process.env.TZ || DEFAULT_TZ
   return (
-    <Shell props={props} title="Notifikasi">
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-        <span data-pk-unread-count={unread}>{unread > 0 ? `${unread} belum dibaca` : 'Semua sudah dibaca.'}</span>
-        {unread > 0 ? <ActionButton url="/api/v1/notifications/read-all" label="Tandai semua dibaca" testId="notifications-read-all" /> : null}
-      </div>
+    <Shell
+      props={props}
+      title="Notifikasi"
+      sub={<span data-pk-unread-count={unread}>{unread > 0 ? `${unread} belum dibaca` : 'Semua sudah dibaca.'}</span>}
+      actions={unread > 0 ? <ActionButton url="/api/v1/notifications/read-all" label="Tandai semua dibaca" testId="notifications-read-all" /> : null}
+    >
+      <Panel id="notifikasi-list" icon="tNotification" title="Kotak masuk" note={`(${res.totalDocs})`}>
       <ListToolbar
         id="notifikasi"
         action="/admin/notifikasi"
@@ -55,12 +58,12 @@ export async function NotificationsView(props: AdminViewServerProps) {
         <Empty text={isFiltered(lq) ? 'Tidak ada notifikasi yang cocok.' : 'Belum ada notifikasi.'} />
       ) : (
         <TableScroll label="Notifikasi">
-          <table style={table} data-pk-table="notifications">
+          <table className={NX_TABLE} data-pk-table="notifications">
             <thead>
               <tr>
-                <th style={th}>Waktu (WITA)</th>
-                <th style={th}>Notifikasi</th>
-                <th style={th}>Dokumen</th>
+                <th>Waktu (WITA)</th>
+                <th>Notifikasi</th>
+                <th>Dokumen</th>
               </tr>
             </thead>
             <tbody>
@@ -68,13 +71,17 @@ export async function NotificationsView(props: AdminViewServerProps) {
                 const href = notificationHref(n.docType, n.docId)
                 return (
                   <tr key={n.id} data-pk-notification={n.id} data-pk-read={n.readAt ? 'true' : 'false'}>
-                    <td style={{ ...td, whiteSpace: 'nowrap' }}>{dateTimeId(n.createdAt, tz)}</td>
-                    <td style={td}>
-                      {!n.readAt ? <span style={{ ...badge('warn'), marginRight: 6 }}>baru</span> : null}
-                      <span style={{ fontWeight: n.readAt ? 400 : 700 }}>{n.title}</span>
-                      <div style={{ fontSize: 12 }}>{n.body}</div>
+                    <td className="pk-nx-nowrap">{dateTimeId(n.createdAt, tz)}</td>
+                    <td>
+                      {!n.readAt ? (
+                        <>
+                          <Badge tone="warn">baru</Badge>{' '}
+                        </>
+                      ) : null}
+                      <span className={n.readAt ? undefined : 'pk-nx-strong'}>{n.title}</span>
+                      <span className="pk-nx-sub">{n.body}</span>
                     </td>
-                    <td style={td}>{href ? <NotificationOpen id={n.id} href={href} unread={!n.readAt} label={n.docNo ? `Buka ${n.docNo}` : 'Buka'} /> : (n.docNo ?? '—')}</td>
+                    <td>{href ? <NotificationOpen id={n.id} href={href} unread={!n.readAt} label={n.docNo ? `Buka ${n.docNo}` : 'Buka'} /> : (n.docNo ?? '—')}</td>
                   </tr>
                 )
               })}
@@ -83,6 +90,7 @@ export async function NotificationsView(props: AdminViewServerProps) {
         </TableScroll>
       )}
       <Pager id="notifikasi" path="/admin/notifikasi" sp={props.searchParams} page={pageOfFind(res)} unit="notifikasi" />
+      </Panel>
     </Shell>
   )
 }

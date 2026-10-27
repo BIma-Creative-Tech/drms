@@ -15,11 +15,13 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseListQuery } from '@/admin/list-query'
 
+import { PageHead } from './frame'
 import { BtnLink, dateParam, EditLink, editModeOf, FIELD_CREATORS, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf, UnitStatusPill } from './field-ui'
 import { ptOptionsOf, ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
-import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, type Col } from './viz'
+import { Bento, Card, DataTable, EmptyState, KpiRow, KpiTile, type Col } from './viz'
 import { DateInput } from '../components/DateInput'
+import { ImageThumb } from '../components/media/ImageThumb'
 
 /**
  * FR1 "Laporan servis unit" (ADR 0020, plan A; mockups Android-Servis + Web-Timeline): list (filters
@@ -124,10 +126,10 @@ export async function FieldServiceList(props: AdminViewServerProps) {
         r.photos.length === 0 ? (
           '—'
         ) : (
-          <span className="pk-thumbs">
-            {r.photos.slice(0, 3).map((p) => (
-              // eslint-disable-next-line @next/next/no-img-element -- authenticated API thumbnail
-              <img key={p.id} src={p.thumbUrl} alt="" loading="lazy" width={36} height={28} />
+          // D2510 (web 0.21.1): real previews (lightbox group = the report)
+          <span className="pk-thumbs" data-pk-report-thumbs={r.id}>
+            {r.photos.slice(0, 3).map((p, i) => (
+              <ImageThumb key={p.id} src={{ href: p.url, thumb: p.thumbUrl, fallback: 'full' }} size={36} group={`service-list-${r.id}`} title={`Foto ${i + 1} laporan servis ${r.docNo ?? r.id}`} caption={dateId(r.reportDate)} data-pk-photo={p.id} />
             ))}
             {r.photos.length > 3 ? <small>+{r.photos.length - 3}</small> : null}
           </span>
@@ -138,7 +140,7 @@ export async function FieldServiceList(props: AdminViewServerProps) {
   ]
   return (
     <FieldFrame props={props} name="laporan-servis">
-      <DashHead title="Laporan servis unit" note="Terbaru di atas · servis, perbaikan, inspeksi dan pemasangan unit · status unit ikut laporan terakhir">
+      <PageHead props={props} title="Laporan servis unit" note="Terbaru di atas · servis, perbaikan, inspeksi dan pemasangan unit · status unit ikut laporan terakhir">
         <div className="pk-kact">
           {creator ? (
             <BtnLink href="/admin/laporan-servis/baru" primary icon="add" attr="servis-baru">
@@ -149,7 +151,7 @@ export async function FieldServiceList(props: AdminViewServerProps) {
             Unit & kontrak
           </BtnLink>
         </div>
-      </DashHead>
+      </PageHead>
       <form className="pk-filter" method="get" action={listHref} role="search" aria-label="Filter laporan servis" data-pk-filter="laporan-servis">
         <label className="pk-filter__search">
           Cari
@@ -319,13 +321,13 @@ export async function FieldServiceNew(props: AdminViewServerProps) {
   }))
   return (
     <FieldFrame props={props} name="servis-baru">
-      <DashHead title="Laporan servis unit" note="Nomor SV dibuat otomatis · bisa diedit pelapor 24 jam, setelah itu koreksi oleh PM/Direktur">
+      <PageHead props={props} title="Laporan servis unit" note="Nomor SV dibuat otomatis · bisa diedit pelapor 24 jam, setelah itu koreksi oleh PM/Direktur">
         <div className="pk-kact">
           <BtnLink href={listHref} icon="arrowLeft">
             Laporan servis
           </BtnLink>
         </div>
-      </DashHead>
+      </PageHead>
       <Bento>
         <Card id="service-form" title="Laporan baru" span={8}>
           {d.projects.length === 0 ? (
@@ -363,7 +365,7 @@ export async function FieldServiceDetail(props: AdminViewServerProps) {
   if (!d) {
     return (
       <FieldFrame props={props} name="servis-detail">
-        <DashHead title="Laporan tidak ditemukan">{back}</DashHead>
+        <PageHead props={props} title="Laporan tidak ditemukan">{back}</PageHead>
       </FieldFrame>
     )
   }
@@ -381,7 +383,7 @@ export async function FieldServiceDetail(props: AdminViewServerProps) {
   ]
   return (
     <FieldFrame props={props} name="servis-detail">
-      <DashHead title={r.docNo ?? `Laporan servis #${r.id}`} note={`${longDate(r.reportDate)} · ${unitName} · ${r.project.code ?? ''} ${r.project.name ?? ''}`}>
+      <PageHead props={props} title={r.docNo ?? `Laporan servis #${r.id}`} note={`${longDate(r.reportDate)} · ${unitName} · ${r.project.code ?? ''} ${r.project.name ?? ''}`}>
         <div className="pk-kact">
           {back}
           <BtnLink href={`/admin/unit-kontrak/unit/${r.unit.id}`}>Unit</BtnLink>
@@ -396,7 +398,7 @@ export async function FieldServiceDetail(props: AdminViewServerProps) {
             </EditLink>
           ) : null}
         </div>
-      </DashHead>
+      </PageHead>
       {one(sp.baru) === '1' ? (
         <Alert tone="ok" attr="created">
           <p>Laporan servis tersimpan{r.unitStatusAfter === 'menunggu_part' ? ' — PM project diberi notifikasi unit menunggu part' : ''}.</p>
@@ -469,7 +471,7 @@ export async function FieldServiceDetail(props: AdminViewServerProps) {
           />
         </Card>
         <Card id="service-photos" title="Foto sebelum / sesudah" sub={r.photos.length ? 'Klik foto untuk ukuran penuh (tab baru)' : undefined} span={7} i={7}>
-          <PhotoGallery photos={r.photos} label={`laporan ${r.docNo ?? r.id}`} empty="Laporan ini tanpa foto." />
+          <PhotoGallery photos={r.photos} label={`laporan ${r.docNo ?? r.id}`} empty="Laporan ini tanpa foto." caption={`${longDate(r.reportDate)} · ${unitName}`} />
         </Card>
         <Card id="service-history" title="Riwayat & koreksi" span={5} i={8}>
           <History entries={history} tz={tz} />
@@ -509,7 +511,7 @@ export async function FieldServiceEdit(props: AdminViewServerProps) {
   if (!d) {
     return (
       <FieldFrame props={props} name="servis-ubah">
-        <DashHead title="Laporan tidak ditemukan">{back(null)}</DashHead>
+        <PageHead props={props} title="Laporan tidak ditemukan">{back(null)}</PageHead>
       </FieldFrame>
     )
   }
@@ -519,7 +521,7 @@ export async function FieldServiceEdit(props: AdminViewServerProps) {
   if (!allowed || r.companyId === null) {
     return (
       <FieldFrame props={props} name="servis-ubah">
-        <DashHead title={title}>{back(r.id)}</DashHead>
+        <PageHead props={props} title={title}>{back(r.id)}</PageHead>
         <Alert tone="bad" attr="not-editable">
           <p>{mode === 'edit' ? 'Laporan ini tidak dapat diubah lagi: hanya pelapor, dalam 24 jam sejak dibuat. Setelah itu koreksi oleh PM project / Direktur.' : 'Koreksi laporan servis hanya oleh PM project (tim) atau Direktur.'}</p>
         </Alert>
@@ -542,9 +544,9 @@ export async function FieldServiceEdit(props: AdminViewServerProps) {
   }
   return (
     <FieldFrame props={props} name="servis-ubah">
-      <DashHead title={title} note={mode === 'edit' ? 'Pelapor, dalam 24 jam sejak dibuat · hanya isian yang berubah yang dikirim · tercatat di riwayat' : 'Koreksi PM project / Direktur dengan alasan · laporan ditandai “dikoreksi”; status & HM terakhir unit dihitung ulang'}>
+      <PageHead props={props} title={title} note={mode === 'edit' ? 'Pelapor, dalam 24 jam sejak dibuat · hanya isian yang berubah yang dikirim · tercatat di riwayat' : 'Koreksi PM project / Direktur dengan alasan · laporan ditandai “dikoreksi”; status & HM terakhir unit dihitung ulang'}>
         <div className="pk-kact">{back(r.id)}</div>
-      </DashHead>
+      </PageHead>
       <Bento>
         <Card id="service-form" title={mode === 'edit' ? 'Ubah laporan (24 jam)' : 'Koreksi laporan'} span={8}>
           <ServiceReportForm

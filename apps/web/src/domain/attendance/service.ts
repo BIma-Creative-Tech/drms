@@ -1,10 +1,11 @@
 import { APIError, type PayloadRequest } from 'payload'
 
 import { employeeIn, membershipsOf, relId } from '@/access/roles'
+import { attendanceMonth } from '@/domain/reports/attendance-report'
 import { firstDay, lastDay, PERIOD_RE } from '@/domain/reports/rules'
 
 import { recapRange, teamToday, type DayRecap, type RecapSummary, type TeamTodayRow } from './aggregate'
-import { attendanceContext, attendanceScope, currentSchedules, employeeRef, fullCompanies, loadFacts, loadHolidays, narrowAttScope, narrowAttToCompanies, narrowAttToSite, teamMembers, type AttScope } from './queries'
+import { attendanceContext, attendanceScope, currentSchedules, employeeRef, fullCompanies, loadFacts, loadHolidays, narrowAttScope, narrowAttToCompanies, teamMembers, type AttScope } from './queries'
 import type { ScheduleSnapshot } from './schedule'
 
 /**
@@ -88,7 +89,7 @@ export type TeamTodayResult = {
 }
 
 /** US-13: team presence for a date (default today; ≤ today). PM team, office roles all. */
-export async function teamTodayFor(req: PayloadRequest, q: { date?: string; projectId?: number; costCenterId?: number; siteId?: number; companyIds?: readonly number[] }): Promise<TeamTodayResult> {
+export async function teamTodayFor(req: PayloadRequest, q: { date?: string; projectId?: number; costCenterId?: number; companyIds?: readonly number[] }): Promise<TeamTodayResult> {
   let scope = await attendanceScope(req)
   if (!scope) throw new APIError('Forbidden', 403, null, true)
   // MC2 UI PT filter: narrows to those PTs of the scope (never widens).
@@ -99,8 +100,6 @@ export async function teamTodayFor(req: PayloadRequest, q: { date?: string; proj
   if (date > ctx.today) throw new APIError('Tanggal tidak boleh di masa depan.', 400, null, true)
   // Filters narrow the scope PER PT; an id outside a PM's team / of another PT → empty (never other data).
   if (q.projectId !== undefined || q.costCenterId !== undefined) scope = narrowAttScope(scope, q.projectId, q.costCenterId)
-  // ADR 0023 §5: the site filter only narrows (an extra predicate per PT)
-  scope = narrowAttToSite(scope, q.siteId)
   const members = await teamMembers(req, scope, date)
   const ids = members.map((m) => m.employeeId)
   const facts = await loadFacts(req, { from: date, to: date, employeeIds: ids, scope })
@@ -108,4 +107,38 @@ export async function teamTodayFor(req: PayloadRequest, q: { date?: string; proj
   const schedules = await currentSchedules(req, ids, ctx.defaultScheduleId)
   const r = teamToday({ date, members, facts, holidayName: holidays.get(date) ?? null, schedules, timeZone: ctx.timeZone })
   return { date, timezone: ctx.timeZone, holidayName: holidays.get(date) ?? null, scope: kind, counts: r.counts, members: r.rows }
+}
+
+export type TeamMonthResult = {
+  month: string
+  from: string
+  to: string
+  timezone: string
+  scope: AttScope['kind']
+  employees: Array<{ employee: { id: number; code: string; name: string }; companyId: number | null; summary: RecapSummary }>
+}
+
+/**
+ * DRMS 26/10 #3: monthly summary per employee in the caller's attendance scope (APK "Rekap bulanan" of the office roles
+ * and the PM — most have no own employee, so GET /attendance/me answered 409). Same list and numbers as the web team
+ * grid /admin/absensi/rekap (teamMonth → attendanceMonth: team assignments in scope + employees with attendance in
+ * scope); the day detail stays GET /attendance/recap. PT / project / cost-center filters only narrow the scope.
+ */
+export async function teamMonthFor(req: PayloadRequest, q: { month?: string; projectId?: number; costCenterId?: number; companyIds?: readonly number[] }): Promise<TeamMonthResult> {
+  let scope = await attendanceScope(req)
+  if (!scope) throw new APIError('Forbidden', 403, null, true)
+  if (q.companyIds?.length) scope = narrowAttToCompanies(scope, q.companyIds)
+  const kind = scope.kind
+  const ctx = await attendanceContext(req)
+  const b = monthBounds(q.month, ctx.today)
+  if (q.projectId !== undefined || q.costCenterId !== undefined) scope = narrowAttScope(scope, q.projectId, q.costCenterId)
+  const list = await attendanceMonth(req, scope, b.month)
+  return {
+    month: b.month,
+    from: b.from,
+    to: b.to,
+    timezone: ctx.timeZone,
+    scope: kind,
+    employees: list.map((e) => ({ employee: { id: e.id, code: e.code, name: e.name }, companyId: e.companyId, summary: e.summary })),
+  }
 }

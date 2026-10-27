@@ -152,6 +152,9 @@ abstract class TransferInfo with _$TransferInfo {
 
     /// ADR 0031: the automatic inter-project loan of a transfer paid from another account.
     TransferLoanRef? projectLoan,
+
+    /// D2510: the bank proof (`media-transfer-proofs` id, image or PDF); null from an older server.
+    int? proofId,
   }) = _TransferInfo;
 
   bool get isVoid => status == 'void';
@@ -381,6 +384,9 @@ abstract class ExpenseDetail with _$ExpenseDetail {
     /// ADR 0031 (DRMS 21/10): the Pusat Biaya = the project's cash account (read-only; null without project or while
     /// the project is not mapped). [costCenter] is a legacy non-project request's own cost center only.
     AccountRef? pusatBiaya,
+
+    // D2410 (point 6): general attachments ("Lampiran", photo / PDF; empty from a server before 0.20).
+    @Default([]) List<RequestAttachment> attachments,
   }) = _ExpenseDetail;
 }
 
@@ -417,6 +423,27 @@ class RequestIntercompany {
 
   @override
   int get hashCode => Object.hash(targetEntryNo, voided, targetCompany, transferId);
+}
+
+/// D2410 (point 6) `ExpenseRequestDetail.attachments[]`: a general attachment of the request — opened through
+/// `GET /media/attachments/{id}/file`.
+class RequestAttachment {
+  const RequestAttachment({required this.id, this.fileName, this.mimeType});
+  final int id;
+  final String? fileName;
+  final String? mimeType;
+
+  bool get isPdf => mimeType == 'application/pdf';
+
+  /// The file name, else "Lampiran #id".
+  String get label => fileName == null || fileName!.isEmpty ? 'Lampiran #$id' : fileName!;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RequestAttachment && other.id == id && other.fileName == fileName && other.mimeType == mimeType;
+
+  @override
+  int get hashCode => Object.hash(id, fileName, mimeType);
 }
 
 /// ADR 0031 `{id, name}` of a cash account (Pusat Biaya, the account a transfer was paid from).
@@ -504,6 +531,13 @@ abstract class InboxItem with _$InboxItem {
     /// ADR 0029: "Dana kurang Rp X" — the gap of a final-step row of a PT with the fund check on (Kas roles of the PT);
     /// null when enough / not applicable / a server before ADR 0029.
     int? fundShort,
+
+    /// DRMS 26/10 #1: [fundShort] is the gap of the project's cash account and no instructed loan waits — the card
+    /// offers "Instruksi pinjam antar proyek" (false on older servers).
+    @Default(false) bool instructProjectLoan,
+
+    /// DRMS 26/10 #1: number of the instructed inter-project loan waiting for Finance's transfer, null when none.
+    String? projectLoanPendingDocNo,
   }) = _InboxItem;
 }
 

@@ -14,6 +14,7 @@ import 'package:proyekkas/features/expense/presentation/receipt_capture.dart';
 import 'package:proyekkas/features/expense/presentation/request_detail_screen.dart';
 import 'package:proyekkas/features/expense/presentation/requester_actions.dart';
 import 'package:proyekkas/features/expense/presentation/widgets/receipt_thumb.dart';
+import 'package:proyekkas/shared/widgets/media_thumb.dart';
 
 import '../support/fake_dio_adapter.dart';
 import '../support/fixtures.dart';
@@ -73,6 +74,9 @@ Future<void> pumpDetail(WidgetTester tester, Map<String, dynamic> json, FakeExpe
       overrides: [
         requestDetailProvider(42).overrideWith((ref) async => detailFromJson(json)),
         receiptThumbProvider(901).overrideWith((ref) => Future.error(const NetworkException())),
+        // D2510: the transfer proof thumbnail (no real HTTP — an answer would mark the fake connectivity online)
+        mediaImageProvider(('/media/transfer-proofs/9/file', true))
+            .overrideWith((ref) => Future.error(const NetworkException())),
         expenseApiProvider.overrideWithValue(api.api),
       ],
     );
@@ -156,6 +160,12 @@ void main() {
     await tester.enterText(find.byKey(const Key('lpj-usage-notes')), 'BBM dan penginapan tim survei');
     await tester.tap(find.byKey(const Key('lpj-send')));
     await tester.pumpAndSettle();
+    // D2410: "Yakin ingin kirim LPJ?" before anything is sent, then the result popup
+    expect(find.text('Yakin ingin kirim LPJ?'), findsOneWidget);
+    expect(api.adapter.calls, isEmpty);
+    await tester.tap(find.byKey(const Key('confirm-action')));
+    await tester.pumpAndSettle();
+    expect(find.text('Berhasil: kirim LPJ'), findsOneWidget);
     expect(api.adapter.calls.single.uri.path, '/api/v1/expense-requests/42/lpj/submit');
     expect(api.adapter.calls.single.headers['Idempotency-Key'], isNotNull);
   });

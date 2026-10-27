@@ -5,8 +5,6 @@ import type { CollectionSlug, PayloadRequest, Where } from 'payload'
 import { memberCompanies, relId } from '@/access/roles'
 import { withEffectiveRadius } from '@/domain/attendance/calendar'
 import { companyById } from '@/domain/companies'
-import { today } from '@/domain/expense/common'
-import { siteFlagsFor, type SiteFlags } from '@/domain/sites'
 import { mayFileIntercompany } from '@/domain/expense/drafts'
 import { direkturEmployees } from '@/domain/expense/on-behalf'
 import { payeeDirectory } from '@/domain/intercompany/service'
@@ -20,19 +18,19 @@ import { HttpError, problem, v1 } from '../http'
 const LIMIT = 500
 
 /** type → collection + whitelisted fields (never internal/sensitive columns like odoo refs). ADR 0028: `intercompany-payees` is computed. */
-const MAP: Record<Exclude<MasterType, 'intercompany-payees'>, { collection: CollectionSlug; fields: string[] }> = {
-  projects: { collection: 'projects', fields: ['code', 'name', 'kind', 'client', 'site', 'address', 'lat', 'lng', 'radiusM', 'pm', 'status', 'startDate', 'targetDate', 'progressPct'] },
+const MAP: Record<Exclude<MasterType, 'intercompany-payees' | 'sites'>, { collection: CollectionSlug; fields: string[] }> = {
+  projects: { collection: 'projects', fields: ['code', 'name', 'kind', 'client', 'address', 'lat', 'lng', 'radiusM', 'pm', 'status', 'startDate', 'targetDate', 'progressPct'] },
   'project-stages': { collection: 'project-stages', fields: ['project', 'name', 'weightPct', 'sequence', 'progressPct', 'active'] },
   'cost-centers': { collection: 'cost-centers', fields: ['code', 'name', 'type', 'manager', 'lat', 'lng', 'radiusM', 'active'] },
   'expense-categories': { collection: 'expense-categories', fields: ['code', 'name', 'defaultUom', 'allowedUoms', 'requiresVehicle', 'active'] },
   uoms: { collection: 'uoms', fields: ['code', 'name', 'category', 'active'] },
   vehicles: { collection: 'vehicles', fields: ['kind', 'displayName', 'unitCode', 'plateNo', 'plateDisplay', 'type', 'brandModel', 'owner', 'status', 'costCenter', 'project', 'active'] },
-  employees: { collection: 'employees', fields: ['code', 'name', 'nickname', 'position', 'homeSite', 'active'] },
+  employees: { collection: 'employees', fields: ['code', 'name', 'nickname', 'position', 'active'] },
   banks: { collection: 'banks', fields: ['code', 'name', 'active'] },
   'bank-accounts': { collection: 'employee-bank-accounts', fields: ['employee', 'bank', 'accountNo', 'accountHolder', 'isDefault', 'verificationStatus', 'active'] },
   'work-schedules': { collection: 'work-schedules', fields: ['name', 'startTime', 'endTime', 'lateToleranceMin', 'workDays', 'active'] },
   holidays: { collection: 'holidays', fields: ['date', 'name'] },
-  'team-assignments': { collection: 'team-assignments', fields: ['employee', 'project', 'costCenter', 'site', 'roleInProject', 'startDate', 'endDate'] },
+  'team-assignments': { collection: 'team-assignments', fields: ['employee', 'project', 'costCenter', 'roleInProject', 'startDate', 'endDate'] },
   // MC3-1: receipt vendor picker (vendor_id) and Kas "sumber kas masuk" — per PT, read access of the collection
   vendors: { collection: 'vendors', fields: ['name', 'contact', 'active'] },
   // ADR 0027: vendor payment — the chosen vendor's accounts (collection access: Admin / Finance / Direktur / PM / Staff,
@@ -42,8 +40,6 @@ const MAP: Record<Exclude<MasterType, 'intercompany-payees'>, { collection: Coll
   'urgency-levels': { collection: 'urgency-levels', fields: ['code', 'name', 'rank', 'active'] },
   // FR1: customers (collection access: office roles + PM; Staff only when assigned to an aftersales project of the PT)
   clients: { collection: 'clients', fields: ['name', 'contact', 'phone', 'active'] },
-  // ADR 0023: kantor cabang (every member of the PT reads them) + per-caller flags home / assigned / team (siteFlagsFor)
-  sites: { collection: 'sites', fields: ['code', 'name', 'isHeadOffice', 'address', 'lat', 'lng', 'radiusM', 'costCenter', 'defaultWorkSchedule', 'active'] },
 }
 
 const SHARED: ReadonlySet<MasterType> = new Set(SHARED_MASTER_TYPES)
@@ -74,8 +70,29 @@ async function intercompanyPayees(req: PayloadRequest, companies: number[]) {
   return { items, hasMore: false }
 }
 
+/**
+ * ADR 0032: sites are no longer part of the product. An APK ≤ 0.11.1 still asks for `sites`: a full read gets an empty
+ * list; a delta read (`since`) gets every site of the PTs as a tombstone (`deleted: true`, `active: false`) so its
+ * cache drops them and they are no longer offered as attendance locations.
+ */
+async function siteTombstones(req: PayloadRequest, companies: number[], since?: string) {
+  if (!since) return { items: [], hasMore: false }
+  const res = await req.payload.find({
+    collection: 'sites',
+    where: { company: { in: companies.length ? companies : [-1] } },
+    sort: 'id',
+    limit: LIMIT,
+    depth: 0,
+    select: { company: true, code: true, name: true, updatedAt: true } as never,
+    overrideAccess: true, // SYSTEM-READ: ids of the removed sites of the caller's PTs (no data beyond code / name)
+    req,
+  })
+  return { items: res.docs.map((d) => ({ ...pick(d as unknown as Record<string, unknown>, ['code', 'name'], false), active: false, deleted: true })), hasMore: res.hasNextPage }
+}
+
 async function loadType(req: PayloadRequest, type: MasterType, companies: number[], since?: string) {
   if (type === 'intercompany-payees') return intercompanyPayees(req, companies)
+  if (type === 'sites') return siteTombstones(req, companies, since)
   const { collection, fields } = MAP[type]
   const shared = SHARED.has(type)
   const and: Where[] = []
@@ -101,18 +118,6 @@ async function loadType(req: PayloadRequest, type: MasterType, companies: number
     if (type === 'projects') items = items.map((i) => (i.status === 'dibatalkan' ? { ...i, active: false } : i))
     // assignments to a soft-deleted project are left out (the project itself is not in `projects`)
     if (type === 'team-assignments') items = await withoutDeletedProjects(req, items)
-    if (type === 'sites') {
-      // ADR 0023 §6: the caller's own check-in sites (home site / active site assignment) and on-behalf sites (team)
-      const flags = new Map<number, SiteFlags>()
-      for (const i of items) {
-        const c = i.company as number
-        if (!flags.has(c)) flags.set(c, await siteFlagsFor(req, c, await today(req, c)))
-        const f = flags.get(c)!
-        i.home = f.home === i.id
-        i.assigned = f.assigned.has(i.id as number)
-        i.team = f.team.has(i.id as number)
-      }
-    }
     if (type === 'employees' && items.length > 0) {
       // ADR 0024: `direktur` = the employee's account holds Direktur in the employee's PT — the APK does not
       // offer such an employee as requester to anyone else (a Direktur files his own request; server: 403 / 409).
@@ -120,7 +125,7 @@ async function loadType(req: PayloadRequest, type: MasterType, companies: number
       const dir = await direkturEmployees(req, items.map((i) => i.id as number))
       items = items.map((i) => ({ ...i, direktur: dir.has(i.id as number) }))
     }
-    if (type === 'projects' || type === 'cost-centers' || type === 'sites') {
+    if (type === 'projects' || type === 'cost-centers') {
       // default geofence radius of EACH item's PT (ADR 0016 §1: per-PT setting)
       const out: Item[] = []
       for (const i of items) out.push(typeof i.company === 'number' ? withEffectiveRadius(i, (await companyById(req, i.company)).defaultGeofenceRadiusM) : i)

@@ -7,20 +7,28 @@ import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/doc_no_chip.dart';
 import '../../../shared/widgets/form_grid.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_keuangan.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../approvals/data/approvals_api.dart';
 import '../../approvals/presentation/decision_sheet.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/expense_providers.dart';
 import '../domain/expense_request.dart';
+import '../domain/project_loan_instruction.dart';
 import '../domain/turn_timeline.dart';
+import 'finance_lpj_actions.dart';
 import 'requester_actions.dart';
+import 'widgets/attachments.dart';
 import 'widgets/fund_check_panel.dart';
+import 'widgets/project_loan_instruct_sheet.dart';
 import 'widgets/rap_item_picker.dart';
 import 'widgets/request_stepper.dart';
+import 'widgets/request_ui.dart';
 import 'widgets/receipt_mismatch_chip.dart';
 import 'widgets/receipt_thumb.dart';
 import 'widgets/transfer_lpj.dart';
@@ -77,21 +85,18 @@ class _DetailBody extends ConsumerWidget {
     final t = AppLocalizations.of(context);
     final d = detail;
     final theme = Theme.of(context);
-    Widget row(String k, String v, {Key? key}) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(width: 150, child: Text(k, style: theme.textTheme.bodySmall)),
-          Expanded(child: Text(v, key: key)),
-        ],
-      ),
+    // D2510: label / value rows inside section cards (value right-aligned, amounts bold).
+    Widget row(String k, String v, {Key? key, bool money = false}) => PkInfoRow(
+      label: k,
+      value: Text(v, key: key),
+      valueStyle: money ? pkMoneyStyle(context) : null,
     );
-    // d1010 (WA-09): the same section titles on web and APK.
-    Widget section(String title, {Key? key}) => Padding(
+    // d1010 (WA-09): the same section titles on web and APK — D2510: each section is a titled card.
+    Widget section(String title, List<Widget> children, {Key? key, Object? icon}) => PkSectionCard(
       key: key,
-      padding: const EdgeInsets.only(top: 16, bottom: 4),
-      child: Text(title, style: theme.textTheme.titleMedium),
+      title: title,
+      icon: icon,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
     );
     String refText(RefItem r) => '${r.code ?? ''} ${r.name ?? ''}'.trim();
     // ADR 0031: the latest posted transfer paid from an account other than the Pusat Biaya (→ its automatic loan)
@@ -114,58 +119,71 @@ class _DetailBody extends ConsumerWidget {
     ];
     final decides = d.allowedActions.any(_decisionActions.contains);
     final header = <Widget>[
-      Text(d.title, style: theme.textTheme.titleLarge),
-      const SizedBox(height: 4),
-      Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Chip(label: Text(d.typeLabel)),
-          Chip(label: Text(d.statusLabel)),
-          if (d.docNo != null) DocNoChip(docNo: d.docNo!),
-          // Persetujuan #8: the PT as a small badge (code + name), no "PT:" label.
-          if (ptText != null) _PtBadge(text: ptText),
-        ],
+      // D2510: header card — type icon + title, type / status pills, PT badge, document number chip.
+      PkCard(
+        key: const Key('detail-header'),
+        radius: PkRadius.lg,
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                requestTypeChip(d.type, payee: d.payeeType, size: 44),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      d.title,
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, height: 1.25),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                PkPill(label: d.typeLabel),
+                PkPill(label: d.statusLabel, tone: requestStatusTone(d.status)),
+                // Persetujuan #8: the PT as a small badge (code + name), no "PT:" label.
+                if (ptText != null) _PtBadge(text: ptText),
+              ],
+            ),
+            if (d.docNo != null) ...[const SizedBox(height: 6), DocNoChip(docNo: d.docNo!)],
+          ],
+        ),
       ),
       // Persetujuan #9: "Tahapan saat ini" — "Menunggu keputusan Anda" when this user decides now.
-      Card(
+      PkNoticeCard(
         key: const Key('turn-card'),
-        color: theme.colorScheme.primaryContainer,
-        child: ListTile(
-          leading: const Icon(Icons.flag_circle),
-          title: Text(decides ? t.turnYours : t.turnLabel, key: const Key('turn-title')),
-          subtitle: Text(currentTurn(d), key: const Key('turn-text')),
-        ),
+        icon: decides ? Icons.flag_rounded : Icons.timelapse_rounded,
+        title: Text(decides ? t.turnYours : t.turnLabel, key: const Key('turn-title')),
+        body: Text(currentTurn(d), key: const Key('turn-text')),
       ),
       // ADR 0021: narrow G1 exception, recorded on the request (audit + PDF + panel).
       if (d.approvalRule?.direkturViaPm ?? false)
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              const Icon(Icons.info_outline, size: 18),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  d.approvalRule!.direkturViaPmSelf ? t.direkturViaPmSelfNote : t.direkturViaPmNote,
-                  key: const Key('direktur-via-pm-note'),
-                ),
-              ),
-            ],
+        PkNoticeCard(
+          dense: true,
+          tone: PkTone.neutral,
+          icon: Icons.info_outline,
+          title: Text(
+            d.approvalRule!.direkturViaPmSelf ? t.direkturViaPmSelfNote : t.direkturViaPmNote,
+            key: const Key('direktur-via-pm-note'),
           ),
         ),
       // ADR 0024: a Direktur's own request without approval (audited policy exception; web panel note).
       if (d.approvalRule?.noApproval ?? false)
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              const Icon(Icons.info_outline, size: 18),
-              const SizedBox(width: 6),
-              Expanded(child: Text(t.noApprovalNote, key: const Key('no-approval-note'))),
-            ],
-          ),
+        PkNoticeCard(
+          dense: true,
+          tone: PkTone.neutral,
+          icon: Icons.info_outline,
+          title: Text(t.noApprovalNote, key: const Key('no-approval-note')),
         ),
       // ADR 0029: "Ketersediaan dana PT" (Finance / Direktur / Owner of the PT) + "Perintahkan pinjaman antar-PT"
       if (d.fundCheck != null)
@@ -180,85 +198,91 @@ class _DetailBody extends ConsumerWidget {
         ),
     ];
     final summary = <Widget>[
-      section(t.sectionRequestDetails, key: const Key('section-details')),
-      if (d.approvedAmount != null) row(t.approvedAmount, formatRupiah(d.approvedAmount!)),
-      row(t.fieldProject, d.project == null ? '-' : refText(d.project!), key: const Key('detail-project')),
-      // ADR 0031 (DRMS 21/10): the Pusat Biaya = the project's cash account (read-only; the requester never picks it)
-      if (d.project != null)
-        row(t.fieldCostCenter, d.pusatBiaya?.label ?? t.pusatBiayaUnmapped, key: const Key('detail-pusat-biaya')),
-      // D2 legacy: the own cost center of an old non-project request
-      if (d.project == null && d.costCenter != null)
-        row(t.costCenterLegacyLabel, refText(d.costCenter!), key: const Key('detail-cost-center')),
-      // ADR 0031: a transfer paid from another account → the automatic inter-project loan
-      if (paidFromAccount != null)
-        row(
-          t.paidFromAccountLabel,
-          paidFromLoan == null ? paidFromAccount : t.paidFromAccountLoan(paidFromAccount, paidFromLoan),
-          key: const Key('detail-paid-from'),
-        ),
-      if (d.urgencyLevel != null) row(t.fieldUrgency, d.urgencyLevel!.name ?? '-'),
-      if (d.requestDate != null) row(t.requestDate, formatDateOnly(d.requestDate)),
-      row(t.neededDate, formatDateOnly(d.neededDate)),
-      if (d.notes != null && d.notes!.trim().isNotEmpty) row(t.fieldNotes, d.notes!.trim()),
-      // owner 2026-10-11: the RAB % is money (the server sends basis "none" to Staff) — no row instead of "Tanpa anggaran"
-      if (d.budget.hasBudget || (pt?.seesProjectMoney ?? profile?.seesProjectMoney ?? false))
-        row(
-          t.budgetImpact,
-          d.budget.hasBudget ? t.budgetChange(pct(d.budget.pctBefore), pct(d.budget.pctAfter)) : t.budgetNone,
-        ),
-      if (over)
-        Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, size: 18, color: context.pk.badText),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text('${t.budgetImpact} > 85%', style: TextStyle(color: context.pk.badText)),
+      section(t.sectionRequestDetails, key: const Key('section-details'), icon: Icons.description_outlined, [
+        if (d.approvedAmount != null) row(t.approvedAmount, formatRupiah(d.approvedAmount!), money: true),
+        row(t.fieldProject, d.project == null ? '-' : refText(d.project!), key: const Key('detail-project')),
+        // ADR 0031 (DRMS 21/10): the Pusat Biaya = the project's cash account (read-only; the requester never picks it)
+        if (d.project != null)
+          row(t.fieldCostCenter, d.pusatBiaya?.label ?? t.pusatBiayaUnmapped, key: const Key('detail-pusat-biaya')),
+        // D2 legacy: the own cost center of an old non-project request
+        if (d.project == null && d.costCenter != null)
+          row(t.costCenterLegacyLabel, refText(d.costCenter!), key: const Key('detail-cost-center')),
+        // ADR 0031: a transfer paid from another account → the automatic inter-project loan
+        if (paidFromAccount != null)
+          row(
+            t.paidFromAccountLabel,
+            paidFromLoan == null ? paidFromAccount : t.paidFromAccountLoan(paidFromAccount, paidFromLoan),
+            key: const Key('detail-paid-from'),
+          ),
+        if (d.urgencyLevel != null) row(t.fieldUrgency, d.urgencyLevel!.name ?? '-'),
+        if (d.requestDate != null) row(t.requestDate, formatDateOnly(d.requestDate)),
+        row(t.neededDate, formatDateOnly(d.neededDate)),
+        if (d.notes != null && d.notes!.trim().isNotEmpty) row(t.fieldNotes, d.notes!.trim()),
+        // owner 2026-10-11: the RAB % is money (the server sends basis "none" to Staff) — no row instead of "Tanpa
+        // anggaran"
+        if (d.budget.hasBudget || (pt?.seesProjectMoney ?? profile?.seesProjectMoney ?? false))
+          row(
+            t.budgetImpact,
+            d.budget.hasBudget ? t.budgetChange(pct(d.budget.pctBefore), pct(d.budget.pctAfter)) : t.budgetNone,
+          ),
+        if (over)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 2),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: PkPill(label: '${t.budgetImpact} > 85%', tone: PkTone.bad, icon: Icons.warning_amber_rounded),
             ),
-          ],
-        ),
-      if (d.rejectReason != null) row(t.rejectReasonLabel, d.rejectReason!),
-      section(t.sectionRequester, key: const Key('section-requester')),
-      row(t.requesters, d.requesters.map((r) => r.name ?? '-').join(', ')),
-      if (d.createdByName != null) row(t.createdBy, d.createdByName!),
+          ),
+        if (d.rejectReason != null) row(t.rejectReasonLabel, d.rejectReason!),
+      ]),
+      // D2410 (point 6): the general attachments ("Lampiran", photo / PDF) — a tap opens the file
+      if (d.attachments.isNotEmpty)
+        section(t.sectionAttachments, key: const Key('section-attachments'), icon: Icons.attach_file, [
+          RequestAttachmentList(attachments: d.attachments),
+        ]),
+      section(t.sectionRequester, key: const Key('section-requester'), icon: Icons.person_outline, [
+        row(t.requesters, d.requesters.map((r) => r.name ?? '-').join(', ')),
+        if (d.createdByName != null) row(t.createdBy, d.createdByName!),
+      ]),
       // ADR 0027: a vendor payment — vendor + invoice (the proof; no receipts / LPJ), paid to the vendor account
-      if (d.isVendor) ...[
-        section(t.sectionVendorPayment, key: const Key('section-vendor')),
-        row(t.fieldVendor, d.vendor?.name ?? '-', key: const Key('detail-vendor')),
-        row(t.fieldInvoiceNo, d.invoiceNo ?? '-', key: const Key('detail-invoice-no')),
-        row(t.fieldInvoiceDate, formatDateOnly(d.invoiceDate)),
-        if (d.invoiceDueDate != null) row(t.fieldInvoiceDueDate, formatDateOnly(d.invoiceDueDate)),
-        row(
-          t.fieldInvoiceFile,
-          d.invoiceFileName ?? (d.invoiceFileId == null ? '-' : '#${d.invoiceFileId}'),
-          key: const Key('detail-invoice-file'),
-        ),
-      ],
+      if (d.isVendor)
+        section(t.sectionVendorPayment, key: const Key('section-vendor'), icon: Icons.storefront_outlined, [
+          row(t.fieldVendor, d.vendor?.name ?? '-', key: const Key('detail-vendor')),
+          row(t.fieldInvoiceNo, d.invoiceNo ?? '-', key: const Key('detail-invoice-no')),
+          row(t.fieldInvoiceDate, formatDateOnly(d.invoiceDate)),
+          if (d.invoiceDueDate != null) row(t.fieldInvoiceDueDate, formatDateOnly(d.invoiceDueDate)),
+          row(
+            t.fieldInvoiceFile,
+            d.invoiceFileName ?? (d.invoiceFileId == null ? '-' : '#${d.invoiceFileId}'),
+            key: const Key('detail-invoice-file'),
+          ),
+        ]),
       // ADR 0028: a PT grup payment — the receiving PT + its document (tagihan / memo), paid to its designated receiving
       // account; after the transfer the receiving PT's Kas Masuk number
-      if (d.isPtGrup) ...[
-        section(t.sectionIntercompanyPayment, key: const Key('section-intercompany')),
-        row(
-          t.fieldPayeeCompany,
-          d.payeeCompany == null
-              ? '-'
-              : [?d.payeeCompany!.code, ?d.payeeCompany!.name].where((e) => e.isNotEmpty).join(' — '),
-          key: const Key('detail-payee-company'),
-        ),
-        row(t.fieldDocumentNo, d.invoiceNo ?? '-', key: const Key('detail-invoice-no')),
-        row(t.fieldDocumentDate, formatDateOnly(d.invoiceDate)),
-        if (d.invoiceDueDate != null) row(t.fieldInvoiceDueDate, formatDateOnly(d.invoiceDueDate)),
-        row(
-          t.fieldDocumentFile,
-          d.invoiceFileName ?? (d.invoiceFileId == null ? '-' : '#${d.invoiceFileId}'),
-          key: const Key('detail-invoice-file'),
-        ),
-        if (d.intercompany case final km?)
+      if (d.isPtGrup)
+        section(t.sectionIntercompanyPayment, key: const Key('section-intercompany'), icon: Icons.apartment_outlined, [
           row(
-            t.intercompanyEntryLabel(km.companyCode ?? d.payeeCompany?.code ?? '-'),
-            km.voided ? t.intercompanyEntryVoided(km.targetEntryNo) : km.targetEntryNo,
-            key: const Key('detail-intercompany-entry'),
+            t.fieldPayeeCompany,
+            d.payeeCompany == null
+                ? '-'
+                : [?d.payeeCompany!.code, ?d.payeeCompany!.name].where((e) => e.isNotEmpty).join(' — '),
+            key: const Key('detail-payee-company'),
           ),
-      ],
+          row(t.fieldDocumentNo, d.invoiceNo ?? '-', key: const Key('detail-invoice-no')),
+          row(t.fieldDocumentDate, formatDateOnly(d.invoiceDate)),
+          if (d.invoiceDueDate != null) row(t.fieldInvoiceDueDate, formatDateOnly(d.invoiceDueDate)),
+          row(
+            t.fieldDocumentFile,
+            d.invoiceFileName ?? (d.invoiceFileId == null ? '-' : '#${d.invoiceFileId}'),
+            key: const Key('detail-invoice-file'),
+          ),
+          if (d.intercompany case final km?)
+            row(
+              t.intercompanyEntryLabel(km.companyCode ?? d.payeeCompany?.code ?? '-'),
+              km.voided ? t.intercompanyEntryVoided(km.targetEntryNo) : km.targetEntryNo,
+              key: const Key('detail-intercompany-entry'),
+            ),
+        ]),
       section(
         d.isVendor
             ? t.fieldVendorBankAccount
@@ -266,29 +290,27 @@ class _DetailBody extends ConsumerWidget {
             ? t.intercompanyReceivingAccount
             : t.bankAccount,
         key: const Key('section-bank'),
+        icon: Icons.account_balance_outlined,
+        [
+          if (d.bankName == null && d.bankAccountNo == null && d.bankAccountHolder == null)
+            Text('-', style: theme.textTheme.bodyMedium)
+          else ...[
+            if (d.bankName != null) row(t.bankNameLabel, d.bankName!),
+            if (d.bankAccountHolder != null) row(t.bankHolderLabel, d.bankAccountHolder!),
+            // Masked by the server unless this user may see the full number (dto.ts maskAccountNo).
+            if (d.bankAccountNo != null) row(t.bankNumberLabel, d.bankAccountNo!, key: const Key('detail-bank-no')),
+          ],
+        ],
       ),
-      if (d.bankName == null && d.bankAccountNo == null && d.bankAccountHolder == null)
-        Text('-', style: theme.textTheme.bodyMedium)
-      else ...[
-        if (d.bankName != null) row(t.bankNameLabel, d.bankName!),
-        if (d.bankAccountHolder != null) row(t.bankHolderLabel, d.bankAccountHolder!),
-        // Masked by the server unless this user may see the full number (dto.ts maskAccountNo).
-        if (d.bankAccountNo != null) row(t.bankNumberLabel, d.bankAccountNo!, key: const Key('detail-bank-no')),
-      ],
     ];
     // Persetujuan #3: one stepper (overall flow + approval steps); after the summary on phones, right column on
     // tablets.
-    final stepper = <Widget>[
-      section(t.timelineTitle, key: const Key('section-stepper')),
+    final stepper = section(t.timelineTitle, key: const Key('section-stepper'), icon: Icons.timeline, [
+      const SizedBox(height: 4),
       RequestStepper(steps: buildRequestStepper(d), zone: zone),
-    ];
+    ]);
     final requestFlags = d.flags.where((f) => f.lineNo == null).toList();
-    final rest = <Widget>[
-      if (TransferSection.visibleFor(d)) TransferSection(detail: d, zone: zone),
-      if (d.settlement != null) LpjSection(settlement: d.settlement!),
-      RequestLifecycleActions(detail: d),
-      RequesterActionsSection(detail: d),
-      section(t.linesTitle, key: const Key('section-lines')),
+    final lines = [
       for (final l in d.lines)
         _LineCard(
           detail: d,
@@ -296,26 +318,44 @@ class _DetailBody extends ConsumerWidget {
           receipts: d.receipts.where((r) => r.lineId == l.id && r.status != 'removed').toList(),
           photos: receiptPhotos,
         ),
-      // Persetujuan #10: the grand total is the footer row of "Rincian item" (not in the header).
-      _GrandTotalRow(total: d.grandTotal),
+    ];
+    final rest = <Widget>[
+      if (TransferSection.visibleFor(d)) TransferSection(detail: d, zone: zone),
+      if (d.settlement != null) LpjSection(settlement: d.settlement!),
+      RequestLifecycleActions(detail: d),
+      RequesterActionsSection(detail: d),
+      section(t.linesTitle, key: const Key('section-lines'), icon: Icons.receipt_long_outlined, [
+        for (final (i, line) in lines.indexed) ...[if (i > 0) Divider(height: 1, color: context.pk.border), line],
+        // Persetujuan #10: the grand total is the footer row of "Rincian item" (not in the header).
+        _GrandTotalRow(total: d.grandTotal),
+      ]),
       // Flags of a line are shown on its card; only request-level flags are listed here.
-      if (requestFlags.isNotEmpty) ...[
-        section(t.flagsTitle, key: const Key('section-flags')),
-        for (final f in requestFlags)
-          ListTile(
-            dense: true,
-            leading: Icon(Icons.flag, color: f.level == 'warning' ? context.pk.warnText : theme.colorScheme.outline),
-            title: Text(f.kindLabel),
-            subtitle: Text(f.message),
-          ),
-      ],
+      if (requestFlags.isNotEmpty)
+        section(t.flagsTitle, key: const Key('section-flags'), icon: Icons.flag_outlined, [
+          for (final f in requestFlags)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.flag, color: f.level == 'warning' ? context.pk.warnText : theme.colorScheme.outline),
+              title: Text(f.kindLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(f.message),
+                  if (f.status == 'reviewed') Text(t.flagReviewedLabel, key: Key('flag-reviewed-${f.id}')),
+                  // D2510: Finance marks the flag reviewed (web Verifikasi LPJ / Reimburse review)
+                  if (canReviewFlag(d, f)) FlagReviewButton(detail: d, flag: f),
+                ],
+              ),
+            ),
+        ]),
       const SizedBox(height: 80),
     ];
     if (MediaQuery.sizeOf(context).width < FormGridLayout.twoColumnsMinWidth) {
       return ListView(
         key: const Key('detail-main'),
         padding: const EdgeInsets.all(16),
-        children: [...header, ...summary, ...stepper, ...rest],
+        children: [...header, ...summary, stepper, ...rest],
       );
     }
     return Row(
@@ -333,14 +373,7 @@ class _DetailBody extends ConsumerWidget {
           child: ListView(
             key: const Key('detail-side'),
             padding: const EdgeInsets.fromLTRB(0, 16, 16, 80),
-            children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: stepper),
-                ),
-              ),
-            ],
+            children: [stepper],
           ),
         ),
       ],
@@ -360,11 +393,17 @@ class _PtBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final style = theme.textTheme.labelMedium?.copyWith(color: scheme.primary, fontWeight: FontWeight.w700);
+    final style = theme.textTheme.labelSmall?.copyWith(
+      color: context.pk.infoOn,
+      fontWeight: FontWeight.w700,
+      fontSize: 12,
+      height: 1.3,
+    );
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: scheme.primary.withValues(alpha: 0.10),
+        color: context.pk.infoBg,
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.25)),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(text, key: const Key('detail-company'), style: style),
@@ -383,18 +422,22 @@ class _GrandTotalRow extends StatelessWidget {
     final theme = Theme.of(context);
     final style = theme.textTheme.titleMedium?.copyWith(
       fontWeight: FontWeight.w700,
+      color: context.pk.infoOn,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
     return Container(
       key: const Key('lines-footer'),
-      margin: const EdgeInsets.only(top: 4),
+      margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant, width: 2)),
-      ),
+      decoration: BoxDecoration(color: context.pk.infoBg, borderRadius: BorderRadius.circular(PkRadius.sm)),
       child: Row(
         children: [
-          Expanded(child: Text(t.grandTotal, style: theme.textTheme.titleSmall)),
+          Expanded(
+            child: Text(
+              t.grandTotal,
+              style: theme.textTheme.titleSmall?.copyWith(color: context.pk.infoOn, fontWeight: FontWeight.w700),
+            ),
+          ),
           Text(formatRupiah(total), key: const Key('lines-grand-total'), style: style),
         ],
       ),
@@ -442,108 +485,138 @@ class _LineCard extends ConsumerWidget {
     // have their chips.
     final flags = detail.flags.where((f) => f.lineNo == line.no && !_chipFlags.contains(f.kind)).toList();
     Color flagColor(FlagInfo f) => f.level == 'warning' ? context.pk.warnText : Theme.of(context).colorScheme.outline;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${line.no}. ${line.description ?? '-'}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    // D2510: a block inside the "Rincian item" card (divider between lines) instead of a card of its own.
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  '${line.no}. ${line.description ?? '-'}',
+                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
-                Text(formatRupiah(line.total), style: const TextStyle(fontWeight: FontWeight.bold)),
-              ],
+              ),
+              const SizedBox(width: 10),
+              Text(formatRupiah(line.total), style: pkMoneyStyle(context)),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(meta, key: Key('line-${line.no}-meta'), style: muted),
+          // D4: RAP item the line is charged to.
+          if (line.rapItem != null)
+            Text('${t.fieldRapItem}: ${rapRefLabel(line.rapItem!)}', key: Key('line-${line.no}-rap'))
+          else if (lineNeedsRapItem(detail, line))
+            Text(
+              t.lineNeedsRapItemShort,
+              key: Key('line-${line.no}-needs-rap'),
+              style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
             ),
-            Text(meta, key: Key('line-${line.no}-meta')),
-            // D4: RAP item the line is charged to.
-            if (line.rapItem != null)
-              Text('${t.fieldRapItem}: ${rapRefLabel(line.rapItem!)}', key: Key('line-${line.no}-rap'))
-            else if (lineNeedsRapItem(detail, line))
-              Text(
-                t.lineNeedsRapItemShort,
-                key: Key('line-${line.no}-needs-rap'),
-                style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
+          if (lineRapOverBudget(detail, line))
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: RapOverBudgetChip(key: Key('line-${line.no}-rap-over')),
+            ),
+          // D3: "Nominal sesuai nota" beside the computed total; "Selisih nota" when they differ.
+          if (line.receiptAmount != null)
+            Text(
+              '${t.fieldReceiptAmount}: ${formatRupiah(line.receiptAmount!)}',
+              key: Key('line-${line.no}-receipt-amount'),
+            ),
+          if (mismatch)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: ReceiptMismatchChip(
+                key: Key('line-${line.no}-receipt-mismatch'),
+                receiptAmount: line.receiptAmount,
+                total: line.total,
               ),
-            if (lineRapOverBudget(detail, line))
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: RapOverBudgetChip(key: Key('line-${line.no}-rap-over')),
-              ),
-            // D3: "Nominal sesuai nota" beside the computed total; "Selisih nota" when they differ.
-            if (line.receiptAmount != null)
-              Text(
-                '${t.fieldReceiptAmount}: ${formatRupiah(line.receiptAmount!)}',
-                key: Key('line-${line.no}-receipt-amount'),
-              ),
-            if (mismatch)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: ReceiptMismatchChip(
-                  key: Key('line-${line.no}-receipt-mismatch'),
-                  receiptAmount: line.receiptAmount,
-                  total: line.total,
-                ),
-              ),
-            if (lineNeedsCompletion(detail, line))
-              Text(
-                t.lineNeedsUnitPriceShort,
-                key: Key('line-${line.no}-needs-unit-price'),
-                style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
-              ),
-            for (final f in flags)
-              Padding(
-                key: Key('line-${line.no}-flag-${f.id}'),
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.flag, size: 16, color: flagColor(f)),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(f.kindLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
-                          Text(f.message, style: Theme.of(context).textTheme.bodySmall),
-                        ],
-                      ),
+            ),
+          if (lineNeedsCompletion(detail, line))
+            Text(
+              t.lineNeedsUnitPriceShort,
+              key: Key('line-${line.no}-needs-unit-price'),
+              style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
+            ),
+          for (final f in flags)
+            Padding(
+              key: Key('line-${line.no}-flag-${f.id}'),
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.flag, size: 16, color: flagColor(f)),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(f.kindLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Text(f.message, style: Theme.of(context).textTheme.bodySmall),
+                        if (f.status == 'reviewed')
+                          Text(
+                            t.flagReviewedLabel,
+                            key: Key('flag-reviewed-${f.id}'),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                          ),
+                        // D2510: Finance marks the flag reviewed (web Verifikasi LPJ / Reimburse review)
+                        if (canReviewFlag(detail, f)) FlagReviewButton(detail: detail, flag: f),
+                      ],
                     ),
+                  ),
+                ],
+              ),
+            ),
+          if (line.notes != null) Text(line.notes!, style: Theme.of(context).textTheme.bodySmall),
+          if (receipts.isNotEmpty) const SizedBox(height: 8),
+          for (final r in receipts)
+            // D2510: a Material tile (the review buttons keep their ink); Finance decides each receipt here.
+            PkTile(
+              key: Key('receipt-${r.id}'),
+              margin: const EdgeInsets.only(top: 6),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        ReceiptThumb(imageId: r.imageId, group: photos, caption: receiptCaption(t, line, r)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '${r.vendorName}\n${r.receiptNo ?? '-'} · ${formatDateOnly(r.receiptDate)} · '
+                            '${receiptStatusLabel(r.status)}',
+                            key: Key('receipt-${r.id}-text'),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(formatRupiah(r.amount), style: pkMoneyStyle(context)),
+                        if (canRemove && receiptRemovable(r.status))
+                          IconButton(
+                            key: Key('receipt-remove-${r.id}'),
+                            tooltip: t.receiptRemove,
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => removeServerReceipt(context, ref, detail, r),
+                          ),
+                      ],
+                    ),
+                    if (canReviewReceipt(detail, r))
+                      Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: ReceiptReviewButtons(detail: detail, receipt: r),
+                      ),
                   ],
                 ),
               ),
-            if (line.notes != null) Text(line.notes!, style: Theme.of(context).textTheme.bodySmall),
-            if (receipts.isNotEmpty) const SizedBox(height: 8),
-            for (final r in receipts)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  children: [
-                    ReceiptThumb(imageId: r.imageId, group: photos, caption: receiptCaption(t, line, r)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${r.vendorName}\n${r.receiptNo ?? '-'} · ${formatDateOnly(r.receiptDate)} · '
-                        '${receiptStatusLabel(r.status)}',
-                      ),
-                    ),
-                    Text(formatRupiah(r.amount)),
-                    if (canRemove && receiptRemovable(r.status))
-                      IconButton(
-                        key: Key('receipt-remove-${r.id}'),
-                        tooltip: t.receiptRemove,
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => removeServerReceipt(context, ref, detail, r),
-                      ),
-                  ],
-                ),
-              ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -560,31 +633,45 @@ class _DecisionBar extends ConsumerWidget {
     final canAck = a.contains('acknowledge');
     final canApprove = a.contains('approve');
     final canReject = a.contains('reject');
+    // D2510: the action bar sits on a card-coloured strip with a hairline top border.
+    Widget bar(Widget child) => DecoratedBox(
+      decoration: BoxDecoration(
+        color: context.pk.card,
+        border: Border(top: BorderSide(color: context.pk.border)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 10), child: child),
+      ),
+    );
     // DRMS 10/10 point 10: Finance records the transfer from the APK too (same form as the Finance menu).
     if (a.contains('transfer') && !canAck && !canApprove && !canReject) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: FilledButton.icon(
-            key: const Key('action-transfer'),
-            onPressed: () async {
-              await context.push<bool>('/finance/transfer/${detail.id}');
-              ref.invalidate(requestDetailProvider(detail.id));
-            },
-            icon: const Icon(Icons.account_balance),
-            label: Text(t.transferRecord),
-          ),
+      return bar(
+        FilledButton.icon(
+          key: const Key('action-transfer'),
+          onPressed: () async {
+            await context.push<bool>('/finance/transfer/${detail.id}');
+            ref.invalidate(requestDetailProvider(detail.id));
+          },
+          icon: const Icon(Icons.account_balance),
+          label: Text(t.transferRecord),
         ),
       );
+    }
+    // D2510: Finance on a submitted LPJ — "Minta revisi" / "Verifikasi LPJ" (the web Verifikasi LPJ actions).
+    if (showsFinanceLpjBar(detail) && !canAck && !canApprove && !canReject) {
+      return bar(FinanceLpjBar(detail: detail));
     }
     if (!canAck && !canApprove && !canReject) return const SizedBox.shrink();
 
     Future<void> open(Decision decision) async {
       final done = await showDecisionSheet(context, detail: detail, decision: decision);
-      if (done == true && context.mounted) showSnack(context, t.decisionDone);
       // Also after a refusal (403/409): the buttons must reflect the server's current allowedActions.
       ref.invalidate(requestDetailProvider(detail.id));
       ref.invalidate(inboxProvider);
+      if (done != true || !context.mounted) return;
+      final message = '${detail.docNo ?? detail.title}: ${t.decisionDone}';
+      await showActionResult(context, message: message, action: decisionActionLabel(t, decision));
     }
 
     final pm = detail.approvalRule?.pmApproval ?? false;
@@ -593,55 +680,58 @@ class _DecisionBar extends ConsumerWidget {
     // FUND_INSUFFICIENT); "Setujui" stays visible but disabled with the reason, "Tolak" stays.
     final blocked = detail.fundCheck?.blockedReason;
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (blocked != null && (canAck || canApprove))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  blocked,
-                  key: const Key('decision-blocked-text'),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.error),
-                ),
+    return bar(
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (blocked != null && (canAck || canApprove))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                blocked,
+                key: const Key('decision-blocked-text'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.error),
               ),
-            Row(
-              children: [
-                if (canReject)
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      key: const Key('action-reject'),
-                      onPressed: () => open(Decision.reject),
-                      icon: const Icon(Icons.close),
-                      label: Text(t.actionReject),
-                    ),
-                  ),
-                if (canReject) const SizedBox(width: 12),
-                if (canAck || canApprove)
-                  Expanded(
-                    child: FilledButton.icon(
-                      key: Key(canApprove ? 'action-approve' : 'action-acknowledge'),
-                      onPressed: blocked != null
-                          ? null
-                          : () => open(canApprove ? Decision.approve : Decision.acknowledge),
-                      icon: const Icon(Icons.check),
-                      label: Text(
-                        canApprove
-                            ? t.actionApprove
-                            : (pm
-                                  ? t.actionAcknowledgePm
-                                  : (direktur ? t.actionAcknowledgeDirektur : t.actionAcknowledge)),
-                      ),
-                    ),
-                  ),
-              ],
             ),
-          ],
-        ),
+          // DRMS 26/10 #1: the project's cash account is short → the final decider instructs an inter-project loan
+          if (detail.allowedActions.contains(instructProjectLoanAction))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: ProjectLoanInstructButton(requestId: detail.id, docNo: detail.docNo, filled: false),
+            ),
+          Row(
+            children: [
+              if (canReject)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('action-reject'),
+                    onPressed: () => open(Decision.reject),
+                    icon: const Icon(Icons.close),
+                    label: Text(t.actionReject),
+                  ),
+                ),
+              if (canReject) const SizedBox(width: 12),
+              if (canAck || canApprove)
+                Expanded(
+                  child: FilledButton.icon(
+                    key: Key(canApprove ? 'action-approve' : 'action-acknowledge'),
+                    onPressed: blocked != null
+                        ? null
+                        : () => open(canApprove ? Decision.approve : Decision.acknowledge),
+                    icon: const Icon(Icons.check),
+                    label: Text(
+                      canApprove
+                          ? t.actionApprove
+                          : (pm
+                                ? t.actionAcknowledgePm
+                                : (direktur ? t.actionAcknowledgeDirektur : t.actionAcknowledge)),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -20,9 +20,11 @@ import { imageQueue, insideImageSlot } from '@/lib/image-queue'
 import { takeToken } from '@/lib/rate-limit'
 import { USER_NAME_VIEW } from '@/fields/users'
 
+import { capLabel, MAX_UPLOAD_BYTES, type MediaLimits, uploadCap } from './limits'
+
 const MEDIA_DIR = process.env.MEDIA_DIR ?? '/data/media'
 
-export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024 // ADR 0004 §2 (upload.limits.fileSize)
+export { MAX_UPLOAD_BYTES }
 /**
  * S3e (US-57): decoded-size cap of an uploaded image (decompression-bomb guard, far below sharp's
  * default 268 MP). 50 MP ≈ 8660 × 5773 — above every phone camera the client uses.
@@ -31,8 +33,8 @@ export const MAX_INPUT_PIXELS = 50_000_000
 
 /** Server-side image limits (pure, unit-tested): byte cap per MIME, then decoded pixel count. */
 export function imageLimitError(spec: Pick<MediaSpec, 'maxBytesByMime'>, mime: string, bytes: number, dims?: { width?: number; height?: number }): { status: number; message: string } | null {
-  const cap = spec.maxBytesByMime?.[mime] ?? MAX_UPLOAD_BYTES
-  if (bytes > cap) return { status: 413, message: `File terlalu besar (maks. ${cap >= 1024 * 1024 ? `${Math.floor(cap / 1024 / 1024)} MB` : `${Math.floor(cap / 1024)} KB`}).` }
+  const cap = uploadCap(spec, mime)
+  if (bytes > cap) return { status: 413, message: `File terlalu besar (maks. ${capLabel(cap)}).` }
   if (dims?.width && dims.height && dims.width * dims.height > MAX_INPUT_PIXELS) {
     return { status: 413, message: `Resolusi foto terlalu besar (${dims.width} × ${dims.height} px, maks. ${MAX_INPUT_PIXELS / 1_000_000} megapiksel).` }
   }
@@ -51,12 +53,12 @@ const EXT_BY_MIME: Record<string, string> = {
 export type MediaSpec = {
   slug: string
   labels: { singular: string; plural: string }
-  mimeTypes: string[]
+  mimeTypes: MediaLimits['mimeTypes']
   resizeOptions?: UploadConfig['resizeOptions']
   formatOptions?: UploadConfig['formatOptions']
   imageSizes?: ImageSize[]
-  /** Per-MIME size cap below the global 8 MiB (e.g. transfer-proof PDFs ≤ 2 MB). */
-  maxBytesByMime?: Record<string, number>
+  /** Per-MIME size cap below the global 8 MiB — from MEDIA_LIMITS (limits.ts, shared with the admin upload guard). */
+  maxBytesByMime?: MediaLimits['maxBytesByMime']
   access: { read: Access; create: Access }
   /** Extra read-only fields of one collection (e.g. selfie retention tombstone). */
   extraFields?: Field[]
@@ -74,6 +76,8 @@ export type MediaSpec = {
    * refused while the uploader has not acknowledged the current privacy notice (enforcement on).
    */
   createGuard?: (req: PayloadRequest) => Promise<void>
+  /** Not in the admin nav / routes (Payload `admin.hidden`; upload-field drawers still work). D2510: selfies. */
+  hidden?: boolean
 }
 
 /**
@@ -162,7 +166,7 @@ export function mediaCollection(spec: MediaSpec): CollectionConfig {
     {
       slug: spec.slug,
       labels: spec.labels,
-      admin: { group: 'Media', defaultColumns: ['filename', 'mimeType', 'filesize', 'uploadedBy', 'createdAt'] },
+      admin: { group: 'Media', defaultColumns: ['filename', 'mimeType', 'filesize', 'uploadedBy', 'createdAt'], ...(spec.hidden ? { hidden: true } : {}) },
       access: { read: spec.access.read, create: spec.access.create, update: denyAll, delete: denyAll },
       upload: {
         staticDir: path.join(MEDIA_DIR, spec.slug),

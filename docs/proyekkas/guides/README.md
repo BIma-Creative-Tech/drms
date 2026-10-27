@@ -10,6 +10,7 @@ Panduan singkat per peran untuk karyawan PT DRMS (dan PT lain dalam grup yang me
 | Direktur | [direktur.md](direktur.md) | APK + web |
 | Owner (di atas Direktur, ADR 0026) | [owner.md](owner.md) | APK + web |
 | Admin | [admin.md](admin.md) | Web |
+| Admin Staff (absensi PT, ADR 0032) | [admin.md §7](admin.md#7-absensi) | Web + APK |
 
 Satu orang bisa punya lebih dari satu peran; baca semua panduan yang sesuai.
 

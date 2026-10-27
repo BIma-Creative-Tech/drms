@@ -26,7 +26,7 @@ export function registerRecordPaths(registry: OpenAPIRegistry, h: Helpers): void
   registry.registerPath({
     method: 'post',
     path: '/records/{collection}/{id}/delete',
-    summary: 'Soft delete (isDeleted = true, reason, audit `soft_delete`): masters / projects nobody references (409 IN_USE / PROJECT_IN_USE + usage), requests only as a never-submitted Draft (409 NOT_A_DRAFT). Whoever may update the row; hard delete stays denied',
+    summary: 'Soft delete (isDeleted = true, reason, audit `soft_delete`): masters / projects nobody references (409 IN_USE / PROJECT_IN_USE + usage), requests only as a Draft nobody ever decided on (never submitted, or withdrawn before any decision — D2410; else 409 NOT_A_DRAFT). Whoever may update the row; hard delete stays denied',
     security: h.security,
     request: { headers: h.idem, params: R.RecordParams, body: body(R.RecordReason) },
     responses: h.res(200, 'Check after the change', R.DeleteCheck, write),

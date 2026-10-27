@@ -17,6 +17,7 @@ export function RapMonitorCard({ data: d, i, span = 12 }: { data: RapMonitoringB
   return (
     <Card
       id="rap-monitor"
+      icon="tRuler"
       title="Monitoring RAP"
       sub={d.projects === 0 ? 'Realisasi pengajuan per item RAP' : `${formatNumber(d.projects)} project ber-RAP · ${formatNumber(d.overProjects)} dengan item melebihi RAP`}
       span={span}
@@ -74,6 +75,7 @@ export function RapMissingCard({ data: d, i, span = 12 }: { data: RapMissingBloc
   return (
     <Card
       id="rap-missing"
+      icon="tDanger"
       title={team ? 'Project Anda belum punya RAP' : 'Project ber-RAB belum punya RAP'}
       sub={`${formatNumber(d.total)} project · pengajuan project ini belum bisa dikirim sampai RAP diisi${team ? '' : ' (minta PM mengisi)'}`}
       span={span}

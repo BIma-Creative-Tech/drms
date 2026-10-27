@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/theme.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/media/photo_compressor.dart';
@@ -10,6 +11,8 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/photo_viewer.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_keuangan.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../masters/domain/master_item.dart';
 import '../../projects/application/projects_providers.dart';
@@ -159,229 +162,251 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
                   widget.line.description.isNotEmpty &&
                   !(widget.projectId != null &&
                       (ref.watch(projectRapProvider(widget.projectId!)).value?.pickable.isEmpty ?? false)))
-                Card(
+                PkNoticeCard(
                   key: const Key('line-needs-rap-item'),
-                  color: theme.colorScheme.tertiaryContainer,
-                  child: ListTile(leading: const Icon(Icons.info_outline), title: Text(t.lineNeedsRapItem)),
+                  dense: true,
+                  tone: PkTone.warn,
+                  icon: Icons.info_outline,
+                  title: Text(t.lineNeedsRapItem),
                 ),
               if (widget.line.needsUnitPrice && widget.line.total != null)
-                Card(
+                PkNoticeCard(
                   key: const Key('line-needs-unit-price'),
-                  color: theme.colorScheme.tertiaryContainer,
-                  child: ListTile(
-                    leading: const Icon(Icons.info_outline),
-                    title: Text(t.lineNeedsUnitPrice(formatRupiah(widget.line.total!))),
-                  ),
+                  dense: true,
+                  tone: PkTone.warn,
+                  icon: Icons.info_outline,
+                  title: Text(t.lineNeedsUnitPrice(formatRupiah(widget.line.total!))),
                 ),
               // DRMS 13/10 Umum #2 / D4: label left of the field, two columns on wide screens (same field order).
-              FormGrid(
-                children: [
-                  FormGridCell(
-                    label: t.fieldDescription,
-                    builder: (label) => TextFormField(
-                      key: const Key('line-description'),
-                      controller: _desc,
-                      maxLength: 500,
-                      decoration: InputDecoration(labelText: label),
-                      validator: req,
+              // D2510: the fields in one card.
+              PkCard(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: FormGrid(
+                  children: [
+                    FormGridCell(
+                      label: t.fieldDescription,
+                      builder: (label) => TextFormField(
+                        key: const Key('line-description'),
+                        controller: _desc,
+                        maxLength: 500,
+                        decoration: InputDecoration(labelText: label),
+                        validator: req,
+                      ),
                     ),
-                  ),
-                  // D4: required RAP item of the draft's project (remaining budget; "Melebihi RAP" when above it).
-                  FormGridCell(
-                    label: t.fieldRapItem,
-                    child: RapItemPickerField(
-                      projectId: widget.projectId,
-                      value: _line.rapItemId,
-                      lineTotal: current.computedTotal,
-                      errorText: _tried && _line.rapItemId == null && _rapPickable ? t.required : null,
-                      onChanged: (v) => setState(() => _line = _line.copyWith(rapItemId: v)),
+                    // D4: required RAP item of the draft's project (remaining budget; "Melebihi RAP" when above it).
+                    FormGridCell(
+                      label: t.fieldRapItem,
+                      child: RapItemPickerField(
+                        projectId: widget.projectId,
+                        value: _line.rapItemId,
+                        lineTotal: current.computedTotal,
+                        errorText: _tried && _line.rapItemId == null && _rapPickable ? t.required : null,
+                        onChanged: (v) => setState(() => _line = _line.copyWith(rapItemId: v)),
+                      ),
                     ),
-                  ),
-                  FormGridCell(
-                    label: t.fieldCategory,
-                    child: MasterPickerField(
+                    FormGridCell(
                       label: t.fieldCategory,
-                      items: m[MasterTypes.categories] ?? const [],
-                      value: _line.categoryId,
-                      onChanged: (v) => setState(() => _line = _line.copyWith(categoryId: v)),
+                      child: MasterPickerField(
+                        label: t.fieldCategory,
+                        items: m[MasterTypes.categories] ?? const [],
+                        value: _line.categoryId,
+                        onChanged: (v) => setState(() => _line = _line.copyWith(categoryId: v)),
+                      ),
                     ),
-                  ),
-                  FormGridCell(
-                    label: t.fieldQty,
-                    builder: (label) => TextFormField(
-                      key: const Key('line-qty'),
-                      controller: _qty,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                      decoration: InputDecoration(labelText: label),
-                      validator: qty,
-                      onChanged: (_) => setState(() {}),
+                    FormGridCell(
+                      label: t.fieldQty,
+                      builder: (label) => TextFormField(
+                        key: const Key('line-qty'),
+                        controller: _qty,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                        decoration: InputDecoration(labelText: label),
+                        validator: qty,
+                        onChanged: (_) => setState(() {}),
+                      ),
                     ),
-                  ),
-                  FormGridCell(
-                    label: t.fieldUom,
-                    child: MasterPickerField(
+                    FormGridCell(
                       label: t.fieldUom,
-                      items: m[MasterTypes.uoms] ?? const [],
-                      value: _line.uomId,
-                      errorText: _tried && _line.uomId == null ? t.required : null,
-                      onChanged: (v) => setState(() => _line = _line.copyWith(uomId: v)),
-                    ),
-                  ),
-                  FormGridCell(
-                    label: t.fieldUnitPrice,
-                    builder: (label) => TextFormField(
-                      key: const Key('line-unit-price'),
-                      controller: _unit,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: const [RupiahInputFormatter()],
-                      decoration: InputDecoration(labelText: label, prefixText: 'Rp '),
-                      validator: (v) => money(v, required: true),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ),
-                  // D3: Total = Qty × Harga satuan, shown live, read-only (not an input).
-                  FormGridCell(
-                    label: t.fieldTotal,
-                    builder: (label) => InputDecorator(
-                      decoration: InputDecoration(
-                        labelText: label,
-                        helperText: t.lineTotalHelper,
-                        helperMaxLines: 2,
-                        filled: true,
-                        enabled: false,
+                      child: MasterPickerField(
+                        label: t.fieldUom,
+                        items: m[MasterTypes.uoms] ?? const [],
+                        value: _line.uomId,
+                        errorText: _tried && _line.uomId == null ? t.required : null,
+                        onChanged: (v) => setState(() => _line = _line.copyWith(uomId: v)),
                       ),
-                      child: Text(
-                        current.computedTotal == null ? '-' : formatRupiah(current.computedTotal!),
-                        key: const Key('line-total'),
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                    FormGridCell(
+                      label: t.fieldUnitPrice,
+                      builder: (label) => TextFormField(
+                        key: const Key('line-unit-price'),
+                        controller: _unit,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: const [RupiahInputFormatter()],
+                        decoration: InputDecoration(labelText: label, prefixText: 'Rp '),
+                        validator: (v) => money(v, required: true),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    // D3: Total = Qty × Harga satuan, shown live, read-only (not an input).
+                    FormGridCell(
+                      label: t.fieldTotal,
+                      builder: (label) => InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: label,
+                          helperText: t.lineTotalHelper,
+                          helperMaxLines: 2,
+                          filled: true,
+                          enabled: false,
                         ),
-                      ),
-                    ),
-                  ),
-                  FormGridCell(
-                    label: t.fieldReceiptAmount,
-                    builder: (label) => Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextFormField(
-                          key: const Key('line-receipt-amount'),
-                          controller: _receiptAmount,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: const [RupiahInputFormatter()],
-                          decoration: InputDecoration(
-                            labelText: label,
-                            helperText: t.receiptAmountHelper,
-                            helperMaxLines: 2,
-                            prefixText: 'Rp ',
+                        child: Text(
+                          current.computedTotal == null ? '-' : formatRupiah(current.computedTotal!),
+                          key: const Key('line-total'),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
-                          validator: (v) => money(v),
-                          onChanged: (_) => setState(() {}),
                         ),
-                        if (current.receiptMismatch)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: ReceiptMismatchChip(
-                                key: const Key('line-receipt-mismatch'),
-                                receiptAmount: current.receiptAmount,
-                                total: current.computedTotal,
+                      ),
+                    ),
+                    FormGridCell(
+                      label: t.fieldReceiptAmount,
+                      builder: (label) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextFormField(
+                            key: const Key('line-receipt-amount'),
+                            controller: _receiptAmount,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: const [RupiahInputFormatter()],
+                            decoration: InputDecoration(
+                              labelText: label,
+                              helperText: t.receiptAmountHelper,
+                              helperMaxLines: 2,
+                              prefixText: 'Rp ',
+                            ),
+                            validator: (v) => money(v),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                          if (current.receiptMismatch)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: ReceiptMismatchChip(
+                                  key: const Key('line-receipt-mismatch'),
+                                  receiptAmount: current.receiptAmount,
+                                  total: current.computedTotal,
+                                ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  FormGridCell(
-                    label: t.fieldVehicle,
-                    child: MasterPickerField(
+                    FormGridCell(
                       label: t.fieldVehicle,
-                      items: m[MasterTypes.vehicles] ?? const [],
-                      value: _line.vehicleId,
-                      onChanged: (v) => setState(() => _line = _line.copyWith(vehicleId: v)),
+                      child: MasterPickerField(
+                        label: t.fieldVehicle,
+                        items: m[MasterTypes.vehicles] ?? const [],
+                        value: _line.vehicleId,
+                        onChanged: (v) => setState(() => _line = _line.copyWith(vehicleId: v)),
+                      ),
                     ),
-                  ),
-                  FormGridCell(
-                    label: t.fieldLineNotes,
-                    full: true,
-                    builder: (label) => TextFormField(
-                      controller: _notes,
-                      maxLength: 500,
-                      decoration: InputDecoration(labelText: label),
+                    FormGridCell(
+                      label: t.fieldLineNotes,
+                      full: true,
+                      builder: (label) => TextFormField(
+                        controller: _notes,
+                        maxLength: 500,
+                        decoration: InputDecoration(labelText: label),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              const Divider(height: 24),
-              Text(t.receiptsTitle, style: Theme.of(context).textTheme.titleMedium),
-              for (final r in _line.receipts)
-                ListTile(
-                  // d1010 (12c): local photo thumbnail, tap = fullscreen viewer over this line's local receipts.
-                  leading: r.isServerReceipt
-                      ? const Icon(Icons.receipt)
-                      : _DraftReceiptThumb(
-                          uuid: r.mediaUuid,
-                          group: [
-                            for (final x in _line.receipts)
-                              if (!x.isServerReceipt) (uuid: x.mediaUuid, caption: x.vendorName),
+              // D2510: the receipts of the line in a titled card.
+              PkSectionCard(
+                title: t.receiptsTitle,
+                icon: Icons.receipt_long_outlined,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final r in _line.receipts)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        // d1010 (12c): local photo thumbnail, tap = fullscreen viewer over this line's local receipts.
+                        leading: r.isServerReceipt
+                            ? const Icon(Icons.receipt)
+                            : _DraftReceiptThumb(
+                                uuid: r.mediaUuid,
+                                group: [
+                                  for (final x in _line.receipts)
+                                    if (!x.isServerReceipt) (uuid: x.mediaUuid, caption: x.vendorName),
+                                ],
+                              ),
+                        title: Text(r.vendorName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text(
+                          '${r.receiptNo ?? '-'} · ${formatDateOnly(r.receiptDate)}${r.receiptTime != null ? ' ${r.receiptTime}' : ''}'
+                          '${r.isServerReceipt ? '\n${t.serverReceiptLocked}' : ''}',
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(formatRupiah(r.amount), style: pkMoneyStyle(context)),
+                            // Receipts of an imported server draft stay on the server (read-only here).
+                            if (r.isServerReceipt)
+                              Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Icon(Icons.cloud_done, semanticLabel: t.serverReceiptLocked),
+                              )
+                            else
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () => setState(
+                                  () => _line = _line.copyWith(
+                                    receipts: [
+                                      for (final x in _line.receipts)
+                                        if (x.clientUuid != r.clientUuid) x,
+                                    ],
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
-                  title: Text(r.vendorName),
-                  subtitle: Text(
-                    '${r.receiptNo ?? '-'} · ${formatDateOnly(r.receiptDate)}${r.receiptTime != null ? ' ${r.receiptTime}' : ''}'
-                    '${r.isServerReceipt ? '\n${t.serverReceiptLocked}' : ''}',
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(formatRupiah(r.amount)),
-                      // Receipts of an imported server draft stay on the server (read-only here).
-                      if (r.isServerReceipt)
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Icon(Icons.cloud_done, semanticLabel: t.serverReceiptLocked),
-                        )
-                      else
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => setState(
-                            () => _line = _line.copyWith(
-                              receipts: [
-                                for (final x in _line.receipts)
-                                  if (x.clientUuid != r.clientUuid) x,
-                              ],
-                            ),
+                      ),
+                    if (_line.receipts.isNotEmpty && diff != 0)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          t.receiptDiff(formatRupiah(diff)),
+                          style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    if (_busy) Padding(padding: const EdgeInsets.all(8), child: Text(t.photoCompressing)),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            key: const Key('add-receipt-camera'),
+                            onPressed: () => _addReceipt(fromCamera: true),
+                            icon: const Icon(Icons.photo_camera),
+                            label: Text(t.addReceiptCamera),
                           ),
                         ),
-                    ],
-                  ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _addReceipt(fromCamera: false),
+                            icon: const Icon(Icons.photo_library),
+                            label: Text(t.addReceiptGallery),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              if (_line.receipts.isNotEmpty && diff != 0) Text(t.receiptDiff(formatRupiah(diff))),
-              if (_busy) Padding(padding: const EdgeInsets.all(8), child: Text(t.photoCompressing)),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      key: const Key('add-receipt-camera'),
-                      onPressed: () => _addReceipt(fromCamera: true),
-                      icon: const Icon(Icons.photo_camera),
-                      label: Text(t.addReceiptCamera),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _addReceipt(fromCamera: false),
-                      icon: const Icon(Icons.photo_library),
-                      label: Text(t.addReceiptGallery),
-                    ),
-                  ),
-                ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
               FilledButton(
                 key: const Key('line-save'),
                 onPressed: () {

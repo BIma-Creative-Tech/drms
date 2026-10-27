@@ -178,12 +178,30 @@ describe('duplicate invoice', () => {
     await ok(api('POST', E, financeV, await vendorBody(financeV, { invoiceNo: no, vendorId: otherVendor, vendorBankAccountId: accOther }), key()), 201)
     // the same draft may keep its own number (PATCH)
     await ok(api('PATCH', `${E}/${first.id}`, financeV, { invoiceNo: no, title: 'Bayar invoice material (ubah)' }))
-    // cancelled → the invoice may be filed again
+    // cancelled → the invoice may be filed again. D2410: "Batalkan" only at the Finance stage — sent, approved (Direktur →
+    // Owner), then cancelled by Finance (here the filer himself: an office role may cancel its own request there)
+    await ok(api('POST', `${E}/${first.id}/submit`, financeV, {}, key()))
+    await ok(api('POST', `${E}/${first.id}/approve`, w.users.owner, {}, key()))
+    expect((await ok(api('POST', `${E}/${first.id}/approve`, principalV, {}, key()))).status).toBe('approved')
     await ok(api('POST', `${E}/${first.id}/cancel`, financeV, { reason: 'salah input invoice' }, key()))
     const again = await ok(api('POST', E, financeV, await vendorBody(financeV, { invoiceNo: no }), key()), 201)
     // DB guard: a raw write of the same key on another live request is refused
     const other = await ok(api('POST', E, financeV, await vendorBody(financeV), key()), 201)
     expect((await sqlError('app', 'UPDATE expense_requests SET invoice_no = $1 WHERE id = $2', [no.toUpperCase(), other.id]))?.code).toBe('23505')
+    expect(again.id).toBeGreaterThan(first.id)
+  })
+
+  it('D2410 "Hapus draft": a soft-deleted draft no longer blocks its invoice number (service + DB index)', async () => {
+    const no = `inv/${Date.now()}-hapus`
+    const first = await ok(api('POST', E, financeV, await vendorBody(financeV, { invoiceNo: no }), key()), 201)
+    expect(first.allowedActions).toContain('delete_draft')
+    expect((await api('POST', E, financeV, await vendorBody(financeV, { invoiceNo: no }), key())).status).toBe(409)
+    const del = await ok(api('POST', `${E}/${first.id}/delete-draft`, financeV, {}, key()))
+    expect(del.id).toBe(first.id)
+    const row = (await sqlAs('app', 'SELECT is_deleted AS d, delete_reason AS r FROM expense_requests WHERE id = $1', [first.id])).rows[0]
+    expect(row).toEqual({ d: true, r: 'Draft dihapus oleh pemohon' })
+    // the same invoice may be filed again: the duplicate check and the partial unique index skip the deleted draft
+    const again = await ok(api('POST', E, financeV, await vendorBody(financeV, { invoiceNo: no }), key()), 201)
     expect(again.id).toBeGreaterThan(first.id)
   })
 })

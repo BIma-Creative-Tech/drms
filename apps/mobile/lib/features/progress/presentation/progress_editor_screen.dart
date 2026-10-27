@@ -7,7 +7,10 @@ import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_lapangan.dart';
 import '../../../app/providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
@@ -230,6 +233,9 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
     if (errors.isNotEmpty) return;
     final online = ref.read(connectivityProvider);
     final queue = ref.read(progressQueueEnabledForProvider(d.companyId));
+    final label = queue ? t.progressSaveQueue : t.progressSendOnline;
+    final summary = [_projectLabel, _stageLabel, fmtPct(d.pctAfter)];
+    if (!await confirmAction(context, action: label, summary: summary) || !mounted) return;
     setState(() => _busy = true);
     try {
       final outcome = await ref.read(progressServiceProvider).save(sub, d, online: online, queueEnabled: queue);
@@ -240,20 +246,20 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
         ref.invalidate(projectProgressProvider);
       }
       if (!mounted) return;
-      showSnack(
-        context,
-        outcome == ProgressSaveOutcome.sent
-            ? t.progressSent
-            : (online ? t.progressQueuedOnline : t.progressQueuedOffline),
-      );
-      Navigator.of(context).maybePop();
+      if (outcome == ProgressSaveOutcome.sent || online) {
+        final done = outcome == ProgressSaveOutcome.sent ? t.progressSent : t.progressQueuedOnline;
+        await showActionResult(context, message: done, action: label);
+      } else {
+        await showActionQueued(context, action: label, message: t.progressQueuedOffline);
+      }
+      if (mounted) Navigator.of(context).maybePop();
     } on NetworkException {
       if (mounted) {
-        showSnack(context, t.progressKeptLocal);
-        Navigator.of(context).maybePop();
+        await showActionQueued(context, action: label, message: t.progressKeptLocal);
+        if (mounted) Navigator.of(context).maybePop();
       }
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -263,19 +269,11 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
     final t = AppLocalizations.of(context);
     final sub = ref.read(currentSubProvider);
     if (sub == null) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t.progressDiscardTitle),
-        content: Text(t.progressDiscardBody),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.delete)),
-        ],
-      ),
-    );
-    if (ok != true) return;
+    final ok = await confirmAction(context, action: t.progressDiscardAction, note: t.progressDiscardBody);
+    if (!ok) return;
     await ref.read(progressServiceProvider).discard(sub, _uuid);
+    if (!mounted) return;
+    await showActionResult(context, message: t.fieldDiscarded, action: t.progressDiscardAction);
     if (mounted) Navigator.of(context).maybePop();
   }
 
@@ -311,160 +309,185 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
           if (!queue) _Info(text: online ? t.progressOnlineOnlyNote : t.progressOnlineOnlyOffline, warn: !online),
           if (_isEdit && _base?.editableUntil != null)
             _Info(text: t.progressEditWindow(reportTime(_base!.editableUntil, profile?.forCompany(_pt).timezone))),
-          // 1. Project
-          AsyncBody<List<MasterItem>>(
-            value: projects,
-            data: (list) => DropdownButtonFormField<int>(
-              hint: Text(pickHintFor(t, t.progressProject)),
-              key: const Key('progress-project'),
-              initialValue: list.any((p) => p.id == _projectId) ? _projectId : null,
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: t.progressProject,
-                prefixIcon: const Icon(Icons.apartment),
-                errorText: _errors['project'],
-                helperText: list.isEmpty ? t.progressNoProjects : null,
-              ),
-              items: [
-                for (final p in list)
-                  DropdownMenuItem(
-                    value: p.id,
-                    child: Text(
-                      (profile?.showCompanyChips ?? false) && p.companyId != null
-                          ? '${profile!.companyCode(p.companyId)} · ${p.label}'
-                          : p.label,
-                      overflow: TextOverflow.ellipsis,
+          // 1. Project + 2. Stage
+          PkCard(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AsyncBody<List<MasterItem>>(
+                  value: projects,
+                  data: (list) => DropdownButtonFormField<int>(
+                    hint: Text(pickHintFor(t, t.progressProject)),
+                    key: const Key('progress-project'),
+                    initialValue: list.any((p) => p.id == _projectId) ? _projectId : null,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: t.progressProject,
+                      prefixIcon: const Icon(Icons.apartment),
+                      errorText: _errors['project'],
+                      helperText: list.isEmpty ? t.progressNoProjects : null,
                     ),
+                    items: [
+                      for (final p in list)
+                        DropdownMenuItem(
+                          value: p.id,
+                          child: Text(
+                            (profile?.showCompanyChips ?? false) && p.companyId != null
+                                ? '${profile!.companyCode(p.companyId)} · ${p.label}'
+                                : p.label,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: lockedPlace || _busy
+                        ? null
+                        : (v) => setState(() {
+                            _projectId = v;
+                            _companyId = list.firstWhere((p) => p.id == v).companyId;
+                            _projectLabel = list.firstWhere((p) => p.id == v).label;
+                            _stageId = null;
+                            _stageLabel = '';
+                            _pctBefore = null;
+                            _errors = {..._errors}..remove('project');
+                          }),
                   ),
+                ),
+                // 2. Stage
+                if (_projectId != null) ...[
+                  const SizedBox(height: 16),
+                  AsyncBody<ProjectStageSet>(
+                    value: stagesAsync!,
+                    onRetry: () => ref.invalidate(stageSetProvider(_projectId!)),
+                    data: (set) {
+                      final active = set.activeStages;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (set.fromCache) _Info(text: t.progressStagesCached),
+                          if (!set.fromCache && !set.complete && !_isEdit)
+                            _Info(text: t.progressStagesIncomplete(fmtPct(set.weightSum)), warn: true),
+                          DropdownButtonFormField<int>(
+                            hint: Text(pickHintFor(t, t.progressStage)),
+                            key: const Key('progress-stage'),
+                            initialValue: active.any((s) => s.id == _stageId) ? _stageId : null,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              labelText: t.progressStage,
+                              prefixIcon: const Icon(Icons.stairs),
+                              errorText: _errors['stage'],
+                            ),
+                            items: [
+                              for (final s in active)
+                                DropdownMenuItem(
+                                  value: s.id,
+                                  child: Text(
+                                    t.progressStageOption(s.name, fmtPct(s.weightPct), fmtPct(s.progressPct)),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ],
+                            onChanged: lockedPlace || _busy
+                                ? null
+                                : (v) => _selectStage(active.firstWhere((s) => s.id == v)),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
               ],
-              onChanged: lockedPlace || _busy
-                  ? null
-                  : (v) => setState(() {
-                      _projectId = v;
-                      _companyId = list.firstWhere((p) => p.id == v).companyId;
-                      _projectLabel = list.firstWhere((p) => p.id == v).label;
-                      _stageId = null;
-                      _stageLabel = '';
-                      _pctBefore = null;
-                      _errors = {..._errors}..remove('project');
-                    }),
             ),
           ),
-          const SizedBox(height: 16),
-          // 2. Stage
-          if (_projectId != null)
-            AsyncBody<ProjectStageSet>(
-              value: stagesAsync!,
-              onRetry: () => ref.invalidate(stageSetProvider(_projectId!)),
-              data: (set) {
-                final active = set.activeStages;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (set.fromCache) _Info(text: t.progressStagesCached),
-                    if (!set.fromCache && !set.complete && !_isEdit)
-                      _Info(text: t.progressStagesIncomplete(fmtPct(set.weightSum)), warn: true),
-                    DropdownButtonFormField<int>(
-                      hint: Text(pickHintFor(t, t.progressStage)),
-                      key: const Key('progress-stage'),
-                      initialValue: active.any((s) => s.id == _stageId) ? _stageId : null,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        labelText: t.progressStage,
-                        prefixIcon: const Icon(Icons.stairs),
-                        errorText: _errors['stage'],
-                      ),
-                      items: [
-                        for (final s in active)
-                          DropdownMenuItem(
-                            value: s.id,
-                            child: Text(
-                              t.progressStageOption(s.name, fmtPct(s.weightPct), fmtPct(s.progressPct)),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                      ],
-                      onChanged: lockedPlace || _busy ? null : (v) => _selectStage(active.firstWhere((s) => s.id == v)),
-                    ),
-                  ],
-                );
-              },
-            ),
-          const SizedBox(height: 16),
           // 3. Percentage (never below the stage % before this report)
           if (_stageId != null) _pctCard(t),
-          const SizedBox(height: 16),
-          TextField(
-            key: const Key('progress-work'),
-            controller: _work,
-            minLines: 3,
-            maxLines: 6,
-            maxLength: 2000,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              labelText: t.progressWork,
-              hintText: t.progressWorkHint,
-              errorText: _errors['work'],
-              alignLabelWithHint: true,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            key: const Key('progress-issues'),
-            controller: _issues,
-            minLines: 2,
-            maxLines: 5,
-            maxLength: 2000,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              labelText: t.progressIssues,
-              errorText: _errors['issues'],
-              alignLabelWithHint: true,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            t.progressPhotosTitle(_photos.length + (_base?.serverPhotoCount ?? 0), maxProgressPhotos),
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          if (_isEdit && (_base?.serverPhotoCount ?? 0) > 0)
-            Text(t.progressPhotosOnServer(_base!.serverPhotoCount), style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              for (final p in _photos)
-                LocalPhotoThumb(
-                  uuid: p,
-                  group: _photos,
-                  onRemove: _busy ? null : () => setState(() => _photos = [..._photos]..remove(p)),
-                ),
-              if (remaining > 0)
-                SizedBox.square(
-                  dimension: 88,
-                  child: OutlinedButton(
-                    key: const Key('progress-add-photo'),
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: _busy ? null : _addPhoto,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.add_a_photo),
-                        Text(t.progressAddPhoto, textAlign: TextAlign.center),
-                      ],
-                    ),
+          PkCard(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  key: const Key('progress-work'),
+                  controller: _work,
+                  minLines: 3,
+                  maxLines: 6,
+                  maxLength: 2000,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    labelText: t.progressWork,
+                    hintText: t.progressWorkHint,
+                    errorText: _errors['work'],
+                    alignLabelWithHint: true,
                   ),
                 ),
-            ],
+                const SizedBox(height: 8),
+                TextField(
+                  key: const Key('progress-issues'),
+                  controller: _issues,
+                  minLines: 2,
+                  maxLines: 5,
+                  maxLength: 2000,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    labelText: t.progressIssues,
+                    errorText: _errors['issues'],
+                    alignLabelWithHint: true,
+                  ),
+                ),
+              ],
+            ),
           ),
-          if (_errors['photos'] != null)
-            Text(_errors['photos']!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          PkSectionCard(
+            title: t.progressPhotosTitle(_photos.length + (_base?.serverPhotoCount ?? 0), maxProgressPhotos),
+            icon: Icons.photo_library_outlined,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_isEdit && (_base?.serverPhotoCount ?? 0) > 0)
+                  Text(t.progressPhotosOnServer(_base!.serverPhotoCount), style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    for (final p in _photos)
+                      LocalPhotoThumb(
+                        uuid: p,
+                        group: _photos,
+                        onRemove: _busy ? null : () => setState(() => _photos = [..._photos]..remove(p)),
+                      ),
+                    if (remaining > 0)
+                      SizedBox.square(
+                        dimension: 88,
+                        child: OutlinedButton(
+                          key: const Key('progress-add-photo'),
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: _busy ? null : _addPhoto,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.add_a_photo),
+                              Text(t.progressAddPhoto, textAlign: TextAlign.center),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                if (_errors['photos'] != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(_errors['photos']!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  ),
+              ],
+            ),
+          ),
           if (_isEdit) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 4),
             TextField(
               key: const Key('progress-reason'),
               controller: _reason,
@@ -476,9 +499,10 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
               ),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           FilledButton.icon(
             key: const Key('progress-save'),
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
             onPressed: canSave ? () => _save(stages) : null,
             icon: _busy
                 ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
@@ -494,61 +518,60 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
     final theme = Theme.of(context);
     final before = _pctBefore ?? 0;
     final delta = _pctAfter - before;
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainerLow,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(t.progressPctTitle(_stageLabel), style: theme.textTheme.titleSmall),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    t.progressPctBefore(_pctBefore == null ? '—' : fmtPct(before)),
-                    style: theme.textTheme.bodyMedium,
-                  ),
+    return PkCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            t.progressPctTitle(_stageLabel),
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  t.progressPctBefore(_pctBefore == null ? '—' : fmtPct(before)),
+                  style: theme.textTheme.bodyMedium,
                 ),
-                SizedBox(
-                  width: 120,
-                  child: TextField(
-                    key: const Key('progress-pct'),
-                    controller: _pctText,
-                    textAlign: TextAlign.end,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                    decoration: const InputDecoration(suffixText: '%', isDense: true),
-                    onChanged: (s) {
-                      final v = double.tryParse(s.replaceAll(',', '.'));
-                      if (v != null) _setPct(v, fromText: true);
-                    },
-                  ),
+              ),
+              SizedBox(
+                width: 120,
+                child: TextField(
+                  key: const Key('progress-pct'),
+                  controller: _pctText,
+                  textAlign: TextAlign.end,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                  decoration: const InputDecoration(suffixText: '%', isDense: true),
+                  onChanged: (s) {
+                    final v = double.tryParse(s.replaceAll(',', '.'));
+                    if (v != null) _setPct(v, fromText: true);
+                  },
                 ),
-              ],
-            ),
-            Slider(
-              key: const Key('progress-slider'),
-              value: _pctAfter.clamp(before, 100).toDouble(),
-              min: before.clamp(0, 100).toDouble(),
-              max: 100,
-              divisions: before >= 100 ? null : ((100 - before) * 2).round().clamp(1, 200),
-              label: fmtPct(_pctAfter),
-              onChanged: before >= 100 || _busy ? null : (v) => _setPct(v),
-            ),
-            PctBar(label: t.progressPctAfterLabel, value: _pctAfter, color: progressSeriesPhysical),
-            const SizedBox(height: 6),
-            Text(
-              _errors['pctAfter'] ?? t.progressPctDelta('${delta >= 0 ? '+' : '−'}${fmtPct(delta.abs())}'),
-              key: const Key('progress-pct-message'),
-              style: _errors['pctAfter'] == null
-                  ? theme.textTheme.bodySmall
-                  : theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          Slider(
+            key: const Key('progress-slider'),
+            value: _pctAfter.clamp(before, 100).toDouble(),
+            min: before.clamp(0, 100).toDouble(),
+            max: 100,
+            divisions: before >= 100 ? null : ((100 - before) * 2).round().clamp(1, 200),
+            label: fmtPct(_pctAfter),
+            onChanged: before >= 100 || _busy ? null : (v) => _setPct(v),
+          ),
+          PctBar(label: t.progressPctAfterLabel, value: _pctAfter, color: progressSeriesPhysical),
+          const SizedBox(height: 6),
+          Text(
+            _errors['pctAfter'] ?? t.progressPctDelta('${delta >= 0 ? '+' : '−'}${fmtPct(delta.abs())}'),
+            key: const Key('progress-pct-message'),
+            style: _errors['pctAfter'] == null
+                ? theme.textTheme.bodySmall
+                : theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+          ),
+        ],
       ),
     );
   }
@@ -559,21 +582,5 @@ class _Info extends StatelessWidget {
   final String text;
   final bool warn;
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Card(
-      elevation: 0,
-      color: warn ? scheme.errorContainer : scheme.secondaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Icon(warn ? Icons.warning_amber_rounded : Icons.info_outline, size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text(text)),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => PkNotice(text: text, tone: warn ? PkTone.warn : PkTone.info);
 }

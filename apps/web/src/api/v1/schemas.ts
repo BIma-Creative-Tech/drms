@@ -28,8 +28,8 @@ export const Ready = z
   .meta({ id: 'Ready' })
 
 export const RoleEnum = z
-  .enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin'])
-  .meta({ id: 'Role', description: 'pk-owner = "Direktur"; pk-principal = "Owner" (ADR 0026: the approval level above the Direktur). Effective roles: an Owner is also listed with pk-owner (same view and permissions as the Direktur); only the approval flow differs.' })
+  .enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator', 'pk-admin-staff'])
+  .meta({ id: 'Role', description: 'pk-owner = "Direktur"; pk-principal = "Owner" (ADR 0026: the approval level above the Direktur); pk-operator = "Operator/Anggota"; pk-admin-staff = "Admin Staff" (ADR 0032). Effective roles: an Owner is also listed with pk-owner (same view and permissions as the Direktur); only the approval flow differs.' })
 
 export const ImageTargets = z
   .object({
@@ -61,6 +61,12 @@ export const Capabilities = z
     disburseIntercompanyLoan: z.boolean().meta({
       description: 'ADR 0029: Finance (stored) — the "Pencairan pinjaman antar-PT" queue (GET /intercompany-loans/queue) and the disbursement of loans whose LENDER is this PT (never one the caller instructed, G1).',
     }),
+    attendanceOnBehalf: z.boolean().meta({
+      description: 'ADR 0032: may record check-in / check-out on behalf of an employee — PM (team members at team locations, APK and — DRMS 24/10 — web) or Admin Staff (any employee of the PT incl. those without an account; web POST /attendance/on-behalf and APK). The server re-checks.',
+    }),
+    attendanceAdminStaff: z.boolean().meta({
+      description: 'ADR 0032: holds pk-admin-staff ("Admin Staff") — reads every attendance + correction of the PT, corrects (never own), on-behalf for any employee (GET /attendance/on-behalf/options).',
+    }),
     fundCheckEnabled: z.boolean().meta({
       description: 'ADR 0029: companies.fundCheckEnabled of this PT (top level: any selected PT) — the final approval / the Owner\'s own submit is refused (409 FUND_INSUFFICIENT) when the PT\'s available funds are short. Off = the fund panel is information only.',
     }),
@@ -72,13 +78,8 @@ const EmployeeRef = z
     id: z.number().int(),
     code: z.string(),
     name: z.string(),
-    homeSite: z
-      .object({ id: z.number().int(), code: z.string(), name: z.string() })
-      .nullable()
-      .optional()
-      .meta({ description: 'ADR 0023: "Site penempatan" (kantor cabang) of the employee, null when none.' }),
   })
-  .meta({ id: 'EmployeeRef' })
+  .meta({ id: 'EmployeeRef', description: 'ADR 0032: no `homeSite` any more (sites removed from the product).' })
 
 export const MeCompany = z
   .object({
@@ -170,7 +171,7 @@ export const MASTER_TYPES = [
   'urgency-levels',
   // FR1 (ADR 0020 §2): customer picker of the aftersales activity log (Staff only on aftersales projects)
   'clients',
-  // ADR 0023: sites (kantor cabang) — attendance locations + per-caller `home` / `assigned` / `team`
+  // ADR 0023 sites — ADR 0032: removed from the product; kept so an APK ≤ 0.11.1 still gets an answer (always empty)
   'sites',
   // ADR 0027: vendor accounts — destination picker of a vendor payment (Finance / PM / Direktur / Admin read; Staff read
   // since the owner request 2026-10-16)

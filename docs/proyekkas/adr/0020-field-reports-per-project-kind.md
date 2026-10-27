@@ -160,3 +160,51 @@ requests until a PM fills the RAP — intended. The APK learns the rule from `GE
 **Consequences.** Reports created before the migration carry exactly their old type. APK 0.7.0 keeps working (single
 type, ≤ 10 photos locally); a newer APK reads `GET /service-types` and sends `service_type_ids`. Down migration is
 refused once a report has more than 10 photos or a type outside the old four / several types (restore the dump).
+
+## Amendment 2026-10-24 — Timesheet: backdate for PM / Direktur, HM weekly (optional) (client feedback 24/10)
+
+- **Status:** accepted (user decisions 2026-10-24). Branch `feat/d2410-timesheet`, migration
+  `20261024_100000_d2410_timesheet_hm_optional`. Amends §5 (unit timesheet: "HM start/end, exactly one HM photo") and the
+  report-date rule (BACKDATE_MAX_DAYS = 14 for every field report) for **unit timesheets only**.
+
+**Context.** The matrix "+" on `/admin/unit-kontrak/kontrak/:id` linked every past missing day of a contract, but the
+form silently replaced a date older than 14 days with today (wrong date, empty or wrong unit) and the API refused it.
+Operators read the hour meter about once a week, not daily, yet HM start/end and the HM photo were required daily.
+
+**Decision.**
+
+1. **Backdate of a timesheet.** The field reporter (assigned Staff, team PM who is not the project's PM) keeps
+   **14 days**. The **PM of the project (`projects.pm`)** and the **Direktur (pk-owner) of the project's PT** may file a
+   timesheet for **any past date inside the contract unit's period** (never the future; the active-contract check of §4
+   and its DB trigger still apply). Enforced by the service (`mayBackdateTimesheet` → `reportDateError(…,
+   { unlimitedBackdate })`) for REST and sync alike; the flag `BACKDATED` is set as before. Other field report types are
+   unchanged.
+   - `GET /projects/{id}/contract-units` returns the caller's **`timesheetMinDate`** (today − 14, or the earliest
+     active contract-unit start for the PM of the project / Direktur) — the APK date picker uses it (fallback today −
+     14 against an older server).
+   - Web matrix: "+" only on missing days the caller may file (`MatrixCell.fillable`); older missing days stay red with
+     "!" and a title naming the limit. The input form honours `?tanggal=`; a date the caller may not file stays visible
+     with a notice (never silently swapped), the unit of `?unit=` is preselected when active on that date.
+2. **HM weekly = optional on the daily timesheet.** `hmStart`, `hmEnd` and the HM photo are optional:
+   - both values or none (400 VALIDATION; DB CHECK `unit_timesheets_hm_pair`), HM end ≥ start, ≥ 0, 2 decimals;
+     **work hours stay required**;
+   - the HM photo is required **only when HM is filled**; a photo without HM is accepted;
+   - **HM_GAP** compares with the previous timesheet of the unit **that has HM** (days without HM are skipped — note: with
+     weekly readings the usage between two readings now shows as a gap for the PM to review);
+   - the unit's `lastHourMeter` (and the service-report HM_DECREASED reference) ignore timesheets without HM;
+   - edits / corrections: `hmStart`/`hmEnd` null clears the HM; `hmPhotoId` (REST) / `hm_photo_media_id` (sync) adds
+     the photo of a timesheet that has none — a stored photo is never replaced (REST 400 `PHOTO_LIMIT`, sync: ignored,
+     so an older APK resending the stored id keeps working);
+   - forms (web + APK): HM awal is prefilled from the last **recorded** HM end (else the unit's last HM); an untouched
+     prefill with an empty HM akhir means "no HM today" and is not sent.
+3. **Recap.** `rekap-timesheet-kontrak` and the web Rekap tab: monthly **Total HM** = Σ (end − start) over timesheets
+   with HM (empty, not 0, when none); "HM awal → akhir" = first / last **recorded** reading; new **weekly HM per unit**
+   (weeks Monday–Sunday overlapping the month, labelled with their dates): HM awal = first recorded HM start of the
+   week, HM akhir = last recorded HM end, total = HM akhir − HM awal, days with HM. Billing (work hours) unchanged.
+4. **Contract.** REST `UnitTimesheet.hmStart/hmEnd/hmUsed`, sync copy `hm_start/hm_end` are nullable; create/sync
+   payloads accept them null or absent. **Old APKs always send HM + photo → unchanged behaviour.**
+
+**Consequences.** Migration drops NOT NULL on `hm_start` / `hm_end` (additive for the 0.19 image, which always writes
+both); its down step is refused once a timesheet without HM exists. An older APK reading a timesheet without HM from
+`GET /unit-timesheets` stores 0 (no crash; its HM prefill may be off until updated). A new APK against a pre-0.20 server
+cannot save a timesheet without HM (server refuses, the draft stays for correction).

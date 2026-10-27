@@ -39,13 +39,16 @@ import type { PillTone } from '@/domain/reports/viz'
 import { withReqTransaction } from '@/lib/system-tx'
 import { formatServerTime } from '@/pdf/format'
 
+import { PageHead } from './frame'
 import { ChartHover } from './ChartHover'
 import { F3Root } from './f3-ui'
 import { foreignPtParam, PtChip, ptOptions, ptView, type PtView } from './pt'
 import { PtNotAllowed } from './shared'
 import { PerPt } from './pt-breakdown'
-import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, rp, StatusPill, VIZ_STYLE, type Col } from './viz'
+import { Bento, Card, DataTable, EmptyState, KpiRow, KpiTile, rp, StatusPill, VIZ_STYLE, type Col } from './viz'
 import { NoAccess } from './NoAccess'
+import { ImageThumb } from '../components/media/ImageThumb'
+import { mediaThumbSource } from '../components/media/media-url'
 
 /**
  * E2 (fase1-golive §E2, US-23/US-24, ADR 0005): web "Kas" for Finance — buku kas with filters,
@@ -67,7 +70,7 @@ const PAGE_STYLE = `
 .pk-f3 form.pk-filter .pk-kbtn { align-self: flex-end; }
 .pk-f3 .pk-pager { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--pk-muted-fg); }
 .pk-f3 .pk-kpi.dim { opacity: .75; }
-@media (max-width: 559px) { .pk-f3 .pk-dash-head .pk-kact { width: 100%; } .pk-f3 .pk-dash-head .pk-kact > * { flex: 1 1 auto; } }
+@media (max-width: 559px) { .pk-f3 .pk-nx-head .pk-kact { width: 100%; } .pk-f3 .pk-nx-head .pk-kact > * { flex: 1 1 auto; } }
 .pk-f3 .pk-ptpick { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .pk-f3 .pk-ptpick li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 .pk-f3 .pk-ptpick .pk-kbtn { gap: 8px; }
@@ -117,7 +120,7 @@ const ptCode = (pt: PtView, id: number | null | undefined) => pt.ref(id)?.shortC
  */
 const lookupsOf = (lk: Lookups, company: number | undefined, tag?: { pt: PtView; multi: boolean }): Lookups => {
   const f = <T extends Option>(l: T[]) => ptOptions(l, { code: (id) => (tag ? ptCode(tag.pt, id) : `#${id}`), company, multi: tag?.multi ?? false })
-  return { accounts: f(lk.accounts), sites: f(lk.sites), projects: f(lk.projects), costCenters: f(lk.costCenters), categories: f(lk.categories), sources: f(lk.sources), vehicles: f(lk.vehicles) }
+  return { accounts: f(lk.accounts), projects: f(lk.projects), costCenters: f(lk.costCenters), categories: f(lk.categories), sources: f(lk.sources), vehicles: f(lk.vehicles) }
 }
 const lockText = (pt: PtView, locks: ReadonlyArray<{ companyId: number; lockDate: string | null }>) =>
   locks.length === 1
@@ -232,20 +235,17 @@ export async function KasBook(props: AdminViewServerProps) {
   const lk = lookupsOf(d.lk, q.pt, { pt, multi })
   const lockOf = (c: number | null) => locks.find((l) => l.companyId === c)?.lockDate ?? null
   const writeIn = (c: number | null) => c !== null && acc.write.includes(c)
-  // ADR 0023 (Q-S7): with a site filter the totals / tiles cover the accounts flagged with that site
-  const siteAccounts = q.site ? new Set(d.lk.accounts.filter((a) => a.siteId === q.site).map((a) => a.id)) : null
-  const inSite = (a: { cashAccountId: number }) => !siteAccounts || siteAccounts.has(a.cashAccountId)
-  const total = bal.filter(inSite).reduce((s, a) => s + a.balance, 0)
+  const total = bal.reduce((s, a) => s + a.balance, 0)
   // combined balance = Σ per PT (mc2-contract §4: show both)
-  const byPt = shown.map((c) => ({ companyId: c, total: bal.filter((a) => a.companyId === c && inSite(a)).reduce((s, a) => s + a.balance, 0) }))
+  const byPt = shown.map((c) => ({ companyId: c, total: bal.filter((a) => a.companyId === c).reduce((s, a) => s + a.balance, 0) }))
   const activeIds = new Set(lk.accounts.filter((a) => a.active).map((a) => a.id))
-  const tiles = bal.filter((a) => (activeIds.has(a.cashAccountId) || a.balance !== 0) && inSite(a))
-  const filtered = Boolean(q.akun || q.periode || q.project || q.pusat || q.arah || q.status || q.sumber || q.pt || q.site || q.q)
+  const tiles = bal.filter((a) => activeIds.has(a.cashAccountId) || a.balance !== 0)
+  const filtered = Boolean(q.akun || q.periode || q.project || q.pusat || q.arah || q.status || q.sumber || q.pt || q.q)
   const flashAcc = flash ? bal.find((a) => a.cashAccountId === relId(flash.cashAccount)) : undefined
   return (
     <Frame props={props} name="kas">
       <ChartHover>
-        <DashHead title="Kas" note={`Buku kas per ${dayMonth(todayDate)} (WITA) · ${lockText(pt, locks)} · termasuk void & jurnal balik`}>
+        <PageHead props={props} title="Kas" note={`Buku kas per ${dayMonth(todayDate)} (WITA) · ${lockText(pt, locks)} · termasuk void & jurnal balik`}>
           <div className="pk-kact">
             {canWrite ? (
               <>
@@ -261,7 +261,7 @@ export async function KasBook(props: AdminViewServerProps) {
               Tutup buku
             </Link>
           </div>
-        </DashHead>
+        </PageHead>
 
         {flash ? (
           <div className="pk-alert ok" role="status" data-pk-flash={flash.entryNo}>
@@ -317,14 +317,14 @@ export async function KasBook(props: AdminViewServerProps) {
         </Bento>
         </div>
 
-        <FilterBar q={q} lk={lk} filtered={filtered} pt={pt} pts={multi ? acc.view : []} />
-
         <Bento label="Buku kas">
           <Card
             id="kas-book"
             title="Buku kas"
             sub={`${page.totalDocs} transaksi${filtered ? ' (terfilter)' : ''} · terbaru dulu · baris void tetap tampil, jurnal baliknya tertaut`}
           >
+            {/* D2510 (Nexus): the filters are the toolbar row of the book card */}
+            <FilterBar q={q} lk={lk} filtered={filtered} pt={pt} pts={multi ? acc.view : []} />
             <LedgerTable rows={page.rows} lk={d.lk} lockOf={lockOf} writeIn={writeIn} canWrite={canWrite} filtered={filtered} pt={multi && q.pt === undefined ? pt : null} />
             <Pager q={q} page={page.page} totalPages={page.totalPages} />
           </Card>
@@ -364,7 +364,6 @@ function FilterBar({ q, lk, filtered, pt, pts }: { q: BookQuery; lk: Lookups; fi
         <input type="search" name="q" defaultValue={q.q ?? ''} placeholder="Nomor atau keterangan…" maxLength={100} autoComplete="off" data-pk-search="kas" />
       </label>
       {pts.length > 1 ? sel('pt', 'PT', pts.map((c) => ({ id: c, label: `${ptCode(pt, c)} — ${pt.ref(c)?.name ?? ''}` })), q.pt, 'Semua PT') : null}
-      {lk.sites.length ? sel('site', 'Site', lk.sites, q.site, 'Semua site') : null}
       {multi('akun', 'Akun / pusat biaya', ids(lk.accounts), q.akun, 'Semua akun')}
       <label>
         Periode
@@ -555,9 +554,8 @@ function LedgerTable({
       cell: (r) => (
         <div className="pk-kact">
           {r.proofId ? (
-            <a className="pk-kbtn sm" href={`/api/v1/media/attachments/${r.proofId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox="kas-proofs" data-pk-lightbox-title={`Bukti ${r.entryNo}`}>
-              Bukti
-            </a>
+            // D2510 (web 0.21.1): the proof as a preview (lightbox over the proofs of the page; a PDF → file link "Bukti")
+            <ImageThumb src={mediaThumbSource('attachments', r.proofId)} group="kas-proofs" title={`Bukti ${r.entryNo}`} caption={`${dayMonth(r.entryDate)} · ${r.direction === 'in' ? 'masuk' : 'keluar'} ${rp(r.amount)}`} size={40} fileLabel="Bukti" data-pk-proof={r.id} />
           ) : null}
           {writeIn(r.companyId) && canEdit(r, lockOf(r.companyId)) ? (
             <a className="pk-kbtn sm" href={`/admin/kas/${r.id}/ubah`} data-pk-action={`edit-${r.id}`}>
@@ -576,6 +574,8 @@ function LedgerTable({
                 </>
               }
               confirmLabel="Void transaksi"
+              summary={[['Transaksi', r.entryNo], ['Tanggal', dayMonth(r.entryDate)], ['Arah', r.direction === 'in' ? 'Kas masuk' : 'Kas keluar'], ['Nominal', rp(r.amount)], ['Keterangan', r.description], ['Pengajuan', r.request?.docNo]]}
+              success="Transaksi ditandai Void dan jurnal balik tercatat."
               testId={`void-${r.id}`}
             />
           ) : null}
@@ -630,7 +630,7 @@ function Pager({ q, page, totalPages }: { q: BookQuery; page: number; totalPages
 
 // ================================================================ forms
 
-const emptyLookups: Lookups = { accounts: [], sites: [], projects: [], costCenters: [], categories: [], sources: [], vehicles: [] }
+const emptyLookups: Lookups = { accounts: [], projects: [], costCenters: [], categories: [], sources: [], vehicles: [] }
 
 function formOptions(lk: Lookups, keep: Array<number | null | undefined> = []): CashEntryFormProps['options'] {
   const k = new Set(keep.filter((x): x is number => typeof x === 'number'))
@@ -683,9 +683,9 @@ export async function KasNew(props: AdminViewServerProps) {
     const locks = await withReqTransaction(req, () => lockDates(req, acc.write))
     return (
       <Frame props={props} name="kas-baru">
-        <DashHead title="Catat kas masuk / keluar" note="Anda Finance di beberapa PT. Pilih PT transaksi ini — akun, project, pusat biaya dan kategori mengikuti PT tersebut.">
+        <PageHead props={props} title="Catat kas masuk / keluar" note="Anda Finance di beberapa PT. Pilih PT transaksi ini — akun, project, pusat biaya dan kategori mengikuti PT tersebut.">
           {back}
-        </DashHead>
+        </PageHead>
         <PtChooser pt={pt} pts={acc.write} locks={locks} href={(c) => `/admin/kas/baru?arah=${arah}&pt=${c}`} title="Pilih PT" note="Kas masuk/keluar dicatat di buku kas satu PT." />
       </Frame>
     )
@@ -693,9 +693,9 @@ export async function KasNew(props: AdminViewServerProps) {
   const { todayDate, lockDate, lk } = await formContext(req, company)
   return (
     <Frame props={props} name="kas-baru">
-      <DashHead title="Catat kas masuk / keluar" note={`${acc.write.length > 1 ? `PT ${ptCode(pt, company)} — ${pt.ref(company)?.name ?? ''} · ` : ''}Nomor KM/KK diberikan otomatis saat disimpan. Saldo akun langsung berubah.`}>
+      <PageHead props={props} title="Catat kas masuk / keluar" note={`${acc.write.length > 1 ? `PT ${ptCode(pt, company)} — ${pt.ref(company)?.name ?? ''} · ` : ''}Nomor KM/KK diberikan otomatis saat disimpan. Saldo akun langsung berubah.`}>
         {back}
-      </DashHead>
+      </PageHead>
       <PtTabs pt={pt} pts={acc.write} current={company} href={(c) => `/admin/kas/baru?arah=${arah}&pt=${c}`} />
       <Bento>
         <Card id="kas-form" title="Transaksi baru" span={8}>
@@ -729,16 +729,16 @@ export async function KasEdit(props: AdminViewServerProps) {
   if (!e) {
     return (
       <Frame props={props} name="kas-ubah">
-        <DashHead title="Transaksi tidak ditemukan">{back}</DashHead>
+        <PageHead props={props} title="Transaksi tidak ditemukan">{back}</PageHead>
       </Frame>
     )
   }
   const editable = canEdit(e, lockDate)
   return (
     <Frame props={props} name="kas-ubah">
-      <DashHead title={`Edit ${e.entryNo}`} note="Keterangan, sumber/kategori, pembebanan, kendaraan dan bukti. Tanggal, akun dan nominal terkunci. Alasan wajib.">
+      <PageHead props={props} title={`Edit ${e.entryNo}`} note="Keterangan, sumber/kategori, pembebanan, kendaraan dan bukti. Tanggal, akun dan nominal terkunci. Alasan wajib.">
         {back}
-      </DashHead>
+      </PageHead>
       {editable ? (
         <Bento>
           <Card id="kas-form" title="Ubah transaksi" span={8}>
@@ -811,11 +811,11 @@ export async function TutupBuku(props: AdminViewServerProps) {
     const locks = await withReqTransaction(req, () => lockDates(req, acc.close))
     return (
       <Frame props={props} name="tutup-buku">
-        <DashHead title="Tutup buku" note="Tutup buku dilakukan per PT: menutup satu PT tidak mengunci PT lain. Pilih PT yang akan dikelola.">
+        <PageHead props={props} title="Tutup buku" note="Tutup buku dilakukan per PT: menutup satu PT tidak mengunci PT lain. Pilih PT yang akan dikelola.">
           <Link className="pk-kbtn" href="/admin/kas">
             ← Buku kas
           </Link>
-        </DashHead>
+        </PageHead>
         <PtChooser pt={pt} pts={acc.close} locks={locks} href={(c) => `/admin/tutup-buku?pt=${c}`} title="Pilih PT" note="Tanggal kunci saat ini per PT." />
       </Frame>
     )
@@ -912,6 +912,8 @@ export async function TutupBuku(props: AdminViewServerProps) {
                 </>
               }
               confirmLabel="Tutup buku"
+              summary={[['Periode', periodLabel(r.period)], ['PT', pt.ref(company)?.name ?? ptCode(pt, company)], ['Transaksi', r.n], ['Kas masuk', rp(r.tin)], ['Kas keluar', rp(r.tout)]]}
+              success={`Transaksi s/d ${dayMonth(periodEnd(r.period))} terkunci.`}
               testId={`close-${r.period}`}
             />
           )
@@ -924,6 +926,8 @@ export async function TutupBuku(props: AdminViewServerProps) {
               title={`Buka kembali ${periodLabel(r.period)}${acc.close.length > 1 ? ` — ${ptCode(pt, company)}` : ''}?`}
               description={<>Periode ini dapat diposting dan dikoreksi lagi sampai ditutup kembali. Alasan wajib dan tercatat di audit log.</>}
               confirmLabel="Buka kembali"
+              summary={[['Periode', periodLabel(r.period)], ['PT', pt.ref(company)?.name ?? ptCode(pt, company)]]}
+              success="Periode dapat diposting dan dikoreksi lagi."
               testId={`reopen-${r.period}`}
             />
           ) : (
@@ -960,14 +964,14 @@ export async function TutupBuku(props: AdminViewServerProps) {
   ]
   return (
     <Frame props={props} name="tutup-buku">
-      <DashHead
+      <PageHead props={props}
         title={acc.close.length > 1 ? `Tutup buku · ${ptCode(pt, company)}` : 'Tutup buku'}
         note={`${acc.close.length > 1 ? `${pt.ref(company)?.name ?? ''} · ` : ''}Tutup bulan yang sudah lewat. Buka kembali hanya oleh Direktur, untuk periode tertutup terakhir, dengan alasan.`}
       >
         <Link className="pk-kbtn" href={`/admin/kas${acc.close.length > 1 ? `?pt=${company}` : ''}`}>
           ← Buku kas
         </Link>
-      </DashHead>
+      </PageHead>
       <PtTabs pt={pt} pts={acc.close} current={company} href={(c) => `/admin/tutup-buku?pt=${c}`} />
       <Bento label="Status periode">
         <KpiRow cols={3}>

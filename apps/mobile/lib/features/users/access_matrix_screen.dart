@@ -9,8 +9,11 @@ import '../../app/theme.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../../l10n/gen/app_localizations.dart';
+import '../../shared/widgets/action_feedback.dart';
 import '../../shared/widgets/async_body.dart';
+import '../../shared/icons/iconsax.dart';
 import '../../shared/widgets/list_search.dart';
+import '../../shared/widgets/pk_ui.dart';
 import '../../shared/widgets/reason_dialog.dart';
 
 // MC2-4 "Akses PT (matriks)" on the APK (user 2026-10-19, phase 6): `GET /company-memberships/matrix` and the atomic
@@ -159,7 +162,7 @@ class _AccessMatrixScreenState extends ConsumerState<AccessMatrixScreen> {
       _drafts.clear();
       _cellErrors = const {};
       ref.invalidate(accessMatrixProvider);
-      if (mounted) showSnack(context, t.matrixSaved(ops.length));
+      if (mounted) await showActionResult(context, message: t.matrixSaved(ops.length), action: t.save);
     } on ProblemException catch (e) {
       // errors[].path = items.<i> → that op's cell (all-or-nothing: nothing was saved)
       final cells = <String, String>{};
@@ -169,10 +172,10 @@ class _AccessMatrixScreenState extends ConsumerState<AccessMatrixScreen> {
       }
       if (mounted) {
         setState(() => _cellErrors = cells);
-        showSnack(context, e.message);
+        await showActionError(context, e, action: t.save);
       }
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: t.save);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -238,6 +241,7 @@ class _AccessMatrixScreenState extends ConsumerState<AccessMatrixScreen> {
           SwitchListTile(
             key: const Key('matrix-inactive'),
             dense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
             title: Text(t.matrixShowInactive),
             value: _m.inactive,
             onChanged: (v) => _query(MatrixQuery(q: _m.q, inactive: v)),
@@ -261,6 +265,12 @@ class _AccessMatrixScreenState extends ConsumerState<AccessMatrixScreen> {
     final groupAdmin = viewer['groupAdmin'] == true;
     final adminOf = {for (final c in _list(viewer['adminOf'])) _int(c)};
     final companies = [for (final c in _list(j['companies'])) _map(c)];
+    // D2510: the user's name / avatar opens the user (same target as the "Edit" button).
+    Future<void> openUser(Object? id) async {
+      await context.push('/users/$id');
+      ref.invalidate(accessMatrixProvider);
+    }
+
     final roles = [
       for (final r in _list(j['roles']))
         (value: '${_map(r)['value']}', label: '${_map(r)['short'] ?? _map(r)['label']}'),
@@ -272,52 +282,81 @@ class _AccessMatrixScreenState extends ConsumerState<AccessMatrixScreen> {
     final totalPages = _int(users['totalPages']);
     return ListView(
       key: const Key('matrix-list'),
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
       children: [
         for (final w in _list(j['warnings']))
-          Card(
-            color: theme.colorScheme.errorContainer,
-            margin: const EdgeInsets.only(bottom: 6),
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Text('$w', style: theme.textTheme.bodySmall),
+          PkCard(
+            color: context.pk.warnBg,
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 20, color: context.pk.warnOn),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text('$w', style: theme.textTheme.bodySmall?.copyWith(color: context.pk.warnOn)),
+                ),
+              ],
             ),
           ),
         for (final u in _list(users['items']).map(_map))
-          Card(
+          PkCard(
             key: Key('matrix-user-${u['id']}'),
-            margin: const EdgeInsets.only(bottom: 8),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${u['name']}${u['active'] == false ? ' · ${t.rapInactive}' : ''}',
-                          style: theme.textTheme.titleSmall,
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        key: Key('matrix-head-${u['id']}'),
+                        borderRadius: BorderRadius.circular(PkRadius.sm),
+                        onTap: () => openUser(u['id']),
+                        child: Row(
+                          children: [
+                            PkAvatar(name: '${u['name'] ?? ''}', size: 40),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${u['name']}',
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${u['email']}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      IconButton(
-                        key: Key('matrix-open-${u['id']}'),
-                        tooltip: t.recordEdit,
-                        icon: const Icon(Icons.manage_accounts_outlined),
-                        onPressed: () async {
-                          await context.push('/users/${u['id']}');
-                          ref.invalidate(accessMatrixProvider);
-                        },
-                      ),
-                    ],
-                  ),
-                  Text('${u['email']}', style: theme.textTheme.bodySmall),
-                  for (final c in companies)
-                    _cellRow(context, u, c, all, stored, roles, employees, groupAdmin, adminOf),
-                ],
-              ),
+                    ),
+                    if (u['active'] == false) PkPill(label: t.rapInactive, tone: PkTone.bad),
+                    IconButton(
+                      key: Key('matrix-open-${u['id']}'),
+                      tooltip: t.recordEdit,
+                      icon: const Icon(Icons.manage_accounts_outlined),
+                      onPressed: () => openUser(u['id']),
+                    ),
+                  ],
+                ),
+                for (final c in companies) _cellRow(context, u, c, all, stored, roles, employees, groupAdmin, adminOf),
+              ],
             ),
           ),
+        if (_list(users['items']).isEmpty) PkEmptyState(icon: PkIcons.users, message: t.recordsEmpty),
         if (totalPages > 1)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -371,15 +410,34 @@ class _AccessMatrixScreenState extends ConsumerState<AccessMatrixScreen> {
           e,
     ];
     final err = _cellErrors[key];
-    return Padding(
+    return Container(
       key: Key('matrix-cell-$key'),
-      padding: const EdgeInsets.only(top: 8),
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 10, right: 6),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(PkRadius.sm + 2),
+        border: Border.all(color: context.pk.border),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${c['shortCode']}${cell.roles.isEmpty && stored[key] != null ? ' · ${t.rapInactive}' : ''}',
-            style: theme.textTheme.labelLarge,
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                Text('${c['shortCode']}', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+                if (cell.roles.isEmpty && stored[key] != null) ...[
+                  const SizedBox(width: 8),
+                  PkPill(label: t.rapInactive, tone: PkTone.bad),
+                ],
+                if (!editable) ...[
+                  const Spacer(),
+                  Icon(Icons.lock_outline, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                ],
+              ],
+            ),
           ),
           Wrap(
             spacing: 4,

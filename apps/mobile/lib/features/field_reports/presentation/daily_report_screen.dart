@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/theme.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
@@ -148,6 +150,8 @@ class _DailyReportScreenState extends ConsumerState<DailyReportScreen> {
       showSnack(context, t.fieldFixErrors);
       return;
     }
+    final label = _isEdit ? t.fieldSaveEdit : t.dailySubmit;
+    if (!await confirmFieldSubmit(context, label, project: _projectLabel, date: _date) || !mounted) return;
     final online = ref.read(connectivityProvider);
     setState(() => _busy = true);
     _autosave?.cancel();
@@ -155,10 +159,10 @@ class _DailyReportScreenState extends ConsumerState<DailyReportScreen> {
       await ref.read(fieldServiceProvider).submit(sub, d, online: online);
       ref.read(syncCoordinatorProvider.notifier).requestSync(delay: Duration.zero);
       if (!mounted) return;
-      showSnack(context, online ? t.fieldQueuedOnline : t.fieldQueuedOffline);
-      Navigator.of(context).maybePop();
+      await showFieldSubmitted(context, label, online: online);
+      if (mounted) Navigator.of(context).maybePop();
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -281,7 +285,7 @@ class _DailyReportScreenState extends ConsumerState<DailyReportScreen> {
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(fieldCacheRefreshProvider),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
             if (refresh.isLoading) const LinearProgressIndicator(),
             if (!online) FieldNote(text: t.fieldOfflineCache, warn: true),
@@ -354,8 +358,13 @@ class _DailyReportScreenState extends ConsumerState<DailyReportScreen> {
             if (sameDay != null)
               Card(
                 key: const Key('daily-same-day'),
-                color: theme.colorScheme.surfaceContainerLow,
+                elevation: 0,
+                margin: const EdgeInsets.only(bottom: 12),
+                color: context.pk.infoBg,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: ListTile(
+                  iconColor: context.pk.infoOn,
+                  textColor: context.pk.infoOn,
                   leading: const Icon(Icons.info_outline),
                   title: Text(t.dailySameDay),
                   trailing: const Icon(Icons.chevron_right),
@@ -652,7 +661,7 @@ class _DailyReportScreenState extends ConsumerState<DailyReportScreen> {
             const SizedBox(height: 8),
             FilledButton(
               key: const Key('daily-submit'),
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
               onPressed: _busy || _projectId == null ? null : () => _submit(itemsById),
               child: _busy
                   ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))

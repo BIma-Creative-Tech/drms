@@ -14,13 +14,14 @@ import { diffLines, type AuditLine } from '@/domain/expense/line-audit'
 import { recomputeFlags } from '@/domain/expense/receipts'
 import { INTERCOMPANY_PAYMENT_LABEL, isContentEditable, isDirectPayment, PAYEE_TYPE_LABELS, payeeOf, REQUEST_STATUSES, REQUEST_TYPE_LABELS, STATUS_LABELS, VENDOR_PAYMENT_LABEL, type RequestStatus, type RequestType } from '@/domain/expense/types'
 import { mayFileIntercompany, VENDOR_PAYMENT_ROLES } from '@/domain/expense/drafts'
+import { REQUEST_REFUSED_PROJECT_STATUSES } from '@/domain/projects/status'
 import { creatableRelationship } from '@/admin/relationship-create'
 import { changeReasonField, rupiahField, uuidField } from '@/fields/common'
 import { requestMeta } from '@/lib/request-meta'
 import { forceDeferredChecks } from '@/lib/system-tx'
 import { notifyCreated, notifyTransition } from '@/domain/notifications'
 import { notifyFundShortfall } from '@/domain/fundcheck/service'
-import { companyField, companyHook, formCompany, isListFilter, pickerSameCompany } from '@/fields/company'
+import { companyField, companyHook, companyScopedOptions, formCompany, isListFilter, pickerSameCompany } from '@/fields/company'
 import { hasRole, hasRoleAny } from '@/access/roles'
 import { select as selectValidation } from 'payload/shared'
 import { validationError } from '@/lib/validation'
@@ -63,6 +64,19 @@ const rupiahView = { components: { Field: RUPIAH_FIELD } }
  * (project, urgency, Pemohon, rekening) wait for.
  */
 export const REQUEST_CREATE_ROLES: readonly Role[] = ['pk-staff', 'pk-pm', 'pk-admin', 'pk-finance', 'pk-owner']
+
+/**
+ * D2610 (backlog 26/10): the project picker offers only projects a new request may use — G10 (domain/expense/drafts.ts)
+ * refuses `arsip` / `dibatalkan` / `selesai`. List filters (data `{}`) keep every project. Save-time re-validation stays
+ * off (pickerSameCompany's validate), so a draft whose project closed later still saves; sending it is refused by G10.
+ */
+const projectCompanyOptions = companyScopedOptions(REQUEST_CREATE_ROLES)
+export const requestProjectOptions = ({ data, user }: { data?: unknown; user?: unknown }): boolean | Where => {
+  const base = projectCompanyOptions({ data, user })
+  if (base === false || isListFilter(data)) return base
+  const open: Where = { status: { not_in: [...REQUEST_REFUSED_PROJECT_STATUSES] } }
+  return base === true ? open : { and: [base, open] }
+}
 
 /**
  * Picker filter of `bankAccount` (S3e, US-44): active accounts of the requesters / the creator's employee.
@@ -310,6 +324,7 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
           .replace(/^vendorBankAccountId$/, 'vendorBankAccount')
           .replace(/^payeeCompanyId$/, 'payeeCompany')
           .replace(/^invoiceFileId$/, 'invoiceFile')
+          .replace(/^attachmentIds$/, 'attachments')
           .replace(/\.(uom|category|vehicle|rapItem)Id$/, '.$1')
       throw validationError(
         req,
@@ -456,7 +471,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       },
       { name: 'title', type: 'text', label: 'Judul', required: true, maxLength: 200, admin: { components: { Field: '@/admin/components/EditableOnlyFields#RequestTitleField' } } },
       // D2: the project is mandatory to send the request (validateContent forSubmit); its RAP items feed the line picker (D4)
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany({ createRoles: REQUEST_CREATE_ROLES }), admin: { placeholder: PLACEHOLDERS.project, description: 'Wajib diisi sebelum dikirim. Item RAP baris diambil dari project ini.', condition: editableInput('project'), components: { Field: COMPANY_SCOPED_FIELD } } },
+      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany({ createRoles: REQUEST_CREATE_ROLES }), filterOptions: requestProjectOptions, admin: { placeholder: PLACEHOLDERS.project, description: 'Wajib diisi sebelum dikirim. Item RAP baris diambil dari project ini.', condition: editableInput('project'), components: { Field: COMPANY_SCOPED_FIELD } } },
       // D2 / ADR 0031 (DRMS 21/10): the requester never sets a Pusat Biaya — it is the project's cash account
       // (projects.cashAccount), shown read-only on the detail. This column is the LEGACY cost center of old requests
       // (shown read-only only when set; create / update closed, a value sent by an old client is ignored).
@@ -532,7 +547,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       { name: 'invoiceNo', type: 'text', label: 'Nomor invoice / dokumen', maxLength: 64, index: true, admin: { placeholder: 'mis. INV/2026/0012', condition: directPayee(editableInput('invoiceNo')) } },
       businessDateField('invoiceDate', 'Tanggal invoice / dokumen', { admin: { condition: directPayee(editableInput('invoiceDate')) } }),
       businessDateField('invoiceDueDate', 'Jatuh tempo', { admin: { condition: directPayee(editableInput('invoiceDueDate')) } }),
-      { name: 'invoiceFile', type: 'upload', relationTo: 'media-attachments', label: 'File invoice / dokumen (foto / PDF)', admin: { description: 'Wajib sebelum dikirim. Invoice vendor / tagihan atau memo PT penerima = bukti pembayaran (tanpa LPJ).', condition: directPayee(editableInput('invoiceFile')) } },
+      { name: 'invoiceFile', type: 'upload', relationTo: 'media-attachments', label: 'File invoice / dokumen (foto / PDF)', admin: { description: 'Wajib sebelum dikirim, maks. 5 MB per file. Invoice vendor / tagihan atau memo PT penerima = bukti pembayaran (tanpa LPJ).', condition: directPayee(editableInput('invoiceFile')) } },
       {
         name: 'bankSnapshot',
         type: 'group',
@@ -547,7 +562,8 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         ],
       },
       { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000, admin: { condition: editableInput() } },
-      { name: 'attachments', type: 'upload', relationTo: 'media-attachments', hasMany: true, label: 'Lampiran', admin: { condition: editableInput() } },
+      // D2410 (point 6): at least one to send a Reimburse (server: validateContent forSubmit); optional for Pengajuan Baru
+      { name: 'attachments', type: 'upload', relationTo: 'media-attachments', hasMany: true, label: 'Lampiran', admin: { description: 'Foto (JPG/PNG) atau PDF, maks. 5 MB per file. Wajib minimal 1 untuk Reimburse; opsional untuk Pengajuan Baru.', condition: editableInput() } },
       {
         name: 'lines',
         type: 'array',

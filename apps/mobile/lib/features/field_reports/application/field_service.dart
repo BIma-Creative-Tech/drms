@@ -227,7 +227,9 @@ class FieldService {
               if (x.clientId != null) FieldClient(id: x.clientId!, companyId: x.companyId, name: x.clientName ?? ''),
           ]);
           if (p.kind == ProjectKind.kontrakUnit) {
-            await repo.putContractUnits(sub, p.id, await api.contractUnits(p.id));
+            final cus = await api.contractUnits(p.id);
+            await repo.putContractUnits(sub, p.id, cus.items);
+            await repo.setTimesheetMinDate(sub, p.id, cus.timesheetMinDate);
             final ts = await api.list(
               FieldReportType.unitTimesheet,
               projectId: p.id,

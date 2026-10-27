@@ -7,7 +7,7 @@ import { addendumInboxCount } from '@/domain/addendum/service'
 import { approvalInboxCount } from '@/domain/expense/queues'
 import { shortfallInboxCount } from '@/domain/expense/shortfall-approval'
 import { TRANSFER_QUEUE_WHERE } from '@/domain/expense/types'
-import { loanInboxCount } from '@/domain/loans/service'
+import { loanInboxCount, loanTransferOrderCount } from '@/domain/loans/service'
 import { pickDisplayName, resolveDisplayName } from '@/domain/user-display-name'
 import { selectedCompaniesWhere } from '@/domain/notifications'
 
@@ -35,11 +35,15 @@ export async function approvalBadge(payload: Payload, user: TypedUser): Promise<
 
 /** Moved from F2NavLinks (US-19 "badge jumlah antrian"): Direktur/Finance only (ADR 0026: the Owner too — effective
  * roles carry pk-owner). S3e (S-07): the transfer badge counts exactly the transfer queue of the page title (TRANSFER_QUEUE_WHERE).
- * DRMS 20/10: + `approvals` (approvalBadge) for the roles of the "Persetujuan" item (Direktur/Finance/PM). */
+ * DRMS 20/10: + `approvals` (approvalBadge) for the roles of the "Persetujuan" item (Direktur/Finance/PM).
+ * DRMS 24/10 (pinjaman): `transfers` also counts the inter-project loan transfer orders the caller executes (Finance of
+ * the PT: approved loan disbursements + approved repayment requests, `loanTransferOrderCount`) — the same orders as the
+ * "Transfer pinjaman antar project" section of the page. */
 export async function loadBadges(
   payload: Pick<Payload, 'count'>,
   user: TypedUser,
   approvals: (payload: Payload, user: TypedUser) => Promise<number> = approvalBadge,
+  loanOrders: (payload: Pick<Payload, 'count'>, user: TypedUser) => Promise<number> = loanTransferOrderCount,
 ): Promise<Partial<Record<BadgeKey, number>>> {
   const roles = rolesOf(user)
   const office = roles.includes('pk-finance') || roles.includes('pk-owner')
@@ -53,8 +57,9 @@ export async function loadBadges(
   }
   const mine = approvals(payload as Payload, user).catch(() => 0)
   if (!office) return { approvals: await mine }
-  const [transfers, lpj, pending] = await Promise.all([count(TRANSFER_QUEUE_WHERE), count({ status: { in: ['lpj_submitted', 'lpj_verified'] } }), mine])
-  return { transfers, lpj, approvals: pending }
+  const loans = loanOrders(payload, user).catch(() => 0)
+  const [transfers, lpj, pending, loanTransfers] = await Promise.all([count(TRANSFER_QUEUE_WHERE), count({ status: { in: ['lpj_submitted', 'lpj_verified'] } }), mine, loans])
+  return { transfers: transfers + loanTransfers, lpj, approvals: pending }
 }
 
 /** S3e (US-05): unread in-app notifications of the caller (bell in the top bar). */

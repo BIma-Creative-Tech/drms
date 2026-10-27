@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/theme.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_lapangan.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/expense_mappers.dart' show Json;
 import '../../sync/application/sync_coordinator.dart';
 import '../application/field_providers.dart';
 import '../domain/field_models.dart';
+import 'widgets/field_widgets.dart' show fieldReportIcon;
 
 final _draftProvider = Provider.autoDispose.family<AsyncValue<FieldDraft?>, String>(
   (ref, uuid) => ref.watch(openFieldDraftsProvider).whenData((l) => l.where((d) => d.clientUuid == uuid).firstOrNull),
@@ -32,12 +37,13 @@ class _FieldConflictScreenState extends ConsumerState<FieldConflictScreen> {
     final t = AppLocalizations.of(context);
     final sub = ref.read(currentSubProvider);
     if (sub == null) return;
+    if (!await confirmAction(context, action: t.fieldUseServer, note: t.fieldUsedServer) || !mounted) return;
     setState(() => _busy = true);
     await ref.read(fieldServiceProvider).useServerVersion(sub, widget.uuid);
     ref.invalidate(myFieldRecordsProvider);
     if (!mounted) return;
-    showSnack(context, t.fieldUsedServer);
-    Navigator.of(context).maybePop();
+    await showActionResult(context, message: t.fieldUsedServer, action: t.fieldUseServer);
+    if (mounted) Navigator.of(context).maybePop();
   }
 
   Future<void> _resend() async {
@@ -53,10 +59,10 @@ class _FieldConflictScreenState extends ConsumerState<FieldConflictScreen> {
           .resendMine(sub, widget.uuid, reason: reason, online: ref.read(connectivityProvider));
       ref.read(syncCoordinatorProvider.notifier).requestSync(delay: Duration.zero);
       if (!mounted) return;
-      showSnack(context, t.fieldResent);
-      Navigator.of(context).maybePop();
+      await showActionResult(context, message: t.fieldResent, action: t.fieldResendMine);
+      if (mounted) Navigator.of(context).maybePop();
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: t.fieldResendMine);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -80,20 +86,38 @@ class _FieldConflictScreenState extends ConsumerState<FieldConflictScreen> {
           final until = DateTime.tryParse(fStr(c['editable_until']));
           final editable = until != null && until.isAfter(DateTime.now());
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             children: [
-              Card(
-                color: Theme.of(context).colorScheme.errorContainer,
-                child: Padding(padding: const EdgeInsets.all(12), child: Text(d.lastError ?? t.fieldConflictHint)),
+              PkNotice(text: d.lastError ?? t.fieldConflictHint, tone: PkTone.warn, icon: Icons.call_split),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  PkIconChip(icon: fieldReportIcon(d.type), tone: PkTone.primary, size: 40),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          d.type.label,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        Text(
+                          [d.projectLabel, d.reportDate].where((e) => e.isNotEmpty).join(' · '),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(d.type.label, style: Theme.of(context).textTheme.titleMedium),
-              Text([d.projectLabel, d.reportDate].where((e) => e.isNotEmpty).join(' · ')),
-              const SizedBox(height: 12),
-              for (final row in _rows(t, d, c, names)) _Compare(label: row.$1, server: row.$2, mine: row.$3),
               const SizedBox(height: 16),
+              for (final row in _rows(t, d, c, names)) _Compare(label: row.$1, server: row.$2, mine: row.$3),
+              const SizedBox(height: 8),
               FilledButton.icon(
                 key: const Key('field-conflict-use-server'),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                 onPressed: _busy ? null : _useServer,
                 icon: const Icon(Icons.cloud_done),
                 label: Text(t.fieldUseServer),
@@ -101,6 +125,7 @@ class _FieldConflictScreenState extends ConsumerState<FieldConflictScreen> {
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 key: const Key('field-conflict-resend'),
+                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                 onPressed: _busy || !editable ? null : _resend,
                 icon: const Icon(Icons.upload),
                 label: Text(t.fieldResendMine),
@@ -108,7 +133,12 @@ class _FieldConflictScreenState extends ConsumerState<FieldConflictScreen> {
               if (!editable)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Text(t.fieldNotEditableAnymore, textAlign: TextAlign.center),
+                  child: Text(
+                    t.fieldNotEditableAnymore,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
                 ),
             ],
           );
@@ -183,37 +213,49 @@ class _Compare extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final differs = server.trim() != mine.trim();
+    final pk = context.pk;
     Widget cell(String title, String text, IconData icon) => Expanded(
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(12),
-          border: differs ? Border.all(color: theme.colorScheme.outline) : null,
+          color: differs ? pk.warnBg : theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(PkRadius.sm + 2),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(icon, size: 16),
+                Icon(icon, size: 16, color: differs ? pk.warnOn : theme.colorScheme.onSurfaceVariant),
                 const SizedBox(width: 4),
-                Text(title, style: theme.textTheme.labelSmall),
+                Flexible(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: differs ? pk.warnOn : theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 4),
-            Text(text),
+            Text(text, style: TextStyle(color: differs ? pk.warnOn : null)),
           ],
         ),
       ),
     );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+    return PkCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('$label${differs ? ' · ${t.fieldDiffers}' : ''}', style: theme.textTheme.titleSmall),
-          const SizedBox(height: 4),
+          Text(
+            '$label${differs ? ' · ${t.fieldDiffers}' : ''}',
+            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -270,7 +312,7 @@ class _ReasonDialogState extends State<_ReasonDialog> {
             }
             Navigator.pop(context, v);
           },
-          child: Text(t.next),
+          child: Text(t.confirmActionYes(actionPhrase(t.fieldResendMine))),
         ),
       ],
     );

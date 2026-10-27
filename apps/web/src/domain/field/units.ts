@@ -3,9 +3,9 @@ import type { PayloadRequest, Where } from 'payload'
 import { relId } from '@/access/roles'
 
 import { mayReadRates } from './access'
-import { companyDay, fail, loadProject } from './common'
+import { companyDay, fail, loadProject, mayBackdateTimesheet } from './common'
 import { namesOf, num, str, unitRef } from './refs'
-import { unitLabel } from './rules'
+import { timesheetMinDate, unitLabel } from './rules'
 
 /**
  * FR1 read models for the APK / web (ADR 0020 §3/§4, §7): units ("Unit & Kendaraan", never with
@@ -16,12 +16,12 @@ import { unitLabel } from './rules'
 type VehicleRow = Record<string, unknown> & { id: number }
 type ContractRow = Record<string, unknown> & { id: number; startDate: string; endDate?: string | null }
 
-async function readableProject(req: PayloadRequest, projectId: number): Promise<{ id: number; company: number; kind: string }> {
+async function readableProject(req: PayloadRequest, projectId: number): Promise<{ id: number; company: number; kind: string; pm: number | null }> {
   // the caller's project read access decides (Staff: assigned, PM: team, office: all) — else 404
   const visible = await req.payload.find({ collection: 'projects', where: { id: { equals: projectId } }, limit: 1, depth: 0, pagination: false, select: { kind: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))
   if (visible.docs.length === 0) fail(404, 'NOT_FOUND', 'Project tidak ditemukan.', 'project')
   const p = (await loadProject(req, projectId))!
-  return { id: p.id, company: p.company, kind: p.kind }
+  return { id: p.id, company: p.company, kind: p.kind, pm: p.pm }
 }
 
 async function activeContracts(req: PayloadRequest, projectId: number, onDate?: string): Promise<ContractRow[]> {
@@ -80,15 +80,20 @@ export async function listUnits(req: PayloadRequest, f: { projectId?: number; up
   }
 }
 
-/** GET /projects/{id}/contract-units: every contract unit of the project (rates only for the rate roles). */
+/**
+ * GET /projects/{id}/contract-units: every contract unit of the project (rates only for the rate roles) + the caller's
+ * earliest timesheet date on it (D2410 `timesheetMinDate`, the APK date picker).
+ */
 export async function projectContractUnits(req: PayloadRequest, projectId: number) {
   const p = await readableProject(req, projectId)
   const r = await req.payload.find({ collection: 'contract-units', where: { project: { equals: p.id } }, depth: 0, pagination: false, sort: 'startDate', overrideAccess: true /* SYSTEM-READ: project readable (checked above); rates stripped below */, req })
   const docs = r.docs as unknown as ContractRow[]
   const rates = mayReadRates(req, p.company)
   const n = await namesOf(req, docs, { users: [], clients: [] })
+  const { today } = await companyDay(req, p.company)
   return {
     projectId: p.id,
+    timesheetMinDate: timesheetMinDate(today, mayBackdateTimesheet(req, p), docs.filter((c) => c.active !== false).map((c) => c.startDate)),
     items: docs.map((c) => ({
       id: c.id,
       companyId: relId(c.company)!,

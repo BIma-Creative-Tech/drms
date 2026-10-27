@@ -151,8 +151,20 @@ export function dateWhere(d: PkDateFilter, range: { from?: string; to?: string }
   return out
 }
 
-function filterWhere(f: PkFilter, values: string[]): Where | null {
+/**
+ * D2410: field → filter value → condition, for values that are not stored as such (config.ts VIRTUAL_OPTIONS; resolved
+ * by data.ts — e.g. `pending_owner` → the ids of the requests waiting for the Owner). A value listed here replaces the
+ * plain `in` match of that value.
+ */
+export type VirtualWheres = Record<string, Record<string, Where>>
+
+function filterWhere(f: PkFilter, values: string[], virtual?: Record<string, Where>): Where | null {
   if (values.length === 0) return null
+  if (virtual && values.some((v) => Object.hasOwn(virtual, v))) {
+    const plain = values.filter((v) => !Object.hasOwn(virtual, v))
+    const parts: Where[] = [...(plain.length ? [{ [f.name]: { in: plain } } as Where] : []), ...values.filter((v) => Object.hasOwn(virtual, v)).map((v) => virtual[v]!)]
+    return parts.length === 1 ? parts[0]! : { or: parts }
+  }
   if (f.kind === 'boolean') {
     const yes = values.includes('true')
     const no = values.includes('false')
@@ -167,14 +179,18 @@ function filterWhere(f: PkFilter, values: string[]): Where | null {
  * The `where` of one list request. `selected` = the caller's PT selection (company-context); a PT filter is
  * only ever a subset of it. `readable` limits the filters to fields the caller may read (field access).
  */
-export function pkWhere(q: PkQuery, cfg: Pick<PkListConfig, 'filters' | 'dates' | 'hasCompany' | 'searchFields'>, ctx: { selected: readonly number[] | null; readable?: (field: string) => boolean; tzOffset?: string }): Where {
+export function pkWhere(
+  q: PkQuery,
+  cfg: Pick<PkListConfig, 'filters' | 'dates' | 'hasCompany' | 'searchFields'>,
+  ctx: { selected: readonly number[] | null; readable?: (field: string) => boolean; tzOffset?: string; virtual?: VirtualWheres },
+): Where {
   const and: Where[] = []
   const readable = ctx.readable ?? (() => true)
   const text = searchWhere(cfg.searchFields.filter(readable), q.q)
   if (text) and.push(text)
   for (const f of cfg.filters) {
     if (!readable(f.name)) continue
-    const w = filterWhere(f, q.filters[f.name] ?? [])
+    const w = filterWhere(f, q.filters[f.name] ?? [], ctx.virtual?.[f.name])
     if (w) and.push(w)
   }
   for (const d of cfg.dates) {

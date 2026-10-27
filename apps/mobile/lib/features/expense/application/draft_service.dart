@@ -5,6 +5,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/time/device_clock.dart';
 import '../../../core/util/async_lock.dart';
 import '../../sync/data/outbox_repository.dart';
+import '../../sync/domain/sync_models.dart' show mediaFileName;
 import '../data/draft_repository.dart';
 import '../data/expense_api.dart';
 import '../data/expense_mappers.dart';
@@ -138,6 +139,34 @@ class DraftService {
     return d.copyWith(invoiceFileId: id);
   }
 
+  /// D2410 (point 6): uploads the local general attachments (photo / PDF) to `POST /media/attachments` — once: the
+  /// blob remembers its server id.
+  Future<DraftRequest> _uploadAttachments(DraftRequest d) async {
+    if (!d.attachments.any((a) => a.isLocal)) return d;
+    final out = <DraftAttachment>[];
+    for (final a in d.attachments) {
+      if (!a.isLocal) {
+        out.add(a);
+        continue;
+      }
+      final blob = await drafts.media(a.mediaUuid!);
+      if (blob == null) {
+        throw ProblemException(
+          status: 422,
+          detail: 'Lampiran "${a.fileName}" tidak ditemukan di HP. Hapus lampiran itu lalu pilih ulang file-nya.',
+        );
+      }
+      var id = int.tryParse(blob.serverMediaId ?? '');
+      if (id == null) {
+        final name = mediaFileName(blob.clientUuid, blob.mimeType);
+        id = await api.uploadMedia('attachments', blob.bytes, filename: name, mime: blob.mimeType);
+        await drafts.markMediaUploaded(blob.clientUuid, serverMediaId: '$id');
+      }
+      out.add(a.uploaded(id));
+    }
+    return d.copyWith(attachments: out);
+  }
+
   /// "Ajukan" — online only. Creates the server draft through `/api/v1` (idempotent by clientUuid)
   /// when the offline queue has not delivered it yet, uploads the receipts, then submits.
   Future<ExpenseDetail> submit(String sub, DraftRequest original, {RapCheck rap = RapCheck.strict}) async {
@@ -155,8 +184,9 @@ class DraftService {
           detail: 'Perubahan draft masih menunggu sinkron. Tekan "Kirim sekarang" lalu coba Ajukan lagi.',
         );
       } else {
-        // ADR 0027 / 0028: the invoice / document photo goes up first (`POST /media/attachments`)
-        draft = await _uploadInvoice(draft);
+        // ADR 0027 / 0028: the invoice / document photo goes up first (`POST /media/attachments`); D2410: + the
+        // general attachments
+        draft = await _uploadAttachments(await _uploadInvoice(draft));
         detail = await api.create(
           draftToCreateBody(draft),
           idempotencyKey: draft.clientUuid,

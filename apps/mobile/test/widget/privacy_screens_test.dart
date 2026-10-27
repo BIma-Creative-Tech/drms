@@ -193,7 +193,8 @@ void main() {
       await pumpCheck(tester, _acked);
       expect(find.byKey(const Key('privacy-attendance-block')), findsNothing);
       await tester.tap(find.byKey(const Key('attendance-checkIn')));
-      await tester.pumpAndSettle();
+      await pumpFrames(tester);
+      await confirmAndAck(tester);
       expect(selfies, 1);
       expect(service.calls, 1);
     });

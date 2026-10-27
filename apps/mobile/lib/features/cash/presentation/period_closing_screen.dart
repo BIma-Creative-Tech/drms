@@ -7,9 +7,13 @@ import '../../../app/theme.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_proyek.dart';
 import '../../../shared/widgets/reason_dialog.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../home/domain/route_access.dart';
 import '../application/cash_providers.dart';
 import '../domain/cash_book.dart';
 
@@ -51,6 +55,7 @@ class _PeriodClosingScreenState extends ConsumerState<PeriodClosingScreen> {
       'close:$company:${r.period}',
       (key) => ref.read(cashApiProvider).close(r.period, company, note: note, idempotencyKey: key),
       t.closingClosed(periodLabel(r.period)),
+      t.closingTitle,
     );
   }
 
@@ -70,22 +75,26 @@ class _PeriodClosingScreenState extends ConsumerState<PeriodClosingScreen> {
       'reopen:$company:${r.period}:$reason',
       (key) => ref.read(cashApiProvider).reopen(r.period, company, reason, idempotencyKey: key),
       t.closingReopened(periodLabel(r.period)),
+      t.closingReopen,
     );
   }
 
-  Future<void> _run(String id, Future<void> Function(String key) action, String done) async {
+  Future<void> _run(String id, Future<void> Function(String key) action, String done, String label) async {
     setState(() => _busy = true);
+    String? error;
     try {
       await action(_keys.putIfAbsent(id, () => const Uuid().v4()));
       _keys.remove(id); // the same month may be closed again after a reopen
-      if (mounted) showSnack(context, done);
     } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      error = e.message;
     } finally {
       ref.invalidate(periodOverviewProvider);
       ref.invalidate(cashBookProvider);
       if (mounted) setState(() => _busy = false);
     }
+    if (!mounted) return;
+    final outcome = error == null ? ActionOutcome.success : ActionOutcome.failed;
+    await showActionResult(context, message: error ?? done, action: label, outcome: outcome);
   }
 
   @override
@@ -127,15 +136,41 @@ class _PeriodClosingScreenState extends ConsumerState<PeriodClosingScreen> {
     final p = ref.watch(currentProfileProvider);
     return ListView(
       key: const Key('closing-pt-chooser'),
+      padding: const EdgeInsets.all(16),
       children: [
-        Padding(padding: const EdgeInsets.all(16), child: Text(t.closingPickPt)),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(t.closingPickPt, style: pkMetaStyle(context)),
+        ),
         for (final e in o.locks.entries)
-          ListTile(
+          PkCard(
             key: Key('closing-pt-${e.key}'),
-            leading: const Icon(Icons.business),
-            title: Text('${p?.companyCode(e.key) ?? ''} — ${p?.company(e.key)?.name ?? ''}'),
-            subtitle: Text(t.closingLockedUntil(e.value == null ? t.closingNoLock : dayMonth(e.value))),
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
             onTap: () => setState(() => _pt = e.key),
+            child: Row(
+              children: [
+                const PkIconChip(icon: Icons.business, size: 38),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${p?.companyCode(e.key) ?? ''} — ${p?.company(e.key)?.name ?? ''}',
+                        style: pkTitleStyle(context),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        t.closingLockedUntil(e.value == null ? t.closingNoLock : dayMonth(e.value)),
+                        style: pkMetaStyle(context),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.outline),
+              ],
+            ),
           ),
       ],
     );
@@ -145,31 +180,17 @@ class _PeriodClosingScreenState extends ConsumerState<PeriodClosingScreen> {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final p = ref.watch(currentProfileProvider);
+    final canOpenHistory = canOpenApkRoute('/data/period-closings/0', p);
     final multi = o.locks.length > 1;
-    Widget kpi(String key, String label, String value, String sub) => Expanded(
-      child: Card(
-        key: Key('closing-kpi-$key'),
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: theme.textTheme.labelSmall),
-              Text(value, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-              Text(sub, style: theme.textTheme.bodySmall),
-            ],
-          ),
-        ),
-      ),
-    );
+    Widget kpi(String key, String label, String value, String sub, {required Object icon, PkTone tone = PkTone.info}) =>
+        PkMiniKpi(key: Key('closing-kpi-$key'), icon: icon, label: label, value: value, sub: sub, tone: tone);
     return ListView(
       key: const Key('closing-body'),
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         Text(
           [if (multi) p?.company(o.company!)?.name ?? '', t.closingLead].where((s) => s.isNotEmpty).join(' · '),
-          style: theme.textTheme.bodySmall,
+          style: pkMetaStyle(context),
         ),
         if (multi)
           SizedBox(
@@ -190,43 +211,44 @@ class _PeriodClosingScreenState extends ConsumerState<PeriodClosingScreen> {
               ],
             ),
           ),
-        const SizedBox(height: 8),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        const SizedBox(height: 12),
+        PkKpiRow(
           children: [
             kpi(
               'lock',
               t.closingKpiLock,
               o.lockDate == null ? t.closingNoLockShort : dayMonth(o.lockDate),
               t.closingKpiLockSub,
+              icon: Icons.lock_outline,
+              tone: PkTone.primary,
             ),
-            const SizedBox(width: 6),
             kpi(
               'last',
               t.closingKpiLast,
               o.latestClosed == null ? '—' : periodLabel(o.latestClosed!),
               t.closingKpiLastSub(o.history.length),
+              icon: Icons.event_available,
+              tone: PkTone.ok,
             ),
-            const SizedBox(width: 6),
             kpi(
               'closable',
               t.closingKpiClosable,
               '${o.closable.length}',
               o.closable.isEmpty ? t.closingKpiClosableNone : o.closable.map(periodLabel).join(', '),
+              icon: Icons.pending_actions,
+              tone: o.closable.isEmpty ? PkTone.neutral : PkTone.warn,
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        Text(t.closingPerMonth, style: theme.textTheme.titleMedium),
-        Text(
-          [
+        PkListTitle(
+          t.closingPerMonth,
+          sub: [
             t.closingPerMonthSub1,
             if (o.booksStart != null) t.closingBooksStart(dayMonth(o.booksStart)),
             t.closingPerMonthSub2,
           ].join(' '),
-          style: theme.textTheme.bodySmall,
+          padding: const EdgeInsets.only(top: 20, bottom: 10),
         ),
-        const SizedBox(height: 8),
         if (o.rows.isEmpty) Text(t.closingNoData),
         for (final r in o.rows)
           _PeriodCard(
@@ -237,38 +259,55 @@ class _PeriodClosingScreenState extends ConsumerState<PeriodClosingScreen> {
             onReopen: () => _reopen(o, r, multi: multi),
             onOpenBook: () => context.push('/cash?periode=${r.period}${multi ? '&pt=${o.company}' : ''}'),
           ),
-        const SizedBox(height: 16),
-        Text(t.closingHistory, style: theme.textTheme.titleMedium),
-        Text(t.closingHistorySub, style: theme.textTheme.bodySmall),
-        const SizedBox(height: 8),
-        if (o.history.isEmpty) Text(t.closingHistoryEmpty, key: const Key('closing-history-empty')),
+        PkListTitle(t.closingHistory, sub: t.closingHistorySub, padding: const EdgeInsets.only(top: 20, bottom: 10)),
+        if (o.history.isEmpty)
+          Text(t.closingHistoryEmpty, key: const Key('closing-history-empty'), style: pkMetaStyle(context)),
         for (final h in o.history)
-          Card(
+          PkCard(
             key: Key('closing-history-${h.id}'),
-            margin: const EdgeInsets.only(bottom: 8),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            // D2510: a history row opens its record (the web "Riwayat tutup buku" document)
+            onTap: canOpenHistory ? () => context.push('/data/period-closings/${h.id}') : null,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                PkIconChip(
+                  icon: h.closed ? Icons.lock_outline : Icons.lock_open,
+                  tone: h.closed ? PkTone.ok : PkTone.warn,
+                  size: 34,
+                  round: true,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: Text(periodLabel(h.period), style: theme.textTheme.labelLarge)),
-                      _StatePill(
-                        text: h.closed ? t.closingStateClosed : t.closingStateReopened,
-                        color: h.closed ? context.pk.okText : context.pk.warnText,
+                      Row(
+                        children: [
+                          Expanded(child: Text(periodLabel(h.period), style: pkTitleStyle(context))),
+                          PkPill(
+                            label: h.closed ? t.closingStateClosed : t.closingStateReopened,
+                            tone: h.closed ? PkTone.ok : PkTone.warn,
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 2),
+                      Text([h.closedBy ?? '—', ?h.closedAt].join(' · '), style: pkMetaStyle(context)),
+                      if (h.note != null) Text(t.closingNoteText(h.note!), style: pkMetaStyle(context)),
+                      if (!h.closed)
+                        Text(
+                          t.closingReopenedBy(h.reopenedBy ?? '—', h.reopenedAt ?? '', h.reopenReason ?? ''),
+                          style: theme.textTheme.bodySmall?.copyWith(color: context.pk.warnText),
+                        ),
                     ],
                   ),
-                  Text([h.closedBy ?? '—', ?h.closedAt].join(' · '), style: theme.textTheme.bodySmall),
-                  if (h.note != null) Text(t.closingNoteText(h.note!), style: theme.textTheme.bodySmall),
-                  if (!h.closed)
-                    Text(
-                      t.closingReopenedBy(h.reopenedBy ?? '—', h.reopenedAt ?? '', h.reopenReason ?? ''),
-                      style: theme.textTheme.bodySmall?.copyWith(color: context.pk.warnText),
-                    ),
+                ),
+                if (canOpenHistory) ...[
+                  const SizedBox(width: 4),
+                  Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.outline),
                 ],
-              ),
+              ],
             ),
           ),
       ],
@@ -297,88 +336,78 @@ class _PeriodCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     final r = row;
-    final (label, color) = switch (r.state) {
+    final (label, tone, icon) = switch (r.state) {
       PeriodState.closed =>
-        r.explicit ? (t.closingStateClosed, context.pk.okText) : (t.closingStateLocked, theme.colorScheme.outline),
-      PeriodState.current => (t.closingStateCurrent, theme.colorScheme.primary),
-      PeriodState.open => (t.closingStateOpen, context.pk.warnText),
+        r.explicit
+            ? (t.closingStateClosed, PkTone.ok, Icons.lock_outline)
+            : (t.closingStateLocked, PkTone.neutral, Icons.lock_outline),
+      PeriodState.current => (t.closingStateCurrent, PkTone.info, Icons.today),
+      PeriodState.open => (t.closingStateOpen, PkTone.warn, Icons.lock_open),
     };
-    final money = theme.textTheme.bodySmall?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
-    return Card(
+    final money = pkMetaStyle(context)?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
+    return PkCard(
       key: Key('closing-period-${r.period}'),
-      margin: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: onOpenBook,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(child: Text(periodLabel(r.period), style: theme.textTheme.titleSmall)),
-                  _StatePill(key: Key('closing-state-${r.period}'), text: label, color: color),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(t.closingCount(r.n, r.voids > 0 ? t.closingVoids(r.voids) : ''), style: theme.textTheme.bodySmall),
-              Text(
-                t.closingFigures(formatRupiah(r.tin), formatRupiah(r.tout), formatRupiah(r.tin - r.tout)),
-                style: money,
-              ),
-              if (r.nKoreksi > 0)
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      onTap: onOpenBook,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PkIconChip(icon: icon, tone: tone, size: 34, round: true),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: Text(periodLabel(r.period), style: pkTitleStyle(context))),
+                    PkPill(key: Key('closing-state-${r.period}'), label: label, tone: tone),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(t.closingCount(r.n, r.voids > 0 ? t.closingVoids(r.voids) : ''), style: pkMetaStyle(context)),
                 Text(
-                  t.closingKoreksi(formatRupiah(r.koreksi), r.nKoreksi),
-                  key: Key('closing-koreksi-${r.period}'),
+                  t.closingFigures(formatRupiah(r.tin), formatRupiah(r.tout), formatRupiah(r.tin - r.tout)),
                   style: money,
                 ),
-              if (r.canClose)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: FilledButton.icon(
-                    key: Key('closing-close-${r.period}'),
-                    onPressed: onClose,
-                    icon: const Icon(Icons.lock_outline),
-                    label: Text(t.closingTitle),
+                if (r.nKoreksi > 0)
+                  Text(
+                    t.closingKoreksi(formatRupiah(r.koreksi), r.nKoreksi),
+                    key: Key('closing-koreksi-${r.period}'),
+                    style: money,
                   ),
-                )
-              else if (r.canReopen)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: OutlinedButton.icon(
-                    key: Key('closing-reopen-${r.period}'),
-                    onPressed: onReopen,
-                    icon: const Icon(Icons.lock_open),
-                    label: Text(t.closingReopen),
+                if (r.canClose)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: FilledButton.icon(
+                      key: Key('closing-close-${r.period}'),
+                      onPressed: onClose,
+                      icon: const Icon(Icons.lock_outline),
+                      label: Text(t.closingTitle),
+                    ),
+                  )
+                else if (r.canReopen)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: OutlinedButton.icon(
+                      key: Key('closing-reopen-${r.period}'),
+                      onPressed: onReopen,
+                      icon: const Icon(Icons.lock_open),
+                      label: Text(t.closingReopen),
+                    ),
+                  )
+                else if (latestClosed && !canReopenHere)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(t.closingReopenDirektur, style: pkMetaStyle(context)),
                   ),
-                )
-              else if (latestClosed && !canReopenHere)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(t.closingReopenDirektur, style: theme.textTheme.bodySmall),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
-}
-
-class _StatePill extends StatelessWidget {
-  const _StatePill({super.key, required this.text, required this.color});
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-    decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999)),
-    child: Text(
-      text,
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w700),
-    ),
-  );
 }

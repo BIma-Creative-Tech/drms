@@ -23,13 +23,14 @@ FieldDraft service(ServiceContent c, {String date = today, int? serverId}) => Fi
   serverRev: serverId == null ? null : 2,
 );
 
-FieldDraft timesheet(TimesheetContent c, {String date = today, int? serverId}) => FieldDraft(
+FieldDraft timesheet(TimesheetContent c, {String date = today, int? serverId, int serverPhotoCount = 0}) => FieldDraft(
   clientUuid: 'ts-1',
   type: FieldReportType.unitTimesheet,
   companyId: 3,
   projectId: 41,
   reportDate: date,
   content: c,
+  serverPhotoCount: serverPhotoCount,
   serverId: serverId,
   serverRev: serverId == null ? null : 1,
 );
@@ -91,6 +92,22 @@ void main() {
       expect(allowedReportDates(today).last, '2026-09-25');
     });
 
+    test('timesheet window (user 2026-10-24): server min date of the caller, else 14 days', () {
+      // PM / Direktur: back to the earliest contract start; a reporter's server min = today − 14
+      expect(timesheetMinDate(today, '2026-08-01'), '2026-08-01');
+      expect(timesheetMinDate(today, null), '2026-09-25');
+      expect(timesheetMinDate(today, 'kemarin'), '2026-09-25');
+      expect(timesheetMinDate(today, '2026-10-20'), today, reason: 'never after today');
+      expect(reportDateError('2026-08-01', today, minDate: '2026-08-01'), isNull);
+      expect(reportDateError('2026-07-31', today, minDate: '2026-08-01'), contains('paling awal 2026-08-01'));
+      expect(reportDateError('2026-10-10', today, minDate: '2026-08-01'), contains('masa depan'));
+      final dates = allowedReportDates(today, minDate: '2026-08-01');
+      expect((dates.first, dates.last, dates.length), (today, '2026-08-01', 70));
+      final old = timesheet(okTimesheet, date: '2026-09-01');
+      expect(validateTimesheet(old, today: today)['date'], contains('14 hari'));
+      expect(validateTimesheet(old, today: today, minDate: '2026-08-01'), isEmpty);
+    });
+
     test('today in the company zone (WITA / WIB)', () {
       final utc = DateTime.utc(2026, 10, 9, 16, 30); // 00:30 WITA on the 10th, 23:30 WIB on the 9th
       expect(todayIn('Asia/Makassar', now: utc), '2026-10-10');
@@ -140,6 +157,13 @@ void main() {
       );
       expect(none.hm, 77);
       expect(previousHmEnd(unitId: 11, date: today, marks: marks).hm, isNull);
+      // weekly HM (user 2026-10-24): a later timesheet without HM is skipped, still the "Salin dari kemarin" source
+      final skip = [
+        const TimesheetMark(unitId: 12, reportDate: '2026-10-01', hmStart: 2000, hmEnd: 2009),
+        const TimesheetMark(unitId: 12, reportDate: '2026-10-05'),
+      ];
+      expect(previousHmEnd(unitId: 12, date: today, marks: skip).hm, 2009);
+      expect(copySource(unitId: 12, date: today, marks: skip)!.reportDate, '2026-10-05');
       final src = copySource(unitId: 9, date: today, marks: marks)!;
       expect((src.operatorName, src.location), ('Slamet', 'Pit 3'));
     });
@@ -337,10 +361,59 @@ void main() {
       expect(e['breakdownReason'], isNotNull);
       expect(e['photos'], contains('wajib'));
       // an own edit keeps the server's HM photo
-      expect(validateTimesheet(timesheet(bad, serverId: 5), today: today), isNot(contains('photos')));
+      expect(
+        validateTimesheet(timesheet(bad, serverId: 5, serverPhotoCount: 1), today: today),
+        isNot(contains('photos')),
+      );
     });
 
-    test('payload: HM photo placeholder → hm_photo_media_id; edit never sends the photo', () {
+    test('HM optional (user 2026-10-24): none ok, both-or-none, photo only with HM', () {
+      const none = TimesheetContent(unitId: 9, unitLabel: 'EX-01', workHours: 8);
+      expect(validateTimesheet(timesheet(none), today: today), isEmpty);
+      expect(none.hasHm, isFalse);
+      final onlyStart = validateTimesheet(
+        timesheet(const TimesheetContent(unitId: 9, hmStart: 1023, workHours: 8, hmPhoto: 'hm-1')),
+        today: today,
+      );
+      expect(onlyStart['hmEnd'], 'HM akhir wajib bila HM awal diisi.');
+      final onlyEnd = validateTimesheet(
+        timesheet(const TimesheetContent(unitId: 9, hmEnd: 1031, workHours: 8, hmPhoto: 'hm-1')),
+        today: today,
+      );
+      expect(onlyEnd['hmStart'], 'HM awal wajib bila HM akhir diisi.');
+      const noPhoto = TimesheetContent(unitId: 9, hmStart: 1023, hmEnd: 1031, workHours: 8);
+      expect(validateTimesheet(timesheet(noPhoto), today: today)['photos'], 'Foto meter HM wajib bila HM diisi.');
+      // an edit of a timesheet without photo that now gets HM needs the photo too
+      expect(validateTimesheet(timesheet(noPhoto, serverId: 5), today: today), contains('photos'));
+      // a photo without HM is accepted
+      const photoOnly = TimesheetContent(unitId: 9, workHours: 8, hmPhoto: 'hm-1');
+      expect(validateTimesheet(timesheet(photoOnly), today: today), isEmpty);
+      expect(timesheetHints(const TimesheetContent(previousHmEnd: 1023)).hmGap, isFalse);
+    });
+
+    test('a prefilled HM awal the user did not touch counts only together with HM akhir', () {
+      expect(effectiveHmStart(hmStart: 1023, hmEnd: null, touched: false), isNull);
+      expect(effectiveHmStart(hmStart: 1023, hmEnd: 1031, touched: false), 1023);
+      expect(effectiveHmStart(hmStart: 1023, hmEnd: null, touched: true), 1023);
+    });
+
+    test('payload without HM: new timesheet omits HM and photo; an edit clears HM with null and may add a photo', () {
+      const none = TimesheetContent(unitId: 9, unitLabel: 'EX-01', workHours: 8);
+      final p = fieldSyncPayload(timesheet(none));
+      expect(p.keys, isNot(contains('hm_start')));
+      expect(p.keys, isNot(contains('hm_end')));
+      expect(p['work_hours'], 8);
+      expect(resolveMediaIds(p, const {})!.keys, isNot(contains('hm_photo_media_id')));
+      final cleared = fieldSyncPayload(timesheet(none, serverId: 5, serverPhotoCount: 1));
+      expect((cleared['hm_start'], cleared['hm_end']), (null, null));
+      expect(cleared.containsKey('hm_start'), isTrue);
+      expect(cleared.keys, isNot(contains(hmPhotoPlaceholderKey)));
+      final added = fieldSyncPayload(timesheet(okTimesheet, serverId: 5));
+      expect(added[hmPhotoPlaceholderKey], 'hm-1', reason: 'a timesheet without photo may get one on an edit');
+      expect(resolveMediaIds(added, {'hm-1': 951})!['hm_photo_media_id'], 951);
+    });
+
+    test('payload: HM photo placeholder → hm_photo_media_id; an edit never replaces the stored photo', () {
       final p = fieldSyncPayload(timesheet(okTimesheet));
       expect(p['timesheet_client_uuid'], 'ts-1');
       expect(p['hm_start'], 1023);
@@ -351,7 +424,7 @@ void main() {
       final r = resolveMediaIds(p, {'hm-1': 950})!;
       expect(r['hm_photo_media_id'], 950);
       expect(resolveMediaIds(p, const {}), isNull, reason: 'photo not uploaded yet');
-      final edit = fieldSyncPayload(timesheet(okTimesheet, serverId: 5));
+      final edit = fieldSyncPayload(timesheet(okTimesheet, serverId: 5, serverPhotoCount: 1));
       expect(edit['timesheet_id'], 5);
       expect(edit.keys, isNot(contains(hmPhotoPlaceholderKey)));
       expect(edit.keys, isNot(contains('report_date')));

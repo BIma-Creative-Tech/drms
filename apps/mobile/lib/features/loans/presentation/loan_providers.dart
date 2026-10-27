@@ -6,8 +6,14 @@ import '../domain/loan.dart';
 
 final loansApiProvider = Provider((ref) => LoansApi(ref.watch(apiClientProvider)));
 
-/// Loans waiting for the caller's decision (Direktur pool).
-final loanInboxProvider = FutureProvider.autoDispose<List<Loan>>((ref) => ref.watch(loansApiProvider).inbox());
+/// Loans and repayment requests waiting for the caller's decision (Direktur level 1, Owner level 2).
+final loanInboxProvider = FutureProvider.autoDispose<LoanInbox>((ref) => ref.watch(loansApiProvider).inbox());
+
+/// User decision 2026-10-24: approved cash-backed loans / repayments waiting in the "Antrian Transfer" (PT switcher
+/// selection, like the transfer queue).
+final loanTransferOrdersProvider = FutureProvider.autoDispose<LoanTransferOrders>(
+  (ref) => ref.watch(loansApiProvider).transferOrders(),
+);
 
 /// Loans of one project (as lender and as borrower), newest first.
 final projectLoansProvider = FutureProvider.autoDispose.family<LoanPage, int>(

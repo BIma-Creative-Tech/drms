@@ -15,7 +15,7 @@ export UAT_PW_DIR=$UAT_WORK/pw UAT_OUT=$UAT_WORK/out UAT_NETWORK=$P-net UAT_PREF
 RUN="$HERE/../run.sh"
 docker run --rm --name "$P-runner" --network "$P-net" --memory 384m --cap-drop ALL --security-opt no-new-privileges:true \
   -e UAT_TARGET -e UAT_APP_URL -e UAT_KC_URL -e UAT_REALM -e UAT_PW_DIR=/uat/pw -e UAT_OUT=/uat/out \
-  -v "$HERE/..:/suite:ro" -v "$UAT_PW_DIR:/uat/pw:ro" -v "$UAT_OUT:/uat/out" -w /suite node:24.21.0-bookworm-slim node local/emulate-staging.mjs
+  -v "$HERE/..:/suite:ro" -v "$UAT_PW_DIR:/uat/pw:ro" -v "$UAT_OUT:/uat/out" -w /suite node:24.22.1-bookworm-slim node local/emulate-staging.mjs
 "$RUN" fixture-plan
 "$RUN" fixture-apply
 UAT_DEACTIVATE_PT=1 UAT_DRMS_WRITER=staff.uji@proyekkas.test "$RUN" api || true

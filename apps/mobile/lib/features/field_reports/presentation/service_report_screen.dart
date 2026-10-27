@@ -6,8 +6,10 @@ import '../../../app/theme.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/form_grid.dart';
+import '../../../shared/widgets/pk_ui.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
 import '../../sync/application/sync_coordinator.dart';
@@ -278,6 +280,9 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
       showSnack(context, t.fieldFixErrors);
       return;
     }
+    final label = _isEdit ? t.fieldSaveEdit : t.fieldServiceSubmit;
+    final ok = await confirmFieldSubmit(context, label, project: _projectLabel, date: _date, unit: _unitLabel);
+    if (!ok || !mounted) return;
     final online = ref.read(connectivityProvider);
     setState(() => _busy = true);
     _autosave?.cancel();
@@ -285,10 +290,10 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
       await ref.read(fieldServiceProvider).submit(sub, d, online: online);
       ref.read(syncCoordinatorProvider.notifier).requestSync(delay: Duration.zero);
       if (!mounted) return;
-      showSnack(context, online ? t.fieldQueuedOnline : t.fieldQueuedOffline);
-      Navigator.of(context).maybePop();
+      await showFieldSubmitted(context, label, online: online);
+      if (mounted) Navigator.of(context).maybePop();
     } on Object catch (e) {
-      if (mounted) showSnack(context, errorText(e));
+      if (mounted) await showActionError(context, e, action: label);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -303,8 +308,8 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
     _autosave?.cancel();
     await ref.read(fieldServiceProvider).discard(sub, _uuid);
     if (!mounted) return;
-    showSnack(context, t.fieldDiscarded);
-    Navigator.of(context).maybePop();
+    await showActionResult(context, message: t.fieldDiscarded, action: t.fieldDiscardAction);
+    if (mounted) Navigator.of(context).maybePop();
   }
 
   @override
@@ -374,34 +379,40 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
             ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                summary,
-                key: const Key('service-summary'),
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: 8),
-              FilledButton(
-                key: const Key('service-submit'),
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                onPressed: _busy ? null : _submit,
-                child: _busy
-                    ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text(_isEdit ? t.fieldSaveEdit : t.fieldServiceSubmit),
-              ),
-            ],
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          color: context.pk.card,
+          border: Border(top: BorderSide(color: context.pk.border)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  summary,
+                  key: const Key('service-summary'),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  key: const Key('service-submit'),
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                  onPressed: _busy ? null : _submit,
+                  child: _busy
+                      ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text(_isEdit ? t.fieldSaveEdit : t.fieldServiceSubmit),
+                ),
+              ],
+            ),
           ),
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           if (_base?.lastError != null) FieldNote(text: _base!.lastError!, error: true),
           if (_isEdit && _base?.editableUntil != null)
@@ -602,9 +613,10 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
                 selected: _status,
                 label: (v) => v.label,
                 code: (v) => v.code,
+                // filled status colours carry white text in both themes
                 selectedColor: (v) => v == UnitStatus.menungguPart
-                    ? const Color(0xFFB45309)
-                    : (v == UnitStatus.rusak ? context.pk.badText : theme.colorScheme.primary),
+                    ? context.pk.warn
+                    : (v == UnitStatus.rusak ? context.pk.bad : theme.colorScheme.primary),
                 onSelected: _busy ? null : (v) => _set(() => _status = v, 'unitStatusAfter'),
               ),
               if (_errors['unitStatusAfter'] != null) FieldNote(text: _errors['unitStatusAfter']!, error: true),
@@ -719,18 +731,13 @@ class _UnitButton extends StatelessWidget {
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             alignment: Alignment.centerLeft,
-            side: BorderSide(color: errorText == null ? theme.colorScheme.outline : theme.colorScheme.error),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            side: BorderSide(color: errorText == null ? context.pk.border : theme.colorScheme.error),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(PkRadius.md)),
           ),
           onPressed: onTap,
           child: Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(10)),
-                child: const Icon(Icons.agriculture, color: Color(0xFF92400E)),
-              ),
+              const PkIconChip(icon: Icons.agriculture, tone: PkTone.warn, size: 44),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -759,22 +766,13 @@ class _UnitButton extends StatelessWidget {
 }
 
 /// "Hapus draft?" confirmation (drafts the server never received).
-Future<bool> confirmDiscard(BuildContext context) async {
+/// D2410: the shared "Yakin ingin hapus draft?" popup (danger button).
+Future<bool> confirmDiscard(BuildContext context) {
   final t = AppLocalizations.of(context);
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(t.fieldDiscardTitle),
-      content: Text(t.fieldDiscardBody),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-        FilledButton(
-          key: const Key('field-discard-ok'),
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(t.delete),
-        ),
-      ],
-    ),
+  return confirmAction(
+    context,
+    action: t.fieldDiscardAction,
+    note: t.fieldDiscardBody,
+    confirmKey: const Key('field-discard-ok'),
   );
-  return ok == true;
 }

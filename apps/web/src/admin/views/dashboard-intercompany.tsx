@@ -13,7 +13,7 @@ export function IntercompanyCard({ data: d, codeOf, i, span = 12 }: { data: Inte
   const pos = new Map(d.positions.map((p) => [p.companyId, p]))
   const rows = d.funds.map((f) => ({ ...f, pos: pos.get(f.companyId) ?? null }))
   return (
-    <Card id="intercompany-funds" title="Dana tersedia & pinjaman antar-PT" sub="Dana tersedia = saldo akun tanpa site − komitmen (pengajuan disetujui belum ditransfer, kekurangan LPJ, perintah pinjaman)" span={span} i={i} action={{ href: '/admin/pinjaman-antar-pt', label: 'Pinjaman antar-PT' }}>
+    <Card id="intercompany-funds" icon="tBuilding4" title="Dana tersedia & pinjaman antar-PT" sub="Dana tersedia = saldo akun kas/bank − komitmen (pengajuan disetujui belum ditransfer, kekurangan LPJ, perintah pinjaman)" span={span} i={i} action={{ href: '/admin/pinjaman-antar-pt', label: 'Pinjaman antar-PT' }}>
       <DataTable
         id="intercompany-funds"
         caption="Dana tersedia dan pinjaman antar-PT per PT"

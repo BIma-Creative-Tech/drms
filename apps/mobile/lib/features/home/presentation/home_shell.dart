@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/icons/iconsax.dart';
 import '../../../shared/widgets/offline_banner.dart';
+import '../../approvals/application/inbox_providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/user_profile.dart';
+import '../../finance/application/finance_providers.dart';
 
 /// Branch indices of the StatefulShellRoute (see app/router.dart).
 abstract final class Tabs {
@@ -41,6 +43,9 @@ class HomeShell extends ConsumerWidget {
     final t = AppLocalizations.of(context);
     final kind = ref.watch(currentProfileProvider)?.navKind ?? NavKind.operator;
     final tabs = tabsFor(kind);
+    // D2510: waiting counts on the Persetujuan / Antrian Transfer tabs (Banani BottomNav badge).
+    final inboxCount = tabs.contains(Tabs.inbox) ? ref.watch(inboxProvider).value?.items.length ?? 0 : 0;
+    final transferCount = tabs.contains(Tabs.transfer) ? ref.watch(transferQueueProvider).value?.length ?? 0 : 0;
     NavigationDestination dest(int tab) {
       final (PkIconData icon, PkIconData selected, String label) = switch (tab) {
         Tabs.home => (PkIcons.homeLinear, PkIcons.home, t.navHome),
@@ -52,10 +57,18 @@ class HomeShell extends ConsumerWidget {
         Tabs.projects => (PkIcons.project, PkIcons.project, t.navProjects),
         _ => (PkIcons.profileLinear, PkIcons.profile, t.navProfile),
       };
+      final count = switch (tab) {
+        Tabs.inbox => inboxCount,
+        Tabs.transfer => transferCount,
+        _ => 0,
+      };
+      Widget glyph(PkIconData d) => count > 0
+          ? Badge(key: Key('nav-badge-$tab'), label: Text(count > 99 ? '99+' : '$count'), child: PkIcon(d))
+          : PkIcon(d);
       return NavigationDestination(
         key: Key('nav-tab-$tab'),
-        icon: PkIcon(icon),
-        selectedIcon: PkIcon(selected),
+        icon: glyph(icon),
+        selectedIcon: glyph(selected),
         label: label,
       );
     }
@@ -90,10 +103,14 @@ class HomeShell extends ConsumerWidget {
 
   static NavigationBarThemeData _compact(NavigationBarThemeData base, int count) {
     if (count < 5) return base;
+    // Six tabs (Direktur / PM): 10 sp with tight tracking keeps "Persetujuan" on one line at 360 dp.
+    final six = count >= 6;
     return base.copyWith(
       height: 76,
       labelTextStyle: WidgetStateProperty.resolveWith(
-        (s) => base.labelTextStyle?.resolve(s)?.copyWith(fontSize: 11, height: 1.15),
+        (s) => base.labelTextStyle
+            ?.resolve(s)
+            ?.copyWith(fontSize: six ? 10 : 11, height: 1.15, letterSpacing: six ? -0.2 : null),
       ),
     );
   }

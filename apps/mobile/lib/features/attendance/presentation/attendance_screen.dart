@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
@@ -11,10 +12,12 @@ import '../../../core/location/location_service.dart';
 import '../../../core/logging/log.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/action_feedback.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_lapangan.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
-import '../../expense/data/expense_mappers.dart' show outsideAreaHintKey;
 import '../../sync/application/sync_coordinator.dart';
 import '../../sync/domain/sync_models.dart';
 import '../../companies/presentation/company_chip.dart';
@@ -24,18 +27,19 @@ import '../../privacy/presentation/privacy_notice_screen.dart';
 import '../application/attendance_service.dart';
 import '../domain/attendance.dart';
 import 'attendance_widgets.dart';
-import 'recap_view.dart';
+import 'team_recap_view.dart';
 import 'team_view.dart';
 
 /// Tabs of the attendance hub (by role).
 enum AttendanceTab { check, recap, team }
 
-/// E6 attendance hub. "Absen": own check-in/out at a site (ADR 0023), a project OR a cost center (US-01/02, Q-40) with
+/// E6 attendance hub. "Absen": own check-in/out at a project OR a cost center (US-01/02, Q-40; ADR 0032: no site) with
 /// geofence distance feedback. DRMS 13/10 A2: the locations are the user's eligible ones by attendance type (OnSite /
 /// Non-OnSite, cached for offline use); on open the GPS fix selects the location whose geofence contains it (nearest
 /// when several overlap → the user picks among them; none → manual picker as fallback) — works offline; GPS +
 /// front-camera selfie are captured on the phone and
-/// queued; the server decides. "Rekap": own month (US-09). "Tim": team today (US-13) with on-behalf
+/// queued; the server decides. "Rekap": own month (US-09); DRMS 26/10 #3: team month for the office roles / PM
+/// ([RecapHub]). "Tim": team today (US-13) with on-behalf
 /// (US-14) and corrections (US-15). Check-in / on-behalf follow `features.syncAttendance`; the recap and
 /// team views are online reads and work with the flag off.
 class AttendanceScreen extends ConsumerWidget {
@@ -59,7 +63,7 @@ class AttendanceScreen extends ConsumerWidget {
     };
     Widget body(AttendanceTab tab) => switch (tab) {
       AttendanceTab.check => const _CheckTab(),
-      AttendanceTab.recap => const RecapView(),
+      AttendanceTab.recap => const RecapHub(),
       AttendanceTab.team => const TeamTodayView(),
     };
     return DefaultTabController(
@@ -122,7 +126,6 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
       final d = detectArea(list, fix);
       final pick = d.inside.firstOrNull;
       final nearest = d.nearest;
-      final outside = list.where((s) => s.outsideArea).firstOrNull;
       setState(() {
         _area = d;
         if (pick != null) {
@@ -132,11 +135,12 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
               ? t.attendanceDetectedOverlap(d.inside.length)
               : t.attendanceDetected(pick.site.label, pick.distanceM);
           _noticeIsError = false;
-        } else if (outside != null) {
-          // DRMS 13/10 A2: Non-OnSite has no location restriction → "Di luar area" (reference site)
-          _siteKey = outside.key;
-          _distance = null;
-          _notice = t.attendanceDetectOutsideArea(outside.label);
+        } else if (nearest != null && nearest.site.unrestricted) {
+          // DRMS 26/10: Non-OnSite outside every registered location may still check in / out — recorded "Di luar
+          // area" at the nearest registered location (the server closes an open check-in of the day there)
+          _siteKey = nearest.site.key;
+          _distance = (site: nearest.site, distanceM: nearest.distanceM, accuracyM: fix.accuracyM);
+          _notice = t.attendanceDetectOutsideArea(nearest.site.label);
           _noticeIsError = false;
         } else if (nearest != null) {
           _distance = (site: nearest.site, distanceM: nearest.distanceM, accuracyM: fix.accuracyM);
@@ -189,10 +193,15 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
     }
   }
 
-  /// DRMS 13/10 A2 (Non-OnSite, no location restriction): the selected location when the fix is inside it, else the
-  /// registered location of the same PT containing the fix (nearest), else its "Di luar area" entry. A mocked fix is
-  /// still refused; the server re-checks and decides where the record belongs.
-  Future<({LocationFix fix, ProjectSite site})?> _locateUnrestricted(ProjectSite site, List<ProjectSite> list) async {
+  /// Non-OnSite (ADR 0032 amendment 2026-10-26, DRMS 26/10): the selected location when the fix is inside it, else the
+  /// registered location of the same PT containing the fix (nearest); outside all → NOT blocked: the nearest registered
+  /// location of the PT, `outside` = recorded "Di luar area" (the note is shown before the confirmation popup). No
+  /// located location at all → refused. A mocked fix is refused; the server re-checks and decides where the record
+  /// belongs.
+  Future<({LocationFix fix, ProjectSite site, bool outside})?> _locateUnrestricted(
+    ProjectSite site,
+    List<ProjectSite> list,
+  ) async {
     final t = AppLocalizations.of(context);
     setState(() {
       _notice = t.attendanceLocating;
@@ -214,25 +223,21 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
       ];
       final d = detectArea(same, fix);
       final hit = d.inside.where((m) => m.site.key == site.key).firstOrNull ?? d.inside.firstOrNull;
-      final outside = same.where((s) => s.outsideArea).firstOrNull;
+      final at = hit ?? d.nearest;
       setState(() {
-        if (hit != null) {
-          _siteKey = hit.site.key;
-          _distance = (site: hit.site, distanceM: hit.distanceM, accuracyM: fix.accuracyM);
-          _notice = t.attendanceInside(hit.distanceM, hit.site.radiusM?.round() ?? 0);
-          _noticeIsError = false;
-        } else if (outside != null) {
-          _siteKey = outside.key;
-          _distance = null;
-          _notice = t.attendanceDetectOutsideArea(outside.label);
+        if (at != null) {
+          _siteKey = at.site.key;
+          _distance = (site: at.site, distanceM: at.distanceM, accuracyM: fix.accuracyM);
+          _notice = hit != null
+              ? t.attendanceInside(hit.distanceM, hit.site.radiusM?.round() ?? 0)
+              : t.attendanceDetectOutsideArea(at.site.label);
           _noticeIsError = false;
         } else {
-          _notice = t.attendanceNoReference;
+          _notice = t.attendanceDetectNoPoint;
           _noticeIsError = true;
         }
       });
-      final target = hit?.site ?? outside;
-      return target == null ? null : (fix: fix, site: target);
+      return at == null ? null : (fix: fix, site: at.site, outside: hit == null);
     } on LocationException catch (e) {
       setState(() {
         _notice = e.message;
@@ -262,14 +267,18 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
     }
     setState(() => _busy = true);
     try {
-      final ({LocationFix fix, ProjectSite site})? at;
+      final ({LocationFix fix, ProjectSite site, bool outside})? at;
       if (site.unrestricted) {
         at = await _locateUnrestricted(site, list);
       } else {
         final fix = await _locate(site);
-        at = fix == null ? null : (fix: fix, site: site);
+        at = fix == null ? null : (fix: fix, site: site, outside: false);
       }
       if (at == null || !mounted) return;
+      final label = kind == AttendanceKind.checkIn ? t.attendanceCheckIn : t.attendanceCheckOut;
+      // DRMS 26/10: Non-OnSite outside every registered location → the "Di luar area" note in the confirmation popup
+      final note = at.outside ? t.attendanceNonOnsiteOutside : null;
+      if (!await confirmAction(context, action: label, summary: [at.site.label], note: note) || !mounted) return;
       final raw = await ref.read(selfieCaptureProvider)(context, t.attendanceSelfieTitle);
       if (raw == null || !mounted) return;
       final online = ref.read(connectivityProvider);
@@ -277,13 +286,18 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
           .read(attendanceServiceProvider)
           .record(sub: sub, kind: kind, site: at.site, fix: at.fix, rawSelfie: raw, online: online);
       ref.read(syncCoordinatorProvider.notifier).requestSync(delay: Duration.zero);
-      if (mounted) showSnack(context, online ? t.attendanceSavedOnline : t.attendanceSavedOffline);
+      if (!mounted) return;
+      if (online) {
+        await showActionResult(context, message: t.attendanceSavedOnline, action: label);
+      } else {
+        await showActionQueued(context, action: label, message: t.attendanceSavedOffline);
+      }
     } on PrivacyNoticeRequiredException {
-      if (mounted) showSnack(context, t.privacyAttendanceBlocked);
+      if (mounted) await showActionFailure(context, t.privacyAttendanceBlocked);
     } on PhotoTooLargeException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionFailure(context, e.message);
     } on QueueFullException catch (e) {
-      if (mounted) showSnack(context, e.message);
+      if (mounted) await showActionFailure(context, e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -306,7 +320,7 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
         // DRMS 13/10 A2: attendance type of the PT of the selected location (eligible list only)
         final type = site?.attendanceType;
         // DRMS 13/10 A2: recognise the area once on open (not while blocked: no GPS before the privacy ack)
-        final detectable = list.any((s) => s.hasGeofence || s.outsideArea);
+        final detectable = list.any((s) => s.hasGeofence);
         if (!_autoDetected && enabled && !privacyBlocked && detectable) {
           _autoDetected = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -314,128 +328,307 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
           });
         }
         final area = _area;
-        // DRMS 13/10 A2: Non-OnSite records anywhere (no geofence needed)
+        // Non-OnSite is not bound to the chosen location (the containing one, else "Di luar area" — DRMS 26/10)
         final ready = enabled && !privacyBlocked && !_busy && site != null && (site.hasGeofence || site.unrestricted);
         final d = _distance;
         final dist = d != null && site != null && d.site.key == site.key ? d : null;
+        final sitesByKey = {for (final s in list) s.key: siteDisplayLabel(t, s)};
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
             if (privacyBlocked) const PrivacyAttendanceBlock(from: 'attendance'),
             if (!enabled) InfoCard(text: t.attendanceDisabled, error: true),
             if (list.isEmpty)
               InfoCard(text: t.attendanceNoProjects, error: true)
             else ...[
-              if (area != null && area.overlap) ...[
-                Text(t.attendanceAreaChoice, style: Theme.of(context).textTheme.labelLarge),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: [
-                    for (final m in area.inside)
-                      ChoiceChip(
-                        key: Key('attendance-area-${m.site.key}'),
-                        avatar: Icon(siteKindIcon(m.site.kind), size: 18),
-                        label: Text('${m.site.label} · ${m.distanceM} m'),
-                        selected: site?.key == m.site.key,
-                        onSelected: _busy
-                            ? null
-                            : (_) => setState(() {
-                                _siteKey = m.site.key;
-                                _distance = null;
-                              }),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-              ],
-              DropdownButtonFormField<String>(
-                hint: Text(t.pickLocation),
-                // keyed by the selection: the auto-detected area (DRMS 13/10 A2) re-initialises the field
-                key: ValueKey('attendance-project:${site?.key}'),
-                initialValue: site?.key,
-                isExpanded: true,
-                decoration: InputDecoration(labelText: t.attendanceLocation, prefixIcon: const Icon(Icons.place)),
-                items: [
-                  for (final s in list)
-                    DropdownMenuItem(
-                      value: s.key,
-                      child: Row(
-                        children: [
-                          Icon(s.outsideArea ? Icons.explore : siteKindIcon(s.kind), size: 18),
-                          const SizedBox(width: 8),
-                          if ((profile?.showCompanyChips ?? false) && s.companyId != null) ...[
-                            CompanyChip(companyId: s.companyId),
-                            const SizedBox(width: 6),
-                          ],
-                          Expanded(child: Text(siteDisplayLabel(t, s), overflow: TextOverflow.ellipsis)),
-                          if (s.home) ...[const SizedBox(width: 6), const HomeSiteBadge()],
-                          if (!s.home && s.isHeadOffice) ...[const SizedBox(width: 6), const HeadOfficeBadge()],
-                        ],
-                      ),
-                    ),
-                ],
-                onChanged: _busy
-                    ? null
-                    : (v) => setState(() {
-                        _siteKey = v;
-                        _notice = null;
-                      }),
-              ),
-              if (site != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4, left: 12),
-                  child: Text(siteSubLabel(t, site), style: Theme.of(context).textTheme.bodySmall),
-                ),
-              if (type != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2, left: 12),
-                  child: Text(
-                    type == AttendanceType.nonOnsite ? t.attendanceTypeNonOnsite : t.attendanceTypeOnsite,
-                    key: const Key('attendance-type-hint'),
-                    style: Theme.of(context).textTheme.bodySmall,
+              _TodayCard(site: site, sites: sitesByKey),
+              const SizedBox(height: 12),
+              if (area != null && area.overlap)
+                PkSectionCard(
+                  title: t.attendanceAreaChoice,
+                  icon: Icons.layers_outlined,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      for (final m in area.inside)
+                        ChoiceChip(
+                          key: Key('attendance-area-${m.site.key}'),
+                          avatar: Icon(siteKindIcon(m.site.kind), size: 18),
+                          label: Text('${m.site.label} · ${m.distanceM} m'),
+                          selected: site?.key == m.site.key,
+                          onSelected: _busy
+                              ? null
+                              : (_) => setState(() {
+                                  _siteKey = m.site.key;
+                                  _distance = null;
+                                }),
+                        ),
+                    ],
                   ),
                 ),
-              if (site != null && !site.hasGeofence && !site.unrestricted)
-                InfoCard(text: t.attendanceNoGeofence, error: true),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                key: const Key('attendance-detect'),
-                onPressed: !_busy && enabled && !privacyBlocked && detectable ? () => _detect(list) : null,
-                icon: const Icon(Icons.travel_explore),
-                label: Text(t.attendanceDetect),
+              PkCard(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      hint: Text(t.pickLocation),
+                      // keyed by the selection: the auto-detected area (DRMS 13/10 A2) re-initialises the field
+                      key: ValueKey('attendance-project:${site?.key}'),
+                      initialValue: site?.key,
+                      isExpanded: true,
+                      decoration: InputDecoration(labelText: t.attendanceLocation, prefixIcon: const Icon(Icons.place)),
+                      items: [
+                        for (final s in list)
+                          DropdownMenuItem(
+                            value: s.key,
+                            child: Row(
+                              children: [
+                                Icon(siteKindIcon(s.kind), size: 18),
+                                const SizedBox(width: 8),
+                                if ((profile?.showCompanyChips ?? false) && s.companyId != null) ...[
+                                  CompanyChip(companyId: s.companyId),
+                                  const SizedBox(width: 6),
+                                ],
+                                Expanded(child: Text(siteDisplayLabel(t, s), overflow: TextOverflow.ellipsis)),
+                              ],
+                            ),
+                          ),
+                      ],
+                      onChanged: _busy
+                          ? null
+                          : (v) => setState(() {
+                              _siteKey = v;
+                              _notice = null;
+                            }),
+                    ),
+                    if (site != null) PkMetaLine(icon: Icons.radar, text: siteSubLabel(t, site)),
+                    if (type != null)
+                      PkMetaLine(
+                        icon: Icons.badge_outlined,
+                        textKey: const Key('attendance-type-hint'),
+                        text: type == AttendanceType.nonOnsite ? t.attendanceTypeNonOnsite : t.attendanceTypeOnsite,
+                      ),
+                    if (site != null && !site.hasGeofence && !site.unrestricted)
+                      InfoCard(text: t.attendanceNoGeofence, error: true),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      key: const Key('attendance-detect'),
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                      onPressed: !_busy && enabled && !privacyBlocked && detectable ? () => _detect(list) : null,
+                      icon: const Icon(Icons.travel_explore),
+                      label: Text(t.attendanceDetect),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      key: const Key('attendance-check-distance'),
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                      onPressed: !_busy && !privacyBlocked && site != null && site.hasGeofence
+                          ? () => _checkDistance(site)
+                          : null,
+                      icon: const Icon(Icons.my_location),
+                      label: Text(t.attendanceCheckDistance),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
               if (dist != null) DistanceCard(site: dist.site, distanceM: dist.distanceM, accuracyM: dist.accuracyM),
-              OutlinedButton.icon(
-                key: const Key('attendance-check-distance'),
-                onPressed: !_busy && !privacyBlocked && site != null && site.hasGeofence
-                    ? () => _checkDistance(site)
-                    : null,
-                icon: const Icon(Icons.my_location),
-                label: Text(t.attendanceCheckDistance),
-              ),
-              const SizedBox(height: 12),
+              // Field-friendly: two full-width 60 dp buttons (gloves, sunlight); check-in solid, check-out tonal.
               for (final kind in AttendanceKind.values)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: FilledButton.icon(
-                    key: Key('attendance-${kind.name}'),
-                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
-                    onPressed: ready ? () => _record(kind, site, list) : null,
-                    icon: Icon(kind == AttendanceKind.checkIn ? Icons.login : Icons.logout),
-                    label: Text(kind == AttendanceKind.checkIn ? t.attendanceCheckIn : t.attendanceCheckOut),
-                  ),
+                  child: kind == AttendanceKind.checkIn
+                      ? FilledButton.icon(
+                          key: Key('attendance-${kind.name}'),
+                          style: _bigButton,
+                          onPressed: ready ? () => _record(kind, site, list) : null,
+                          icon: const Icon(Icons.login, size: 24),
+                          label: Text(t.attendanceCheckIn),
+                        )
+                      : FilledButton.tonalIcon(
+                          key: Key('attendance-${kind.name}'),
+                          style: _bigButton,
+                          onPressed: ready ? () => _record(kind, site, list) : null,
+                          icon: const Icon(Icons.logout, size: 24),
+                          label: Text(t.attendanceCheckOut),
+                        ),
                 ),
             ],
             if (_notice != null) InfoCard(key: const Key('attendance-notice'), text: _notice!, error: _noticeIsError),
-            const Divider(height: 32),
-            Text(t.attendanceHistory, style: Theme.of(context).textTheme.titleMedium),
-            _History(sites: {for (final s in list) s.key: siteDisplayLabel(t, s)}),
+            PkSectionHeader(title: t.attendanceHistory),
+            _History(sites: sitesByKey),
           ],
         );
       },
+    );
+  }
+
+  static final _bigButton = FilledButton.styleFrom(
+    minimumSize: const Size.fromHeight(60),
+    textStyle: const TextStyle(fontFamily: PkFonts.body, fontSize: 17, fontWeight: FontWeight.w700),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(PkRadius.md)),
+  );
+}
+
+/// Own check-in / check-out of this phone (not on-behalf), not refused.
+bool _ownMark(OutboxData r) =>
+    AttendanceKind.fromItemType(r.type) != null && r.status != 'rejected' && r.status != 'failed';
+
+/// Wall-clock of [iso] in the company [zone] (null = unparsable).
+DateTime? _inZone(String iso, String? zone) => DateTime.tryParse(iso)?.toUtc().add(offsetForZone(zone));
+
+/// D2510 hero: today's status from this phone's own marks as a soft-tone card — "Belum absen" (orange) /
+/// "Hadir" (blue) / "Selesai" (green), check-in and check-out times and the location. Offline-safe (outbox rows);
+/// the server's day status stays in "Rekap".
+class _TodayCard extends ConsumerWidget {
+  const _TodayCard({required this.site, required this.sites});
+  final ProjectSite? site;
+  final Map<String, String> sites;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final zone = ref.watch(currentProfileProvider)?.timezone;
+    final items = ref.watch(attendanceItemsProvider).value ?? const <OutboxData>[];
+    final today = DateTime.now().toUtc().add(offsetForZone(zone));
+    bool isToday(OutboxData r) {
+      final d = _inZone(r.deviceTime, zone);
+      return d != null && d.year == today.year && d.month == today.month && d.day == today.day;
+    }
+
+    final marks = [
+      for (final r in items)
+        if (_ownMark(r) && isToday(r)) r,
+    ]..sort((a, b) => a.deviceTime.compareTo(b.deviceTime));
+    OutboxData? first(AttendanceKind k) => marks.where((r) => r.type == k.itemType).firstOrNull;
+    OutboxData? last(AttendanceKind k) => marks.where((r) => r.type == k.itemType).lastOrNull;
+    final checkIn = first(AttendanceKind.checkIn);
+    final checkOut = last(AttendanceKind.checkOut);
+    final latest = marks.lastOrNull;
+    final (tone, icon, status) = checkOut != null
+        ? (PkTone.ok, Icons.check_circle, t.recapStatusDone)
+        : checkIn != null
+        ? (PkTone.info, Icons.login, t.recapStatusPresent)
+        : (PkTone.warn, Icons.schedule, t.recapStatusNotYet);
+    final c = pkToneColors(context, tone);
+    String hm(OutboxData? r) {
+      final d = r == null ? null : _inZone(r.deviceTime, zone);
+      return d == null ? '—' : '${d.hour.toString().padLeft(2, '0')}.${d.minute.toString().padLeft(2, '0')}';
+    }
+
+    final where = latest != null
+        ? (sites[_History._siteOf(latest)] ?? '-')
+        : (site == null ? null : siteLabel(t, site!));
+    // queued on the phone / being sent: a cloud glyph beside the status (the history below has the text)
+    final pendingIcon = latest == null || latest.status == 'applied'
+        ? null
+        : (latest.offline ? Icons.cloud_off : Icons.cloud_upload_outlined);
+    return PkToneHeroCard(
+      key: const Key('attendance-today'),
+      tone: tone,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(color: context.pk.card, shape: BoxShape.circle),
+                child: Icon(icon, size: 28, color: c.fg),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      DateFormat('EEEE, d MMMM yyyy', 'id').format(today),
+                      style: theme.textTheme.labelLarge?.copyWith(color: c.fg, fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      status,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        color: c.fg,
+                        fontFamily: PkFonts.heading,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (pendingIcon != null) Icon(pendingIcon, size: 20, color: c.fg, semanticLabel: t.queueStatusPending),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _TimeTile(label: t.teamIn, value: hm(checkIn), color: c.fg),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _TimeTile(label: t.teamOut, value: hm(checkOut), color: c.fg),
+              ),
+            ],
+          ),
+          if (where != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.place_outlined, size: 18, color: c.fg),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    where,
+                    style: theme.textTheme.bodyMedium?.copyWith(color: c.fg, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TimeTile extends StatelessWidget {
+  const _TimeTile({required this.label, required this.value, required this.color});
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: context.pk.card.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(PkRadius.md),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: theme.textTheme.labelMedium?.copyWith(color: color)),
+            Text(
+              value,
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: color,
+                fontFamily: PkFonts.heading,
+                fontWeight: FontWeight.w700,
+                height: 1.2,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -447,39 +640,60 @@ class _History extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final items = ref.watch(attendanceItemsProvider).value ?? const <OutboxData>[];
-    if (items.isEmpty) return Padding(padding: const EdgeInsets.all(8), child: Text(t.attendanceHistoryEmpty));
+    if (items.isEmpty) {
+      return PkEmptyState(icon: Icons.history, message: t.attendanceHistoryEmpty);
+    }
     final zone = ref.watch(currentProfileProvider)?.timezone;
-    String status(OutboxData r) => switch (r.status) {
-      'pending' => t.queueStatusPending,
-      'applied' => t.queueStatusApplied,
-      'rejected' => t.queueStatusRejected,
-      'failed' => t.queueStatusFailed,
-      _ => r.status,
+    (String, PkTone, IconData) status(OutboxData r) => switch (r.status) {
+      'pending' => (t.queueStatusPending, PkTone.info, Icons.schedule),
+      'applied' => (t.queueStatusApplied, PkTone.ok, Icons.cloud_done),
+      'rejected' => (t.queueStatusRejected, PkTone.bad, Icons.error),
+      'failed' => (t.queueStatusFailed, PkTone.bad, Icons.error),
+      _ => (r.status, PkTone.neutral, Icons.schedule),
     };
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
     return Column(
       children: [
         for (final r in items)
-          ListTile(
-            key: Key('attendance-item-${r.opUuid}'),
-            leading: Icon(
-              r.status == 'applied'
-                  ? Icons.cloud_done
-                  : (r.status == 'rejected' || r.status == 'failed' ? Icons.error : Icons.schedule),
-              color: r.status == 'applied'
-                  ? context.pk.okText
-                  : (r.status == 'rejected' || r.status == 'failed' ? context.pk.badText : null),
-            ),
-            title: Text(
-              '${_label(r)} · '
-              '${sites[_siteOf(r)] ?? '-'}${r.offline ? ' · ${t.attendanceOfflineTag}' : ''}',
-            ),
-            subtitle: Text(
-              [
-                '${formatServerDateTime(r.deviceTime, zone: zone)} · ${status(r)}',
-                if (r.lastErrorMessage != null && r.status != 'applied') r.lastErrorMessage!,
-              ].join('\n'),
-            ),
+          Builder(
+            builder: (context) {
+              final (label, tone, icon) = status(r);
+              final error = r.lastErrorMessage != null && r.status != 'applied' ? r.lastErrorMessage : null;
+              return PkCard(
+                key: Key('attendance-item-${r.opUuid}'),
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    PkIconChip(icon: icon, tone: tone, size: 40),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${_label(r)} · '
+                            '${sites[_siteOf(r)] ?? '-'}${r.offline ? ' · ${t.attendanceOfflineTag}' : ''}',
+                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(formatServerDateTime(r.deviceTime, zone: zone), style: muted),
+                          if (error != null) ...[
+                            const SizedBox(height: 4),
+                            Text(error, style: theme.textTheme.bodySmall?.copyWith(color: context.pk.badText)),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    PkPill(label: label, tone: tone),
+                  ],
+                ),
+              );
+            },
           ),
       ],
     );
@@ -498,9 +712,7 @@ class _History extends ConsumerWidget {
 
   static String? _siteOf(OutboxData r) {
     final p = _payload(r);
-    // DRMS 13/10 A2: a "Di luar area" item (local-only hint) → its outside entry
-    if (p[outsideAreaHintKey] == true && r.siteId != null) return 'o${r.siteId}';
-    // ADR 0023 (schema v9): a site item carries its site in the outbox column
+    // ADR 0023 (schema v9): a (legacy) site item carries its site in the outbox column
     if (r.siteId != null) return '${SiteKind.site.prefix}${r.siteId}';
     final project = (p['project_id'] as num?)?.toInt();
     if (project != null) return 'p$project';

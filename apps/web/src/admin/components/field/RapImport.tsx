@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation'
 import React, { useId, useState } from 'react'
 
 import { problemText } from '../ActionButton'
+import { askField, fieldResult } from './client'
 
 /**
  * P3 RAP Excel import (two steps): POST …/rap/import/preview (multipart "file") shows new / changed /
@@ -62,15 +63,20 @@ export function RapImport({ projectId, needsReason, stageRequired = true }: { pr
     if (needsReason && reason.trim().length < 3) return setError('RAP terkunci: isi alasan perubahan (min. 3 karakter).')
     if (usedChanged.length > 0 && reason.trim().length < 3) return setError(`Item sudah terpakai ikut berubah (${usedChanged.join(', ')}): isi alasan perubahan (min. 3 karakter).`)
     setError(null)
+    // DRMS 24/10: popup before (file, counts) and after the import (preview = read-only, no popup)
+    const c = preview!.counts
+    if (!(await askField('Simpan RAP dari Excel', null, [['File', file?.name], ['Baru', c.new], ['Berubah', c.changed], ['Dinonaktifkan', c.deactivated], ['Tahapan baru', preview!.newStages.length || null], ['Alasan', reason.trim() || null]]))) return
     setBusy('Menyimpan RAP…')
     try {
       await post('commit')
+      fieldResult('Simpan RAP dari Excel', null, null)
       setDone(`RAP tersimpan: ${preview!.counts.new} baru, ${preview!.counts.changed} berubah, ${preview!.counts.deactivated} dinonaktifkan.`)
       setPreview(null)
       setFile(null)
       router.refresh()
     } catch (x) {
       setError((x as Error).message)
+      fieldResult('Simpan RAP dari Excel', null, (x as Error).message || 'Gagal menyimpan RAP.')
     } finally {
       setBusy(null)
     }

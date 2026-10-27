@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/theme.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/icons/iconsax.dart';
-import '../../../shared/widgets/module_tile.dart';
+import '../../../shared/widgets/pk_ui.dart';
+import '../../../shared/widgets/pk_ui_akun.dart';
 import '../../addendum/presentation/addendum_providers.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../auth/application/auth_controller.dart';
@@ -120,23 +122,19 @@ class ModuleLandingScreen extends ConsumerWidget {
       appBar: AppBar(title: Text(m?.label ?? '')),
       body: switch (menu) {
         AsyncData() when m == null => Center(child: Text(t.homeMenuEmpty)),
-        AsyncData() => ListView(
+        AsyncData() when m != null => ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
-            for (final s in m!.sections) ...[
-              if (s.label != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8, bottom: 10),
-                  child: Text(s.label!, style: Theme.of(context).textTheme.titleMedium),
+            _ModuleHeader(module: m),
+            for (final s in m.sections)
+              if (s.items.isNotEmpty)
+                PkMenuGroup(
+                  title: s.label,
+                  children: [
+                    for (final i in s.items)
+                      _ItemTile(module: m, item: i, localBadge: local[relativeWebHref(i.href)] ?? 0),
+                  ],
                 ),
-              ModuleGrid(
-                children: [
-                  for (final i in s.items)
-                    _ItemTile(module: m, item: i, localBadge: local[relativeWebHref(i.href)] ?? 0),
-                ],
-              ),
-              const SizedBox(height: 16),
-            ],
           ],
         ),
         AsyncError() => Center(child: Text(t.homeMenuEmpty)),
@@ -157,15 +155,62 @@ class _ItemTile extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final ready = apkTargetFor(item.href) != null;
     final n = item.badge + localBadge;
-    final tile = ModuleTile(
+    final tile = PkMenuRow(
       key: Key('menu-item-${item.href}'),
-      module: module.module,
       icon: item.label.startsWith('+') ? PkIcons.advance : module.icon,
-      label: item.label.replaceFirst(RegExp(r'^\+\s*'), ''),
+      tone: ready ? PkTone.info : PkTone.neutral,
+      title: item.label.replaceFirst(RegExp(r'^\+\s*'), ''),
       subtitle: ready ? null : t.menuComingSoonShort,
-      badge: n > 0 ? '$n' : null,
-      onPressed: () => openWebMenuItem(context, item),
+      badge: n,
+      onTap: () => openWebMenuItem(context, item),
     );
     return ready ? tile : Opacity(opacity: 0.55, child: tile);
+  }
+}
+
+/// Module glyph on its web gradient + the module name and hint (Banani "AppSideMenu" header, light card).
+class _ModuleHeader extends StatelessWidget {
+  const _ModuleHeader({required this.module});
+  final WebModule module;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final g = context.pk.gradient(module.module);
+    return PkCard(
+      radius: PkRadius.lg,
+      margin: const EdgeInsets.only(bottom: 20),
+      child: Row(
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(PkRadius.md),
+              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [g.from, g.to]),
+            ),
+            child: SizedBox.square(
+              dimension: 52,
+              child: Center(child: PkIcon(module.icon, size: 28, color: const Color(0xFFFFFFFF))),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(module.label, style: theme.textTheme.titleLarge?.copyWith(fontSize: 19)),
+                if (module.hint.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      module.hint,
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

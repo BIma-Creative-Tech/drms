@@ -12,8 +12,8 @@ const businessDate = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[0
 
 /** Same set as `ROLES` (access/roles.ts) — inlined: this module is bundled without Payload. */
 export const OnboardingRole = z
-  .enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator'])
-  .meta({ id: 'OnboardingRole', description: 'Role in ONE PT (pk-owner = Direktur, pk-principal = Owner (ADR 0026), pk-operator = Operator/Anggota).' })
+  .enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator', 'pk-admin-staff'])
+  .meta({ id: 'OnboardingRole', description: 'Role in ONE PT (pk-owner = Direktur, pk-principal = Owner (ADR 0026), pk-operator = Operator/Anggota, pk-admin-staff = Admin Staff (ADR 0032)).' })
 
 const optText = (max: number, label: string) => z.string().trim().max(max, `${label} maksimal ${max} karakter.`)
 
@@ -34,7 +34,7 @@ export const OnboardingEmployeeInput = z
     nickname: optText(64, 'Nama panggilan').nullable().optional(),
     position: optText(128, 'Jabatan').nullable().optional(),
     phone: optText(32, 'No. HP karyawan').nullable().optional(),
-    attendanceType: z.enum(['onsite', 'non_onsite']).optional().meta({ description: 'DRMS 13/10 A2 "Tipe absensi": onsite (default for a new employee) = any registered location of the PT; non_onsite = head office + branch offices only.' }),
+    attendanceType: z.enum(['onsite', 'non_onsite']).optional().meta({ description: 'DRMS 13/10 A2 "Tipe absensi": onsite (default for a new employee) = inside the chosen registered location of the PT; non_onsite (ADR 0032) = inside any registered location of the PT (picked automatically, outside all refused).' }),
     active: z.boolean().optional(),
   })
   .strict()
@@ -54,7 +54,7 @@ export const OnboardingBankAccountInput = z
 /** DRMS 15/10: team assignment of THIS PT's employee (collection `team-assignments`, its hooks stay the guard). */
 export const OnboardingAssignmentInput = z
   .object({
-    id: id.optional().meta({ description: 'Existing assignment of this PT\'s employee: only roleInProject and endDate change (reason required). Omitted = a NEW assignment (exactly one of project / costCenter / site).' }),
+    id: id.optional().meta({ description: 'Existing assignment of this PT\'s employee: only roleInProject and endDate change (reason required). Omitted = a NEW assignment (exactly one of project / costCenter; ADR 0032: `site` is refused).' }),
     project: id.optional(),
     costCenter: id.optional(),
     site: id.optional(),
@@ -148,8 +148,8 @@ export const UserOnboardingDetail = z
           .array(z.object({ id, kind: z.enum(['project', 'costCenter', 'site']).nullable(), label: z.string(), roleInProject: z.string(), startDate: z.string().nullable(), endDate: z.string().nullable() }))
           .meta({ description: 'Team assignments of the linked employee.' }),
         assignmentChoices: z
-          .object({ projects: z.array(Choice), costCenters: z.array(Choice), sites: z.array(Choice) })
-          .meta({ description: 'Selectable locations of a NEW assignment: active projects (not selesai / arsip), cost centers and sites of this PT, read with the caller\'s access.' }),
+          .object({ projects: z.array(Choice), costCenters: z.array(Choice), sites: z.array(Choice).meta({ description: 'ADR 0032: always empty (sites removed; kept for APK ≤ 0.11.1).' }) })
+          .meta({ description: 'Selectable locations of a NEW assignment: active projects (not selesai / arsip) and cost centers of this PT, read with the caller\'s access.' }),
       }),
     ),
     banks: z.array(z.object({ id, name: z.string() })),
@@ -167,6 +167,13 @@ export const UserOnboardingResult = z
     detail: UserOnboardingDetail,
   })
   .meta({ id: 'UserOnboardingResult' })
+
+export const UserPasswordResetResult = z
+  .object({
+    userId: id,
+    temporaryPassword: z.string().meta({ description: 'Shown ONCE: the new temporary password (Keycloak requires a new password at the next login, UPDATE_PASSWORD). Never stored or logged.' }),
+  })
+  .meta({ id: 'UserPasswordResetResult' })
 
 export type UserOnboardingCreateBody = z.infer<typeof UserOnboardingCreate>
 export type UserOnboardingUpdateBody = z.infer<typeof UserOnboardingUpdate>

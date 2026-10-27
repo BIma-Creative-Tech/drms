@@ -125,6 +125,10 @@ klik foto untuk ukuran penuh. Anda juga boleh membuat laporan dari HP (sama sepe
 **Koreksi** → halaman form yang sama dengan isian laporan (project, unit, tanggal terkunci) → ubah isian → **Alasan
 koreksi** (wajib, paling bawah) → **Simpan koreksi**. Lihat juga Panduan PM §2a.
 
+**Timesheet unit (sejak 24 Okt 2026):** Direktur (dan PM project) boleh mengisi timesheet untuk tanggal mana pun dalam
+periode kontrak unit — pelapor lapangan tetap paling lama 14 hari ke belakang. HM dan foto meter HM opsional (dicatat
+±1× seminggu); tab **Rekap** menampilkan HM mingguan per unit. Lihat Panduan PM §2b.
+
 ## 6. Keuangan
 
 - **Kas** (baca saja; transaksi kas yang dikonfirmasi meski saldo menjadi minus dan transfer ke rekening belum
@@ -142,10 +146,20 @@ koreksi** (wajib, paling bawah) → **Simpan koreksi**. Lihat juga Panduan PM §
   mendapat notifikasi "Kas masuk antar-PT". Dashboard → kartu **Arus kas bulanan** → *Tampilkan tanpa antar-PT* untuk
   melihat arus kas gabungan tanpa transfer antar PT (tidak dieliminasi otomatis; Rekap Kas: filter **Antar PT**).
 
+### 6b. Pinjaman antar project (sejak 24 Okt 2026)
+
+- Pinjaman antar project diajukan **PM project peminjam atau Finance**. Anda memutuskan **level 1 (Direktur)** di
+  **Persetujuan → Pinjaman antar project** atau di detail pinjaman; setelah Anda menyetujui, pinjaman menunggu
+  **persetujuan Owner** (level 2). Penolakan (alasan wajib) di level mana pun mengakhiri pinjaman.
+- Pengembalian pinjaman **dana** juga diajukan (PM peminjam / Finance) dan Anda setujui di level 1, lalu Owner; setelah
+  itu Finance mentransfernya dari Antrian Transfer. Pinjaman barang: pengembalian dicatat langsung.
+- Pengaju tidak memutuskan pengajuannya sendiri (bila Anda satu-satunya Direktur dan mengajukan sebagai PM, Anda boleh
+  memutuskan level Direktur; level Owner tetap oleh Owner).
+
 ### 6a. Cek dana & pinjaman antar-PT (ADR 0029)
 
-- Di pengajuan yang menunggu persetujuan Anda (dan Owner) tampil panel **"Ketersediaan dana PT"** (saldo tanpa akun
-  site − komitmen = dana tersedia) — informasi; **cek akhir di Owner**. Pada aturan tanpa level Owner, persetujuan
+- Di pengajuan yang menunggu persetujuan Anda (dan Owner) tampil panel **"Ketersediaan dana PT"** (saldo tanpa akun kas
+  cabang lama bertanda site − komitmen = dana tersedia) — informasi; **cek akhir di Owner**. Pada aturan tanpa level Owner, persetujuan
   terakhir Anda sendiri yang ditolak bila dana PT kurang (Owner diberi tahu dan dapat memerintahkan pinjaman antar-PT).
 - Anda dapat melihat **Pinjaman antar-PT** PT Anda (Keuangan → Pinjaman antar-PT) dan diberi tahu saat pinjaman
   diperintahkan / dicairkan / dikembalikan; perintah dan pembatalan hanya oleh Owner.

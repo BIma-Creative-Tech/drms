@@ -20,18 +20,32 @@ String addDays(String d, int n) => toYmd(_ymd(d).add(Duration(days: n)));
 final _ymdRe = RegExp(r'^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$');
 final _hhmmRe = RegExp(r'^([01]\d|2[0-3]):[0-5]\d$');
 
-/// Not in the future, at most [fieldBackdateMaxDays] back (server `reportDateError`).
-String? reportDateError(String date, String today) {
+/// Not in the future, at most [fieldBackdateMaxDays] back (server `reportDateError`). [minDate] = the caller's own
+/// earliest date when the server gave one (timesheet: `timesheetMinDate` of `GET /projects/{id}/contract-units` —
+/// the project's PM and the PT's Direktur may fill any date of the unit's contract period, user 2026-10-24).
+String? reportDateError(String date, String today, {String? minDate}) {
   if (!_ymdRe.hasMatch(date)) return 'Tanggal tidak valid.';
   if (date.compareTo(today) > 0) return 'Tanggal laporan tidak boleh di masa depan.';
+  if (minDate != null) {
+    return date.compareTo(minDate) < 0 ? 'Tanggal laporan paling awal $minDate.' : null;
+  }
   if (daysBetween(date, today) > fieldBackdateMaxDays) {
     return 'Tanggal laporan paling lama $fieldBackdateMaxDays hari ke belakang.';
   }
   return null;
 }
 
-/// Dates offered by the date pickers: today and up to 14 days back (newest first).
-List<String> allowedReportDates(String today) => [for (var i = 0; i <= fieldBackdateMaxDays; i++) addDays(today, -i)];
+/// Earliest report date of a timesheet: the server's `timesheetMinDate` (never after today), else today − 14.
+String timesheetMinDate(String today, String? serverMin) {
+  if (serverMin == null || !_ymdRe.hasMatch(serverMin)) return addDays(today, -fieldBackdateMaxDays);
+  return serverMin.compareTo(today) > 0 ? today : serverMin;
+}
+
+/// Dates offered by the date pickers: today and up to 14 days back, or back to [minDate] (newest first).
+List<String> allowedReportDates(String today, {String? minDate}) {
+  final back = minDate == null ? fieldBackdateMaxDays : daysBetween(minDate, today);
+  return [for (var i = 0; i <= back; i++) addDays(today, -i)];
+}
 
 bool _dec2(double v, double max) => v >= 0 && v <= max && ((v * 100).round() - v * 100).abs() < 1e-6;
 String? _len(String v, int max, String label) => v.trim().length > max ? '$label maks. $max karakter.' : null;
@@ -56,8 +70,8 @@ double? hmFloor({
   return best;
 }
 
-/// HM awal prefill: HM akhir of the latest timesheet of the unit BEFORE [date] (local or server), else the
-/// unit's last HM reading (when not after [date]).
+/// HM awal prefill: HM akhir of the latest timesheet of the unit BEFORE [date] that HAS HM (local or server; HM is
+/// recorded about once a week — user 2026-10-24), else the unit's last HM reading (when not after [date]).
 ({double? hm, String? date}) previousHmEnd({
   required int unitId,
   required String date,
@@ -67,7 +81,7 @@ double? hmFloor({
 }) {
   TimesheetMark? prev;
   for (final m in marks) {
-    if (m.unitId != unitId || m.reportDate.compareTo(date) >= 0) continue;
+    if (m.unitId != unitId || m.hmEnd == null || m.reportDate.compareTo(date) >= 0) continue;
     if (prev == null || m.reportDate.compareTo(prev.reportDate) > 0) prev = m;
   }
   if (prev != null) return (hm: prev.hmEnd, date: prev.reportDate);
@@ -87,11 +101,11 @@ TimesheetMark? copySource({required int unitId, required String date, required I
   return prev;
 }
 
-Map<String, String> _common(FieldDraft d, String today) {
+Map<String, String> _common(FieldDraft d, String today, {String? minDate}) {
   final e = <String, String>{};
   if (d.projectId <= 0) e['project'] = 'Pilih project / kontrak dulu.';
   if (!d.isEdit) {
-    final de = reportDateError(d.reportDate, today);
+    final de = reportDateError(d.reportDate, today, minDate: minDate);
     if (de != null) e['date'] = de;
   }
   if (d.photoTotal > d.type.maxPhotos) e['photos'] = 'Maksimal ${d.type.maxPhotos} foto.';
@@ -163,20 +177,21 @@ Map<String, String> validateService(FieldDraft d, {required String today, double
   return e;
 }
 
-/// Timesheet Unit: HM akhir ≥ HM awal, hours 0–24 each and Σ ≤ 24, breakdown needs a reason, exactly one HM
-/// photo on create.
-Map<String, String> validateTimesheet(FieldDraft d, {required String today}) {
+/// Timesheet Unit: HM optional (user 2026-10-24, recorded about once a week) but both-or-none, HM akhir ≥ HM awal,
+/// hours 0–24 each and Σ ≤ 24, breakdown needs a reason, the HM photo only when HM is filled (an edit keeps or adds
+/// the one photo). [minDate] = [timesheetMinDate] of the project (PM / Direktur: the whole contract period).
+Map<String, String> validateTimesheet(FieldDraft d, {required String today, String? minDate}) {
   final c = d.timesheet;
-  final e = _common(d, today);
+  final e = _common(d, today, minDate: minDate);
   if (c.unitId == null) e['unit'] = 'Pilih unit.';
   final s = c.hmStart, en = c.hmEnd;
   if (s == null) {
-    e['hmStart'] = 'HM awal wajib diisi.';
+    if (en != null) e['hmStart'] = 'HM awal wajib bila HM akhir diisi.';
   } else if (!_dec2(s, maxHourMeter)) {
     e['hmStart'] = 'HM awal ≥ 0 (maks. 2 desimal).';
   }
   if (en == null) {
-    e['hmEnd'] = 'HM akhir wajib diisi.';
+    if (s != null) e['hmEnd'] = 'HM akhir wajib bila HM awal diisi.';
   } else if (!_dec2(en, maxHourMeter)) {
     e['hmEnd'] = 'HM akhir ≥ 0 (maks. 2 desimal).';
   } else if (s != null && en < s) {
@@ -205,9 +220,14 @@ Map<String, String> validateTimesheet(FieldDraft d, {required String today}) {
   lenErrors.forEach((k, v) {
     if (v != null) e[k] = v;
   });
-  if (!d.isEdit && c.hmPhoto == null) e['photos'] = 'Foto meter HM wajib (1 foto).';
+  if (c.hasHm && c.hmPhoto == null && d.serverPhotoCount == 0) e['photos'] = 'Foto meter HM wajib bila HM diisi.';
   return e;
 }
+
+/// HM awal that counts: a PREFILLED HM awal the user did not touch is dropped while HM akhir is empty — a day
+/// without an HM reading sends no HM at all (same rule as the web form; user 2026-10-24).
+double? effectiveHmStart({required double? hmStart, required double? hmEnd, required bool touched}) =>
+    touched || hmEnd != null ? hmStart : null;
 
 /// Non-blocking hints of a timesheet: HM gap against the previous HM akhir (server flag HM_GAP) and the
 /// "breakdown ≥ 4 jam → buat laporan servis" suggestion.
@@ -310,9 +330,10 @@ Map<String, String> validateField(
   required String today,
   double? hmFloorValue,
   Map<int, RapItem> rapItems = const {},
+  String? timesheetMinDateValue,
 }) => switch (d.type) {
   FieldReportType.serviceReport => validateService(d, today: today, floor: hmFloorValue),
-  FieldReportType.unitTimesheet => validateTimesheet(d, today: today),
+  FieldReportType.unitTimesheet => validateTimesheet(d, today: today, minDate: timesheetMinDateValue),
   FieldReportType.aftersalesActivity => validateActivity(d, today: today),
   FieldReportType.dailyReport => validateDaily(d, today: today, items: rapItems),
 };
@@ -356,8 +377,12 @@ Json fieldSyncPayload(FieldDraft d) {
       return {
         ...head,
         if (!d.isEdit) ...{'unit_id': c.unitId, 'report_date': d.reportDate},
-        'hm_start': _r2(c.hmStart ?? 0),
-        'hm_end': _r2(c.hmEnd ?? 0),
+        // HM optional (user 2026-10-24): a new timesheet sends it only when filled; an edit always sends it (null
+        // clears HM the user emptied — the server takes both or none).
+        if (d.isEdit || c.hasHm) ...{
+          'hm_start': c.hmStart == null ? null : _r2(c.hmStart!),
+          'hm_end': c.hmEnd == null ? null : _r2(c.hmEnd!),
+        },
         'work_hours': _r2(c.workHours ?? 0),
         'standby_hours': _r2(c.standbyHours ?? 0),
         'breakdown_hours': _r2(c.breakdownHours ?? 0),
@@ -367,8 +392,8 @@ Json fieldSyncPayload(FieldDraft d) {
         'location': _t(c.location),
         'notes': _t(c.notes),
         'reason': ?reason,
-        // The HM photo is fixed once the timesheet exists (server: "cannot change afterwards").
-        if (!d.isEdit) hmPhotoPlaceholderKey: c.hmPhoto,
+        // The HM photo is fixed once the timesheet has one; an edit may only ADD it to a timesheet without photo.
+        if (!d.isEdit || d.serverPhotoCount == 0) hmPhotoPlaceholderKey: c.hmPhoto,
       };
     case final ActivityContent c:
       final kind = c.kind;

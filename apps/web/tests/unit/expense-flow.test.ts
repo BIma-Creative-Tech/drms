@@ -5,7 +5,7 @@ import { computeFlags, normalizeReceiptNo, normalizeVendor, type FlagInput } fro
 import { diffLines } from '@/domain/expense/line-audit'
 import { computeLineTotal, displayUnitPrice, grandTotal, lineNeedsCompletion, normalizeLines, receiptMismatch, unlockLine, validateLines } from '@/domain/expense/lines'
 import { budgetImpact, buildSnapshot, matchesAcknowledger, matchesStep, selectRule, stepsError, type RuleInput } from '@/domain/expense/rules'
-import { allowedActions, assertTransition, targets, TransitionError, type ActorContext } from '@/domain/expense/state'
+import { allowedActions, assertTransition, cascadeCancellable, FINANCE_SELF_PROCESSED, mayPerform, targets, TransitionError, type ActorContext } from '@/domain/expense/state'
 import { addDays, isBusinessDate, receiptsEditable, statusLabel } from '@/domain/expense/types'
 import { formatRupiah } from '@/lib/money'
 import { FORM_228 } from '@/seed/form-fixture'
@@ -59,9 +59,60 @@ describe('state machines (architecture §5.1 Pengajuan Baru / §5.2 Reimburse, G
     ...over,
   })
 
-  it('actor guards: own edit/submit/cancel; strangers nothing', () => {
-    expect(allowedActions(ctx({ isCreator: true }))).toEqual(expect.arrayContaining(['edit', 'submit', 'cancel']))
+  it('actor guards: own edit/submit + "Hapus draft" (D2410: no cancel on a Draft); strangers nothing', () => {
+    expect(allowedActions(ctx({ isCreator: true }))).toEqual(['edit', 'submit', 'delete_draft'])
+    expect(allowedActions(ctx({ isRequester: true }))).toContain('delete_draft')
     expect(allowedActions(ctx({}))).toEqual([])
+    // D2410 "Hapus draft": only an own Draft without a decision; never in the flow, never for others
+    expect(allowedActions(ctx({ isCreator: true, hasDecision: true }))).not.toContain('delete_draft')
+    expect(allowedActions(ctx({ isCreator: true, status: 'pending_approval' }))).not.toContain('delete_draft')
+    expect(allowedActions(ctx({ roles: ['pk-finance'] }))).not.toContain('delete_draft')
+    expect(mayPerform(ctx({ roles: ['pk-finance'] }), 'delete_draft')).toBe(false)
+    expect(mayPerform(ctx({ isRequester: true }), 'delete_draft')).toBe(true)
+  })
+
+  it('D2410 (point 13): "Batalkan" only at the Finance stage, only Finance / Direktur — also on their own request', () => {
+    // no cancel row before the Finance stage (the project-cancel cascade has its own system list)
+    for (const t of ['advance', 'reimburse'] as const) {
+      for (const s of ['draft', 'pending_ack', 'pending_approval'] as const) {
+        expect(targets(t, s, 'cancel')).toEqual([])
+        expect(cascadeCancellable(t, s)).toBe(true)
+        for (const roles of [['pk-staff'], ['pk-finance'], ['pk-owner'], ['pk-admin']] as const) {
+          expect(allowedActions(ctx({ type: t, status: s, roles: [...roles], isCreator: true, isRequester: true }))).not.toContain('cancel')
+          expect(allowedActions(ctx({ type: t, status: s, roles: [...roles] }))).not.toContain('cancel')
+        }
+      }
+    }
+    // Finance stage: Pengajuan Baru (karyawan, vendor, PT grup) "Disetujui"; Reimburse approved / receipts_verified / receipt_revision
+    for (const payeeType of ['karyawan', 'vendor', 'pt_grup'] as const) {
+      expect(targets('advance', 'approved', 'cancel', payeeType)).toEqual(['cancelled'])
+      expect(targets('advance', payeeType === 'karyawan' ? 'transferred' : 'completed', 'cancel', payeeType)).toEqual([])
+    }
+    for (const s of ['approved', 'receipts_verified', 'receipt_revision'] as const) expect(targets('reimburse', s, 'cancel')).toEqual(['cancelled'])
+    for (const s of ['transferred', 'receipts_complete', 'lpj_submitted', 'lpj_verified'] as const) {
+      expect(targets('advance', s, 'cancel')).toEqual([])
+      expect(cascadeCancellable('advance', s)).toBe(false)
+    }
+    // office roles only — the requester himself may not, a Finance / Direktur requester may (one action, reason in the service)
+    expect(allowedActions(ctx({ status: 'approved', isRequester: true }))).not.toContain('cancel')
+    expect(allowedActions(ctx({ status: 'approved', roles: ['pk-pm'], isCreator: true }))).not.toContain('cancel')
+    expect(allowedActions(ctx({ status: 'approved', roles: ['pk-finance'], isRequester: true }))).toContain('cancel')
+    expect(allowedActions(ctx({ status: 'approved', roles: ['pk-owner'] }))).toContain('cancel')
+    expect(allowedActions(ctx({ type: 'reimburse', status: 'receipt_revision', roles: ['pk-finance'] }))).toContain('cancel')
+    expect(mayPerform(ctx({ status: 'draft', isCreator: true }), 'cancel')).toBe(false)
+    expect(mayPerform(ctx({ status: 'approved', roles: ['pk-finance'], isCreator: true }), 'cancel')).toBe(true)
+  })
+
+  it('D2410: Finance requester / creator may process receipts, flags, LPJ and settlement of its own request', () => {
+    const fin = (over: Partial<ActorContext>) => ctx({ roles: ['pk-finance'], isCreator: true, isRequester: true, ...over })
+    expect(allowedActions(fin({ type: 'reimburse', status: 'approved' }))).toEqual(expect.arrayContaining(['receipt_verify', 'receipt_reject', 'verify_receipts', 'review_flag']))
+    expect(allowedActions(fin({ status: 'lpj_submitted' }))).toEqual(expect.arrayContaining(['receipt_verify', 'lpj_request_revision', 'lpj_verify', 'review_flag']))
+    expect(allowedActions(fin({ status: 'lpj_verified' }))).toContain('settle')
+    expect(allowedActions(fin({ status: 'completed' }))).toContain('settle_reverse')
+    for (const a of FINANCE_SELF_PROCESSED) expect(mayPerform(fin({}), a)).toBe(true)
+    // a non-Finance requester still does none of them; approvals stay G1
+    for (const a of FINANCE_SELF_PROCESSED) expect(mayPerform(ctx({ roles: ['pk-staff'], isRequester: true }), a)).toBe(false)
+    expect(allowedActions(fin({ status: 'pending_approval', matchesCurrentStep: true }))).not.toContain('approve')
   })
 
   it('G1: requester/creator can never approve/acknowledge even with the Owner role', () => {
@@ -73,8 +124,8 @@ describe('state machines (architecture §5.1 Pengajuan Baru / §5.2 Reimburse, G
     expect(allowedActions(ctx({ status: 'pending_approval', roles: ['pk-owner'], matchesCurrentStep: true, alreadyDecided: true }))).not.toContain('approve')
   })
 
-  it('US-04: requester withdraw/cancel only before any decision; Finance cannot approve', () => {
-    expect(allowedActions(ctx({ status: 'pending_approval', isRequester: true }))).toEqual(expect.arrayContaining(['withdraw', 'cancel']))
+  it('US-04: requester withdraw only before any decision (D2410: never cancel); Finance cannot approve', () => {
+    expect(allowedActions(ctx({ status: 'pending_approval', isRequester: true }))).toEqual(['withdraw'])
     const decided = allowedActions(ctx({ status: 'pending_approval', isRequester: true, hasDecision: true }))
     expect(decided).not.toContain('withdraw')
     expect(decided).not.toContain('cancel')

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../l10n/gen/app_localizations.dart';
+import '../../../auth/application/auth_controller.dart';
+import '../../../../shared/widgets/pk_ui.dart';
 import '../../application/progress_providers.dart';
 import '../../domain/progress.dart';
 import 'progress_widgets.dart';
@@ -18,6 +20,8 @@ class ProjectProgressSummary extends ConsumerWidget {
     final t = AppLocalizations.of(context);
     final list = ref.watch(projectProgressProvider).value;
     if (list == null || list.projects.isEmpty) return const SizedBox.shrink();
+    // D2510: one project → that project (not the whole list) when the user may see it.
+    final canOpen = ref.watch(currentProfileProvider)?.canSeeProjects ?? false;
     int rank(ProgressTone tone) => switch (tone) {
       ProgressTone.bad => 0,
       ProgressTone.warn => 1,
@@ -33,16 +37,19 @@ class ProjectProgressSummary extends ConsumerWidget {
       key: const Key('home-project-progress'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(child: Text(t.progressHomeTitle, style: Theme.of(context).textTheme.titleMedium)),
-            TextButton(onPressed: () => context.push('/progress?tab=projects'), child: Text(t.seeAll)),
-          ],
+        PkSectionHeader(
+          title: t.progressHomeTitle,
+          actionLabel: t.seeAll,
+          onAction: () => context.push('/progress?tab=projects'),
+          padding: const EdgeInsets.only(bottom: 10),
         ),
         for (final p in sorted.take(3))
           Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: ProjectProgressCard(item: p, onTap: () => context.push('/progress?tab=projects')),
+            padding: const EdgeInsets.only(bottom: 10),
+            child: ProjectProgressCard(
+              item: p,
+              onTap: () => context.push(canOpen ? '/projects/${p.id}' : '/progress?tab=projects'),
+            ),
           ),
       ],
     );
