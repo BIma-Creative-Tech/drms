@@ -416,7 +416,7 @@ export interface Company {
   remindersEnabled?: boolean | null;
   reminderHour: number;
   /**
-   * Selain notifikasi in-app. Batas SMTP 30 email/jam per mailbox — aktifkan setelah alamat email pengguna benar.
+   * Selain notifikasi in-app: satu email ringkasan per pengguna per hari (semua pengingat dan PT). Batas SMTP 30 email/jam per mailbox — aktifkan setelah alamat email pengguna benar.
    */
   reminderEmailEnabled?: boolean | null;
   /**
