@@ -208,7 +208,7 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
             type: 'checkbox',
             label: 'Juga kirim email',
             defaultValue: false,
-            admin: { description: 'Selain notifikasi in-app. Batas SMTP 30 email/jam per mailbox — aktifkan setelah alamat email pengguna benar.' },
+            admin: { description: 'Selain notifikasi in-app: satu email ringkasan per pengguna per hari (semua pengingat dan PT). Batas SMTP 30 email/jam per mailbox — aktifkan setelah alamat email pengguna benar.' },
           },
         ],
       },

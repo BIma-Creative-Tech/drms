@@ -16,7 +16,7 @@ import { withSystemTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
-import { companyClock, crossedThresholds, DEFAULT_TEXTS, fill, REMINDER_EVENTS, reminderSettingsOf, runDecision, type ReminderRule, type ReminderSettings } from './rules'
+import { companyClock, crossedThresholds, DEFAULT_TEXTS, digestEmail, fill, REMINDER_EVENTS, reminderSettingsOf, runDecision, type DigestItem, type ReminderRule, type ReminderSettings } from './rules'
 import { activeCompanyIds, companyRefs, settingsOf } from '@/domain/companies'
 
 /**
@@ -35,7 +35,8 @@ import { activeCompanyIds, companyRefs, settingsOf } from '@/domain/companies'
  * rule's reminder for a subject at most once per business day (budget: once per threshold), even when
  * the job is re-run or forced. Recipients are ACTIVE users only; archived projects (and requests of
  * archived projects) produce nothing. Channels: in-app notification always (push status per
- * PUSH_FCM_ENABLED), email via the sendEmail queue when reminderEmailEnabled. Logs carry counts only.
+ * PUSH_FCM_ENABLED), email when reminderEmailEnabled — D2710: as ONE daily digest per recipient over every rule
+ * and PT (flushDigests below), not one email per subject. Logs carry counts only.
  *
  * MC2 (ADR 0016 §7): one run PER ACTIVE PT with that PT's settings (hour, toggles, thresholds) and its
  * own `reminder_runs (company_id, run_date)` row / advisory lock / transaction; subjects are the PT's
@@ -50,6 +51,7 @@ export type CompanyRunResult = {
   date: string
   hour: number
   rules: Partial<Record<ReminderRule, RuleSummary>>
+  /** D2710: reminder lines of this PT put into the recipients' digests. */
   emails: number
 }
 export type ReminderRunResult = {
@@ -58,6 +60,7 @@ export type ReminderRunResult = {
   date: string
   hour: number
   rules: Partial<Record<ReminderRule, RuleSummary>>
+  /** D2710: digest emails queued by this tick (one per recipient). */
   emails: number
   companies: CompanyRunResult[]
 }
@@ -136,6 +139,8 @@ async function inApp(req: PayloadRequest, event: string, userIds: number[], m: M
 class Run {
   emails = 0
   rules: Partial<Record<ReminderRule, RuleSummary>> = {}
+  /** D2710: email part of every delivery, per recipient — stored with the run (reminder_runs.summary.digest). */
+  digest = new Map<number, DigestItem[]>()
   constructor(
     readonly req: PayloadRequest,
     readonly s: ReminderSettings,
@@ -148,15 +153,13 @@ class Run {
     r.notified += notified
   }
 
-  async email(userIds: number[], m: Msg) {
+  /** D2710: adds the reminder to the recipients' daily digest (sent by flushDigests after every PT ran). */
+  email(rule: ReminderRule, userIds: number[], m: Msg) {
     if (!this.s.email) return
-    const base = process.env.APP_URL ? `${process.env.APP_URL.replace(/\/$/, '')}/admin` : null
     for (const uid of userIds) {
-      await this.req.payload.jobs.queue({
-        task: 'sendEmail',
-        input: { userId: uid, subject: `RR Teams — ${m.title}`.slice(0, 200), text: `${m.body}\n\n${base ? `Buka RR Teams: ${base}\n\n` : ''}Email otomatis pengingat harian RR Teams.\n` },
-        req: this.req,
-      })
+      const list = this.digest.get(uid) ?? []
+      list.push({ rule, title: m.title, body: m.body, companyId: this.s.companyId })
+      this.digest.set(uid, list)
       this.emails++
     }
   }
@@ -164,7 +167,7 @@ class Run {
   /** Claims + delivers one subject of a rule to `recipients` (active users only). */
   async deliver(rule: ReminderRule, subject: string, period: string, recipients: Iterable<number>, send: (userIds: number[]) => Promise<Msg>): Promise<number> {
     const fresh = await claim(this.req, rule, subject, period, await activeOnly(this.req, recipients))
-    if (fresh.length > 0) await this.email(fresh, await send(fresh))
+    if (fresh.length > 0) this.email(rule, fresh, await send(fresh))
     this.count(rule, fresh.length)
     return fresh.length
   }
@@ -352,7 +355,7 @@ async function budgetThreshold(run: Run) {
       const m: Msg = { title: fill(t.title, vars), body: fill(t.body, vars), docType: 'project', docId: String(p.id), docNo: p.code }
       userIds.sort((a, b) => a - b)
       await inApp(req, REMINDER_EVENTS.budget_threshold, userIds, m, s.companyId)
-      await run.email(userIds, m)
+      run.email('budget_threshold', userIds, m)
     }
     const r = (run.rules.budget_threshold ??= { subjects: 0, notified: 0 })
     r.subjects++
@@ -393,10 +396,55 @@ async function runCompany(payload: Payload, companyId: number, now: Date, force:
       if (s.loanOverdue.enabled) await loanOverdue(run)
       if (s.icLoanOverdue.enabled) await icLoanOverdue(run)
       await tx.execute(
-        sql`INSERT INTO reminder_runs (company_id, run_date, summary) VALUES (${companyId}, ${date}, ${JSON.stringify({ rules: run.rules, emails: run.emails })}::jsonb)
+        sql`INSERT INTO reminder_runs (company_id, run_date, summary) VALUES (${companyId}, ${date}, ${JSON.stringify({ rules: run.rules, emails: run.emails, ...(run.digest.size > 0 ? { digest: Object.fromEntries(run.digest) } : {}) })}::jsonb)
             ON CONFLICT (company_id, run_date) DO UPDATE SET summary = EXCLUDED.summary, finished_at = clock_timestamp()`,
       )
       return { ...base, rules: run.rules, emails: run.emails }
+    },
+    { auditSource: 'job' },
+  )
+}
+
+/**
+ * D2710: queues ONE email per recipient over every PT's digest not sent yet (`reminder_runs.summary.digest`, written in
+ * the PT's own transaction together with its deliveries) and marks those runs sent — one transaction under its own
+ * lock, so a crash before it leaves the digests for the next hourly tick and a digest is never queued twice.
+ * Returns the number of emails queued.
+ */
+async function flushDigests(payload: Payload): Promise<number> {
+  return withSystemTransaction(
+    payload,
+    null,
+    async (req) => {
+      const tx = await getRequestTx(req)
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended('pk:daily-reminders:digest', 0))`)
+      const rows = await q<{ company_id: number; run_date: string; digest: Record<string, DigestItem[]> | null }>(
+        req,
+        sql`SELECT company_id, run_date::text AS run_date, summary->'digest' AS digest FROM reminder_runs
+             WHERE summary->'digest' IS NOT NULL ORDER BY run_date, company_id FOR UPDATE`,
+      )
+      if (rows.length === 0) return 0
+      const byUser = new Map<number, DigestItem[]>()
+      let date = ''
+      for (const r of rows) {
+        if (r.run_date > date) date = r.run_date
+        for (const [uid, items] of Object.entries(r.digest ?? {})) {
+          const id = Number(uid)
+          if (Number.isInteger(id) && id > 0 && Array.isArray(items)) byUser.set(id, [...(byUser.get(id) ?? []), ...items])
+        }
+      }
+      const refs = new Map((await companyRefs(req, rows.map((r) => Number(r.company_id)))).map((c) => [c.id, c.shortCode || c.name]))
+      let queued = 0
+      for (const [uid, items] of [...byUser].sort((a, b) => a[0] - b[0])) {
+        const m = digestEmail(items, { date, appUrl: process.env.APP_URL, ptLabel: (id) => refs.get(id) ?? null })
+        await req.payload.jobs.queue({ task: 'sendEmail', input: { userId: uid, subject: m.subject, text: m.text }, req })
+        queued++
+      }
+      await tx.execute(
+        sql`UPDATE reminder_runs SET summary = (summary - 'digest') || jsonb_build_object('digestQueuedAt', clock_timestamp())
+             WHERE summary->'digest' IS NOT NULL`,
+      )
+      return queued
     },
     { auditSource: 'job' },
   )
@@ -421,6 +469,13 @@ export async function runDailyReminders(payload: Payload, opts: { now?: Date; fo
       companies.push({ companyId: cid, status: 'failed', date, hour, rules: {}, emails: 0 })
     }
   }
+  let emails = 0
+  try {
+    emails = await flushDigests(payload)
+  } catch (err) {
+    // the digests stay in reminder_runs and go out with the next tick
+    payload.logger.error({ msg: 'daily reminder digests not queued', err: (err as Error).message })
+  }
   const first = companies[0]
   const rules: Partial<Record<ReminderRule, RuleSummary>> = {}
   for (const c of companies)
@@ -435,7 +490,7 @@ export async function runDailyReminders(payload: Payload, opts: { now?: Date; fo
     date: first?.date ?? clock.date,
     hour: first?.hour ?? clock.hour,
     rules,
-    emails: companies.reduce((a, c) => a + c.emails, 0),
+    emails,
     companies,
   }
 }

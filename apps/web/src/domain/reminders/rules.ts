@@ -105,3 +105,69 @@ export const DEFAULT_TEXTS: Record<Exclude<ReminderRule, 'late_progress' | 'loan
     body: 'Komitmen project {code} {name} mencapai {pct}% dari RAB (ambang {threshold}%). Komitmen {committed} dari RAB {budget}.',
   },
 }
+
+// ---------------------------------------------------------------- D2710 daily digest email
+
+/**
+ * D2710 (user 2026-10-27): ONE reminder email per recipient per day instead of one per subject — prod sent ~150
+ * reminder emails at once to ~12 people (up to 19 each) against the mailbox budget of 24/h (email/rate-guard.ts), so
+ * about half failed for good every day. Every rule's email part goes into the daily digest; in-app rows are unchanged.
+ */
+export type DigestItem = { rule: ReminderRule; title: string; body: string; companyId: number }
+
+/** Section headings of the digest, in this order. */
+export const DIGEST_SECTIONS: Record<ReminderRule, string> = {
+  lpj_overdue: 'LPJ terlambat',
+  revision_pending: 'Revisi belum diperbaiki',
+  late_progress: 'Laporan progress terlambat',
+  budget_threshold: 'Ambang anggaran project',
+  loan_overdue: 'Pinjaman antar proyek terlambat',
+  ic_loan_overdue: 'Pinjaman antar-PT terlambat',
+  aftersales_followup: 'Follow-up penawaran',
+}
+
+/** Text budget of one digest (sendEmail input `text` max 20 000). */
+export const DIGEST_MAX_TEXT = 18_000
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+
+/** "2026-10-27" → "27 Okt 2026". */
+export function dateLabel(date: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
+  return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1] ?? m[2]} ${m[1]}` : date
+}
+
+/**
+ * Subject + text of one recipient's digest. One item keeps the single reminder's subject; several items are grouped
+ * per rule (DIGEST_SECTIONS order), each line prefixed with the PT when the items span several PTs (`ptLabel`).
+ */
+export function digestEmail(items: readonly DigestItem[], opts: { date: string; appUrl?: string | null; ptLabel?: (companyId: number) => string | null }): { subject: string; text: string } {
+  const base = opts.appUrl ? `${opts.appUrl.replace(/\/$/, '')}/admin` : null
+  const footer = `${base ? `Buka RR Teams: ${base}\n\n` : ''}Email otomatis pengingat harian RR Teams (satu email per hari). Setiap pengingat juga ada di lonceng notifikasi.\n`
+  if (items.length === 1) {
+    const only = items[0]!
+    return { subject: `RR Teams — ${only.title}`.slice(0, 200), text: `${only.body}\n\n${footer}` }
+  }
+  const multiPt = new Set(items.map((i) => i.companyId)).size > 1
+  const pt = (i: DigestItem) => {
+    const label = multiPt ? opts.ptLabel?.(i.companyId) : null
+    return label ? `[${label}] ` : ''
+  }
+  let text = `Ringkasan pengingat harian RR Teams, ${dateLabel(opts.date)}: ${items.length} pengingat.\n`
+  let shown = 0
+  outer: for (const rule of Object.keys(DIGEST_SECTIONS) as ReminderRule[]) {
+    const list = items.filter((i) => i.rule === rule)
+    if (list.length === 0) continue
+    const head = `\n${DIGEST_SECTIONS[rule]} (${list.length})\n`
+    if (text.length + head.length > DIGEST_MAX_TEXT) break
+    text += head
+    for (const i of list) {
+      const line = `- ${pt(i)}${i.body}\n`
+      if (text.length + line.length > DIGEST_MAX_TEXT) break outer
+      text += line
+      shown++
+    }
+  }
+  if (shown < items.length) text += `\n… dan ${items.length - shown} pengingat lainnya. Lihat semuanya di lonceng notifikasi RR Teams.\n`
+  return { subject: `RR Teams — Ringkasan pengingat ${dateLabel(opts.date)} (${items.length} pengingat)`.slice(0, 200), text: `${text}\n${footer}` }
+}
