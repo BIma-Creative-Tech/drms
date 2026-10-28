@@ -98,59 +98,81 @@
     white-space: nowrap;
   }
 
-  .pk-dots {
+  // Payload's own LoadingOverlay (bulk upload "Mengunggah 1 dari 1", fullscreen toggles) has its own
+  // text and click blocking; while it is up our overlay would stack its dots on top of it (DRMS 27/10).
+  // Hide ours then, and draw Payload's five bars as the same five dots.
+  body:has(.loading-overlay--entering) .pk-loading {
+    opacity: 0;
+    visibility: hidden;
+    transition: none;
+  }
+
+  .pk-dots,
+  .loading-overlay__bars {
     display: flex;
+    gap: 0;
     align-items: center;
     justify-content: center;
   }
 
-  .pk-dots__dot {
+  .pk-dots__dot,
+  .loading-overlay__bar {
     width: 20px;
     height: 20px;
     margin-right: 10px;
     border-radius: 10px;
     background-color: var(--pk-loader-rest);
+    transform: none;
   }
 
-  .pk-dots__dot:last-child {
+  .pk-dots__dot:last-child,
+  .loading-overlay__bar:last-child {
     margin-right: 0;
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .pk-dots__dot {
+    .pk-dots__dot,
+    .loading-overlay__bar {
       animation: pk-dots-pulse 1.5s infinite ease-in-out;
     }
 
-    .pk-dots__dot:nth-child(1) {
+    .pk-dots__dot:nth-child(1),
+    .loading-overlay__bar:nth-child(1) {
       animation-delay: -0.3s;
     }
 
-    .pk-dots__dot:nth-child(2) {
+    .pk-dots__dot:nth-child(2),
+    .loading-overlay__bar:nth-child(2) {
       animation-delay: -0.1s;
     }
 
-    .pk-dots__dot:nth-child(3) {
+    .pk-dots__dot:nth-child(3),
+    .loading-overlay__bar:nth-child(3) {
       animation-delay: 0.1s;
     }
 
-    .pk-dots__dot:nth-child(4) {
+    .pk-dots__dot:nth-child(4),
+    .loading-overlay__bar:nth-child(4) {
       animation-delay: 0.3s;
     }
 
-    .pk-dots__dot:nth-child(5) {
+    .pk-dots__dot:nth-child(5),
+    .loading-overlay__bar:nth-child(5) {
       animation-delay: 0.5s;
     }
   }
 
   // Reduced motion: no scale / glow / pulse — a static row fading into the peak colour.
   @media (prefers-reduced-motion: reduce) {
-    .pk-dots__dot {
+    .pk-dots__dot,
+    .loading-overlay__bar {
       animation: none;
       background-color: var(--pk-loader-peak);
     }
 
     @for $i from 1 through 5 {
-      .pk-dots__dot:nth-child(#{$i}) {
+      .pk-dots__dot:nth-child(#{$i}),
+      .loading-overlay__bar:nth-child(#{$i}) {
         opacity: 0.2 + $i * 0.16;
       }
     }
