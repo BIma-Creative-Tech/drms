@@ -47,6 +47,16 @@ const pill = (tone: 'warn' | 'muted' | 'ok' | 'bad'): React.CSSProperties => ({
   color: tone === 'muted' ? 'var(--theme-elevation-800)' : '#FFFFFF', // ≥ 4.5:1 on every --pk-tone-*
   background: tone === 'warn' ? 'var(--pk-tone-warn)' : tone === 'ok' ? 'var(--pk-tone-ok)' : tone === 'bad' ? 'var(--pk-tone-bad)' : 'var(--theme-elevation-150)',
 })
+/** Grand-total receipt summary: tinted box + bold text in the tone's text colour (readable in light and dark). */
+const summaryBox = (tone: 'warn' | 'ok'): React.CSSProperties => ({
+  padding: '6px 8px',
+  borderRadius: 6,
+  borderLeft: `3px solid var(--pk-tone-${tone})`,
+  background: `color-mix(in oklab, var(--pk-tone-${tone}) 14%, transparent)`,
+  color: `var(--pk-tone-${tone}-text)`,
+  fontSize: 12,
+  fontWeight: 700,
+})
 const RECEIPT_STATUS: Record<string, { text: string; tone: 'ok' | 'bad' | 'muted' }> = {
   valid: { text: 'valid', tone: 'ok' },
   rejected: { text: 'ditolak', tone: 'bad' },
@@ -200,11 +210,12 @@ export function ReviewDetails({ d, title = 'Rincian untuk pemeriksa' }: { d: Det
               <td style={{ ...numCell, borderBottom: 0, fontWeight: 700, fontSize: 13 }}>{rp(d.grandTotal)}</td>
               <td style={{ ...numCell, borderBottom: 0 }} />
               <td style={{ ...cell, borderBottom: 0, fontSize: 11 }} data-pk-receipt-total={needsReceipts ? receiptTotal : undefined}>
+                {/* DRMS 29/10: highlighted + bold so Finance sees at a glance how much of the request is not yet covered by receipts */}
                 {needsReceipts ? (
-                  <>
+                  <div style={summaryBox(receiptTotal === d.grandTotal ? 'ok' : 'warn')} data-pk-receipt-summary>
                     Nota {rp(receiptTotal)}
                     {receiptTotal !== d.grandTotal ? ` · selisih ${rp(d.grandTotal - receiptTotal)}` : ' · sesuai'}
-                  </>
+                  </div>
                 ) : null}
               </td>
             </tr>
