@@ -6,7 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-10-29
+
+**Admin password reset + web fixes (PR #134, #146, #148, #149, #150).** No migrations. API contract 0.23.0
+(additive): `POST /user-onboarding/{userId}/reset-password`; `GET /notifications` now honours the PT selection. APK
+unchanged (0.14.1).
+
+### Added
+- **"Reset password" for an existing user (user 2026-10-27).** Pengguna & Akses › Detail Pengguna gets a "Reset
+  password" button: after a confirm popup it sets a new temporary Keycloak password (must be changed at the next
+  login) and shows it once with "Salin". Same rule as editing the identity: only accounts in the caller's Admin PTs, a
+  group admin only by a group admin; never the own account or an inactive one. The reset is audited (the fact, never
+  the value) in the same transaction, Keycloak written last, so a refused / unreachable Keycloak (502
+  `KEYCLOAK_FAILED`) changes nothing. Open sessions are left alone. Replaces the manual Keycloak resets.
+
 ### Fixed
+- **Request review: the receipt summary of the Grand total row stands out (user 2026-10-29).** "Nota Rp … · selisih
+  Rp …" in the Nota & flag column is a tinted, bold box — orange while receipts do not match the grand total, green
+  when "sesuai" — so Finance sees how much of the request is not covered by receipts yet. Table layout only.
+- Bulk upload ("Mengunggah 1 dari 1") showed two loaders on top of each other: the DRMS save overlay now hides while
+  Payload's own upload overlay is shown, and Payload's bars use the same brand dots, so one loader with the progress
+  text remains.
 - Notification bell badge, `/admin/notifikasi` (list + "belum dibaca") and `GET /api/v1/notifications` (`unreadCount`)
   now follow the PT switcher (user 2026-10-23): "Semua PT saya" = every own notification; a narrowed selection = the
   selected PTs' rows plus rows without a PT. "Tandai semua dibaca" marks only those rows. APK follows via
