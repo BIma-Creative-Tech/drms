@@ -15,6 +15,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   was see-through and the next rows' fields painted over it (user 2026-10-29). The cell dimmed its whole role wrapper
   (`opacity`), which also faded the open panel and trapped it below the following rows; only the button is dimmed now.
 
+### Security
+- `graphql-scalars` 1.22.2 → 2.0.1 via `overrides` (GHSA-x8rm-f576-gq67, HIGH, PhoneNumber regex DoS, published
+  2026-10-28; transitive through `@payloadcms/graphql`, which pins 1.22.2 up to the latest Payload 3.92.1). Not
+  reachable here (`graphQL: { disable: true }`, no `/api/graphql` route); Payload only imports `DateTimeResolver` and
+  `EmailAddressResolver`, both unchanged in 2.0.1 (peer `graphql ^16`). Remaining `npm audit` findings are low/moderate
+  (deepmerge, esbuild via drizzle-kit, fast-uri, nodemailer).
+
 ## [0.22.2] - 2026-10-27
 
 **Daily reminder digest (user 2026-10-27).** No migrations, API contract unchanged (version only), APK unchanged
