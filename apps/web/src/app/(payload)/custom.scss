@@ -2299,7 +2299,9 @@ $pk-side-compact: 76px;
     box-shadow: inset 3px 0 0 var(--pk-tone-bad);
   }
 
-  .pk-rmx__cell[data-inactive] .pk-rmx__roles {
+  // D2910: dim the button only — opacity on .pk-rmx__roles made the open panel see-through and trapped it in a
+  // stacking context, so the next rows' fields painted over the role list (inactive / new cell)
+  .pk-rmx__cell[data-inactive] .pk-ms__btn {
     opacity: 0.75;
   }
 
