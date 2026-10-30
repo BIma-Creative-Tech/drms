@@ -16,6 +16,7 @@ import '../../shared/icons/iconsax.dart';
 import '../../shared/widgets/online_only_button.dart';
 import '../../shared/widgets/pk_ui.dart';
 import '../../shared/widgets/pk_ui_akun.dart';
+import '../auth/application/auth_controller.dart';
 import '../expense/presentation/widgets/master_picker.dart';
 import '../masters/domain/master_item.dart';
 import '../records/data/records_providers.dart';
@@ -23,7 +24,8 @@ import 'onboarding.dart';
 
 /// `/users/new` and `/users/:id` (DRMS 13/10 W3 web "Pengguna" form, phase 6): Akun (email, nama, No. HP, aktif),
 /// then per PT — peran, karyawan (pilih / baru), rekening, penugasan tim — and one save. A new account shows its
-/// temporary password once (Keycloak asks for a new password at the first login).
+/// temporary password once (Keycloak asks for a new password at the first login); an existing one can get a new
+/// temporary password with "Reset password" (DRMS 27/10).
 class OnboardingScreen extends ConsumerWidget {
   const OnboardingScreen({super.key, this.id});
   final int? id;
@@ -145,29 +147,7 @@ class _OnboardingFormState extends ConsumerState<_OnboardingForm> {
       ref.invalidate(recordPageProvider);
       if (!mounted) return;
       if (r.temporaryPassword case final pw?) {
-        await showDialog<void>(
-          context: context,
-          barrierDismissible: false,
-          builder: (c) => AlertDialog(
-            title: Text(t.onbTempPasswordTitle),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(t.onbTempPasswordBody),
-                const SizedBox(height: 12),
-                SelectableText(pw, key: const Key('onb-temp-password'), style: Theme.of(c).textTheme.titleLarge),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Clipboard.setData(ClipboardData(text: pw)),
-                child: Text(t.onbCopy),
-              ),
-              FilledButton(onPressed: () => Navigator.pop(c), child: Text(t.onbDone)),
-            ],
-          ),
-        );
+        await _showTemporaryPassword(pw, t.onbTempPasswordBody);
       } else {
         final done = r.linked && !_edit ? t.onbLinked : t.recordSaved(_name.text.trim());
         await showActionResult(context, message: done, action: t.save);
@@ -189,12 +169,71 @@ class _OnboardingFormState extends ConsumerState<_OnboardingForm> {
     }
   }
 
+  /// A temporary password, shown once (new account, or a reset): [body], the password, Salin, Selesai.
+  Future<void> _showTemporaryPassword(String pw, String body) {
+    final t = AppLocalizations.of(context);
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => AlertDialog(
+        title: Text(t.onbTempPasswordTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(body),
+            const SizedBox(height: 12),
+            SelectableText(pw, key: const Key('onb-temp-password'), style: Theme.of(c).textTheme.titleLarge),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Clipboard.setData(ClipboardData(text: pw)),
+            child: Text(t.onbCopy),
+          ),
+          FilledButton(onPressed: () => Navigator.pop(c), child: Text(t.onbDone)),
+        ],
+      ),
+    );
+  }
+
+  /// DRMS 27/10 (web "Reset password", server 0.23.0): same rule as editing the identity — not the own account, not
+  /// an inactive one (the stored state, not the unsaved switch); the server re-checks.
+  bool _mayResetPassword(int? selfId) =>
+      _edit && widget.detail.identityEditable && _u?['active'] != false && widget.detail.id != selfId;
+
+  /// Confirm → `POST /user-onboarding/{id}/reset-password` → the new temporary password, shown once. The old password
+  /// stops working; open sessions stay.
+  Future<void> _resetPassword() async {
+    final t = AppLocalizations.of(context);
+    final id = widget.detail.id;
+    if (id == null || _busy) return;
+    final yes = await confirmAction(
+      context,
+      action: t.onbResetPasswordAction,
+      summary: ['${_u?['name'] ?? ''}', '${_u?['email'] ?? ''}'],
+      note: t.onbResetPasswordNote,
+      confirmKey: const Key('onb-reset-password-confirm'),
+    );
+    if (!yes || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final pw = await ref.read(onboardingApiProvider).resetPassword(id);
+      if (mounted) await _showTemporaryPassword(pw, t.onbResetPasswordBody);
+    } on Object catch (e) {
+      if (mounted) await showActionError(context, e, action: t.onbResetPasswordAction);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final identity = widget.detail.identityEditable;
     final pk = context.pk;
+    final mayReset = _mayResetPassword(ref.watch(currentProfileProvider)?.id);
     return Scaffold(
       appBar: AppBar(title: Text(_edit ? (_u?['name'] as String? ?? t.onbTitle) : t.onbNewTitle)),
       body: AbsorbPointer(
@@ -286,6 +325,24 @@ class _OnboardingFormState extends ConsumerState<_OnboardingForm> {
                       value: _active,
                       onChanged: (v) => setState(() => _active = v),
                     ),
+                  if (mayReset) ...[
+                    const Divider(height: 24),
+                    Text(t.onbPassword, style: theme.textTheme.labelLarge),
+                    const SizedBox(height: 4),
+                    Text(
+                      t.onbResetPasswordHint,
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 8),
+                    OnlineOnlyButton(
+                      key: const Key('onb-reset-password'),
+                      label: t.onbResetPassword,
+                      icon: Icons.lock_reset,
+                      outlined: true,
+                      onPressed: _busy ? null : _resetPassword,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                 ],
               ),
             ),

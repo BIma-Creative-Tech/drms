@@ -4900,5 +4900,11 @@
   "loanStepInstructedOwner": "Instruksi Owner",
   "@loanStepInstructedOwner": {
     "description": "DRMS 26/10 #1: first step of an Owner-instructed inter-project loan."
-  }
+  },
+  "onbPassword": "Kata sandi",
+  "onbResetPassword": "Reset password",
+  "onbResetPasswordAction": "Reset kata sandi",
+  "onbResetPasswordHint": "Untuk pengguna yang lupa kata sandi: membuat kata sandi sementara baru yang wajib diganti saat login berikutnya.",
+  "onbResetPasswordNote": "Kata sandi lama tidak berlaku lagi. Pengguna login dengan kata sandi sementara yang ditampilkan, lalu wajib membuat kata sandi baru.",
+  "onbResetPasswordBody": "Berikan langsung kepada pengguna. Kata sandi ini hanya ditampilkan sekali; saat login berikutnya pengguna wajib menggantinya."
 }

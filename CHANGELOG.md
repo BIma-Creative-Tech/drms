@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **APK: "Reset password" for an existing user (user 2026-10-30, parity with web 0.23.0 / #148).** Pengguna › an
+  existing account › Akun: "Reset password" (online only) → confirm popup → `POST /user-onboarding/{id}/reset-password`
+  → the new temporary password in the same "Kata sandi sementara" popup as a new account (Salin, shown once; must be
+  changed at the next login). Shown with the web rule: not the own account, not an inactive one, only when the
+  identity is editable (`identityEditable`); the server re-checks and a refusal shows its message. Needs server
+  0.23.0 (live since 30/10).
+
 ## [0.23.0] - 2026-10-29
 
 **Admin password reset + web fixes (PR #134, #146, #148, #149, #150).** No migrations. API contract 0.23.0

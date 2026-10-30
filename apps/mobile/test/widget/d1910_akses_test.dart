@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proyekkas/core/network/api_client.dart';
+import 'package:proyekkas/core/network/api_exception.dart';
 import 'package:proyekkas/features/attendance/presentation/schedule_screen.dart';
 import 'package:proyekkas/features/home/domain/web_route_map.dart';
 import 'package:proyekkas/features/users/access_matrix_screen.dart';
@@ -90,14 +91,20 @@ Map<String, dynamic> _matrix({bool groupAdmin = false}) => {
 };
 
 class _FakeOnb implements OnboardingApi {
+  _FakeOnb({this.user, this.resetError});
+
+  /// `null` = the "Pengguna baru" form; otherwise the stored account of `/users/:id`.
+  final Map<String, Object?>? user;
+  final Object? resetError;
   final saved = <Map<String, Object?>>[];
+  final resets = <int>[];
 
   @override
   ApiClient get client => throw UnimplementedError();
 
   @override
   Future<OnbDetail> load(int? id) async => OnbDetail({
-    'user': null,
+    'user': user,
     'companies': [
       {
         'id': 1,
@@ -126,8 +133,26 @@ class _FakeOnb implements OnboardingApi {
   }
 
   @override
+  Future<String> resetPassword(int id) async {
+    resets.add(id);
+    if (resetError case final e?) throw e;
+    return 'Rst-456-xyz';
+  }
+
+  @override
   Future<List<OnbChoice>> banks() async => const [];
 }
+
+/// An existing account (`GET /user-onboarding/{id}` `user`); the harness profile (the caller) is user 5.
+Map<String, Object?> _user({int id = 21, bool active = true, bool identityEditable = true}) => {
+  'id': id,
+  'email': 'sari@x.test',
+  'name': 'Sari',
+  'phone': null,
+  'active': active,
+  'groupAdmin': false,
+  'identityEditable': identityEditable,
+};
 
 /// User 2026-10-19 (APK ↔ web parity, phase 6): Jadwal & hari libur, Akses PT, Pengguna.
 void main() {
@@ -206,5 +231,51 @@ void main() {
       ],
     });
     expect(find.text('Tmp-123-abc'), findsOneWidget);
+    expect(find.byKey(const Key('onb-reset-password')), findsNothing, reason: 'new account: no reset');
   });
+
+  testWidgets('DRMS 27/10: Reset password → confirm → new temporary password shown once', (tester) async {
+    final api = _FakeOnb(user: _user());
+    await pumpScreen(tester, const OnboardingScreen(id: 21), overrides: [onboardingApiProvider.overrideWithValue(api)]);
+    await tester.tap(find.byKey(const Key('onb-reset-password')));
+    await tester.pumpAndSettle();
+    expect(find.text('Yakin ingin reset kata sandi?'), findsOneWidget);
+    expect(find.textContaining('Kata sandi lama tidak berlaku lagi'), findsOneWidget);
+    expect(api.resets, isEmpty, reason: 'nothing sent before the confirmation');
+    await confirmPopup(tester, key: const Key('onb-reset-password-confirm'));
+    expect(api.resets, [21]);
+    expect(find.text('Rst-456-xyz'), findsOneWidget);
+    expect(find.textContaining('saat login berikutnya'), findsWidgets);
+    expect(api.saved, isEmpty, reason: 'the reset is not a form save');
+  });
+
+  testWidgets('DRMS 27/10: a refused reset shows the server message', (tester) async {
+    final api = _FakeOnb(
+      user: _user(),
+      resetError: const ProblemException(
+        status: 409,
+        detail: 'Akun nonaktif — aktifkan dulu sebelum mereset kata sandi.',
+      ),
+    );
+    await pumpScreen(tester, const OnboardingScreen(id: 21), overrides: [onboardingApiProvider.overrideWithValue(api)]);
+    await tester.tap(find.byKey(const Key('onb-reset-password')));
+    await tester.pumpAndSettle();
+    await confirmPopup(tester, key: const Key('onb-reset-password-confirm'));
+    expect(find.textContaining('Akun nonaktif'), findsOneWidget);
+    expect(find.byKey(const Key('onb-temp-password')), findsNothing);
+  });
+
+  for (final (why, user) in [
+    ('own account', _user(id: 5)),
+    ('inactive account', _user(active: false)),
+    ('account of a PT the caller does not manage', _user(identityEditable: false)),
+  ]) {
+    testWidgets('DRMS 27/10: no Reset password for the $why', (tester) async {
+      final api = _FakeOnb(user: user);
+      final id = user['id']! as int;
+      await pumpScreen(tester, OnboardingScreen(id: id), overrides: [onboardingApiProvider.overrideWithValue(api)]);
+      expect(find.byKey(const Key('onb-email')), findsOneWidget);
+      expect(find.byKey(const Key('onb-reset-password')), findsNothing);
+    });
+  }
 }
