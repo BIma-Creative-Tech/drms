@@ -11124,6 +11124,42 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Instruksi Owner'**
   String get loanStepInstructedOwner;
+
+  /// No description provided for @onbPassword.
+  ///
+  /// In id, this message translates to:
+  /// **'Kata sandi'**
+  String get onbPassword;
+
+  /// No description provided for @onbResetPassword.
+  ///
+  /// In id, this message translates to:
+  /// **'Reset password'**
+  String get onbResetPassword;
+
+  /// No description provided for @onbResetPasswordAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Reset kata sandi'**
+  String get onbResetPasswordAction;
+
+  /// No description provided for @onbResetPasswordHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Untuk pengguna yang lupa kata sandi: membuat kata sandi sementara baru yang wajib diganti saat login berikutnya.'**
+  String get onbResetPasswordHint;
+
+  /// No description provided for @onbResetPasswordNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Kata sandi lama tidak berlaku lagi. Pengguna login dengan kata sandi sementara yang ditampilkan, lalu wajib membuat kata sandi baru.'**
+  String get onbResetPasswordNote;
+
+  /// No description provided for @onbResetPasswordBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Berikan langsung kepada pengguna. Kata sandi ini hanya ditampilkan sekali; saat login berikutnya pengguna wajib menggantinya.'**
+  String get onbResetPasswordBody;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

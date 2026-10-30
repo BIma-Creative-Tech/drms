@@ -6393,4 +6393,25 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get loanStepInstructedOwner => 'Instruksi Owner';
+
+  @override
+  String get onbPassword => 'Kata sandi';
+
+  @override
+  String get onbResetPassword => 'Reset password';
+
+  @override
+  String get onbResetPasswordAction => 'Reset kata sandi';
+
+  @override
+  String get onbResetPasswordHint =>
+      'Untuk pengguna yang lupa kata sandi: membuat kata sandi sementara baru yang wajib diganti saat login berikutnya.';
+
+  @override
+  String get onbResetPasswordNote =>
+      'Kata sandi lama tidak berlaku lagi. Pengguna login dengan kata sandi sementara yang ditampilkan, lalu wajib membuat kata sandi baru.';
+
+  @override
+  String get onbResetPasswordBody =>
+      'Berikan langsung kepada pengguna. Kata sandi ini hanya ditampilkan sekali; saat login berikutnya pengguna wajib menggantinya.';
 }
