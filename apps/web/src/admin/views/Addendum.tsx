@@ -62,7 +62,7 @@ export async function AddendumList(props: AdminViewServerProps) {
   const d = await withReqTransaction(req, async () => {
     const page = await listAddenda(req, { projectId: project, status, limit: lq.per, after: before, q: lq.q })
     const all = await listAddenda(req, { projectId: project, limit: 100 })
-    const projects = (await req.payload.find({ collection: 'projects', sort: 'code', depth: 0, pagination: false, select: { code: true, name: true, company: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; code: string; name: string; company?: unknown }>
+    const projects = (await req.payload.find({ collection: 'projects', sort: 'code', depth: 0, pagination: false, select: { code: true, name: true, company: true }, user: req.user, overrideAccess: false, req, disableErrors: true })).docs as Array<{ id: number; code: string; name: string; company?: unknown }>
     const inbox = await addendumInbox(req)
     const canCreate = (await addendumProjectOptions(req)).length > 0
     return { page, all: all.items, projects, inbox: inbox.items.length, canCreate }

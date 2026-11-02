@@ -76,7 +76,7 @@ async function loadProject(req: PayloadRequest, id: number, lock: boolean): Prom
   const r = await rows<ProjectRow>(req, sql`SELECT id, code, name, status::text AS status, company_id FROM projects WHERE id = ${id} AND is_deleted IS NOT TRUE${lock ? sql` FOR UPDATE` : sql``}`)
   const p = r[0]
   if (!p) return fail(404, 'NOT_FOUND', 'Project tidak ditemukan.')
-  const visible = await req.payload.count({ collection: 'projects', where: { id: { equals: id } }, overrideAccess: false, user: req.user, req }).catch(() => ({ totalDocs: 0 }))
+  const visible = await req.payload.count({ collection: 'projects', where: { id: { equals: id } }, overrideAccess: false, user: req.user, req, disableErrors: true })
   if (visible.totalDocs === 0) fail(404, 'NOT_FOUND', 'Project tidak ditemukan.')
   return p
 }

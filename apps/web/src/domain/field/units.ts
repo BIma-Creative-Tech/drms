@@ -18,7 +18,7 @@ type ContractRow = Record<string, unknown> & { id: number; startDate: string; en
 
 async function readableProject(req: PayloadRequest, projectId: number): Promise<{ id: number; company: number; kind: string; pm: number | null }> {
   // the caller's project read access decides (Staff: assigned, PM: team, office: all) — else 404
-  const visible = await req.payload.find({ collection: 'projects', where: { id: { equals: projectId } }, limit: 1, depth: 0, pagination: false, select: { kind: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))
+  const visible = await req.payload.find({ collection: 'projects', where: { id: { equals: projectId } }, limit: 1, depth: 0, pagination: false, select: { kind: true }, user: req.user, overrideAccess: false, req, disableErrors: true })
   if (visible.docs.length === 0) fail(404, 'NOT_FOUND', 'Project tidak ditemukan.', 'project')
   const p = (await loadProject(req, projectId))!
   return { id: p.id, company: p.company, kind: p.kind, pm: p.pm }

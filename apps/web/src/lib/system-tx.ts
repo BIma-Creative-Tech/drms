@@ -37,6 +37,11 @@ export async function withReqTransaction<T>(req: PayloadRequest, fn: () => Promi
   req.transactionID = id
   try {
     const result = await fn()
+    // Payload rolls the request transaction back and removes it from req on EVERY error one of its operations throws
+    // (utilities/killTransaction.js, payload 3.90.1) — also when `fn` catches it (a refused 403/404 read turned into
+    // "not found"). Never go on as if it were still open: what `fn` wrote before is gone, later writes ran outside it.
+    // Reads that may be refused pass `disableErrors: true` (null / no rows, nothing thrown) instead.
+    if (req.transactionID !== id) throw new Error('withReqTransaction: the transaction was rolled back by a caught Payload error (read with disableErrors: true)')
     // Payload's commitTransaction swallows COMMIT errors (@payloadcms/drizzle 3.90.1
     // transactions/commitTransaction.js + beginTransaction.js `.catch`), so a failing DEFERRED
     // constraint trigger would roll back silently while the caller reports success. Force every

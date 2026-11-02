@@ -209,7 +209,7 @@ export async function RapProject(props: AdminViewServerProps) {
   const id = /^\d{1,10}$/.test(raw) ? Number(raw) : NaN
   const data = Number.isSafeInteger(id)
     ? await withReqTransaction(r, async () => {
-        const p = (await r.payload.findByID({ collection: 'projects', id, depth: 0, select: { code: true, name: true, kind: true, status: true, company: true }, user: r.user, overrideAccess: false /* caller's read scope */, req: r }).catch(() => null)) as {
+        const p = (await r.payload.findByID({ collection: 'projects', id, depth: 0, select: { code: true, name: true, kind: true, status: true, company: true }, user: r.user, overrideAccess: false /* caller's read scope */, req: r, disableErrors: true })) as {
           code?: string
           name?: string
           kind?: string | null

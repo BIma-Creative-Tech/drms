@@ -121,33 +121,24 @@ export const listRequestsEndpoint = v1({
     if (search) and.push(search)
     if (pageNo !== undefined && scope !== 'inbox') {
       // DRMS 10/10 D8: numbered pages (newest first) instead of the cursor
-      try {
-        const res = await req.payload.find({ collection: 'expense-requests', where: and.length ? { and } : undefined, sort: '-id', page: pageNo, limit, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req })
-        return json({ items: (res.docs as unknown as RequestDoc[]).map((d) => listItem(d)), nextCursor: null, page: res.page ?? pageNo, totalPages: Math.max(1, res.totalPages), totalDocs: res.totalDocs })
-      } catch (err) {
-        if ((err as { status?: number }).status === 403) return json({ items: [], nextCursor: null, page: 1, totalPages: 1, totalDocs: 0 })
-        throw err
-      }
+      // disableErrors: no read access → empty page (a thrown 403 would roll back the request transaction)
+      const res = await req.payload.find({ collection: 'expense-requests', where: and.length ? { and } : undefined, sort: '-id', page: pageNo, limit, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req, disableErrors: true })
+      return json({ items: (res.docs as unknown as RequestDoc[]).map((d) => listItem(d)), nextCursor: null, page: res.page ?? pageNo, totalPages: Math.max(1, res.totalPages), totalDocs: res.totalDocs })
     }
     const after = decodeCursor(cursor)
     if (after !== undefined) and.push({ id: { less_than: after } })
-    let docs: RequestDoc[] = []
-    try {
-      const res = await req.payload.find({
-        collection: 'expense-requests',
-        where: and.length ? { and } : undefined,
-        sort: '-id',
-        limit: scope === 'inbox' ? 200 : limit + 1,
-        depth: 0,
-        user: req.user,
-        overrideAccess: false, // caller's read scope
-        req,
-      })
-      docs = res.docs as unknown as RequestDoc[]
-    } catch (err) {
-      if ((err as { status?: number }).status === 403) return json({ items: [], nextCursor: null })
-      throw err
-    }
+    const res = await req.payload.find({
+      collection: 'expense-requests',
+      where: and.length ? { and } : undefined,
+      sort: '-id',
+      limit: scope === 'inbox' ? 200 : limit + 1,
+      depth: 0,
+      user: req.user,
+      overrideAccess: false, // caller's read scope
+      req,
+      disableErrors: true, // no read access → [] (a thrown 403 would roll back the request transaction)
+    })
+    let docs = res.docs as unknown as RequestDoc[]
     if (scope === 'inbox') {
       const mine: RequestDoc[] = []
       for (const d of docs) {

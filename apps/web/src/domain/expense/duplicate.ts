@@ -64,11 +64,11 @@ export async function duplicateAsDraft(req: PayloadRequest, id: number): Promise
   const input = duplicateDraftInput(src)
   if (input.vendorBankAccountId) {
     // ADR 0027: an account that is no longer usable (inactive) is dropped — the filer picks one before submit
-    const acc = await req.payload.findByID({ collection: 'vendor-bank-accounts', id: input.vendorBankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: is the copied vendor account still usable */, req }).catch(() => null)
+    const acc = await req.payload.findByID({ collection: 'vendor-bank-accounts', id: input.vendorBankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: is the copied vendor account still usable */, req, disableErrors: true })
     if (!acc || acc.active === false || relId(acc.vendor) !== input.vendorId) input.vendorBankAccountId = null
   }
   if (input.vendorId) {
-    const v = await req.payload.findByID({ collection: 'vendors', id: input.vendorId, depth: 0, overrideAccess: true /* SYSTEM-READ: is the copied vendor still active */, req }).catch(() => null)
+    const v = await req.payload.findByID({ collection: 'vendors', id: input.vendorId, depth: 0, overrideAccess: true /* SYSTEM-READ: is the copied vendor still active */, req, disableErrors: true })
     if (!v || v.active === false) input.vendorId = input.vendorBankAccountId = null
   }
   if (input.payeeCompanyId) {
@@ -78,8 +78,7 @@ export async function duplicateAsDraft(req: PayloadRequest, id: number): Promise
   }
   if (input.bankAccountId && !isDirectPayment(input.payeeType)) {
     const acc = await req.payload
-      .findByID({ collection: 'employee-bank-accounts', id: input.bankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: is the copied account still usable (G9) */, req })
-      .catch(() => null)
+      .findByID({ collection: 'employee-bank-accounts', id: input.bankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: is the copied account still usable (G9) */, req, disableErrors: true })
     if (!acc || acc.active === false || !(input.requesterIds ?? []).includes(relId(acc.employee) ?? -1)) input.bankAccountId = null
   }
   const { doc } = await createDraft(req, input)

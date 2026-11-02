@@ -213,9 +213,8 @@ async function defaultOf(f: FormLeaf['field'], req: PayloadRequest): Promise<unk
 async function labelsOf(req: PayloadRequest, relationTo: string, ids: Array<number | string>): Promise<Map<string, string>> {
   if (ids.length === 0) return new Map()
   const r = await req.payload
-    .find({ collection: relationTo as CollectionSlug, where: { id: { in: ids } }, depth: 0, limit: ids.length, pagination: false, user: req.user, overrideAccess: false, req })
-    .catch(() => ({ docs: [] as unknown[] }))
-  return new Map((r.docs as Doc[]).map((d) => [String(d.id), titleOf(req, relationTo, d)]))
+    .find({ collection: relationTo as CollectionSlug, where: { id: { in: ids } }, depth: 0, limit: ids.length, pagination: false, user: req.user, overrideAccess: false, req, disableErrors: true })
+  return new Map((r.docs as unknown as Doc[]).map((d) => [String(d.id), titleOf(req, relationTo, d)]))
 }
 
 /** The audit reason rules (withAudit / withGlobalAudit keep them under `custom.pkAudit.reasonRules`). */
@@ -280,7 +279,7 @@ export const dataFormEndpoint = v1({
     const rawId = req.searchParams.get('id')
     const id = rawId === null || rawId === '' ? null : idParam(rawId)
     const collection = req.payload.collections[cfg.slug as CollectionSlug]!
-    const doc = id === null ? null : ((await req.payload.findByID({ collection: cfg.slug as CollectionSlug, id, depth: 0, user: req.user, overrideAccess: false, req }).catch(() => null)) as Doc | null)
+    const doc = id === null ? null : ((await req.payload.findByID({ collection: cfg.slug as CollectionSlug, id, depth: 0, user: req.user, overrideAccess: false, req, disableErrors: true })) as Doc | null)
     if (id !== null && !doc) throw new HttpError(404, 'Not Found')
     const perms = (await docAccessOperation({ collection, req, ...(id !== null ? { id } : {}) })) as Perms
     const op = id === null ? 'create' : 'update'
@@ -316,7 +315,7 @@ export const dataOptionsEndpoint = v1({
     const f = leaf.field as Field & { relationTo: string; filterOptions?: unknown }
     const rawId = req.searchParams.get('id')
     const id = rawId ? idParam(rawId) : undefined
-    const doc = id !== undefined ? ((await req.payload.findByID({ collection: cfg.slug as CollectionSlug, id, depth: 0, user: req.user, overrideAccess: false, req }).catch(() => null)) as Doc | null) : null
+    const doc = id !== undefined ? ((await req.payload.findByID({ collection: cfg.slug as CollectionSlug, id, depth: 0, user: req.user, overrideAccess: false, req, disableErrors: true })) as Doc | null) : null
     // the form state the web hands filterOptions (`data` / `siblingData`): the stored doc, overlaid by `data[<key>]=` params
     const data: Doc = { ...(doc ?? {}) }
     for (const [k, v] of req.searchParams.entries()) {
@@ -409,7 +408,7 @@ export const dataUpdateEndpoint = v1({
   handler: async ({ req, body, params }) => {
     const cfg = writableOf(req, params.collection)
     const id = idParam(params.id)
-    const exists = await req.payload.findByID({ collection: cfg.slug as CollectionSlug, id, depth: 0, user: req.user, overrideAccess: false, req }).catch(() => null)
+    const exists = await req.payload.findByID({ collection: cfg.slug as CollectionSlug, id, depth: 0, user: req.user, overrideAccess: false, req, disableErrors: true })
     if (!exists) throw new HttpError(404, 'Not Found')
     const data = await writeData(req, cfg, body.data, 'update', id)
     if (body.reason) data[CHANGE_REASON] = body.reason

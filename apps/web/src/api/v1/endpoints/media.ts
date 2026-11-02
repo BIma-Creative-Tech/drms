@@ -164,12 +164,7 @@ async function signatureOnVisibleRequest(req: PayloadRequest, mediaId: number): 
   const reqIds = rows.docs.map((d) => relId((d as { request?: unknown }).request)).filter((x): x is number => x !== undefined)
   if (reqIds.length === 0) return false
   // QA-MC4-07: those requests only (was: every visible request id of the caller)
-  const visible = await req.payload
-    .find({ collection: 'expense-requests', where: { id: { in: reqIds } }, depth: 0, limit: 1, pagination: false, select: { status: true }, user: req.user, overrideAccess: false, req })
-    .catch((err: { status?: number }) => {
-      if (err.status === 403) return { docs: [] }
-      throw err
-    })
+  const visible = await req.payload.find({ collection: 'expense-requests', where: { id: { in: reqIds } }, depth: 0, limit: 1, pagination: false, select: { status: true }, user: req.user, overrideAccess: false, req, disableErrors: true })
   return visible.docs.length > 0
 }
 
@@ -200,11 +195,11 @@ async function selfieOnVisibleAttendance(req: PayloadRequest, mediaId: number): 
  * Shared by the file download, the signed-URL minting and the signed-URL re-check.
  */
 async function readableMedia(req: PayloadRequest, slug: CollectionSlug, id: number): Promise<MediaDoc | null> {
-  let doc = (await req.payload.findByID({ collection: slug, id, depth: 0, user: req.user, overrideAccess: false, req }).catch(() => null)) as MediaDoc | null
+  let doc = (await req.payload.findByID({ collection: slug, id, depth: 0, user: req.user, overrideAccess: false, req, disableErrors: true })) as MediaDoc | null
   const fallback =
     (slug === 'media-signatures' && (() => signatureOnVisibleRequest(req, id))) || (slug === 'media-selfies' && (() => selfieOnVisibleAttendance(req, id))) || null
   if (!doc && fallback && (await fallback())) {
-    doc = (await req.payload.findByID({ collection: slug, id, depth: 0, overrideAccess: true /* SYSTEM-READ: visibility checked above */, req }).catch(() => null)) as MediaDoc | null
+    doc = (await req.payload.findByID({ collection: slug, id, depth: 0, overrideAccess: true /* SYSTEM-READ: visibility checked above */, req, disableErrors: true })) as MediaDoc | null
   }
   return doc
 }

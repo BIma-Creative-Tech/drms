@@ -109,8 +109,7 @@ export async function loadVisibleAddendum(req: PayloadRequest, id: number, opts:
   if (!Number.isSafeInteger(id) || id <= 0 || !mayReadAddenda(req)) fail(404, 'NOT_FOUND', 'Addendum tidak ditemukan.')
   if (opts.lock) await lockAddendum(req, id)
   const doc = (await req.payload
-    .findByID({ collection: 'budget-addenda', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req })
-    .catch(() => null)) as AddendumDoc | null
+    .findByID({ collection: 'budget-addenda', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req, disableErrors: true })) as AddendumDoc | null
   if (!doc) fail(404, 'NOT_FOUND', 'Addendum tidak ditemukan.')
   return doc!
 }

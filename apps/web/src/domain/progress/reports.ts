@@ -104,8 +104,7 @@ async function loadRaw(req: PayloadRequest, id: number): Promise<ReportDoc | nul
 /** A report the CALLER may read (collection access), else 404. */
 export async function loadVisibleReport(req: PayloadRequest, id: number): Promise<ReportDoc> {
   const doc = (await req.payload
-    .findByID({ collection: 'progress-reports', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req })
-    .catch(() => null)) as ReportDoc | null
+    .findByID({ collection: 'progress-reports', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req, disableErrors: true })) as ReportDoc | null
   if (!doc) fail(404, 'NOT_FOUND', 'Laporan progress tidak ditemukan.')
   return doc!
 }

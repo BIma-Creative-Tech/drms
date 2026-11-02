@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-11-02
+
+**Hotfix: "tidak ditemukan" instead of error 500.** No migrations. API contract 0.23.1 (version only). APK unchanged
+(0.14.1).
+
+### Fixed
+- **A document the caller may not read answered error 500 (prod 2026-11-01/02).** The loan detail
+  (`/admin/pinjaman/detail/{id}`) of a loan outside the caller's PTs (e.g. a PT whose membership is inactive) and the
+  Persetujuan page of an account without read access showed "getRequestTx: no active transaction on req" instead of
+  "Pinjaman tidak ditemukan" / an empty list. Payload rolls the request transaction back on EVERY error one of its
+  operations throws, also when our code catches it: the refused read was caught, the page went on and found no
+  transaction at the end. Every request-bound read that may be refused or miss — detail loaders (loan, addendum,
+  progress report, request, field report, RAP item, project), the visible-id helpers behind the satellite read rules,
+  lists, pickers, masters, media and PDF reads (87 places) — now asks Payload for "null / no rows" (`disableErrors`)
+  instead of catching an error. Read-only page loads: no data was changed by the failed requests.
+- `withReqTransaction` names a transaction lost that way ("rolled back by a caught Payload error") instead of going
+  on with it. Unit guard: no request-bound Local API read in `src/` swallows its error with `.catch`.
+
 ## [0.23.0] - 2026-10-29
 
 **Admin password reset + web fixes (PR #134, #146, #148, #149, #150).** No migrations. API contract 0.23.0

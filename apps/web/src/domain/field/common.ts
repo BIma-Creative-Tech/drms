@@ -144,7 +144,7 @@ export async function loadRaw<T extends FieldDoc>(req: PayloadRequest, type: Fie
 
 /** A document the CALLER may read (collection access), else 404. */
 export async function loadVisible<T extends FieldDoc>(req: PayloadRequest, type: FieldReportType, id: number): Promise<T> {
-  const doc = (await req.payload.findByID({ collection: FIELD_COLLECTIONS[type], id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req }).catch(() => null)) as T | null
+  const doc = (await req.payload.findByID({ collection: FIELD_COLLECTIONS[type], id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req, disableErrors: true })) as T | null
   if (!doc) fail(404, 'NOT_FOUND', `${FIELD_REPORT_LABELS[type]} tidak ditemukan.`)
   return doc!
 }

@@ -317,8 +317,7 @@ export const dataDetailEndpoint = v1({
 /** The read-only detail of one document (also the answer of the phase-5 create / update, data-forms.ts). */
 export async function detailOf(req: PayloadRequest, cfg: ReturnType<typeof collectionOf>, id: number) {
   const doc = (await req.payload
-    .findByID({ collection: cfg.slug as CollectionSlug, id, depth: 1, user: req.user, overrideAccess: false, req })
-    .catch(() => null)) as Doc | null
+    .findByID({ collection: cfg.slug as CollectionSlug, id, depth: 1, user: req.user, overrideAccess: false, req, disableErrors: true })) as Doc | null
   if (!doc) throw new HttpError(404, 'Not Found')
   const tz = await tzOf(req)
   return {

@@ -288,10 +288,8 @@ function anyId(v: unknown): number | undefined {
 export async function parentCompany(data: unknown, parent: CompanyParent, user: unknown, req: PayloadRequest | undefined): Promise<number | undefined> {
   const id = anyId((data as Record<string, unknown> | undefined)?.[parent.field])
   if (id !== undefined && req?.payload) {
-    const r = await req.payload
-      .find({ collection: parent.collection, where: { id: { equals: id } }, limit: 1, depth: 0, pagination: false, select: { company: true } as never, user: req.user, overrideAccess: false /* the caller's readable parent only */, req })
-      .catch(() => null)
-    const c = relId((r?.docs[0] as { company?: unknown } | undefined)?.company)
+    const r = await req.payload.find({ collection: parent.collection, where: { id: { equals: id } }, limit: 1, depth: 0, pagination: false, select: { company: true } as never, user: req.user, overrideAccess: false /* the caller's readable parent only */, req, disableErrors: true })
+    const c = relId((r.docs[0] as { company?: unknown } | undefined)?.company)
     if (c !== undefined) return c
   }
   return formOrSoleCompany(data, user)

@@ -115,7 +115,7 @@ function closingCompany(req: PayloadRequest, companyId: number | undefined, role
 export type CashAccountDoc = { id: number; name?: string | null; company?: unknown; active?: boolean | null; openingBalance?: number | null; openingBalanceDate?: string | null }
 
 export async function assertAccount(req: PayloadRequest, id: number, companyId?: number): Promise<CashAccountDoc> {
-  const a = (await req.payload.findByID({ collection: 'cash-accounts', id, depth: 0, overrideAccess: true /* SYSTEM-READ: account check, PT compared below */, req }).catch(() => null)) as CashAccountDoc | null
+  const a = (await req.payload.findByID({ collection: 'cash-accounts', id, depth: 0, overrideAccess: true /* SYSTEM-READ: account check, PT compared below */, req, disableErrors: true })) as CashAccountDoc | null
   if (!a || a.active === false || (companyId !== undefined && relId(a.company) !== companyId)) fail(400, 'Akun kas tidak ditemukan atau nonaktif.', [{ path: 'cashAccountId', message: 'Akun kas tidak valid.' }])
   return a!
 }
@@ -373,7 +373,7 @@ export async function loadEntry(req: PayloadRequest, id: number, opts: { system?
   if (!Number.isSafeInteger(id) || id <= 0) fail(404, 'Transaksi kas tidak ditemukan.')
   const tx = await getRequestTx(req)
   await tx.execute(sql`SELECT id FROM cash_entries WHERE id = ${id} FOR UPDATE`)
-  const e = await req.payload.findByID({ collection: 'cash-entries', id, depth: 0, overrideAccess: true /* SYSTEM-READ: PT role checked below */, req }).catch(() => null)
+  const e = await req.payload.findByID({ collection: 'cash-entries', id, depth: 0, overrideAccess: true /* SYSTEM-READ: PT role checked below */, req, disableErrors: true })
   if (!e) fail(404, 'Transaksi kas tidak ditemukan.')
   // ADR 0016 §5 (MC2 fix): edit / void only by Finance OF THE ENTRY's PT (else 404, no existence leak)
   if (req.user && !opts.system && !hasRole(req, 'pk-finance', relId((e as { company?: unknown }).company))) fail(404, 'Transaksi kas tidak ditemukan.')

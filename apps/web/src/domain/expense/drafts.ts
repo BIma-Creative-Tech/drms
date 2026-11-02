@@ -243,21 +243,21 @@ export async function validateContent(
 
   // G10: project / cost center in the caller's scope (office roles: any active one).
   if (c.projectId) {
-    const p = await req.payload.findByID({ collection: 'projects', id: c.projectId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
+    const p = await req.payload.findByID({ collection: 'projects', id: c.projectId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req, disableErrors: true })
     // D1610: a soft-deleted project is reported like a missing one (findByID still returns it — labels of old documents)
     if (!p || p.isDeleted === true || isForeign(req, relId(p.company) ?? -1)) errors.push({ path: 'projectId', message: 'Project tidak ditemukan.' })
     else if (!isRequestableProjectStatus(p.status)) errors.push({ path: 'projectId', message: p.status === 'dibatalkan' ? 'Project sudah dibatalkan.' : 'Project sudah selesai/diarsipkan.' })
     else if (!office && !(await scope()).assignedProjects.includes(c.projectId)) fail(403, 'Project di luar penugasan Anda.')
   }
   if (c.costCenterId) {
-    const cc = await req.payload.findByID({ collection: 'cost-centers', id: c.costCenterId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
+    const cc = await req.payload.findByID({ collection: 'cost-centers', id: c.costCenterId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req, disableErrors: true })
     if (!cc || cc.active === false || cc.isDeleted === true || isForeign(req, relId(cc.company) ?? -1)) errors.push({ path: 'costCenterId', message: 'Pusat biaya tidak ditemukan atau nonaktif.' })
     else if (!office && !(await scope()).assignedCostCenters.includes(c.costCenterId)) fail(403, 'Pusat biaya di luar penugasan Anda.')
   }
 
   // Owner decision 2026-10-09: "Tingkat Urgensi" (per-PT master) replaces the activity period of Q-04.
   if (c.urgencyLevelId) {
-    const u = await req.payload.findByID({ collection: 'urgency-levels', id: c.urgencyLevelId, depth: 0, overrideAccess: true /* SYSTEM-READ: master check */, req }).catch(() => null)
+    const u = await req.payload.findByID({ collection: 'urgency-levels', id: c.urgencyLevelId, depth: 0, overrideAccess: true /* SYSTEM-READ: master check */, req, disableErrors: true })
     const uPt = relId(u?.company) ?? -1
     if (!u || u.active === false || isForeign(req, uPt) || (company !== undefined && uPt !== company)) {
       errors.push({ path: 'urgencyLevelId', message: 'Tingkat urgensi tidak ditemukan atau nonaktif.' })
@@ -309,8 +309,7 @@ export async function validateContent(
   if (!direct && opts.forSubmit && !c.bankAccountId) errors.push({ path: 'bankAccountId', message: 'Rekening tujuan wajib diisi.' })
   if (!direct && c.bankAccountId) {
     const acc = await req.payload
-      .findByID({ collection: 'employee-bank-accounts', id: c.bankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: G9 */, req })
-      .catch(() => null)
+      .findByID({ collection: 'employee-bank-accounts', id: c.bankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: G9 */, req, disableErrors: true })
     if (!acc || acc.active === false || isForeign(req, relId(acc.company) ?? -1)) errors.push({ path: 'bankAccountId', message: 'Rekening tidak ditemukan atau nonaktif.' })
     else if (!uniq.includes(relId(acc.employee) ?? -1)) errors.push({ path: 'bankAccountId', message: 'Rekening harus milik salah satu pemohon.' })
   }

@@ -18,21 +18,17 @@ export async function visibleLoanIds(req: PayloadRequest): Promise<number[]> {
   if (uid === undefined || !mayReadLoans(req)) return []
   const cached = req.context?.[CTX_IDS] as { uid: number; ids: number[] } | undefined
   if (cached && cached.uid === uid) return cached.ids
-  let ids: number[] = []
-  try {
-    const res = await req.payload.find({
-      collection: 'project-loans',
-      depth: 0,
-      pagination: false,
-      select: { status: true },
-      user: req.user,
-      overrideAccess: false, // the caller's own read scope decides
-      req,
-    })
-    ids = res.docs.map((d) => d.id as number)
-  } catch (err) {
-    if ((err as { status?: number }).status !== 403) throw err
-  }
+  const res = await req.payload.find({
+    collection: 'project-loans',
+    depth: 0,
+    pagination: false,
+    select: { status: true },
+    user: req.user,
+    overrideAccess: false, // the caller's own read scope decides
+    req,
+    disableErrors: true, // no read access → [] (a thrown 403 would roll back the request transaction)
+  })
+  const ids = res.docs.map((d) => d.id as number)
   req.context[CTX_IDS] = { uid, ids }
   return ids
 }

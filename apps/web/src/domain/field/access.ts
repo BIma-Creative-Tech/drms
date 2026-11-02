@@ -81,22 +81,18 @@ export async function visibleFieldIds(req: PayloadRequest, type: FieldReportType
   req.context ??= {}
   const cache = (req.context[CTX_IDS] ??= {}) as Record<string, number[]>
   if (cache[key]) return cache[key]
-  let ids: number[] = []
-  try {
-    const res = await req.payload.find({
-      collection: FIELD_COLLECTIONS[type],
-      ...(except.length > 0 ? { where: { company: { not_in: except } } } : {}),
-      depth: 0,
-      pagination: false,
-      select: { project: true } as never,
-      user: req.user,
-      overrideAccess: false, // the caller's own read scope decides
-      req,
-    })
-    ids = (res.docs as unknown as Array<{ id: number }>).map((d) => d.id)
-  } catch (err) {
-    if ((err as { status?: number }).status !== 403) throw err
-  }
+  const res = await req.payload.find({
+    collection: FIELD_COLLECTIONS[type],
+    ...(except.length > 0 ? { where: { company: { not_in: except } } } : {}),
+    depth: 0,
+    pagination: false,
+    select: { project: true } as never,
+    user: req.user,
+    overrideAccess: false, // the caller's own read scope decides
+    req,
+    disableErrors: true, // no read access → [] (a thrown 403 would roll back the request transaction)
+  })
+  const ids = (res.docs as unknown as Array<{ id: number }>).map((d) => d.id)
   cache[key] = ids
   return ids
 }

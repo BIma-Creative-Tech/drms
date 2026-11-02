@@ -126,23 +126,18 @@ export async function listReports(req: PayloadRequest, f: ReportListFilter): Pro
   if (f.companyIds?.length) and.push({ company: { in: [...f.companyIds] } }) // MC3: narrows only
   const text = searchWhere(['docNo', 'work', 'issues'], f.q) // DRMS 10/10 D8
   if (text) and.push(text)
-  let docs: ReportDoc[] = []
-  try {
-    const res = await req.payload.find({
-      collection: 'progress-reports',
-      where: and.length ? { and } : undefined,
-      sort: '-id',
-      limit: f.limit + 1,
-      depth: 0,
-      user: req.user,
-      overrideAccess: false, // caller's read scope (PM team, Direktur/Finance all)
-      req,
-    })
-    docs = res.docs as unknown as ReportDoc[]
-  } catch (err) {
-    if ((err as { status?: number }).status === 403) return { items: [], nextCursor: null }
-    throw err
-  }
+  const res = await req.payload.find({
+    collection: 'progress-reports',
+    where: and.length ? { and } : undefined,
+    sort: '-id',
+    limit: f.limit + 1,
+    depth: 0,
+    user: req.user,
+    overrideAccess: false, // caller's read scope (PM team, Direktur/Finance all)
+    req,
+    disableErrors: true, // no read access → [] (a thrown 403 would roll back the request transaction)
+  })
+  const docs = res.docs as unknown as ReportDoc[]
   const page = docs.slice(0, f.limit)
   return { items: await reportDtos(req, page), nextCursor: docs.length > f.limit ? page[page.length - 1]!.id : null }
 }

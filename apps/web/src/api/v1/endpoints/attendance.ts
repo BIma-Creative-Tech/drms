@@ -294,12 +294,11 @@ export const attendanceSelfieEndpoint = v1({
     if (!/^\d{1,10}$/.test(p.id ?? '')) throw new HttpError(404, 'Not Found')
     const id = Number(p.id)
     const att = (await req.payload
-      .findByID({ collection: 'attendances', id, depth: 0, user: req.user, overrideAccess: false, req })
-      .catch(() => null)) as { id: number; user?: unknown; employee?: unknown; selfie?: unknown } | null
+      .findByID({ collection: 'attendances', id, depth: 0, user: req.user, overrideAccess: false, req, disableErrors: true })) as { id: number; user?: unknown; employee?: unknown; selfie?: unknown } | null
     if (!att) throw new HttpError(404, 'Not Found')
     const selfieId = relId(att.selfie)
     const doc = selfieId
-      ? ((await req.payload.findByID({ collection: 'media-selfies', id: selfieId, depth: 0, overrideAccess: true /* SYSTEM-READ: visibility = attendance read access (checked above) */, req }).catch(() => null)) as {
+      ? ((await req.payload.findByID({ collection: 'media-selfies', id: selfieId, depth: 0, overrideAccess: true /* SYSTEM-READ: visibility = attendance read access (checked above) */, req, disableErrors: true })) as {
           filename?: string | null
           mimeType?: string | null
         } | null)

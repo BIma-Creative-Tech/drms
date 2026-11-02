@@ -100,43 +100,40 @@ async function loadType(req: PayloadRequest, type: MasterType, companies: number
   // per-PT masters: the PTs of this request (selection, narrowed by ?company=) — the collection
   // access applies on top (scope own/team/assigned/all per role IN each PT, ADR 0016 §5)
   if (!shared) and.push({ company: { in: companies.length ? companies : [-1] } })
-  try {
-    const res = await req.payload.find({
-      collection,
-      where: { and },
-      sort: 'updatedAt',
-      limit: LIMIT,
-      depth: 0,
-      overrideAccess: false, // access control of the collection applies (scope own/team/assigned/all)
-      req,
-    })
-    let items = res.docs.map((d) => pick(d as unknown as Record<string, unknown>, fields, shared))
-    // D1610 (ADR 0030): soft-deleted rows are not in the list (central read rule). A delta read (`since`) gets them as
-    // tombstones (`deleted: true`, `active: false`) so a delta cache can drop them; the full read simply omits them.
-    if (since && softDeleteEntry(collection)) items = [...items, ...(await tombstones(req, collection, and, fields, shared))]
-    // a cancelled project ("Batalkan proyek") is closed: inactive for the APK pickers (attendance, progress, reports)
-    if (type === 'projects') items = items.map((i) => (i.status === 'dibatalkan' ? { ...i, active: false } : i))
-    // assignments to a soft-deleted project are left out (the project itself is not in `projects`)
-    if (type === 'team-assignments') items = await withoutDeletedProjects(req, items)
-    if (type === 'employees' && items.length > 0) {
-      // ADR 0024: `direktur` = the employee's account holds Direktur in the employee's PT — the APK does not
-      // offer such an employee as requester to anyone else (a Direktur files his own request; server: 403 / 409).
-      // ADR 0026: also an Owner (pk-principal) — the Owner's own request is the no-approval one (filed by himself).
-      const dir = await direkturEmployees(req, items.map((i) => i.id as number))
-      items = items.map((i) => ({ ...i, direktur: dir.has(i.id as number) }))
-    }
-    if (type === 'projects' || type === 'cost-centers') {
-      // default geofence radius of EACH item's PT (ADR 0016 §1: per-PT setting)
-      const out: Item[] = []
-      for (const i of items) out.push(typeof i.company === 'number' ? withEffectiveRadius(i, (await companyById(req, i.company)).defaultGeofenceRadiusM) : i)
-      items = out
-    }
-    return { items, hasMore: res.hasNextPage }
-  } catch (err) {
-    // Access `false` (nothing in scope, e.g. staff without assignments) → Forbidden → empty list.
-    if ((err as { status?: number }).status === 403) return { items: [], hasMore: false }
-    throw err
+  const res = await req.payload.find({
+    collection,
+    where: { and },
+    sort: 'updatedAt',
+    limit: LIMIT,
+    depth: 0,
+    overrideAccess: false, // access control of the collection applies (scope own/team/assigned/all)
+    req,
+    // access `false` (nothing in scope, e.g. staff without assignments) → empty list, WITHOUT a thrown Forbidden
+    // (Payload rolls the request transaction back on every error it throws, a caught 403 included)
+    disableErrors: true,
+  })
+  let items = res.docs.map((d) => pick(d as unknown as Record<string, unknown>, fields, shared))
+  // D1610 (ADR 0030): soft-deleted rows are not in the list (central read rule). A delta read (`since`) gets them as
+  // tombstones (`deleted: true`, `active: false`) so a delta cache can drop them; the full read simply omits them.
+  if (since && softDeleteEntry(collection)) items = [...items, ...(await tombstones(req, collection, and, fields, shared))]
+  // a cancelled project ("Batalkan proyek") is closed: inactive for the APK pickers (attendance, progress, reports)
+  if (type === 'projects') items = items.map((i) => (i.status === 'dibatalkan' ? { ...i, active: false } : i))
+  // assignments to a soft-deleted project are left out (the project itself is not in `projects`)
+  if (type === 'team-assignments') items = await withoutDeletedProjects(req, items)
+  if (type === 'employees' && items.length > 0) {
+    // ADR 0024: `direktur` = the employee's account holds Direktur in the employee's PT — the APK does not
+    // offer such an employee as requester to anyone else (a Direktur files his own request; server: 403 / 409).
+    // ADR 0026: also an Owner (pk-principal) — the Owner's own request is the no-approval one (filed by himself).
+    const dir = await direkturEmployees(req, items.map((i) => i.id as number))
+    items = items.map((i) => ({ ...i, direktur: dir.has(i.id as number) }))
   }
+  if (type === 'projects' || type === 'cost-centers') {
+    // default geofence radius of EACH item's PT (ADR 0016 §1: per-PT setting)
+    const out: Item[] = []
+    for (const i of items) out.push(typeof i.company === 'number' ? withEffectiveRadius(i, (await companyById(req, i.company)).defaultGeofenceRadiusM) : i)
+    items = out
+  }
+  return { items, hasMore: res.hasNextPage }
 }
 
 /** D1610: rows soft-deleted since the delta point, within the caller's read access (`isDeleted` kept: INCLUDE_DELETED). */
@@ -144,7 +141,7 @@ async function tombstones(req: PayloadRequest, collection: CollectionSlug, and: 
   const before = req.context[INCLUDE_DELETED]
   req.context[INCLUDE_DELETED] = true
   try {
-    const res = await req.payload.find({ collection, where: { and: [...and, ONLY_DELETED] }, sort: 'updatedAt', limit: LIMIT, depth: 0, overrideAccess: false /* caller's read scope */, req })
+    const res = await req.payload.find({ collection, where: { and: [...and, ONLY_DELETED] }, sort: 'updatedAt', limit: LIMIT, depth: 0, overrideAccess: false /* caller's read scope */, req, disableErrors: true })
     return res.docs.map((d) => ({ ...pick(d as unknown as Record<string, unknown>, fields, shared), active: false, deleted: true }))
   } finally {
     if (before === undefined) delete req.context[INCLUDE_DELETED]

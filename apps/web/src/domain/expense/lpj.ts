@@ -433,8 +433,7 @@ export async function reverseSettlement(req: PayloadRequest, id: number, reason:
     const transferId = relId(s.shortfallTransfer)
     if (!transferId) fail(409, 'Transfer kekurangan tidak ditemukan pada LPJ ini.')
     const t = (await req.payload
-      .findByID({ collection: 'transfers', id: transferId, depth: 0, overrideAccess: true /* SYSTEM-READ: linked from the LPJ checked above */, req })
-      .catch(() => null)) as { id: number; docNo?: string; status: string; amount: number; transferDate: string; cashEntry?: unknown } | null
+      .findByID({ collection: 'transfers', id: transferId, depth: 0, overrideAccess: true /* SYSTEM-READ: linked from the LPJ checked above */, req, disableErrors: true })) as { id: number; docNo?: string; status: string; amount: number; transferDate: string; cashEntry?: unknown } | null
     if (!t) fail(409, 'Transfer kekurangan tidak ditemukan pada LPJ ini.')
     if (t.status !== 'posted') fail(409, 'Transfer kekurangan sudah dibatalkan.')
     if (lock && t.transferDate <= lock) closed(t.transferDate)
