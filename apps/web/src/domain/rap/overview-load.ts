@@ -21,23 +21,19 @@ type AggRow = { project_id: number; active_items: string; priced: string; rap_va
 export async function loadRapOverview(req: PayloadRequest): Promise<RapOverviewRow[]> {
   const companies = memberCompanies(req)
   if (companies.length === 0) return []
-  let docs: ProjectDoc[] = []
-  try {
-    const res = await req.payload.find({
-      collection: 'projects',
-      where: { company: { in: companies } },
-      sort: 'code',
-      depth: 0,
-      pagination: false,
-      select: { code: true, name: true, kind: true, status: true, company: true, budget: true },
-      user: req.user,
-      overrideAccess: false, // caller's project read scope (+ field access of the RAB)
-      req,
-    })
-    docs = res.docs as unknown as ProjectDoc[]
-  } catch (err) {
-    if ((err as { status?: number }).status !== 403) throw err
-  }
+  const res = await req.payload.find({
+    collection: 'projects',
+    where: { company: { in: companies } },
+    sort: 'code',
+    depth: 0,
+    pagination: false,
+    select: { code: true, name: true, kind: true, status: true, company: true, budget: true },
+    user: req.user,
+    overrideAccess: false, // caller's project read scope (+ field access of the RAB)
+    req,
+    disableErrors: true, // no read access → [] (a thrown 403 would roll back the request transaction)
+  })
+  const docs = res.docs as unknown as ProjectDoc[]
   if (docs.length === 0) return []
   const tx = await getRequestTx(req)
   const r = (await tx.execute(sql`

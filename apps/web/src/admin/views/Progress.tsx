@@ -165,7 +165,7 @@ export async function ProjectProgressView(props: AdminViewServerProps) {
     const addenda = await listAddenda(req, { projectId: id, limit: 5 })
     const teamPm = hasRoleAny(req, 'pk-pm') && (await resolveScope(req)).teamProjects.includes(id)
     const templates = hasRoleAny(req, 'pk-owner')
-      ? ((await req.payload.find({ collection: 'stage-templates', where: { active: { equals: true } }, depth: 0, pagination: false, select: { name: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; name: string }>)
+      ? ((await req.payload.find({ collection: 'stage-templates', where: { active: { equals: true } }, depth: 0, pagination: false, select: { name: true }, user: req.user, overrideAccess: false, req, disableErrors: true })).docs as Array<{ id: number; name: string }>)
       : []
     // FR1 (ADR 0020): field-report timeline tab for project kinds with field reports, PT flag on
     const companyId = typeof full.company === 'number' ? full.company : ((full.company as { id?: number } | null)?.id ?? null)
@@ -373,9 +373,9 @@ export async function ProgressReportList(props: AdminViewServerProps) {
   const lq = parseListQuery(props.searchParams)
   const d = await withReqTransaction(req, async () => {
     const page = await listReports(req, { projectId: q.project, stageId: q.stage, from: q.from, to: q.to, limit: lq.per, after: q.before, q: lq.q })
-    const projects = (await req.payload.find({ collection: 'projects', sort: 'code', depth: 0, pagination: false, select: { code: true, name: true, company: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; code: string; name: string; company?: unknown }>
+    const projects = (await req.payload.find({ collection: 'projects', sort: 'code', depth: 0, pagination: false, select: { code: true, name: true, company: true }, user: req.user, overrideAccess: false, req, disableErrors: true })).docs as Array<{ id: number; code: string; name: string; company?: unknown }>
     const stages = q.project
-      ? ((await req.payload.find({ collection: 'project-stages', where: { project: { equals: q.project } }, sort: 'sequence', depth: 0, pagination: false, select: { name: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; name: string }>)
+      ? ((await req.payload.find({ collection: 'project-stages', where: { project: { equals: q.project } }, sort: 'sequence', depth: 0, pagination: false, select: { name: true }, user: req.user, overrideAccess: false, req, disableErrors: true })).docs as Array<{ id: number; name: string }>)
       : []
     return { page, projects, stages, pt: await ptView(req) }
   })

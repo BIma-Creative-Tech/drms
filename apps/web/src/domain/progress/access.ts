@@ -40,22 +40,18 @@ export async function visibleReportIds(req: PayloadRequest, opts: { exceptCompan
   const cached = req.context?.[CTX_IDS] as { uid: number; byExcept: Record<string, number[]> } | undefined
   const hit = cached && cached.uid === uid ? cached.byExcept[k] : undefined
   if (hit) return hit
-  let ids: number[] = []
-  try {
-    const res = await req.payload.find({
-      collection: 'progress-reports',
-      ...(except.length > 0 ? { where: { company: { not_in: except } } } : {}),
-      depth: 0,
-      pagination: false,
-      select: { docNo: true },
-      user: req.user,
-      overrideAccess: false, // the caller's own read scope decides
-      req,
-    })
-    ids = res.docs.map((d) => d.id as number)
-  } catch (err) {
-    if ((err as { status?: number }).status !== 403) throw err
-  }
+  const res = await req.payload.find({
+    collection: 'progress-reports',
+    ...(except.length > 0 ? { where: { company: { not_in: except } } } : {}),
+    depth: 0,
+    pagination: false,
+    select: { docNo: true },
+    user: req.user,
+    overrideAccess: false, // the caller's own read scope decides
+    req,
+    disableErrors: true, // no read access → [] (a thrown 403 would roll back the request transaction)
+  })
+  const ids = res.docs.map((d) => d.id as number)
   req.context[CTX_IDS] = { uid, byExcept: { ...(cached && cached.uid === uid ? cached.byExcept : {}), [k]: ids } }
   return ids
 }

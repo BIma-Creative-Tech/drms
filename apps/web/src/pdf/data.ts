@@ -181,7 +181,7 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
   for (const [i, a] of attachmentIds.entries()) {
     const id = relId(a)
     const m = id
-      ? ((await req.payload.findByID({ collection: 'media-attachments', id, depth: 0, overrideAccess: true /* SYSTEM-READ: caller access checked */, req }).catch(() => null)) as {
+      ? ((await req.payload.findByID({ collection: 'media-attachments', id, depth: 0, overrideAccess: true /* SYSTEM-READ: caller access checked */, req, disableErrors: true })) as {
           mimeType?: string | null
           width?: number | null
           height?: number | null

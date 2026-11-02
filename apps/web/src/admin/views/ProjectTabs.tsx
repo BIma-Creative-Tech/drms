@@ -61,7 +61,7 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
   const id = idOf(props)
   const data = Number.isSafeInteger(id)
     ? await withReqTransaction(req, async () => {
-        const p = (await req.payload.findByID({ collection: 'projects', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req }).catch(() => null)) as { kind?: string | null; status?: string | null; company?: unknown } | null
+        const p = (await req.payload.findByID({ collection: 'projects', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req, disableErrors: true })) as { kind?: string | null; status?: string | null; company?: unknown } | null
         if (!p) return null
         const rap = await loadRap(req, id)
         // the item form only for the RAP editors (same condition as the Kelola RAP card)
@@ -291,7 +291,7 @@ type Row = ReturnType<typeof listItem>
  * any other role there → null (the collection read scope alone). The project must be readable by the caller.
  */
 async function ownOnlyWhere(req: PayloadRequest, projectId: number): Promise<Where | null> {
-  const p = (await req.payload.findByID({ collection: 'projects', id: projectId, depth: 0, select: { company: true }, user: req.user, overrideAccess: false /* caller's read scope */, req }).catch(() => null)) as { company?: unknown } | null
+  const p = (await req.payload.findByID({ collection: 'projects', id: projectId, depth: 0, select: { company: true }, user: req.user, overrideAccess: false /* caller's read scope */, req, disableErrors: true })) as { company?: unknown } | null
   const company = relId(p?.company)
   const roles = rolesIn(req, company)
   if (!roles.includes('pk-staff') || roles.some((r) => r !== 'pk-staff')) return null
@@ -320,8 +320,7 @@ export async function ProjectRequestsTab(props: DocumentViewServerProps) {
   if (own) and.push(own)
   const res = Number.isSafeInteger(id)
     ? await req.payload
-        .find({ collection: 'expense-requests', where: { and }, sort: '-id', page: lq.page, limit: lq.per, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req })
-        .catch(() => null)
+        .find({ collection: 'expense-requests', where: { and }, sort: '-id', page: lq.page, limit: lq.per, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req, disableErrors: true })
     : null
   const page = res ? pageOfFind({ ...res, docs: (res.docs as unknown as RequestDoc[]).map((d) => listItem(d)) }) : paginate<Row>([], 1, lq.per)
   const tone = (s: string) => (s === 'rejected' || s === 'cancelled' ? 'bad' : s === 'completed' ? 'ok' : s === 'draft' ? 'none' : s === 'pending_ack' || s === 'pending_approval' ? 'wait' : 'progress')

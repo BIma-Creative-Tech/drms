@@ -34,8 +34,7 @@ export async function loadStageSet(req: PayloadRequest, projectId: number) {
 /** The project must be readable by the caller (collection access) — else 404, no existence leak. */
 export async function requireVisibleProject(req: PayloadRequest, projectId: number): Promise<{ id: number; status?: string | null }> {
   const p = (await req.payload
-    .findByID({ collection: 'projects', id: projectId, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req })
-    .catch(() => null)) as { id: number; status?: string | null } | null
+    .findByID({ collection: 'projects', id: projectId, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req, disableErrors: true })) as { id: number; status?: string | null } | null
   if (!p) fail(404, 'NOT_FOUND', 'Project tidak ditemukan.')
   return p!
 }

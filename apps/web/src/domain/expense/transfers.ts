@@ -315,8 +315,7 @@ export async function voidTransfer(req: PayloadRequest, id: number, transferId: 
   requireAction(await actorContext(req, visible), 'transfer_void')
   const doc = await loadRaw(req, id)
   const t = (await req.payload
-    .findByID({ collection: 'transfers', id: transferId, depth: 0, overrideAccess: true /* SYSTEM-READ: belongs-to check below */, req })
-    .catch(() => null)) as TransferDoc | null
+    .findByID({ collection: 'transfers', id: transferId, depth: 0, overrideAccess: true /* SYSTEM-READ: belongs-to check below */, req, disableErrors: true })) as TransferDoc | null
   if (!t || relId(t.request) !== id) fail(404, 'Transfer tidak ditemukan.')
   if (t.status !== 'posted') fail(409, 'Transfer sudah dibatalkan.')
   // ADR 0029: a PT grup transfer reverses entries in two PTs → both fund locks first (ascending id)

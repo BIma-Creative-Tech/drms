@@ -43,7 +43,7 @@ export const rapEditorItems = (rap: Rap): RapItemView[] => rap.items.map(rapItem
  */
 export async function loadRapEditor(req: PayloadRequest, p: { id: number; company: number; status?: string | null }, rap: Rap): Promise<{ mode: RapEditMode; stages: Opt[]; uoms: Opt[] }> {
   const roles = await rapRoles(req, { id: p.id, company: p.company })
-  const units = (await req.payload.find({ collection: 'uoms', where: { active: { not_equals: false } }, sort: 'code', depth: 0, pagination: false, user: req.user, overrideAccess: false /* shared master, caller's read access */, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; code?: string; name?: string }>
+  const units = (await req.payload.find({ collection: 'uoms', where: { active: { not_equals: false } }, sort: 'code', depth: 0, pagination: false, user: req.user, overrideAccess: false /* shared master, caller's read access */, req, disableErrors: true })).docs as Array<{ id: number; code?: string; name?: string }>
   const stages = rap.stages.filter((s) => s.active || rap.items.some((i) => i.stage?.id === s.id)).map((s) => ({ id: s.id, label: s.active ? s.name : `${s.name} (nonaktif)` }))
   const uoms = units.map((u) => ({ id: u.id, label: `${u.code ?? ''}${u.name && u.name !== u.code ? ` — ${u.name}` : ''}` }))
   for (const i of rap.items) if (!uoms.some((u) => u.id === i.uom.id)) uoms.push({ id: i.uom.id, label: i.uom.code })

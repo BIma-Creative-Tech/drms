@@ -81,13 +81,9 @@ async function loadRow(req: PayloadRequest, entry: SoftDeleteEntry, id: number, 
 
 /** The caller may read the row (the collection's read access; a deleted row is found by id). */
 async function mayRead(req: PayloadRequest, slug: string, id: number): Promise<boolean> {
-  try {
-    const r = await req.payload.count({ collection: slug as CollectionSlug, where: { id: { equals: id } }, overrideAccess: false, user: req.user, req })
-    return r.totalDocs > 0
-  } catch (err) {
-    if ((err as { status?: number }).status === 403) return false
-    throw err
-  }
+  // disableErrors: no read access → 0 (a thrown 403 would roll back the request transaction)
+  const r = await req.payload.count({ collection: slug as CollectionSlug, where: { id: { equals: id } }, overrideAccess: false, user: req.user, req, disableErrors: true })
+  return r.totalDocs > 0
 }
 
 /** The collection's update access → true / false / the rows (`Where`) the caller may update. */

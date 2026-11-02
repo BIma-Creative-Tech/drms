@@ -53,13 +53,9 @@ export function officeQueueWhere(req: PayloadRequest, where: Where, f?: QueueFil
 }
 
 async function findVisible(req: PayloadRequest, where: Where, sort: string, limit = 200): Promise<Populated[]> {
-  try {
-    const res = await req.payload.find({ collection: 'expense-requests', where, sort, limit, depth: 1, user: req.user, overrideAccess: false, req })
-    return res.docs as unknown as Populated[]
-  } catch (err) {
-    if ((err as { status?: number }).status === 403) return []
-    throw err
-  }
+  // disableErrors: no read access → [] (a thrown 403 would roll back the request transaction)
+  const res = await req.payload.find({ collection: 'expense-requests', where, sort, limit, depth: 1, user: req.user, overrideAccess: false, req, disableErrors: true })
+  return res.docs as unknown as Populated[]
 }
 
 async function flagCounts(req: PayloadRequest, requestId: number) {

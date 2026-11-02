@@ -345,7 +345,7 @@ export async function createRapItem(req: PayloadRequest, projectId: number, inpu
 
 /** PATCH /rap-items/{id} — kind and project never change; deactivate with `active: false`. */
 export async function updateRapItem(req: PayloadRequest, itemId: number, input: RapItemInput, reason?: string | null): Promise<RapItemDto> {
-  const cur = (await req.payload.findByID({ collection: 'rap-items', id: itemId, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req }).catch(() => null)) as Record<string, unknown> | null
+  const cur = (await req.payload.findByID({ collection: 'rap-items', id: itemId, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req, disableErrors: true })) as Record<string, unknown> | null
   if (!cur) fail(404, 'NOT_FOUND', 'Item RAP tidak ditemukan.')
   const projectId = relId(cur!.project)!
   const p = await loadProjectFor(req, projectId)

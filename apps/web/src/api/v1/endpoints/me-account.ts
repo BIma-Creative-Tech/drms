@@ -18,8 +18,7 @@ async function ownRow(req: PayloadRequest): Promise<OwnRow> {
   const uid = userId(req)
   if (uid === undefined) throw new HttpError(401, 'Unauthorized')
   const row = await req.payload
-    .findByID({ collection: 'users', id: uid, depth: 0, overrideAccess: true /* SYSTEM-READ: the caller's OWN row */, req })
-    .catch(() => null)
+    .findByID({ collection: 'users', id: uid, depth: 0, overrideAccess: true /* SYSTEM-READ: the caller's OWN row */, req, disableErrors: true })
   if (!row) throw new HttpError(401, 'Unauthorized')
   return row as unknown as OwnRow
 }
@@ -30,8 +29,7 @@ async function accountOf(req: PayloadRequest, row: OwnRow) {
   let signature: { id: number; width: number | null; height: number | null } | null = null
   if (sigId !== undefined) {
     const m = (await req.payload
-      .findByID({ collection: 'media-signatures', id: sigId, depth: 0, overrideAccess: true /* SYSTEM-READ: the caller's own profile signature */, req })
-      .catch(() => null)) as SignatureRow | null
+      .findByID({ collection: 'media-signatures', id: sigId, depth: 0, overrideAccess: true /* SYSTEM-READ: the caller's own profile signature */, req, disableErrors: true })) as SignatureRow | null
     if (m) signature = { id: m.id, width: m.width ?? null, height: m.height ?? null }
   }
   return {

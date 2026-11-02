@@ -191,8 +191,7 @@ export async function loadVisibleLoan(req: PayloadRequest, id: number, opts: { l
   if (!Number.isSafeInteger(id) || id <= 0 || !mayReadLoans(req)) fail(404, 'NOT_FOUND', 'Pinjaman tidak ditemukan.')
   if (opts.lock) await lockLoan(req, id)
   const doc = (await req.payload
-    .findByID({ collection: 'project-loans', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req })
-    .catch(() => null)) as LoanDoc | null
+    .findByID({ collection: 'project-loans', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req, disableErrors: true })) as LoanDoc | null
   if (!doc) fail(404, 'NOT_FOUND', 'Pinjaman tidak ditemukan.')
   return doc!
 }
