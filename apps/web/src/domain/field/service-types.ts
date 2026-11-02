@@ -137,7 +137,7 @@ export async function listServiceTypes(req: PayloadRequest, f: { companyIds?: re
   if (!f.includeInactive) and.push({ active: { equals: true } })
   const r = await req.payload
     .find({ collection: 'service-types', where: { and }, depth: 0, pagination: false, sort: 'sortOrder', user: req.user, overrideAccess: false /* caller's read scope (members of the PT) */, req, disableErrors: true })
-  return (r.docs as Array<Record<string, unknown>>)
+  return (r.docs as unknown as Array<Record<string, unknown>>)
     .map(rowOf)
     .filter((t) => !t.deleted)
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'id') || a.id - b.id)

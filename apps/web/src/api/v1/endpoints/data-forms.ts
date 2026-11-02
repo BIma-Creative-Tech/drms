@@ -214,7 +214,7 @@ async function labelsOf(req: PayloadRequest, relationTo: string, ids: Array<numb
   if (ids.length === 0) return new Map()
   const r = await req.payload
     .find({ collection: relationTo as CollectionSlug, where: { id: { in: ids } }, depth: 0, limit: ids.length, pagination: false, user: req.user, overrideAccess: false, req, disableErrors: true })
-  return new Map((r.docs as Doc[]).map((d) => [String(d.id), titleOf(req, relationTo, d)]))
+  return new Map((r.docs as unknown as Doc[]).map((d) => [String(d.id), titleOf(req, relationTo, d)]))
 }
 
 /** The audit reason rules (withAudit / withGlobalAudit keep them under `custom.pkAudit.reasonRules`). */

@@ -138,7 +138,7 @@ export const listRequestsEndpoint = v1({
       req,
       disableErrors: true, // no read access → [] (a thrown 403 would roll back the request transaction)
     })
-    const docs = res.docs as unknown as RequestDoc[]
+    let docs = res.docs as unknown as RequestDoc[]
     if (scope === 'inbox') {
       const mine: RequestDoc[] = []
       for (const d of docs) {

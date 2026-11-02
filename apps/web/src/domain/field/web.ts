@@ -92,7 +92,7 @@ export async function contractsOf(req: PayloadRequest, projectIds: readonly numb
   if (projectIds.length === 0) return []
   const r = await req.payload
     .find({ collection: 'contract-units', where: { project: { in: [...projectIds] } }, sort: 'startDate', depth: 0, pagination: false, user: req.user, overrideAccess: false /* caller's scope; rate fields stripped by field access */, req, disableErrors: true })
-  const docs = r.docs as ContractRow[]
+  const docs = r.docs as unknown as ContractRow[]
   const n = await namesOf(req, docs, { users: [], clients: [] })
   return docs.map((c) => {
     const company = relId(c.company)!
@@ -186,7 +186,7 @@ export async function unitsOf(req: PayloadRequest, companies: readonly number[],
   if (opts.ids) and.push({ id: { in: [...opts.ids, 0] } }, NOT_DELETED)
   if (opts.activeOnly) and.push({ active: { equals: true } })
   const r = await req.payload.find({ collection: 'vehicles', where: { and }, sort: 'displayName', depth: 0, pagination: false, user: req.user, overrideAccess: false /* members read the units of their PTs */, req, disableErrors: true })
-  const docs = r.docs as Array<Record<string, unknown> & { id: number }>
+  const docs = r.docs as unknown as Array<Record<string, unknown> & { id: number }>
   const n = await namesOf(req, docs, { users: [], clients: ['client'] })
   return docs.map((d) => unitView(d, (id) => n.client.get(id) ?? null)).sort((a, b) => (a.kind === b.kind ? a.label.localeCompare(b.label, 'id') : a.kind === 'alat_berat' ? -1 : 1))
 }
