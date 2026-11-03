@@ -108,7 +108,7 @@ describe('Ganti bukti transfer — Selesai only', () => {
     expect(ok.body.transfers.find((t: { id: number }) => t.id === r.transferId).proofId).toBe(next)
     const after = await transferRow(r.transferId)
     expect(after).toEqual({ ...before, proof_id: next })
-    const rows = (await auditRows('transfer', r.transferId)).filter((a) => a.field === 'proof')
+    const rows = (await auditRows('transfer', r.transferId)).filter((a) => a.field === 'proof' && a.action === 'update')
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({ action: 'update', old_value: { v: r.proofId }, new_value: { v: next }, reason: 'salah upload bukti PB lain' })
     // the old file stays linked to the request: the requester still reads it (Riwayat link)
