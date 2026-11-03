@@ -391,6 +391,7 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /expense-requests/:id/flags/:fid/review': 'document',
   'POST /expense-requests/:id/transfer': 'document',
   'POST /expense-requests/:id/transfers/:tid/void': 'document',
+  'POST /expense-requests/:id/transfers/:tid/proof': 'document',
   'POST /expense-requests/:id/receipts-complete': 'document',
   'POST /expense-requests/:id/lpj/submit': 'document',
   'PUT /expense-requests/:id/lpj/photos': 'document',

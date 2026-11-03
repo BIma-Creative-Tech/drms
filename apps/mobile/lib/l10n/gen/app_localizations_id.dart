@@ -3630,6 +3630,27 @@ class AppLocalizationsId extends AppLocalizations {
   String get transferProofHelp => 'Foto bukti transfer bank (kamera atau galeri); dikompres sebelum diunggah.';
 
   @override
+  String get transferProofReplace => 'Ganti bukti transfer';
+
+  @override
+  String get transferProofReplaceNote =>
+      'Hanya file bukti yang diganti. Nominal, tanggal, akun, No. referensi bank dan KK tetap. Bukti lama tetap tersimpan di Riwayat.';
+
+  @override
+  String get transferProofNewLabel => 'Bukti transfer baru';
+
+  @override
+  String get transferProofReplaceReason => 'Alasan';
+
+  @override
+  String get transferProofReplaceReasonHint => 'Wajib, minimal 3 karakter. Tercatat di audit log.';
+
+  @override
+  String transferProofReplaceDone(String docNo) {
+    return 'Bukti transfer $docNo diganti. Bukti lama tetap tersimpan di Riwayat.';
+  }
+
+  @override
   String get processing => 'Memproses…';
 
   @override

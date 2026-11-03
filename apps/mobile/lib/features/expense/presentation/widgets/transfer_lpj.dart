@@ -9,10 +9,12 @@ import '../../../../shared/widgets/pk_ui.dart';
 import '../../../../shared/widgets/pk_ui_keuangan.dart';
 import '../../domain/expense_request.dart';
 import '../../domain/request_status.dart';
+import '../transfer_proof_replace_screen.dart';
 import 'receipt_thumb.dart';
 
 /// Transfer status for the requester (US-08: "Ditransfer" + amount, date, bank reference; void shown
-/// with its reason). Data = `ExpenseRequestDetail.transfers` (Finance posts them on the web).
+/// with its reason). Data = `ExpenseRequestDetail.transfers` (Finance posts them on the web). D0311: "Ganti bukti
+/// transfer" for Finance / Admin of the PT once the request is "Selesai".
 class TransferSection extends StatelessWidget {
   const TransferSection({super.key, required this.detail, this.zone});
   final ExpenseDetail detail;
@@ -101,6 +103,25 @@ class TransferSection extends StatelessWidget {
                           const SizedBox(width: 10),
                           Text(t.transferProofLabel, style: theme.textTheme.bodySmall),
                         ],
+                      ),
+                    ),
+                  // D0311 (user 2026-11-03): request "Selesai" → Finance / Admin of the PT replace a wrong bank proof
+                  // (file only, reason required) — same rule as the web (`transfer_proof_replace`)
+                  if (!tr.isVoid && detail.allowedActions.contains('transfer_proof_replace'))
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 0, 12, 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          key: Key('replace-proof-${tr.id}'),
+                          icon: const Icon(Icons.published_with_changes, size: 18),
+                          label: Text(t.transferProofReplace),
+                          onPressed: () => Navigator.of(context).push<bool>(
+                            MaterialPageRoute(
+                              builder: (_) => TransferProofReplaceScreen(detail: detail, transfer: tr),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                 ],

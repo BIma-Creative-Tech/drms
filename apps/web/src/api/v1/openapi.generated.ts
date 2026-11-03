@@ -3,7 +3,7 @@ export const openapiDocument = {
   "openapi": "3.1.0",
   "info": {
     "title": "RR Teams API v1",
-    "version": "0.23.1",
+    "version": "0.24.0",
     "description": "Versioned contract for the Android APK and admin custom views (architecture §6). Errors: RFC 9457."
   },
   "servers": [
@@ -3555,7 +3555,8 @@ export const openapiDocument = {
           "settle_reverse",
           "instruct_loan",
           "instruct_project_loan",
-          "delete_draft"
+          "delete_draft",
+          "transfer_proof_replace"
         ]
       },
       "ExpenseRequestCreate": {
@@ -4857,6 +4858,26 @@ export const openapiDocument = {
           "cashAccountId",
           "bankRef",
           "proofMediaId"
+        ],
+        "additionalProperties": false
+      },
+      "TransferProofReplace": {
+        "type": "object",
+        "properties": {
+          "proofMediaId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "New media-transfer-proofs id (POST /media/transfer-proofs, uploaded by the caller, not used elsewhere)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "proofMediaId",
+          "reason"
         ],
         "additionalProperties": false
       },
@@ -30710,6 +30731,165 @@ export const openapiDocument = {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ReasonBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Request after the action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseRequestDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/expense-requests/{id}/transfers/{tid}/proof": {
+      "post": {
+        "summary": "D0311 Finance / Admin of the PT: replace the bank proof of a posted transfer of a \"Selesai\" request (file only — amount, dates, accounts, bank reference and KK unchanged; also in a closed period). Reason required (audited, old file kept); 409 when the request is not Selesai or the transfer is void",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "tid",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferProofReplace"
               }
             }
           }

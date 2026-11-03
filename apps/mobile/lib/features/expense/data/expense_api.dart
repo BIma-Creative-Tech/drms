@@ -158,6 +158,24 @@ class ExpenseApi {
     (data) => detailFromJson(data as Map<String, dynamic>),
   );
 
+  /// D0311 "Ganti bukti transfer": `POST …/transfers/{transferId}/proof` — Finance / Admin of the PT replace the bank
+  /// proof of a posted transfer once the request is "Selesai" ([proofMediaId] from `POST /media/transfer-proofs`, reason
+  /// ≥ 3 characters, audited; nothing else of the transfer changes). Returns the updated detail.
+  Future<ExpenseDetail> replaceTransferProof(
+    int requestId,
+    int transferId, {
+    required int proofMediaId,
+    required String reason,
+    required String idempotencyKey,
+  }) => client.run(
+    (d) => d.post<dynamic>(
+      '/expense-requests/$requestId/transfers/$transferId/proof',
+      data: {'proofMediaId': proofMediaId, 'reason': reason},
+      options: _idem(idempotencyKey),
+    ),
+    (data) => detailFromJson(data as Map<String, dynamic>),
+  );
+
   Future<ExpenseDetail> _reasonAction(int requestId, String path, String reason, String idempotencyKey) => client.run(
     (d) =>
         d.post<dynamic>('/expense-requests/$requestId/$path', data: {'reason': reason}, options: _idem(idempotencyKey)),

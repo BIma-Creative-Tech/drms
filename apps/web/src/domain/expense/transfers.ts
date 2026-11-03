@@ -340,6 +340,35 @@ export async function voidTransfer(req: PayloadRequest, id: number, transferId: 
 }
 
 /**
+ * POST /expense-requests/{id}/transfers/{tid}/proof (D0311, user 2026-11-03 "Ganti bukti transfer"): Finance / Admin of
+ * the request's PT replace the bank proof of a POSTED transfer once the request is "Selesai" — a wrong upload no longer
+ * needs a DB fix. File only: amount, dates, accounts, bank reference and the KK stay as recorded, so a closed period
+ * does not block it. The old file keeps its owner link (readable from the Riwayat); the audit row carries old → new
+ * proof id with the reason. No notification (Finance's record). DB: pk_transfers_guard allows exactly this change.
+ */
+export async function replaceTransferProof(req: PayloadRequest, id: number, transferId: number, input: { proofMediaId: number; reason: string }) {
+  const visible = await loadVisible(req, id, { lock: true })
+  requireAction(await actorContext(req, visible), 'transfer_proof_replace')
+  const t = (await req.payload
+    .findByID({ collection: 'transfers', id: transferId, depth: 0, overrideAccess: true /* SYSTEM-READ: belongs-to check below */, req, disableErrors: true })) as (TransferDoc & { proof?: unknown }) | null
+  if (!t || relId(t.request) !== id) fail(404, 'Transfer tidak ditemukan.')
+  if (t!.status !== 'posted') fail(409, 'Transfer sudah di-void; buktinya tidak dapat diganti.')
+  const previous = relId(t!.proof) ?? null
+  if (previous === input.proofMediaId) fail(409, 'File bukti sama dengan bukti saat ini.')
+  await claimMedia(req, 'media-transfer-proofs', input.proofMediaId, id)
+  req.context.auditReason = input.reason
+  const transfer = await req.payload.update({
+    collection: 'transfers',
+    id: transferId,
+    data: { proof: input.proofMediaId } as never,
+    depth: 0,
+    overrideAccess: true, // SYSTEM-WRITE: proof only, after guards (DB: posted transfer of a completed request, nothing else changes)
+    req,
+  })
+  return { transfer, previousProofId: previous }
+}
+
+/**
  * ADR 0013 O-2 (S3e, S-29): requests among `requestIds` whose CURRENT approval cycle the caller
  * approved (Finance "Approval" decision). Approve and transfer by the same Finance user stay allowed
  * (small team, audited); the transfer screen shows "Anda juga yang menyetujui" as a warning.
