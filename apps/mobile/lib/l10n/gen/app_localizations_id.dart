@@ -3633,7 +3633,8 @@ class AppLocalizationsId extends AppLocalizations {
   String get transferProofReplace => 'Ganti bukti transfer';
 
   @override
-  String get transferProofReplaceNote => 'Hanya file bukti yang diganti. Nominal, tanggal, akun, No. referensi bank dan KK tetap. Bukti lama tetap tersimpan di Riwayat.';
+  String get transferProofReplaceNote =>
+      'Hanya file bukti yang diganti. Nominal, tanggal, akun, No. referensi bank dan KK tetap. Bukti lama tetap tersimpan di Riwayat.';
 
   @override
   String get transferProofNewLabel => 'Bukti transfer baru';
