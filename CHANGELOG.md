@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-03
+
+**Ganti bukti transfer (D0311, user 2026-11-03).** 1 migration (`20261103_100000_d0311_transfer_proof`, DB guard only).
+API contract 0.24.0 (additive): `POST /expense-requests/{id}/transfers/{tid}/proof`, action `transfer_proof_replace`.
+APK 0.15.0.
+
+### Added
+- **Finance and Admin of the PT replace the bank proof of a transfer once the request is "Selesai"** — a wrong upload
+  (e.g. TRF/DRMS/2611/0002) no longer needs a DB fix. Only the file changes: amount, dates, accounts, bank reference
+  and the KK stay as recorded, so a closed period does not block it. Reason required; the change is audited (old →
+  new file, reason) and the old file stays readable. While the request is "Sudah Ditransfer" nothing changes: a wrong
+  transfer is voided and recorded again. No notification to the requester (Finance's record).
+  - Web: "Ganti bukti TRF/…" on the request page (transfer section) and on the transfer document (Keuangan › Transfer
+    & LPJ › Transfer); "Riwayat" and "Log perubahan" link "Bukti lama" / "Bukti baru".
+  - APK 0.15.0: "Ganti bukti transfer" per posted transfer of the request detail (photo + reason).
+- DB: `pk_transfers_guard` lets `proof_id` change alone, on a completed request, to a transfer-proof file of that
+  request; every other column of a posted transfer stays immutable (void only). Down restores the previous guard.
+- Admin may upload transfer proofs (used only by this action; recording a transfer stays Finance).
+
 ## [0.23.1] - 2026-11-02
 
 **Hotfix: "tidak ditemukan" instead of error 500.** No migrations. API contract 0.23.1 (version only). APK unchanged
