@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
+
 import { sql } from '@payloadcms/db-postgres'
 import { createLocalReq, type Payload, type PayloadRequest } from 'payload'
 
@@ -26,12 +28,36 @@ export async function withSystemTransaction<T>(
   return withReqTransaction(req, () => fn(req))
 }
 
+/** The reqs whose transaction the current async call chain opened in withReqTransaction (nested use joins it). */
+const ownTx = new AsyncLocalStorage<ReadonlySet<PayloadRequest>>()
+/** Per req: settles when the withReqTransaction that currently owns `req.transactionID` has finished. */
+const txBusy = new WeakMap<PayloadRequest, Promise<void>>()
+
 /**
  * Wraps `fn` in a transaction bound to an EXISTING req (custom /api/v1 endpoints: Payload does
  * not open a transaction for root endpoints). Nested use joins the outer transaction.
+ *
+ * Prod 0.23.1 (2026-11-03): sibling server components of ONE admin page share `initPageResult.req` and render
+ * concurrently (Persetujuan: Addendum, Kekurangan LPJ, Pinjaman sections). They are not nested — each one used to see
+ * no / another section's `req.transactionID`, overwrite it and delete it in `finally` → 500. A sibling now waits until
+ * the running one has finished and opens its own transaction; only the async chain that opened it (AsyncLocalStorage)
+ * joins it. A transaction set on req by Payload itself (collection operation → hook) is joined as before.
  */
 export async function withReqTransaction<T>(req: PayloadRequest, fn: () => Promise<T>): Promise<T> {
+  if (ownTx.getStore()?.has(req)) return fn()
+  for (let busy = txBusy.get(req); busy; busy = txBusy.get(req)) await busy
   if (req.transactionID) return fn()
+  let done!: () => void
+  txBusy.set(req, new Promise<void>((resolve) => (done = resolve)))
+  try {
+    return await ownTx.run(new Set([...(ownTx.getStore() ?? []), req]), () => runInTransaction(req, fn))
+  } finally {
+    txBusy.delete(req)
+    done()
+  }
+}
+
+async function runInTransaction<T>(req: PayloadRequest, fn: () => Promise<T>): Promise<T> {
   const id = await req.payload.db.beginTransaction()
   if (!id) throw new Error('transactions not supported by adapter')
   req.transactionID = id
