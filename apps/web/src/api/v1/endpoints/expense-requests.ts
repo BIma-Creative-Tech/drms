@@ -12,7 +12,7 @@ import { bankPreview } from '@/domain/expense/bank-preview'
 import { detail, listItem } from '@/domain/expense/dto'
 import { addReceipt, editReceipt, rejectReceipt, removeReceipt, resubmitReceipts, reviewFlag, verifyAllReceipts, verifyReceipt } from '@/domain/expense/receipts'
 import { allowedActions } from '@/domain/expense/state'
-import { recordTransfer, voidTransfer } from '@/domain/expense/transfers'
+import { recordTransfer, replaceTransferProof, voidTransfer } from '@/domain/expense/transfers'
 import { acknowledge, approve, cancel, complete, DELETE_DRAFT_DEFAULT_REASON, deleteDraft, reject, submit, withdraw } from '@/domain/expense/workflow'
 import { receiptsComplete, requestLpjRevision, reverseSettlement, setLpjPhotos, settle, submitLpj, verifyLpj } from '@/domain/expense/lpj'
 import { requestHistory } from '@/domain/history'
@@ -44,6 +44,7 @@ import {
   RejectBody,
   SignBody,
   TransferCreate,
+  TransferProofReplace,
 } from '../schemas-flow'
 import { ProjectLoanInstruct } from '../schemas-loans'
 
@@ -469,6 +470,22 @@ export const voidTransferEndpoint = v1({
   },
 })
 
+/** D0311 "Ganti bukti transfer": Finance / Admin of the PT, request "Selesai", reason required — returns the detail. */
+export const replaceTransferProofEndpoint = v1({
+  path: '/expense-requests/:id/transfers/:tid/proof',
+  method: 'post',
+  roles: ['pk-finance', 'pk-admin'],
+  body: TransferProofReplace,
+  rateLimit: ACTION_LIMIT,
+  transactional: true,
+  idempotent: true,
+  handler: async ({ req, body, params }) => {
+    const id = idParam(params)
+    await replaceTransferProof(req, id, idParam(params, 'tid'), body)
+    return ok(req, id)
+  },
+})
+
 // ---------------------------------------------------------------- T5 LPJ & settlement (Pengajuan Baru)
 
 export const receiptsCompleteEndpoint = action('receipts-complete', EmptyBody, (req, id) => receiptsComplete(req, id))
@@ -687,6 +704,7 @@ export const EXPENSE_ENDPOINTS = [
   reviewFlagEndpoint,
   transferEndpoint,
   voidTransferEndpoint,
+  replaceTransferProofEndpoint,
   receiptsCompleteEndpoint,
   lpjSubmitEndpoint,
   lpjPhotosEndpoint,

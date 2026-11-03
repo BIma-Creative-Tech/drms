@@ -306,7 +306,8 @@ export const MediaTransferProofs = mediaCollection({
   imageSizes: [thumbJpeg],
   disposition: 'attachment',
   ownerCompany: true,
-  access: { read: focused('media-transfer-proofs', ownerLinked, true), create: rolesAllowedAny('pk-finance') },
+  // D0311: Admin uploads too — only for "Ganti bukti transfer" (recording a transfer stays Finance: claimed by its service)
+  access: { read: focused('media-transfer-proofs', ownerLinked, true), create: rolesAllowedAny('pk-finance', 'pk-admin') },
 })
 
 export const MediaSelfies = mediaCollection({

@@ -36,6 +36,9 @@ export const ACTIONS = [
   'settle_reverse',
   // D2410 (user decision "Hapus draft"): the creator / requester soft-deletes a Draft nobody ever decided on (ADR 0030).
   'delete_draft',
+  // D0311 (user 2026-11-03): Finance / Admin of the PT replace the bank proof of a posted transfer once the request is
+  // "Selesai" (file only — amount, date, account, bank reference and KK unchanged; reason required, audited).
+  'transfer_proof_replace',
 ] as const
 export type Action = (typeof ACTIONS)[number]
 
@@ -159,7 +162,7 @@ export function cascadeCancellable(type: RequestType, status: RequestStatus, pay
 }
 
 /** Actions that do not move the status (their own status preconditions are checked in allowedActions). */
-const NON_TRANSITION: ReadonlySet<Action> = new Set<Action>(['edit', 'resubmit', 'review_flag', 'add_receipt', 'receipt_verify', 'delete_draft'])
+const NON_TRANSITION: ReadonlySet<Action> = new Set<Action>(['edit', 'resubmit', 'review_flag', 'add_receipt', 'receipt_verify', 'delete_draft', 'transfer_proof_replace'])
 
 /**
  * Finance receipt / flag / LPJ / settlement actions. F2e refused them on a request where the Finance user is requester or
@@ -210,6 +213,8 @@ export function allowedActions(ctx: ActorContext): Action[] {
   add('review_flag', finance && ctx.status !== 'draft' && ctx.status !== 'cancelled' && ctx.status !== 'rejected')
   add('transfer', has(ctx, 'pk-finance'))
   add('transfer_void', has(ctx, 'pk-finance'))
+  // D0311: only on "Selesai" — while "Sudah Ditransfer" a wrong transfer is voided and recorded again (existing flow)
+  add('transfer_proof_replace', ctx.status === 'completed' && has(ctx, 'pk-finance', 'pk-admin'))
   add('complete', own || has(ctx, 'pk-finance'))
   add('resubmit', ctx.status === 'rejected' && own)
   // T5 (US-08, US-21, US-22): the requester side completes receipts and (re)submits the LPJ;
@@ -257,6 +262,8 @@ export function mayPerform(ctx: ActorContext, action: Action): boolean {
     case 'transfer':
     case 'transfer_void':
       return finance
+    case 'transfer_proof_replace':
+      return finance || has(ctx, 'pk-admin')
     case 'complete':
       return own || finance
     default:

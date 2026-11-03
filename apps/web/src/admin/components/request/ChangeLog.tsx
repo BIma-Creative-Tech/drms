@@ -57,6 +57,14 @@ export function ChangeLog({ entries, created, updated }: { entries: HistoryEntry
                     <td style={td}>
                       {r.field ? <span style={{ fontWeight: 600 }}>{r.field}: </span> : null}
                       {r.change}
+                      {r.files?.map((f) => (
+                        <React.Fragment key={f.href}>
+                          {' · '}
+                          <a href={f.href} target="_blank" rel="noopener noreferrer" data-pk-log-file>
+                            {f.label}
+                          </a>
+                        </React.Fragment>
+                      ))}
                     </td>
                     <td style={td}>{r.reason ?? '—'}</td>
                   </tr>

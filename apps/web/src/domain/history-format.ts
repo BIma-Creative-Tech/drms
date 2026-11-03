@@ -3,6 +3,7 @@
  * "Log perubahan" section of the expense-request page (DRMS 13/10 Persetujuan #6) read the same labels.
  * Pure module (unit-tested): no Payload import.
  */
+import { mediaFileUrl } from '@/admin/components/media/media-url'
 import { fieldLabel } from '@/lib/field-labels'
 import { formatServerTime } from '@/pdf/format'
 
@@ -72,6 +73,19 @@ export type HistoryEntry = {
   /** "lama → baru" or the status change. */
   change: string
   reason: string | null
+  /** D0311 "Ganti bukti transfer": the old and the new proof file (links; the media endpoint checks read access). */
+  files?: Array<{ label: string; href: string }>
+}
+
+const validMediaId = (v: unknown): v is number | string => (typeof v === 'number' || typeof v === 'string') && /^\d{1,10}$/.test(String(v))
+
+/** D0311: links of a transfer proof change (old → new) — null for any other row. */
+export function proofFiles(r: Pick<HistoryRow, 'docType' | 'field' | 'oldValue' | 'newValue'>): Array<{ label: string; href: string }> | null {
+  if (r.docType !== 'transfer' || r.field !== 'proof') return null
+  const out: Array<{ label: string; href: string }> = []
+  if (validMediaId(r.oldValue)) out.push({ label: 'Bukti lama', href: mediaFileUrl('transfer-proofs', r.oldValue) })
+  if (validMediaId(r.newValue)) out.push({ label: 'Bukti baru', href: mediaFileUrl('transfer-proofs', r.newValue) })
+  return out.length ? out : null
 }
 
 /** A history row as the change log shows it (labels in Bahasa Indonesia, status codes as their labels). */
@@ -99,5 +113,6 @@ export function historyEntry(r: HistoryRow, tz: string): HistoryEntry {
     field,
     change,
     reason: r.reason,
+    ...(proofFiles(r) ? { files: proofFiles(r)! } : {}),
   }
 }

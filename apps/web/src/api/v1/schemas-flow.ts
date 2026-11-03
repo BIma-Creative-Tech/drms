@@ -91,6 +91,8 @@ export const ActionEnum = z
     'instruct_project_loan',
     // D2410 "Hapus draft" (POST /expense-requests/{id}/delete-draft)
     'delete_draft',
+    // D0311 "Ganti bukti transfer" (POST /expense-requests/{id}/transfers/{tid}/proof): Finance / Admin of the PT, "Selesai" only
+    'transfer_proof_replace',
   ])
   .meta({ id: 'RequestAction' })
 
@@ -203,6 +205,15 @@ const confirmUnverifiedAccount = z
   .boolean()
   .optional()
   .meta({ description: 'QA-17: confirm a transfer to a bank account with verificationStatus ≠ verified (else 409 BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED); audited bank_unverified_confirmed.' })
+
+/** D0311: "Ganti bukti transfer" — the new proof (uploaded first) + the required reason; nothing else of the transfer changes. */
+export const TransferProofReplace = z
+  .object({
+    proofMediaId: id.meta({ description: 'New media-transfer-proofs id (POST /media/transfer-proofs, uploaded by the caller, not used elsewhere).' }),
+    reason,
+  })
+  .strict()
+  .meta({ id: 'TransferProofReplace' })
 
 export const TransferCreate = z
   .object({

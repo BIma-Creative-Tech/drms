@@ -8,6 +8,7 @@ import { formatServerTime } from '@/pdf/format'
 import { DocSummaryProvider } from './feedback/DocContext'
 import { expenseRequestSummary } from './feedback/summaries'
 import { ReasonAction } from './kas/ReasonAction'
+import { TransferProofReplace } from './kas/TransferProofReplace'
 import { KAS_STYLE } from './kas/style'
 import { Act, RequesterActions, type RequesterActionsProps } from './RequesterActions'
 import { ReviewDetails } from './ReviewDetails'
@@ -207,6 +208,17 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
                     confirmLabel="Void transfer"
                     testId={`void-transfer-${t.id}`}
                   />
+                ))}
+            </div>
+          ) : null}
+          {d.allowedActions.includes('transfer_proof_replace') ? (
+            // D0311 (user 2026-11-03): "Selesai" → Finance / Admin of the PT replace a wrong bank proof (file only, reason)
+            <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }} data-pk-transfer-proof-replace>
+              <style>{KAS_STYLE}</style>
+              {d.transfers
+                .filter((t) => t.status === 'posted')
+                .map((t) => (
+                  <TransferProofReplace key={t.id} requestId={d.id} transferId={t.id} transferNo={t.docNo} />
                 ))}
             </div>
           ) : null}
