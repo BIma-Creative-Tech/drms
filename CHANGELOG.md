@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.23.2] - 2026-11-03
+
+**Hotfix: Persetujuan page error 500.** No migrations. API contract 0.23.2 (version only). APK unchanged (0.14.1).
+
+### Fixed
+- **Menu Persetujuan › Persetujuan showed "This page couldn't load" on nearly every visit (prod 0.23.1, 2026-11-03).**
+  The Addendum and Kekurangan LPJ sections of the page load at the same time on the same page request; each opened
+  its own database transaction on it and overwrote / removed the other's, which the 0.23.1 check reported as
+  "transaction rolled back by a caught Payload error". `withReqTransaction` now lets such sibling sections take turns
+  (each in its own transaction); a call nested inside one still joins it. Read-only page loads: no data was changed
+  by the failed requests. Likely also the cause of the Persetujuan 500s of 2026-11-01.
+
 ## [0.23.1] - 2026-11-02
 
 **Hotfix: "tidak ditemukan" instead of error 500.** No migrations. API contract 0.23.1 (version only). APK unchanged
