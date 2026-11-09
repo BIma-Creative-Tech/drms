@@ -5005,6 +5005,30 @@ abstract class AppLocalizations {
   /// **'Maksimal {max} foto per laporan.'**
   String fieldPhotoLimit(int max);
 
+  /// No description provided for @fieldPhotoSourceTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tambah foto'**
+  String get fieldPhotoSourceTitle;
+
+  /// No description provided for @fieldPhotoFromCamera.
+  ///
+  /// In id, this message translates to:
+  /// **'Ambil dari kamera'**
+  String get fieldPhotoFromCamera;
+
+  /// No description provided for @fieldPhotoFromGallery.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih dari galeri (bisa lebih dari satu)'**
+  String get fieldPhotoFromGallery;
+
+  /// No description provided for @fieldPhotoGalleryTrimmed.
+  ///
+  /// In id, this message translates to:
+  /// **'{added} foto ditambahkan; sisanya tidak, batas {max} foto per laporan.'**
+  String fieldPhotoGalleryTrimmed(int added, int max);
+
   /// No description provided for @fieldPhotosOnServer.
   ///
   /// In id, this message translates to:

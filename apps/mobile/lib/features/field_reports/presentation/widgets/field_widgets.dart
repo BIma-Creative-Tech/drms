@@ -4,6 +4,7 @@ import 'package:camera/camera.dart' show CameraLensDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../app/theme.dart';
@@ -21,7 +22,7 @@ import '../../domain/field_models.dart';
 
 typedef FieldPhotoCapture = Future<Uint8List?> Function(BuildContext context, String title);
 
-/// Rear camera, no gallery (ADR 0010 decision 11). Overridden in widget tests.
+/// Rear camera (ADR 0010 decision 11; the service report also offers the gallery, below). Overridden in widget tests.
 final fieldPhotoCaptureProvider = Provider<FieldPhotoCapture>(
   (ref) =>
       (context, title) => Navigator.of(context).push<Uint8List>(
@@ -30,6 +31,55 @@ final fieldPhotoCaptureProvider = Provider<FieldPhotoCapture>(
         ),
       ),
 );
+
+/// RAW bytes of the gallery photos, in the order picked (`limit` = free slots, a hint to the system picker — older
+/// Android versions may return more; the caller trims); empty = cancelled.
+typedef FieldGalleryPick = Future<List<Uint8List>> Function(int limit);
+
+/// D0911 (user 2026-11-09): Laporan Service photos before / after may come from the gallery, several at once — an
+/// exception to ADR 0010 decision 11 for this report only. `pickMultiImage` needs a limit ≥ 2 (one slot left → the
+/// single picker). Callers compress on the device like a camera photo. Overridden in widget tests.
+final fieldGalleryPickProvider = Provider<FieldGalleryPick>(
+  (ref) => (limit) async {
+    if (limit <= 0) return const [];
+    final picker = ImagePicker();
+    final files = limit == 1
+        ? [?await picker.pickImage(source: ImageSource.gallery, requestFullMetadata: false)]
+        : await picker.pickMultiImage(limit: limit, requestFullMetadata: false);
+    return [for (final f in files) await f.readAsBytes()];
+  },
+);
+
+enum FieldPhotoSource { camera, gallery }
+
+/// "Tambah foto": camera or gallery (several). Null = dismissed.
+Future<FieldPhotoSource?> pickFieldPhotoSource(BuildContext context) {
+  final t = AppLocalizations.of(context);
+  return showModalBottomSheet<FieldPhotoSource>(
+    context: context,
+    showDragHandle: true,
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(title: Text(t.fieldPhotoSourceTitle, style: Theme.of(ctx).textTheme.titleMedium)),
+          ListTile(
+            key: const Key('field-photo-camera'),
+            leading: const Icon(Icons.photo_camera_outlined),
+            title: Text(t.fieldPhotoFromCamera),
+            onTap: () => Navigator.pop(ctx, FieldPhotoSource.camera),
+          ),
+          ListTile(
+            key: const Key('field-photo-gallery'),
+            leading: const Icon(Icons.photo_library_outlined),
+            title: Text(t.fieldPhotoFromGallery),
+            onTap: () => Navigator.pop(ctx, FieldPhotoSource.gallery),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
 /// `21 Sep 2026 12.05 WITA` of a server instant.
 String formatEditableUntil(String? iso, String? zone) => formatServerDateTime(iso, zone: zone);

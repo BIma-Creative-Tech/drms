@@ -338,6 +338,8 @@ void main() {
       await tester.ensureVisible(find.byKey(const Key('service-add-before')));
       await tester.tap(find.byKey(const Key('service-add-before')));
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('field-photo-camera')));
+      await tester.pumpAndSettle();
       expect(find.text('Sebelum (1)'), findsOneWidget);
       expect(find.byKey(const Key('service-summary')), findsOneWidget);
       expect(find.text('EX-01 · HM 1.023 → 1.025 · 1 sparepart · 1 foto'), findsOneWidget);
@@ -355,6 +357,50 @@ void main() {
       expect(c.filledParts.single.summary, 'Seal kit boom 1 set');
       expect(c.beforePhotos, ['ph-1']);
       expect(service.autosaved, isNotEmpty, reason: 'draft autosaved while typing');
+    });
+
+    // D0911 (user 2026-11-09): photos before / after from the gallery, several at once, up to the 25 slots
+    testWidgets('gallery adds several photos at once', (tester) async {
+      int? asked;
+      await pump(
+        tester,
+        const ServiceReportScreen(projectId: 41, unitId: 9),
+        extra: [
+          fieldGalleryPickProvider.overrideWithValue((limit) async {
+            asked = limit;
+            return List.generate(3, (i) => Uint8List.fromList([i]));
+          }),
+        ],
+      );
+      await tester.ensureVisible(find.byKey(const Key('service-add-after')));
+      await tester.tap(find.byKey(const Key('service-add-after')));
+      await tester.pumpAndSettle();
+      expect(find.text('Ambil dari kamera'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('field-photo-gallery')));
+      await tester.pumpAndSettle();
+      expect(asked, 25);
+      expect(find.text('Sesudah (3)'), findsOneWidget);
+      expect(find.text('Sebelum (0)'), findsOneWidget);
+    });
+
+    testWidgets('gallery picks beyond the 25 slots are trimmed with a note', (tester) async {
+      await pump(
+        tester,
+        const ServiceReportScreen(projectId: 41, unitId: 9),
+        extra: [
+          fieldGalleryPickProvider.overrideWithValue(
+            (limit) async => List.generate(30, (i) => Uint8List.fromList([i])),
+          ),
+        ],
+      );
+      await tester.ensureVisible(find.byKey(const Key('service-add-before')));
+      await tester.tap(find.byKey(const Key('service-add-before')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('field-photo-gallery')));
+      await tester.pumpAndSettle();
+      expect(find.text('Sebelum (25)'), findsOneWidget);
+      expect(find.text('25 foto ditambahkan; sisanya tidak, batas 25 foto per laporan.'), findsOneWidget);
+      expect(find.byKey(const Key('service-add-after')), findsNothing, reason: 'no slot left');
     });
 
     testWidgets('missing fields are marked; nothing is sent', (tester) async {

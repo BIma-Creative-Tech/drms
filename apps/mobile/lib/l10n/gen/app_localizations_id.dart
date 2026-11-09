@@ -2797,6 +2797,20 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
+  String get fieldPhotoSourceTitle => 'Tambah foto';
+
+  @override
+  String get fieldPhotoFromCamera => 'Ambil dari kamera';
+
+  @override
+  String get fieldPhotoFromGallery => 'Pilih dari galeri (bisa lebih dari satu)';
+
+  @override
+  String fieldPhotoGalleryTrimmed(int added, int max) {
+    return '$added foto ditambahkan; sisanya tidak, batas $max foto per laporan.';
+  }
+
+  @override
   String fieldPhotosOnServer(int count) {
     return '$count foto sudah ada di server (foto tidak bisa dihapus).';
   }

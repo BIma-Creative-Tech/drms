@@ -246,26 +246,54 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
     );
   }
 
+  int get _photoSlots =>
+      FieldReportType.serviceReport.maxPhotos - (_base?.serverPhotoCount ?? 0) - _before.length - _after.length;
+
+  /// D0911 (user 2026-11-09): camera (one photo) or gallery (several at once, up to the free slots of the 25).
   Future<void> _addPhoto({required bool after}) async {
     final t = AppLocalizations.of(context);
     final sub = ref.read(currentSubProvider);
     if (sub == null) return;
-    final raw = await ref.read(fieldPhotoCaptureProvider)(context, after ? t.fieldPhotoAfter : t.fieldPhotoBefore);
-    if (raw == null || !mounted) return;
+    final source = await pickFieldPhotoSource(context);
+    if (source == null || !mounted) return;
+    final slots = _photoSlots;
+    final List<Uint8List> picked;
+    if (source == FieldPhotoSource.camera) {
+      final raw = await ref.read(fieldPhotoCaptureProvider)(context, after ? t.fieldPhotoAfter : t.fieldPhotoBefore);
+      picked = [?raw];
+    } else {
+      picked = await ref.read(fieldGalleryPickProvider)(slots);
+    }
+    if (picked.isEmpty || !mounted) return;
+    final raws = picked.take(slots).toList();
     setState(() => _busy = true);
+    var added = 0;
+    String? error;
     try {
-      final uuid = await ref.read(fieldServiceProvider).addPhoto(sub, raw);
-      if (!mounted) return;
-      _set(() => after ? _after = [..._after, uuid] : _before = [..._before, uuid], 'photos');
-      await _autosave?.flush(); // the photo is on the phone now: keep the draft that references it
-    } on PhotoTooLargeException catch (e) {
-      if (mounted) showSnack(context, e.message);
-    } on QueueFullException catch (e) {
-      if (mounted) showSnack(context, e.message);
-    } on Object {
-      if (mounted) showSnack(context, t.fieldPhotoFailed);
+      for (final raw in raws) {
+        try {
+          final uuid = await ref.read(fieldServiceProvider).addPhoto(sub, raw);
+          if (!mounted) return;
+          added++;
+          _set(() => after ? _after = [..._after, uuid] : _before = [..._before, uuid], 'photos');
+        } on PhotoTooLargeException catch (e) {
+          error ??= e.message;
+        } on QueueFullException catch (e) {
+          error = e.message;
+          break; // the phone's queue is full: the next photos would fail the same way
+        } on Object {
+          error ??= t.fieldPhotoFailed;
+        }
+      }
+      if (added > 0) await _autosave?.flush(); // the photos are on the phone now: keep the draft that references them
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+    if (!mounted) return;
+    if (error != null) {
+      showSnack(context, error);
+    } else if (picked.length > raws.length) {
+      showSnack(context, t.fieldPhotoGalleryTrimmed(added, FieldReportType.serviceReport.maxPhotos));
     }
   }
 
@@ -354,8 +382,7 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
     final floor = _floor();
     final hm = parseDec(_hm.text);
     final hmBelow = !_isEdit && hm != null && floor != null && hm < floor - 0.005;
-    final remaining =
-        FieldReportType.serviceReport.maxPhotos - (_base?.serverPhotoCount ?? 0) - _before.length - _after.length;
+    final remaining = _photoSlots;
     final dates = allowedReportDates(ref.watch(fieldTodayProvider));
     final c = _current().service;
     final summary = [

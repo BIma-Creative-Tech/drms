@@ -1965,6 +1965,20 @@
       }
     }
   },
+  "fieldPhotoSourceTitle": "Tambah foto",
+  "fieldPhotoFromCamera": "Ambil dari kamera",
+  "fieldPhotoFromGallery": "Pilih dari galeri (bisa lebih dari satu)",
+  "fieldPhotoGalleryTrimmed": "{added} foto ditambahkan; sisanya tidak, batas {max} foto per laporan.",
+  "@fieldPhotoGalleryTrimmed": {
+    "placeholders": {
+      "added": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
   "fieldPhotosOnServer": "{count} foto sudah ada di server (foto tidak bisa dihapus).",
   "@fieldPhotosOnServer": {
     "placeholders": {
