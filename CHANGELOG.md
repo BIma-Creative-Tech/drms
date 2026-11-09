@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**APK 0.16.0 (APK-only, works with server 0.24.0)** (branch `feat/d0911-service-gallery`, pubspec `0.16.0+1`, release
+notes `docs/release-notes/apk/0.16.0.md`): no server change, no migration, no API change; APK 0.15.0 keeps working.
+
+### Added
+
+- **APK: Laporan Service photos from the gallery, several at once (D0911, user 2026-11-09).** The + of "Foto sebelum" /
+  "Foto sesudah" asks "Ambil dari kamera" or "Pilih dari galeri (bisa lebih dari satu)"; gallery photos are compressed
+  on the device like camera photos (JPEG, EXIF stripped). The 25-photo limit holds: the system picker is asked for the
+  free slots, extra picks are dropped with a note. An exception to ADR 0010 decision 11 (rear camera only) for this
+  report only; the daily report, timesheet HM photo, aftersales proof and selfies stay camera-only.
+
 ## [0.24.0] - 2026-11-03
 
 **Ganti bukti transfer (D0311, user 2026-11-03).** 1 migration (`20261103_100000_d0311_transfer_proof`, DB guard only).
