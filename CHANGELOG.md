@@ -23,6 +23,15 @@ notes `docs/release-notes/apk/0.16.0.md`): no server change, no migration, no AP
   identity is editable (`identityEditable`); the server re-checks and a refusal shows its message. Needs server
   0.23.0 or newer.
 
+### Fixed
+
+- **APK: "Ajukan" on a draft already sent to the server always failed (D1011, prod 05-11, Draft #181).** "Ajukan" saves
+  the draft first, so the submit always found that edit still queued ("Perubahan draft masih menunggu sinkron") on
+  every tap. The edit is now sent first, then the draft is submitted. Also: the editor kept the rev it opened with, so
+  the next save of the same open draft came back as a STALE_REV conflict ("Menunggu sinkron" / "diubah di web") without
+  anyone editing it on the web; saves are now based on the stored rev of a delivered copy. A real web edit still
+  conflicts, and "Ajukan" then refuses with a clear message instead of submitting the server version.
+
 ## [0.24.0] - 2026-11-03
 
 **Ganti bukti transfer (D0311, user 2026-11-03).** 1 migration (`20261103_100000_d0311_transfer_proof`, DB guard only).

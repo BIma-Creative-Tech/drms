@@ -56,8 +56,21 @@ class DraftService {
     final issues = validateForSave(draft);
     if (issues.isNotEmpty) throw DraftValidationException(issues);
     final lines = renumber(draft.lines);
-    final toSave = draft.copyWith(lines: lines, syncState: DraftSyncState.queued, lastError: null);
+    late DraftRequest toSave;
     await lock.run(() async {
+      // D1011: the editor keeps the copy it opened with, but a queued save may have been applied meanwhile (server id
+      // and rev stored by the sync engine). Base the next edit on that stored rev; the stale one made every second save
+      // of an open draft a STALE_REV conflict. Only a delivered ("synced") copy rebases: a real conflict (changed on the
+      // web) keeps its rule, and the editor carries the returned rev from then on.
+      final stored = await drafts.load(sub, draft.clientUuid);
+      final storedRev = stored?.syncState == DraftSyncState.synced ? stored?.serverRev : null;
+      toSave = draft.copyWith(
+        lines: lines,
+        syncState: DraftSyncState.queued,
+        lastError: null,
+        serverId: draft.serverId ?? stored?.serverId,
+        serverRev: (storedRev ?? 0) > (draft.serverRev ?? 0) ? storedRev : draft.serverRev,
+      );
       await drafts.save(sub, toSave);
       await outbox.enqueueDraftUpsert(
         sub: sub,
@@ -169,11 +182,34 @@ class DraftService {
 
   /// "Ajukan" — online only. Creates the server draft through `/api/v1` (idempotent by clientUuid)
   /// when the offline queue has not delivered it yet, uploads the receipts, then submits.
-  Future<ExpenseDetail> submit(String sub, DraftRequest original, {RapCheck rap = RapCheck.strict}) async {
+  ///
+  /// D1011: [flush] sends the offline queue first (the sync engine; it takes the same lock, so it runs before ours).
+  /// "Ajukan" saves the draft just before, so a draft the server already knows always had a queued edit and the submit
+  /// was refused with "masih menunggu sinkron" on every tap.
+  Future<ExpenseDetail> submit(
+    String sub,
+    DraftRequest original, {
+    RapCheck rap = RapCheck.strict,
+    Future<void> Function()? flush,
+  }) async {
     var draft = original;
     final issues = validateForSubmit(draft, rap: rap);
     if (issues.isNotEmpty) throw DraftValidationException(issues);
+    if (flush != null && await outbox.pendingForTarget(sub, draft.clientUuid) != null) await flush();
     return lock.run(() async {
+      final stored = await drafts.load(sub, draft.clientUuid);
+      if (stored != null) {
+        if (stored.syncState == DraftSyncState.conflict) {
+          throw const ProblemException(
+            status: 409,
+            detail: 'Draft ini diubah di web. Buka ulang draft dari daftar pengajuan, periksa, lalu Ajukan lagi.',
+          );
+        }
+        if (stored.syncState == DraftSyncState.rejected) {
+          throw ProblemException(status: 422, detail: stored.lastError ?? 'Perubahan draft ditolak server.');
+        }
+        if (draft.serverId == null && stored.serverId != null) draft = draft.copyWith(serverId: stored.serverId);
+      }
       final pending = await outbox.pendingForTarget(sub, draft.clientUuid);
       ExpenseDetail detail;
       if (draft.serverId != null && pending == null) {
