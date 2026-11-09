@@ -189,7 +189,7 @@ export async function LoanList(props: AdminViewServerProps) {
     const totals = await loanTotals(req, await loanScope(req))
     const inbox = (await loanInbox(req)).items.length
     const options = await loanProjectOptions(req)
-    const projects = (await req.payload.find({ collection: 'projects', sort: 'code', depth: 0, pagination: false, select: { code: true, name: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; code: string; name: string }>
+    const projects = (await req.payload.find({ collection: 'projects', sort: 'code', depth: 0, pagination: false, select: { code: true, name: true }, user: req.user, overrideAccess: false, req, disableErrors: true })).docs as Array<{ id: number; code: string; name: string }>
     return { page, totals, inbox, canCreate: options.borrowers.length > 0, projects }
   })
   const pt = await ptView(req)
@@ -689,7 +689,7 @@ export async function ProjectLoansTab(props: DocumentViewServerProps) {
   const d =
     Number.isSafeInteger(id) && readers
       ? await withReqTransaction(req, async () => {
-          const p = (await req.payload.findByID({ collection: 'projects', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req }).catch(() => null)) as { pm?: unknown; company?: unknown } | null
+          const p = (await req.payload.findByID({ collection: 'projects', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req, disableErrors: true })) as { pm?: unknown; company?: unknown } | null
           if (!p) return null
           const status = allowedValues(lq, 'status', LOAN_STATUSES)
           const role = loanRole(lq)

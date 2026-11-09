@@ -5005,6 +5005,30 @@ abstract class AppLocalizations {
   /// **'Maksimal {max} foto per laporan.'**
   String fieldPhotoLimit(int max);
 
+  /// No description provided for @fieldPhotoSourceTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tambah foto'**
+  String get fieldPhotoSourceTitle;
+
+  /// No description provided for @fieldPhotoFromCamera.
+  ///
+  /// In id, this message translates to:
+  /// **'Ambil dari kamera'**
+  String get fieldPhotoFromCamera;
+
+  /// No description provided for @fieldPhotoFromGallery.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih dari galeri (bisa lebih dari satu)'**
+  String get fieldPhotoFromGallery;
+
+  /// No description provided for @fieldPhotoGalleryTrimmed.
+  ///
+  /// In id, this message translates to:
+  /// **'{added} foto ditambahkan; sisanya tidak, batas {max} foto per laporan.'**
+  String fieldPhotoGalleryTrimmed(int added, int max);
+
   /// No description provided for @fieldPhotosOnServer.
   ///
   /// In id, this message translates to:
@@ -6468,6 +6492,42 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Foto bukti transfer bank (kamera atau galeri); dikompres sebelum diunggah.'**
   String get transferProofHelp;
+
+  /// No description provided for @transferProofReplace.
+  ///
+  /// In id, this message translates to:
+  /// **'Ganti bukti transfer'**
+  String get transferProofReplace;
+
+  /// No description provided for @transferProofReplaceNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Hanya file bukti yang diganti. Nominal, tanggal, akun, No. referensi bank dan KK tetap. Bukti lama tetap tersimpan di Riwayat.'**
+  String get transferProofReplaceNote;
+
+  /// No description provided for @transferProofNewLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Bukti transfer baru'**
+  String get transferProofNewLabel;
+
+  /// No description provided for @transferProofReplaceReason.
+  ///
+  /// In id, this message translates to:
+  /// **'Alasan'**
+  String get transferProofReplaceReason;
+
+  /// No description provided for @transferProofReplaceReasonHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Wajib, minimal 3 karakter. Tercatat di audit log.'**
+  String get transferProofReplaceReasonHint;
+
+  /// No description provided for @transferProofReplaceDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Bukti transfer {docNo} diganti. Bukti lama tetap tersimpan di Riwayat.'**
+  String transferProofReplaceDone(String docNo);
 
   /// No description provided for @processing.
   ///

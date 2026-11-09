@@ -74,8 +74,7 @@ export async function claimMedia(
 ) {
   const ownerType = opts.ownerType ?? 'expense_request'
   const m = (await req.payload
-    .findByID({ collection, id: mediaId, depth: 0, overrideAccess: true /* SYSTEM-READ: ownership checked below */, req })
-    .catch(() => null)) as { id: number; uploadedBy?: unknown; ownerDocType?: string | null; ownerDocId?: string | null; sha256Original?: string | null } | null
+    .findByID({ collection, id: mediaId, depth: 0, overrideAccess: true /* SYSTEM-READ: ownership checked below */, req, disableErrors: true })) as { id: number; uploadedBy?: unknown; ownerDocType?: string | null; ownerDocId?: string | null; sha256Original?: string | null } | null
   if (!m) fail(400, 'File tidak ditemukan.')
   if (!opts.anyUploader && relId(m.uploadedBy) !== userId(req)) fail(403, 'File bukan unggahan Anda.')
   // QA-11: an unclaimed upload removed by the orphan cleanup (domain/media-orphans.ts) is a tombstone
@@ -106,8 +105,7 @@ export async function claimAttachments(req: PayloadRequest, doc: RequestDoc, inv
   const invoice = relId(doc.invoiceFile)
   for (const mediaId of [...new Set([...ids(doc.attachments), ...(invoice !== undefined ? [invoice] : [])])]) {
     const m = (await req.payload
-      .findByID({ collection: 'media-attachments', id: mediaId, depth: 0, overrideAccess: true /* SYSTEM-READ: owner link checked below */, req })
-      .catch(() => null)) as { uploadedBy?: unknown; ownerDocType?: string | null; ownerDocId?: string | null } | null
+      .findByID({ collection: 'media-attachments', id: mediaId, depth: 0, overrideAccess: true /* SYSTEM-READ: owner link checked below */, req, disableErrors: true })) as { uploadedBy?: unknown; ownerDocType?: string | null; ownerDocId?: string | null } | null
     if (!m) fail(409, 'Lampiran tidak ditemukan; hapus dari pengajuan lalu unggah ulang.')
     if (m.ownerDocType === 'expense_request' && m.ownerDocId && m.ownerDocId !== String(doc.id)) continue
     if (!m.ownerDocId && !involved.has(relId(m.uploadedBy) ?? -1)) fail(409, 'Lampiran bukan unggahan pembuat/pemohon pengajuan ini; unggah ulang.')
@@ -185,8 +183,7 @@ export async function addReceipt(req: PayloadRequest, requestId: number, input: 
 
 async function loadReceipt(req: PayloadRequest, requestId: number, receiptId: number): Promise<ReceiptDoc> {
   const r = (await req.payload
-    .findByID({ collection: 'receipts', id: receiptId, depth: 0, overrideAccess: true /* SYSTEM-READ: belongs-to check below */, req })
-    .catch(() => null)) as ReceiptDoc | null
+    .findByID({ collection: 'receipts', id: receiptId, depth: 0, overrideAccess: true /* SYSTEM-READ: belongs-to check below */, req, disableErrors: true })) as ReceiptDoc | null
   if (!r || relId(r.request) !== requestId) fail(404, 'Nota tidak ditemukan.')
   return r
 }
@@ -513,8 +510,7 @@ export async function reviewFlag(req: PayloadRequest, requestId: number, flagId:
   const doc = await loadVisible(req, requestId, { lock: true })
   await requireActionAudited(req, await actorContext(req, doc), 'review_flag', doc)
   const f = (await req.payload
-    .findByID({ collection: 'receipt-flags', id: flagId, depth: 0, overrideAccess: true /* SYSTEM-READ: belongs-to check below */, req })
-    .catch(() => null)) as (FlagDoc & { request: unknown; relatedCompany?: unknown }) | null
+    .findByID({ collection: 'receipt-flags', id: flagId, depth: 0, overrideAccess: true /* SYSTEM-READ: belongs-to check below */, req, disableErrors: true })) as (FlagDoc & { request: unknown; relatedCompany?: unknown }) | null
   if (!f || relId(f.request) !== requestId || !mayViewFlag(req, f)) fail(404, 'Flag tidak ditemukan.')
   if (f.status !== 'open') fail(409, 'Flag tidak terbuka.')
   const updated = await req.payload.update({

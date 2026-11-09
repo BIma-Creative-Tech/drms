@@ -1965,6 +1965,20 @@
       }
     }
   },
+  "fieldPhotoSourceTitle": "Tambah foto",
+  "fieldPhotoFromCamera": "Ambil dari kamera",
+  "fieldPhotoFromGallery": "Pilih dari galeri (bisa lebih dari satu)",
+  "fieldPhotoGalleryTrimmed": "{added} foto ditambahkan; sisanya tidak, batas {max} foto per laporan.",
+  "@fieldPhotoGalleryTrimmed": {
+    "placeholders": {
+      "added": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
   "fieldPhotosOnServer": "{count} foto sudah ada di server (foto tidak bisa dihapus).",
   "@fieldPhotosOnServer": {
     "placeholders": {
@@ -2563,6 +2577,19 @@
   "transferProofLabel": "Bukti transfer",
   "proofRetake": "Foto ulang",
   "transferProofHelp": "Foto bukti transfer bank (kamera atau galeri); dikompres sebelum diunggah.",
+  "transferProofReplace": "Ganti bukti transfer",
+  "transferProofReplaceNote": "Hanya file bukti yang diganti. Nominal, tanggal, akun, No. referensi bank dan KK tetap. Bukti lama tetap tersimpan di Riwayat.",
+  "transferProofNewLabel": "Bukti transfer baru",
+  "transferProofReplaceReason": "Alasan",
+  "transferProofReplaceReasonHint": "Wajib, minimal 3 karakter. Tercatat di audit log.",
+  "transferProofReplaceDone": "Bukti transfer {docNo} diganti. Bukti lama tetap tersimpan di Riwayat.",
+  "@transferProofReplaceDone": {
+    "placeholders": {
+      "docNo": {
+        "type": "String"
+      }
+    }
+  },
   "processing": "Memproses…",
   "overdraftTitle": "Saldo akun kas akan minus",
   "overdraftFigures": "Saldo saat ini {balance}; sesudah transaksi ini {after}.",

@@ -119,18 +119,14 @@ export async function listProjects(req: PayloadRequest, q: ProjectListQuery) {
   const text = searchWhere(['code', 'name'], q.q)
   if (text) and.push(text)
   if (q.companies?.length) and.push({ company: { in: q.companies } })
-  try {
-    const res = await req.payload.find({ collection: 'projects', where: { and }, sort: 'code', page: q.page, limit: q.limit, depth: 0, user: req.user, overrideAccess: false /* caller's project read scope */, req })
-    return { docs: await items(req, res.docs as unknown as ProjectDoc[]), totalDocs: res.totalDocs, page: res.page ?? q.page, totalPages: Math.max(1, res.totalPages), limit: res.limit }
-  } catch (err) {
-    if ((err as { status?: number }).status === 403) return { docs: [], totalDocs: 0, page: 1, totalPages: 1, limit: q.limit }
-    throw err
-  }
+  // disableErrors: no read access → empty page (a thrown 403 would roll back the request transaction)
+  const res = await req.payload.find({ collection: 'projects', where: { and }, sort: 'code', page: q.page, limit: q.limit, depth: 0, user: req.user, overrideAccess: false /* caller's project read scope */, req, disableErrors: true })
+  return { docs: await items(req, res.docs as unknown as ProjectDoc[]), totalDocs: res.totalDocs, page: res.page ?? q.page, totalPages: Math.max(1, res.totalPages), limit: res.limit }
 }
 
 /** GET /projects/{id} — one visible project (else 404) incl. PM, default cost center and RAP summary. */
 export async function projectDetail(req: PayloadRequest, id: number) {
-  const d = (await req.payload.findByID({ collection: 'projects', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req }).catch(() => null)) as ProjectDoc | null
+  const d = (await req.payload.findByID({ collection: 'projects', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req, disableErrors: true })) as ProjectDoc | null
   if (!d) return null
   const [item] = await items(req, [d])
   const prices = (await rapRoles(req, { id, company: relId(d.company) ?? -1 })).prices
@@ -153,22 +149,18 @@ export async function listCostCenters(req: PayloadRequest, q: { q?: string; comp
   const text = searchWhere(['code', 'name'], q.q)
   if (text) and.push(text)
   if (q.companies?.length) and.push({ company: { in: q.companies } })
-  try {
-    const res = await req.payload.find({ collection: 'cost-centers', where: and.length ? { and } : undefined, sort: 'code', limit: 500, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req })
-    return {
-      docs: (res.docs as Array<{ id: number; code?: string; name?: string; type?: string; company?: unknown; active?: boolean | null }>).map((c) => ({
-        id: c.id,
-        code: c.code ?? '',
-        name: c.name ?? '',
-        type: c.type ?? null,
-        companyId: relId(c.company) ?? null,
-        active: c.active !== false,
-      })),
-      totalDocs: res.totalDocs,
-    }
-  } catch (err) {
-    if ((err as { status?: number }).status === 403) return { docs: [], totalDocs: 0 }
-    throw err
+  // disableErrors: no read access → [] (a thrown 403 would roll back the request transaction)
+  const res = await req.payload.find({ collection: 'cost-centers', where: and.length ? { and } : undefined, sort: 'code', limit: 500, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req, disableErrors: true })
+  return {
+    docs: (res.docs as Array<{ id: number; code?: string; name?: string; type?: string; company?: unknown; active?: boolean | null }>).map((c) => ({
+      id: c.id,
+      code: c.code ?? '',
+      name: c.name ?? '',
+      type: c.type ?? null,
+      companyId: relId(c.company) ?? null,
+      active: c.active !== false,
+    })),
+    totalDocs: res.totalDocs,
   }
 }
 

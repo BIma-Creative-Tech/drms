@@ -134,14 +134,10 @@ export async function lockRequest(req: PayloadRequest, id: number): Promise<void
 export async function loadVisible(req: PayloadRequest, id: number, opts: { lock?: boolean } = {}): Promise<RequestDoc> {
   if (!Number.isSafeInteger(id) || id <= 0) fail(404, 'Pengajuan tidak ditemukan.')
   if (opts.lock) await lockRequest(req, id)
-  try {
-    const doc = await req.payload.findByID({ collection: 'expense-requests', id, depth: 0, user: req.user, overrideAccess: false, req })
-    return doc as unknown as RequestDoc
-  } catch (err) {
-    const status = (err as { status?: number }).status
-    if (status === 404 || status === 403) fail(404, 'Pengajuan tidak ditemukan.')
-    throw err
-  }
+  // disableErrors: unreadable / unknown → null, not a thrown 403/404 (that would roll back the request transaction)
+  const doc = await req.payload.findByID({ collection: 'expense-requests', id, depth: 0, user: req.user, overrideAccess: false, req, disableErrors: true })
+  if (!doc) fail(404, 'Pengajuan tidak ditemukan.')
+  return doc as unknown as RequestDoc
 }
 
 /** Same document without access control (after the visibility check or for system work). */
@@ -238,7 +234,7 @@ export function selfApprovalAllowed(
  */
 export function requireAction(ctx: ActorContext, action: Action): void {
   if (!mayPerform(ctx, action)) fail(403, 'Anda tidak berhak melakukan aksi ini pada pengajuan ini.')
-  const nonTransition = ['edit', 'add_receipt', 'receipt_verify', 'review_flag', 'resubmit', 'delete_draft'].includes(action)
+  const nonTransition = ['edit', 'add_receipt', 'receipt_verify', 'review_flag', 'resubmit', 'delete_draft', 'transfer_proof_replace'].includes(action)
   if (!nonTransition && targets(ctx.type, ctx.status, action, ctx.payeeType).length === 0) {
     fail(409, `Aksi tidak dapat dilakukan pada status pengajuan saat ini (${ctx.status}).`)
   }
@@ -247,6 +243,10 @@ export function requireAction(ctx: ActorContext, action: Action): void {
     if (own && action === 'edit') fail(409, 'Pengajuan hanya dapat diubah saat Draft (tarik kembali dulu).')
     if (own && action === 'add_receipt') fail(409, 'Nota tidak dapat diubah pada status pengajuan saat ini.')
     if (own && action === 'resubmit') fail(409, 'Hanya pengajuan yang ditolak yang dapat diajukan ulang.')
+    // D0311: Finance / Admin of the PT on a request that is not "Selesai" yet → 409 (status), not 403
+    if (action === 'transfer_proof_replace' && mayPerform(ctx, action)) {
+      fail(409, `Bukti transfer hanya dapat diganti setelah pengajuan Selesai.${ctx.status === 'transferred' ? ' Saat Sudah Ditransfer: void transfer lalu catat ulang.' : ''}`)
+    }
     if (own && action === 'delete_draft') fail(409, 'Hanya draft yang belum pernah diputuskan yang dapat dihapus (pengajuan yang sedang berjalan: tarik kembali ke Draft sebelum ada keputusan).')
     fail(403, 'Anda tidak berhak melakukan aksi ini pada pengajuan ini.')
   }
@@ -391,15 +391,14 @@ export type Signature = { mediaId: number; sha256: string | null; source: 'profi
 export async function resolveSignature(req: PayloadRequest, signerId: number, capturedId?: number | null): Promise<Signature | null> {
   if (capturedId) {
     const m = await req.payload
-      .findByID({ collection: 'media-signatures', id: capturedId, depth: 0, overrideAccess: true /* SYSTEM-READ: ownership checked below */, req })
-      .catch(() => null)
+      .findByID({ collection: 'media-signatures', id: capturedId, depth: 0, overrideAccess: true /* SYSTEM-READ: ownership checked below */, req, disableErrors: true })
     if (!m || relId(m.uploadedBy) !== signerId) fail(400, 'Tanda tangan tidak ditemukan atau bukan milik Anda.')
     return { mediaId: m.id, sha256: m.sha256Original ?? null, source: 'captured' }
   }
-  const u = await req.payload.findByID({ collection: 'users', id: signerId, depth: 0, overrideAccess: true /* SYSTEM-READ: profile signature */, req }).catch(() => null)
+  const u = await req.payload.findByID({ collection: 'users', id: signerId, depth: 0, overrideAccess: true /* SYSTEM-READ: profile signature */, req, disableErrors: true })
   const sigId = relId(u?.signature)
   if (!sigId) return null
-  const m = await req.payload.findByID({ collection: 'media-signatures', id: sigId, depth: 0, overrideAccess: true /* SYSTEM-READ: profile signature */, req }).catch(() => null)
+  const m = await req.payload.findByID({ collection: 'media-signatures', id: sigId, depth: 0, overrideAccess: true /* SYSTEM-READ: profile signature */, req, disableErrors: true })
   return m ? { mediaId: m.id, sha256: m.sha256Original ?? null, source: 'profile' } : null
 }
 

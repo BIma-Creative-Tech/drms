@@ -109,6 +109,7 @@ import * as migration_20261024_510000_d2410_delete_draft_invoice from './2026102
 import * as migration_20261026_100000_d2610_owner_loan_enums from './20261026_100000_d2610_owner_loan_enums';
 import * as migration_20261026_100100_d2610_owner_loan_schema from './20261026_100100_d2610_owner_loan_schema';
 import * as migration_20261026_100200_d2610_owner_loan_guard from './20261026_100200_d2610_owner_loan_guard';
+import * as migration_20261103_100000_d0311_transfer_proof from './20261103_100000_d0311_transfer_proof';
 
 export const migrations = [
   {
@@ -665,5 +666,10 @@ export const migrations = [
     up: migration_20261026_100200_d2610_owner_loan_guard.up,
     down: migration_20261026_100200_d2610_owner_loan_guard.down,
     name: '20261026_100200_d2610_owner_loan_guard',
+  },
+  {
+    up: migration_20261103_100000_d0311_transfer_proof.up,
+    down: migration_20261103_100000_d0311_transfer_proof.down,
+    name: '20261103_100000_d0311_transfer_proof',
   },
 ];

@@ -36,12 +36,8 @@ const focusOf = (req: PayloadRequest): Focus | undefined => req.context?.[FOCUS]
 /** `[id]` when the caller may read owner document `id` (caller's own access), else []. */
 async function visibleOwner(req: PayloadRequest, collection: CollectionSlug, id: string | null): Promise<string[]> {
   if (!id || !/^\d{1,10}$/.test(id)) return []
-  const res = await req.payload
-    .find({ collection, where: { id: { equals: Number(id) } }, depth: 0, limit: 1, pagination: false, select: { updatedAt: true }, user: req.user, overrideAccess: false, req })
-    .catch((err: { status?: number }) => {
-      if (err.status === 403) return { docs: [] }
-      throw err
-    })
+  // disableErrors: no read access → [] (a thrown 403 would roll back the request transaction of the outer read)
+  const res = await req.payload.find({ collection, where: { id: { equals: Number(id) } }, depth: 0, limit: 1, pagination: false, select: { updatedAt: true }, user: req.user, overrideAccess: false, req, disableErrors: true })
   return res.docs.length > 0 ? [id] : []
 }
 
@@ -310,7 +306,8 @@ export const MediaTransferProofs = mediaCollection({
   imageSizes: [thumbJpeg],
   disposition: 'attachment',
   ownerCompany: true,
-  access: { read: focused('media-transfer-proofs', ownerLinked, true), create: rolesAllowedAny('pk-finance') },
+  // D0311: Admin uploads too — only for "Ganti bukti transfer" (recording a transfer stays Finance: claimed by its service)
+  access: { read: focused('media-transfer-proofs', ownerLinked, true), create: rolesAllowedAny('pk-finance', 'pk-admin') },
 })
 
 export const MediaSelfies = mediaCollection({

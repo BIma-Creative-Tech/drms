@@ -4,7 +4,7 @@ import React from 'react'
 
 import { loadVisible } from '@/domain/expense/common'
 import { historyRows, requestHistory, type HistoryRow } from '@/domain/history'
-import { actorText, ACTION_LABELS, DOC_LABELS, showValue as show } from '@/domain/history-format'
+import { actorText, ACTION_LABELS, DOC_LABELS, proofFiles, showValue as show } from '@/domain/history-format'
 import { formatServerTime } from '@/pdf/format'
 import { DEFAULT_TZ } from '@/lib/time'
 import { withReqTransaction } from '@/lib/system-tx'
@@ -97,7 +97,17 @@ export async function RiwayatView(props: DocumentViewServerProps) {
                     {r.field ?? '—'}
                     {r.lineNo ? ` (baris ${r.lineNo})` : ''}
                   </td>
-                  <td>{r.statusFrom || r.statusTo ? `${r.statusFrom ?? '—'} → ${r.statusTo ?? '—'}` : `${show(r.oldValue)} → ${show(r.newValue)}`}</td>
+                  <td>
+                    {r.statusFrom || r.statusTo ? `${r.statusFrom ?? '—'} → ${r.statusTo ?? '—'}` : `${show(r.oldValue)} → ${show(r.newValue)}`}
+                    {/* D0311: old / new file of a "Ganti bukti transfer" */}
+                    {proofFiles(r)?.map((f) => (
+                      <span key={f.href} className="pk-nx-sub">
+                        <a href={f.href} target="_blank" rel="noopener noreferrer" data-pk-log-file>
+                          {f.label}
+                        </a>
+                      </span>
+                    ))}
+                  </td>
                   <td>{r.reason ?? '—'}</td>
                   <td>
                     {r.source ?? '—'}

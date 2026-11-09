@@ -15,7 +15,8 @@ import { USER_NAME_VIEW } from '@/fields/users'
  * T3 Transfer / pencairan (requirements v1.1 §7 T3, US-20). Amount is COPIED server-side from the
  * request's approved amount (G3; DB trigger re-checks on insert), destination = request's bank
  * snapshot, proof + bank reference required, automatic KK cash-out (T7) in the same transaction.
- * CLASS B: flat, no DELETE; only the void columns may change (posted → void). Period lock (G5) on
+ * CLASS B: flat, no DELETE; only the void columns may change (posted → void) — and, D0311, the proof of a posted
+ * transfer of a "Selesai" request (Ganti bukti transfer, reason required). Period lock (G5) on
  * `transfer_date` enforced by DB trigger.
  */
 export const Transfers: CollectionConfig = withAudit(
@@ -57,6 +58,8 @@ export const Transfers: CollectionConfig = withAudit(
       },
       { name: 'bankRef', type: 'text', label: 'Nomor referensi bank', required: true, maxLength: 64, admin: ro },
       { name: 'proof', type: 'upload', relationTo: 'media-transfer-proofs', label: 'Bukti transfer', required: true, admin: ro },
+      // D0311: "Ganti bukti transfer" (Finance / Admin of the PT, request Selesai) — the button only, nothing stored
+      { name: 'proofReplace', type: 'ui', label: 'Ganti bukti transfer', admin: { components: { Field: '@/admin/components/TransferProofField#TransferProofField' } } },
       businessDateField('transferDate', 'Tanggal transfer', { required: true, admin: ro }),
       // Item 11 (DRMS 10/10): date AND time of the bank transfer document; `transferDate` = its date in the PT
       // time zone (reports keep using it). Null = recorded by an old client without a time ("jam tidak diketahui").
@@ -73,7 +76,7 @@ export const Transfers: CollectionConfig = withAudit(
   {
     docType: 'transfer',
     docNo: (d) => (typeof d.docNo === 'string' ? d.docNo : undefined),
-    reasonRules: [reasonOnChange(['voidReason'], 'Alasan wajib diisi saat membatalkan transfer.')],
+    reasonRules: [reasonOnChange(['voidReason'], 'Alasan wajib diisi saat membatalkan transfer.'), reasonOnChange(['proof'], 'Alasan wajib diisi saat mengganti bukti transfer.')],
     actionFor: (c) => (c.field === 'status' && c.newValue === 'void' ? 'void' : undefined),
   },
 )

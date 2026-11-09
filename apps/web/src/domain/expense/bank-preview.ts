@@ -40,16 +40,12 @@ async function bankName(req: PayloadRequest, bank: unknown): Promise<string | nu
   if (bank && typeof bank === 'object') return String((bank as { name?: string }).name ?? '') || null
   const id = relId(bank)
   if (id === undefined) return null
-  const b = await req.payload.findByID({ collection: 'banks', id, depth: 0, overrideAccess: true /* SYSTEM-READ: shared bank master name */, req }).catch(() => null)
+  const b = await req.payload.findByID({ collection: 'banks', id, depth: 0, overrideAccess: true /* SYSTEM-READ: shared bank master name */, req, disableErrors: true })
   return (b as { name?: string } | null)?.name ?? null
 }
 
 async function readableAccount(req: PayloadRequest, id: number, vendor = false): Promise<AccountDoc | null> {
-  try {
-    return (await req.payload.findByID({ collection: vendor ? 'vendor-bank-accounts' : 'employee-bank-accounts', id, depth: 0, user: req.user, overrideAccess: false, req })) as unknown as AccountDoc
-  } catch {
-    return null
-  }
+  return (await req.payload.findByID({ collection: vendor ? 'vendor-bank-accounts' : 'employee-bank-accounts', id, depth: 0, user: req.user, overrideAccess: false, req, disableErrors: true })) as unknown as AccountDoc | null
 }
 
 function out(source: BankPreview['source'], acc: { bankName: string | null; accountNo: string | null | undefined; accountHolder: string | null | undefined }, full: boolean, reveal: boolean): BankPreview {
@@ -116,7 +112,7 @@ export async function bankPreview(req: PayloadRequest, input: { requestId?: numb
   const saved = relId(doc.bankAccount)
   const id = accountId ?? saved
   if (id === undefined) fail(404, 'Belum ada rekening tujuan.')
-  const acc = (await req.payload.findByID({ collection: 'employee-bank-accounts', id, depth: 0, overrideAccess: true /* SYSTEM-READ: checked below (same PT + saved / requester's / readable) */, req }).catch(() => null)) as AccountDoc | null
+  const acc = (await req.payload.findByID({ collection: 'employee-bank-accounts', id, depth: 0, overrideAccess: true /* SYSTEM-READ: checked below (same PT + saved / requester's / readable) */, req, disableErrors: true })) as AccountDoc | null
   if (!acc || relId(acc.company) !== company) fail(404, 'Rekening tidak ditemukan.')
   const allowed = id === saved || ids(doc.requesters).includes(relId(acc.employee) ?? -1) || (await readableAccount(req, id)) !== null
   if (!allowed) fail(404, 'Rekening tidak ditemukan.')
@@ -146,7 +142,7 @@ async function vendorPreview(req: PayloadRequest, input: { requestId?: number; a
     if (!s?.accountNo) fail(404, 'Rekening tujuan belum tercatat.')
     return out('snapshot', { bankName: s.bankName ?? null, accountNo: s.accountNo, accountHolder: s.accountHolder }, full, reveal)
   }
-  const acc = (await req.payload.findByID({ collection: 'vendor-bank-accounts', id: accountId, depth: 0, overrideAccess: true /* SYSTEM-READ: checked below (same PT + saved / of the chosen vendor / readable) */, req }).catch(() => null)) as AccountDoc | null
+  const acc = (await req.payload.findByID({ collection: 'vendor-bank-accounts', id: accountId, depth: 0, overrideAccess: true /* SYSTEM-READ: checked below (same PT + saved / of the chosen vendor / readable) */, req, disableErrors: true })) as AccountDoc | null
   if (!acc || relId(acc.company) !== company) fail(404, 'Rekening tidak ditemukan.')
   const allowed = accountId === relId(doc.vendorBankAccount) || (relId(doc.vendor) !== undefined && relId(acc.vendor) === relId(doc.vendor)) || readable !== null
   if (!allowed) fail(404, 'Rekening tidak ditemukan.')

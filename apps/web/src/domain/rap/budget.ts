@@ -240,23 +240,19 @@ export async function rapMonitoring(req: PayloadRequest, opts: { limit?: number 
   )) as unknown as { rows: Array<{ project_id: number }> }
   const ids = withRap.rows.map((r) => Number(r.project_id))
   if (ids.length === 0) return { rows: [], projects: 0, overProjects: 0 }
-  let docs: Array<{ id: number; code?: string; name?: string; company?: unknown; status?: string | null }> = []
-  try {
-    const res = await req.payload.find({
-      collection: 'projects',
-      // D1610: an explicit id list skips the central read rule → the soft-delete condition is named here
-      where: { and: [{ id: { in: ids } }, { status: { not_in: ['arsip', 'dibatalkan'] } }, NOT_DELETED] },
-      depth: 0,
-      limit: 500,
-      select: { code: true, name: true, company: true, status: true },
-      user: req.user,
-      overrideAccess: false, // caller's project read scope (Direktur: every project of the selected PTs)
-      req,
-    })
-    docs = res.docs as typeof docs
-  } catch (err) {
-    if ((err as { status?: number }).status !== 403) throw err
-  }
+  const res = await req.payload.find({
+    collection: 'projects',
+    // D1610: an explicit id list skips the central read rule → the soft-delete condition is named here
+    where: { and: [{ id: { in: ids } }, { status: { not_in: ['arsip', 'dibatalkan'] } }, NOT_DELETED] },
+    depth: 0,
+    limit: 500,
+    select: { code: true, name: true, company: true, status: true },
+    user: req.user,
+    overrideAccess: false, // caller's project read scope (Direktur: every project of the selected PTs)
+    req,
+    disableErrors: true, // no read access → [] (a thrown 403 would roll back the request transaction)
+  })
+  const docs = res.docs as Array<{ id: number; code?: string; name?: string; company?: unknown; status?: string | null }>
   const sums = await projectRapSummaries(req, docs.map((d) => d.id))
   const rows: RapMonitorRow[] = docs.map((d) => ({
     ...sums.get(d.id)!,
@@ -286,28 +282,24 @@ export async function rapMissingProjects(req: PayloadRequest, opts: { teamOnly?:
     for (const c of companies) if (hasRole(req, 'pk-pm', c)) team.push(...(await resolveScope(req, c)).teamProjects)
     if (team.length === 0) return { rows: [], total: 0 }
   }
-  let docs: Array<{ id: number; code?: string; name?: string; kind?: string | null; company?: unknown; budget?: number | null; pm?: unknown }> = []
-  try {
-    const res = await req.payload.find({
-      collection: 'projects',
-      where: {
-        // no `budget` condition here: RAB is a money field (moneyRead) and a caller who is Staff in one selected PT may
-        // not query it at all ("path cannot be queried") — `rapRequiredFor` below filters on the budget the caller can
-        // read (hidden budget = none → only konstruksi projects need a RAP there)
-        and: [{ status: { not_in: ['arsip', 'selesai', 'dibatalkan'] } }, NOT_DELETED, ...(team ? [{ id: { in: team } }] : [])],
-      },
-      depth: 0,
-      limit: 2000, // every open project (the RAB filter runs below)
-      sort: 'code',
-      select: { code: true, name: true, kind: true, company: true, budget: true, pm: true },
-      user: req.user,
-      overrideAccess: false, // caller's project read scope
-      req,
-    })
-    docs = res.docs as typeof docs
-  } catch (err) {
-    if ((err as { status?: number }).status !== 403) throw err
-  }
+  const res = await req.payload.find({
+    collection: 'projects',
+    where: {
+      // no `budget` condition here: RAB is a money field (moneyRead) and a caller who is Staff in one selected PT may
+      // not query it at all ("path cannot be queried") — `rapRequiredFor` below filters on the budget the caller can
+      // read (hidden budget = none → only konstruksi projects need a RAP there)
+      and: [{ status: { not_in: ['arsip', 'selesai', 'dibatalkan'] } }, NOT_DELETED, ...(team ? [{ id: { in: team } }] : [])],
+    },
+    depth: 0,
+    limit: 2000, // every open project (the RAB filter runs below)
+    sort: 'code',
+    select: { code: true, name: true, kind: true, company: true, budget: true, pm: true },
+    user: req.user,
+    overrideAccess: false, // caller's project read scope
+    req,
+    disableErrors: true, // no read access → [] (a thrown 403 would roll back the request transaction)
+  })
+  const docs = res.docs as Array<{ id: number; code?: string; name?: string; kind?: string | null; company?: unknown; budget?: number | null; pm?: unknown }>
   if (docs.length === 0) return { rows: [], total: 0 }
   const tx = await getRequestTx(req)
   const withRap = (await tx.execute(

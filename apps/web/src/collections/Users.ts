@@ -44,8 +44,7 @@ export const selfProfileGuard: CollectionBeforeOperationHook = async ({ args, op
   const sig = relId(data.signature)
   if (sig !== undefined && sig !== relId(current.signature)) {
     const m = await req.payload
-      .findByID({ collection: 'media-signatures', id: sig, depth: 0, overrideAccess: true /* SYSTEM-READ: ownership checked below */, req })
-      .catch(() => null)
+      .findByID({ collection: 'media-signatures', id: sig, depth: 0, overrideAccess: true /* SYSTEM-READ: ownership checked below */, req, disableErrors: true })
     if (!m || relId(m.uploadedBy) !== uid) throw new APIError('Tanda tangan harus gambar yang Anda unggah sendiri.', 403, null, true)
   }
   return args

@@ -68,22 +68,20 @@ export async function visibleRequestIds(req: PayloadRequest, opts: { exceptCompa
   const cached = req.context?.[CTX_IDS] as { uid: number; byExcept: Record<string, number[]> } | undefined
   const hit = cached && cached.uid === uid ? cached.byExcept[k] : undefined
   if (hit) return hit
-  let ids: number[] = []
-  try {
-    const res = await req.payload.find({
-      collection: 'expense-requests',
-      ...(except.length > 0 ? { where: { company: { not_in: except } } } : {}),
-      depth: 0,
-      pagination: false,
-      select: { status: true },
-      user: req.user,
-      overrideAccess: false, // the caller's own read scope
-      req,
-    })
-    ids = res.docs.map((d) => d.id as number)
-  } catch (err) {
-    if ((err as { status?: number }).status !== 403) throw err
-  }
+  const res = await req.payload.find({
+    collection: 'expense-requests',
+    ...(except.length > 0 ? { where: { company: { not_in: except } } } : {}),
+    depth: 0,
+    pagination: false,
+    select: { status: true },
+    user: req.user,
+    overrideAccess: false, // the caller's own read scope
+    req,
+    // no read access → no rows WITHOUT a thrown Forbidden: Payload rolls the request transaction back on every error
+    // it throws (killTransaction), a caught 403 included (lib/system-tx.ts withReqTransaction)
+    disableErrors: true,
+  })
+  const ids = res.docs.map((d) => d.id as number)
   req.context[CTX_IDS] = { uid, byExcept: { ...(cached && cached.uid === uid ? cached.byExcept : {}), [k]: ids } }
   return ids
 }

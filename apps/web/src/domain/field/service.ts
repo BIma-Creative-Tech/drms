@@ -355,12 +355,8 @@ export async function listServiceReports(req: PayloadRequest, f: ServiceListFilt
 
 /** Collection find with the caller's access; a role without read access gets an empty list (403 → []). */
 export async function scopedFind<T>(req: PayloadRequest, collection: 'service-reports' | 'unit-timesheets' | 'aftersales-activities' | 'daily-reports', and: Where[], limit: number, sort: string): Promise<T[]> {
-  try {
-    const res = await req.payload.find({ collection, where: and.length ? { and } : undefined, sort, limit, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req })
-    return res.docs as unknown as T[]
-  } catch (err) {
-    if ((err as { status?: number }).status === 403) return []
-    throw err
-  }
+  // disableErrors: no read access → [] (a thrown 403 would roll back the request transaction)
+  const res = await req.payload.find({ collection, where: and.length ? { and } : undefined, sort, limit, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req, disableErrors: true })
+  return res.docs as unknown as T[]
 }
 

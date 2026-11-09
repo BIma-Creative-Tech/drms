@@ -6,13 +6,71 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**APK 0.16.0 (APK-only, works with server 0.24.0)** (branch `feat/d0911-service-gallery`, pubspec `0.16.0+1`, release
+notes `docs/release-notes/apk/0.16.0.md`): no server change, no migration, no API change; APK 0.15.0 keeps working.
+
 ### Added
+
+- **APK: Laporan Service photos from the gallery, several at once (D0911, user 2026-11-09).** The + of "Foto sebelum" /
+  "Foto sesudah" asks "Ambil dari kamera" or "Pilih dari galeri (bisa lebih dari satu)"; gallery photos are compressed
+  on the device like camera photos (JPEG, EXIF stripped). The 25-photo limit holds: the system picker is asked for the
+  free slots, extra picks are dropped with a note. An exception to ADR 0010 decision 11 (rear camera only) for this
+  report only; the daily report, timesheet HM photo, aftersales proof and selfies stay camera-only.
 - **APK: "Reset password" for an existing user (user 2026-10-30, parity with web 0.23.0 / #148).** Pengguna › an
   existing account › Akun: "Reset password" (online only) → confirm popup → `POST /user-onboarding/{id}/reset-password`
   → the new temporary password in the same "Kata sandi sementara" popup as a new account (Salin, shown once; must be
   changed at the next login). Shown with the web rule: not the own account, not an inactive one, only when the
   identity is editable (`identityEditable`); the server re-checks and a refusal shows its message. Needs server
-  0.23.0 (live since 30/10).
+  0.23.0 or newer.
+
+## [0.24.0] - 2026-11-03
+
+**Ganti bukti transfer (D0311, user 2026-11-03).** 1 migration (`20261103_100000_d0311_transfer_proof`, DB guard only).
+API contract 0.24.0 (additive): `POST /expense-requests/{id}/transfers/{tid}/proof`, action `transfer_proof_replace`.
+APK 0.15.0.
+
+### Added
+- **Finance and Admin of the PT replace the bank proof of a transfer once the request is "Selesai"** — a wrong upload
+  (e.g. TRF/DRMS/2611/0002) no longer needs a DB fix. Only the file changes: amount, dates, accounts, bank reference
+  and the KK stay as recorded, so a closed period does not block it. Reason required; the change is audited (old →
+  new file, reason) and the old file stays readable. While the request is "Sudah Ditransfer" nothing changes: a wrong
+  transfer is voided and recorded again. No notification to the requester (Finance's record).
+  - Web: "Ganti bukti TRF/…" on the request page (transfer section) and on the transfer document (Keuangan › Transfer
+    & LPJ › Transfer); "Riwayat" and "Log perubahan" link "Bukti lama" / "Bukti baru".
+  - APK 0.15.0: "Ganti bukti transfer" per posted transfer of the request detail (photo + reason).
+- DB: `pk_transfers_guard` lets `proof_id` change alone, on a completed request, to a transfer-proof file of that
+  request; every other column of a posted transfer stays immutable (void only). Down restores the previous guard.
+- Admin may upload transfer proofs (used only by this action; recording a transfer stays Finance).
+
+## [0.23.2] - 2026-11-03
+
+**Hotfix: Persetujuan page error 500.** No migrations. API contract 0.23.2 (version only). APK unchanged (0.14.1).
+
+### Fixed
+- **Menu Persetujuan › Persetujuan showed "This page couldn't load" on nearly every visit (prod 0.23.1, 2026-11-03).**
+  The Addendum and Kekurangan LPJ sections of the page load at the same time on the same page request; each opened
+  its own database transaction on it and overwrote / removed the other's, which the 0.23.1 check reported as
+  "transaction rolled back by a caught Payload error". `withReqTransaction` now lets such sibling sections take turns
+  (each in its own transaction); a call nested inside one still joins it. Read-only page loads: no data was changed
+  by the failed requests. Likely also the cause of the Persetujuan 500s of 2026-11-01.
+
+## [0.23.1] - 2026-11-02
+
+**Hotfix: "tidak ditemukan" instead of error 500.** No migrations. API contract 0.23.1 (version only). APK unchanged
+(0.14.1).
+
+### Fixed
+- **A document the caller may not read answered error 500 (prod 2026-11-01/02).** The loan detail
+  (`/admin/pinjaman/detail/{id}`) of a loan outside the caller's PTs (e.g. a PT whose membership is inactive) and the
+  Persetujuan page of an account without read access showed "getRequestTx: no active transaction on req" instead of
+  "Pinjaman tidak ditemukan" / an empty list. Payload rolls the request transaction back on EVERY error one of its
+  operations throws, also when our code catches it: the refused read was caught, the page went on and found no
+  transaction at the end. Every request-bound read that may be refused or miss — detail loaders (loan, addendum,
+  progress report, request, field report, RAP item, project), the visible-id helpers behind the satellite read rules,
+  lists, pickers, masters, media and PDF reads (87 places) — now asks Payload for "null / no rows" (`disableErrors`)
+  instead of catching an error. Read-only page loads: no data was changed by the failed requests.
+- `withReqTransaction` names a transaction lost that way ("rolled back by a caught Payload error") instead of going
+  on with it. Unit guard: no request-bound Local API read in `src/` swallows its error with `.catch`.
 
 ## [0.23.0] - 2026-10-29
 

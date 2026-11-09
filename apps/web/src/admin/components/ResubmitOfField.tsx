@@ -15,8 +15,7 @@ export async function ResubmitOfField(props: UIFieldServerProps) {
   const prevId = relId((data as { resubmitOf?: unknown } | undefined)?.resubmitOf)
   if (prevId === undefined || !req.user) return null
   const prev = (await req.payload
-    .findByID({ collection: 'expense-requests', id: prevId, depth: 0, user: req.user, overrideAccess: false, req })
-    .catch(() => null)) as { docNo?: string | null; title?: string } | null
+    .findByID({ collection: 'expense-requests', id: prevId, depth: 0, user: req.user, overrideAccess: false, req, disableErrors: true })) as { docNo?: string | null; title?: string } | null
   const label = prev ? `${prev.docNo ?? `#${prevId}`} — ${prev.title ?? ''}` : `#${prevId}`
   return (
     <div className="field-type" data-pk-field="resubmitOf" style={{ marginBottom: 16 }}>

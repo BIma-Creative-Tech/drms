@@ -16,6 +16,7 @@ import { CompanyListFilter as CompanyListFilter_b31d22e0603f5879a90d350d8ff6b31b
 import { PkListView as PkListView_ff264d598d1662a7ac6f3895692319e4 } from '@/admin/pk-list/PkListView'
 import { CompanyField as CompanyField_d907892a7d1864bfc60310041555d48d } from '@/admin/components/companies/CompanyField'
 import { ProjectDetailLink as ProjectDetailLink_50199ae12722a75ff9856fb84c25b621 } from '@/admin/components/ProjectDetailLink'
+import { TransferProofField as TransferProofField_2512241c26c460d505e2f4477eb0ff47 } from '@/admin/components/TransferProofField'
 import { ProjectRapTab as ProjectRapTab_477bcbaacaa37a019b46a0d40f873f32 } from '@/admin/views/ProjectTabs'
 import { ProjectRequestsTab as ProjectRequestsTab_477bcbaacaa37a019b46a0d40f873f32 } from '@/admin/views/ProjectTabs'
 import { ProjectLoansTab as ProjectLoansTab_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
@@ -138,6 +139,7 @@ export const importMap = {
   "@/admin/pk-list/PkListView#PkListView": PkListView_ff264d598d1662a7ac6f3895692319e4,
   "@/admin/components/companies/CompanyField#CompanyField": CompanyField_d907892a7d1864bfc60310041555d48d,
   "@/admin/components/ProjectDetailLink#ProjectDetailLink": ProjectDetailLink_50199ae12722a75ff9856fb84c25b621,
+  "@/admin/components/TransferProofField#TransferProofField": TransferProofField_2512241c26c460d505e2f4477eb0ff47,
   "@/admin/views/ProjectTabs#ProjectRapTab": ProjectRapTab_477bcbaacaa37a019b46a0d40f873f32,
   "@/admin/views/ProjectTabs#ProjectRequestsTab": ProjectRequestsTab_477bcbaacaa37a019b46a0d40f873f32,
   "@/admin/views/Loans#ProjectLoansTab": ProjectLoansTab_e5d452935824a68d96fdc373e55d7f95,

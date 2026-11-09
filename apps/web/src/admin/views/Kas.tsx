@@ -228,7 +228,7 @@ export async function KasBook(props: AdminViewServerProps) {
     const flowPeriod = q.periode ?? todayDate.slice(0, 7)
     const flows = await accountFlows(req, flowPeriod, shown)
     const flashId = Number(typeof sp.baru === 'string' ? sp.baru : typeof sp.diubah === 'string' ? sp.diubah : NaN)
-    const flash = Number.isSafeInteger(flashId) && flashId > 0 ? await req.payload.findByID({ collection: 'cash-entries', id: flashId, depth: 0, user: req.user, overrideAccess: false, req }).catch(() => null) : null
+    const flash = Number.isSafeInteger(flashId) && flashId > 0 ? await req.payload.findByID({ collection: 'cash-entries', id: flashId, depth: 0, user: req.user, overrideAccess: false, req, disableErrors: true }) : null
     return { todayDate, locks, lk, page, bal, flowPeriod, flows, flash: flash as unknown as CashEntryDoc | null }
   })
   const { todayDate, locks, page, bal, flowPeriod, flows, flash } = d
@@ -715,7 +715,7 @@ export async function KasEdit(props: AdminViewServerProps) {
   const idText = segments[1] ?? ''
   const id = /^\d{1,10}$/.test(idText) ? Number(idText) : 0
   const found = id
-    ? ((await withReqTransaction(req, () => req.payload.findByID({ collection: 'cash-entries', id, depth: 0, user: req.user, overrideAccess: false, req })).catch(() => null)) as unknown as CashEntryDoc | null)
+    ? ((await withReqTransaction(req, () => req.payload.findByID({ collection: 'cash-entries', id, depth: 0, user: req.user, overrideAccess: false, req, disableErrors: true })).catch(() => null)) as unknown as CashEntryDoc | null)
     : null
   // Finance of the ENTRY's PT only (a Direktur of that PT reads it in the book, no edit form)
   const company = found ? relId((found as { company?: unknown }).company) : undefined

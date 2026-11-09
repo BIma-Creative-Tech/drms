@@ -315,8 +315,7 @@ export async function voidTransfer(req: PayloadRequest, id: number, transferId: 
   requireAction(await actorContext(req, visible), 'transfer_void')
   const doc = await loadRaw(req, id)
   const t = (await req.payload
-    .findByID({ collection: 'transfers', id: transferId, depth: 0, overrideAccess: true /* SYSTEM-READ: belongs-to check below */, req })
-    .catch(() => null)) as TransferDoc | null
+    .findByID({ collection: 'transfers', id: transferId, depth: 0, overrideAccess: true /* SYSTEM-READ: belongs-to check below */, req, disableErrors: true })) as TransferDoc | null
   if (!t || relId(t.request) !== id) fail(404, 'Transfer tidak ditemukan.')
   if (t.status !== 'posted') fail(409, 'Transfer sudah dibatalkan.')
   // ADR 0029: a PT grup transfer reverses entries in two PTs → both fund locks first (ascending id)
@@ -338,6 +337,35 @@ export async function voidTransfer(req: PayloadRequest, id: number, transferId: 
   const back = doc.type === 'advance' ? 'approved' : 'receipts_verified'
   const updated = await updateRequest(req, id, { status: back, transferredTotal: Math.max(0, (doc.transferredTotal ?? 0) - t.amount) }, reason)
   return { transfer, reversal: voided?.reversal ?? null, intercompanyReversal: ic?.reversal ?? null, projectLoan: loan ? { id: loan.id, docNo: loan.docNo ?? null, status: loan.status } : null, request: updated }
+}
+
+/**
+ * POST /expense-requests/{id}/transfers/{tid}/proof (D0311, user 2026-11-03 "Ganti bukti transfer"): Finance / Admin of
+ * the request's PT replace the bank proof of a POSTED transfer once the request is "Selesai" — a wrong upload no longer
+ * needs a DB fix. File only: amount, dates, accounts, bank reference and the KK stay as recorded, so a closed period
+ * does not block it. The old file keeps its owner link (readable from the Riwayat); the audit row carries old → new
+ * proof id with the reason. No notification (Finance's record). DB: pk_transfers_guard allows exactly this change.
+ */
+export async function replaceTransferProof(req: PayloadRequest, id: number, transferId: number, input: { proofMediaId: number; reason: string }) {
+  const visible = await loadVisible(req, id, { lock: true })
+  requireAction(await actorContext(req, visible), 'transfer_proof_replace')
+  const t = (await req.payload
+    .findByID({ collection: 'transfers', id: transferId, depth: 0, overrideAccess: true /* SYSTEM-READ: belongs-to check below */, req, disableErrors: true })) as (TransferDoc & { proof?: unknown }) | null
+  if (!t || relId(t.request) !== id) fail(404, 'Transfer tidak ditemukan.')
+  if (t!.status !== 'posted') fail(409, 'Transfer sudah di-void; buktinya tidak dapat diganti.')
+  const previous = relId(t!.proof) ?? null
+  if (previous === input.proofMediaId) fail(409, 'File bukti sama dengan bukti saat ini.')
+  await claimMedia(req, 'media-transfer-proofs', input.proofMediaId, id)
+  req.context.auditReason = input.reason
+  const transfer = await req.payload.update({
+    collection: 'transfers',
+    id: transferId,
+    data: { proof: input.proofMediaId } as never,
+    depth: 0,
+    overrideAccess: true, // SYSTEM-WRITE: proof only, after guards (DB: posted transfer of a completed request, nothing else changes)
+    req,
+  })
+  return { transfer, previousProofId: previous }
 }
 
 /**

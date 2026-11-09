@@ -44,8 +44,7 @@ export async function fieldProjects(req: PayloadRequest, kinds: readonly Project
   const and: Where[] = [{ kind: { in: [...kinds] } }, { company: { in: [...companies] } }]
   if (!opts.includeArchived) and.push({ status: { not_in: ['arsip', 'dibatalkan'] } })
   const r = await req.payload
-    .find({ collection: 'projects', where: { and }, sort: 'code', depth: 0, pagination: false, select: { code: true, name: true, kind: true, company: true, client: true, status: true, pm: true }, user: req.user, overrideAccess: false /* caller's project scope */, req })
-    .catch(() => ({ docs: [] as unknown[] }))
+    .find({ collection: 'projects', where: { and }, sort: 'code', depth: 0, pagination: false, select: { code: true, name: true, kind: true, company: true, client: true, status: true, pm: true }, user: req.user, overrideAccess: false /* caller's project scope */, req, disableErrors: true })
   return (r.docs as Array<Record<string, unknown> & { id: number }>).map((p) => ({
     id: p.id,
     code: String(p.code ?? ''),
@@ -92,9 +91,8 @@ export type ContractView = MatrixContract & { projectId: number; companyId: numb
 export async function contractsOf(req: PayloadRequest, projectIds: readonly number[]): Promise<ContractView[]> {
   if (projectIds.length === 0) return []
   const r = await req.payload
-    .find({ collection: 'contract-units', where: { project: { in: [...projectIds] } }, sort: 'startDate', depth: 0, pagination: false, user: req.user, overrideAccess: false /* caller's scope; rate fields stripped by field access */, req })
-    .catch(() => ({ docs: [] as unknown[] }))
-  const docs = r.docs as ContractRow[]
+    .find({ collection: 'contract-units', where: { project: { in: [...projectIds] } }, sort: 'startDate', depth: 0, pagination: false, user: req.user, overrideAccess: false /* caller's scope; rate fields stripped by field access */, req, disableErrors: true })
+  const docs = r.docs as unknown as ContractRow[]
   const n = await namesOf(req, docs, { users: [], clients: [] })
   return docs.map((c) => {
     const company = relId(c.company)!
@@ -187,8 +185,8 @@ export async function unitsOf(req: PayloadRequest, companies: readonly number[],
   // D1610: an explicit id list skips the central read rule → soft-deleted units are excluded here
   if (opts.ids) and.push({ id: { in: [...opts.ids, 0] } }, NOT_DELETED)
   if (opts.activeOnly) and.push({ active: { equals: true } })
-  const r = await req.payload.find({ collection: 'vehicles', where: { and }, sort: 'displayName', depth: 0, pagination: false, user: req.user, overrideAccess: false /* members read the units of their PTs */, req }).catch(() => ({ docs: [] as unknown[] }))
-  const docs = r.docs as Array<Record<string, unknown> & { id: number }>
+  const r = await req.payload.find({ collection: 'vehicles', where: { and }, sort: 'displayName', depth: 0, pagination: false, user: req.user, overrideAccess: false /* members read the units of their PTs */, req, disableErrors: true })
+  const docs = r.docs as unknown as Array<Record<string, unknown> & { id: number }>
   const n = await namesOf(req, docs, { users: [], clients: ['client'] })
   return docs.map((d) => unitView(d, (id) => n.client.get(id) ?? null)).sort((a, b) => (a.kind === b.kind ? a.label.localeCompare(b.label, 'id') : a.kind === 'alat_berat' ? -1 : 1))
 }
@@ -204,8 +202,7 @@ export async function visibleUnit(req: PayloadRequest, id: number): Promise<Unit
 export async function clientsOf(req: PayloadRequest, companies: readonly number[]): Promise<Array<{ id: number; name: string; companyId: number }>> {
   if (companies.length === 0) return []
   const r = await req.payload
-    .find({ collection: 'clients', where: { company: { in: [...companies] } }, sort: 'name', depth: 0, pagination: false, select: { name: true, company: true }, user: req.user, overrideAccess: false /* caller's read scope */, req })
-    .catch(() => ({ docs: [] as unknown[] }))
+    .find({ collection: 'clients', where: { company: { in: [...companies] } }, sort: 'name', depth: 0, pagination: false, select: { name: true, company: true }, user: req.user, overrideAccess: false /* caller's read scope */, req, disableErrors: true })
   return (r.docs as Array<{ id: number; name?: string; company?: unknown }>).map((c) => ({ id: c.id, name: c.name ?? `#${c.id}`, companyId: relId(c.company)! }))
 }
 

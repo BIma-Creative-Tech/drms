@@ -20,7 +20,7 @@ type MediaRow = { id: number; filename?: string | null; mimeType?: string | null
  */
 export async function loadImage(req: PayloadRequest, collection: CollectionSlug, id: number | undefined): Promise<PdfImage | null> {
   if (!id) return null
-  const m = (await req.payload.findByID({ collection, id, depth: 0, overrideAccess: true /* SYSTEM-READ: image of a document the caller may read */, req }).catch(() => null)) as MediaRow | null
+  const m = (await req.payload.findByID({ collection, id, depth: 0, overrideAccess: true /* SYSTEM-READ: image of a document the caller may read */, req, disableErrors: true })) as MediaRow | null
   if (!m) return null
   const format = m.mimeType === 'image/jpeg' ? 'jpg' : m.mimeType === 'image/png' ? 'png' : null
   if (!format) return null // WebP/PDF cannot be embedded (@react-pdf/image: JPEG/PNG/SVG only)

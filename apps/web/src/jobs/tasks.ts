@@ -67,8 +67,7 @@ export const sendEmailTask: TaskConfig<{
   retries: { attempts: 6, backoff: { type: 'exponential', delay: 150_000 } },
   handler: async ({ input, req, job }) => {
     const user = await req.payload
-      .findByID({ collection: 'users', id: input.userId, depth: 0, select: { email: true, active: true }, overrideAccess: true /* SYSTEM-READ: recipient address */, req })
-      .catch(() => null)
+      .findByID({ collection: 'users', id: input.userId, depth: 0, select: { email: true, active: true }, overrideAccess: true /* SYSTEM-READ: recipient address */, req, disableErrors: true })
     if (!user?.email || user.active === false) {
       req.payload.logger.warn({ msg: 'email skipped (user missing, inactive or without address)', jobId: job.id, userId: input.userId })
       return { output: { messageId: '' } }
