@@ -466,7 +466,9 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     if (sub == null) return;
     setState(() => _busy = true);
     try {
-      final detail = await ref.read(draftServiceProvider).submit(sub, _d, rap: _rapCheck());
+      final detail = await ref
+          .read(draftServiceProvider)
+          .submit(sub, _d, rap: _rapCheck(), flush: () => ref.read(syncEngineProvider).run(sub));
       ref.invalidate(requestListProvider('mine'));
       if (!mounted) return;
       await showActionResult(context, message: '${detail.docNo ?? ''} ${t.submitted}'.trim(), action: t.submit);

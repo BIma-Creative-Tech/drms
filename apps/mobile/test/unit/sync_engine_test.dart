@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proyekkas/core/db/app_database.dart';
+import 'package:proyekkas/core/network/api_exception.dart';
 import 'package:proyekkas/core/time/device_clock.dart';
 import 'package:proyekkas/core/util/async_lock.dart';
 import 'package:proyekkas/features/expense/application/draft_service.dart';
@@ -13,6 +14,7 @@ import 'package:proyekkas/features/sync/application/sync_engine.dart';
 import 'package:proyekkas/features/sync/data/outbox_repository.dart';
 import 'package:proyekkas/features/sync/data/sync_api.dart';
 
+import '../support/fixtures.dart';
 import '../support/harness.dart';
 import '../support/mock_server.dart';
 import '../support/seed.dart';
@@ -319,6 +321,85 @@ void main() {
       'draft_client_uuid': seedDraft().clientUuid,
       'request_id': 77,
       'reason': 'Draft dihapus dari aplikasi',
+    });
+  });
+
+  group('D1011: "Ajukan" on a draft the server already knows (prod 05-11, Draft #181)', () {
+    var rev = 0;
+    var batchItems = <Map<String, dynamic>>[];
+    late DraftRequest editorCopy;
+
+    Map<String, dynamic> receipt(int i) => {
+      'id': 600 + i,
+      'lineId': 'l$i',
+      'lineNo': 1,
+      'receiptNo': null,
+      'vendorName': 'v',
+      'receiptDate': '2026-09-21',
+      'amount': 1000,
+      'imageId': 900 + i,
+      'status': 'pending',
+    };
+
+    setUp(() async {
+      rev = 0;
+      batchItems = [];
+      server.on('POST', '/api/v1/media/receipts', (req, body) => (201, {'id': 900 + server.calls.length}));
+      server.on('POST', '/api/v1/sync/batch', (req, body) {
+        final items = ((jsonDecode(body) as Map)['items'] as List).cast<Map<String, dynamic>>();
+        batchItems.addAll(items);
+        final stale = items.any((i) => i['base_rev'] != null && i['base_rev'] != rev);
+        if (stale) return (200, resultFor(body, 'conflict', extra: {'server_id': '42', 'rev': rev}));
+        return (200, resultFor(body, 'applied', extra: {'server_id': '42', 'rev': ++rev}));
+      });
+      server.on(
+        'GET',
+        '/api/v1/expense-requests/42',
+        (req, body) => (
+          200,
+          detailJson(status: 'draft', allowed: ['submit'], approvals: const [])
+            ..['receipts'] = [for (var i = 1; i <= 3; i++) receipt(i)],
+        ),
+      );
+      server.on('POST', '/api/v1/expense-requests/42/submit', (req, body) {
+        return (200, detailJson(status: 'pending_ack', allowed: const []));
+      });
+      // The editor keeps this copy (no server id / rev) while its first save is delivered.
+      editorCopy = await saveSeed();
+      await engine.run(sub);
+    });
+
+    test('a second save from the editor copy is based on the stored rev, not a self-made conflict', () async {
+      await service.save(sub, editorCopy.copyWith(title: 'Edit kedua'), online: true);
+      final due = (await outbox.due(sub, clock.now())).single;
+      expect(due.baseRev, 1);
+      await engine.run(sub);
+      expect(batchItems.last['base_rev'], 1);
+      final d = await drafts.load(sub, editorCopy.clientUuid);
+      expect(d!.syncState, DraftSyncState.synced);
+      expect(d.serverRev, 2);
+    });
+
+    test('submit sends the just-saved edit first, then submits (no "masih menunggu sinkron")', () async {
+      final saved = await service.save(sub, editorCopy.copyWith(title: 'Edit lalu ajukan'), online: true);
+      final detail = await service.submit(sub, saved, flush: () => engine.run(sub));
+      expect(detail.status.name, isNot('draft'));
+      final order = server.pathsCalled().toList();
+      final lastBatch = order.lastIndexOf('POST /api/v1/sync/batch');
+      expect(lastBatch, lessThan(order.indexOf('GET /api/v1/expense-requests/42')));
+      expect(order.last, 'POST /api/v1/expense-requests/42/submit');
+      expect((batchItems.last['payload'] as Map)['title'], 'Edit lalu ajukan');
+      expect((await drafts.load(sub, saved.clientUuid))!.syncState, DraftSyncState.submitted);
+    });
+
+    test('changed on the web meanwhile → clear refusal, the server version is not submitted', () async {
+      rev = 5; // someone saved it on the web
+      final saved = await service.save(sub, editorCopy.copyWith(title: 'Edit HP'), online: true);
+      await expectLater(
+        service.submit(sub, saved, flush: () => engine.run(sub)),
+        throwsA(isA<ProblemException>().having((e) => e.detail, 'detail', contains('diubah di web'))),
+      );
+      expect(server.pathsCalled(), isNot(contains('POST /api/v1/expense-requests/42/submit')));
     });
   });
 }
