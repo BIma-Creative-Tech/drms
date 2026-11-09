@@ -16,6 +16,12 @@ notes `docs/release-notes/apk/0.16.0.md`): no server change, no migration, no AP
   on the device like camera photos (JPEG, EXIF stripped). The 25-photo limit holds: the system picker is asked for the
   free slots, extra picks are dropped with a note. An exception to ADR 0010 decision 11 (rear camera only) for this
   report only; the daily report, timesheet HM photo, aftersales proof and selfies stay camera-only.
+- **APK: "Reset password" for an existing user (user 2026-10-30, parity with web 0.23.0 / #148).** Pengguna › an
+  existing account › Akun: "Reset password" (online only) → confirm popup → `POST /user-onboarding/{id}/reset-password`
+  → the new temporary password in the same "Kata sandi sementara" popup as a new account (Salin, shown once; must be
+  changed at the next login). Shown with the web rule: not the own account, not an inactive one, only when the
+  identity is editable (`identityEditable`); the server re-checks and a refusal shows its message. Needs server
+  0.23.0 or newer.
 
 ## [0.24.0] - 2026-11-03
 

@@ -6,7 +6,8 @@ import '../../core/network/api_client.dart';
 
 // DRMS 13/10 W3 "Pengguna baru" / "Pengguna" on the APK (user 2026-10-19, phase 6): `GET|POST /user-onboarding`,
 // `GET|PATCH /user-onboarding/{id}` — account, access per PT, employee, bank accounts and team assignments in one save
-// (Keycloak first, then the DB; the server rolls Keycloak back on a failed save).
+// (Keycloak first, then the DB; the server rolls Keycloak back on a failed save). DRMS 27/10 (server 0.23.0):
+// `POST /user-onboarding/{id}/reset-password` — new temporary password of an existing account, returned once.
 
 Map<String, dynamic> _map(Object? v) => v is Map<String, dynamic> ? v : const {};
 List<dynamic> _list(Object? v) => v is List ? v : const [];
@@ -196,6 +197,14 @@ class OnboardingApi {
         linked: j['linkedExistingAccount'] == true,
       );
     },
+  );
+
+  /// DRMS 27/10: new temporary password of account [id] (Keycloak asks for a new one at the next login), returned
+  /// once. The server applies the identity rule (`identityEditable`), never the own or an inactive account.
+  Future<String> resetPassword(int id) => client.run(
+    (d) => d.post<dynamic>('/user-onboarding/$id/reset-password', options: ApiClient.allCompanies()),
+    (data) =>
+        _s(_map(data)['temporaryPassword']) ?? (throw const FormatException('reset-password: no temporaryPassword')),
   );
 
   /// Banks (`GET /masters?types=banks`, shared master).
