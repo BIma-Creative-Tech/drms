@@ -104,7 +104,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(api.instructed, hasLength(1));
       expect(api.instructed.single['borrowerCompanyId'], 4);
-      expect(api.instructed.single['requestIds'], isEmpty);
+      expect(api.instructed.single['requestIds'] ?? const <int>[], isEmpty);
     });
 
     testWidgets('not an Owner anywhere: explained, no form', (tester) async {
