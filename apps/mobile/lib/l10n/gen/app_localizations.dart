@@ -7363,6 +7363,12 @@ abstract class AppLocalizations {
   /// **'Tidak ada PT lain di mana Anda Owner.'**
   String get icLoanNoLenders;
 
+  /// No description provided for @icLoanNotOwner.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman antar-PT diperintahkan oleh Owner (peran Owner di PT pemberi dan PT peminjam).'**
+  String get icLoanNotOwner;
+
   /// No description provided for @icLoanLenderShort.
   ///
   /// In id, this message translates to:

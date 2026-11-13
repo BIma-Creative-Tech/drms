@@ -374,14 +374,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      // ADR 0029: inter-PT loans — the Owner's instruction (`?borrower=&amount=&requests=1,2`), the read-only detail
+      // ADR 0029: inter-PT loans — the Owner's instruction (`?borrower=&amount=&requests=1,2` from a request's fund panel;
+      // without `borrower` from the "Pinjaman antar-PT" list, the Owner picks the borrower), the read-only detail
       // (notifications icloan.*) and Finance's disbursement (online only; repayments / voids on the web)
       GoRoute(
         path: '/intercompany-loans/new',
         builder: (_, s) {
           final q = s.uri.queryParameters;
           final borrower = int.tryParse(q['borrower'] ?? '');
-          if (borrower == null) return const RouteErrorScreen();
+          if (q.containsKey('borrower') && borrower == null) return const RouteErrorScreen();
           return IcLoanInstructScreen(
             borrowerId: borrower,
             amount: int.tryParse(q['amount'] ?? ''),
