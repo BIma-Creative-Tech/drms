@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**APK 0.16.1 (APK-only, works with server 0.24.0)** (branch `feat/d1311-apk-icloan-instruct`, pubspec `0.16.1+1`,
+release notes `docs/release-notes/apk/0.16.1.md`): no server change, no migration, no API change.
+
+### Added
+
+- **APK: "Perintahkan pinjaman" on the "Pinjaman antar-PT" list (user 2026-11-13, parity with the web).** The APK offered
+  the inter-PT loan instruction (ADR 0029) only from the fund panel of a short request. The list now has the button for
+  an Owner of at least 2 PTs (server `summary.canInstruct`); the form opened from it first asks the borrower PT among
+  the PTs where the user is Owner (changing it clears the lender and the linked requests, as on the web). Opened from
+  a request it is unchanged.
+
 **APK 0.16.0 (APK-only, works with server 0.24.0)** (branch `feat/d0911-service-gallery`, pubspec `0.16.0+1`, release
 notes `docs/release-notes/apk/0.16.0.md`): no server change, no migration, no API change; APK 0.15.0 keeps working.
 
