@@ -4152,6 +4152,10 @@ class AppLocalizationsId extends AppLocalizations {
   String get icLoanNoLenders => 'Tidak ada PT lain di mana Anda Owner.';
 
   @override
+  String get icLoanNotOwner =>
+      'Pinjaman antar-PT diperintahkan oleh Owner (peran Owner di PT pemberi dan PT peminjam).';
+
+  @override
   String get icLoanLenderShort => 'Dana tersedia tidak cukup untuk nilai ini';
 
   @override

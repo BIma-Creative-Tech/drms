@@ -2973,6 +2973,7 @@
   },
   "icLoanBorrowerNoAccount": "PT peminjam belum menetapkan rekening penerimaan antar-PT — pinjaman tidak dapat diterima.",
   "icLoanNoLenders": "Tidak ada PT lain di mana Anda Owner.",
+  "icLoanNotOwner": "Pinjaman antar-PT diperintahkan oleh Owner (peran Owner di PT pemberi dan PT peminjam).",
   "icLoanLenderShort": "Dana tersedia tidak cukup untuk nilai ini",
   "icLoanLenderNoAccount": "Pengembalian belum dapat dicatat sampai PT ini menetapkan rekening penerimaan antar-PT.",
   "icLoanAmount": "Nilai pinjaman",

@@ -291,6 +291,16 @@ abstract class UserProfile with _$UserProfile {
     return scopedTo([companyId]);
   }
 
+  /// ADR 0029: every PT (not only the switcher scope, as the web's `/pinjaman-antar-pt/baru`) where the user is Owner as
+  /// stored — the borrowers he may instruct a "Pinjaman antar-PT" for. PTs of the current scope first.
+  List<CompanyMembership> get loanInstructCompanies {
+    final owner = companies.where((c) => c.capabilities.instructIntercompanyLoan);
+    return [
+      ...owner.where((c) => scopeCompanyIds.contains(c.id)),
+      ...owner.where((c) => !scopeCompanyIds.contains(c.id)),
+    ];
+  }
+
   /// PTs of the scope in which the user may create expense requests (Staff / PM / Admin there).
   List<CompanyMembership> get requestCompanies => scopedCompanies.where((c) => c.canCreateRequests).toList();
 

@@ -69,9 +69,14 @@ class IcLoanStatusChip extends StatelessWidget {
 /// (borrower). Lender list from `GET /intercompany-loans/lenders` (each PT's "Dana tersedia"; PTs short of the amount are
 /// disabled), amount default = the gap, due date default = `defaultDueDate` (+30 days), reason required, the requests
 /// waiting at their final step as optional links (pre-ticked: the request the form was opened from).
+/// Opened from the "Pinjaman antar-PT" list (no `borrower`, user 2026-11-13: APK parity with the web's "+ Perintahkan
+/// pinjaman") the Owner first picks the borrower among the PTs where he is Owner; changing it clears the lender and the
+/// linked requests, as the web form does.
 class IcLoanInstructScreen extends ConsumerStatefulWidget {
-  const IcLoanInstructScreen({super.key, required this.borrowerId, this.amount, this.requestIds = const []});
-  final int borrowerId;
+  const IcLoanInstructScreen({super.key, this.borrowerId, this.amount, this.requestIds = const []});
+
+  /// The short PT of the request the form was opened from; null = picked in the form.
+  final int? borrowerId;
 
   /// The gap of the request the form was opened from (fund panel); null = computed from the ticked requests.
   final int? amount;
@@ -85,6 +90,7 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
   late final _amount = TextEditingController(text: widget.amount == null ? '' : groupRupiah(widget.amount));
   final _reason = TextEditingController();
   late final Set<int> _requestIds = {...widget.requestIds};
+  late int? _borrowerId = widget.borrowerId ?? ref.read(accountProfileProvider)?.loanInstructCompanies.firstOrNull?.id;
   int? _lenderId;
   String? _dueDate;
   bool _seeded = false;
@@ -95,7 +101,7 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
   /// One idempotency key per distinct body (a retry of the same body replays; another body needs a new key).
   final _keys = <String, String>{};
 
-  ({int borrower, int? amount}) get _query => (borrower: widget.borrowerId, amount: widget.amount);
+  ({int borrower, int? amount}) get _query => (borrower: _borrowerId!, amount: widget.amount);
 
   @override
   void dispose() {
@@ -159,7 +165,7 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
       _error = null;
     });
     if (errors.isNotEmpty || lender == null || amount == null) return;
-    final borrowerCode = o.borrower.company?.shortCode ?? '#${widget.borrowerId}';
+    final borrowerCode = o.borrower.company?.shortCode ?? '#$_borrowerId';
     final ok = await confirmAction(
       context,
       action: t.icLoanSubmit,
@@ -169,7 +175,7 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
     );
     if (!ok || !mounted) return;
     final body = icLoanCreateBody(
-      borrowerCompanyId: widget.borrowerId,
+      borrowerCompanyId: _borrowerId!,
       lenderCompanyId: lender.company.id,
       amount: amount,
       dueDate: _dueDate!,
@@ -235,6 +241,12 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    if (_borrowerId == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(t.icLoanInstructTitle)),
+        body: PkEmptyState(key: const Key('icloan-not-owner'), icon: Icons.lock_outline, message: t.icLoanNotOwner),
+      );
+    }
     final provider = icLenderOptionsProvider(_query);
     return Scaffold(
       appBar: AppBar(title: Text(t.icLoanInstructTitle)),
@@ -249,12 +261,41 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
     );
   }
 
+  /// Borrower select (opened from the list): the PTs where the caller is Owner.
+  Widget _borrowerPicker(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final options = ref.watch(accountProfileProvider)?.loanInstructCompanies ?? const <CompanyMembership>[];
+    return DropdownButtonFormField<int>(
+      key: const Key('icloan-borrower-pick'),
+      initialValue: options.any((c) => c.id == _borrowerId) ? _borrowerId : null,
+      isExpanded: true,
+      decoration: InputDecoration(labelText: t.icLoanBorrower),
+      items: [
+        for (final c in options)
+          DropdownMenuItem(
+            value: c.id,
+            child: Text('${c.code} — ${c.name}', overflow: TextOverflow.ellipsis),
+          ),
+      ],
+      onChanged: (v) {
+        if (v == null || v == _borrowerId) return;
+        setState(() {
+          _borrowerId = v;
+          _lenderId = null;
+          _requestIds.clear();
+          _errors = const {};
+          _error = null;
+        });
+      },
+    );
+  }
+
   Widget _form(BuildContext context, IcLenderOptions o) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final amount = parseRupiah(_amount.text);
     final b = o.borrower;
-    final borrowerCode = b.company?.shortCode ?? '#${widget.borrowerId}';
+    final borrowerCode = b.company?.shortCode ?? '#$_borrowerId';
     final selectedGap = _requestIds.isEmpty ? null : _gapOf(o, _requestIds);
     final money = theme.textTheme.bodyMedium?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
     return ListView(
@@ -263,6 +304,7 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
       children: [
         Text(t.icLoanInstructNote, style: pkMetaStyle(context)),
         const SizedBox(height: 12),
+        if (widget.borrowerId == null) ...[_borrowerPicker(context), const SizedBox(height: 12)],
         // PT peminjam: its availability (same §1 definition) and the receiving account check
         PkCard(
           key: const Key('icloan-borrower'),

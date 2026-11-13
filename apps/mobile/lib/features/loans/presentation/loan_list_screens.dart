@@ -369,6 +369,18 @@ class _IcLoanListScreenState extends ConsumerState<IcLoanListScreen> {
     final value = ref.watch(icLoanListProvider(_f));
     return Scaffold(
       appBar: AppBar(title: Text(t.icLoanListTitle)),
+      // user 2026-11-13: the web's "+ Perintahkan pinjaman" (Owner in ≥ 2 PTs, server `summary.canInstruct`)
+      floatingActionButton: value.value?.summary?.canInstruct == true
+          ? FloatingActionButton.extended(
+              key: const Key('icloan-list-new'),
+              onPressed: () async {
+                await context.push('/intercompany-loans/new');
+                ref.invalidate(icLoanListProvider);
+              },
+              icon: const Icon(Icons.add),
+              label: Text(t.icLoanSubmit),
+            )
+          : null,
       body: RefreshIndicator(
         onRefresh: () {
           setState(() {
@@ -385,7 +397,7 @@ class _IcLoanListScreenState extends ConsumerState<IcLoanListScreen> {
             final sum = page.summary;
             return ListView(
               key: const Key('icloan-list'),
-              padding: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.only(bottom: 88),
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
